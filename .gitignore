@@ -1,0 +1,13 @@
+# Fichiers et dossiers du backend (server)
+server/node_modules/
+server/.env
+server/uploads/
+
+# Fichiers et dossiers du frontend (client)
+client/node_modules/
+client/build/
+client/.env
+
+# Fichiers système
+.DS_Store
+npm-debug.log
