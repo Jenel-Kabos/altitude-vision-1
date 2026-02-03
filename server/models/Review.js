@@ -1,22 +1,47 @@
 const mongoose = require('mongoose');
 
-// Schéma pour les Avis
-const reviewSchema = mongoose.Schema({
-  reviewer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  rating: { type: Number, required: true, min: 1, max: 5 },
-  comment: { type: String, required: true },
-}, { timestamps: true });
+const reviewSchema = new mongoose.Schema(
+  {
+    rating: {
+      type: Number,
+      min: [1, 'La note minimale est 1'],
+      max: [5, 'La note maximale est 5'],
+      required: [true, 'Une review doit avoir une note.'],
+    },
+    comment: {
+      type: String,
+      trim: true,
+      required: [true, 'Une review doit contenir un commentaire.'],
+    },
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: [true, 'Une review doit appartenir à un auteur.'],
+    },
+    // La review concerne un élément spécifique du portfolio
+    portfolioItem: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PortfolioItem',
+      required: [true, 'Une review doit être liée à un élément du portfolio.'],
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-// Schéma pour les Projets du Portfolio
-const projectSchema = mongoose.Schema({
-  title: { type: String, required: true },
-  category: { type: String, enum: ['Branding', 'Digital', 'Média'], required: true },
-  description: { type: String, required: true },
-  images: [String],
-  videoUrl: String,
-  reviews: [reviewSchema], // Avis intégrés directement
-}, { timestamps: true });
+// Index unique pour empêcher qu’un même utilisateur laisse plusieurs reviews sur le même portfolioItem
+reviewSchema.index({ portfolioItem: 1, author: 1 }, { unique: true });
 
-const Project = mongoose.model('Project', projectSchema);
-// Pas besoin de modèle séparé pour Review si c'est un sous-document
-module.exports = Project;
+// Pré-remplissage automatique des infos auteur pour toutes les queries "find"
+reviewSchema.pre(/^find/, function (next) {
+  this.populate({
+    path: 'author',
+    select: 'name photo', // On ne récupère que le nom et la photo de l’auteur
+  });
+  next();
+});
+
+const Review = mongoose.model('Review', reviewSchema);
+
+module.exports = Review;

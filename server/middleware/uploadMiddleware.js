@@ -1,50 +1,151 @@
+// Utilisation de CommonJS (require) au lieu de ESM (import)
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
-// 1. Configuration du stockage des fichiers
+// Définir les types de fichiers acceptés pour les pièces jointes de messages
+const MESSAGE_ATTACHMENT_TYPES = [
+    'image/', 'application/pdf', 'application/msword', 
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/zip', 'application/x-zip-compressed',
+];
+const MAX_FILE_SIZE = 1024 * 1024 * 10; // 10 Mo
+
+// Configuration du stockage sur le disque
 const storage = multer.diskStorage({
-  // Définit le dossier de destination pour les fichiers uploadés
-  destination(req, file, cb) {
-    // Les fichiers seront sauvegardés dans le dossier 'uploads'
-    // Assurez-vous que ce dossier existe à la racine de /server
-    cb(null, 'uploads/');
-  },
-  // Définit le nom du fichier une fois sauvegardé sur le serveur
-  filename(req, file, cb) {
-    // Pour éviter les conflits de noms, on crée un nom unique :
-    // nomDuChamp-DateActuelle.extensionOriginale
-    // ex: image-166788T120000.jpg
-    cb(
-      null,
-      `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`
-    );
-  },
+  destination(req, file, cb) {
+    let uploadPath = 'uploads/';
+    
+    // 🎯 Détection intelligente du type d'upload
+    if (req.baseUrl.includes('/users') || req.path.includes('updateMe')) {
+      uploadPath = 'uploads/users/'; // Ex: photos de profil
+    } else if (req.baseUrl.includes('/messages')) { // ⬅️ NOUVEAU : Messages/Pièces jointes
+        uploadPath = 'uploads/attachments/'; 
+    } else if (req.baseUrl.includes('/properties')) {
+      uploadPath = 'uploads/properties/';
+    } else if (req.baseUrl.includes('/services')) {
+      uploadPath = 'uploads/services/';
+    } else if (req.baseUrl.includes('/events')) {
+      uploadPath = 'uploads/events/';
+    } else if (req.baseUrl.includes('/documents')) {
+      uploadPath = 'uploads/documents/';
+    }
+    
+    // Créer le chemin absolu
+    const fullPath = path.join(__dirname, '..', uploadPath);
+    
+    // Créer le dossier s'il n'existe pas
+    if (!fs.existsSync(fullPath)) {
+      fs.mkdirSync(fullPath, { recursive: true });
+      console.log(`📁 [Upload] Dossier créé: ${fullPath}`);
+    }
+    
+    console.log(`📤 [Upload] Destination: ${fullPath}`);
+    console.log(`📤 [Upload] Route: ${req.baseUrl}${req.path}`);
+    
+    cb(null, fullPath);
+  },
+  filename(req, file, cb) {
+    // Utilisation de l'ID utilisateur (si disponible via protect) et du timestamp
+    const userId = req.user ? req.user.id : 'anonymous';
+    const safeOriginalName = file.originalname.replace(/\s/g, '_');
+    const uniqueName = `${userId}-${Date.now()}-${safeOriginalName}`;
+    
+    console.log(`📝 [Upload] Nom du fichier: ${uniqueName}`);
+    console.log(`📝 [Upload] Fichier original: ${file.originalname}`);
+    console.log(`📝 [Upload] Type MIME: ${file.mimetype}`);
+    
+    cb(null, uniqueName);
+  },
 });
 
-// 2. Fonction de validation pour n'accepter que les images
-function checkFileType(file, cb) {
-  // Types de fichiers autorisés (expressions régulières)
-  const filetypes = /jpeg|jpg|png|gif/;
-  // Vérifier l'extension du fichier (ex: .png)
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  // Vérifier le type MIME du fichier (ex: image/jpeg)
-  const mimetype = filetypes.test(file.mimetype);
-
-  if (extname && mimetype) {
-    // Si c'est une image, on autorise l'upload
-    return cb(null, true);
-  } else {
-    // Sinon, on rejette l'upload avec un message d'erreur
-    cb(new Error('Erreur : Seules les images sont autorisées !'));
-  }
+/**
+ * Filtre personnalisé : images pour les avatars/propriétés, tout pour les messages
+ */
+function checkFileType(req, file, cb) {
+  console.log(`🔍 [Upload] Vérification du type: ${file.mimetype}`);
+  
+  // Logique spécifique aux PIÈCES JOINTES de messages
+  if (req.baseUrl.includes('/messages')) {
+    if (MESSAGE_ATTACHMENT_TYPES.some(type => file.mimetype.startsWith(type))) {
+      console.log(`✅ [Upload] Fichier accepté (Pièce jointe): ${file.originalname}`);
+      return cb(null, true);
+    } else {
+      console.log(`❌ [Upload] Fichier rejeté (Pièce jointe): ${file.originalname}`);
+      cb(new Error('Erreur : Ce format de pièce jointe n\'est pas autorisé.'));
+    }
+  } 
+  // Logique par défaut (pour les autres routes comme /users, /properties, etc.)
+  else if (file.mimetype.startsWith('image/')) {
+    console.log(`✅ [Upload] Fichier accepté (Image): ${file.originalname}`);
+    return cb(null, true);
+  } else {
+    console.log(`❌ [Upload] Fichier rejeté (Image): ${file.originalname} (type: ${file.mimetype})`);
+    cb(new Error('Erreur : Seules les images sont autorisées sur cette route !'));
+  }
 }
 
-// 3. Initialisation de multer avec la configuration
+// Initialisation de Multer avec la configuration complète
 const upload = multer({
-  storage: storage,
-  fileFilter: function (req, file, cb) {
-    checkFileType(file, cb);
-  },
+  storage,
+  limits: {
+    fileSize: MAX_FILE_SIZE, // Limite la taille des fichiers à 10 Mo
+  },
+  fileFilter: function (req, file, cb) {
+    checkFileType(req, file, cb); // On passe req pour la logique dynamique
+  },
 });
 
+/**
+ * Fonction pour supprimer les fichiers du disque en cas d'erreur de transaction ou de validation.
+ * @param {Array<object>} files Tableau d'objets fichiers (req.files)
+ */
+const cleanupUploadedFiles = (files) => {
+    if (Array.isArray(files) && files.length > 0) {
+        files.forEach(file => {
+            fs.unlink(file.path, (err) => {
+                if (err) console.error("⚠️ [Cleanup Error] Échec de la suppression du fichier:", file.path, err.message);
+                else console.log(`🗑️ [Cleanup] Fichier supprimé: ${file.path}`);
+            });
+        });
+    }
+};
+
+// Middleware de gestion des erreurs Multer
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error('❌ [Multer Error]:', err.message, err.code);
+    // Tenter de nettoyer les fichiers si une erreur Multer survient après le stockage
+    cleanupUploadedFiles(req.files); 
+
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        status: 'error',
+        message: `Fichier trop volumineux. Taille maximale: ${MAX_FILE_SIZE / (1024 * 1024)} MB.`
+      });
+    }
+    return res.status(400).json({
+      status: 'error',
+      message: `Erreur d'upload: ${err.message}`
+    });
+  } else if (err) {
+    console.error('❌ [Upload Error]:', err.message);
+    // Tenter de nettoyer les fichiers pour toute autre erreur (ex: fileFilter)
+    cleanupUploadedFiles(req.files);
+    return res.status(400).json({
+      status: 'error',
+      message: err.message
+    });
+  }
+  next();
+};
+
+// Exporter les middlewares d'upload spécifiques aux besoins des messages
+const uploadAttachments = upload.array('attachments', 5); // Nom du champ 'attachments', max 5 fichiers
+
+// Utilisation de module.exports au lieu de export default
 module.exports = upload;
+module.exports.handleMulterError = handleMulterError;
+module.exports.uploadAttachments = uploadAttachments;
+module.exports.cleanupUploadedFiles = cleanupUploadedFiles;

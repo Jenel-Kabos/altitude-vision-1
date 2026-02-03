@@ -1,25 +1,30 @@
 import React from 'react';
 
 /**
- * A simple loading spinner component.
- * It's centered within a container for easy use on loading pages.
+ * A simple, reusable loading spinner component.
+ * @param {object} props - The component props.
+ * @param {string} [props.size='w-16 h-16'] - TailwindCSS size classes for the spinner.
+ * @param {string} [props.className] - Additional classes for the container.
  */
-const Spinner = () => {
+const Spinner = ({ size = 'w-16 h-16', className = '' }) => {
   return (
-    <div className="flex justify-center items-center p-10">
-      <div 
-        className="
-          w-16 h-16               // Sets the size of the spinner
-          border-8                // Sets the thickness of the border
-          border-gray-200         // Sets the color of the main circle
-          border-t-primary        // Sets the color of the top part, creating the spinning effect
-          rounded-full            // Makes the element a perfect circle
-          animate-spin            // Applies the spinning animation from TailwindCSS
-        "
+    <div className={`flex justify-center items-center p-10 ${className}`}>
+      <div
+        className={`
+          border-8 
+          border-gray-200 
+          border-t-primary 
+          rounded-full 
+          animate-spin
+          ${size}
+        `}
+        role="status"
+        aria-label="Chargement en cours"
       >
+        <span className="sr-only">Chargement...</span>
       </div>
     </div>
   );
 };
 
-export default Spinner;
+export default React.memo(Spinner);

@@ -1,40 +1,99 @@
 const Service = require('../models/Service');
 
-// @desc    Récupérer tous les services
-// @route   GET /api/services
-// @access  Public
-const getServices = async (req, res, next) => {
-    try {
-        const services = await Service.find({});
-        res.json(services);
-    } catch (error) {
-        next(error);
+// --- GET ALL SERVICES ---
+// Can be filtered by pole, e.g., /api/services?pole=Altcom
+exports.getAllServices = async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.pole) {
+      filter.pole = req.query.pole;
     }
+
+    const services = await Service.find(filter);
+
+    res.status(200).json({
+      status: 'success',
+      results: services.length,
+      data: {
+        services,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 };
 
-// @desc    (Admin) Créer un nouveau service
-// @route   POST /api/services
-// @access  Privé/Admin
-const createService = async (req, res, next) => {
-    const { name, description, category, basePrice, imageUrl, options } = req.body;
-    
+// --- CREATE A NEW SERVICE ---
+// Accessible by: Admin, Collaborateur
+exports.createService = async (req, res) => {
+  try {
+    const newService = await Service.create(req.body);
+    res.status(201).json({
+      status: 'success',
+      data: {
+        service: newService,
+      },
+    });
+  } catch (error) {
+    res.status(400).json({ status: 'fail', message: error.message });
+  }
+};
+
+// --- GET A SINGLE SERVICE ---
+exports.getService = async (req, res) => {
     try {
-        const service = new Service({
-            name,
-            description,
-            category,
-            basePrice,
-            imageUrl,
-            options
+        const service = await Service.findById(req.params.id);
+        if (!service) {
+            return res.status(404).json({ status: 'fail', message: 'No service found with that ID' });
+        }
+        res.status(200).json({
+            status: 'success',
+            data: { service }
         });
-
-        const createdService = await service.save();
-        res.status(201).json(createdService);
     } catch (error) {
-        next(error);
+        res.status(500).json({ status: 'error', message: error.message });
     }
 };
 
+// --- UPDATE A SERVICE ---
+// Accessible by: Admin, Collaborateur
+exports.updateService = async (req, res) => {
+  try {
+    const service = await Service.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
 
-// VÉRIFIEZ BIEN QUE CETTE LIGNE EST CORRECTE ET COMPLÈTE
-module.exports = { getServices, createService };
+    if (!service) {
+      return res.status(404).json({ status: 'fail', message: 'No service found with that ID' });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        service,
+      },
+    });
+  } catch (error) {
+    res.status(400).json({ status: 'fail', message: error.message });
+  }
+};
+
+// --- DELETE A SERVICE ---
+// Accessible by: Admin
+exports.deleteService = async (req, res) => {
+    try {
+        const service = await Service.findByIdAndDelete(req.params.id);
+
+        if (!service) {
+            return res.status(404).json({ status: 'fail', message: 'No service found with that ID' });
+        }
+
+        res.status(204).json({
+            status: 'success',
+            data: null,
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};

@@ -2,11 +2,15 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
+    // Configure Mongoose to avoid deprecation warnings
+    mongoose.set('strictQuery', true);
+
     const conn = await mongoose.connect(process.env.MONGO_URI);
-    console.log(`✅ MongoDB connecté: ${conn.connection.host}`.cyan.underline);
+
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error(`❌ Erreur de connexion à MongoDB: ${error.message}`.red.bold);
-    process.exit(1);
+    console.error(`Error connecting to MongoDB: ${error.message}`);
+    process.exit(1); // Exit process with failure
   }
 };
 

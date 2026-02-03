@@ -1,145 +1,147 @@
-const Project = require('../models/Project');
+// --- controllers/projectController.js ---
 
-// @desc    Récupérer tous les projets du portfolio
-// @route   GET /api/projects
-// @access  Public
-const getProjects = async (req, res, next) => {
-    try {
-        const projects = await Project.find({});
-        res.json(projects);
-    } catch (error) {
-        next(error);
-    }
-};
+import asyncHandler from 'express-async-handler';
+import Project from '../models/projectModel.js';
+import AppError from '../utils/appError.js';
 
-// @desc    Récupérer un projet par son ID
-// @route   GET /api/projects/:id
-// @access  Public
-const getProjectById = async (req, res, next) => {
-    try {
-        const project = await Project.findById(req.params.id);
-        if (project) {
-            res.json(project);
-        } else {
-            res.status(404);
-            throw new Error('Projet non trouvé');
-        }
-    } catch (error) {
-        next(error);
-    }
-};
+/**
+ * @desc    Create a new project
+ * @route   POST /api/projects
+ * @access  Private
+ */
+const createProject = asyncHandler(async (req, res, next) => {
+  const { name, description, property, service } = req.body;
 
-// @desc    (Admin) Créer un nouveau projet pour le portfolio
-// @route   POST /api/projects
-// @access  Privé/Admin
-const createProject = async (req, res, next) => {
-    const { title, category, description, imageUrl } = req.body;
+  if (!name || !property || !service) {
+    return next(new AppError('Le nom, la propriété et le service sont requis.', 400));
+  }
 
-    try {
-        const project = new Project({
-            title,
-            category,
-            description,
-            imageUrl,
-        });
+  const project = await Project.create({
+    user: req.user._id, // Assigner le projet à l'utilisateur connecté
+    name,
+    description,
+    property,
+    service,
+  });
 
-        const createdProject = await project.save();
-        res.status(201).json(createdProject);
-    } catch (error) {
-        next(error);
-    }
-};
+  res.status(201).json({
+    success: true,
+    data: project,
+  });
+});
 
-// @desc    (Admin) Mettre à jour un projet
-// @route   PUT /api/projects/:id
-// @access  Privé/Admin
-const updateProject = async (req, res, next) => {
-    const { title, category, description, imageUrl } = req.body;
-    try {
-        const project = await Project.findById(req.params.id);
-        if (project) {
-            project.title = title;
-            project.category = category;
-            project.description = description;
-            project.imageUrl = imageUrl;
+/**
+ * @desc    Get logged-in user's projects
+ * @route   GET /api/projects/my-projects
+ * @access  Private
+ */
+const getMyProjects = asyncHandler(async (req, res, next) => {
+  const projects = await Project.find({ user: req.user._id })
+    .populate('service', 'name')
+    .populate('property', 'address');
 
-            const updatedProject = await project.save();
-            res.json(updatedProject);
-        } else {
-            res.status(404);
-            throw new Error('Projet non trouvé');
-        }
-    } catch (error) {
-        next(error);
-    }
-};
+  res.status(200).json({
+    success: true,
+    count: projects.length,
+    data: projects,
+  });
+});
 
-// @desc    (Admin) Supprimer un projet
-// @route   DELETE /api/projects/:id
-// @access  Privé/Admin
-const deleteProject = async (req, res, next) => {
-    try {
-        const project = await Project.findById(req.params.id);
-        if (project) {
-            await project.remove();
-            res.json({ message: 'Projet supprimé avec succès' });
-        } else {
-            res.status(404);
-            throw new Error('Projet non trouvé');
-        }
-    } catch (error) {
-        next(error);
-    }
-};
+/**
+ * @desc    Get all projects
+ * @route   GET /api/projects/all
+ * @access  Private/Admin
+ */
+const getAllProjects = asyncHandler(async (req, res, next) => {
+  const projects = await Project.find({})
+    .populate('user', 'name email')
+    .populate('service', 'name');
 
-// @desc    Créer un nouvel avis sur un projet
-// @route   POST /api/projects/:id/reviews
-// @access  Privé (utilisateurs connectés)
-const createProjectReview = async (req, res, next) => {
-    const { rating, comment } = req.body;
+  res.status(200).json({
+    success: true,
+    count: projects.length,
+    data: projects,
+  });
+});
 
-    try {
-        const project = await Project.findById(req.params.id);
+/**
+ * @desc    Get a single project by ID
+ * @route   GET /api/projects/:id
+ * @access  Private
+ */
+const getProjectById = asyncHandler(async (req, res, next) => {
+  const project = await Project.findById(req.params.id);
 
-        if (!project) {
-            res.status(404);
-            throw new Error('Projet non trouvé');
-        }
+  if (!project) {
+    return next(new AppError('Aucun projet trouvé avec cet ID.', 404));
+  }
 
-        const alreadyReviewed = project.reviews.find(
-            (r) => r.user.toString() === req.user._id.toString()
-        );
+  // SÉCURITÉ : L'utilisateur doit être le propriétaire du projet ou un admin.
+  if (project.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    return next(new AppError('Action non autorisée.', 403));
+  }
 
-        if (alreadyReviewed) {
-            res.status(400);
-            throw new Error('Vous avez déjà évalué ce projet.');
-        }
+  res.status(200).json({
+    success: true,
+    data: project,
+  });
+});
 
-        const review = {
-            name: req.user.name,
-            rating: Number(rating),
-            comment,
-            user: req.user._id,
-        };
+/**
+ * @desc    Update a project
+ * @route   PUT /api/projects/:id
+ * @access  Private
+ */
+const updateProject = asyncHandler(async (req, res, next) => {
+  const project = await Project.findById(req.params.id);
 
-        project.reviews.push(review);
-        project.numReviews = project.reviews.length;
-        project.rating = project.reviews.reduce((acc, item) => item.rating + acc, 0) / project.reviews.length;
+  if (!project) {
+    return next(new AppError('Aucun projet trouvé avec cet ID.', 404));
+  }
 
-        await project.save();
-        res.status(201).json({ message: 'Avis ajouté avec succès !' });
+  // SÉCURITÉ : Seul le propriétaire ou un admin peut modifier.
+  if (project.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    return next(new AppError('Action non autorisée.', 403));
+  }
 
-    } catch (error) {
-        next(error);
-    }
-};
+  const updatedProject = await Project.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
 
-// Exporter toutes les fonctions
-module.exports = { 
-    getProjects, 
-    getProjectById,
-    createProject, 
-    updateProject,
-    deleteProject,
-    createProjectReview 
+  res.status(200).json({
+    success: true,
+    data: updatedProject,
+  });
+});
+
+/**
+ * @desc    Delete a project
+ * @route   DELETE /api/projects/:id
+ * @access  Private
+ */
+const deleteProject = asyncHandler(async (req, res, next) => {
+  const project = await Project.findById(req.params.id);
+
+  if (!project) {
+    return next(new AppError('Aucun projet trouvé avec cet ID.', 404));
+  }
+
+  // SÉCURITÉ : Seul le propriétaire ou un admin peut supprimer.
+  if (project.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    return next(new AppError('Action non autorisée.', 403));
+  }
+
+  await project.deleteOne();
+
+  res.status(200).json({ success: true, message: 'Projet supprimé.' });
+});
+
+export {
+  createProject,
+  getMyProjects,
+  getAllProjects,
+  getProjectById,
+  updateProject,
+  deleteProject,
 };

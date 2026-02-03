@@ -1,25 +1,36 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import React from "react";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { Loader2 } from "lucide-react";
 
 /**
- * Ce composant vérifie si un utilisateur est authentifié.
- * S'il l'est, il affiche les composants enfants (la page demandée).
- * Sinon, il redirige vers la page de connexion.
+ * ✅ ProtectedRoute
+ * Protège les routes accessibles uniquement aux utilisateurs connectés.
+ * - Affiche un spinner pendant le chargement
+ * - Redirige vers /login si non connecté
+ * - Conserve la route d’origine pour redirection post-login
  */
-const ProtectedRoute = ({ children }) => {
-  const { userInfo } = useAuth();
+const ProtectedRoute = () => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
 
-  if (!userInfo) {
-    // L'utilisateur n'est pas connecté.
-    // On le redirige vers /login. L'option 'replace' évite que l'utilisateur
-    // puisse revenir à la page précédente (la page protégée) avec le bouton "retour".
-    return <Navigate to="/login" replace />;
+  // 🌀 Affichage pendant la vérification de session
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+        <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-3" />
+        <p className="text-gray-600 text-lg">Vérification de votre session...</p>
+      </div>
+    );
   }
 
-  // L'utilisateur est connecté, on peut afficher la page.
-  return children;
+  // 🚫 Si non connecté → redirection vers /login
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // ✅ Utilisateur connecté → autorisation d'accès
+  return <Outlet />;
 };
 
 export default ProtectedRoute;
-

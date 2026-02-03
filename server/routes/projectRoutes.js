@@ -1,27 +1,40 @@
-const express = require('express');
-const router = express.Router();
-const { 
-  getProjects, 
-  getProjectById,
+// --- routes/projectRoutes.js ---
+
+import express from 'express';
+import {
   createProject,
+  getMyProjects,
+  getAllProjects,
+  getProjectById,
   updateProject,
   deleteProject,
-  createProjectReview
-} = require('../controllers/projectController');
-const { protect, admin } = require('../middleware/authMiddleware');
+} from '../controllers/projectController.js';
+import { protect, admin } from '../middleware/authMiddleware.js';
 
-// Route pour la collection de projets '/api/projects'
+const router = express.Router();
+
+// --- Sécurisation Globale ---
+// Toutes les routes liées aux projets nécessitent une authentification.
+router.use(protect);
+
+// --- Routes Générales ---
 router.route('/')
-  .get(getProjects)
-  .post(protect, admin, createProject);
+  .post(createProject); // Un utilisateur connecté peut créer un projet.
 
-// Routes pour un projet spécifique
+// --- Routes Spécifiques aux Rôles ---
+// Un utilisateur demande la liste de SES projets.
+router.get('/my-projects', getMyProjects);
+
+// Un admin demande la liste de TOUS les projets.
+router.get('/all', admin, getAllProjects);
+
+
+// --- Routes pour un Projet Spécifique ---
+// L'utilisateur doit être le propriétaire ou un admin pour y accéder.
+// La vérification est faite dans le controller.
 router.route('/:id')
-  .get(getProjectById) // Tout le monde peut voir un projet
-  .put(protect, admin, updateProject) // Seul un admin peut modifier
-  .delete(protect, admin, deleteProject); // Seul un admin peut supprimer
+  .get(getProjectById)
+  .put(updateProject)
+  .delete(deleteProject);
 
-// Route pour ajouter un avis à un projet spécifique
-router.route('/:id/reviews').post(protect, createProjectReview);
-
-module.e
+export default router;

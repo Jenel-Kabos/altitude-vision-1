@@ -1,10 +1,29 @@
-// Ce fichier exporte des fonctions qui génèrent le HTML de nos emails.
+// templates/quoteNotificationTemplate.js
+
+// Fonction simple pour échapper les caractères HTML
+const escapeHTML = (str) =>
+  str.replace(
+    /[&<>'"]/g,
+    (tag) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;',
+      }[tag] || tag)
+  );
 
 // Email envoyé à l'agence pour notifier d'une nouvelle demande
-const adminNotificationEmail = (quote) => {
-  // Affiche les services sélectionnés sous forme de liste HTML
+export const adminNotificationEmail = (quote) => {
   const servicesList = quote.services
-    .map(service => `<li>${service.name} - ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF' }).format(service.price)}</li>`)
+    .map(
+      (service) =>
+        `<li>${escapeHTML(service.name)} - ${new Intl.NumberFormat('fr-FR', {
+          style: 'currency',
+          currency: 'XAF',
+        }).format(service.price)}</li>`
+    )
     .join('');
 
   return `
@@ -22,12 +41,17 @@ const adminNotificationEmail = (quote) => {
       <div class="container">
         <h1>Nouvelle Demande de Devis</h1>
         <p>Vous avez reçu une nouvelle demande de devis via le site Altitude-Vision.</p>
-        <p><strong>Client :</strong> ${quote.clientName}</p>
-        <p><strong>Email du client :</strong> <a href="mailto:${quote.clientEmail}">${quote.clientEmail}</a></p>
+        <p><strong>Client :</strong> ${escapeHTML(quote.clientName)}</p>
+        <p><strong>Email du client :</strong> <a href="mailto:${escapeHTML(
+          quote.clientEmail
+        )}">${escapeHTML(quote.clientEmail)}</a></p>
         <hr>
         <h3>Détails de la demande :</h3>
         <ul>${servicesList}</ul>
-        <h3>Total Préliminaire : ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF' }).format(quote.totalPrice)}</h3>
+        <h3>Total Préliminaire : ${new Intl.NumberFormat('fr-FR', {
+          style: 'currency',
+          currency: 'XAF',
+        }).format(quote.totalPrice)}</h3>
         <hr>
         <p>Veuillez contacter le client rapidement pour finaliser le devis.</p>
       </div>
@@ -37,11 +61,17 @@ const adminNotificationEmail = (quote) => {
 };
 
 // Email de confirmation envoyé au client
-const clientConfirmationEmail = (quote) => {
+export const clientConfirmationEmail = (quote) => {
   const servicesList = quote.services
-    .map(service => `<li>${service.name} - ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF' }).format(service.price)}</li>`)
+    .map(
+      (service) =>
+        `<li>${escapeHTML(service.name)} - ${new Intl.NumberFormat('fr-FR', {
+          style: 'currency',
+          currency: 'XAF',
+        }).format(service.price)}</li>`
+    )
     .join('');
-    
+
   return `
     <!DOCTYPE html>
     <html>
@@ -55,18 +85,19 @@ const clientConfirmationEmail = (quote) => {
     <body>
       <div class="container">
         <h1>Confirmation de votre demande de devis</h1>
-        <p>Bonjour ${quote.clientName},</p>
-        <p>Nous avons bien reçu votre demande de devis pour un événement et nous vous remercions de votre confiance.</p>
+        <p>Bonjour ${escapeHTML(quote.clientName)},</p>
+        <p>Nous avons bien reçu votre demande de devis et nous vous remercions de votre confiance.</p>
         <p><strong>Voici un résumé de votre sélection :</strong></p>
         <ul>${servicesList}</ul>
-        <p><strong>Total Préliminaire : ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF' }).format(quote.totalPrice)}</strong></p>
+        <p><strong>Total Préliminaire : ${new Intl.NumberFormat('fr-FR', {
+          style: 'currency',
+          currency: 'XAF',
+        }).format(quote.totalPrice)}</strong></p>
         <hr>
-        <p>Un membre de notre équipe Mila Events vous contactera dans les plus brefs délais pour affiner les détails avec vous.</p>
+        <p>Un membre de notre équipe vous contactera dans les plus brefs délais.</p>
         <p>Cordialement,<br>L'équipe Altitude-Vision</p>
       </div>
     </body>
     </html>
   `;
 };
-
-module.exports = { adminNotificationEmail, clientConfirmationEmail };
