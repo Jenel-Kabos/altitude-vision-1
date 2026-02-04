@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // URL de base de l'API (à adapter selon ton environnement)
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://altitude-vision.onrender.com/api';
 
 /**
  * Créer un nouveau projet Altcom

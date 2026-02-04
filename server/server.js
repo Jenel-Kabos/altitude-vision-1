@@ -67,26 +67,20 @@ app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- Configuration CORS ---
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  process.env.FRONTEND_URL,
-].filter(Boolean);
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.warn(`❌ [CORS] Origine non autorisée : ${origin}`);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  })
-);
+// ============================================================
+// 🔓 CONFIGURATION CORS (MISE À JOUR)
+// ============================================================
+app.use(cors({
+  origin: [
+    "https://altitudevision.netlify.app", // Ton site en ligne
+    "http://localhost:5173",            // Ton PC (Vite)
+    "http://localhost:3000",            // Ton PC (Node/React standard)
+    process.env.FRONTEND_URL            // Sécurité supplémentaire via .env
+  ].filter(Boolean), // Retire les valeurs vides
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"]
+}));
 
 // --- Création automatique des dossiers uploads ---
 const uploadDirs = [
@@ -170,7 +164,7 @@ app.get("/", (req, res) => {
   res.status(200).json({
     status: "success",
     message: "🚀 API Altitude-Vision est en ligne.",
-    version: "1.4.0", // ✅ Version mise à jour
+    version: "1.4.1", // ✅ Version mise à jour pour le fix CORS
     environnement: process.env.NODE_ENV,
     nouveautes: [
       "✅ Emails professionnels @altitudevision.cg",

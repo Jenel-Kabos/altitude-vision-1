@@ -2,8 +2,8 @@ import axios from "axios";
 
 // Base URL dynamique et sûre
 const BASE_URL = typeof import.meta === 'undefined' 
-  ? "http://localhost:5000/api" 
-  : import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  ? "https://altitude-vision.onrender.com/api" 
+  : import.meta.env.VITE_API_URL || "https://altitude-vision.onrender.com/api";
 
 console.log("🔧 API Base URL configurée:", BASE_URL);
 

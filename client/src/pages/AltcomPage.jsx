@@ -29,7 +29,7 @@ import PortfolioCard from "../components/PortfolioCard";
 import ReviewCard from "../components/ReviewCard";
 import AltcomProjectFormModal from "../components/AltcomProjectFormModal";
 
-const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
 
 const PORTFOLIO_PER_PAGE = 6;
 

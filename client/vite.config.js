@@ -20,7 +20,7 @@ export default defineConfig({
       // Toutes les requêtes qui commencent par '/api' seront redirigées.
       '/api': {
         // L'adresse de votre serveur backend.
-        target: 'http://localhost:5000',
+        target: 'https://altitude-vision.onrender.com',
         // Nécessaire pour que le backend accepte la requête redirigée.
         changeOrigin: true,
         // Ne réécrit pas le chemin, '/api/users' reste '/api/users'.
@@ -31,7 +31,7 @@ export default defineConfig({
       // Redirige les requêtes pour les images (ou autres fichiers statiques)
       // vers le backend.
       '/uploads': {
-        target: 'http://localhost:5000',
+        target: 'https://altitude-vision.onrender.com',
         changeOrigin: true,
       }
     },

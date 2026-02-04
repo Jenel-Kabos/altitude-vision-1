@@ -4,7 +4,7 @@ import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import { RotateCcw, Ban } from 'lucide-react'; 
 
-const BASE_API_URL = 'http://localhost:5000/api/admin/owners'; 
+const BASE_API_URL = 'https://altitude-vision.onrender.com/api/admin/owners'; 
 
 const ActiveUsersPage = () => {
     const [activeUsers, setActiveUsers] = useState([]);

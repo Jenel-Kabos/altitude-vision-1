@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api', // Votre URL API
+  baseURL: 'https://altitude-vision.onrender.com/api', // Votre URL API
 });
 
 // Intercepteur pour ajouter le token à chaque requête

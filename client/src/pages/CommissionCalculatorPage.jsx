@@ -9,7 +9,7 @@ const CommissionCalculatorPage = () => {
   const isLoggedIn = isAuthenticated();
 
   // Définissons nos règles de calcul
-  const AGENCY_FEE_PERCENTAGE = 0.05; // 5% de commission pour l'agence (exemple)
+  const AGENCY_FEE_PERCENTAGE = 0.1; // 10% de commission pour l'agence (exemple)
   const OWNER_SHARE_PERCENTAGE = 0.30; // 30% de cette commission pour l'apporteur d'affaires
 
   // Calculs

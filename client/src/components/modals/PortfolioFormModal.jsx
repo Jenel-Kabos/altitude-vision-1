@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { createPortfolioItem, updatePortfolioItem } from '../../services/portfolioService';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
 
 const CATEGORIES = [
   'Communication Digitale',

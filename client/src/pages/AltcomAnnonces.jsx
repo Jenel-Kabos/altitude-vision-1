@@ -19,7 +19,7 @@ import {
 import { getAllPortfolioItems } from '../services/portfolioService';
 
 const ITEMS_PER_PAGE = 12;
-const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
 
 // 🔧 FONCTION UTILITAIRE POUR CONSTRUIRE L'URL DE L'IMAGE CORRECTEMENT
 const getImageUrl = (imagePath) => {

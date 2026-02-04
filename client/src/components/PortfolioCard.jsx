@@ -5,7 +5,7 @@ import { Star, Calendar, User, Tag, ExternalLink } from 'lucide-react';
 import LikeButton from './likes/LikeButton'; // ✅ AJOUT
 
 // 🔧 CORRECTION: Utilisation correcte de BACKEND_URL
-const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
 
 console.log('🔧 [PortfolioCard] BACKEND_URL:', BACKEND_URL);
 

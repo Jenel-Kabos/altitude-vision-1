@@ -12,7 +12,7 @@ import PortfolioCard from './PortfolioCard';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
 
 console.log('🔧 [HomeSlider] BACKEND_URL configuré:', BACKEND_URL);
 
