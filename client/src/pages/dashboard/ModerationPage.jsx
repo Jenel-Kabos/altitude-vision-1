@@ -1,6 +1,7 @@
 // src/pages/ModerationPage.jsx
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+// 1. On remplace axios par ton service API configuré
+import api from '../services/api'; 
 import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
 
 const ModerationPage = () => {
@@ -12,18 +13,15 @@ const ModerationPage = () => {
   const [selectedPole, setSelectedPole] = useState('Tous');
   const [stats, setStats] = useState({ total: 0, Altimmo: 0, MilaEvents: 0, Altcom: 0 });
 
-  const API_URL = '/api/properties/status/pending'; // ✅ URL CORRIGÉE
-
   const poles = ['Tous', 'Altimmo', 'MilaEvents', 'Altcom'];
 
   // Récupération des propriétés en attente
   const fetchProperties = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // 2. Plus besoin de l'URL complète ni du header Authorization manuel
+      // api.js s'occupe de tout (Render URL + Token)
+      const res = await api.get('/properties/status/pending');
       
       const props = res.data.data.properties;
       setProperties(props);
@@ -41,7 +39,8 @@ const ModerationPage = () => {
       console.log('✅ [ModerationPage] Propriétés chargées:', newStats);
     } catch (err) {
       console.error('❌ [ModerationPage] Erreur:', err);
-      setError(err.response?.data?.message || err.message);
+      // api.js gère déjà certaines erreurs, mais on garde l'affichage local
+      setError(err.response?.data?.message || "Impossible de charger les annonces.");
     } finally {
       setLoading(false);
     }
@@ -63,22 +62,30 @@ const ModerationPage = () => {
   // Valider ou rejeter une propriété
   const handleModeration = async (id, action) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.patch(
-        `/api/properties/${id}/${action}`, // ✅ URL CORRIGÉE
-        {}, 
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      // 3. Appel simplifié via api.js
+      await api.patch(`/properties/${id}/${action}`);
 
       // Supprimer la propriété de la liste
-      setProperties(properties.filter((p) => p._id !== id));
+      const updatedProperties = properties.filter((p) => p._id !== id);
+      setProperties(updatedProperties);
+      
+      // Mettre à jour les stats instantanément sans recharger
+      const propertyToRemove = properties.find(p => p._id === id);
+      if (propertyToRemove) {
+        setStats(prev => ({
+            ...prev,
+            total: prev.total - 1,
+            [propertyToRemove.pole]: prev[propertyToRemove.pole] - 1
+        }));
+      }
+
       setSelectedProperty(null);
       
-      // Afficher un message de succès
+      // Afficher un message de succès (tu pourrais utiliser toast ici plus tard)
       alert(`Annonce ${action === 'validate' ? 'validée' : 'rejetée'} avec succès !`);
     } catch (err) {
       console.error('❌ [ModerationPage] Erreur modération:', err);
-      alert(err.response?.data?.message || err.message);
+      alert(err.response?.data?.message || "Une erreur est survenue.");
     }
   };
 
