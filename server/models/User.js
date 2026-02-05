@@ -200,3 +200,5 @@ userSchema.methods.verifyOwner = async function () {
 // ======================================================
 const User = mongoose.model('User', userSchema);
 module.exports = User;
+
+// Fin du fichier User.js (Mise à jour Proprietaire)
