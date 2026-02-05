@@ -47,12 +47,13 @@ exports.createProperty = asyncHandler(async (req, res, next) => {
     console.log("👤 User:", req.user ? `${req.user.id} (${req.user.role})` : 'Non défini');
     console.log("-------------------------------");
     
-    // 1. Gérer les images
+    // 1. Gérer les images (✅ MODIFICATION CLOUDINARY)
+    // Cloudinary renvoie l'URL complète dans 'file.path'
     const imagePaths = req.files 
-        ? req.files.map(file => `/uploads/properties/${file.filename}`)
+        ? req.files.map(file => file.path) 
         : [];
     
-    console.log("🖼️ Images uploadées:", imagePaths);
+    console.log("🖼️ Images uploadées (Cloudinary):", imagePaths);
     
     // 2. Préparer les données
     const { 
@@ -337,14 +338,14 @@ exports.updateProperty = asyncHandler(async (req, res, next) => {
         
         console.log("🧹 [updateProperty] Champs exclus supprimés");
         
-        // 4. Gérer les nouvelles images uploadées
+        // 4. Gérer les nouvelles images uploadées (✅ MODIFICATION CLOUDINARY)
         const newImages = req.files 
-            ? req.files.map(file => `/uploads/properties/${file.filename}`) 
+            ? req.files.map(file => file.path) // Utilisation de .path pour l'URL Cloudinary
             : [];
 
-        console.log("🖼️ [updateProperty] Nouvelles images uploadées:", newImages);
+        console.log("🖼️ [updateProperty] Nouvelles images uploadées (Cloudinary):", newImages);
 
-        // 5. ✅ CORRECTION : Gérer les images existantes à conserver
+        // 5. Gérer les images existantes à conserver
         let existingImagesToKeep = [];
         
         if (req.body.existingImages) {

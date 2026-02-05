@@ -3,21 +3,25 @@
 const express = require('express');
 const router = express.Router();
 const { protect, optionalAuth, restrictTo, adminOnly, checkPropertyOwnership } = require('../middleware/authMiddleware');
-const upload = require('../middleware/uploadMiddleware');
+
+// ✅ MODIFICATION ICI : On utilise la configuration Cloudinary
+const upload = require('../config/cloudinary');
+// (Ancienne ligne supprimée : const upload = require('../middleware/uploadMiddleware');)
+
 const {
-    createProperty,
-    getAllProperties,
-    getProperty,
-    updateProperty,
-    deleteProperty,
-    getMyProperties,
-    getPendingProperties,
-    updatePropertyStatus,
-    adminDeleteProperty,
-    getLatestProperties
+  createProperty,
+  getAllProperties,
+  getProperty,
+  updateProperty,
+  deleteProperty,
+  getMyProperties,
+  getPendingProperties,
+  updatePropertyStatus,
+  adminDeleteProperty,
+  getLatestProperties
 } = require('../controllers/propertyController');
 
-// ⭐ AJOUTE CE CODE DE DIAGNOSTIC ⭐
+// ⭐ CODE DE DIAGNOSTIC (Conservé pour debug) ⭐
 console.log('🔍 === DIAGNOSTIC DES IMPORTS ===');
 console.log('createProperty:', typeof createProperty);
 console.log('getAllProperties:', typeof getAllProperties);
@@ -65,6 +69,7 @@ router.get('/my-properties', protect, getMyProperties);
  * @route POST /api/properties
  * @description Créer une nouvelle propriété
  * @access Protected (Proprietaire ou Admin)
+ * ✅ Cloudinary gère maintenant l'upload ici
  */
 router.post('/', protect, restrictTo('AdminOnly', 'Proprietaire'), upload.array('images', 10), createProperty);
 
