@@ -1,7 +1,7 @@
-// src/pages/ModerationPage.jsx
+// src/pages/dashboard/ModerationPage.jsx
 import React, { useEffect, useState } from 'react';
-// 1. On remplace axios par ton service API configuré
-import api from '../services/api'; 
+// ✅ CORRECTION ICI : On remonte de 2 niveaux (../../) pour trouver le dossier services
+import api from '../../services/api'; 
 import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
 
 const ModerationPage = () => {
@@ -19,15 +19,14 @@ const ModerationPage = () => {
   const fetchProperties = async () => {
     setLoading(true);
     try {
-      // 2. Plus besoin de l'URL complète ni du header Authorization manuel
-      // api.js s'occupe de tout (Render URL + Token)
+      // Appel via api.js (gère automatiquement l'URL Render et le Token)
       const res = await api.get('/properties/status/pending');
       
       const props = res.data.data.properties;
       setProperties(props);
       setFilteredProperties(props);
       
-      // Calculer les statistiques
+      // Calcul des statistiques
       const newStats = {
         total: props.length,
         Altimmo: props.filter(p => p.pole === 'Altimmo').length,
@@ -39,7 +38,6 @@ const ModerationPage = () => {
       console.log('✅ [ModerationPage] Propriétés chargées:', newStats);
     } catch (err) {
       console.error('❌ [ModerationPage] Erreur:', err);
-      // api.js gère déjà certaines erreurs, mais on garde l'affichage local
       setError(err.response?.data?.message || "Impossible de charger les annonces.");
     } finally {
       setLoading(false);
@@ -62,14 +60,14 @@ const ModerationPage = () => {
   // Valider ou rejeter une propriété
   const handleModeration = async (id, action) => {
     try {
-      // 3. Appel simplifié via api.js
+      // Appel via api.js
       await api.patch(`/properties/${id}/${action}`);
 
-      // Supprimer la propriété de la liste
+      // Mise à jour locale de la liste (suppression de l'élément traité)
       const updatedProperties = properties.filter((p) => p._id !== id);
       setProperties(updatedProperties);
       
-      // Mettre à jour les stats instantanément sans recharger
+      // Mise à jour instantanée des stats
       const propertyToRemove = properties.find(p => p._id === id);
       if (propertyToRemove) {
         setStats(prev => ({
@@ -81,7 +79,6 @@ const ModerationPage = () => {
 
       setSelectedProperty(null);
       
-      // Afficher un message de succès (tu pourrais utiliser toast ici plus tard)
       alert(`Annonce ${action === 'validate' ? 'validée' : 'rejetée'} avec succès !`);
     } catch (err) {
       console.error('❌ [ModerationPage] Erreur modération:', err);
@@ -127,7 +124,6 @@ const ModerationPage = () => {
 
   return (
     <div className="p-6">
-      {/* En-tête avec statistiques */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-4">Modération des Annonces</h1>
         
@@ -151,7 +147,7 @@ const ModerationPage = () => {
           </div>
         </div>
 
-        {/* Filtres par pôle */}
+        {/* Filtres */}
         <div className="flex items-center gap-2 flex-wrap">
           <Filter className="text-gray-600" size={20} />
           <span className="text-gray-600 font-medium">Filtrer par pôle :</span>
@@ -176,7 +172,7 @@ const ModerationPage = () => {
         </div>
       </div>
 
-      {/* Liste des propriétés */}
+      {/* Liste des annonces */}
       {filteredProperties.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
           <p className="text-gray-500 text-lg">
@@ -228,7 +224,7 @@ const ModerationPage = () => {
         </div>
       )}
 
-      {/* Modal pour détails */}
+      {/* Modal Détails */}
       {selectedProperty && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-white rounded-lg w-full max-w-4xl p-6 relative max-h-[90vh] overflow-y-auto">
@@ -239,7 +235,6 @@ const ModerationPage = () => {
               &times;
             </button>
             
-            {/* Badge du pôle */}
             <span className={`inline-block mb-4 px-4 py-2 rounded-full text-sm font-bold text-white ${
               selectedProperty.pole === 'Altimmo' ? 'bg-green-500' :
               selectedProperty.pole === 'MilaEvents' ? 'bg-purple-500' :
@@ -273,7 +268,6 @@ const ModerationPage = () => {
               </div>
             </div>
 
-            {/* Galerie d'images */}
             <div className="mb-6">
               <h3 className="font-bold text-lg mb-3">Images ({selectedProperty.images?.length || 0})</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -288,7 +282,6 @@ const ModerationPage = () => {
               </div>
             </div>
 
-            {/* Boutons d'action */}
             <div className="flex justify-end gap-3 flex-wrap border-t pt-4">
               <button
                 onClick={() => handleModeration(selectedProperty._id, 'validate')}

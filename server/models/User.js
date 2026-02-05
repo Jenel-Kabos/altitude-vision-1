@@ -26,6 +26,20 @@ const userSchema = new mongoose.Schema(
             ],
         },
 
+        photo: {
+            type: String,
+            default: 'default.jpg',
+        },
+
+        role: {
+            type: String,
+            // ✅ CORRECTION ICI : 
+            // 1. 'Proprietaire' (sans accent) pour matcher ton Frontend
+            // 2. 'User' ajouté pour la compatibilité avec les anciens comptes
+            enum: ['User', 'Client', 'Proprietaire', 'Collaborateur', 'Admin', 'Prestataire'],
+            default: 'User',
+        },
+
         password: {
             type: String,
             required: [true, 'Un mot de passe est requis.'],
@@ -33,21 +47,23 @@ const userSchema = new mongoose.Schema(
             select: false,
         },
 
-        role: {
+        // ✅ AJOUT SÉCURITÉ : Validation de la confirmation du mot de passe
+        passwordConfirm: {
             type: String,
-            enum: ['Client', 'Propriétaire', 'Collaborateur', 'Admin', 'Prestataire'],
-            default: 'Client',
+            required: [true, 'Veuillez confirmer votre mot de passe'],
+            validate: {
+                // Fonctionne uniquement lors de CREATE et SAVE
+                validator: function (el) {
+                    return el === this.password;
+                },
+                message: 'Les mots de passe ne sont pas identiques !',
+            },
         },
 
         phone: {
             type: String,
             trim: true,
             default: '',
-        },
-
-        photo: {
-            type: String,
-            default: 'default.jpg',
         },
 
         bio: {
@@ -60,6 +76,7 @@ const userSchema = new mongoose.Schema(
         isActive: {
             type: Boolean,
             default: true,
+            select: false,
         },
 
         // 🔹 Indique si le propriétaire est vérifié par un administrateur
@@ -86,6 +103,8 @@ const userSchema = new mongoose.Schema(
         lastActivityAt: Date,
 
         passwordChangedAt: Date,
+        passwordResetToken: String,
+        passwordResetExpires: Date,
     },
     {
         timestamps: true,
@@ -97,7 +116,12 @@ const userSchema = new mongoose.Schema(
 // ======================================================
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
+    
+    // Hashage du mot de passe avec un coût de 12
     this.password = await bcrypt.hash(this.password, 12);
+    
+    // Suppression du champ passwordConfirm (on ne le stocke pas en base)
+    this.passwordConfirm = undefined;
     next();
 });
 
@@ -106,6 +130,8 @@ userSchema.pre('save', async function (next) {
 // ======================================================
 userSchema.pre('save', function (next) {
     if (!this.isModified('password') || this.isNew) return next();
+    
+    // On retire 1 seconde pour s'assurer que le token soit créé après le changement
     this.passwordChangedAt = Date.now() - 1000;
     next();
 });
@@ -163,7 +189,7 @@ userSchema.methods.activate = async function () {
 
 // 🔹 Vérifier un propriétaire
 userSchema.methods.verifyOwner = async function () {
-    if (this.role === 'Propriétaire') {
+    if (this.role === 'Proprietaire') { // Note: sans accent ici aussi pour matcher l'enum
         this.isVerified = true;
         await this.save({ validateBeforeSave: false });
     }
