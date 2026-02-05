@@ -23,7 +23,7 @@ const RegisterPage = () => {
       const redirect =
         auth.user.role === "Admin"
           ? "/admin"
-          : auth.user.role === "Proprietaire" // ⭐ Correction: "Proprietaire" au lieu de "Propriétaire"
+          : auth.user.role === "Proprietaire"
           ? "/mes-biens"
           : "/";
       navigate(redirect);
@@ -53,14 +53,16 @@ const RegisterPage = () => {
     setError("");
 
     try {
+      // ✅ CORRECTION ICI : Ajout de passwordConfirm
       const payload = {
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
+        passwordConfirm: formData.confirmPassword, // <-- La ligne manquante ajoutée !
         role: formData.role,
       };
       
-      console.log("📤 [Register] Envoi des données:", { ...payload, password: '***' });
+      console.log("📤 [Register] Envoi des données:", { ...payload, password: '***', passwordConfirm: '***' });
 
       const { data } = await api.post("/users/signup", payload);
 
@@ -69,11 +71,10 @@ const RegisterPage = () => {
       if (data?.data?.user && data?.token) {
         auth.login(data.data.user, data.token);
         
-        // ⭐ Correction: Redirection basée sur le rôle Mongoose (avec accents supprimés)
         const redirect =
           data.data.user.role === "Admin"
             ? "/admin"
-            : data.data.user.role === "Proprietaire" // ⭐ Sans accent
+            : data.data.user.role === "Proprietaire"
             ? "/mes-biens"
             : "/";
         

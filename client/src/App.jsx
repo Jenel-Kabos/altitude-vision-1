@@ -27,6 +27,9 @@ import NotFoundPage from "./pages/NotFoundPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import MentionsLegales from "./pages/MentionsLegales";
 
+// ✅ NOUVEL IMPORT : Page de vérification d'email
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+
 // Pages Services Altimmo
 import VenteDeBiensPage from "./pages/services/VenteDeBiensPage";
 import LocationGestionPage from "./pages/services/LocationGestionPage";
@@ -135,6 +138,9 @@ function App() {
                 {/* AUTRES */}
                 <Route path="/contact" element={<MainLayout><ContactPage /></MainLayout>} />
                 <Route path="/unauthorized" element={<MainLayout><UnauthorizedPage /></MainLayout>} />
+
+                {/* ✅ NOUVELLE ROUTE : VALIDATION EMAIL (Accessible à tous) */}
+                <Route path="/verify-email/:token" element={<MainLayout><VerifyEmailPage /></MainLayout>} />
 
                 {/* === ROUTES PUBLIQUES AUTHENTIFICATION === */}
                 <Route element={<PublicAuthRoute />}>

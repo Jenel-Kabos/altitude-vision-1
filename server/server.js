@@ -1,3 +1,5 @@
+// server.js (ou app.js)
+
 // --- Importations principales ---
 const express = require("express");
 const dotenv = require("dotenv");
@@ -28,7 +30,7 @@ const quoteRoutes = require("./routes/quoteRoutes");
 // Documents partagés
 const documentRoutes = require("./routes/documentRoutes");
 
-// Dashboard (Admin + Collaborateur)
+// ✅ DASHBOARD (Admin + Collaborateur)
 const dashboardRoutes = require("./routes/dashboardRoutes");
 
 // Likes & Commentaires
@@ -38,9 +40,8 @@ const commentRoutes = require("./routes/commentRoutes");
 // Conversations & Messagerie (Interne & Publique)
 const conversationRoutes = require("./routes/conversationRoutes");
 const messageRoutes = require("./routes/messageRoutes");
-// const internalMessageRoutes = require("./routes/internalMessageRoutes"); // ← Ancien système (peut être déprécié)
 
-// ✅ NOUVEAU : Emails internes avec brouillons et corbeille
+// Emails internes avec brouillons et corbeille
 const internalMailRoutes = require("./routes/internalMailRoutes");
 
 // Emails professionnels
@@ -68,13 +69,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ============================================================
-// 🔓 CONFIGURATION CORS (MISE À JOUR DOMAINE .AGENCY)
+// 🔓 CONFIGURATION CORS
 // ============================================================
 app.use(cors({
   origin: [
-    "https://altitudevision.agency",       // <--- TON NOUVEAU DOMAINE (Important !)
-    "https://www.altitudevision.agency",   // <--- AVEC WWW (Sécurité)
-    "https://altitudevision.netlify.app",  // (Garde l'ancien au cas où)
+    "https://altitudevision.agency",       // Ton domaine principal
+    "https://www.altitudevision.agency",   // Avec www
+    "https://altitudevision.netlify.app",  // Netlify (backup)
     "http://localhost:5173",             
     "http://localhost:3000",
     process.env.FRONTEND_URL
@@ -92,7 +93,7 @@ const uploadDirs = [
   path.join(__dirname, "uploads/services"),
   path.join(__dirname, "uploads/events"),
   path.join(__dirname, "uploads/documents"),
-  path.join(__dirname, "uploads/internal-mails"), // ✅ NOUVEAU : Dossier pour les emails internes
+  path.join(__dirname, "uploads/internal-mails"),
 ];
 
 uploadDirs.forEach((dir) => {
@@ -105,8 +106,7 @@ uploadDirs.forEach((dir) => {
 // --- Gestion des fichiers statiques ---
 app.use("/uploads", (req, res, next) => {
   const filePath = path.join(__dirname, "uploads", req.path);
-  const fileExists = fs.existsSync(filePath);
-  if (!fileExists) console.warn(`⚠️ Fichier introuvable: ${filePath}`);
+  // Petite vérification silencieuse pour éviter les crashs si fichier manquant
   next();
 });
 
@@ -116,7 +116,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // 🧭 ROUTES PRINCIPALES
 // ============================================================
 
-// ✅ Utilisateurs (Standard & Admin)
+// ✅ Utilisateurs (Auth, Profil, Admin)
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 
@@ -137,25 +137,22 @@ app.use("/api/quotes", quoteRoutes);
 // 📂 Documents partagés
 app.use("/api/documents", documentRoutes);
 
-// 🧩 Dashboard Admin/Collaborateur
+// 📊 DASHBOARD (Statistiques)
 app.use("/api/dashboard", dashboardRoutes);
 
-// 💬 Messagerie & Communication
+// 💬 Messagerie
 app.use("/api/conversations", conversationRoutes);
-app.use("/api/messages", messageRoutes); // Messages publics ou clients (conversations en temps réel)
-// app.use("/api/internal-messages", internalMessageRoutes); // ← Ancien système (commenté, peut être supprimé)
-
-// ✅ NOUVEAU : Emails internes avec gestion complète (brouillons, corbeille, favoris)
-app.use("/api/internal-mails", internalMailRoutes);
+app.use("/api/messages", messageRoutes);
+app.use("/api/internal-mails", internalMailRoutes); // Emails internes
 
 // 📧 Emails professionnels
 app.use("/api/company-emails", companyEmailRoutes);
 
-// ❤️ Likes & 💭 Commentaires
+// ❤️ Likes & Commentaires
 app.use("/api/likes", likeRoutes);
 app.use("/api/comments", commentRoutes);
 
-// Contact
+// 📞 Contact
 app.use('/api/contact', contactRoutes);
 
 
@@ -166,87 +163,54 @@ app.get("/", (req, res) => {
   res.status(200).json({
     status: "success",
     message: "🚀 API Altitude-Vision est en ligne.",
-    version: "1.4.1", // ✅ Version mise à jour pour le fix CORS
+    version: "1.5.0", // Nouvelle version
     environnement: process.env.NODE_ENV,
-    nouveautes: [
-      "✅ Emails professionnels @altitudevision.cg",
-      "✅ Messagerie interne des collaborateurs",
-      "✅ Système d'emails internes avec brouillons et corbeille", // ✅ NOUVEAU
-      "✅ Gestion des pièces jointes (max 5 fichiers, 10MB chacun)", // ✅ NOUVEAU
-      "✅ Logs détaillés des fichiers statiques et CORS",
-    ],
-    routes_disponibles: {
-      emails_internes: "/api/internal-mails",
-      conversations: "/api/messages",
-      emails_professionnels: "/api/company-emails",
-      dashboard: "/api/dashboard",
-      documents: "/api/documents"
+    etat: {
+        database: "Connectée",
+        dashboard: "Actif",
+        emails: "Actifs"
     }
   });
 });
 
-// --- Route de diagnostic des uploads (DEV uniquement) ---
+// --- Routes de Debug (Dev uniquement) ---
 if (process.env.NODE_ENV === "development") {
+  // Debug Uploads
   app.get("/api/debug/uploads", (req, res) => {
     const uploadsPath = path.join(__dirname, "uploads");
-
     const listFiles = (dir, basePath = "") => {
-      const files = [];
-      const items = fs.readdirSync(dir);
-      for (const item of items) {
-        const fullPath = path.join(dir, item);
-        const relativePath = path.join(basePath, item);
-        const stat = fs.statSync(fullPath);
-        if (stat.isDirectory()) {
-          files.push(...listFiles(fullPath, relativePath));
-        } else {
-          files.push({
-            path: relativePath.replace(/\\/g, "/"),
-            size: stat.size,
-            modified: stat.mtime,
-          });
-        }
-      }
+      let files = [];
+      try {
+          const items = fs.readdirSync(dir);
+          for (const item of items) {
+            const fullPath = path.join(dir, item);
+            const relativePath = path.join(basePath, item);
+            const stat = fs.statSync(fullPath);
+            if (stat.isDirectory()) {
+              files.push(...listFiles(fullPath, relativePath));
+            } else {
+              files.push({ path: relativePath.replace(/\\/g, "/"), size: stat.size });
+            }
+          }
+      } catch (e) { console.error(e); }
       return files;
     };
-
-    try {
-      const files = listFiles(uploadsPath);
-      res.json({
-        status: "success",
-        totalFiles: files.length,
-        files,
-      });
-    } catch (error) {
-      res.status(500).json({ status: "error", message: error.message });
-    }
+    res.json({ status: "success", files: listFiles(uploadsPath) });
   });
 
-  // ✅ NOUVEAU : Route de diagnostic des emails internes
+  // Debug Emails Internes
   app.get("/api/debug/internal-mails", async (req, res) => {
     try {
-      const InternalMail = require("./models/InternalMail");
-      
+      // Chargement dynamique pour éviter erreur si modèle pas encore créé
+      const InternalMail = require("./models/InternalMail"); 
       const stats = {
         total: await InternalMail.countDocuments(),
         drafts: await InternalMail.countDocuments({ isDraft: true }),
-        sent: await InternalMail.countDocuments({ isDraft: false, isDeleted: false }),
         trash: await InternalMail.countDocuments({ isDeleted: true }),
-        unread: await InternalMail.countDocuments({ isRead: false, isDraft: false, isDeleted: false }),
-        starred: await InternalMail.countDocuments({ isStarred: true, isDeleted: false }),
       };
-
-      res.json({
-        status: "success",
-        message: "Statistiques des emails internes",
-        stats,
-      });
+      res.json({ status: "success", stats });
     } catch (error) {
-      res.status(500).json({ 
-        status: "error", 
-        message: error.message,
-        hint: "Assurez-vous que le modèle InternalMail existe"
-      });
+      res.status(500).json({ message: "Modèle InternalMail introuvable ou erreur DB" });
     }
   });
 }
@@ -260,21 +224,20 @@ app.use("/api/*", (req, res) => {
   res.status(404).json({
     status: "fail",
     message: "Route API introuvable",
-    requested_path: req.originalUrl,
-    method: req.method,
+    path: req.originalUrl,
   });
 });
 
-// Gestion des erreurs
+// Gestionnaire d'erreurs
 app.use((err, req, res, next) => {
   if (err.message === "Not allowed by CORS") {
-    return res.status(403).json({ status: "fail", message: err.message });
+    return res.status(403).json({ status: "fail", message: "Bloqué par CORS" });
   }
   console.error("❌ [Serveur] Erreur :", err);
   res.status(500).json({
     status: "error",
     message: "Erreur interne du serveur.",
-    ...(process.env.NODE_ENV === "development" && { error: err.message, stack: err.stack }),
+    error: process.env.NODE_ENV === "development" ? err.message : undefined,
   });
 });
 
@@ -283,59 +246,14 @@ app.use((err, req, res, next) => {
 // ============================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`\n${"=".repeat(60)}`);
-  console.log(`✅ Serveur Altitude-Vision lancé sur le port ${PORT}`);
-  console.log(`🌍 Environnement : ${process.env.NODE_ENV || "development"}`);
-  console.log(`${"=".repeat(60)}\n`);
-  
-  console.log("📁 Dossiers uploads :");
-  console.log(`   → ${path.join(__dirname, "uploads")}`);
-  console.log(`   → ${path.join(__dirname, "uploads/internal-mails")} ✅ NOUVEAU`);
-  
-  console.log("\n🌐 URLs disponibles :");
-  console.log(`   → API principale : http://localhost:${PORT}/`);
-  console.log(`   → Uploads : http://localhost:${PORT}/uploads`);
-  console.log(`   → Dashboard : http://localhost:${PORT}/api/dashboard`);
-  
-  console.log("\n💬 Messagerie :");
-  console.log(`   → Conversations (temps réel) : http://localhost:${PORT}/api/messages`);
-  console.log(`   → Emails internes (brouillons/corbeille) : http://localhost:${PORT}/api/internal-mails ✅ NOUVEAU`);
-  // console.log(`   → Messages internes (ancien) : http://localhost:${PORT}/api/internal-messages`); // Commenté
-  
-  console.log("\n📧 Emails :");
-  console.log(`   → Emails professionnels : http://localhost:${PORT}/api/company-emails`);
-  
-  if (process.env.NODE_ENV === "development") {
-    console.log("\n🔧 Routes de debug (DEV uniquement) :");
-    console.log(`   → Debug uploads : http://localhost:${PORT}/api/debug/uploads`);
-    console.log(`   → Debug emails internes : http://localhost:${PORT}/api/debug/internal-mails ✅ NOUVEAU`);
-  }
-  
-  console.log(`\n${"=".repeat(60)}\n`);
+  console.log(`\n✅ Serveur Altitude-Vision lancé sur le port ${PORT}`);
+  console.log(`🌍 URL: http://localhost:${PORT}`);
+  console.log(`📊 Dashboard: http://localhost:${PORT}/api/dashboard/stats`);
+  console.log(`📧 Email Vérif: Activée\n`);
 });
 
-// ============================================================
-// 🛑 GESTION PROPRE DE L'ARRÊT DU SERVEUR
-// ============================================================
-process.on('SIGTERM', () => {
-  console.log('\n👋 SIGTERM reçu. Fermeture du serveur...');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('\n👋 SIGINT reçu. Fermeture du serveur...');
-  process.exit(0);
-});
-
-// Gestion des erreurs non capturées
-process.on('unhandledRejection', (err) => {
-  console.error('❌ [Serveur] Rejet non géré :', err);
-  process.exit(1);
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('❌ [Serveur] Exception non capturée :', err);
-  process.exit(1);
-});
+// Gestion arrêt propre
+process.on('SIGTERM', () => process.exit(0));
+process.on('SIGINT', () => process.exit(0));
 
 module.exports = app;

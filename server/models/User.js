@@ -1,6 +1,7 @@
 // server/models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto'); // ✅ AJOUT INDISPENSABLE POUR LES TOKENS
 
 // ======================================================
 // 🧩 SCHÉMA UTILISATEUR
@@ -33,9 +34,7 @@ const userSchema = new mongoose.Schema(
 
         role: {
             type: String,
-            // ✅ CORRECTION ICI : 
-            // 1. 'Proprietaire' (sans accent) pour matcher ton Frontend
-            // 2. 'User' ajouté pour la compatibilité avec les anciens comptes
+            // 'Proprietaire' (sans accent) pour matcher le Frontend
             enum: ['User', 'Client', 'Proprietaire', 'Collaborateur', 'Admin', 'Prestataire'],
             default: 'User',
         },
@@ -47,12 +46,10 @@ const userSchema = new mongoose.Schema(
             select: false,
         },
 
-        // ✅ AJOUT SÉCURITÉ : Validation de la confirmation du mot de passe
         passwordConfirm: {
             type: String,
             required: [true, 'Veuillez confirmer votre mot de passe'],
             validate: {
-                // Fonctionne uniquement lors de CREATE et SAVE
                 validator: function (el) {
                     return el === this.password;
                 },
@@ -79,7 +76,15 @@ const userSchema = new mongoose.Schema(
             select: false,
         },
 
-        // 🔹 Indique si le propriétaire est vérifié par un administrateur
+        // ✅ AJOUT EMAIL VERIFICATION
+        isEmailVerified: {
+            type: Boolean,
+            default: false,
+        },
+        emailVerificationToken: String,
+        emailVerificationExpires: Date,
+
+        // 🔹 Indique si le propriétaire est vérifié par un administrateur (KYC)
         isVerified: {
             type: Boolean,
             default: false,
@@ -92,13 +97,11 @@ const userSchema = new mongoose.Schema(
             default: 'Actif',
         },
 
-        // 🔹 Version du token JWT (pour forcer la déconnexion)
         tokenVersion: {
             type: Number,
             default: 0,
         },
 
-        // 🔹 Logs d’activité
         lastLoginAt: Date,
         lastActivityAt: Date,
 
@@ -112,40 +115,32 @@ const userSchema = new mongoose.Schema(
 );
 
 // ======================================================
-// 🔒 Middleware: Hashage du mot de passe avant sauvegarde
+// 🔒 Middleware: Hashage du mot de passe
 // ======================================================
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
-    
-    // Hashage du mot de passe avec un coût de 12
     this.password = await bcrypt.hash(this.password, 12);
-    
-    // Suppression du champ passwordConfirm (on ne le stocke pas en base)
     this.passwordConfirm = undefined;
     next();
 });
 
 // ======================================================
-// ⏰ Middleware: Mise à jour du champ passwordChangedAt
+// ⏰ Middleware: Mise à jour du timestamp passwordChangedAt
 // ======================================================
 userSchema.pre('save', function (next) {
     if (!this.isModified('password') || this.isNew) return next();
-    
-    // On retire 1 seconde pour s'assurer que le token soit créé après le changement
     this.passwordChangedAt = Date.now() - 1000;
     next();
 });
 
 // ======================================================
-// 🔐 Vérification du mot de passe
+// 🔐 Méthodes d'Instance
 // ======================================================
+
 userSchema.methods.correctPassword = async function (candidatePassword, userPassword) {
     return await bcrypt.compare(candidatePassword, userPassword);
 };
 
-// ======================================================
-// 🔁 Vérifie si le mot de passe a été changé après émission du JWT
-// ======================================================
 userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
     if (this.passwordChangedAt) {
         const changedTimestamp = parseInt(this.passwordChangedAt.getTime() / 1000, 10);
@@ -154,17 +149,31 @@ userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
     return false;
 };
 
+// ✅ AJOUT EMAIL VERIFICATION : Génération du token
+userSchema.methods.createEmailVerificationToken = function () {
+    const resetToken = crypto.randomBytes(32).toString('hex');
+
+    // On hash le token pour la base de données (sécurité)
+    this.emailVerificationToken = crypto
+        .createHash('sha256')
+        .update(resetToken)
+        .digest('hex');
+
+    // Le token expire dans 24 heures
+    this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+
+    return resetToken; // On renvoie la version claire pour l'envoyer par email
+};
+
 // ======================================================
-// ⚙️ MÉTHODES ADMINISTRATIVES PERSONNALISÉES
+// ⚙️ Méthodes Administratives
 // ======================================================
 
-// 🔹 Invalider tous les tokens (déconnexion forcée)
 userSchema.methods.invalidateTokens = async function () {
     this.tokenVersion += 1;
     await this.save({ validateBeforeSave: false });
 };
 
-// 🔹 Bannir un utilisateur
 userSchema.methods.ban = async function () {
     if (this.role === 'Admin') throw new Error('Impossible de bannir un administrateur.');
     this.status = 'Banni';
@@ -172,7 +181,6 @@ userSchema.methods.ban = async function () {
     await this.invalidateTokens();
 };
 
-// 🔹 Suspendre un utilisateur
 userSchema.methods.suspend = async function () {
     if (this.role === 'Admin') throw new Error('Impossible de suspendre un administrateur.');
     this.status = 'Suspendu';
@@ -180,25 +188,21 @@ userSchema.methods.suspend = async function () {
     await this.save({ validateBeforeSave: false });
 };
 
-// 🔹 Réactiver un utilisateur
 userSchema.methods.activate = async function () {
     this.status = 'Actif';
     this.isActive = true;
     await this.save({ validateBeforeSave: false });
 };
 
-// 🔹 Vérifier un propriétaire
 userSchema.methods.verifyOwner = async function () {
-    if (this.role === 'Proprietaire') { // Note: sans accent ici aussi pour matcher l'enum
+    if (this.role === 'Proprietaire') {
         this.isVerified = true;
         await this.save({ validateBeforeSave: false });
     }
 };
 
 // ======================================================
-// 🚀 EXPORT DU MODÈLE
+// 🚀 EXPORT
 // ======================================================
 const User = mongoose.model('User', userSchema);
 module.exports = User;
-
-// Fin du fichier User.js (Mise à jour Proprietaire)

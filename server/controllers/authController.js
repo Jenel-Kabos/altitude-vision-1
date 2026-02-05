@@ -1,12 +1,14 @@
-// server/controllers/authController.js (MODIFIÉ)
+// server/controllers/authController.js
+const crypto = require('crypto'); // ✅ IMPORT NECESSAIRE
 const jwt = require('jsonwebtoken');
 const { promisify } = require('util');
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
+const sendEmail = require('../utils/email'); // ✅ IMPORT NECESSAIRE
 
 // Utility: create & send token
 const createSendToken = (user, statusCode, res) => {
-    // 🚨 MODIFICATION : Passez la tokenVersion pour qu'elle soit dans le payload
+    // On passe la tokenVersion pour qu'elle soit dans le payload
     const token = generateToken(user._id, user.tokenVersion); 
 
     user.password = undefined;
@@ -22,16 +24,20 @@ const createSendToken = (user, statusCode, res) => {
                 role: user.role,
                 phone: user.phone || null, 
                 photo: user.photo || null,
+                isEmailVerified: user.isEmailVerified, // On renvoie l'info au front
             },
         },
     });
 };
 
-// Signup
+// ============================================================
+// 1. INSCRIPTION (Modifiée pour Email Verification)
+// ============================================================
 exports.signup = async (req, res) => {
     try {
-        const { name, email, password, role, phone } = req.body;
+        const { name, email, password, passwordConfirm, role, phone } = req.body;
 
+        // 1. Vérifications de base
         if (!name || !email || !password) {
             return res.status(400).json({
                 status: 'fail',
@@ -47,18 +53,53 @@ exports.signup = async (req, res) => {
             });
         }
 
+        // 2. Création de l'utilisateur (isEmailVerified est false par défaut)
         const newUser = await User.create({
             name,
             email,
             password,
+            passwordConfirm, // Important pour la validation du modèle
             role: role || 'Client',
             phone: phone || '',
             photo: req.file ? req.file.path : undefined,
         });
 
-        // Lors de la création, le modèle donne par défaut tokenVersion: 0.
-        // On envoie le token avec la version initiale.
-        createSendToken(newUser, 201, res);
+        // 3. Générer le token de vérification d'email
+        const verificationToken = newUser.createEmailVerificationToken();
+        await newUser.save({ validateBeforeSave: false });
+
+        // 4. Construire l'URL de vérification (Lien vers le Frontend)
+        // Note: Assure-toi que FRONTEND_URL est bien dans ton .env (ex: https://altitudevision.agency)
+        const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+
+        const message = `Bonjour ${newUser.name},\n\nBienvenue chez Altitude Vision ! 🎉\n\nPour activer votre compte, veuillez cliquer sur le lien ci-dessous :\n\n${verifyURL}\n\nCe lien est valide pendant 24 heures.\n\nSi vous n'avez pas créé de compte, veuillez ignorer cet email.`;
+
+        try {
+            // 5. Envoyer l'email
+            await sendEmail({
+                email: newUser.email,
+                subject: 'Altitude Vision - Activez votre compte',
+                message,
+            });
+
+            // 6. Répondre au client (SANS le token JWT)
+            res.status(200).json({
+                status: 'success',
+                message: 'Compte créé ! Un email de confirmation a été envoyé à votre adresse.',
+            });
+
+        } catch (err) {
+            // En cas d'erreur d'envoi, on nettoie l'utilisateur pour qu'il puisse réessayer
+            newUser.emailVerificationToken = undefined;
+            newUser.emailVerificationExpires = undefined;
+            await newUser.save({ validateBeforeSave: false });
+
+            return res.status(500).json({
+                status: 'error',
+                message: 'Erreur lors de l\'envoi de l\'email. Veuillez réessayer plus tard.',
+            });
+        }
+
     } catch (error) {
         res.status(500).json({
             status: 'error',
@@ -67,7 +108,54 @@ exports.signup = async (req, res) => {
     }
 };
 
-// Login
+// ============================================================
+// 2. VERIFICATION EMAIL (Nouvelle fonction)
+// ============================================================
+exports.verifyEmail = async (req, res) => {
+    try {
+        // 1. Hasher le token reçu dans l'URL pour le comparer à la BDD
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(req.params.token)
+            .digest('hex');
+
+        // 2. Chercher l'utilisateur avec ce token ET vérif expiration
+        const user = await User.findOne({
+            emailVerificationToken: hashedToken,
+            emailVerificationExpires: { $gt: Date.now() }, // Doit être dans le futur
+        });
+
+        if (!user) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Le lien est invalide ou a expiré.',
+            });
+        }
+
+        // 3. Activer le compte
+        user.isEmailVerified = true;
+        user.emailVerificationToken = undefined;
+        user.emailVerificationExpires = undefined;
+        
+        // On initialise la tokenVersion ici si elle n'existe pas
+        if (!user.tokenVersion) user.tokenVersion = 0;
+        
+        await user.save({ validateBeforeSave: false });
+
+        // 4. Connecter l'utilisateur directement (Envoi du JWT)
+        createSendToken(user, 200, res);
+
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            message: error.message,
+        });
+    }
+};
+
+// ============================================================
+// 3. LOGIN (Modifié pour vérifier l'email)
+// ============================================================
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -87,10 +175,18 @@ exports.login = async (req, res) => {
                 message: 'Email ou mot de passe incorrect.',
             });
         }
+
+        // 🚨 NOUVEAU : Vérification de l'email
+        if (!user.isEmailVerified) {
+            return res.status(401).json({
+                status: 'fail',
+                message: 'Veuillez vérifier votre adresse email avant de vous connecter.',
+            });
+        }
         
-        // 🚨 MODIFICATION : Mise à jour de la session et de la tokenVersion lors du login
+        // Mise à jour de la session et de la tokenVersion
         user.lastLoginAt = new Date();
-        user.tokenVersion = user.tokenVersion + 1; // Incrémente pour invalider les anciens tokens
+        user.tokenVersion = (user.tokenVersion || 0) + 1; 
         await user.save({ validateBeforeSave: false });
 
         createSendToken(user, 200, res);
@@ -102,7 +198,9 @@ exports.login = async (req, res) => {
     }
 };
 
-// Protect
+// ============================================================
+// 4. PROTECT (INCHANGÉ)
+// ============================================================
 exports.protect = async (req, res, next) => {
     try {
         let token;
@@ -128,11 +226,11 @@ exports.protect = async (req, res, next) => {
             });
         }
         
-        // 🚨 NOUVEAU CONTRÔLE 1 : Vérification de l'invalidation du token (bannissement/déconnexion forcée)
+        // Vérification invalidation token
         if (currentUser.tokenVersion > decoded.tokenVersion) { 
             return res.status(401).json({
                 status: 'fail',
-                message: 'La session a été invalidée par l’administrateur ou par un changement de mot de passe. Veuillez vous reconnecter.',
+                message: 'La session a été invalidée. Veuillez vous reconnecter.',
             });
         }
 
@@ -143,8 +241,7 @@ exports.protect = async (req, res, next) => {
             });
         }
 
-        // 🚨 NOUVEAU CONTRÔLE 2 : Mettre à jour la dernière activité (pour le suivi)
-        // Ceci est une opération fréquente, donc on l'enregistre en arrière-plan
+        // Mise à jour activité
         currentUser.lastActivityAt = new Date();
         await currentUser.save({ validateBeforeSave: false }); 
 
@@ -158,7 +255,10 @@ exports.protect = async (req, res, next) => {
     }
 };
 
-// Restrict roles (INCHANGÉ)
+// ============================================================
+// 5. AUTRES FONCTIONS (INCHANGÉES)
+// ============================================================
+
 exports.restrictTo = (...roles) => {
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {
@@ -171,7 +271,6 @@ exports.restrictTo = (...roles) => {
     };
 };
 
-// 🔹 Update user info (name, email, phone, photo) (INCHANGÉ)
 exports.updateMe = async (req, res) => {
     try {
         if (req.body.password || req.body.passwordConfirm) {
@@ -184,7 +283,7 @@ exports.updateMe = async (req, res) => {
         const filteredBody = {
             name: req.body.name,
             email: req.body.email,
-            phone: req.body.phone, // 🔹 numéro de téléphone
+            phone: req.body.phone,
         };
 
         if (req.file) filteredBody.photo = req.file.path;
@@ -205,7 +304,7 @@ exports.updateMe = async (req, res) => {
                     _id: updatedUser._id,
                     name: updatedUser.name,
                     email: updatedUser.email,
-                    phone: updatedUser.phone || null, // 🔹 renvoyer le téléphone
+                    phone: updatedUser.phone || null,
                     role: updatedUser.role,
                     photo: updatedUser.photo || null,
                 },
@@ -216,7 +315,6 @@ exports.updateMe = async (req, res) => {
     }
 };
 
-// Update password (INCHANGÉ)
 exports.updateMyPassword = async (req, res) => {
     try {
         const { passwordCurrent, password, passwordConfirm } = req.body;
@@ -232,7 +330,6 @@ exports.updateMyPassword = async (req, res) => {
         }
 
         user.password = password;
-        // La mise à jour du passwordChangedAt invalidera automatiquement les tokens existants
         await user.save(); 
 
         createSendToken(user, 200, res);

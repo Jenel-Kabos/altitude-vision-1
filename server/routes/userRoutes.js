@@ -2,7 +2,9 @@
 const express = require('express');
 const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
-const upload = require('../middleware/uploadMiddleware'); // ✅ Import correct
+
+// ✅ MODIFICATION : On utilise Cloudinary pour les photos de profil (important pour Render)
+const upload = require('../config/cloudinary'); 
 
 const router = express.Router();
 
@@ -12,17 +14,26 @@ const router = express.Router();
 router.post('/signup', upload.single('photo'), authController.signup);
 router.post('/login', authController.login);
 
+// ✅ NOUVELLE ROUTE : Pour valider le lien reçu par email
+router.get('/verify-email/:token', authController.verifyEmail);
+
 /* =======================================
    🧭 ROUTES PROTÉGÉES (nécessite un token)
 ======================================= */
+// Toutes les routes ci-dessous nécessitent d'être connecté
 router.use(authController.protect);
 
 /* ===========================
    👤 UTILISATEUR CONNECTÉ
 =========================== */
 router.get('/me', userController.getMe, userController.getUser);
-router.patch('/updateMe', upload.single('photo'), userController.updateMe); // ✅ Correction ici
-router.patch('/updateMyPassword', userController.updateMyPassword);
+
+// ✅ Mise à jour du profil (avec Cloudinary pour la photo)
+// Note : J'utilise authController car c'est là que nous avons mis la fonction updateMe
+router.patch('/updateMe', upload.single('photo'), authController.updateMe); 
+
+// ✅ Mise à jour du mot de passe
+router.patch('/updateMyPassword', authController.updateMyPassword);
 
 /* =======================================
    👑 ROUTES ADMIN UNIQUEMENT
