@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const { protect, optionalAuth, restrictTo, adminOnly, checkPropertyOwnership } = require('../middleware/authMiddleware');
 
-// ✅ Configuration Cloudinary
+// ✅ CONFIGURATION CLOUDINARY (Import correct)
 const upload = require('../config/cloudinary');
 
 const {
@@ -20,14 +20,15 @@ const {
   getLatestProperties
 } = require('../controllers/propertyController');
 
-// ⭐ CODE DE DIAGNOSTIC (Conservé pour debug) ⭐
-console.log('🔍 === DIAGNOSTIC DES IMPORTS ===');
-console.log('getPendingProperties:', typeof getPendingProperties); // Vérif cruciale
-console.log('=================================');
+// ⭐ DIAGNOSTIC (Tu pourras le supprimer plus tard)
+console.log('🔍 === ROUTE ORDER CHECK ===');
+console.log('pending handler:', typeof getPendingProperties);
+console.log('=============================');
+
 
 // ============================================================
-// 1️⃣ ROUTES SPÉCIFIQUES (STATIQUES)
-// ⚠️ Doivent TOUJOURS être en premier pour ne pas être confondues avec des IDs
+// 1️⃣ ROUTES SPÉCIFIQUES ET STATIQUES
+// ⚠️ Doivent TOUJOURS être déclarées en premier !
 // ============================================================
 
 /**
@@ -39,7 +40,7 @@ router.get('/latest', optionalAuth, getLatestProperties, getAllProperties);
 /**
  * @route GET /api/properties/status/pending
  * @description Obtenir les propriétés en attente (ADMIN)
- * ✅ DÉPLACÉ ICI (HAUT) pour éviter l'erreur 404
+ * ✅ FIX 404 : Cette route est maintenant AVANT /:id
  */
 router.get('/status/pending', protect, adminOnly, getPendingProperties);
 
@@ -51,25 +52,30 @@ router.get('/my-properties', protect, getMyProperties);
 
 /**
  * @route GET /api/properties
- * @description Obtenir toutes les propriétés
+ * @description Obtenir toutes les propriétés (avec filtres)
  */
 router.get('/', optionalAuth, getAllProperties);
 
+
+// ============================================================
+// 2️⃣ CRÉATION
+// ============================================================
+
 /**
  * @route POST /api/properties
- * @description Créer une propriété (avec Cloudinary)
+ * @description Créer une propriété (Upload via Cloudinary)
  */
 router.post('/', protect, restrictTo('AdminOnly', 'Proprietaire'), upload.array('images', 10), createProperty);
 
 
 // ============================================================
-// 2️⃣ ROUTES DYNAMIQUES (AVEC PARAMÈTRES :id)
-// ⚠️ Doivent être APRÈS les routes spécifiques
+// 3️⃣ ROUTES DYNAMIQUES (AVEC :id)
+// ⚠️ Doivent être déclarées APRÈS les routes spécifiques
 // ============================================================
 
 /**
  * @route PATCH /api/properties/:id/:action
- * @description Valider/Rejeter une propriété (ADMIN)
+ * @description Valider ou rejeter une propriété (ADMIN)
  */
 router.patch('/:id/:action', protect, adminOnly, updatePropertyStatus);
 
@@ -91,10 +97,15 @@ router.put('/:id', protect, checkPropertyOwnership, upload.array('images', 10), 
  */
 router.delete('/:id', protect, checkPropertyOwnership, deleteProperty);
 
+
+// ============================================================
+// 4️⃣ LA ROUTE "CATCH-ALL" (EN DERNIER ABSOLU)
+// ============================================================
+
 /**
  * @route GET /api/properties/:id
  * @description Obtenir une propriété par ID
- * ⚠️ LA PLUS GÉNÉRIQUE => TOUJOURS EN DERNIER
+ * ⚠️ Si tu mets cette ligne plus haut, elle bloquera "latest" et "pending"
  */
 router.get('/:id', optionalAuth, getProperty);
 
