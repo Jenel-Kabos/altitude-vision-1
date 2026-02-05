@@ -68,15 +68,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ============================================================
-// 🔓 CONFIGURATION CORS (MISE À JOUR)
+// 🔓 CONFIGURATION CORS (MISE À JOUR DOMAINE .AGENCY)
 // ============================================================
 app.use(cors({
   origin: [
-    "https://altitudevision.netlify.app", // Ton site en ligne
-    "http://localhost:5173",            // Ton PC (Vite)
-    "http://localhost:3000",            // Ton PC (Node/React standard)
-    process.env.FRONTEND_URL            // Sécurité supplémentaire via .env
-  ].filter(Boolean), // Retire les valeurs vides
+    "https://altitudevision.agency",       // <--- TON NOUVEAU DOMAINE (Important !)
+    "https://www.altitudevision.agency",   // <--- AVEC WWW (Sécurité)
+    "https://altitudevision.netlify.app",  // (Garde l'ancien au cas où)
+    "http://localhost:5173",             
+    "http://localhost:3000",
+    process.env.FRONTEND_URL
+  ].filter(Boolean),
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"]
