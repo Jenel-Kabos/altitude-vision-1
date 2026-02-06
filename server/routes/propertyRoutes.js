@@ -1,112 +1,141 @@
 // server/routes/propertyRoutes.js
-
 const express = require('express');
 const router = express.Router();
-const { protect, optionalAuth, restrictTo, adminOnly, checkPropertyOwnership } = require('../middleware/authMiddleware');
 
-// ✅ CONFIGURATION CLOUDINARY (Import correct)
+// ✅ IMPORT 1 : Le contrôleur Auth (Sécurité unifiée)
+const authController = require('../controllers/authController');
+
+// ✅ IMPORT 2 : Configuration Cloudinary
 const upload = require('../config/cloudinary');
 
-const {
-  createProperty,
-  getAllProperties,
-  getProperty,
-  updateProperty,
-  deleteProperty,
-  getMyProperties,
-  getPendingProperties,
-  updatePropertyStatus,
-  adminDeleteProperty,
-  getLatestProperties
-} = require('../controllers/propertyController');
-
-// ⭐ DIAGNOSTIC (Tu pourras le supprimer plus tard)
-console.log('🔍 === ROUTE ORDER CHECK ===');
-console.log('pending handler:', typeof getPendingProperties);
-console.log('=============================');
-
+// ✅ IMPORT 3 : Le contrôleur Property
+const propertyController = require('../controllers/propertyController');
 
 // ============================================================
-// 1️⃣ ROUTES SPÉCIFIQUES ET STATIQUES
-// ⚠️ Doivent TOUJOURS être déclarées en premier !
+// 1️⃣ ROUTES SPÉCIFIQUES (Doivent être EN PREMIER)
 // ============================================================
 
 /**
  * @route GET /api/properties/latest
- * @description Obtenir les dernières propriétés
+ * @description Les dernières propriétés (Public)
  */
-router.get('/latest', optionalAuth, getLatestProperties, getAllProperties);
+router.get('/latest', propertyController.getLatestProperties, propertyController.getAllProperties);
 
 /**
  * @route GET /api/properties/status/pending
- * @description Obtenir les propriétés en attente (ADMIN)
- * ✅ FIX 404 : Cette route est maintenant AVANT /:id
+ * @description Propriétés en attente (ADMIN UNIQUEMENT)
+ * ✅ Placé ici pour éviter le conflit avec /:id
  */
-router.get('/status/pending', protect, adminOnly, getPendingProperties);
+router.get(
+    '/status/pending', 
+    authController.protect, 
+    authController.restrictTo('Admin'), 
+    propertyController.getPendingProperties
+);
 
 /**
  * @route GET /api/properties/my-properties
- * @description Obtenir les propriétés de l'utilisateur
+ * @description Propriétés de l'utilisateur connecté
  */
-router.get('/my-properties', protect, getMyProperties);
+router.get(
+    '/my-properties', 
+    authController.protect, 
+    propertyController.getMyProperties
+);
 
 /**
  * @route GET /api/properties
- * @description Obtenir toutes les propriétés (avec filtres)
+ * @description Toutes les propriétés avec filtres
  */
-router.get('/', optionalAuth, getAllProperties);
+router.get(
+    '/', 
+    authController.optionalAuth, 
+    propertyController.getAllProperties
+);
 
 
 // ============================================================
-// 2️⃣ CRÉATION
+// 2️⃣ ROUTE DE CRÉATION
 // ============================================================
 
 /**
  * @route POST /api/properties
- * @description Créer une propriété (Upload via Cloudinary)
+ * @description Créer une propriété + Upload images
+ * ✅ Correction du rôle : 'Admin' (et pas AdminOnly)
  */
-router.post('/', protect, restrictTo('AdminOnly', 'Proprietaire'), upload.array('images', 10), createProperty);
+router.post(
+    '/', 
+    authController.protect, 
+    authController.restrictTo('Admin', 'Proprietaire'), 
+    upload.array('images', 10), 
+    propertyController.createProperty
+);
 
 
 // ============================================================
-// 3️⃣ ROUTES DYNAMIQUES (AVEC :id)
-// ⚠️ Doivent être déclarées APRÈS les routes spécifiques
+// 3️⃣ ROUTES ADMIN SPÉCIFIQUES
 // ============================================================
 
 /**
- * @route PATCH /api/properties/:id/:action
- * @description Valider ou rejeter une propriété (ADMIN)
+ * @route PATCH /api/properties/admin/:id/:action
+ * @description Valider ou Rejeter (Admin)
  */
-router.patch('/:id/:action', protect, adminOnly, updatePropertyStatus);
+router.patch(
+    '/admin/:id/:action', 
+    authController.protect, 
+    authController.restrictTo('Admin'), 
+    propertyController.updatePropertyStatus
+);
 
 /**
  * @route DELETE /api/properties/admin/:id
- * @description Supprimer une propriété (ADMIN)
+ * @description Suppression forcée (Admin)
  */
-router.delete('/admin/:id', protect, adminOnly, adminDeleteProperty);
+router.delete(
+    '/admin/:id', 
+    authController.protect, 
+    authController.restrictTo('Admin'), 
+    propertyController.adminDeleteProperty
+);
+
+
+// ============================================================
+// 4️⃣ ROUTES DYNAMIQUES PAR ID (EN DERNIER)
+// ============================================================
 
 /**
  * @route PUT /api/properties/:id
- * @description Mettre à jour une propriété
+ * @description Mise à jour (Propriétaire ou Admin)
+ * Note: La vérification de propriété est faite dans le contrôleur
  */
-router.put('/:id', protect, checkPropertyOwnership, upload.array('images', 10), updateProperty);
+router.put(
+    '/:id', 
+    authController.protect, 
+    authController.restrictTo('Admin', 'Proprietaire'), 
+    upload.array('images', 10), 
+    propertyController.updateProperty
+);
 
 /**
  * @route DELETE /api/properties/:id
- * @description Supprimer une propriété
+ * @description Suppression (Propriétaire ou Admin)
  */
-router.delete('/:id', protect, checkPropertyOwnership, deleteProperty);
-
-
-// ============================================================
-// 4️⃣ LA ROUTE "CATCH-ALL" (EN DERNIER ABSOLU)
-// ============================================================
+router.delete(
+    '/:id', 
+    authController.protect, 
+    authController.restrictTo('Admin', 'Proprietaire'), 
+    propertyController.deleteProperty
+);
 
 /**
  * @route GET /api/properties/:id
- * @description Obtenir une propriété par ID
- * ⚠️ Si tu mets cette ligne plus haut, elle bloquera "latest" et "pending"
+ * @description Détail d'une propriété (Public ou Privé selon statut)
+ * ⚠️ C'est la route "Catch-All", elle doit être tout en bas !
  */
-router.get('/:id', optionalAuth, getProperty);
+router.get(
+    '/:id', 
+    authController.optionalAuth, 
+    propertyController.getProperty
+);
 
 module.exports = router;

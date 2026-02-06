@@ -1,78 +1,89 @@
 // server/routes/internalMailRoutes.js
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/authMiddleware');
-const { uploadAttachments } = require('../middleware/uploadMiddleware');
 
-const {
-  sendInternalMail,
-  saveDraft,
-  updateDraft,
-  deleteDraft,
-  getInbox,
-  getSent,
-  getUnread,
-  getStarred,
-  getDrafts,
-  getTrash,
-  getUnreadCount,
-  markAsRead,
-  markAsUnread,
-  addStar,
-  removeStar,
-  moveToTrash,
-  restoreFromTrash,
-  permanentlyDelete,
-  emptyTrash,
-} = require('../controllers/internalMailController');
+// ✅ IMPORT 1 : Sécurité unifiée
+const authController = require('../controllers/authController');
+
+// ✅ IMPORT 2 : Configuration Cloudinary (Pour les pièces jointes sur Render)
+const upload = require('../config/cloudinary');
+
+// ✅ IMPORT 3 : Le Contrôleur
+const internalMailController = require('../controllers/internalMailController');
+
+// 🔒 Sécurité : Toutes les routes nécessitent d'être connecté
+router.use(authController.protect);
 
 // ==========================================================
 // --- 📌 Routes de récupération (GET) ---
 // ==========================================================
 
-// Routes spécifiques (doivent être avant les routes dynamiques)
-router.get('/received', protect, getInbox);
-router.get('/sent', protect, getSent);
-router.get('/unread', protect, getUnread);
-router.get('/starred', protect, getStarred);
-router.get('/drafts', protect, getDrafts);
-router.get('/trash', protect, getTrash);
-router.get('/count/unread', protect, getUnreadCount);
+// ✅ CRITIQUE : Cette route doit être en PREMIER pour éviter les conflits d'ID
+router.get('/count/unread', internalMailController.getUnreadCount);
+
+// Listes de messages
+router.get('/received', internalMailController.getInbox);
+router.get('/sent', internalMailController.getSent);
+router.get('/unread', internalMailController.getUnread);
+router.get('/starred', internalMailController.getStarred);
+router.get('/drafts', internalMailController.getDrafts);
+router.get('/trash', internalMailController.getTrash);
+
 
 // ==========================================================
 // --- 📤 Routes d'envoi et de gestion des brouillons ---
 // ==========================================================
 
-// Envoyer un email
-router.post('/', protect, uploadAttachments, sendInternalMail);
+// Envoyer un email (avec pièces jointes Cloudinary)
+// 'attachments' est le nom du champ dans le FormData, max 5 fichiers
+router.post(
+    '/', 
+    upload.array('attachments', 5), 
+    internalMailController.sendInternalMail
+);
 
-// Gestion des brouillons
-router.post('/drafts', protect, uploadAttachments, saveDraft);
-router.put('/drafts/:draftId', protect, uploadAttachments, updateDraft);
-router.delete('/drafts/:draftId', protect, deleteDraft);
+// Sauvegarder un brouillon
+router.post(
+    '/drafts', 
+    upload.array('attachments', 5), 
+    internalMailController.saveDraft
+);
+
+// Mettre à jour un brouillon
+router.put(
+    '/drafts/:draftId', 
+    upload.array('attachments', 5), 
+    internalMailController.updateDraft
+);
+
+// Supprimer un brouillon
+router.delete('/drafts/:draftId', internalMailController.deleteDraft);
+
 
 // ==========================================================
-// --- 🗑️ Gestion de la corbeille ---
+// --- 🗑️ Actions Globales ---
 // ==========================================================
 
-// Vider la corbeille (doit être avant /:mailId)
-router.delete('/trash/empty', protect, emptyTrash);
+// Vider la corbeille (Doit être avant les routes dynamiques /:mailId)
+router.delete('/trash/empty', internalMailController.emptyTrash);
+
 
 // ==========================================================
-// --- ✏️ Routes de modification (PATCH/DELETE) ---
+// --- 🔗 Routes Dynamiques (Actions sur un email spécifique) ---
+// ⚠️ Doivent être À LA FIN du fichier
 // ==========================================================
 
-// Marquer comme lu/non lu
-router.patch('/:mailId/read', protect, markAsRead);
-router.patch('/:mailId/unread', protect, markAsUnread);
+// Lecture
+router.patch('/:mailId/read', internalMailController.markAsRead);
+router.patch('/:mailId/unread', internalMailController.markAsUnread);
 
-// Gérer les favoris
-router.patch('/:mailId/star', protect, addStar);
-router.patch('/:mailId/unstar', protect, removeStar);
+// Favoris
+router.patch('/:mailId/star', internalMailController.addStar);
+router.patch('/:mailId/unstar', internalMailController.removeStar);
 
-// Corbeille
-router.patch('/:mailId/trash', protect, moveToTrash);
-router.patch('/:mailId/restore', protect, restoreFromTrash);
-router.delete('/:mailId/permanent', protect, permanentlyDelete);
+// Corbeille & Suppression
+router.patch('/:mailId/trash', internalMailController.moveToTrash);
+router.patch('/:mailId/restore', internalMailController.restoreFromTrash);
+router.delete('/:mailId/permanent', internalMailController.permanentlyDelete);
 
 module.exports = router;
