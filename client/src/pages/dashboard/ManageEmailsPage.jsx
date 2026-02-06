@@ -157,7 +157,7 @@ const ManageEmailsPage = () => {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-4xl font-bold text-gray-800 mb-2">Gestion des Emails Professionnels</h1>
-        <p className="text-gray-600">Gérez les adresses @altitudevision.cg et leurs notifications</p>
+        <p className="text-gray-600">Gérez les adresses @altitudevision.agency et leurs notifications</p>
       </div>
 
       {/* Statistiques */}
@@ -374,7 +374,7 @@ const EmailModal = ({ mode, email, onClose, onSubmit, showPassword, setShowPassw
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    const fullEmail = `${formData.email}@altitudevision.cg`;
+    const fullEmail = `${formData.email}@altitudevision.agency`;
     
     if (!formData.email || !formData.displayName) {
       alert('Veuillez remplir tous les champs obligatoires');
@@ -432,7 +432,7 @@ const EmailModal = ({ mode, email, onClose, onSubmit, showPassword, setShowPassw
                   className="flex-1 p-3 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 />
                 <span className="bg-gray-200 px-4 py-3 border border-l-0 border-gray-300 rounded-r-lg text-gray-700">
-                  @altitudevision.cg
+                  @altitudevision.agency
                 </span>
               </div>
             </div>
