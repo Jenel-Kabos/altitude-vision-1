@@ -1,0 +1,11 @@
+[build]
+  # Si tu utilises Vite, le dossier est "dist". 
+  # Si tu utilises Create React App, c'est "build".
+  publish = "dist"
+  command = "npm run build"
+
+# C'est cette partie qui répare tes liens quand tu actualises la page
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
