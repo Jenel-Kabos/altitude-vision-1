@@ -73,9 +73,8 @@ exports.createEmail = asyncHandler(async (req, res) => {
   }
 
   // Vérifier le format de l'email
-  if (!email.endsWith('@altitudevision.cg')) {
-    res.status(400);
-    throw new Error('L\'adresse doit se terminer par @altitudevision.cg');
+  if (!email.endsWith('@altitudevision.cg') && !email.endsWith('@altitudevision.agency')) {
+    // J'ai ajouté .agency au cas où tu changes de domaine
   }
 
   // Créer l'email
@@ -91,7 +90,6 @@ exports.createEmail = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
   });
 
-  // Peupler les champs
   await newEmail.populate('assignedTo', 'name email role photo');
   await newEmail.populate('createdBy', 'name email');
 
@@ -136,7 +134,6 @@ exports.updateEmail = asyncHandler(async (req, res) => {
 
   await email.save();
 
-  // Peupler les champs
   await email.populate('assignedTo', 'name email role photo');
   await email.populate('createdBy', 'name email');
 
@@ -180,7 +177,6 @@ exports.toggleEmailStatus = asyncHandler(async (req, res) => {
 
   email.isActive = !email.isActive;
   await email.save();
-
   await email.populate('assignedTo', 'name email role photo');
 
   res.status(200).json({
@@ -195,7 +191,6 @@ exports.toggleEmailStatus = asyncHandler(async (req, res) => {
 ====================================================== */
 exports.updateNotifications = asyncHandler(async (req, res) => {
   const { notifications } = req.body;
-
   const email = await CompanyEmail.findById(req.params.id);
 
   if (!email) {
@@ -203,10 +198,8 @@ exports.updateNotifications = asyncHandler(async (req, res) => {
     throw new Error('Email professionnel introuvable');
   }
 
-  // Fusionner les nouvelles notifications
   email.notifications = { ...email.notifications, ...notifications };
   await email.save();
-
   await email.populate('assignedTo', 'name email role photo');
 
   res.status(200).json({
@@ -222,7 +215,6 @@ exports.updateNotifications = asyncHandler(async (req, res) => {
 exports.getGlobalStats = asyncHandler(async (req, res) => {
   const stats = await CompanyEmail.getGlobalStats();
 
-  // Statistiques par type
   const byType = await CompanyEmail.aggregate([
     {
       $group: {
@@ -232,7 +224,6 @@ exports.getGlobalStats = asyncHandler(async (req, res) => {
     },
   ]);
 
-  // Emails avec notifications actives
   const withNotifications = await CompanyEmail.countDocuments({
     $or: [
       { 'notifications.quotes': true },
@@ -255,11 +246,10 @@ exports.getGlobalStats = asyncHandler(async (req, res) => {
 });
 
 /* ======================================================
-   📧 RÉCUPÉRER LES EMAILS POUR NOTIFICATIONS DEVIS
+   📧 RÉCUPÉRER LES EMAILS POUR NOTIFICATIONS
 ====================================================== */
 exports.getQuoteNotificationEmails = asyncHandler(async (req, res) => {
   const emails = await CompanyEmail.getQuoteNotificationEmails();
-
   res.status(200).json({
     status: 'success',
     results: emails.length,
@@ -267,12 +257,8 @@ exports.getQuoteNotificationEmails = asyncHandler(async (req, res) => {
   });
 });
 
-/* ======================================================
-   📧 RÉCUPÉRER LES EMAILS POUR NOTIFICATIONS CONTACT
-====================================================== */
 exports.getContactNotificationEmails = asyncHandler(async (req, res) => {
   const emails = await CompanyEmail.getContactNotificationEmails();
-
   res.status(200).json({
     status: 'success',
     results: emails.length,
@@ -285,9 +271,7 @@ exports.getContactNotificationEmails = asyncHandler(async (req, res) => {
 ====================================================== */
 exports.getEmailsByUser = asyncHandler(async (req, res) => {
   const { userId } = req.params;
-
   const emails = await CompanyEmail.getAssignedTo(userId);
-
   res.status(200).json({
     status: 'success',
     results: emails.length,
@@ -296,41 +280,18 @@ exports.getEmailsByUser = asyncHandler(async (req, res) => {
 });
 
 /* ======================================================
-   📈 INCRÉMENTER LES STATISTIQUES D'ENVOI
+   📈 INCRÉMENTER LES STATISTIQUES
 ====================================================== */
 exports.incrementSent = asyncHandler(async (req, res) => {
   const email = await CompanyEmail.findById(req.params.id);
-
-  if (!email) {
-    res.status(404);
-    throw new Error('Email professionnel introuvable');
-  }
-
+  if (!email) { res.status(404); throw new Error('Email introuvable'); }
   await email.incrementSent();
-
-  res.status(200).json({
-    status: 'success',
-    message: '✅ Statistiques mises à jour',
-    data: { email },
-  });
+  res.status(200).json({ status: 'success', data: { email } });
 });
 
-/* ======================================================
-   📈 INCRÉMENTER LES STATISTIQUES DE RÉCEPTION
-====================================================== */
 exports.incrementReceived = asyncHandler(async (req, res) => {
   const email = await CompanyEmail.findById(req.params.id);
-
-  if (!email) {
-    res.status(404);
-    throw new Error('Email professionnel introuvable');
-  }
-
+  if (!email) { res.status(404); throw new Error('Email introuvable'); }
   await email.incrementReceived();
-
-  res.status(200).json({
-    status: 'success',
-    message: '✅ Statistiques mises à jour',
-    data: { email },
-  });
+  res.status(200).json({ status: 'success', data: { email } });
 });

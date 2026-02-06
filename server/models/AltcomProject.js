@@ -1,19 +1,17 @@
+// server/models/AltcomProject.js
 const mongoose = require('mongoose');
 
 const altcomProjectSchema = new mongoose.Schema({
-  // Informations générales
-  projectName: {
+  // ======================================================
+  // 👤 Informations Contact
+  // ======================================================
+  contactName: {
     type: String,
-    required: [true, 'Le nom du projet est requis'],
+    required: [true, 'Le nom du contact est requis'],
     trim: true,
   },
   companyName: {
     type: String,
-    trim: true,
-  },
-  contactName: {
-    type: String,
-    required: [true, 'Le nom du contact est requis'],
     trim: true,
   },
   email: {
@@ -21,14 +19,23 @@ const altcomProjectSchema = new mongoose.Schema({
     required: [true, "L'email est requis"],
     lowercase: true,
     trim: true,
-    match: [/^\S+@\S+\.\S+$/, 'Email invalide'],
+    match: [/^\S+@\S+\.\S+$/, 'Veuillez fournir une adresse email valide'],
   },
   phone: {
     type: String,
     trim: true,
   },
+
+  // ======================================================
+  // 📂 Informations Projet
+  // ======================================================
+  projectName: {
+    type: String,
+    required: [true, 'Le nom du projet est requis'],
+    trim: true,
+  },
   
-  // Détails du projet
+  // Type de prestation
   projectType: {
     type: String,
     enum: [
@@ -42,23 +49,31 @@ const altcomProjectSchema = new mongoose.Schema({
       'Production Audiovisuelle',
       'Autre'
     ],
-    required: true,
+    required: [true, 'Le type de projet est requis'],
   },
+
+  // Catégorie (Interne)
   projectCategory: {
     type: String,
     enum: ['Stratégie', 'Création', 'Production', 'Diffusion', 'Conseil'],
     default: 'Stratégie',
   },
+
+  // ======================================================
+  // 🎯 Objectifs & Cible
+  // ======================================================
   targetAudience: {
     type: String,
-    required: true,
+    required: [true, 'Le public cible est requis'],
   },
   objectives: {
     type: String,
-    required: true,
+    required: [true, 'Les objectifs sont requis'],
   },
-  
-  // Budget et timing
+
+  // ======================================================
+  // 💰 Budget & Planning
+  // ======================================================
   budget: {
     type: String,
     enum: [
@@ -70,7 +85,7 @@ const altcomProjectSchema = new mongoose.Schema({
       'Plus de 10M',
       'À définir'
     ],
-    required: true,
+    required: [true, 'Le budget est requis'],
   },
   startDate: {
     type: Date,
@@ -78,8 +93,10 @@ const altcomProjectSchema = new mongoose.Schema({
   deadline: {
     type: Date,
   },
-  
-  // Description détaillée
+
+  // ======================================================
+  // 📝 Description Détaillée
+  // ======================================================
   detailedDescription: {
     type: String,
     required: [true, 'La description du projet est requise'],
@@ -93,8 +110,10 @@ const altcomProjectSchema = new mongoose.Schema({
     type: String,
     maxlength: 1000,
   },
-  
-  // Matériaux existants
+
+  // ======================================================
+  // 📦 Matériaux
+  // ======================================================
   hasExistingMaterials: {
     type: Boolean,
     default: false,
@@ -103,28 +122,29 @@ const altcomProjectSchema = new mongoose.Schema({
     type: String,
     maxlength: 500,
   },
-  
-  // Statut du projet
+
+  // ======================================================
+  // ⚙️ Gestion (Admin)
+  // ======================================================
   status: {
     type: String,
     enum: ['En attente', 'En cours d\'analyse', 'Accepté', 'Refusé', 'En cours', 'Terminé'],
     default: 'En attente',
   },
-  
-  // Métadonnées
+
+  // Date de soumission (Utilisée pour le tri dans le contrôleur)
   submittedAt: {
     type: Date,
     default: Date.now,
   },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
 }, {
-  timestamps: true,
+  // Crée automatiquement createdAt et updatedAt
+  timestamps: true, 
 });
 
-// Index pour recherche rapide
+// ======================================================
+// 📊 Index
+// ======================================================
 altcomProjectSchema.index({ email: 1, submittedAt: -1 });
 altcomProjectSchema.index({ status: 1 });
 

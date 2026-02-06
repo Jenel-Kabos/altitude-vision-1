@@ -1,74 +1,63 @@
 // server/routes/companyEmailRoutes.js
 const express = require('express');
-const companyEmailController = require('../controllers/companyEmailController');
-const { protect, restrictTo } = require('../middleware/authMiddleware');
-
 const router = express.Router();
 
-// ======================================================
-// 🔒 PROTECTION - Toutes les routes sont réservées aux Admin/Collaborateurs
-// ======================================================
-router.use(protect);
-router.use(restrictTo('Admin', 'Collaborateur'));
+// ✅ IMPORT 1 : Le contrôleur logique
+const companyEmailController = require('../controllers/companyEmailController');
+
+// ✅ IMPORT 2 : La sécurité unifiée (et pas l'ancien middleware)
+const authController = require('../controllers/authController');
 
 // ======================================================
-// 📊 STATISTIQUES
+// 🔒 PROTECTION GLOBALE
 // ======================================================
-// GET /api/company-emails/stats - Récupérer les statistiques globales
+// Toutes les routes nécessitent d'être connecté
+router.use(authController.protect);
+
+// Par défaut, accès Admin et Collaborateur (pour voir), 
+// mais on restreindra la suppression/création plus bas si nécessaire.
+router.use(authController.restrictTo('Admin', 'Collaborateur'));
+
+
+// ======================================================
+// 1️⃣ ROUTES SPÉCIFIQUES (DOIVENT ÊTRE EN PREMIER !)
+// ======================================================
+
+// 📊 Statistiques (Si placé après /:id, "stats" serait pris pour un ID -> Erreur 500)
 router.get('/stats', companyEmailController.getGlobalStats);
 
-// ======================================================
-// 📋 LISTE & CRÉATION
-// ======================================================
-// GET /api/company-emails - Récupérer tous les emails
-router.get('/', companyEmailController.getAllEmails);
-
-// GET /api/company-emails/active - Récupérer uniquement les emails actifs
+// 📋 Listes filtrées
 router.get('/active', companyEmailController.getActiveEmails);
-
-// POST /api/company-emails - Créer un nouvel email
-router.post('/', companyEmailController.createEmail);
-
-// ======================================================
-// 🔔 NOTIFICATIONS SPÉCIFIQUES
-// ======================================================
-// GET /api/company-emails/notifications/quotes - Emails recevant notifications devis
 router.get('/notifications/quotes', companyEmailController.getQuoteNotificationEmails);
-
-// GET /api/company-emails/notifications/contact - Emails recevant notifications contact
 router.get('/notifications/contact', companyEmailController.getContactNotificationEmails);
 
-// ======================================================
-// 👤 PAR UTILISATEUR
-// ======================================================
-// GET /api/company-emails/user/:userId - Emails d'un collaborateur spécifique
+// 👤 Par utilisateur
 router.get('/user/:userId', companyEmailController.getEmailsByUser);
 
-// ======================================================
-// 🔍 DÉTAILS, MISE À JOUR, SUPPRESSION
-// ======================================================
-// GET /api/company-emails/:id - Récupérer un email spécifique
-router.get('/:id', companyEmailController.getEmailById);
-
-// PUT /api/company-emails/:id - Mettre à jour un email
-router.put('/:id', companyEmailController.updateEmail);
-
-// DELETE /api/company-emails/:id - Supprimer un email (Admin uniquement)
-router.delete('/:id', restrictTo('Admin'), companyEmailController.deleteEmail);
 
 // ======================================================
-// 🔄 ACTIONS SPÉCIFIQUES
+// 2️⃣ ROUTE RACINE (LISTE & CRÉATION)
 // ======================================================
-// PATCH /api/company-emails/:id/toggle-status - Activer/Désactiver
+router.get('/', companyEmailController.getAllEmails);
+
+// Création : Réservé aux Admins (Sécurité supplémentaire)
+router.post('/', authController.restrictTo('Admin'), companyEmailController.createEmail);
+
+
+// ======================================================
+// 3️⃣ ROUTES DYNAMIQUES (AVEC :id - À LA FIN)
+// ======================================================
+
+// Actions spécifiques (Patch)
 router.patch('/:id/toggle-status', companyEmailController.toggleEmailStatus);
-
-// PATCH /api/company-emails/:id/notifications - Mettre à jour les notifications
 router.patch('/:id/notifications', companyEmailController.updateNotifications);
-
-// PATCH /api/company-emails/:id/increment-sent - Incrémenter emails envoyés
 router.patch('/:id/increment-sent', companyEmailController.incrementSent);
-
-// PATCH /api/company-emails/:id/increment-received - Incrémenter emails reçus
 router.patch('/:id/increment-received', companyEmailController.incrementReceived);
+
+// Opérations CRUD sur un ID
+router.route('/:id')
+    .get(companyEmailController.getEmailById)
+    .put(authController.restrictTo('Admin'), companyEmailController.updateEmail) // Admin modifie
+    .delete(authController.restrictTo('Admin'), companyEmailController.deleteEmail); // Admin supprime
 
 module.exports = router;

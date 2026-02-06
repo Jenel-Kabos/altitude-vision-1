@@ -14,8 +14,8 @@ const companyEmailSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       match: [
-        /^[a-zA-Z0-9._-]+@altitudevision\.cg$/,
-        'L\'adresse doit se terminer par @altitudevision.cg',
+        /^[a-zA-Z0-9._-]+@altitudevision\.(cg|agency)$/, // ✅ ACCEPTE .cg ET .agency
+        'L\'adresse doit se terminer par @altitudevision.cg ou @altitudevision.agency',
       ],
     },
 
@@ -59,31 +59,11 @@ const companyEmailSchema = new mongoose.Schema(
 
     // 📩 Notifications activées
     notifications: {
-      // Recevoir les demandes de devis
-      quotes: {
-        type: Boolean,
-        default: false,
-      },
-      // Recevoir les messages de contact
-      contactMessages: {
-        type: Boolean,
-        default: false,
-      },
-      // Recevoir les notifications système
-      systemAlerts: {
-        type: Boolean,
-        default: false,
-      },
-      // Recevoir les notifications de propriétés
-      properties: {
-        type: Boolean,
-        default: false,
-      },
-      // Recevoir les notifications d'événements
-      events: {
-        type: Boolean,
-        default: false,
-      },
+      quotes: { type: Boolean, default: false },
+      contactMessages: { type: Boolean, default: false },
+      systemAlerts: { type: Boolean, default: false },
+      properties: { type: Boolean, default: false },
+      events: { type: Boolean, default: false },
     },
 
     // ✅ Statut actif/inactif
@@ -92,30 +72,24 @@ const companyEmailSchema = new mongoose.Schema(
       default: true,
     },
 
-    // 🔐 Mot de passe de l'email (crypté, pour config SMTP)
+    // 🔐 Mot de passe de l'email (select: false pour sécurité)
     password: {
       type: String,
-      select: false, // Ne pas renvoyer par défaut
+      select: false, 
     },
 
-    // ⚙️ Configuration SMTP (optionnel)
+    // ⚙️ Configuration SMTP (avec valeurs par défaut)
     smtpConfig: {
-      host: String,
-      port: Number,
-      secure: Boolean,
+      host: { type: String, default: 'mail.privateemail.com' },
+      port: { type: Number, default: 465 },
+      secure: { type: Boolean, default: true },
     },
 
     // 📊 Statistiques
     stats: {
-      emailsSent: {
-        type: Number,
-        default: 0,
-      },
-      emailsReceived: {
-        type: Number,
-        default: 0,
-      },
-      lastUsed: Date,
+      emailsSent: { type: Number, default: 0 },
+      emailsReceived: { type: Number, default: 0 },
+      lastUsed: { type: Date, default: Date.now },
     },
 
     // 🧾 Créé par (admin)
@@ -126,7 +100,7 @@ const companyEmailSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // createdAt & updatedAt
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
@@ -155,16 +129,10 @@ companyEmailSchema.virtual('hasNotifications').get(function() {
 // 🔧 MIDDLEWARE PRE-SAVE
 // ======================================================
 companyEmailSchema.pre('save', function(next) {
-  // Vérifier que l'email se termine bien par @altitudevision.cg
-  if (!this.email.endsWith('@altitudevision.cg')) {
-    return next(new Error('L\'adresse doit se terminer par @altitudevision.cg'));
-  }
-  
-  // Mettre à jour lastUsed si des emails ont été envoyés
-  if (this.stats.emailsSent > 0 || this.stats.emailsReceived > 0) {
+  // Mise à jour lastUsed si des emails ont été envoyés
+  if (this.isModified('stats.emailsSent') || this.isModified('stats.emailsReceived')) {
     this.stats.lastUsed = Date.now();
   }
-  
   next();
 });
 
@@ -198,32 +166,14 @@ companyEmailSchema.methods.incrementReceived = function() {
   return this.save();
 };
 
-// Activer une notification spécifique
-companyEmailSchema.methods.enableNotification = function(type) {
-  if (this.notifications.hasOwnProperty(type)) {
-    this.notifications[type] = true;
-    return this.save();
-  }
-  throw new Error(`Type de notification invalide: ${type}`);
-};
-
-// Désactiver une notification spécifique
-companyEmailSchema.methods.disableNotification = function(type) {
-  if (this.notifications.hasOwnProperty(type)) {
-    this.notifications[type] = false;
-    return this.save();
-  }
-  throw new Error(`Type de notification invalide: ${type}`);
-};
-
 // ======================================================
-// 📋 MÉTHODES STATIQUES
+// 📋 MÉTHODES STATIQUES (Appelées par le contrôleur)
 // ======================================================
 
 // Récupérer tous les emails actifs
 companyEmailSchema.statics.getActiveEmails = function() {
   return this.find({ isActive: true })
-    .populate('assignedTo', 'name email role')
+    .populate('assignedTo', 'name email role photo') // ✅ AJOUT DE PHOTO
     .populate('createdBy', 'name email')
     .sort({ createdAt: -1 });
 };
@@ -231,13 +181,14 @@ companyEmailSchema.statics.getActiveEmails = function() {
 // Récupérer les emails par type
 companyEmailSchema.statics.getByType = function(emailType) {
   return this.find({ emailType, isActive: true })
-    .populate('assignedTo', 'name email role')
+    .populate('assignedTo', 'name email role photo') // ✅ AJOUT DE PHOTO
     .sort({ createdAt: -1 });
 };
 
 // Récupérer les emails assignés à un collaborateur
 companyEmailSchema.statics.getAssignedTo = function(userId) {
   return this.find({ assignedTo: userId, isActive: true })
+    .populate('assignedTo', 'name email role photo')
     .sort({ createdAt: -1 });
 };
 
@@ -247,7 +198,7 @@ companyEmailSchema.statics.getQuoteNotificationEmails = function() {
     'notifications.quotes': true, 
     isActive: true 
   })
-  .populate('assignedTo', 'name email')
+  .populate('assignedTo', 'name email photo')
   .select('email displayName assignedTo');
 };
 
@@ -257,7 +208,7 @@ companyEmailSchema.statics.getContactNotificationEmails = function() {
     'notifications.contactMessages': true, 
     isActive: true 
   })
-  .populate('assignedTo', 'name email')
+  .populate('assignedTo', 'name email photo')
   .select('email displayName assignedTo');
 };
 
