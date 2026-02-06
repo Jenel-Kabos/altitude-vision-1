@@ -11,58 +11,67 @@ const router = express.Router();
 // 📦 Import des contrôleurs et middlewares
 // =============================================================
 const adminController = require('../controllers/adminController');
-const authMiddleware = require('../middleware/authMiddleware');
+
+// ✅ CORRECTION : Utilisation du contrôleur d'auth unifié (et pas l'ancien middleware)
+const authController = require('../controllers/authController');
 
 // =============================================================
 // 🛡️ ACCÈS RÉSERVÉ À L'ADMINISTRATEUR
 // =============================================================
-router.use(authMiddleware.protect);
-router.use(authMiddleware.restrictTo('Admin', 'Collaborateur')); // Ajout de 'Collaborateur' comme prévu dans ta doc
+// Toutes les routes ci-dessous nécessitent d'être connecté
+router.use(authController.protect);
+
+// Seuls les Admins et Collaborateurs peuvent accéder
+router.use(authController.restrictTo('Admin', 'Collaborateur'));
+
+
+// =============================================================
+// 📊 STATISTIQUES GLOBALES (Dashboard)
+// =============================================================
+router.get('/stats', adminController.getDashboardStats);
+router.get('/activity', adminController.getActivityReport);
+
 
 // =============================================================
 // 🏠 GESTION DES PROPRIÉTÉS / PUBLICATIONS
 // =============================================================
 
-// 🔹 Obtenir toutes les propriétés (avec filtrage facultatif)
-router.route('/properties')
-  .get(adminController.getAllProperties);
+// 🔹 Obtenir uniquement les propriétés en attente (AVANT /properties/:id)
+router.get('/properties/status/pending', adminController.getPendingProperties);
 
-// 🔹 Obtenir uniquement les propriétés en attente
-router.route('/properties/status/pending')
-  .get(adminController.getPendingProperties);
-
-// 🔹 Actions sur une propriété spécifique
-router.route('/properties/:id')
-  // .get(adminController.getProperty) // Optionnel : à implémenter si besoin
-  .delete(adminController.deleteProperty);
+// 🔹 Obtenir toutes les propriétés
+router.get('/properties', adminController.getAllProperties);
 
 // 🔹 Validation ou rejet d'une propriété
 router.patch('/properties/:id/approve', adminController.approveProperty);
 router.patch('/properties/:id/reject', adminController.rejectProperty);
 
+// 🔹 Suppression d'une propriété spécifique
+router.delete('/properties/:id', adminController.deleteProperty);
+
+
 // =============================================================
 // 👤 GESTION DES UTILISATEURS / PROPRIÉTAIRES
 // =============================================================
 
-// 🔹 Obtenir les sessions actives (utilisateurs connectés)
-router.route('/owners/active-sessions')
-  .get(adminController.getConnectedUsers);
+// 🔹 Obtenir les sessions actives (IMPORTANT : Avant /:id)
+router.get('/owners/active-sessions', adminController.getConnectedUsers);
 
-// 🔹 Obtenir tous les propriétaires
-router.route('/owners')
-  .get(adminController.getAllOwners);
+// 🔹 Obtenir tous les utilisateurs (Route appelée par le UserManagementPage)
+// Note : On mappe sur getAllUsers pour voir tout le monde (Clients + Propriétaires)
+router.get('/owners', adminController.getAllUsers);
 
-// 🔹 Gestion individuelle d’un propriétaire
-router.route('/owners/:id')
-  .get(adminController.getUser)          // Récupération des infos d’un propriétaire
-  .patch(adminController.updateUser)     // Mise à jour des infos générales
-  .delete(adminController.deleteUser);   // Suppression d’un utilisateur
-
-// 🔹 Actions spécifiques sur un propriétaire
-router.patch('/owners/:id/verify', adminController.verifyOwner);   // ✅ Fonction désormais existante
+// 🔹 Actions spécifiques sur un utilisateur
+router.patch('/owners/:id/verify', adminController.verifyOwner);
 router.patch('/owners/:id/suspend', adminController.suspendUser);
 router.patch('/owners/:id/activate', adminController.activateUser);
 router.patch('/owners/:id/ban', adminController.banUser);
+
+// 🔹 Gestion individuelle (CRUD)
+router.route('/owners/:id')
+  .get(adminController.getUser)          // Voir les détails
+  .patch(adminController.updateUser)     // Modifier
+  .delete(adminController.deleteUser);   // Supprimer
 
 // =============================================================
 // 🚀 EXPORT DU ROUTEUR

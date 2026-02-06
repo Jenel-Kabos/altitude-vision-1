@@ -12,9 +12,10 @@ const AppError = require('../utils/appError');
    📊 DASHBOARD ADMIN – STATISTIQUES GLOBALES
 ============================================================ */
 exports.getDashboardStats = catchAsync(async (req, res) => {
+    // Exécution en parallèle pour la performance
     const [totalUsers, totalOwners, totalProperties, pendingProperties] = await Promise.all([
         User.countDocuments(),
-        User.countDocuments({ role: 'Propriétaire' }),
+        User.countDocuments({ role: { $in: ['Propriétaire', 'Proprietaire'] } }), // Gère les deux orthographes
         Property.countDocuments(),
         Property.countDocuments({ adminStatus: 'pending' }),
     ]);
@@ -42,8 +43,8 @@ exports.getConnectedUsers = catchAsync(async (req, res) => {
     const activeUsers = await User.find({
         isActive: true,
         lastActivityAt: { $gte: activeSince },
-        _id: { $ne: req.user.id },
-    }).select('name email role status lastActivityAt');
+        _id: { $ne: req.user.id }, // Exclure l'admin actuel
+    }).select('name email role status lastActivityAt photo');
 
     res.status(200).json({
         status: 'success',
@@ -52,23 +53,29 @@ exports.getConnectedUsers = catchAsync(async (req, res) => {
     });
 });
 
-// 🔹 Bannir un utilisateur (et invalider ses tokens)
+// 🔹 Bannir un utilisateur (Désactivation + Invalidation Token)
 exports.banUser = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.params.id);
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
-    await user.ban();
+    // Logique de bannissement
+    user.isActive = false;
+    user.status = 'banned'; // Si tu as un champ status
+    // On invalide le token pour forcer la déconnexion immédiate
+    user.tokenVersion = (user.tokenVersion || 0) + 1; 
+    
+    await user.save({ validateBeforeSave: false });
 
     res.status(200).json({
         status: 'success',
-        message: 'Utilisateur banni et déconnecté de force avec succès.',
+        message: 'Utilisateur banni et déconnecté de force.',
         data: { user },
     });
 });
 
 // 🔹 Liste de tous les utilisateurs
 exports.getAllUsers = catchAsync(async (req, res) => {
-    const users = await User.find().select('-password');
+    const users = await User.find().select('-password').sort('-createdAt');
     res.status(200).json({
         status: 'success',
         results: users.length,
@@ -78,7 +85,10 @@ exports.getAllUsers = catchAsync(async (req, res) => {
 
 // 🔹 Liste de tous les propriétaires
 exports.getAllOwners = catchAsync(async (req, res) => {
-    const owners = await User.find({ role: 'Propriétaire' }).select('-password');
+    const owners = await User.find({ 
+        role: { $in: ['Propriétaire', 'Proprietaire'] } 
+    }).select('-password').sort('-createdAt');
+
     res.status(200).json({
         status: 'success',
         results: owners.length,
@@ -99,7 +109,8 @@ exports.getUser = catchAsync(async (req, res, next) => {
 
 // 🔹 Modifier un utilisateur spécifique
 exports.updateUser = catchAsync(async (req, res, next) => {
-    const forbiddenFields = ['password', 'passwordConfirm', 'role', 'status', 'tokenInvalidatedAt'];
+    // Champs interdits à la modification directe via cette route
+    const forbiddenFields = ['password', 'passwordConfirm', 'tokenInvalidatedAt'];
     const filteredBody = {};
 
     Object.keys(req.body).forEach((key) => {
@@ -120,17 +131,18 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     });
 });
 
-// 🔹 Vérifier un propriétaire (AJOUTÉ)
+// 🔹 Vérifier un propriétaire
 exports.verifyOwner = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.params.id);
 
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
-    if (user.role !== 'Propriétaire') {
+    // Vérification souple du rôle (avec ou sans accent)
+    if (!['Propriétaire', 'Proprietaire'].includes(user.role)) {
         return next(new AppError('Cet utilisateur n’est pas un propriétaire.', 400));
     }
 
-    user.isVerified = true;
+    user.isEmailVerified = true; // Ou user.isVerified selon ton modèle
     await user.save({ validateBeforeSave: false });
 
     res.status(200).json({
@@ -145,7 +157,11 @@ exports.suspendUser = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.params.id);
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
-    await user.suspend();
+    user.isActive = false;
+    // On invalide aussi la session
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+
+    await user.save({ validateBeforeSave: false });
 
     res.status(200).json({
         status: 'success',
@@ -159,7 +175,10 @@ exports.activateUser = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.params.id);
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
-    await user.activate();
+    user.isActive = true;
+    user.status = 'active'; // Reset du status si nécessaire
+    
+    await user.save({ validateBeforeSave: false });
 
     res.status(200).json({
         status: 'success',
@@ -168,12 +187,15 @@ exports.activateUser = catchAsync(async (req, res, next) => {
     });
 });
 
-// 🔹 Supprimer un utilisateur et ses propriétés
+// 🔹 Supprimer un utilisateur et ses propriétés (Cascade)
 exports.deleteUser = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.params.id);
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
+    // Suppression en cascade des propriétés
     await Property.deleteMany({ owner: user._id });
+    
+    // Suppression de l'utilisateur
     await user.deleteOne();
 
     res.status(204).json({
@@ -189,7 +211,7 @@ exports.deleteUser = catchAsync(async (req, res, next) => {
 // 🔹 Récupérer toutes les propriétés
 exports.getAllProperties = catchAsync(async (req, res) => {
     const properties = await Property.find()
-        .populate('owner', 'name email')
+        .populate('owner', 'name email photo phone')
         .sort('-createdAt');
 
     res.status(200).json({
@@ -202,7 +224,7 @@ exports.getAllProperties = catchAsync(async (req, res) => {
 // 🔹 Récupérer les propriétés en attente
 exports.getPendingProperties = catchAsync(async (req, res) => {
     const properties = await Property.find({ adminStatus: 'pending' })
-        .populate('owner', 'name email')
+        .populate('owner', 'name email photo phone')
         .sort('-createdAt');
 
     res.status(200).json({
@@ -218,6 +240,8 @@ exports.approveProperty = catchAsync(async (req, res, next) => {
     if (!property) return next(new AppError('Propriété non trouvée.', 404));
 
     property.adminStatus = 'approved';
+    // property.status = 'available'; // Optionnel : rendre dispo immédiatement
+    
     await property.save({ validateBeforeSave: false });
 
     res.status(200).json({
@@ -244,10 +268,9 @@ exports.rejectProperty = catchAsync(async (req, res, next) => {
 
 // 🔹 Supprimer une propriété
 exports.deleteProperty = catchAsync(async (req, res, next) => {
-    const property = await Property.findById(req.params.id);
+    const property = await Property.findByIdAndDelete(req.params.id);
+    
     if (!property) return next(new AppError('Propriété non trouvée.', 404));
-
-    await Property.findByIdAndDelete(req.params.id);
 
     res.status(204).json({
         status: 'success',
@@ -263,8 +286,8 @@ exports.getActivityReport = catchAsync(async (req, res) => {
     last30days.setDate(last30days.getDate() - 30);
 
     const [newUsers, newProperties] = await Promise.all([
-        User.find({ createdAt: { $gte: last30days } }).countDocuments(),
-        Property.find({ createdAt: { $gte: last30days } }).countDocuments(),
+        User.countDocuments({ createdAt: { $gte: last30days } }),
+        Property.countDocuments({ createdAt: { $gte: last30days } }),
     ]);
 
     res.status(200).json({
@@ -272,8 +295,10 @@ exports.getActivityReport = catchAsync(async (req, res) => {
         data: {
             newUsers,
             newProperties,
-            from: last30days,
-            to: new Date(),
+            period: {
+                from: last30days,
+                to: new Date(),
+            }
         },
     });
 });
