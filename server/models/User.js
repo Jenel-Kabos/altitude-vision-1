@@ -1,7 +1,7 @@
 // server/models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const crypto = require('crypto'); // ✅ AJOUT INDISPENSABLE POUR LES TOKENS
+const crypto = require('crypto');
 
 // ======================================================
 // 🧩 SCHÉMA UTILISATEUR
@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema(
 
         role: {
             type: String,
-            // 'Proprietaire' (sans accent) pour matcher le Frontend
+            // 'Proprietaire' (sans accent) pour compatibilité Frontend
             enum: ['User', 'Client', 'Proprietaire', 'Collaborateur', 'Admin', 'Prestataire'],
             default: 'User',
         },
@@ -51,6 +51,7 @@ const userSchema = new mongoose.Schema(
             required: [true, 'Veuillez confirmer votre mot de passe'],
             validate: {
                 validator: function (el) {
+                    // Fonctionne uniquement au CREATE et SAVE
                     return el === this.password;
                 },
                 message: 'Les mots de passe ne sont pas identiques !',
@@ -73,10 +74,10 @@ const userSchema = new mongoose.Schema(
         isActive: {
             type: Boolean,
             default: true,
-            select: false,
+            select: true,
         },
 
-        // ✅ AJOUT EMAIL VERIFICATION
+        // 🔹 Vérification Email
         isEmailVerified: {
             type: Boolean,
             default: false,
@@ -84,7 +85,7 @@ const userSchema = new mongoose.Schema(
         emailVerificationToken: String,
         emailVerificationExpires: Date,
 
-        // 🔹 Indique si le propriétaire est vérifié par un administrateur (KYC)
+        // 🔹 Vérification Propriétaire (KYC Admin)
         isVerified: {
             type: Boolean,
             default: false,
@@ -97,13 +98,16 @@ const userSchema = new mongoose.Schema(
             default: 'Actif',
         },
 
+        // 🔹 SÉCURITÉ & SESSIONS (Critique pour ActiveSessionsPage)
         tokenVersion: {
             type: Number,
             default: 0,
         },
-
         lastLoginAt: Date,
-        lastActivityAt: Date,
+        lastActivityAt: { 
+            type: Date, 
+            default: Date.now 
+        },
 
         passwordChangedAt: Date,
         passwordResetToken: String,
@@ -125,7 +129,7 @@ userSchema.pre('save', async function (next) {
 });
 
 // ======================================================
-// ⏰ Middleware: Mise à jour du timestamp passwordChangedAt
+// ⏰ Middleware: timestamp passwordChangedAt
 // ======================================================
 userSchema.pre('save', function (next) {
     if (!this.isModified('password') || this.isNew) return next();
@@ -137,10 +141,12 @@ userSchema.pre('save', function (next) {
 // 🔐 Méthodes d'Instance
 // ======================================================
 
-userSchema.methods.correctPassword = async function (candidatePassword, userPassword) {
+// Vérification du mot de passe (Renommé en matchPassword pour le standard)
+userSchema.methods.matchPassword = async function (candidatePassword, userPassword) {
     return await bcrypt.compare(candidatePassword, userPassword);
 };
 
+// Vérifie si le mot de passe a changé après l'émission du token
 userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
     if (this.passwordChangedAt) {
         const changedTimestamp = parseInt(this.passwordChangedAt.getTime() / 1000, 10);
@@ -149,26 +155,25 @@ userSchema.methods.changedPasswordAfter = function (JWTTimestamp) {
     return false;
 };
 
-// ✅ AJOUT EMAIL VERIFICATION : Génération du token
+// Génération du token de vérification email
 userSchema.methods.createEmailVerificationToken = function () {
     const resetToken = crypto.randomBytes(32).toString('hex');
 
-    // On hash le token pour la base de données (sécurité)
     this.emailVerificationToken = crypto
         .createHash('sha256')
         .update(resetToken)
         .digest('hex');
 
-    // Le token expire dans 24 heures
     this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000;
 
-    return resetToken; // On renvoie la version claire pour l'envoyer par email
+    return resetToken;
 };
 
 // ======================================================
-// ⚙️ Méthodes Administratives
+// ⚙️ Méthodes Administratives (Helpers)
 // ======================================================
 
+// Force la déconnexion de toutes les sessions
 userSchema.methods.invalidateTokens = async function () {
     this.tokenVersion += 1;
     await this.save({ validateBeforeSave: false });
@@ -185,20 +190,14 @@ userSchema.methods.suspend = async function () {
     if (this.role === 'Admin') throw new Error('Impossible de suspendre un administrateur.');
     this.status = 'Suspendu';
     this.isActive = false;
-    await this.save({ validateBeforeSave: false });
+    // On invalide aussi le token pour une suspension immédiate
+    await this.invalidateTokens(); 
 };
 
 userSchema.methods.activate = async function () {
     this.status = 'Actif';
     this.isActive = true;
     await this.save({ validateBeforeSave: false });
-};
-
-userSchema.methods.verifyOwner = async function () {
-    if (this.role === 'Proprietaire') {
-        this.isVerified = true;
-        await this.save({ validateBeforeSave: false });
-    }
 };
 
 // ======================================================

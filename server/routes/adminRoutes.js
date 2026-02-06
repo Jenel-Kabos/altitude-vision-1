@@ -12,7 +12,7 @@ const router = express.Router();
 // =============================================================
 const adminController = require('../controllers/adminController');
 
-// ✅ CORRECTION : Utilisation du contrôleur d'auth unifié (et pas l'ancien middleware)
+// ✅ CORRECTION : Utilisation du contrôleur d'auth unifié
 const authController = require('../controllers/authController');
 
 // =============================================================
@@ -36,7 +36,7 @@ router.get('/activity', adminController.getActivityReport);
 // 🏠 GESTION DES PROPRIÉTÉS / PUBLICATIONS
 // =============================================================
 
-// 🔹 Obtenir uniquement les propriétés en attente (AVANT /properties/:id)
+// 🔹 Obtenir uniquement les propriétés en attente
 router.get('/properties/status/pending', adminController.getPendingProperties);
 
 // 🔹 Obtenir toutes les propriétés
@@ -54,24 +54,24 @@ router.delete('/properties/:id', adminController.deleteProperty);
 // 👤 GESTION DES UTILISATEURS / PROPRIÉTAIRES
 // =============================================================
 
-// 🔹 Obtenir les sessions actives (IMPORTANT : Avant /:id)
+// 🚨 CRITIQUE : Cette route doit être AVANT '/owners/:id'
+// Sinon "active-sessions" est pris pour un ID, ce qui plante le serveur.
 router.get('/owners/active-sessions', adminController.getConnectedUsers);
 
-// 🔹 Obtenir tous les utilisateurs (Route appelée par le UserManagementPage)
-// Note : On mappe sur getAllUsers pour voir tout le monde (Clients + Propriétaires)
+// 🔹 Obtenir tous les utilisateurs
 router.get('/owners', adminController.getAllUsers);
 
-// 🔹 Actions spécifiques sur un utilisateur
+// 🔹 Actions spécifiques sur un utilisateur (Verify, Suspend, Ban...)
 router.patch('/owners/:id/verify', adminController.verifyOwner);
 router.patch('/owners/:id/suspend', adminController.suspendUser);
 router.patch('/owners/:id/activate', adminController.activateUser);
 router.patch('/owners/:id/ban', adminController.banUser);
 
-// 🔹 Gestion individuelle (CRUD)
+// 🔹 Gestion individuelle (CRUD générique sur l'ID)
 router.route('/owners/:id')
-  .get(adminController.getUser)          // Voir les détails
-  .patch(adminController.updateUser)     // Modifier
-  .delete(adminController.deleteUser);   // Supprimer
+  .get(adminController.getUser)      // Voir les détails
+  .patch(adminController.updateUser) // Modifier
+  .delete(adminController.deleteUser); // Supprimer
 
 // =============================================================
 // 🚀 EXPORT DU ROUTEUR
