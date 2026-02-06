@@ -1,18 +1,16 @@
-// ✅ src/main.jsx
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App.jsx';
-import './index.css';
-import { AuthProvider } from './context/AuthContext';
-import { BrowserRouter } from 'react-router-dom';
+// src/main.jsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+import './index.css'
+// Change l'import ici :
+import { HashRouter } from 'react-router-dom' 
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  // La boucle infinie était causée par le <div> inutile ici.
-  // Les fournisseurs doivent être l'enfant direct de root.render().
-  
-  <AuthProvider>
-    <BrowserRouter>
+  <React.StrictMode>
+    {/* Utilise HashRouter au lieu de BrowserRouter */}
+    <HashRouter>
       <App />
-    </BrowserRouter>
-  </AuthProvider>
-);
+    </HashRouter>
+  </React.StrictMode>,
+)
