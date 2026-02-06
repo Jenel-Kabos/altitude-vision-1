@@ -58,20 +58,10 @@ const internalMailSchema = new mongoose.Schema({
   // ========== PIÈCES JOINTES ==========
   attachments: [
     {
-      filename: { 
-        type: String, 
-        required: true 
-      },
-      filepath: { 
-        type: String, 
-        required: true 
-      },
-      mimetype: { 
-        type: String 
-      },
-      size: { 
-        type: Number 
-      }
+      filename: { type: String, required: true },
+      filepath: { type: String, required: true },
+      mimetype: { type: String },
+      size: { type: Number }
     }
   ],
   
@@ -92,7 +82,6 @@ internalMailSchema.index({ receiver: 1, isRead: 1 });
 internalMailSchema.index({ receiver: 1, isStarred: 1 });
 internalMailSchema.index({ sender: 1, isDraft: 1 });
 internalMailSchema.index({ receiver: 1, isDeleted: 1 });
-internalMailSchema.index({ sender: 1, isDeleted: 1 });
 
 // ========== MÉTHODES STATIQUES ==========
 
@@ -108,7 +97,7 @@ internalMailSchema.statics.getInbox = function(userId, options = {}) {
     isDraft: false,
     isDeleted: false,
   })
-    .populate('sender', 'name email avatar')
+    .populate('sender', 'name email photo') // ✅ Correction: photo au lieu de avatar
     .sort({ createdAt: -1 })
     .limit(parseInt(limit))
     .skip(skip);
@@ -126,7 +115,7 @@ internalMailSchema.statics.getSent = function(userId, options = {}) {
     isDraft: false,
     isDeleted: false,
   })
-    .populate('receiver', 'name email avatar')
+    .populate('receiver', 'name email photo') // ✅ Correction: photo
     .sort({ createdAt: -1 })
     .limit(parseInt(limit))
     .skip(skip);
@@ -145,7 +134,7 @@ internalMailSchema.statics.getUnread = function(userId, options = {}) {
     isDraft: false,
     isDeleted: false,
   })
-    .populate('sender', 'name email avatar')
+    .populate('sender', 'name email photo') // ✅ Correction: photo
     .sort({ createdAt: -1 })
     .limit(parseInt(limit))
     .skip(skip);
@@ -166,8 +155,8 @@ internalMailSchema.statics.getStarred = function(userId, options = {}) {
     isDraft: false,
     isDeleted: false,
   })
-    .populate('sender', 'name email avatar')
-    .populate('receiver', 'name email avatar')
+    .populate('sender', 'name email photo') // ✅ Correction: photo
+    .populate('receiver', 'name email photo')
     .sort({ createdAt: -1 })
     .limit(parseInt(limit))
     .skip(skip);
@@ -185,7 +174,7 @@ internalMailSchema.statics.getDrafts = function(userId, options = {}) {
     isDraft: true,
     isDeleted: false,
   })
-    .populate('receiver', 'name email avatar')
+    .populate('receiver', 'name email photo') // ✅ Correction: photo
     .sort({ createdAt: -1 })
     .limit(parseInt(limit))
     .skip(skip);
@@ -204,8 +193,8 @@ internalMailSchema.statics.getTrash = function(userId, options = {}) {
       { sender: userId, isDeleted: true }
     ],
   })
-    .populate('sender', 'name email avatar')
-    .populate('receiver', 'name email avatar')
+    .populate('sender', 'name email photo') // ✅ Correction: photo
+    .populate('receiver', 'name email photo')
     .sort({ deletedAt: -1 })
     .limit(parseInt(limit))
     .skip(skip);

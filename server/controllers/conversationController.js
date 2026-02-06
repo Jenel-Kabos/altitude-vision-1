@@ -1,8 +1,15 @@
 // server/controllers/conversationController.js
 const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
-const Conversation = require('../models/Conversation');
 const User = require('../models/User');
+
+// Gestion optionnelle du modèle Conversation
+let Conversation = null;
+try {
+  Conversation = require('../models/Conversation');
+} catch (error) {
+  // Le modèle n'existe pas encore, on fera sans (mode basé sur les messages)
+}
 
 /**
  * @description Récupérer toutes les conversations de l'utilisateur
@@ -10,75 +17,66 @@ const User = require('../models/User');
  * @access Protected
  */
 exports.getConversations = asyncHandler(async (req, res) => {
-  // Si vous avez un modèle Conversation
+  // Option 1 : Si le modèle Conversation existe et est utilisé
   if (Conversation) {
     const conversations = await Conversation.find({
       participants: req.user.id
     })
-      .populate('participants', 'name email avatar')
+      .populate('participants', 'name email photo') // ✅ Correction: photo
       .populate('lastMessage')
       .sort({ updatedAt: -1 });
 
-    res.status(200).json({
+    return res.status(200).json({
       status: 'success',
       results: conversations.length,
-      data: {
-        conversations,
-      },
+      data: { conversations },
     });
-  } else {
-    // Sinon, construire les conversations à partir des messages
-    const messages = await Message.find({
-      $or: [{ sender: req.user.id }, { receiver: req.user.id }],
-    })
-      .populate('sender', 'name email avatar')
-      .populate('receiver', 'name email avatar')
-      .sort({ createdAt: -1 });
+  } 
+  
+  // Option 2 (Fallback) : Construire les conversations à partir des messages
+  const messages = await Message.find({
+    $or: [{ sender: req.user.id }, { receiver: req.user.id }],
+  })
+    .populate('sender', 'name email photo') // ✅ Correction: photo
+    .populate('receiver', 'name email photo') // ✅ Correction: photo
+    .sort({ createdAt: -1 });
 
-    const conversationsMap = new Map();
+  const conversationsMap = new Map();
 
-    messages.forEach((message) => {
-      const otherUserId =
-        message.sender._id.toString() === req.user.id
-          ? message.receiver._id.toString()
-          : message.sender._id.toString();
+  messages.forEach((message) => {
+    // Identifier l'autre personne
+    const isSender = message.sender._id.toString() === req.user.id;
+    const otherUserId = isSender ? message.receiver._id.toString() : message.sender._id.toString();
+    const otherUser = isSender ? message.receiver : message.sender;
 
-      if (!conversationsMap.has(otherUserId)) {
-        const otherUser =
-          message.sender._id.toString() === req.user.id
-            ? message.receiver
-            : message.sender;
-
-        conversationsMap.set(otherUserId, {
-          _id: otherUserId,
-          user: otherUser,
-          lastMessage: message,
-          unreadCount: 0,
-          updatedAt: message.createdAt,
-        });
-      }
-    });
-
-    // Compter les messages non lus pour chaque conversation
-    for (const [userId, conversation] of conversationsMap.entries()) {
-      const unreadCount = await Message.countDocuments({
-        sender: userId,
-        receiver: req.user.id,
-        isRead: false,
+    if (!conversationsMap.has(otherUserId)) {
+      conversationsMap.set(otherUserId, {
+        _id: otherUserId,
+        user: otherUser,
+        lastMessage: message,
+        unreadCount: 0,
+        updatedAt: message.createdAt,
       });
-      conversation.unreadCount = unreadCount;
     }
+  });
 
-    const conversations = Array.from(conversationsMap.values());
-
-    res.status(200).json({
-      status: 'success',
-      results: conversations.length,
-      data: {
-        conversations,
-      },
+  // Compter les messages non lus pour chaque conversation
+  for (const [userId, conversation] of conversationsMap.entries()) {
+    const unreadCount = await Message.countDocuments({
+      sender: userId,
+      receiver: req.user.id,
+      isRead: false,
     });
+    conversation.unreadCount = unreadCount;
   }
+
+  const conversations = Array.from(conversationsMap.values());
+
+  res.status(200).json({
+    status: 'success',
+    results: conversations.length,
+    data: { conversations },
+  });
 });
 
 /**
@@ -90,23 +88,23 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const { page = 1, limit = 50 } = req.query;
 
-  // Vérifier que conversationId est un ObjectId valide
-  if (!conversationId || !conversationId.match(/^[0-9a-fA-F]{24}$/)) {
+  // Validation ID simple
+  if (!conversationId) {
     res.status(400);
     throw new Error('ID de conversation invalide.');
   }
 
   const skip = (page - 1) * limit;
 
-  // Récupérer les messages entre l'utilisateur et l'autre personne
+  // Récupérer les messages
   const messages = await Message.find({
     $or: [
       { sender: req.user.id, receiver: conversationId },
       { sender: conversationId, receiver: req.user.id },
     ],
   })
-    .populate('sender', 'name email avatar')
-    .populate('receiver', 'name email avatar')
+    .populate('sender', 'name email photo') // ✅ Correction: photo
+    .populate('receiver', 'name email photo') // ✅ Correction: photo
     .sort({ createdAt: 1 })
     .limit(parseInt(limit))
     .skip(skip);
@@ -128,12 +126,9 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
     status: 'success',
     results: messages.length,
     total,
-    totalMessages: total,
     page: parseInt(page),
     totalPages: Math.ceil(total / limit),
-    data: {
-      messages,
-    },
+    data: { messages },
   });
 });
 
@@ -145,13 +140,6 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
 exports.markConversationAsRead = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
 
-  // Vérifier que conversationId est un ObjectId valide
-  if (!conversationId || !conversationId.match(/^[0-9a-fA-F]{24}$/)) {
-    res.status(400);
-    throw new Error('ID de conversation invalide.');
-  }
-
-  // Marquer tous les messages de cette conversation comme lus
   const result = await Message.updateMany(
     {
       sender: conversationId,
@@ -166,9 +154,7 @@ exports.markConversationAsRead = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     status: 'success',
-    data: {
-      markedCount: result.modifiedCount,
-    },
+    data: { markedCount: result.modifiedCount },
   });
 });
 
@@ -178,56 +164,52 @@ exports.markConversationAsRead = asyncHandler(async (req, res) => {
  * @access Protected
  */
 exports.createOrGetConversation = asyncHandler(async (req, res) => {
-  // Accepter TOUS les formats possibles pour compatibilité maximale
   const { participantId, userId, otherUserId, receiverId, recipientId } = req.body;
   const targetUserId = participantId || userId || otherUserId || receiverId || recipientId;
 
   if (!targetUserId) {
     res.status(400);
-    throw new Error('ID du participant requis (recipientId, participantId, userId, otherUserId ou receiverId).');
+    throw new Error('ID du participant requis.');
   }
 
-  // Vérifier que le participant existe
   const participant = await User.findById(targetUserId);
   if (!participant) {
     res.status(404);
     throw new Error('Participant non trouvé.');
   }
 
-  // Si vous avez un modèle Conversation
+  // Si le modèle Conversation existe
   if (Conversation) {
     let conversation = await Conversation.findOne({
       participants: { $all: [req.user.id, targetUserId] },
-    }).populate('participants', 'name email avatar');
+    }).populate('participants', 'name email photo'); // ✅ Correction
 
     if (!conversation) {
       conversation = await Conversation.create({
         participants: [req.user.id, targetUserId],
       });
-      await conversation.populate('participants', 'name email avatar');
+      await conversation.populate('participants', 'name email photo'); // ✅ Correction
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       status: 'success',
-      data: {
-        conversation,
-      },
+      data: { conversation },
     });
-  } else {
-    // Sinon, retourner simplement l'ID du participant comme conversationId
-    res.status(200).json({
-      status: 'success',
-      data: {
-        conversation: {
-          _id: targetUserId,
-          participants: [
-            { _id: req.user.id, name: req.user.name, email: req.user.email },
-            { _id: participant._id, name: participant.name, email: participant.email },
-          ],
-        },
+  } 
+
+  // Fallback sans modèle Conversation
+  res.status(200).json({
+    status: 'success',
+    data: {
+      conversation: {
+        _id: targetUserId, // On utilise l'ID de l'autre user comme ID de conversation
+        participants: [
+          { _id: req.user.id, name: req.user.name, email: req.user.email, photo: req.user.photo },
+          { _id: participant._id, name: participant.name, email: participant.email, photo: participant.photo },
+        ],
       },
-    });
-  }
+    },
+  });
 });
 
 /**
@@ -238,7 +220,6 @@ exports.createOrGetConversation = asyncHandler(async (req, res) => {
 exports.deleteConversation = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
 
-  // Supprimer tous les messages de la conversation
   const result = await Message.deleteMany({
     $or: [
       { sender: req.user.id, receiver: conversationId },
@@ -246,27 +227,33 @@ exports.deleteConversation = asyncHandler(async (req, res) => {
     ],
   });
 
-  console.log(`✅ [deleteConversation] ${result.deletedCount} message(s) supprimé(s)`);
-
-  // Si vous avez un modèle Conversation, le supprimer aussi
   if (Conversation) {
-    await Conversation.findByIdAndDelete(conversationId);
+    try {
+        // Essayer de supprimer par ID ou par participant
+        await Conversation.findOneAndDelete({
+             $or: [
+                 { _id: conversationId }, // Si c'est un vrai ID de conversation
+                 { participants: { $all: [req.user.id, conversationId] } } // Si c'est un ID user
+             ]
+        });
+    } catch (e) {
+        // Ignorer erreur de cast si ID invalide
+    }
   }
 
   res.status(200).json({
     status: 'success',
-    data: {
-      deletedCount: result.deletedCount,
-    },
+    data: { deletedCount: result.deletedCount },
   });
 });
 
 /**
- * @description Compter les messages non lus dans toutes les conversations
+ * @description Compter les messages non lus (GLOBAL)
  * @route GET /api/conversations/count/unread
  * @access Protected
  */
-exports.countUnreadMessages = asyncHandler(async (req, res) => {
+// ✅ RENOMMAGE ICI : countUnreadMessages -> getUnreadCount
+exports.getUnreadCount = asyncHandler(async (req, res) => {
   const unreadCount = await Message.countDocuments({
     receiver: req.user.id,
     isRead: false,
@@ -274,8 +261,6 @@ exports.countUnreadMessages = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     status: 'success',
-    data: {
-      unreadCount,
-    },
+    data: { unreadCount },
   });
 });
