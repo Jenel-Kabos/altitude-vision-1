@@ -27,7 +27,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import MentionsLegales from "./pages/MentionsLegales";
 
-// ✅ NOUVEL IMPORT : Page de vérification d'email
+// Page de vérification d'email
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 
 // Pages Services Altimmo
@@ -46,6 +46,7 @@ import AddPropertyPage from "./pages/dashboard/AddPropertyPage";
 import ManageEventsPage from "./pages/dashboard/ManageEventsPage";
 import ManageQuotesPage from "./pages/dashboard/ManageQuotesPage";
 import ModerationPage from "./pages/dashboard/ModerationPage";
+// ✅ IMPORT CORRECT (Celui que nous avons corrigé)
 import UserManagementPage from "./pages/dashboard/UserManagementPage";
 import ActiveSessionsPage from "./pages/dashboard/ActiveSessionsPage"; 
 
@@ -167,6 +168,8 @@ function App() {
                             <Route path="events" element={<ManageEventsPage />} />
                             <Route path="quotes" element={<ManageQuotesPage />} />
                             <Route path="moderation" element={<ModerationPage />} />
+                            
+                            {/* C'est ici que la magie opère pour la gestion des utilisateurs */}
                             <Route path="users" element={<UserManagementPage />} />
                             
                             {/* GESTION DES PROJETS ALTCOM */}
