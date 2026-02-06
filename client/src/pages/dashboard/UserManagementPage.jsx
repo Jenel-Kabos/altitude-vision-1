@@ -1,12 +1,8 @@
 // src/pages/dashboard/UserManagementPage.jsx
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-// Importation de react-toastify
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
-// ✅ Utilisation de l'URL dynamique (Local en dev, Render en prod)
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const UserManagementPage = () => {
   const [users, setUsers] = useState([]);
@@ -14,19 +10,18 @@ const UserManagementPage = () => {
   const [error, setError] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null); 
   
-  // Endpoint spécifique pour la gestion des propriétaires/utilisateurs
-  const ENDPOINT = `${API_URL}/admin/owners`; 
+  // 🚨 ICI : On met l'adresse REELLE de ton site (plus de localhost)
+  const ENDPOINT = 'https://altitude-vision.onrender.com/api/admin/owners'; 
 
   // Récupération des utilisateurs
   const fetchUsers = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      // ✅ Utilisation de l'endpoint dynamique
       const res = await axios.get(ENDPOINT, { 
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Adaptation selon la structure de réponse (data.data.owners ou data.data.users)
+      // Adaptation selon la structure de réponse
       setUsers(res.data.data.owners || res.data.data.users || []);
       setError(null);
     } catch (err) {
@@ -71,7 +66,6 @@ const UserManagementPage = () => {
           return;
       }
 
-      // ✅ Appel API avec l'URL correcte
       const res = await axios({ 
         url, 
         method, 
@@ -82,17 +76,15 @@ const UserManagementPage = () => {
       if (action === 'delete') {
         setUsers(users.filter((u) => u._id !== userId));
       } else {
-        // Mise à jour locale de l'utilisateur avec l'objet mis à jour renvoyé
+        // Mise à jour locale
         setUsers(users.map((u) => (u._id === userId ? res.data.data.user || res.data.data.owner : u)));
       }
       
-      // Affichage du message de succès
       toast.success(successMessage);
       setSelectedUser(null);
 
     } catch (err) {
       console.error(`Erreur action ${action}:`, err);
-      // Affichage du message d'erreur spécifique ou par défaut
       const errorMessage = err.response?.data?.message || `Erreur lors de l'action "${action}".`;
       toast.error(errorMessage);
       setSelectedUser(null);
@@ -139,7 +131,6 @@ const UserManagementPage = () => {
                     </span>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap text-sm font-medium flex gap-2">
-                  {/* Bouton VÉRIFIER (Si pas encore vérifié) */}
                   {!user.isEmailVerified && (
                     <button
                       onClick={() => setSelectedUser({ ...user, actionType: 'verify' })}
@@ -148,8 +139,6 @@ const UserManagementPage = () => {
                       Vérifier
                     </button>
                   )}
-                  
-                  {/* Bouton SUSPENDRE/RÉACTIVER */}
                   {user.isActive ? (
                     <button
                       onClick={() => setSelectedUser({ ...user, actionType: 'suspend' })}
@@ -165,8 +154,6 @@ const UserManagementPage = () => {
                       Réactiver
                     </button>
                   )}
-
-                  {/* Bouton SUPPRIMER */}
                   <button
                     onClick={() => setSelectedUser({ ...user, actionType: 'delete' })}
                     className="text-red-600 hover:text-red-900 bg-red-50 px-2 py-1 rounded hover:bg-red-100"
@@ -183,7 +170,6 @@ const UserManagementPage = () => {
         )}
       </div>
       
-      {/* Modal de confirmation unifié */}
       {selectedUser && (
         <ConfirmationModal 
           user={selectedUser} 
@@ -195,8 +181,7 @@ const UserManagementPage = () => {
   );
 };
 
-
-// Composant Modal de Confirmation unifié
+// Composant Modal (inchangé)
 const ConfirmationModal = ({ user, onConfirm, onClose }) => {
     const { name, actionType } = user;
     let title = '';
@@ -207,7 +192,7 @@ const ConfirmationModal = ({ user, onConfirm, onClose }) => {
     switch (actionType) {
         case 'verify':
             title = 'Confirmer la vérification';
-            message = `Êtes-vous sûr de vouloir vérifier l'utilisateur ${name} ?`;
+            message = `Voulez-vous forcer la vérification de l'utilisateur ${name} ?`;
             confirmColor = 'bg-green-600 hover:bg-green-700';
             confirmText = 'Vérifier';
             break;
@@ -226,7 +211,7 @@ const ConfirmationModal = ({ user, onConfirm, onClose }) => {
         case 'delete':
         default:
             title = 'Confirmer la suppression';
-            message = `Êtes-vous sûr de vouloir supprimer l'utilisateur ${name} ? Cette action est irréversible.`;
+            message = `Êtes-vous sûr de vouloir supprimer définitivement ${name} ?`;
             confirmColor = 'bg-red-600 hover:bg-red-700';
             confirmText = 'Supprimer';
             break;
@@ -234,22 +219,12 @@ const ConfirmationModal = ({ user, onConfirm, onClose }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-xl p-6 w-11/12 md:w-1/3 transform transition-all scale-100">
+            <div className="bg-white rounded-xl shadow-xl p-6 w-11/12 md:w-1/3">
                 <h2 className="text-xl font-bold mb-4 text-gray-800">{title}</h2>
                 <p className="text-gray-600 mb-6">{message}</p>
                 <div className="flex justify-end gap-3">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 rounded-lg text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-                    >
-                        Annuler
-                    </button>
-                    <button
-                        onClick={() => onConfirm(user._id, actionType)}
-                        className={`px-4 py-2 rounded-lg text-white font-medium transition-colors ${confirmColor}`}
-                    >
-                        {confirmText}
-                    </button>
+                    <button onClick={onClose} className="px-4 py-2 rounded-lg text-gray-700 bg-gray-100 hover:bg-gray-200">Annuler</button>
+                    <button onClick={() => onConfirm(user._id, actionType)} className={`px-4 py-2 rounded-lg text-white font-medium ${confirmColor}`}>{confirmText}</button>
                 </div>
             </div>
         </div>
