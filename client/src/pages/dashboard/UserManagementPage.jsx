@@ -1,6 +1,7 @@
 // src/pages/dashboard/UserManagementPage.jsx
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+// Importation de react-toastify
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -81,15 +82,17 @@ const UserManagementPage = () => {
       if (action === 'delete') {
         setUsers(users.filter((u) => u._id !== userId));
       } else {
-        // Mise à jour locale de l'utilisateur
+        // Mise à jour locale de l'utilisateur avec l'objet mis à jour renvoyé
         setUsers(users.map((u) => (u._id === userId ? res.data.data.user || res.data.data.owner : u)));
       }
       
+      // Affichage du message de succès
       toast.success(successMessage);
       setSelectedUser(null);
 
     } catch (err) {
       console.error(`Erreur action ${action}:`, err);
+      // Affichage du message d'erreur spécifique ou par défaut
       const errorMessage = err.response?.data?.message || `Erreur lors de l'action "${action}".`;
       toast.error(errorMessage);
       setSelectedUser(null);
@@ -180,7 +183,7 @@ const UserManagementPage = () => {
         )}
       </div>
       
-      {/* Modal de confirmation */}
+      {/* Modal de confirmation unifié */}
       {selectedUser && (
         <ConfirmationModal 
           user={selectedUser} 
@@ -192,7 +195,8 @@ const UserManagementPage = () => {
   );
 };
 
-// Composant Modal de Confirmation
+
+// Composant Modal de Confirmation unifié
 const ConfirmationModal = ({ user, onConfirm, onClose }) => {
     const { name, actionType } = user;
     let title = '';
@@ -203,13 +207,13 @@ const ConfirmationModal = ({ user, onConfirm, onClose }) => {
     switch (actionType) {
         case 'verify':
             title = 'Confirmer la vérification';
-            message = `Voulez-vous forcer la vérification de l'utilisateur ${name} ?`;
+            message = `Êtes-vous sûr de vouloir vérifier l'utilisateur ${name} ?`;
             confirmColor = 'bg-green-600 hover:bg-green-700';
             confirmText = 'Vérifier';
             break;
         case 'suspend':
             title = 'Confirmer la suspension';
-            message = `Êtes-vous sûr de vouloir suspendre l'utilisateur ${name} ? Il ne pourra plus se connecter.`;
+            message = `Êtes-vous sûr de vouloir suspendre l'utilisateur ${name} ?`;
             confirmColor = 'bg-yellow-500 hover:bg-yellow-600';
             confirmText = 'Suspendre';
             break;
@@ -222,7 +226,7 @@ const ConfirmationModal = ({ user, onConfirm, onClose }) => {
         case 'delete':
         default:
             title = 'Confirmer la suppression';
-            message = `Êtes-vous sûr de vouloir supprimer définitivement ${name} ? Cette action est irréversible.`;
+            message = `Êtes-vous sûr de vouloir supprimer l'utilisateur ${name} ? Cette action est irréversible.`;
             confirmColor = 'bg-red-600 hover:bg-red-700';
             confirmText = 'Supprimer';
             break;
