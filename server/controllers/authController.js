@@ -1,10 +1,10 @@
 // server/controllers/authController.js
-const crypto = require('crypto'); // ✅ IMPORT NECESSAIRE
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { promisify } = require('util');
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
-const sendEmail = require('../utils/email'); // ✅ IMPORT NECESSAIRE
+const sendEmail = require('../utils/email');
 
 // Utility: create & send token
 const createSendToken = (user, statusCode, res) => {
@@ -69,7 +69,6 @@ exports.signup = async (req, res) => {
         await newUser.save({ validateBeforeSave: false });
 
         // 4. Construire l'URL de vérification (Lien vers le Frontend)
-        // Note: Assure-toi que FRONTEND_URL est bien dans ton .env (ex: https://altitudevision.agency)
         const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
 
         const message = `Bonjour ${newUser.name},\n\nBienvenue chez Altitude Vision ! 🎉\n\nPour activer votre compte, veuillez cliquer sur le lien ci-dessous :\n\n${verifyURL}\n\nCe lien est valide pendant 24 heures.\n\nSi vous n'avez pas créé de compte, veuillez ignorer cet email.`;
@@ -109,7 +108,7 @@ exports.signup = async (req, res) => {
 };
 
 // ============================================================
-// 2. VERIFICATION EMAIL (Nouvelle fonction)
+// 2. VERIFICATION EMAIL
 // ============================================================
 exports.verifyEmail = async (req, res) => {
     try {
@@ -154,7 +153,7 @@ exports.verifyEmail = async (req, res) => {
 };
 
 // ============================================================
-// 3. LOGIN (Modifié pour vérifier l'email)
+// 3. LOGIN
 // ============================================================
 exports.login = async (req, res) => {
     try {
@@ -176,7 +175,7 @@ exports.login = async (req, res) => {
             });
         }
 
-        // 🚨 NOUVEAU : Vérification de l'email
+        // Vérification de l'email
         if (!user.isEmailVerified) {
             return res.status(401).json({
                 status: 'fail',
@@ -199,7 +198,49 @@ exports.login = async (req, res) => {
 };
 
 // ============================================================
-// 4. PROTECT (INCHANGÉ)
+// 4. AUTHENTIFICATION OPTIONNELLE (✅ C'est la fonction manquante !)
+// ============================================================
+exports.optionalAuth = async (req, res, next) => {
+    try {
+        let token;
+        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+            token = req.headers.authorization.split(' ')[1];
+        }
+
+        if (!token) {
+            return next(); // Pas de token, on continue en tant que visiteur (req.user reste undefined)
+        }
+
+        // Vérification du token (si présent)
+        const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+
+        // Vérifier si l'utilisateur existe encore
+        const currentUser = await User.findById(decoded.id);
+        if (!currentUser) {
+            return next();
+        }
+
+        // Vérifier si le token a été invalidé
+        if (currentUser.tokenVersion > decoded.tokenVersion) {
+            return next();
+        }
+
+        // Vérifier si mot de passe changé
+        if (currentUser.changedPasswordAfter(decoded.iat)) {
+            return next();
+        }
+
+        // Si tout est bon, on attache l'utilisateur à la requête
+        req.user = currentUser;
+        return next();
+    } catch (err) {
+        // En cas d'erreur (token invalide, expiré, etc.), on continue simplement en tant que visiteur
+        return next();
+    }
+};
+
+// ============================================================
+// 5. PROTECT (Auth Obligatoire)
 // ============================================================
 exports.protect = async (req, res, next) => {
     try {
@@ -256,9 +297,8 @@ exports.protect = async (req, res, next) => {
 };
 
 // ============================================================
-// 5. AUTRES FONCTIONS (INCHANGÉES)
+// 6. RESTRICTION (Rôles)
 // ============================================================
-
 exports.restrictTo = (...roles) => {
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {
@@ -271,6 +311,9 @@ exports.restrictTo = (...roles) => {
     };
 };
 
+// ============================================================
+// 7. MISES À JOUR UTILISATEUR
+// ============================================================
 exports.updateMe = async (req, res) => {
     try {
         if (req.body.password || req.body.passwordConfirm) {
