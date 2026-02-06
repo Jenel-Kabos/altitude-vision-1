@@ -46,8 +46,10 @@ import AddPropertyPage from "./pages/dashboard/AddPropertyPage";
 import ManageEventsPage from "./pages/dashboard/ManageEventsPage";
 import ManageQuotesPage from "./pages/dashboard/ManageQuotesPage";
 import ModerationPage from "./pages/dashboard/ModerationPage";
-// ✅ IMPORT CORRECT (Celui que nous avons corrigé)
-import UserManagementPage from "./pages/dashboard/UserManagementPage";
+
+// ✅ NOUVEL IMPORT : On utilise le nouveau panneau pour forcer la mise à jour
+import UsersPanel from "./pages/dashboard/UsersPanel";
+
 import ActiveSessionsPage from "./pages/dashboard/ActiveSessionsPage"; 
 
 // Page de gestion Altcom
@@ -169,8 +171,8 @@ function App() {
                             <Route path="quotes" element={<ManageQuotesPage />} />
                             <Route path="moderation" element={<ModerationPage />} />
                             
-                            {/* C'est ici que la magie opère pour la gestion des utilisateurs */}
-                            <Route path="users" element={<UserManagementPage />} />
+                            {/* ✅ UTILISATION DU NOUVEAU COMPOSANT "UsersPanel" */}
+                            <Route path="users" element={<UsersPanel />} />
                             
                             {/* GESTION DES PROJETS ALTCOM */}
                             <Route path="altcom" element={<ManageAltcomPage />} />
