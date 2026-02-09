@@ -6,7 +6,7 @@ import {
 import { 
   Building2, Calendar, Megaphone, FileText, 
   Loader2, AlertCircle, ChevronRight, ArrowLeft,
-  LayoutDashboard, TrendingUp, CheckCircle, Clock
+  LayoutDashboard, TrendingUp, CheckCircle, Clock, Menu
 } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
@@ -24,10 +24,8 @@ const DashboardHome = () => {
   const [error, setError] = useState(null);
 
   // --- ÉTATS D'AFFICHAGE ---
-  // 'overview' est la section par défaut
   const [activeTab, setActiveTab] = useState('overview'); 
-  // Sur mobile, est-ce qu'on affiche le détail ? (False = on voit le menu)
-  const [showMobileDetail, setShowMobileDetail] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(true); // true = afficher le menu sur mobile
 
   // --- CHARGEMENT ---
   useEffect(() => {
@@ -70,12 +68,11 @@ const DashboardHome = () => {
   // --- GESTION DU CLIC MENU ---
   const handleMenuClick = (tabId) => {
     setActiveTab(tabId);
-    setShowMobileDetail(true); // Sur mobile, on affiche le détail
-    // Sur desktop, cela ne change rien visuellement car les deux sont affichés
+    setShowMobileMenu(false); // Masquer le menu et afficher le contenu sur mobile
   };
 
-  const handleBackToMenu = () => {
-    setShowMobileDetail(false); // On revient au menu sur mobile
+  const handleToggleMenu = () => {
+    setShowMobileMenu(true); // Retour au menu sur mobile
   };
 
   if (authLoading || loading) return <LoadingScreen />;
@@ -125,19 +122,20 @@ const DashboardHome = () => {
       
       {/* =======================================================
           COLONNE 1 : LE MENU (Panneau d'administration)
-          - Mobile : Caché si showMobileDetail est true
-          - Desktop : Toujours visible (md:flex), largeur fixe (md:w-80)
+          - Mobile : Occupe tout l'écran quand showMobileMenu = true
+          - Desktop : Toujours visible, largeur fixe (md:w-80)
       ======================================================== */}
       <aside className={`
-        flex-col w-full md:w-80 bg-white border-r border-gray-200 overflow-y-auto
-        ${showMobileDetail ? 'hidden md:flex' : 'flex'}
+        ${showMobileMenu ? 'flex' : 'hidden'} 
+        md:flex flex-col w-full md:w-80 bg-white border-r border-gray-200 overflow-y-auto
+        fixed md:relative inset-0 z-40 md:z-auto
       `}>
         <div className="p-6 border-b border-gray-100">
           <h1 className="text-xl font-bold text-gray-800">Mon Activité</h1>
           <p className="text-sm text-gray-500 mt-1">Bienvenue, {user?.name}</p>
         </div>
 
-        <nav className="p-4 space-y-2">
+        <nav className="p-4 space-y-2 flex-1">
           {menuItems.map((item) => (
             <button
               key={item.id}
@@ -163,7 +161,7 @@ const DashboardHome = () => {
                  <span className="text-sm font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
                     {item.count}
                  </span>
-                 <ChevronRight size={16} className="text-gray-300 md:hidden" />
+                 <ChevronRight size={16} className="text-gray-300" />
               </div>
             </button>
           ))}
@@ -172,20 +170,22 @@ const DashboardHome = () => {
 
       {/* =======================================================
           COLONNE 2 : LES DÉTAILS (Graphiques, Stats...)
-          - Mobile : Caché si showMobileDetail est false
-          - Desktop : Toujours visible (md:flex), prend le reste de la place (flex-1)
+          - Mobile : Occupe tout l'écran quand showMobileMenu = false
+          - Desktop : Toujours visible, prend le reste de la place
       ======================================================== */}
       <main className={`
-        flex-1 bg-gray-50 flex-col overflow-hidden
-        ${showMobileDetail ? 'flex' : 'hidden md:flex'}
+        ${showMobileMenu ? 'hidden' : 'flex'} 
+        md:flex flex-1 bg-gray-50 flex-col overflow-hidden
+        fixed md:relative inset-0 z-30 md:z-auto
       `}>
-        {/* Header Mobile avec bouton Retour */}
-        <div className="md:hidden bg-white border-b p-4 flex items-center gap-3 shadow-sm">
+        {/* Header avec bouton Menu (Mobile) */}
+        <div className="bg-white border-b p-4 flex items-center gap-3 shadow-sm">
             <button 
-                onClick={handleBackToMenu}
-                className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600"
+                onClick={handleToggleMenu}
+                className="p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-600 md:hidden transition-colors"
+                aria-label="Ouvrir le menu"
             >
-                <ArrowLeft size={24} />
+                <Menu size={24} />
             </button>
             <h2 className="text-lg font-bold text-gray-800">
                 {menuItems.find(i => i.id === activeTab)?.label}
