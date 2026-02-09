@@ -30,6 +30,9 @@ import MentionsLegales from "./pages/MentionsLegales";
 // Page de vérification d'email
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 
+// ✅ NOUVEAU : Page pour laisser un avis
+import LeaveReviewPage from "./pages/LeaveReviewPage";
+
 // Pages Services Altimmo
 import VenteDeBiensPage from "./pages/services/VenteDeBiensPage";
 import LocationGestionPage from "./pages/services/LocationGestionPage";
@@ -46,10 +49,7 @@ import AddPropertyPage from "./pages/dashboard/AddPropertyPage";
 import ManageEventsPage from "./pages/dashboard/ManageEventsPage";
 import ManageQuotesPage from "./pages/dashboard/ManageQuotesPage";
 import ModerationPage from "./pages/dashboard/ModerationPage";
-
-// ✅ NOUVEL IMPORT : On utilise le nouveau panneau pour forcer la mise à jour
 import UsersPanel from "./pages/dashboard/UsersPanel";
-
 import ActiveSessionsPage from "./pages/dashboard/ActiveSessionsPage"; 
 
 // Page de gestion Altcom
@@ -142,7 +142,7 @@ function App() {
                 <Route path="/contact" element={<MainLayout><ContactPage /></MainLayout>} />
                 <Route path="/unauthorized" element={<MainLayout><UnauthorizedPage /></MainLayout>} />
 
-                {/* ✅ NOUVELLE ROUTE : VALIDATION EMAIL (Accessible à tous) */}
+                {/* ROUTE VALIDATION EMAIL (Accessible à tous) */}
                 <Route path="/verify-email/:token" element={<MainLayout><VerifyEmailPage /></MainLayout>} />
 
                 {/* === ROUTES PUBLIQUES AUTHENTIFICATION === */}
@@ -156,6 +156,9 @@ function App() {
                     {/* Pages utilisateur accessibles à tous les rôles connectés */}
                     <Route path="/mon-compte" element={<MainLayout><AccountPage /></MainLayout>} />
                     <Route path="/profile" element={<MainLayout><ProfilePage /></MainLayout>} />
+                    
+                    {/* ✅ NOUVELLE ROUTE : Laisser un avis (Protégée) */}
+                    <Route path="/avis/nouveau" element={<MainLayout><LeaveReviewPage /></MainLayout>} />
                     
                     {/* MESSAGERIE CLIENT/PROPRIÉTAIRE & FAVORIS */}
                     <Route path="/favoris" element={<MainLayout><FavoritesPage /></MainLayout>} />
@@ -171,7 +174,7 @@ function App() {
                             <Route path="quotes" element={<ManageQuotesPage />} />
                             <Route path="moderation" element={<ModerationPage />} />
                             
-                            {/* ✅ UTILISATION DU NOUVEAU COMPOSANT "UsersPanel" */}
+                            {/* GESTION UTILISATEURS */}
                             <Route path="users" element={<UsersPanel />} />
                             
                             {/* GESTION DES PROJETS ALTCOM */}
