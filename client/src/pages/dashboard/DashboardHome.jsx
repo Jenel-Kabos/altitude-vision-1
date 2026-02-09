@@ -2,17 +2,14 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  LineChart,
-  Line,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
+  LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar,
 } from "recharts";
-import { Building2, Calendar, Megaphone, Users, Loader2, AlertCircle, FileText, Clock, CheckCircle } from "lucide-react";
+import { 
+  Building2, Calendar, Megaphone, FileText, 
+  Loader2, AlertCircle, ChevronLeft, ChevronRight,
+  LayoutDashboard, TrendingUp, CheckCircle, Clock
+} from "lucide-react";
+
 import { useAuth } from "../../context/AuthContext";
 import { getDashboardStats } from "../../services/dashboardService";
 import { getAllQuotes } from "../../services/quoteService";
@@ -21,246 +18,302 @@ const DashboardHome = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
+  // --- ÉTATS ---
   const [stats, setStats] = useState({ Altimmo: 0, MilaEvents: 0, Altcom: 0 });
   const [quotesStats, setQuotesStats] = useState({ total: 0, nouveau: 0, enCours: 0, converti: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // État de sélection : null = Afficher la liste / 'id' = Afficher le détail
+  const [selectedSection, setSelectedSection] = useState(null); 
+
+  // --- CHARGEMENT DES DONNÉES ---
   useEffect(() => {
     if (authLoading) return;
-
     const fetchStats = async () => {
       try {
         setLoading(true);
-        setError(null);
+        const [dashboardData, quotesData] = await Promise.all([
+          getDashboardStats(),
+          getAllQuotes()
+        ]);
+
+        setStats(dashboardData);
+        setQuotesStats({
+          total: quotesData.length,
+          nouveau: quotesData.filter(q => q.status === 'Nouveau').length,
+          enCours: quotesData.filter(q => q.status === 'En cours').length,
+          converti: quotesData.filter(q => q.status === 'Converti').length,
+        });
         
-        // Charger les stats du dashboard
-        const data = await getDashboardStats();
-        setStats(data);
+        // Optionnel : Sur Grand Écran, on sélectionne "overview" par défaut
+        // Sur Mobile, on laisse à null pour voir la liste
+        if (window.innerWidth >= 768) {
+            setSelectedSection('overview');
+        }
 
-        // Charger les stats des devis
-        const quotes = await getAllQuotes();
-        const quotesStatsData = {
-          total: quotes.length,
-          nouveau: quotes.filter(q => q.status === 'Nouveau').length,
-          enCours: quotes.filter(q => q.status === 'En cours').length,
-          converti: quotes.filter(q => q.status === 'Converti').length,
-        };
-        setQuotesStats(quotesStatsData);
       } catch (err) {
-        console.error("❌ Erreur lors du chargement des stats :", err);
-
+        console.error("Erreur Dashboard:", err);
         if (err.response?.status === 401) {
-          setError("Session expirée. Redirection...");
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          setTimeout(() => navigate("/login", { replace: true }), 1500);
+            navigate("/login");
         } else {
-          setError(err.response?.data?.message || "Erreur lors du chargement des statistiques.");
+            setError("Impossible de charger les données.");
         }
       } finally {
         setLoading(false);
       }
     };
-
     fetchStats();
-  }, [user, authLoading, navigate]);
+  }, [authLoading, navigate]);
 
-  if (authLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center p-6">
-          <Loader2 className="animate-spin text-blue-500 w-12 h-12 mx-auto mb-4" />
-          <p className="text-gray-600 text-lg animate-pulse">
-            {authLoading ? "Vérification de la session..." : "Chargement des statistiques..."}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
-        <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg shadow-md max-w-md w-full">
-          <div className="flex items-center mb-2">
-            <AlertCircle className="text-red-500 w-6 h-6 mr-3" />
-            <h3 className="text-lg font-semibold text-red-800">Erreur</h3>
-          </div>
-          <p className="text-red-700">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const total = stats.Altimmo + stats.MilaEvents + stats.Altcom;
   const chartData = [
     { name: "Altimmo", Annonces: stats.Altimmo },
     { name: "MilaEvents", Annonces: stats.MilaEvents },
     { name: "Altcom", Annonces: stats.Altcom },
   ];
 
+  if (authLoading || loading) return <LoadingScreen />;
+  if (error) return <ErrorScreen error={error} />;
+
+  // Configuration des cartes de la liste
+  const masterItems = [
+    { 
+      id: 'overview', 
+      label: "Vue d'ensemble", 
+      icon: <LayoutDashboard size={20} />, 
+      value: stats.Altimmo + stats.MilaEvents + stats.Altcom,
+      sub: "Publications totales",
+      color: "bg-indigo-50 text-indigo-600"
+    },
+    { 
+      id: 'quotes', 
+      label: "Gestion des Devis", 
+      icon: <FileText size={20} />, 
+      value: quotesStats.total,
+      sub: "Demandes reçues",
+      color: "bg-purple-50 text-purple-600"
+    },
+    { 
+      id: 'altimmo', 
+      label: "Altimmo", 
+      icon: <Building2 size={20} />, 
+      value: stats.Altimmo,
+      sub: "Biens immobiliers",
+      color: "bg-blue-50 text-blue-600"
+    },
+    { 
+      id: 'mila', 
+      label: "MilaEvents", 
+      icon: <Calendar size={20} />, 
+      value: stats.MilaEvents,
+      sub: "Événements à venir",
+      color: "bg-pink-50 text-pink-600"
+    },
+    { 
+      id: 'altcom', 
+      label: "Altcom", 
+      icon: <Megaphone size={20} />, 
+      value: stats.Altcom,
+      sub: "Campagnes actives",
+      color: "bg-green-50 text-green-600"
+    },
+  ];
+
   return (
-    // PADDING RESPONSIVE : p-4 sur mobile, p-6 sur desktop
-    <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
+    <div className="flex h-[calc(100vh-64px)] bg-gray-50 overflow-hidden">
       
-      {/* HEADER : Taille de texte adaptative */}
-      <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-          Tableau de Bord
-        </h1>
-        <p className="text-gray-600 mt-1 md:mt-2 text-sm md:text-base">
-          Bienvenue, <span className="font-semibold">{user?.name || "Utilisateur"}</span> !
-        </p>
-      </div>
-
-      {/* GRID : 1 col mobile, 2 cols tablette (sm), 4 cols desktop (lg) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
-        <StatCard 
-          title="Altimmo" 
-          icon={<Building2 className="text-blue-500 w-6 h-6 md:w-8 md:h-8" />} 
-          value={stats.Altimmo} 
-          subtitle="Biens immobiliers" 
-        />
-        <StatCard 
-          title="MilaEvents" 
-          icon={<Calendar className="text-pink-500 w-6 h-6 md:w-8 md:h-8" />} 
-          value={stats.MilaEvents} 
-          subtitle="Événements" 
-        />
-        <StatCard 
-          title="Altcom" 
-          icon={<Megaphone className="text-green-500 w-6 h-6 md:w-8 md:h-8" />} 
-          value={stats.Altcom} 
-          subtitle="Campagnes" 
-        />
-        <StatCard 
-          title="Devis" 
-          icon={<FileText className="text-purple-500 w-6 h-6 md:w-8 md:h-8" />} 
-          value={quotesStats.total} 
-          subtitle="Demandes totales"
-          clickable
-          onClick={() => navigate('/dashboard/quotes')}
-        />
-      </div>
-
-      {/* SECTION DEVIS */}
-      <div className="bg-white p-4 md:p-6 rounded-2xl shadow mb-6 md:mb-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-3">
-          <h2 className="text-lg md:text-xl font-semibold text-gray-700">Gestion des Devis</h2>
-          {/* BOUTON : Pleine largeur sur mobile pour faciliter le clic */}
-          <button
-            onClick={() => navigate('/dashboard/quotes')}
-            className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition font-semibold text-sm md:text-base text-center"
-          >
-            Voir tous les devis
-          </button>
+      {/* =======================================================
+          COLONNE 1 : MASTER (LA LISTE)
+          - Mobile : Caché si selectedSection existe (hidden)
+          - Desktop : Toujours visible (md:flex)
+      ======================================================== */}
+      <div className={`
+          w-full md:w-1/3 lg:w-1/4 bg-white border-r border-gray-200 flex-col
+          ${selectedSection ? 'hidden md:flex' : 'flex'} 
+      `}>
+        {/* Header de la liste */}
+        <div className="p-5 border-b bg-gray-50">
+          <h1 className="text-xl font-bold text-gray-800">Tableau de Bord</h1>
+          <p className="text-sm text-gray-500 mt-1">Bienvenue, {user?.name}</p>
         </div>
-        
-        {/* GRID STATS DEVIS : 1 col mobile, 3 cols desktop */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-          <QuoteStatCard
-            icon={<Clock className="w-5 h-5 md:w-6 md:h-6 text-blue-500" />}
-            label="Nouveaux"
-            value={quotesStats.nouveau}
-            color="bg-blue-50"
-            textColor="text-blue-700"
-          />
-          <QuoteStatCard
-            icon={<Clock className="w-5 h-5 md:w-6 md:h-6 text-yellow-500" />}
-            label="En cours"
-            value={quotesStats.enCours}
-            color="bg-yellow-50"
-            textColor="text-yellow-700"
-          />
-          <QuoteStatCard
-            icon={<CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-green-500" />}
-            label="Convertis"
-            value={quotesStats.converti}
-            color="bg-green-50"
-            textColor="text-green-700"
-          />
+
+        {/* Liste des éléments */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {masterItems.map((item) => (
+            <div
+              key={item.id}
+              onClick={() => setSelectedSection(item.id)}
+              className={`
+                group flex items-center justify-between p-4 rounded-xl cursor-pointer transition-all border
+                ${selectedSection === item.id 
+                  ? 'bg-blue-50 border-blue-200 shadow-sm' 
+                  : 'bg-white border-transparent hover:bg-gray-50 hover:border-gray-200'}
+              `}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-lg ${item.color}`}>
+                  {item.icon}
+                </div>
+                <div>
+                  <h3 className={`font-semibold ${selectedSection === item.id ? 'text-blue-900' : 'text-gray-700'}`}>
+                    {item.label}
+                  </h3>
+                  <p className="text-xs text-gray-400">{item.sub}</p>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-gray-300" />
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ACTIVITÉ GLOBALE */}
-      <div className="bg-white p-4 md:p-6 rounded-2xl shadow mb-6 md:mb-8">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-700">Activité Globale</h2>
-          <Users className="text-purple-500 w-6 h-6" />
-        </div>
-        <p className="text-3xl md:text-4xl font-bold mt-2 md:mt-4 text-gray-800">{total}</p>
-        <p className="text-xs md:text-sm text-gray-500">Publications totales</p>
-      </div>
+      {/* =======================================================
+          COLONNE 2 : DETAIL (LE CONTENU)
+          - Mobile : Caché si RIEN n'est sélectionné (hidden)
+          - Desktop : Toujours visible (md:flex)
+      ======================================================== */}
+      <div className={`
+          w-full md:w-2/3 lg:w-3/4 bg-gray-50 flex-col
+          ${selectedSection ? 'flex' : 'hidden md:flex'}
+      `}>
+        {selectedSection ? (
+          <>
+            {/* Header du détail (Avec bouton retour mobile) */}
+            <div className="bg-white border-b p-4 flex items-center gap-3 shadow-sm z-10 sticky top-0">
+              <button 
+                onClick={() => setSelectedSection(null)}
+                className="md:hidden p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600 transition"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                {masterItems.find(i => i.id === selectedSection)?.icon}
+                {masterItems.find(i => i.id === selectedSection)?.label}
+              </h2>
+            </div>
 
-      {/* GRAPHIQUES : 1 col sur mobile/tablette, 2 cols sur grand écran */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-        <ChartCard title="Répartition par Pôle" type="bar" data={chartData} />
-        <ChartCard title="Tendance Mensuelle" type="line" data={chartData} />
+            {/* Contenu dynamique */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-8">
+              
+              {/* --- VUE: GESTION DES DEVIS --- */}
+              {selectedSection === 'quotes' && (
+                <div className="space-y-6 max-w-4xl mx-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <QuoteDetailCard label="Nouveaux" value={quotesStats.nouveau} icon={<Clock />} color="blue" />
+                        <QuoteDetailCard label="En Cours" value={quotesStats.enCours} icon={<TrendingUp />} color="yellow" />
+                        <QuoteDetailCard label="Convertis" value={quotesStats.converti} icon={<CheckCircle />} color="green" />
+                    </div>
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center">
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Actions Rapides</h3>
+                        <p className="text-gray-500 mb-6">Gérez vos demandes et transformez-les en projets.</p>
+                        <button 
+                            onClick={() => navigate('/dashboard/quotes')}
+                            className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-lg shadow-blue-200 font-semibold"
+                        >
+                            Accéder à la liste complète
+                        </button>
+                    </div>
+                </div>
+              )}
+
+              {/* --- VUE: VUE D'ENSEMBLE & AUTRES --- */}
+              {selectedSection !== 'quotes' && (
+                <div className="space-y-6 max-w-5xl mx-auto">
+                    {/* Carte Résumé Spécifique */}
+                    {selectedSection !== 'overview' && (
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 flex items-center gap-4">
+                             <div className="p-4 bg-blue-50 text-blue-600 rounded-full">
+                                {masterItems.find(i => i.id === selectedSection)?.icon}
+                             </div>
+                             <div>
+                                 <p className="text-gray-500 text-sm font-medium">Total actuel</p>
+                                 <p className="text-4xl font-bold text-gray-900">
+                                     {masterItems.find(i => i.id === selectedSection)?.value}
+                                 </p>
+                             </div>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <ChartCard title="Répartition par Pôle" type="bar" data={chartData} />
+                        <ChartCard title="Tendance Mensuelle" type="line" data={chartData} />
+                    </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          /* État vide Desktop */
+          <div className="hidden md:flex flex-col items-center justify-center h-full text-gray-400 bg-gray-50/50">
+             <div className="bg-white p-8 rounded-full shadow-sm mb-4">
+                <LayoutDashboard size={48} className="text-gray-300" />
+             </div>
+             <p className="text-lg font-medium">Sélectionnez une section à gauche</p>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-// --- Sous-composants optimisés ---
+// --- SOUS-COMPOSANTS ---
 
-const StatCard = ({ title, icon, value, subtitle, clickable, onClick }) => (
-  <div 
-    className={`
-      bg-white p-5 rounded-2xl shadow transition-all duration-200
-      ${clickable ? 'cursor-pointer hover:shadow-lg active:scale-95 md:hover:scale-105' : ''}
-    `}
-    onClick={clickable ? onClick : undefined}
-  >
-    <div className="flex items-center justify-between mb-3">
-      <h2 className="text-base md:text-lg font-semibold text-gray-700 truncate">{title}</h2>
-      {icon}
-    </div>
-    <p className="text-2xl md:text-3xl font-bold text-gray-900">{value}</p>
-    <p className="text-xs md:text-sm text-gray-500 mt-1">{subtitle}</p>
-  </div>
-);
-
-const QuoteStatCard = ({ icon, label, value, color, textColor }) => (
-  <div className={`${color} p-4 rounded-xl flex items-center justify-between sm:block`}>
-    <div className="flex items-center gap-3 sm:mb-2">
-      {icon}
-      <span className={`text-sm md:text-base font-medium ${textColor}`}>{label}</span>
-    </div>
-    <p className={`text-2xl md:text-3xl font-bold ${textColor}`}>{value}</p>
-  </div>
-);
+const QuoteDetailCard = ({ label, value, icon, color }) => {
+    const colors = {
+        blue: "bg-blue-50 text-blue-600 border-blue-100",
+        yellow: "bg-yellow-50 text-yellow-600 border-yellow-100",
+        green: "bg-green-50 text-green-600 border-green-100",
+    };
+    return (
+        <div className={`p-6 rounded-2xl border ${colors[color]} flex flex-col items-center justify-center text-center shadow-sm`}>
+            <div className="mb-3 opacity-80 scale-125">{icon}</div>
+            <span className="text-4xl font-bold mb-1">{value}</span>
+            <span className="text-xs font-bold uppercase tracking-widest opacity-70">{label}</span>
+        </div>
+    );
+};
 
 const ChartCard = ({ title, type, data }) => (
-  <div className="bg-white p-4 md:p-6 rounded-2xl shadow overflow-hidden">
-    <h2 className="text-base md:text-lg font-semibold mb-4 text-gray-700">{title}</h2>
-    <div className="w-full h-[250px] text-xs">
+  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+    <h3 className="text-lg font-semibold text-gray-800 mb-6">{title}</h3>
+    <div className="h-[250px] w-full text-xs">
       <ResponsiveContainer width="100%" height="100%">
         {type === "bar" ? (
-          <BarChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280'}} dy={10} />
-            <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280'}} />
-            <Tooltip 
-              cursor={{fill: '#f3f4f6'}}
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
-            />
-            <Bar dataKey="Annonces" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} />
+            <YAxis axisLine={false} tickLine={false} />
+            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+            <Bar dataKey="Annonces" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={40} />
           </BarChart>
         ) : (
-          <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280'}} dy={10} />
-            <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280'}} />
-            <Tooltip 
-               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-            />
-            <Line type="monotone" dataKey="Annonces" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: "#10b981" }} activeDot={{ r: 6 }} />
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} />
+            <YAxis axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+            <Line type="monotone" dataKey="Annonces" stroke="#10b981" strokeWidth={3} dot={{r:4, fill:'#10b981'}} />
           </LineChart>
         )}
       </ResponsiveContainer>
     </div>
   </div>
+);
+
+const LoadingScreen = () => (
+    <div className="flex h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+    </div>
+);
+
+const ErrorScreen = ({ error }) => (
+    <div className="flex h-screen items-center justify-center bg-gray-50 p-6">
+        <div className="text-center max-w-md bg-white p-8 rounded-2xl shadow-lg">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Erreur</h3>
+            <p className="text-gray-600">{error}</p>
+        </div>
+    </div>
 );
 
 export default DashboardHome;

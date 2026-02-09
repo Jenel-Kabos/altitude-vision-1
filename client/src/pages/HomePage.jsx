@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
-    Sparkles, 
     ArrowRight,
     Loader2 as IconSpinner,
     Building2,
@@ -12,10 +11,13 @@ import {
 import HeroSlider from "../components/HeroSlider";
 import HomeSlider from "../components/HomeSlider";
 import CtaCommission from "../components/CtaCommission";
+// 1. Import du nouveau composant (ajustez le chemin selon votre structure)
+import Testimonials from "../components/Testimonials"; 
+
 import { getLatestPropertiesByPoles } from "../services/propertyService";
 import { getAllEvents } from "../services/eventService";
 import { getAllPortfolioItems } from "../services/portfolioService";
-import Slider from "react-slick";
+// Note : Plus besoin d'importer getAllTestimonials ni Slider ici !
 
 const poles = [
     { 
@@ -44,68 +46,39 @@ const poles = [
     }
 ];
 
-const testimonials = [
-    {
-        name: "Jean K.",
-        role: "Client Altimmo",
-        message: "Grâce à Altitude-Vision, j'ai trouvé la maison de mes rêves à Brazzaville !",
-        avatar: "/uploads/users/testimonial1.jpg",
-    },
-    {
-        name: "Sophie M.",
-        role: "Client MilaEvents",
-        message: "Un service impeccable pour l'organisation de mon événement.",
-        avatar: "/uploads/users/testimonial2.jpg",
-    },
-    {
-        name: "Pierre L.",
-        role: "Client Altcom",
-        message: "L'équipe Altcom a boosté ma visibilité en ligne rapidement.",
-        avatar: "/uploads/users/testimonial3.jpg",
-    },
-];
-
 const HomePage = () => {
     const [latestProperties, setLatestProperties] = useState({});
     const [isLoading, setIsLoading] = useState(true);
     const [activePole, setActivePole] = useState(poles[0].id);
 
+    // Suppression du state 'testimonials' car géré dans le composant enfant
+
     useEffect(() => {
-        console.log("🚀 [HomePage] Composant monté - Début du chargement des données");
+        console.log("🚀 [HomePage] Composant monté");
 
         const fetchData = async () => {
             try {
-                console.log("📡 [HomePage] Appel API pour récupérer les données");
+                // On a retiré l'appel aux témoignages ici
+                const [propertiesResults, allEvents, allPortfolio] = await Promise.all([
+                    getLatestPropertiesByPoles(["Altimmo"], 5),
+                    getAllEvents(),
+                    getAllPortfolioItems()
+                ]);
 
-                const propertiesResults = await getLatestPropertiesByPoles(["Altimmo"], 5);
-                const allEvents = await getAllEvents();
                 const recentEvents = allEvents
                     .filter(event => event.status === 'Publié')
                     .slice(0, 5);
 
-                const allPortfolio = await getAllPortfolioItems();
                 const recentPortfolio = allPortfolio
                     .filter(item => item.isPublished)
                     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
                     .slice(0, 5);
-
-                console.log("✅ [HomePage] Données récupérées:", {
-                    properties: propertiesResults.Altimmo?.length || 0,
-                    events: recentEvents.length,
-                    portfolio: recentPortfolio.length
-                });
 
                 const combinedData = {
                     Altimmo: propertiesResults.Altimmo || [],
                     MilaEvents: recentEvents,
                     Altcom: recentPortfolio
                 };
-
-                console.log("📊 [HomePage] Données combinées:", {
-                    Altimmo: combinedData.Altimmo.length,
-                    MilaEvents: combinedData.MilaEvents.length,
-                    Altcom: combinedData.Altcom.length
-                });
 
                 setLatestProperties(combinedData);
                 setIsLoading(false);
@@ -119,18 +92,6 @@ const HomePage = () => {
 
         fetchData();
     }, []);
-
-    const testimonialSettings = {
-        dots: true,
-        infinite: true,
-        speed: 700,
-        slidesToShow: 1,
-        slidesToScroll: 1,
-        autoplay: true,
-        autoplaySpeed: 4000,
-        arrows: false,
-        dotsClass: "slick-dots !bottom-6",
-    };
 
     const activePoleItems = latestProperties[activePole] || [];
     const activePoleData = poles.find(p => p.id === activePole);
@@ -151,34 +112,12 @@ const HomePage = () => {
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
                 .font-sans { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-                
                 html { scroll-behavior: smooth; }
-                
-                @keyframes gradient-shift {
-                    0%, 100% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
-                }
-                
-                .animate-gradient {
-                    background-size: 200% 200%;
-                    animation: gradient-shift 8s ease infinite;
-                }
-
-                .slick-dots li button:before {
-                    color: white !important;
-                    opacity: 0.5;
-                }
-                
-                .slick-dots li.slick-active button:before {
-                    color: white !important;
-                    opacity: 1;
-                }
             `}</style>
 
             {/* Header Hero Section */}
             <header className="relative text-white pt-32 pb-24 overflow-hidden h-[75vh] min-h-[600px]">
                 <HeroSlider />
-                
             </header>
 
             {/* Section Présentation */}
@@ -349,53 +288,9 @@ const HomePage = () => {
                 </div>
             </section>
 
-            {/* Section Témoignages */}
-            <section className="py-16 sm:py-20 bg-white">
-                <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
-                    <div className="text-center mb-12 sm:mb-14">
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ duration: 0.6 }}
-                        >
-                            <p className="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wider mb-2">Retours Clients</p>
-                            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3">
-                                Ils Nous Font Confiance
-                            </h2>
-                            <div className="h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent w-24 mx-auto rounded-full"></div>
-                        </motion.div>
-                    </div>
-
-                    <div className="max-w-3xl mx-auto">
-                        <Slider {...testimonialSettings}>
-                            {testimonials.map((t, index) => (
-                                <div key={index} className="px-4 pb-12">
-                                    <motion.div 
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        whileInView={{ opacity: 1, scale: 1 }}
-                                        viewport={{ once: true }}
-                                        className="bg-gradient-to-br from-white to-slate-50 p-8 sm:p-10 rounded-3xl shadow-lg border border-gray-100"
-                                    >
-                                        <div className="flex flex-col items-center text-center">
-                                            <img
-                                                src={t.avatar}
-                                                alt={t.name}
-                                                className="w-20 h-20 rounded-full mb-6 object-cover border-4 border-white shadow-xl"
-                                            />
-                                            <p className="text-gray-700 text-base sm:text-lg leading-relaxed mb-6 italic">
-                                                "{t.message}"
-                                            </p>
-                                            <h4 className="text-xl font-bold text-gray-900">{t.name}</h4>
-                                            <p className="text-sm text-gray-500 font-medium">{t.role}</p>
-                                        </div>
-                                    </motion.div>
-                                </div>
-                            ))}
-                        </Slider>
-                    </div>
-                </div>
-            </section>
+            {/* 🚀 NOUVELLE SECTION TÉMOIGNAGES (Composant intégré) */}
+            {/* Le composant gère lui-même son fond sombre, ses données et ses animations */}
+            <Testimonials />
 
             {/* Section CTA Commission */}
             <section className="py-14 px-4 sm:px-6 bg-gradient-to-b from-slate-50 to-white">
@@ -408,7 +303,6 @@ const HomePage = () => {
             <footer className="bg-gray-900 text-white py-8 border-t border-gray-800">
                 <div className="container mx-auto px-4 sm:px-6 text-center max-w-6xl">
                     <div className="flex items-center justify-center gap-2 mb-3">
-                        
                         <p className="text-2xl font-bold text-white">Altitude-Vision</p>
                     </div>
                     <p className="text-xs sm:text-sm text-gray-400">
