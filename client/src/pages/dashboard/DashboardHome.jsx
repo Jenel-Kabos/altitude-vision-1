@@ -1,4 +1,3 @@
-// src/pages/dashboard/DashboardHome.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -6,7 +5,7 @@ import {
 } from "recharts";
 import { 
   Building2, Calendar, Megaphone, FileText, 
-  Loader2, AlertCircle, ChevronLeft, ChevronRight,
+  Loader2, AlertCircle, ChevronRight, ArrowLeft,
   LayoutDashboard, TrendingUp, CheckCircle, Clock
 } from "lucide-react";
 
@@ -18,16 +17,19 @@ const DashboardHome = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  // --- ÉTATS ---
+  // --- ÉTATS DES DONNÉES ---
   const [stats, setStats] = useState({ Altimmo: 0, MilaEvents: 0, Altcom: 0 });
   const [quotesStats, setQuotesStats] = useState({ total: 0, nouveau: 0, enCours: 0, converti: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // État de sélection : null = Afficher la liste / 'id' = Afficher le détail
-  const [selectedSection, setSelectedSection] = useState(null); 
+  // --- ÉTATS D'AFFICHAGE ---
+  // 'overview' est la section par défaut
+  const [activeTab, setActiveTab] = useState('overview'); 
+  // Sur mobile, est-ce qu'on affiche le détail ? (False = on voit le menu)
+  const [showMobileDetail, setShowMobileDetail] = useState(false);
 
-  // --- CHARGEMENT DES DONNÉES ---
+  // --- CHARGEMENT ---
   useEffect(() => {
     if (authLoading) return;
     const fetchStats = async () => {
@@ -45,13 +47,6 @@ const DashboardHome = () => {
           enCours: quotesData.filter(q => q.status === 'En cours').length,
           converti: quotesData.filter(q => q.status === 'Converti').length,
         });
-        
-        // Optionnel : Sur Grand Écran, on sélectionne "overview" par défaut
-        // Sur Mobile, on laisse à null pour voir la liste
-        if (window.innerWidth >= 768) {
-            setSelectedSection('overview');
-        }
-
       } catch (err) {
         console.error("Erreur Dashboard:", err);
         if (err.response?.status === 401) {
@@ -72,203 +67,196 @@ const DashboardHome = () => {
     { name: "Altcom", Annonces: stats.Altcom },
   ];
 
+  // --- GESTION DU CLIC MENU ---
+  const handleMenuClick = (tabId) => {
+    setActiveTab(tabId);
+    setShowMobileDetail(true); // Sur mobile, on affiche le détail
+    // Sur desktop, cela ne change rien visuellement car les deux sont affichés
+  };
+
+  const handleBackToMenu = () => {
+    setShowMobileDetail(false); // On revient au menu sur mobile
+  };
+
   if (authLoading || loading) return <LoadingScreen />;
   if (error) return <ErrorScreen error={error} />;
 
-  // Configuration des cartes de la liste
-  const masterItems = [
+  // Configuration du Menu
+  const menuItems = [
     { 
       id: 'overview', 
       label: "Vue d'ensemble", 
       icon: <LayoutDashboard size={20} />, 
-      value: stats.Altimmo + stats.MilaEvents + stats.Altcom,
-      sub: "Publications totales",
-      color: "bg-indigo-50 text-indigo-600"
+      count: stats.Altimmo + stats.MilaEvents + stats.Altcom,
+      color: "text-indigo-600 bg-indigo-50"
     },
     { 
       id: 'quotes', 
       label: "Gestion des Devis", 
       icon: <FileText size={20} />, 
-      value: quotesStats.total,
-      sub: "Demandes reçues",
-      color: "bg-purple-50 text-purple-600"
+      count: quotesStats.total,
+      color: "text-purple-600 bg-purple-50"
     },
     { 
       id: 'altimmo', 
-      label: "Altimmo", 
+      label: "Altimmo (Immo)", 
       icon: <Building2 size={20} />, 
-      value: stats.Altimmo,
-      sub: "Biens immobiliers",
-      color: "bg-blue-50 text-blue-600"
+      count: stats.Altimmo,
+      color: "text-blue-600 bg-blue-50"
     },
     { 
       id: 'mila', 
       label: "MilaEvents", 
       icon: <Calendar size={20} />, 
-      value: stats.MilaEvents,
-      sub: "Événements à venir",
-      color: "bg-pink-50 text-pink-600"
+      count: stats.MilaEvents,
+      color: "text-pink-600 bg-pink-50"
     },
     { 
       id: 'altcom', 
-      label: "Altcom", 
+      label: "Altcom (Pub)", 
       icon: <Megaphone size={20} />, 
-      value: stats.Altcom,
-      sub: "Campagnes actives",
-      color: "bg-green-50 text-green-600"
+      count: stats.Altcom,
+      color: "text-green-600 bg-green-50"
     },
   ];
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-gray-50 overflow-hidden">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-gray-50 overflow-hidden">
       
       {/* =======================================================
-          COLONNE 1 : MASTER (LA LISTE)
-          - Mobile : Caché si selectedSection existe (hidden)
-          - Desktop : Toujours visible (md:flex)
+          COLONNE 1 : LE MENU (Panneau d'administration)
+          - Mobile : Caché si showMobileDetail est true
+          - Desktop : Toujours visible (md:flex), largeur fixe (md:w-80)
       ======================================================== */}
-      <div className={`
-          w-full md:w-1/3 lg:w-1/4 bg-white border-r border-gray-200 flex-col
-          ${selectedSection ? 'hidden md:flex' : 'flex'} 
+      <aside className={`
+        flex-col w-full md:w-80 bg-white border-r border-gray-200 overflow-y-auto
+        ${showMobileDetail ? 'hidden md:flex' : 'flex'}
       `}>
-        {/* Header de la liste */}
-        <div className="p-5 border-b bg-gray-50">
-          <h1 className="text-xl font-bold text-gray-800">Tableau de Bord</h1>
+        <div className="p-6 border-b border-gray-100">
+          <h1 className="text-xl font-bold text-gray-800">Mon Activité</h1>
           <p className="text-sm text-gray-500 mt-1">Bienvenue, {user?.name}</p>
         </div>
 
-        {/* Liste des éléments */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {masterItems.map((item) => (
-            <div
+        <nav className="p-4 space-y-2">
+          {menuItems.map((item) => (
+            <button
               key={item.id}
-              onClick={() => setSelectedSection(item.id)}
+              onClick={() => handleMenuClick(item.id)}
               className={`
-                group flex items-center justify-between p-4 rounded-xl cursor-pointer transition-all border
-                ${selectedSection === item.id 
-                  ? 'bg-blue-50 border-blue-200 shadow-sm' 
+                w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200 border
+                ${activeTab === item.id 
+                  ? 'bg-blue-50 border-blue-200 shadow-sm ring-1 ring-blue-200' 
                   : 'bg-white border-transparent hover:bg-gray-50 hover:border-gray-200'}
               `}
             >
               <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-lg ${item.color}`}>
+                <div className={`p-2 rounded-lg ${item.color}`}>
                   {item.icon}
                 </div>
-                <div>
-                  <h3 className={`font-semibold ${selectedSection === item.id ? 'text-blue-900' : 'text-gray-700'}`}>
+                <div className="text-left">
+                  <p className={`font-semibold ${activeTab === item.id ? 'text-gray-900' : 'text-gray-600'}`}>
                     {item.label}
-                  </h3>
-                  <p className="text-xs text-gray-400">{item.sub}</p>
+                  </p>
                 </div>
               </div>
-              <ChevronRight size={16} className="text-gray-300" />
-            </div>
+              <div className="flex items-center gap-3">
+                 <span className="text-sm font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {item.count}
+                 </span>
+                 <ChevronRight size={16} className="text-gray-300 md:hidden" />
+              </div>
+            </button>
           ))}
-        </div>
-      </div>
+        </nav>
+      </aside>
 
       {/* =======================================================
-          COLONNE 2 : DETAIL (LE CONTENU)
-          - Mobile : Caché si RIEN n'est sélectionné (hidden)
-          - Desktop : Toujours visible (md:flex)
+          COLONNE 2 : LES DÉTAILS (Graphiques, Stats...)
+          - Mobile : Caché si showMobileDetail est false
+          - Desktop : Toujours visible (md:flex), prend le reste de la place (flex-1)
       ======================================================== */}
-      <div className={`
-          w-full md:w-2/3 lg:w-3/4 bg-gray-50 flex-col
-          ${selectedSection ? 'flex' : 'hidden md:flex'}
+      <main className={`
+        flex-1 bg-gray-50 flex-col overflow-hidden
+        ${showMobileDetail ? 'flex' : 'hidden md:flex'}
       `}>
-        {selectedSection ? (
-          <>
-            {/* Header du détail (Avec bouton retour mobile) */}
-            <div className="bg-white border-b p-4 flex items-center gap-3 shadow-sm z-10 sticky top-0">
-              <button 
-                onClick={() => setSelectedSection(null)}
-                className="md:hidden p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600 transition"
-              >
-                <ChevronLeft size={24} />
-              </button>
-              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                {masterItems.find(i => i.id === selectedSection)?.icon}
-                {masterItems.find(i => i.id === selectedSection)?.label}
-              </h2>
-            </div>
+        {/* Header Mobile avec bouton Retour */}
+        <div className="md:hidden bg-white border-b p-4 flex items-center gap-3 shadow-sm">
+            <button 
+                onClick={handleBackToMenu}
+                className="p-2 -ml-2 rounded-full hover:bg-gray-100 text-gray-600"
+            >
+                <ArrowLeft size={24} />
+            </button>
+            <h2 className="text-lg font-bold text-gray-800">
+                {menuItems.find(i => i.id === activeTab)?.label}
+            </h2>
+        </div>
 
-            {/* Contenu dynamique */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8">
-              
-              {/* --- VUE: GESTION DES DEVIS --- */}
-              {selectedSection === 'quotes' && (
-                <div className="space-y-6 max-w-4xl mx-auto">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <QuoteDetailCard label="Nouveaux" value={quotesStats.nouveau} icon={<Clock />} color="blue" />
-                        <QuoteDetailCard label="En Cours" value={quotesStats.enCours} icon={<TrendingUp />} color="yellow" />
-                        <QuoteDetailCard label="Convertis" value={quotesStats.converti} icon={<CheckCircle />} color="green" />
+        {/* Contenu Défilant */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+            <div className="max-w-5xl mx-auto animate-in fade-in duration-300">
+                
+                {/* --- VUE: DEVIS --- */}
+                {activeTab === 'quotes' && (
+                    <div className="space-y-6">
+                        <h2 className="text-2xl font-bold text-gray-800 hidden md:block">Gestion des Devis</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <QuoteDetailCard label="Nouveaux" value={quotesStats.nouveau} icon={<Clock />} color="blue" />
+                            <QuoteDetailCard label="En Cours" value={quotesStats.enCours} icon={<TrendingUp />} color="yellow" />
+                            <QuoteDetailCard label="Convertis" value={quotesStats.converti} icon={<CheckCircle />} color="green" />
+                        </div>
+                        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 text-center">
+                            <h3 className="text-lg font-semibold text-gray-900">Toutes les demandes</h3>
+                            <p className="text-gray-500 mb-6 mt-1">Consultez, traitez et convertissez vos prospects.</p>
+                            <button 
+                                onClick={() => navigate('/dashboard/quotes')}
+                                className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition"
+                            >
+                                Ouvrir la liste des devis
+                            </button>
+                        </div>
                     </div>
-                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center">
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">Actions Rapides</h3>
-                        <p className="text-gray-500 mb-6">Gérez vos demandes et transformez-les en projets.</p>
-                        <button 
-                            onClick={() => navigate('/dashboard/quotes')}
-                            className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-lg shadow-blue-200 font-semibold"
-                        >
-                            Accéder à la liste complète
-                        </button>
-                    </div>
-                </div>
-              )}
+                )}
 
-              {/* --- VUE: VUE D'ENSEMBLE & AUTRES --- */}
-              {selectedSection !== 'quotes' && (
-                <div className="space-y-6 max-w-5xl mx-auto">
-                    {/* Carte Résumé Spécifique */}
-                    {selectedSection !== 'overview' && (
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 flex items-center gap-4">
-                             <div className="p-4 bg-blue-50 text-blue-600 rounded-full">
-                                {masterItems.find(i => i.id === selectedSection)?.icon}
-                             </div>
-                             <div>
-                                 <p className="text-gray-500 text-sm font-medium">Total actuel</p>
-                                 <p className="text-4xl font-bold text-gray-900">
-                                     {masterItems.find(i => i.id === selectedSection)?.value}
-                                 </p>
+                {/* --- VUE: VUE D'ENSEMBLE & AUTRES --- */}
+                {activeTab !== 'quotes' && (
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between mb-6">
+                             <h2 className="text-2xl font-bold text-gray-800 hidden md:block">
+                                 {activeTab === 'overview' ? "Vue d'ensemble" : "Statistiques Détaillées"}
+                             </h2>
+                             {/* Petit badge récap */}
+                             <div className="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-medium text-gray-600">
+                                 Total: {menuItems.find(i => i.id === activeTab)?.count}
                              </div>
                         </div>
-                    )}
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <ChartCard title="Répartition par Pôle" type="bar" data={chartData} />
-                        <ChartCard title="Tendance Mensuelle" type="line" data={chartData} />
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <ChartCard title="Répartition par Pôle" type="bar" data={chartData} />
+                            <ChartCard title="Tendance Mensuelle" type="line" data={chartData} />
+                        </div>
                     </div>
-                </div>
-              )}
+                )}
             </div>
-          </>
-        ) : (
-          /* État vide Desktop */
-          <div className="hidden md:flex flex-col items-center justify-center h-full text-gray-400 bg-gray-50/50">
-             <div className="bg-white p-8 rounded-full shadow-sm mb-4">
-                <LayoutDashboard size={48} className="text-gray-300" />
-             </div>
-             <p className="text-lg font-medium">Sélectionnez une section à gauche</p>
-          </div>
-        )}
-      </div>
+        </div>
+      </main>
     </div>
   );
 };
 
-// --- SOUS-COMPOSANTS ---
+// --- COMPOSANTS UI ---
 
 const QuoteDetailCard = ({ label, value, icon, color }) => {
-    const colors = {
-        blue: "bg-blue-50 text-blue-600 border-blue-100",
-        yellow: "bg-yellow-50 text-yellow-600 border-yellow-100",
-        green: "bg-green-50 text-green-600 border-green-100",
+    const styles = {
+        blue: "bg-blue-50 text-blue-700 border-blue-100",
+        yellow: "bg-yellow-50 text-yellow-700 border-yellow-100",
+        green: "bg-green-50 text-green-700 border-green-100",
     };
     return (
-        <div className={`p-6 rounded-2xl border ${colors[color]} flex flex-col items-center justify-center text-center shadow-sm`}>
-            <div className="mb-3 opacity-80 scale-125">{icon}</div>
-            <span className="text-4xl font-bold mb-1">{value}</span>
-            <span className="text-xs font-bold uppercase tracking-widest opacity-70">{label}</span>
+        <div className={`p-6 rounded-2xl border ${styles[color]} flex flex-col items-center justify-center text-center`}>
+            <div className="mb-2 opacity-80">{icon}</div>
+            <span className="text-3xl font-extrabold mb-1">{value}</span>
+            <span className="text-xs font-bold uppercase tracking-wider opacity-70">{label}</span>
         </div>
     );
 };
@@ -276,23 +264,26 @@ const QuoteDetailCard = ({ label, value, icon, color }) => {
 const ChartCard = ({ title, type, data }) => (
   <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
     <h3 className="text-lg font-semibold text-gray-800 mb-6">{title}</h3>
-    <div className="h-[250px] w-full text-xs">
+    <div className="h-[300px] w-full text-xs">
       <ResponsiveContainer width="100%" height="100%">
         {type === "bar" ? (
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} />
-            <YAxis axisLine={false} tickLine={false} />
-            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
-            <Bar dataKey="Annonces" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={40} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} tick={{fill: '#64748b'}} />
+            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
+            <Tooltip 
+                cursor={{fill: '#f8fafc'}} 
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} 
+            />
+            <Bar dataKey="Annonces" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={50} />
           </BarChart>
         ) : (
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} />
-            <YAxis axisLine={false} tickLine={false} />
+             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} tick={{fill: '#64748b'}} />
+            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
             <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
-            <Line type="monotone" dataKey="Annonces" stroke="#10b981" strokeWidth={3} dot={{r:4, fill:'#10b981'}} />
+            <Line type="monotone" dataKey="Annonces" stroke="#10b981" strokeWidth={4} dot={{r:6, fill:'#10b981', strokeWidth:2, stroke:'white'}} />
           </LineChart>
         )}
       </ResponsiveContainer>
@@ -308,7 +299,7 @@ const LoadingScreen = () => (
 
 const ErrorScreen = ({ error }) => (
     <div className="flex h-screen items-center justify-center bg-gray-50 p-6">
-        <div className="text-center max-w-md bg-white p-8 rounded-2xl shadow-lg">
+        <div className="text-center max-w-md bg-white p-8 rounded-2xl shadow-lg border border-red-100">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-gray-900 mb-2">Erreur</h3>
             <p className="text-gray-600">{error}</p>
