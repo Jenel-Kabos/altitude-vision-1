@@ -3,8 +3,8 @@ import Slider from "react-slick";
 import { motion } from "framer-motion";
 import { Quote, Loader2, MessageSquarePlus, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom"; // ✅ Import nécessaire pour la redirection
-import { getAllTestimonials } from "../../services/testimonialService"; // Vérifie ton chemin
-import { useAuth } from "../../context/AuthContext"; // ✅ Import du contexte Auth
+import { getAllTestimonials } from "../services/testimonialService"; // Vérifie ton chemin
+import { useAuth } from "../context/AuthContext"; // ✅ Import du contexte Auth
 
 const Testimonials = () => {
   const [testimonials, setTestimonials] = useState([]);
