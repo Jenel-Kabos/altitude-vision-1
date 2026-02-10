@@ -15,7 +15,7 @@ const OwnerRoute = ({ redirectTo = '/login', forbiddenRedirect = '/unauthorized'
     // 🔑 Ajout de la vérification du token pour la sécurité et la cohérence
     const token = localStorage.getItem("token"); 
 
-    const allowedRole = 'Propriétaire';
+    const allowedRole = 'Proprietaire';
 
     // 1️⃣ Affichage pendant le chargement du contexte auth
     if (loading) {

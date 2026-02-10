@@ -25,7 +25,7 @@ const PublicAuthRoute = () => {
       case "Admin":
         redirectPath = "/dashboard";
         break;
-      case "Propriétaire":
+      case "Proprietaire":
         redirectPath = "/mes-biens";
         break;
       default:

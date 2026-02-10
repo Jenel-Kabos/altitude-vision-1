@@ -14,8 +14,7 @@ import {
 } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import { getTotalUnreadCount } from '../../services/unreadCountService';
-import UnreadMessagesBadge from '../messaging/UnreadMessagesBadge'; 
-import logo from '../../assets/logo.png';
+import UnreadMessagesBadge from '../messaging/UnreadMessagesBadge';
 
 // --- LOGIQUE DYNAMIQUE DE COMPTAGE DES MESSAGES NON LUS ---
 // ✅ Utilise le nouveau service unifié qui compte emails internes + conversations
@@ -191,7 +190,7 @@ const Header = () => {
                     <NavLink to="/" className="flex items-center">
                         <img
                             className="h-14 sm:h-16 object-contain"
-                            src={logo}
+                            src="/logo.png"
                             alt="Logo Altitude-Vision"
                         />
                     </NavLink>
