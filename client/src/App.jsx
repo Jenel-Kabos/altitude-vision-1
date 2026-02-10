@@ -65,7 +65,7 @@ import MessagesPage from './pages/MessagesPage';
 
 // Utilisateur / Propriétaire
 import AccountPage from "./pages/AccountPage";
-import ProfilePage from "./services/ProfilePage";
+import ProfilePage from "./services/ProfilePage"; // Vérifie que ce fichier est bien dans services, sinon change pour "./pages/ProfilePage"
 
 // Layout Propriétaire et Composant de gestion
 import OwnerDashboard from "./pages/dashboard/OwnerDashboard";
@@ -157,7 +157,7 @@ function App() {
                     <Route path="/mon-compte" element={<MainLayout><AccountPage /></MainLayout>} />
                     <Route path="/profile" element={<MainLayout><ProfilePage /></MainLayout>} />
                     
-                    {/* ✅ NOUVELLE ROUTE : Laisser un avis (Protégée) */}
+                    {/* ✅ PAGE AVIS : Accessible uniquement si connecté */}
                     <Route path="/avis/nouveau" element={<MainLayout><LeaveReviewPage /></MainLayout>} />
                     
                     {/* MESSAGERIE CLIENT/PROPRIÉTAIRE & FAVORIS */}
