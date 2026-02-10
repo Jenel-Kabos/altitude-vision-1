@@ -1,10 +1,13 @@
 [build]
-  # Si tu utilises Vite, le dossier est "dist". 
-  # Si tu utilises Create React App, c'est "build".
+  # Indique à Netlify d'aller dans le dossier "client" avant de faire quoi que ce soit
+  base = "client"
+  
+  # Le dossier où Vite va créer le site (relatif au dossier "base")
   publish = "dist"
+  
+  # La commande pour construire le site
   command = "npm run build"
 
-# C'est cette partie qui répare tes liens quand tu actualises la page
 [[redirects]]
   from = "/*"
   to = "/index.html"
