@@ -1,14 +1,14 @@
 [build]
-  # On force Netlify à entrer dans le dossier client
+  # On dit à Netlify d'entrer dans le dossier client
   base = "client"
   
-  # Le dossier de sortie de Vite (relatif à client)
-  publish = "dist"
-  
-  # La commande de build
+  # La commande pour construire le site
   command = "npm run build"
+  
+  # Le dossier où Vite crée le site (relatif au dossier client)
+  publish = "dist"
 
-# Gestion des redirections pour React (SPA)
+# Redirections pour que le routing React fonctionne (évite les 404 au refresh)
 [[redirects]]
   from = "/*"
   to = "/index.html"
