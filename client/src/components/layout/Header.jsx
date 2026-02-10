@@ -72,7 +72,7 @@ const Header = () => {
     const renderAuthButtons = () => {
         if (user) {
             const isAdmin = user.role === 'Admin' || user.role === 'Collaborateur';
-            const isOwner = user.role === 'Propriétaire';
+            const isOwner = user.role === 'Proprietaire';
 
             return (
                 <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-2 md:space-y-0">
