@@ -1,6 +1,5 @@
 // src/pages/dashboard/ModerationPage.jsx
 import React, { useEffect, useState } from 'react';
-// ✅ CORRECTION ICI : On remonte de 2 niveaux (../../) pour trouver le dossier services
 import api from '../../services/api'; 
 import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
 
@@ -19,7 +18,6 @@ const ModerationPage = () => {
   const fetchProperties = async () => {
     setLoading(true);
     try {
-      // Appel via api.js (gère automatiquement l'URL Render et le Token)
       const res = await api.get('/properties/status/pending');
       
       const props = res.data.data.properties;
@@ -60,8 +58,8 @@ const ModerationPage = () => {
   // Valider ou rejeter une propriété
   const handleModeration = async (id, action) => {
     try {
-      // Appel via api.js
-      await api.patch(`/properties/${id}/${action}`);
+      // ✅ CORRECTION : Utilisation de la route /admin/:id/:action
+      await api.patch(`/properties/admin/${id}/${action}`);
 
       // Mise à jour locale de la liste (suppression de l'élément traité)
       const updatedProperties = properties.filter((p) => p._id !== id);
