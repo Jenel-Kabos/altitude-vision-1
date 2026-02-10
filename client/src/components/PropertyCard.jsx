@@ -1,5 +1,5 @@
 // src/components/PropertyCard.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -10,13 +10,28 @@ import {
 } from 'react-icons/io5'; 
 import { LuBath } from 'react-icons/lu';
 import { BiArea } from 'react-icons/bi';
-import { Calendar, Euro } from 'lucide-react';
+import { Calendar, Euro, ImageOff } from 'lucide-react';
 import LikeButton from './likes/LikeButton';
 
-// ✅ CORRECTION : Vérifier que VITE_API_URL existe avant de l'utiliser
-const BACKEND_URL = import.meta.env.VITE_API_URL 
-    ? import.meta.env.VITE_API_URL.replace('/api', '') 
-    : 'https://altitude-vision.onrender.com';
+// ✅ CORRECTION : Gestion robuste de l'URL du backend
+const getBackendUrl = () => {
+    // 1. Essayer d'abord VITE_API_URL
+    if (import.meta.env.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL.replace('/api', '');
+    }
+    
+    // 2. Fallback sur l'URL de production
+    if (window.location.hostname === 'altitudevision.agency' || 
+        window.location.hostname === 'www.altitudevision.agency' ||
+        window.location.hostname === 'altitudevision.netlify.app') {
+        return 'https://altitude-vision.onrender.com';
+    }
+    
+    // 3. Fallback local
+    return 'http://localhost:5000';
+};
+
+const BACKEND_URL = getBackendUrl();
 
 const formatDate = (dateString) => {
     if (!dateString) return 'Date inconnue';
@@ -33,28 +48,61 @@ const formatDate = (dateString) => {
 };
 
 const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
-    // Debug: afficher les données de la propriété
-    console.log('PropertyCard - property:', property);
-    console.log('PropertyCard - amenities:', property.amenities);
-    console.log('PropertyCard - amenities type:', typeof property.amenities);
-    console.log('PropertyCard - amenities isArray:', Array.isArray(property.amenities));
-    
+    const [imageError, setImageError] = useState(false);
+
+    // ✅ FONCTION AMÉLIORÉE POUR OBTENIR L'URL DE L'IMAGE
+    const getImageUrl = () => {
+        // 1. Vérifier si images existe et contient des éléments
+        if (property.images && Array.isArray(property.images) && property.images.length > 0) {
+            const firstImage = property.images[0];
+            
+            // Si c'est une URL complète (http:// ou https://)
+            if (typeof firstImage === 'string' && firstImage.match(/^https?:\/\//)) {
+                console.log('✅ [PropertyCard] URL absolue détectée:', firstImage);
+                return firstImage;
+            }
+            
+            // Si c'est un chemin relatif, construire l'URL complète
+            if (typeof firstImage === 'string' && firstImage.trim()) {
+                const cleanPath = firstImage.startsWith('/') ? firstImage.substring(1) : firstImage;
+                const fullUrl = `${BACKEND_URL}/${cleanPath}`;
+                console.log('✅ [PropertyCard] URL construite:', fullUrl);
+                return fullUrl;
+            }
+        }
+
+        // 2. Vérifier mainImage
+        if (property.mainImage && typeof property.mainImage === 'string') {
+            if (property.mainImage.match(/^https?:\/\//)) {
+                console.log('✅ [PropertyCard] mainImage URL absolue:', property.mainImage);
+                return property.mainImage;
+            }
+            const cleanPath = property.mainImage.startsWith('/') 
+                ? property.mainImage.substring(1) 
+                : property.mainImage;
+            const fullUrl = `${BACKEND_URL}/${cleanPath}`;
+            console.log('✅ [PropertyCard] mainImage URL construite:', fullUrl);
+            return fullUrl;
+        }
+
+        // 3. Image par défaut
+        console.log('⚠️ [PropertyCard] Aucune image trouvée, utilisation du placeholder');
+        return 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=2073&auto=format&fit=crop';
+    };
+
     const priceFormatter = new Intl.NumberFormat('fr-FR', {
         maximumFractionDigits: 0,
     });
 
-    const imagePath = property.images && property.images.length > 0 ? property.images[0] : null;
-    const imageUrl = imagePath
-        ? `${BACKEND_URL}/${imagePath.replace(/^\//, '')}`
-        : 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=2073&auto=format&fit=crop';
-
+    const imageUrl = getImageUrl();
     const publicationDate = property.createdAt ? formatDate(property.createdAt) : 'N/D';
-
     const formattedPrice = property.price > 0 ? priceFormatter.format(property.price) : 'Prix sur demande';
 
-    // Gérer l'affichage de la localisation
+    // ✅ Gérer l'affichage de la localisation
     const getLocationDisplay = () => {
-        if (typeof property.location === 'string') return property.location;
+        if (typeof property.location === 'string' && property.location.trim()) {
+            return property.location;
+        }
         if (property.address && typeof property.address === 'object') {
             const parts = [];
             if (property.address.street) parts.push(property.address.street);
@@ -62,12 +110,16 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
             if (property.address.city) parts.push(property.address.city);
             if (parts.length > 0) return parts.join(', ');
         }
-        if (typeof property.address === 'string') return property.address;
-        if (typeof property.city === 'string') return property.city;
+        if (typeof property.address === 'string' && property.address.trim()) {
+            return property.address;
+        }
+        if (typeof property.city === 'string' && property.city.trim()) {
+            return property.city;
+        }
         return 'Localisation non spécifiée';
     };
 
-    // Normaliser les amenities en tableau
+    // ✅ Normaliser les amenities en tableau
     const getAmenities = () => {
         if (!property.amenities) return [];
         
@@ -88,7 +140,20 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
     };
 
     const amenitiesList = getAmenities();
-    console.log('PropertyCard - amenitiesList après traitement:', amenitiesList);
+
+    // ✅ Gestionnaire d'erreur d'image amélioré
+    const handleImageError = (e) => {
+        console.error('❌ [PropertyCard] Erreur de chargement image:', imageUrl);
+        console.error('❌ [PropertyCard] Property ID:', property._id);
+        console.error('❌ [PropertyCard] Images brutes:', property.images);
+        setImageError(true);
+        e.target.onerror = null; // Éviter les boucles infinies
+    };
+
+    const handleImageLoad = () => {
+        console.log('✅ [PropertyCard] Image chargée avec succès:', imageUrl);
+        setImageError(false);
+    };
 
     // Vue Liste
     if (viewMode === 'list') {
@@ -100,18 +165,25 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
                 className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 group"
             >
                 <Link to={`/altimmo/property/${property._id}`} className="flex flex-col md:flex-row">
-                    <div className="relative md:w-1/3 h-64 md:h-auto overflow-hidden">
-                        <img
-                            src={imageUrl}
-                            alt={property.title}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                            onError={(e) => {
-                                e.target.src = 'https://placehold.co/800x600/3B82F6/FFFFFF?text=Altimmo';
-                            }}
-                        />
+                    <div className="relative md:w-1/3 h-64 md:h-auto overflow-hidden bg-gray-200">
+                        {!imageError ? (
+                            <img
+                                src={imageUrl}
+                                alt={property.title || 'Bien immobilier'}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                onError={handleImageError}
+                                onLoad={handleImageLoad}
+                            />
+                        ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                                <ImageOff className="w-16 h-16 text-gray-400 mb-2" />
+                                <p className="text-gray-500 text-sm">Image non disponible</p>
+                            </div>
+                        )}
+                        
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                         
-                        {/* Badge Status - Position modernisée */}
+                        {/* Badge Status */}
                         <div className="absolute top-3 right-3">
                             <span
                                 className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md border ${
@@ -145,18 +217,20 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
                     <div className="p-6 md:w-2/3 flex flex-col justify-between">
                         <div>
                             <h3 className="text-2xl font-bold text-gray-800 mb-3 group-hover:text-blue-600 transition">
-                                {property.title}
+                                {property.title || 'Sans titre'}
                             </h3>
-                            <p className="text-gray-600 mb-4 line-clamp-2">{property.description}</p>
+                            <p className="text-gray-600 mb-4 line-clamp-2">
+                                {property.description || 'Aucune description disponible'}
+                            </p>
                         </div>
 
                         <div className="space-y-3">
                             <div className="flex items-center text-gray-600">
-                                <IoLocationOutline className="w-5 h-5 mr-3 text-red-500" />
+                                <IoLocationOutline className="w-5 h-5 mr-3 text-red-500 flex-shrink-0" />
                                 <span>{getLocationDisplay()}</span>
                             </div>
                             
-                            <div className="flex gap-6 text-gray-600">
+                            <div className="flex gap-6 text-gray-600 flex-wrap">
                                 {property.bedrooms > 0 && (
                                     <div className="flex items-center">
                                         <IoBedOutline className="w-5 h-5 mr-2 text-blue-500" />
@@ -169,7 +243,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
                                         <span className="font-semibold">{property.bathrooms}</span>
                                     </div>
                                 )}
-                                {property.surface && (
+                                {property.surface > 0 && (
                                     <div className="flex items-center">
                                         <BiArea className="w-5 h-5 mr-2 text-purple-500" />
                                         <span className="font-semibold">{property.surface} m²</span>
@@ -195,7 +269,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
 
                         {/* Commodités / Amenities */}
                         {amenitiesList.length > 0 && (
-                            <div className="mb-4">
+                            <div className="mt-4">
                                 <div className="flex flex-wrap gap-1.5">
                                     {amenitiesList.slice(0, 4).map((amenity, idx) => (
                                         <span key={idx} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
@@ -226,20 +300,26 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
         >
             <Link to={`/altimmo/property/${property._id}`} className="flex flex-col h-full">
                 {/* Image Container */}
-                <div className="relative h-64 overflow-hidden">
-                    <img 
-                        src={imageUrl} 
-                        alt={property.title} 
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
-                        onError={(e) => {
-                            e.target.src = 'https://placehold.co/800x600/3B82F6/FFFFFF?text=Altimmo';
-                        }}
-                    />
+                <div className="relative h-64 overflow-hidden bg-gray-200">
+                    {!imageError ? (
+                        <img 
+                            src={imageUrl} 
+                            alt={property.title || 'Bien immobilier'} 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                            onError={handleImageError}
+                            onLoad={handleImageLoad}
+                        />
+                    ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                            <ImageOff className="w-16 h-16 text-gray-400 mb-2" />
+                            <p className="text-gray-500 text-sm">Image non disponible</p>
+                        </div>
+                    )}
                     
                     {/* Overlay gradient */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                     
-                    {/* Badge Status - Position modernisée */}
+                    {/* Badge Status */}
                     <div className="absolute top-3 right-3">
                         <span
                             className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-md border ${
@@ -284,7 +364,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
                     {/* Titre et Localisation */}
                     <div className="mb-3">
                         <h3 className="text-xl font-bold text-gray-800 mb-2 line-clamp-2 group-hover:text-blue-600 transition">
-                            {property.title}
+                            {property.title || 'Sans titre'}
                         </h3>
                         <div className="flex items-center text-sm text-gray-600">
                             <IoLocationOutline className="w-4 h-4 mr-2 text-red-500 flex-shrink-0" />
@@ -293,7 +373,9 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
                     </div>
 
                     {/* Description */}
-                    <p className="text-gray-600 mb-4 line-clamp-2 text-sm">{property.description}</p>
+                    <p className="text-gray-600 mb-4 line-clamp-2 text-sm">
+                        {property.description || 'Aucune description disponible'}
+                    </p>
                     
                     {/* Séparateur */}
                     <div className="border-t border-gray-100 mb-4"></div>
@@ -322,7 +404,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
                             </div>
                         )}
 
-                        {property.surface && (
+                        {property.surface > 0 && (
                             <div className="flex items-center gap-2">
                                 <div className="p-1.5 rounded-lg bg-blue-50">
                                     <BiArea className="w-4 h-4 text-blue-600"/>
