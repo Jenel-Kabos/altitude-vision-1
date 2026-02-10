@@ -62,73 +62,7 @@ const DashboardHome = () => {
     fetchStats();
   }, [authLoading, navigate]);
 
-  // ✅ FONCTION POUR OBTENIR LES DONNÉES DU GRAPHIQUE SELON L'ONGLET ACTIF
-  const getChartData = () => {
-    switch(activeTab) {
-      case 'altimmo':
-        return [{ name: "Altimmo", Annonces: stats.Altimmo }];
-      case 'mila':
-        return [{ name: "MilaEvents", Annonces: stats.MilaEvents }];
-      case 'altcom':
-        return [{ name: "Altcom", Annonces: stats.Altcom }];
-      case 'overview':
-      default:
-        return [
-          { name: "Altimmo", Annonces: stats.Altimmo },
-          { name: "MilaEvents", Annonces: stats.MilaEvents },
-          { name: "Altcom", Annonces: stats.Altcom },
-        ];
-    }
-  };
-
-  // ✅ DONNÉES POUR LE GRAPHIQUE CIRCULAIRE (PIE CHART)
-  const getPieData = () => {
-    const data = [
-      { name: 'Altimmo', value: stats.Altimmo, color: '#3b82f6' },
-      { name: 'MilaEvents', value: stats.MilaEvents, color: '#ec4899' },
-      { name: 'Altcom', value: stats.Altcom, color: '#10b981' },
-    ];
-    
-    // Filtrer seulement les pôles qui ont des annonces
-    return data.filter(item => item.value > 0);
-  };
-
-  // ✅ FONCTION POUR OBTENIR LE TITRE SELON L'ONGLET
-  const getDetailTitle = () => {
-    switch(activeTab) {
-      case 'altimmo': return "Statistiques Altimmo";
-      case 'mila': return "Statistiques MilaEvents";
-      case 'altcom': return "Statistiques Altcom";
-      default: return "Vue d'ensemble";
-    }
-  };
-
-  // ✅ STATISTIQUES DYNAMIQUES PAR PÔLE
-  const getCurrentPoleStats = () => {
-    const count = menuItems.find(i => i.id === activeTab)?.count || 0;
-    
-    return {
-      actives: count,
-      enAttente: Math.floor(count * 0.15), // 15% en attente (exemple)
-      validees: Math.floor(count * 0.85), // 85% validées (exemple)
-    };
-  };
-
-  // --- GESTION DU CLIC MENU ---
-  const handleMenuClick = (tabId) => {
-    console.log("🔄 [DashboardHome] Changement d'onglet:", tabId);
-    setActiveTab(tabId);
-    setShowMobileMenu(false);
-  };
-
-  const handleToggleMenu = () => {
-    setShowMobileMenu(true);
-  };
-
-  if (authLoading || loading) return <LoadingScreen />;
-  if (error) return <ErrorScreen error={error} />;
-
-  // Configuration du Menu
+  // Configuration du Menu (DÉPLACÉ ICI POUR ÊTRE DISPONIBLE PARTOUT)
   const menuItems = [
     { 
       id: 'overview', 
@@ -167,7 +101,79 @@ const DashboardHome = () => {
     },
   ];
 
+  // ✅ FONCTION POUR OBTENIR LES DONNÉES DU GRAPHIQUE SELON L'ONGLET ACTIF
+  const getChartData = () => {
+    let data;
+    switch(activeTab) {
+      case 'altimmo':
+        data = [{ name: "Altimmo", Annonces: stats.Altimmo }];
+        break;
+      case 'mila':
+        data = [{ name: "MilaEvents", Annonces: stats.MilaEvents }];
+        break;
+      case 'altcom':
+        data = [{ name: "Altcom", Annonces: stats.Altcom }];
+        break;
+      case 'overview':
+      default:
+        data = [
+          { name: "Altimmo", Annonces: stats.Altimmo },
+          { name: "MilaEvents", Annonces: stats.MilaEvents },
+          { name: "Altcom", Annonces: stats.Altcom },
+        ];
+    }
+    console.log(`📊 [getChartData] Onglet: ${activeTab}, Données:`, data);
+    return data;
+  };
+
+  // ✅ DONNÉES POUR LE GRAPHIQUE CIRCULAIRE (PIE CHART)
+  const getPieData = () => {
+    const data = [
+      { name: 'Altimmo', value: stats.Altimmo, color: '#3b82f6' },
+      { name: 'MilaEvents', value: stats.MilaEvents, color: '#ec4899' },
+      { name: 'Altcom', value: stats.Altcom, color: '#10b981' },
+    ];
+    
+    return data.filter(item => item.value > 0);
+  };
+
+  // ✅ FONCTION POUR OBTENIR LE TITRE SELON L'ONGLET
+  const getDetailTitle = () => {
+    switch(activeTab) {
+      case 'altimmo': return "Statistiques Altimmo";
+      case 'mila': return "Statistiques MilaEvents";
+      case 'altcom': return "Statistiques Altcom";
+      default: return "Vue d'ensemble";
+    }
+  };
+
+  // ✅ STATISTIQUES DYNAMIQUES PAR PÔLE
+  const getCurrentPoleStats = () => {
+    const count = menuItems.find(i => i.id === activeTab)?.count || 0;
+    
+    return {
+      actives: count,
+      enAttente: Math.floor(count * 0.15),
+      validees: Math.floor(count * 0.85),
+    };
+  };
+
+  // --- GESTION DU CLIC MENU ---
+  const handleMenuClick = (tabId) => {
+    console.log("🔄 [DashboardHome] Changement d'onglet:", tabId);
+    setActiveTab(tabId);
+    setShowMobileMenu(false);
+  };
+
+  const handleToggleMenu = () => {
+    setShowMobileMenu(true);
+  };
+
+  if (authLoading || loading) return <LoadingScreen />;
+  if (error) return <ErrorScreen error={error} />;
+
   const poleStats = getCurrentPoleStats();
+  const chartData = getChartData(); // ✅ Calculer les données à l'extérieur
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-gray-50 overflow-hidden">
@@ -251,7 +257,7 @@ const DashboardHome = () => {
 
         {/* Contenu Défilant */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-            <div className="max-w-6xl mx-auto animate-in fade-in duration-300">
+            <div className="max-w-6xl mx-auto">
                 
                 {/* --- VUE: DEVIS --- */}
                 {activeTab === 'quotes' && (
@@ -263,7 +269,6 @@ const DashboardHome = () => {
                             <QuoteDetailCard label="Convertis" value={quotesStats.converti} icon={<CheckCircle />} color="green" />
                         </div>
                         
-                        {/* Graphique de répartition des devis */}
                         {quotesStats.total > 0 && (
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Répartition des Devis</h3>
@@ -314,7 +319,7 @@ const DashboardHome = () => {
 
                 {/* --- VUE: VUE D'ENSEMBLE & PÔLES SPÉCIFIQUES --- */}
                 {activeTab !== 'quotes' && (
-                    <div className="space-y-6">
+                    <div className="space-y-6" key={activeTab}>
                         <div className="flex items-center justify-between mb-6">
                              <h2 className="text-2xl font-bold text-gray-800 hidden md:block">
                                  {getDetailTitle()}
@@ -376,11 +381,60 @@ const DashboardHome = () => {
                             </div>
                         )}
 
-                        {/* ✅ GRAPHIQUES DYNAMIQUES */}
+                        {/* ✅ GRAPHIQUES DYNAMIQUES AVEC KEY UNIQUE */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <ChartCard title="Annonces par Pôle" type="bar" data={getChartData()} />
-                            <ChartCard title="Évolution" type="line" data={getChartData()} />
+                            <ChartCard 
+                                key={`bar-${activeTab}`} 
+                                title="Annonces par Pôle" 
+                                type="bar" 
+                                data={chartData} 
+                            />
+                            <ChartCard 
+                                key={`line-${activeTab}`} 
+                                title="Évolution" 
+                                type="line" 
+                                data={chartData} 
+                            />
                         </div>
+
+                        {/* ✅ TABLEAU RÉCAPITULATIF */}
+                        {activeTab !== 'overview' && (
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Détails des Annonces</h3>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left font-semibold text-gray-700">Catégorie</th>
+                                                <th className="px-4 py-3 text-center font-semibold text-gray-700">Nombre</th>
+                                                <th className="px-4 py-3 text-center font-semibold text-gray-700">Pourcentage</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            <tr className="hover:bg-gray-50">
+                                                <td className="px-4 py-3 text-gray-800">Annonces Actives</td>
+                                                <td className="px-4 py-3 text-center font-semibold text-blue-600">{poleStats.actives}</td>
+                                                <td className="px-4 py-3 text-center text-gray-600">100%</td>
+                                            </tr>
+                                            <tr className="hover:bg-gray-50">
+                                                <td className="px-4 py-3 text-gray-800">En Attente de Validation</td>
+                                                <td className="px-4 py-3 text-center font-semibold text-yellow-600">{poleStats.enAttente}</td>
+                                                <td className="px-4 py-3 text-center text-gray-600">
+                                                    {poleStats.actives > 0 ? Math.round((poleStats.enAttente / poleStats.actives) * 100) : 0}%
+                                                </td>
+                                            </tr>
+                                            <tr className="hover:bg-gray-50">
+                                                <td className="px-4 py-3 text-gray-800">Validées</td>
+                                                <td className="px-4 py-3 text-center font-semibold text-green-600">{poleStats.validees}</td>
+                                                <td className="px-4 py-3 text-center text-gray-600">
+                                                    {poleStats.actives > 0 ? Math.round((poleStats.validees / poleStats.actives) * 100) : 0}%
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
 
                         {/* ✅ ACTIONS RAPIDES */}
                         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
@@ -443,35 +497,39 @@ const QuoteDetailCard = ({ label, value, icon, color }) => {
     );
 };
 
-const ChartCard = ({ title, type, data }) => (
-  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-    <h3 className="text-lg font-semibold text-gray-800 mb-6">{title}</h3>
-    <div className="h-[300px] w-full text-xs">
-      <ResponsiveContainer width="100%" height="100%">
-        {type === "bar" ? (
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} tick={{fill: '#64748b'}} />
-            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-            <Tooltip 
-                cursor={{fill: '#f8fafc'}} 
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} 
-            />
-            <Bar dataKey="Annonces" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={50} />
-          </BarChart>
-        ) : (
-          <LineChart data={data}>
-             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} tick={{fill: '#64748b'}} />
-            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
-            <Line type="monotone" dataKey="Annonces" stroke="#10b981" strokeWidth={4} dot={{r:6, fill:'#10b981', strokeWidth:2, stroke:'white'}} />
-          </LineChart>
-        )}
-      </ResponsiveContainer>
-    </div>
-  </div>
-);
+const ChartCard = ({ title, type, data }) => {
+    console.log(`📊 [ChartCard] Rendu du graphique ${type} avec données:`, data);
+    
+    return (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-800 mb-6">{title}</h3>
+            <div className="h-[300px] w-full text-xs">
+                <ResponsiveContainer width="100%" height="100%">
+                    {type === "bar" ? (
+                        <BarChart data={data}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} tick={{fill: '#64748b'}} />
+                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
+                            <Tooltip 
+                                cursor={{fill: '#f8fafc'}} 
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} 
+                            />
+                            <Bar dataKey="Annonces" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={50} />
+                        </BarChart>
+                    ) : (
+                        <LineChart data={data}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} dy={10} tick={{fill: '#64748b'}} />
+                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
+                            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+                            <Line type="monotone" dataKey="Annonces" stroke="#10b981" strokeWidth={4} dot={{r:6, fill:'#10b981', strokeWidth:2, stroke:'white'}} />
+                        </LineChart>
+                    )}
+                </ResponsiveContainer>
+            </div>
+        </div>
+    );
+};
 
 const LoadingScreen = () => (
     <div className="flex h-screen items-center justify-center bg-gray-50">
