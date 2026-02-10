@@ -462,6 +462,9 @@ const MilaEventsPage = () => {
             <MilaContact />
       </section>
 
+      {/* Composant de Contact */}
+            <MilaContact />
+
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-8 border-t border-gray-800">
         <div className="container mx-auto px-4 sm:px-6 text-center max-w-6xl">
