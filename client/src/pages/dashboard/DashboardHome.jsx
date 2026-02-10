@@ -25,7 +25,7 @@ const DashboardHome = () => {
 
   // --- ÉTATS D'AFFICHAGE ---
   const [activeTab, setActiveTab] = useState('overview'); 
-  const [showMobileMenu, setShowMobileMenu] = useState(true); // true = afficher le menu sur mobile
+  const [showMobileMenu, setShowMobileMenu] = useState(true);
 
   // --- CHARGEMENT ---
   useEffect(() => {
@@ -59,20 +59,43 @@ const DashboardHome = () => {
     fetchStats();
   }, [authLoading, navigate]);
 
-  const chartData = [
-    { name: "Altimmo", Annonces: stats.Altimmo },
-    { name: "MilaEvents", Annonces: stats.MilaEvents },
-    { name: "Altcom", Annonces: stats.Altcom },
-  ];
+  // ✅ FONCTION POUR OBTENIR LES DONNÉES DU GRAPHIQUE SELON L'ONGLET ACTIF
+  const getChartData = () => {
+    switch(activeTab) {
+      case 'altimmo':
+        return [{ name: "Altimmo", Annonces: stats.Altimmo }];
+      case 'mila':
+        return [{ name: "MilaEvents", Annonces: stats.MilaEvents }];
+      case 'altcom':
+        return [{ name: "Altcom", Annonces: stats.Altcom }];
+      case 'overview':
+      default:
+        return [
+          { name: "Altimmo", Annonces: stats.Altimmo },
+          { name: "MilaEvents", Annonces: stats.MilaEvents },
+          { name: "Altcom", Annonces: stats.Altcom },
+        ];
+    }
+  };
+
+  // ✅ FONCTION POUR OBTENIR LE TITRE SELON L'ONGLET
+  const getDetailTitle = () => {
+    switch(activeTab) {
+      case 'altimmo': return "Statistiques Altimmo";
+      case 'mila': return "Statistiques MilaEvents";
+      case 'altcom': return "Statistiques Altcom";
+      default: return "Vue d'ensemble";
+    }
+  };
 
   // --- GESTION DU CLIC MENU ---
   const handleMenuClick = (tabId) => {
     setActiveTab(tabId);
-    setShowMobileMenu(false); // Masquer le menu et afficher le contenu sur mobile
+    setShowMobileMenu(false);
   };
 
   const handleToggleMenu = () => {
-    setShowMobileMenu(true); // Retour au menu sur mobile
+    setShowMobileMenu(true);
   };
 
   if (authLoading || loading) return <LoadingScreen />;
@@ -122,8 +145,6 @@ const DashboardHome = () => {
       
       {/* =======================================================
           COLONNE 1 : LE MENU (Panneau d'administration)
-          - Mobile : Occupe tout l'écran quand showMobileMenu = true
-          - Desktop : Toujours visible, largeur fixe (md:w-80)
       ======================================================== */}
       <aside className={`
         ${showMobileMenu ? 'flex' : 'hidden'} 
@@ -169,9 +190,7 @@ const DashboardHome = () => {
       </aside>
 
       {/* =======================================================
-          COLONNE 2 : LES DÉTAILS (Graphiques, Stats...)
-          - Mobile : Occupe tout l'écran quand showMobileMenu = false
-          - Desktop : Toujours visible, prend le reste de la place
+          COLONNE 2 : LES DÉTAILS
       ======================================================== */}
       <main className={`
         ${showMobileMenu ? 'hidden' : 'flex'} 
@@ -218,12 +237,12 @@ const DashboardHome = () => {
                     </div>
                 )}
 
-                {/* --- VUE: VUE D'ENSEMBLE & AUTRES --- */}
+                {/* --- VUE: VUE D'ENSEMBLE & PÔLES SPÉCIFIQUES --- */}
                 {activeTab !== 'quotes' && (
                     <div className="space-y-6">
                         <div className="flex items-center justify-between mb-6">
                              <h2 className="text-2xl font-bold text-gray-800 hidden md:block">
-                                 {activeTab === 'overview' ? "Vue d'ensemble" : "Statistiques Détaillées"}
+                                 {getDetailTitle()}
                              </h2>
                              {/* Petit badge récap */}
                              <div className="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-medium text-gray-600">
@@ -231,9 +250,55 @@ const DashboardHome = () => {
                              </div>
                         </div>
 
+                        {/* ✅ STATISTIQUES DÉTAILLÉES PAR PÔLE */}
+                        {activeTab !== 'overview' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                                <StatCard 
+                                    label="Annonces Actives" 
+                                    value={menuItems.find(i => i.id === activeTab)?.count || 0}
+                                    color="blue"
+                                    icon={<TrendingUp />}
+                                />
+                                <StatCard 
+                                    label="En Attente" 
+                                    value={0}
+                                    color="yellow"
+                                    icon={<Clock />}
+                                />
+                                <StatCard 
+                                    label="Validées ce mois" 
+                                    value={menuItems.find(i => i.id === activeTab)?.count || 0}
+                                    color="green"
+                                    icon={<CheckCircle />}
+                                />
+                            </div>
+                        )}
+
+                        {/* ✅ GRAPHIQUES DYNAMIQUES */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <ChartCard title="Répartition par Pôle" type="bar" data={chartData} />
-                            <ChartCard title="Tendance Mensuelle" type="line" data={chartData} />
+                            <ChartCard title="Répartition" type="bar" data={getChartData()} />
+                            <ChartCard title="Évolution" type="line" data={getChartData()} />
+                        </div>
+
+                        {/* ✅ ACTIONS RAPIDES */}
+                        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions Rapides</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <button 
+                                    onClick={() => navigate('/dashboard/properties')}
+                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition flex items-center justify-center gap-2"
+                                >
+                                    <Building2 size={18} />
+                                    Voir toutes les annonces
+                                </button>
+                                <button 
+                                    onClick={() => navigate('/dashboard/properties/new')}
+                                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition flex items-center justify-center gap-2"
+                                >
+                                    <ChevronRight size={18} />
+                                    Créer une annonce
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -245,6 +310,21 @@ const DashboardHome = () => {
 };
 
 // --- COMPOSANTS UI ---
+
+const StatCard = ({ label, value, icon, color }) => {
+    const styles = {
+        blue: "bg-blue-50 text-blue-700 border-blue-100",
+        yellow: "bg-yellow-50 text-yellow-700 border-yellow-100",
+        green: "bg-green-50 text-green-700 border-green-100",
+    };
+    return (
+        <div className={`p-6 rounded-2xl border ${styles[color]} flex flex-col items-center justify-center text-center`}>
+            <div className="mb-2 opacity-80">{icon}</div>
+            <span className="text-3xl font-extrabold mb-1">{value}</span>
+            <span className="text-xs font-bold uppercase tracking-wider opacity-70">{label}</span>
+        </div>
+    );
+};
 
 const QuoteDetailCard = ({ label, value, icon, color }) => {
     const styles = {
