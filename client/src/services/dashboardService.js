@@ -21,10 +21,16 @@ export const getDashboardStats = async () => {
       },
     });
 
-    // Retourne les données ou valeurs par défaut si vide
-    return response.data?.data || { Altimmo: 0, MilaEvents: 0, Altcom: 0 };
+    console.log("📊 [dashboardService] Réponse complète:", response.data);
+
+    // ✅ CORRECTION : Accès correct à response.data.data.stats
+    const stats = response.data?.data?.stats || { Altimmo: 0, MilaEvents: 0, Altcom: 0 };
+    
+    console.log("📊 [dashboardService] Stats extraites:", stats);
+    
+    return stats;
   } catch (error) {
-    console.error("Erreur lors du chargement des statistiques :", error);
+    console.error("❌ [dashboardService] Erreur lors du chargement des statistiques :", error);
 
     // On peut propager l'erreur pour que le composant l'affiche/redirige
     throw error;

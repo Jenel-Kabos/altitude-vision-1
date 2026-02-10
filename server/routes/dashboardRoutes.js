@@ -6,8 +6,6 @@ const router = express.Router();
 const Property = require('../models/Property');
 const Event = require('../models/Event');
 const User = require('../models/User');
-// Si tu n'as pas de fichier models/Service.js, commente la ligne ci-dessous ou remplace par Portfolio
-// const Service = require('../models/Service'); 
 
 // ✅ IMPORT DU CONTRÔLEUR D'AUTH (Pour la sécurité unifiée)
 const authController = require('../controllers/authController');
@@ -24,8 +22,9 @@ router.use(authController.restrictTo('Admin', 'Collaborateur'));
  */
 router.get('/stats', async (req, res) => {
   try {
+    console.log('📊 [Dashboard] Requête reçue pour /stats');
+
     // Exécution des requêtes en parallèle pour la rapidité
-    // Note: Si Service n'existe pas, retire serviceCount de la liste
     const [propertyCount, eventCount, usersCount, ownersCount] = await Promise.all([
       Property.countDocuments(),
       Event.countDocuments(),
@@ -33,31 +32,36 @@ router.get('/stats', async (req, res) => {
       User.countDocuments({ role: 'Proprietaire' }) // ✅ Sans accent !
     ]);
 
-    // On prépare les données (ajout de Service si tu as le modèle)
+    // Comptage des services (Altcom) - gestion si le modèle n'existe pas
     let serviceCount = 0;
     try {
-        // Tentative de comptage des services si le modèle existe
-        const Service = require('../models/Service');
-        serviceCount = await Service.countDocuments();
+      const Service = require('../models/Service');
+      serviceCount = await Service.countDocuments();
     } catch (e) {
-        // Ignorer si le modèle Service n'existe pas
+      console.log('⚠️ [Dashboard] Modèle Service non trouvé, serviceCount = 0');
+      // Si le modèle Service n'existe pas, on reste à 0
     }
+
+    // ✅ Structure des données conforme aux attentes du frontend
+    const statsData = {
+      Altimmo: propertyCount,
+      MilaEvents: eventCount,
+      Altcom: serviceCount,
+      Users: usersCount,
+      Owners: ownersCount
+    };
+
+    console.log('✅ [Dashboard] Stats calculées:', statsData);
 
     res.status(200).json({
       status: 'success',
       data: {
-        stats: {
-            Altimmo: propertyCount,
-            MilaEvents: eventCount,
-            Altcom: serviceCount,
-            Users: usersCount,
-            Owners: ownersCount
-        }
+        stats: statsData
       },
     });
 
   } catch (error) {
-    console.error('🚨 Erreur Dashboard Stats :', error);
+    console.error('🚨 [Dashboard] Erreur lors du chargement des stats:', error);
     res.status(500).json({
       status: 'error',
       message: 'Erreur serveur lors du chargement des statistiques.',

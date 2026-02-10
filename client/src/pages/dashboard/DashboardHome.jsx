@@ -30,39 +30,59 @@ const DashboardHome = () => {
   // --- CHARGEMENT ---
   useEffect(() => {
     if (authLoading) return;
+    
     const fetchStats = async () => {
       try {
         setLoading(true);
+        setError(null);
+
+        console.log("🔄 [DashboardHome] Début du chargement des statistiques...");
+
         const [dashboardData, quotesData] = await Promise.all([
           getDashboardStats(),
           getAllQuotes()
         ]);
 
-        console.log("📊 [DashboardHome] Stats reçues:", dashboardData);
-        console.log("📋 [DashboardHome] Devis reçus:", quotesData.length);
+        console.log("✅ [DashboardHome] Stats reçues du service:", dashboardData);
+        console.log("✅ [DashboardHome] Devis reçus:", quotesData?.length || 0);
 
-        setStats(dashboardData);
-        setQuotesStats({
-          total: quotesData.length,
-          nouveau: quotesData.filter(q => q.status === 'Nouveau').length,
-          enCours: quotesData.filter(q => q.status === 'En cours').length,
-          converti: quotesData.filter(q => q.status === 'Converti').length,
-        });
-      } catch (err) {
-        console.error("❌ [DashboardHome] Erreur:", err);
-        if (err.response?.status === 401) {
-            navigate("/login");
+        // ✅ Vérification des données reçues
+        if (!dashboardData) {
+          console.warn("⚠️ [DashboardHome] dashboardData est null/undefined");
+          setStats({ Altimmo: 0, MilaEvents: 0, Altcom: 0 });
         } else {
-            setError("Impossible de charger les données.");
+          setStats(dashboardData);
+        }
+
+        // ✅ Gestion des devis
+        const quotes = quotesData || [];
+        setQuotesStats({
+          total: quotes.length,
+          nouveau: quotes.filter(q => q.status === 'Nouveau').length,
+          enCours: quotes.filter(q => q.status === 'En cours').length,
+          converti: quotes.filter(q => q.status === 'Converti').length,
+        });
+
+        console.log("✅ [DashboardHome] État mis à jour avec succès");
+
+      } catch (err) {
+        console.error("❌ [DashboardHome] Erreur lors du chargement:", err);
+        
+        if (err.response?.status === 401) {
+          console.log("🔒 [DashboardHome] Non authentifié, redirection vers /login");
+          navigate("/login");
+        } else {
+          setError("Impossible de charger les données du dashboard.");
         }
       } finally {
         setLoading(false);
       }
     };
+
     fetchStats();
   }, [authLoading, navigate]);
 
-  // Configuration du Menu (DÉPLACÉ ICI POUR ÊTRE DISPONIBLE PARTOUT)
+  // Configuration du Menu
   const menuItems = [
     { 
       id: 'overview', 
@@ -173,7 +193,7 @@ const DashboardHome = () => {
   if (error) return <ErrorScreen error={error} />;
 
   const poleStats = getCurrentPoleStats();
-  const chartData = getChartData(); // ✅ Calculer les données à l'extérieur
+  const chartData = getChartData();
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-gray-50 overflow-hidden">
@@ -533,7 +553,10 @@ const ChartCard = ({ title, type, data }) => {
 
 const LoadingScreen = () => (
     <div className="flex h-screen items-center justify-center bg-gray-50">
-        <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
+        <div className="text-center">
+            <Loader2 className="animate-spin text-blue-600 w-10 h-10 mx-auto mb-4" />
+            <p className="text-gray-600 text-sm">Chargement des statistiques...</p>
+        </div>
     </div>
 );
 
@@ -541,8 +564,14 @@ const ErrorScreen = ({ error }) => (
     <div className="flex h-screen items-center justify-center bg-gray-50 p-6">
         <div className="text-center max-w-md bg-white p-8 rounded-2xl shadow-lg border border-red-100">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Erreur</h3>
-            <p className="text-gray-600">{error}</p>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Erreur de chargement</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button 
+                onClick={() => window.location.reload()} 
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+                Réessayer
+            </button>
         </div>
     </div>
 );
