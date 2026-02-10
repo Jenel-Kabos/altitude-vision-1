@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 import HeroSlider from '../components/HeroSliderMila';
+import MilaContact from '../components/MilaContact';
 import { getAllEvents } from '../services/eventService';
 import { createQuoteRequest } from '../services/quoteService';
 import { getFirstValidImage } from '../utils/imageUtils';
@@ -457,6 +458,8 @@ const MilaEventsPage = () => {
             </button>
           </motion.div>
         </div>
+        {/* Composant de Contact */}
+            <MilaContact />
       </section>
 
       {/* Footer */}
