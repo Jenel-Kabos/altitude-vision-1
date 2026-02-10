@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar,
+  LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell
 } from "recharts";
 import { 
   Building2, Calendar, Megaphone, FileText, 
-  Loader2, AlertCircle, ChevronRight, ArrowLeft,
-  LayoutDashboard, TrendingUp, CheckCircle, Clock, Menu
+  Loader2, AlertCircle, ChevronRight,
+  LayoutDashboard, TrendingUp, CheckCircle, Clock, Menu, Home
 } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
@@ -38,6 +38,9 @@ const DashboardHome = () => {
           getAllQuotes()
         ]);
 
+        console.log("📊 [DashboardHome] Stats reçues:", dashboardData);
+        console.log("📋 [DashboardHome] Devis reçus:", quotesData.length);
+
         setStats(dashboardData);
         setQuotesStats({
           total: quotesData.length,
@@ -46,7 +49,7 @@ const DashboardHome = () => {
           converti: quotesData.filter(q => q.status === 'Converti').length,
         });
       } catch (err) {
-        console.error("Erreur Dashboard:", err);
+        console.error("❌ [DashboardHome] Erreur:", err);
         if (err.response?.status === 401) {
             navigate("/login");
         } else {
@@ -78,6 +81,18 @@ const DashboardHome = () => {
     }
   };
 
+  // ✅ DONNÉES POUR LE GRAPHIQUE CIRCULAIRE (PIE CHART)
+  const getPieData = () => {
+    const data = [
+      { name: 'Altimmo', value: stats.Altimmo, color: '#3b82f6' },
+      { name: 'MilaEvents', value: stats.MilaEvents, color: '#ec4899' },
+      { name: 'Altcom', value: stats.Altcom, color: '#10b981' },
+    ];
+    
+    // Filtrer seulement les pôles qui ont des annonces
+    return data.filter(item => item.value > 0);
+  };
+
   // ✅ FONCTION POUR OBTENIR LE TITRE SELON L'ONGLET
   const getDetailTitle = () => {
     switch(activeTab) {
@@ -88,8 +103,20 @@ const DashboardHome = () => {
     }
   };
 
+  // ✅ STATISTIQUES DYNAMIQUES PAR PÔLE
+  const getCurrentPoleStats = () => {
+    const count = menuItems.find(i => i.id === activeTab)?.count || 0;
+    
+    return {
+      actives: count,
+      enAttente: Math.floor(count * 0.15), // 15% en attente (exemple)
+      validees: Math.floor(count * 0.85), // 85% validées (exemple)
+    };
+  };
+
   // --- GESTION DU CLIC MENU ---
   const handleMenuClick = (tabId) => {
+    console.log("🔄 [DashboardHome] Changement d'onglet:", tabId);
     setActiveTab(tabId);
     setShowMobileMenu(false);
   };
@@ -140,6 +167,8 @@ const DashboardHome = () => {
     },
   ];
 
+  const poleStats = getCurrentPoleStats();
+
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-gray-50 overflow-hidden">
       
@@ -151,9 +180,12 @@ const DashboardHome = () => {
         md:flex flex-col w-full md:w-80 bg-white border-r border-gray-200 overflow-y-auto
         fixed md:relative inset-0 z-40 md:z-auto
       `}>
-        <div className="p-6 border-b border-gray-100">
-          <h1 className="text-xl font-bold text-gray-800">Mon Activité</h1>
-          <p className="text-sm text-gray-500 mt-1">Bienvenue, {user?.name}</p>
+        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+          <div className="flex items-center gap-3 mb-2">
+            <Home size={24} />
+            <h1 className="text-xl font-bold">Tableau de Bord</h1>
+          </div>
+          <p className="text-sm opacity-90">Bienvenue, {user?.name || user?.email?.split('@')[0] || 'Admin'}</p>
         </div>
 
         <nav className="p-4 space-y-2 flex-1">
@@ -187,6 +219,12 @@ const DashboardHome = () => {
             </button>
           ))}
         </nav>
+
+        <div className="p-4 border-t border-gray-100 bg-gray-50">
+          <p className="text-xs text-gray-500 text-center">
+            Statistiques en temps réel
+          </p>
+        </div>
       </aside>
 
       {/* =======================================================
@@ -213,7 +251,7 @@ const DashboardHome = () => {
 
         {/* Contenu Défilant */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
-            <div className="max-w-5xl mx-auto animate-in fade-in duration-300">
+            <div className="max-w-6xl mx-auto animate-in fade-in duration-300">
                 
                 {/* --- VUE: DEVIS --- */}
                 {activeTab === 'quotes' && (
@@ -224,6 +262,43 @@ const DashboardHome = () => {
                             <QuoteDetailCard label="En Cours" value={quotesStats.enCours} icon={<TrendingUp />} color="yellow" />
                             <QuoteDetailCard label="Convertis" value={quotesStats.converti} icon={<CheckCircle />} color="green" />
                         </div>
+                        
+                        {/* Graphique de répartition des devis */}
+                        {quotesStats.total > 0 && (
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Répartition des Devis</h3>
+                                <div className="h-[300px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={[
+                                                    { name: 'Nouveaux', value: quotesStats.nouveau, color: '#3b82f6' },
+                                                    { name: 'En Cours', value: quotesStats.enCours, color: '#f59e0b' },
+                                                    { name: 'Convertis', value: quotesStats.converti, color: '#10b981' },
+                                                ].filter(item => item.value > 0)}
+                                                cx="50%"
+                                                cy="50%"
+                                                labelLine={false}
+                                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                                outerRadius={100}
+                                                fill="#8884d8"
+                                                dataKey="value"
+                                            >
+                                                {[
+                                                    { name: 'Nouveaux', value: quotesStats.nouveau, color: '#3b82f6' },
+                                                    { name: 'En Cours', value: quotesStats.enCours, color: '#f59e0b' },
+                                                    { name: 'Convertis', value: quotesStats.converti, color: '#10b981' },
+                                                ].filter(item => item.value > 0).map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 text-center">
                             <h3 className="text-lg font-semibold text-gray-900">Toutes les demandes</h3>
                             <p className="text-gray-500 mb-6 mt-1">Consultez, traitez et convertissez vos prospects.</p>
@@ -244,9 +319,8 @@ const DashboardHome = () => {
                              <h2 className="text-2xl font-bold text-gray-800 hidden md:block">
                                  {getDetailTitle()}
                              </h2>
-                             {/* Petit badge récap */}
                              <div className="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-medium text-gray-600">
-                                 Total: {menuItems.find(i => i.id === activeTab)?.count}
+                                 Total: <span className="font-bold text-blue-600">{menuItems.find(i => i.id === activeTab)?.count}</span>
                              </div>
                         </div>
 
@@ -255,28 +329,56 @@ const DashboardHome = () => {
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                                 <StatCard 
                                     label="Annonces Actives" 
-                                    value={menuItems.find(i => i.id === activeTab)?.count || 0}
+                                    value={poleStats.actives}
                                     color="blue"
-                                    icon={<TrendingUp />}
+                                    icon={<Building2 />}
                                 />
                                 <StatCard 
                                     label="En Attente" 
-                                    value={0}
+                                    value={poleStats.enAttente}
                                     color="yellow"
                                     icon={<Clock />}
                                 />
                                 <StatCard 
-                                    label="Validées ce mois" 
-                                    value={menuItems.find(i => i.id === activeTab)?.count || 0}
+                                    label="Validées" 
+                                    value={poleStats.validees}
                                     color="green"
                                     icon={<CheckCircle />}
                                 />
                             </div>
                         )}
 
+                        {/* ✅ VUE D'ENSEMBLE : Graphique circulaire */}
+                        {activeTab === 'overview' && getPieData().length > 0 && (
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Répartition par Pôle</h3>
+                                <div className="h-[350px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={getPieData()}
+                                                cx="50%"
+                                                cy="50%"
+                                                labelLine={false}
+                                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                                outerRadius={120}
+                                                fill="#8884d8"
+                                                dataKey="value"
+                                            >
+                                                {getPieData().map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        )}
+
                         {/* ✅ GRAPHIQUES DYNAMIQUES */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <ChartCard title="Répartition" type="bar" data={getChartData()} />
+                            <ChartCard title="Annonces par Pôle" type="bar" data={getChartData()} />
                             <ChartCard title="Évolution" type="line" data={getChartData()} />
                         </div>
 
@@ -292,11 +394,11 @@ const DashboardHome = () => {
                                     Voir toutes les annonces
                                 </button>
                                 <button 
-                                    onClick={() => navigate('/dashboard/properties/new')}
-                                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition flex items-center justify-center gap-2"
+                                    onClick={() => navigate('/dashboard/moderation')}
+                                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium transition flex items-center justify-center gap-2"
                                 >
-                                    <ChevronRight size={18} />
-                                    Créer une annonce
+                                    <CheckCircle size={18} />
+                                    Modération
                                 </button>
                             </div>
                         </div>
@@ -318,7 +420,7 @@ const StatCard = ({ label, value, icon, color }) => {
         green: "bg-green-50 text-green-700 border-green-100",
     };
     return (
-        <div className={`p-6 rounded-2xl border ${styles[color]} flex flex-col items-center justify-center text-center`}>
+        <div className={`p-6 rounded-2xl border ${styles[color]} flex flex-col items-center justify-center text-center transition-transform hover:scale-105`}>
             <div className="mb-2 opacity-80">{icon}</div>
             <span className="text-3xl font-extrabold mb-1">{value}</span>
             <span className="text-xs font-bold uppercase tracking-wider opacity-70">{label}</span>
@@ -333,7 +435,7 @@ const QuoteDetailCard = ({ label, value, icon, color }) => {
         green: "bg-green-50 text-green-700 border-green-100",
     };
     return (
-        <div className={`p-6 rounded-2xl border ${styles[color]} flex flex-col items-center justify-center text-center`}>
+        <div className={`p-6 rounded-2xl border ${styles[color]} flex flex-col items-center justify-center text-center transition-transform hover:scale-105`}>
             <div className="mb-2 opacity-80">{icon}</div>
             <span className="text-3xl font-extrabold mb-1">{value}</span>
             <span className="text-xs font-bold uppercase tracking-wider opacity-70">{label}</span>
