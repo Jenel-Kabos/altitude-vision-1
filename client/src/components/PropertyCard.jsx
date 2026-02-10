@@ -13,7 +13,10 @@ import { BiArea } from 'react-icons/bi';
 import { Calendar, Euro } from 'lucide-react';
 import LikeButton from './likes/LikeButton';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL.replace('/api', '');
+// ✅ CORRECTION : Vérifier que VITE_API_URL existe avant de l'utiliser
+const BACKEND_URL = import.meta.env.VITE_API_URL 
+    ? import.meta.env.VITE_API_URL.replace('/api', '') 
+    : 'https://altitude-vision.onrender.com';
 
 const formatDate = (dateString) => {
     if (!dateString) return 'Date inconnue';
