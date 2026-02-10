@@ -21,7 +21,12 @@ const BACKEND_URL = import.meta.env.VITE_API_URL
     ? import.meta.env.VITE_API_URL.replace('/api', '') 
     : 'https://altitude-vision.onrender.com';
 
-const buildImageUrl = (path) => path ? `${BACKEND_URL}/${path.replace(/^\//,'')}` : 'https://via.placeholder.com/800x600';
+const buildImageUrl = (path) => {
+  if (!path) return 'https://via.placeholder.com/800x600?text=Image+non+disponible';
+  // Gérer les URLs complètes vs relatives
+  if (path.startsWith('http')) return path;
+  return `${BACKEND_URL}/${path.replace(/^\//, '')}`;
+};
 
 const PropertyDetailPage = () => {
   const { propertyId } = useParams();
@@ -36,10 +41,18 @@ const PropertyDetailPage = () => {
         setLoading(true);
         const data = await getPropertyById(propertyId);
         setProperty(data);
-        setMainImage(buildImageUrl(data.images?.[0]));
+        
+        // ✅ FIX: Vérifier que les images existent et sont un tableau
+        if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+          setMainImage(buildImageUrl(data.images[0]));
+        } else {
+          setMainImage('https://via.placeholder.com/800x600?text=Aucune+image+disponible');
+        }
+        
         setError('');
       } catch (err) {
-        setError('Impossible de charger les détails de l annonce.');
+        console.error('Erreur lors du chargement:', err);
+        setError('Impossible de charger les détails de l\'annonce.');
       } finally {
         setLoading(false);
       }
@@ -86,6 +99,7 @@ const PropertyDetailPage = () => {
     maximumFractionDigits: 0 
   });
 
+  // ✅ FIX: Gérer les valeurs manquantes avec valeurs par défaut
   const characteristics = [
     { icon: IoBedOutline, label: 'Chambres', value: property.bedrooms || 0 },
     { icon: LuBath, label: 'Salles de bain', value: property.bathrooms || 0 },
@@ -93,6 +107,14 @@ const PropertyDetailPage = () => {
     { icon: IoFastFoodOutline, label: 'Cuisines', value: property.kitchens || 0 },
     { icon: BiArea, label: 'Surface', value: `${property.surface || 0} m²` },
   ];
+
+  // ✅ FIX: Gérer l'adresse manquante
+  const displayAddress = property.address 
+    ? `${property.address.district || ''}, ${property.address.city || ''}`.replace(/^, |, $/g, '') 
+    : 'Adresse non disponible';
+
+  // ✅ FIX: Vérifier que images existe et est un tableau
+  const propertyImages = Array.isArray(property.images) ? property.images : [];
 
   return (
     <div className="min-h-screen bg-white">
@@ -118,14 +140,12 @@ const PropertyDetailPage = () => {
             transition={{ duration: 0.6 }}
           >
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3">
-              {property.title}
+              {property.title || 'Titre non disponible'}
             </h1>
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center text-gray-600">
                 <MapPin className="w-5 h-5 mr-2 text-blue-600" />
-                <span className="font-medium">{property.address.district}</span>
-                <span className="mx-2">•</span>
-                <span>{property.address.city}</span>
+                <span className="font-medium">{displayAddress}</span>
               </div>
               <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
                 property.status === 'Vendre' 
@@ -133,7 +153,7 @@ const PropertyDetailPage = () => {
                   : 'bg-green-100 text-green-700'
               }`}>
                 <Tag className="w-4 h-4 mr-1.5" />
-                En {property.status}
+                En {property.status || 'vente'}
               </div>
             </div>
           </motion.div>
@@ -149,30 +169,45 @@ const PropertyDetailPage = () => {
           transition={{ delay: 0.2, duration: 0.6 }}
           className="mb-10"
         >
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
-            <div className="lg:col-span-4">
-              <img 
-                src={mainImage} 
-                alt="Vue principale" 
-                className="w-full h-[400px] sm:h-[500px] object-cover rounded-3xl shadow-lg"
-              />
-            </div>
-            <div className="flex lg:flex-col overflow-x-auto lg:overflow-y-auto gap-3 pb-2 lg:pb-0">
-              {property.images.map((img, i) => (
-                <img
-                  key={i}
-                  src={buildImageUrl(img)}
-                  alt={`Vue ${i+1}`}
-                  className={`w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-2xl cursor-pointer border-2 transition-all duration-300 flex-shrink-0 ${
-                    mainImage === buildImageUrl(img) 
-                      ? 'border-blue-600 scale-105 shadow-lg' 
-                      : 'border-gray-200 hover:border-blue-300'
-                  }`}
-                  onClick={() => setMainImage(buildImageUrl(img))}
+          {propertyImages.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+              <div className="lg:col-span-4">
+                <img 
+                  src={mainImage} 
+                  alt="Vue principale" 
+                  className="w-full h-[400px] sm:h-[500px] object-cover rounded-3xl shadow-lg"
+                  onError={(e) => {
+                    e.target.src = 'https://via.placeholder.com/800x600?text=Image+non+disponible';
+                  }}
                 />
-              ))}
+              </div>
+              <div className="flex lg:flex-col overflow-x-auto lg:overflow-y-auto gap-3 pb-2 lg:pb-0">
+                {propertyImages.map((img, i) => (
+                  <img
+                    key={i}
+                    src={buildImageUrl(img)}
+                    alt={`Vue ${i+1}`}
+                    className={`w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-2xl cursor-pointer border-2 transition-all duration-300 flex-shrink-0 ${
+                      mainImage === buildImageUrl(img) 
+                        ? 'border-blue-600 scale-105 shadow-lg' 
+                        : 'border-gray-200 hover:border-blue-300'
+                    }`}
+                    onClick={() => setMainImage(buildImageUrl(img))}
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/150?text=Image+non+disponible';
+                    }}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="w-full h-[400px] sm:h-[500px] bg-gray-100 rounded-3xl flex items-center justify-center">
+              <div className="text-center">
+                <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 font-medium">Aucune image disponible</p>
+              </div>
+            </div>
+          )}
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -191,7 +226,7 @@ const PropertyDetailPage = () => {
                 <div>
                   <p className="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-1">Prix</p>
                   <p className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
-                    {priceFormatter.format(property.price)}
+                    {priceFormatter.format(property.price || 0)}
                   </p>
                 </div>
               </div>
@@ -225,7 +260,7 @@ const PropertyDetailPage = () => {
                 Description
               </h2>
               <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
-                {property.description}
+                {property.description || 'Aucune description disponible pour ce bien.'}
               </p>
             </motion.div>
 
@@ -247,7 +282,7 @@ const PropertyDetailPage = () => {
                 </div>
                 <div className="flex items-center justify-between py-3 border-b border-gray-100">
                   <span className="text-gray-600">Statut</span>
-                  <span className="font-semibold text-gray-900 capitalize">{property.status}</span>
+                  <span className="font-semibold text-gray-900 capitalize">{property.status || 'Non spécifié'}</span>
                 </div>
               </div>
             </motion.div>
@@ -301,7 +336,7 @@ const PropertyDetailPage = () => {
               <div className="text-center mb-6">
                 <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Prix du bien</p>
                 <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
-                  {priceFormatter.format(property.price)}
+                  {priceFormatter.format(property.price || 0)}
                 </p>
               </div>
 
@@ -313,7 +348,7 @@ const PropertyDetailPage = () => {
               </div>
 
               <a 
-                href={`https://wa.me/242068002151?text=Bonjour, je suis intéressé par le bien "${property.title}" (ID: ${property._id})`} 
+                href={`https://wa.me/242068002151?text=Bonjour, je suis intéressé par le bien "${property.title || 'sans titre'}" (ID: ${property._id})`} 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold py-4 px-6 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
@@ -324,15 +359,15 @@ const PropertyDetailPage = () => {
 
               <div className="mt-6 pt-6 border-t border-gray-100 space-y-3 text-sm text-gray-600">
                 <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-blue-600 mt-1.5"></div>
+                  <div className="w-2 h-2 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
                   <p>Réponse rapide garantie sous 24h</p>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-blue-600 mt-1.5"></div>
+                  <div className="w-2 h-2 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
                   <p>Visite virtuelle disponible sur demande</p>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-blue-600 mt-1.5"></div>
+                  <div className="w-2 h-2 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
                   <p>Accompagnement juridique inclus</p>
                 </div>
               </div>
