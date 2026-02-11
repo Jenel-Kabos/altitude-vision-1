@@ -30,7 +30,7 @@ const FormInput = ({ label, id, type = 'text', required = false, isTextArea = fa
     </div>
 );
 
-const AltimmoContact = () => {
+const MilaContact = () => {
     const containerVariants = {
         hidden: { opacity: 0 },
         visible: {
@@ -56,21 +56,21 @@ const AltimmoContact = () => {
         {
             icon: Mail,
             title: 'Email Professionnel',
-            content: 'contact@altimmo.Agency',
-            link: 'mailto:contact@altimmo.Agency',
+            content: 'Milaevents@altitudevision.Agency',
+            link: 'mailto:Milaevents@altitudevision.Agency',
             gradient: 'from-sky-600 to-blue-500'
         },
         {
             icon: Phone,
             title: 'Numéro de Téléphone',
-            content: '+242 06 800 21 51',
-            link: 'tel:+242068002151',
+            content: '+242 05 330 16 75',
+            link: 'tel:+242053301675',
             gradient: 'from-indigo-600 to-blue-500'
         }
     ];
 
     return (
-        <section id="contact-altimmo" className="py-16 sm:py-20 bg-gradient-to-b from-slate-50 to-white">
+        <section id="contact-mila" className="py-16 sm:py-20 bg-gradient-to-b from-slate-50 to-white">
             <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                 
                 <motion.div
@@ -87,7 +87,8 @@ const AltimmoContact = () => {
                         </h2>
                         <div className="h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent w-24 mx-auto rounded-full mb-4"></div>
                         <p className="text-gray-600 text-base sm:text-lg font-light max-w-2xl mx-auto">
-                            Notre équipe est à votre disposition pour répondre à toutes vos questions immobilières
+                            Notre équipe est à votre disposition pour répondre à toutes vos questions évènementielles. 
+                            N'hésitez pas à nous contacter pour discuter de votre projet ou pour toute demande d'information.
                         </p>
                     </motion.div>
 
@@ -174,11 +175,11 @@ const AltimmoContact = () => {
                                 <div className="space-y-1 text-sm text-gray-600">
                                     <p className="flex justify-between">
                                         <span className="font-medium">Lundi - Vendredi</span>
-                                        <span>8h00 - 18h00</span>
+                                        <span>8h30 - 17h30</span>
                                     </p>
                                     <p className="flex justify-between">
                                         <span className="font-medium">Samedi</span>
-                                        <span>9h00 - 14h00</span>
+                                        <span>9h00 - 12h00</span>
                                     </p>
                                     <p className="flex justify-between">
                                         <span className="font-medium">Dimanche</span>
@@ -194,4 +195,4 @@ const AltimmoContact = () => {
     );
 };
 
-export default AltimmoContact;
+export default MilaContact;
