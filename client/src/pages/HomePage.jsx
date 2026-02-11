@@ -300,19 +300,7 @@ const HomePage = () => {
             </section>
 
             {/* Footer */}
-            <footer className="bg-gray-900 text-white py-8 border-t border-gray-800">
-                <div className="container mx-auto px-4 sm:px-6 text-center max-w-6xl">
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                        <p className="text-2xl font-bold text-white">Altitude-Vision</p>
-                    </div>
-                    <p className="text-xs sm:text-sm text-gray-400">
-                        &copy; {new Date().getFullYear()} Tous droits réservés | 
-                        <Link to="/mentions-legales" className="text-gray-400 hover:text-blue-400 transition duration-200 ml-2 underline underline-offset-2">
-                            Mentions Légales
-                        </Link>
-                    </p>
-                </div>
-            </footer> 
+            
         </div>
     );
 };

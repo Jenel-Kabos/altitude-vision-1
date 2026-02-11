@@ -38,8 +38,8 @@ const Footer = () => {
               <p>Derrière Canal Olympia</p>
               <p>Brazzaville, Congo</p>
               <p>
-                <a href="mailto:contact@altitudevision.cg" className="hover:text-blue-400">
-                  contact@altitudevision.cg
+                <a href="mailto:contact@altitudevision.agency" className="hover:text-blue-400">
+                  contact@altitudevision.agency
                 </a>
               </p>
             </address>
@@ -59,6 +59,9 @@ const Footer = () => {
       <div className="bg-gray-900 py-4">
         <p className="text-center text-gray-500 text-sm">
           &copy; {currentYear} Altitude-Vision. Tous droits réservés.
+          <Link to="/mentions-legales" className="text-gray-400 hover:text-blue-400 transition duration-200 ml-2 underline underline-offset-2">
+                Mentions Légales
+            </Link>
         </p>
       </div>
     </footer>
