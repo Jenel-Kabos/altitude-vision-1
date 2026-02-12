@@ -341,7 +341,7 @@ const MilaEventsPage = () => {
 
       {/* Hero */}
       <header className="relative text-white pt-32 pb-24 overflow-hidden h-[75vh] min-h-[600px]">
-                <HeroSlider /> 
+        <HeroSlider /> 
         <div className="container mx-auto px-4 sm:px-6 text-center relative z-10 max-w-6xl h-full flex flex-col justify-center">
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6 }} className="inline-flex justify-center mb-6">
             <div className="p-3 bg-white/15 backdrop-blur-md rounded-2xl border border-white/30 shadow-xl">
@@ -439,7 +439,7 @@ const MilaEventsPage = () => {
         </div>
       </section>
 
-      {/* CTA */}
+      {/* ✅ CTA - Section "Prêt à créer votre événement de rêve ?" */}
       <section className="py-20 px-4 sm:px-6 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white">
         <div className="container mx-auto max-w-4xl text-center">
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
@@ -453,14 +453,15 @@ const MilaEventsPage = () => {
               onClick={() => navigate('/mila-events/creer-projet')}
               className="inline-flex items-center gap-3 px-10 py-4 bg-white text-purple-600 font-bold text-lg rounded-full shadow-2xl hover:bg-gray-50 transition-all hover:scale-105"
             >
-              <Sparkles className="w-6 h-6" />
+              <Sparkles className="w-5 h-5" />
               Lancer votre Projet
             </button>
           </motion.div>
         </div>
-        {/* Composant de Contact */}
-            <MilaContact />
       </section>
+
+      {/* ✅ SECTION CONTACT - Avec espacement ajouté */}
+      <MilaContact />
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-8 border-t border-gray-800">
