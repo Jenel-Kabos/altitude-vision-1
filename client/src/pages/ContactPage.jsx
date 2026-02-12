@@ -87,7 +87,7 @@ const ContactPage = () => {
             <h1 className="text-5xl sm:text-6xl font-black">Contactez-Nous</h1>
           </div>
           <p className="mt-4 text-xl font-medium max-w-2xl mx-auto">
-            Nous sommes à votre écoute pour toute question ou projet événementiel.
+            Nous sommes à votre écoute pour toute question ou projet immobilier, événementiel ou de communication. N'hésitez pas à nous contacter, notre équipe se fera un plaisir de vous répondre rapidement.
           </p>
         </div>
       </section>
@@ -221,7 +221,7 @@ const ContactPage = () => {
                       href="mailto:contact@altitudevision.cg" 
                       className="text-indigo-600 hover:text-indigo-700 font-medium hover:underline transition-colors"
                     >
-                      contact@altitudevision.cg
+                      contact@altitudevision.agency
                     </a>
                   </div>
                 </div>
@@ -236,7 +236,7 @@ const ContactPage = () => {
                       href="tel:+24206800215" 
                       className="text-green-600 hover:text-green-700 font-medium hover:underline transition-colors"
                     >
-                      +242 06 800 21 51
+                      +242 06 800 21 51 / +242 05 330 16 75
                     </a>
                   </div>
                 </div>

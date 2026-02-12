@@ -56,8 +56,8 @@ const MilaContact = () => {
         {
             icon: Mail,
             title: 'Email Professionnel',
-            content: 'Milaevents@altitudevision.Agency',
-            link: 'mailto:Milaevents@altitudevision.Agency',
+            content: 'Milaevents@altitudevision.agency',
+            link: 'mailto:Milaevents@altitudevision.agency',
             gradient: 'from-sky-600 to-blue-500'
         },
         {

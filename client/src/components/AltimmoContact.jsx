@@ -56,8 +56,8 @@ const AltimmoContact = () => {
         {
             icon: Mail,
             title: 'Email Professionnel',
-            content: 'contact@altimmo.Agency',
-            link: 'mailto:contact@altimmo.Agency',
+            content: 'altimmo@altitudevision.agency',
+            link: 'mailto:altimmo@altitudevision.agency',
             gradient: 'from-sky-600 to-blue-500'
         },
         {
