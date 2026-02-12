@@ -25,21 +25,24 @@ const realEstateServices = [
         title: 'Vente de Biens', 
         description: 'Nous vous accompagnons à chaque étape pour vendre votre propriété au meilleur prix et dans les meilleurs délais.',
         gradient: 'from-blue-600 to-sky-500', 
-        iconColor: 'text-sky-500'
+        iconColor: 'text-sky-500',
+        slug: 'vente-de-biens' // ✅ Slug explicite
     },
     { 
         icon: FaBuilding, 
         title: 'Location & Gestion', 
         description: 'Confiez-nous la location et la gestion de vos biens pour une tranquillité d\'esprit et une rentabilité optimale.',
         gradient: 'from-emerald-600 to-green-500',
-        iconColor: 'text-green-500'
+        iconColor: 'text-green-500',
+        slug: 'location-gestion' // ✅ Slug explicite
     },
     { 
         icon: FaHandshake, 
         title: 'Conseil en Investissement', 
         description: 'Bénéficiez de notre expertise du marché local pour réaliser des investissements immobiliers judicieux et performants.',
         gradient: 'from-indigo-600 to-violet-500',
-        iconColor: 'text-violet-500'
+        iconColor: 'text-violet-500',
+        slug: 'conseil-investissement' // ✅ Slug explicite
     },
 ];
 
@@ -241,7 +244,7 @@ const AltimmoPage = () => {
                                     {service.description}
                                 </p>
                                 <Link 
-                                    to={`/altimmo/services/${service.title.toLowerCase().replace(/ /g, '-').replace(/&/g, '')}`}
+                                    to={`/altimmo/services/${service.slug}`}
                                     className="inline-flex items-center text-sm font-semibold text-blue-600 hover:text-blue-700 transition-all group-hover:gap-2"
                                 >
                                     En savoir plus 
