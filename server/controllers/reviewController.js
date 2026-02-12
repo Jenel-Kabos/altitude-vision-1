@@ -58,7 +58,58 @@ exports.getAllReviews = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Créer une nouvelle review
+ * @desc    Créer une nouvelle review (route directe)
+ * @route   POST /api/reviews
+ * @access  Private (utilisateur connecté)
+ */
+exports.createReviewDirect = asyncHandler(async (req, res) => {
+  const { rating, comment, portfolioItem } = req.body;
+
+  // Validation des données
+  if (!rating || !comment || !portfolioItem) {
+    res.status(400);
+    throw new Error('Veuillez fournir une note, un commentaire et un élément de portfolio');
+  }
+
+  // Vérifier que le portfolioItem existe
+  const portfolio = await PortfolioItem.findById(portfolioItem);
+  if (!portfolio) {
+    res.status(404);
+    throw new Error('Élément de portfolio non trouvé');
+  }
+
+  // Vérifier si l'utilisateur a déjà laissé un avis
+  const existingReview = await Review.findOne({
+    portfolioItem: portfolioItem,
+    author: req.user._id,
+  });
+
+  if (existingReview) {
+    res.status(400);
+    throw new Error('Vous avez déjà laissé un avis pour cet élément');
+  }
+
+  // Créer la review
+  const review = await Review.create({
+    rating,
+    comment,
+    author: req.user._id,
+    portfolioItem: portfolioItem,
+  });
+
+  // Recalculer la note moyenne du portfolioItem
+  await PortfolioItem.calcAverageRating(portfolioItem);
+
+  res.status(201).json({
+    status: 'success',
+    data: {
+      review,
+    },
+  });
+});
+
+/**
+ * @desc    Créer une nouvelle review (via portfolio)
  * @route   POST /api/portfolio/:portfolioItemId/reviews
  * @access  Private (utilisateur connecté)
  */

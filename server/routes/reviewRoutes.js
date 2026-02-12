@@ -21,17 +21,15 @@ router
 // Les routes suivantes nécessitent un utilisateur connecté
 router.use(authController.protect);
 
-// ✅ Seuls les clients, prestataires ou admin peuvent créer un avis
+// ✅ Tous les utilisateurs connectés peuvent créer un avis
 router
   .route('/')
-  .post(
-    authController.restrictTo('Client', 'Prestataire', 'Admin'),
-    reviewController.createReview
-  );
+  .post(reviewController.createReviewDirect);
 
-// ✅ Seul l'auteur de l'avis ou un admin peut le supprimer
+// ✅ Seul l'auteur de l'avis ou un admin peut le modifier/supprimer
 router
   .route('/:id')
+  .patch(reviewController.updateReview)
   .delete(reviewController.deleteReview);
 
 module.exports = router;
