@@ -16,16 +16,39 @@ const LeaveReviewPage = () => {
   const [loading, setLoading] = useState(false);
   const [portfolioItems, setPortfolioItems] = useState([]);
   const [selectedPortfolioItem, setSelectedPortfolioItem] = useState('');
+  const [loadingPortfolio, setLoadingPortfolio] = useState(true);
 
-  // ✅ AJOUT : Récupérer la liste des projets portfolio au chargement
+  // ✅ Récupérer la liste des projets portfolio au chargement
   useEffect(() => {
     const fetchPortfolioItems = async () => {
       try {
+        setLoadingPortfolio(true);
         const response = await fetch('https://altitude-vision.onrender.com/api/portfolio');
         const data = await response.json();
         
-        // Adapter selon la structure de votre API
-        const items = data.data?.portfolioItems || data.data || data.portfolioItems || data;
+        console.log('📦 Données portfolio reçues:', data);
+        
+        // ✅ Gestion robuste de la structure de réponse
+        let items = [];
+        
+        if (data.data?.portfolioItems && Array.isArray(data.data.portfolioItems)) {
+          items = data.data.portfolioItems;
+        } else if (data.data?.data && Array.isArray(data.data.data)) {
+          items = data.data.data;
+        } else if (data.portfolioItems && Array.isArray(data.portfolioItems)) {
+          items = data.portfolioItems;
+        } else if (data.data && Array.isArray(data.data)) {
+          items = data.data;
+        } else if (Array.isArray(data)) {
+          items = data;
+        }
+        
+        console.log('✅ Items extraits:', items);
+        
+        if (items.length === 0) {
+          toast.warning('Aucun projet disponible pour le moment');
+        }
+        
         setPortfolioItems(items);
         
         // ✅ Sélectionner automatiquement le premier item s'il existe
@@ -33,8 +56,11 @@ const LeaveReviewPage = () => {
           setSelectedPortfolioItem(items[0]._id);
         }
       } catch (error) {
-        console.error('Erreur lors du chargement des projets:', error);
+        console.error('❌ Erreur lors du chargement des projets:', error);
         toast.error('Impossible de charger les projets');
+        setPortfolioItems([]);
+      } finally {
+        setLoadingPortfolio(false);
       }
     };
 
@@ -54,7 +80,6 @@ const LeaveReviewPage = () => {
       return;
     }
 
-    // ✅ AJOUT : Vérifier qu'un projet est sélectionné
     if (!selectedPortfolioItem) {
       toast.error("Veuillez sélectionner un projet.");
       return;
@@ -63,11 +88,11 @@ const LeaveReviewPage = () => {
     try {
       setLoading(true);
       
-      // ✅ CORRECTION : Envoyer les bons champs attendus par le backend
+      // ✅ Envoyer les bons champs attendus par le backend
       await createReview({
         rating,
-        comment, // ✅ "comment" au lieu de "review"
-        portfolioItem: selectedPortfolioItem, // ✅ AJOUT obligatoire
+        comment,
+        portfolioItem: selectedPortfolioItem,
       });
 
       toast.success("Merci ! Votre avis a été enregistré.");
@@ -101,24 +126,36 @@ const LeaveReviewPage = () => {
         <div className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             
-            {/* ✅ AJOUT : Sélection du projet */}
+            {/* ✅ Sélection du projet */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
                 Projet concerné <span className="text-red-500">*</span>
               </label>
-              <select
-                value={selectedPortfolioItem}
-                onChange={(e) => setSelectedPortfolioItem(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                required
-              >
-                <option value="">Sélectionnez un projet</option>
-                {portfolioItems.map((item) => (
-                  <option key={item._id} value={item._id}>
-                    {item.title || item.name}
-                  </option>
-                ))}
-              </select>
+              
+              {loadingPortfolio ? (
+                <div className="flex items-center justify-center p-4 border border-gray-300 rounded-lg">
+                  <Loader2 className="animate-spin text-blue-600" size={20} />
+                  <span className="ml-2 text-gray-600">Chargement des projets...</span>
+                </div>
+              ) : portfolioItems.length === 0 ? (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
+                  Aucun projet disponible pour le moment. Veuillez réessayer plus tard.
+                </div>
+              ) : (
+                <select
+                  value={selectedPortfolioItem}
+                  onChange={(e) => setSelectedPortfolioItem(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  required
+                >
+                  <option value="">Sélectionnez un projet</option>
+                  {portfolioItems.map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.title || item.name || 'Projet sans nom'}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Note en Étoiles */}
@@ -178,7 +215,7 @@ const LeaveReviewPage = () => {
             {/* Bouton Soumettre */}
             <button
               type="submit"
-              disabled={loading || !selectedPortfolioItem}
+              disabled={loading || !selectedPortfolioItem || portfolioItems.length === 0}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? (
