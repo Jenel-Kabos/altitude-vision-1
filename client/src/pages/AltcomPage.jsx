@@ -25,6 +25,7 @@ import {
 import { createAltcomProject } from '../services/altcomService';
 import { createQuoteRequest } from '../services/quoteService';
 import { getAllPortfolioItems } from '../services/portfolioService';
+import { getAltcomReviews } from '../services/reviewService';
 import PortfolioCard from "../components/PortfolioCard"; 
 import ReviewCard from "../components/ReviewCard";
 import AltcomProjectFormModal from "../components/AltcomProjectFormModal";
@@ -89,12 +90,6 @@ const defaultServices = [
   },
 ];
 
-const defaultReviews = [
-  { _id: 1, author: "Client 1", content: "Excellent service et très professionnel.", rating: 5, company: "Tech Solutions" },
-  { _id: 2, author: "Client 2", content: "Équipe créative et réactive.", rating: 4, company: "Global Corp" },
-  { _id: 3, author: "Client 3", content: "Je recommande Altcom pour toute communication.", rating: 5, company: "StartUp Innov" },
-];
-
 // ServiceCard intégré avec le style modernisé
 const ServiceCard = ({ service, onQuoteRequest, index }) => {
   const navigate = useNavigate();
@@ -103,7 +98,6 @@ const ServiceCard = ({ service, onQuoteRequest, index }) => {
 
   const handleDetailsClick = (e) => {
     e.preventDefault();
-    // Utiliser la route personnalisée si elle existe, sinon la route par défaut
     const targetRoute = service.route || `/altcom/service/${service._id}`;
     navigate(targetRoute);
   };
@@ -349,10 +343,22 @@ const AltcomPage = () => {
       
       setPortfolio(altcomPortfolio || []);
       
+      // Récupérer les avis Altcom depuis l'API
+      try {
+        const reviewsData = await getAltcomReviews();
+        console.log('⭐ Avis Altcom chargés:', reviewsData);
+        setReviews(reviewsData || []);
+      } catch (reviewError) {
+        console.error('⚠️ Erreur lors du chargement des avis:', reviewError);
+        // On continue avec des avis vides si l'API ne répond pas
+        setReviews([]);
+      }
+      
     } catch (err) {
-      console.error('❌ Erreur lors du chargement du portfolio Altcom:', err);
-      setError('Impossible de charger les réalisations');
+      console.error('❌ Erreur lors du chargement des données Altcom:', err);
+      setError('Impossible de charger les données');
       setPortfolio([]);
+      setReviews([]);
     } finally {
       setLoading(false);
     }
@@ -360,7 +366,7 @@ const AltcomPage = () => {
   
   const displayServices = services?.length > 0 ? services : defaultServices;
   const displayPortfolio = portfolio || [];
-  const displayReviews = reviews?.length > 0 ? reviews : defaultReviews;
+  const displayReviews = reviews || [];
 
   const totalPages = Math.ceil(displayPortfolio.length / PORTFOLIO_PER_PAGE);
   const currentPortfolio = useMemo(() => {
@@ -552,7 +558,7 @@ const AltcomPage = () => {
     </div>
   </section>
 
-  {/* Avis */}
+  {/* Avis - Section Dynamique */}
   <section className="py-16 sm:py-20 bg-white">
     <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
       <div className="text-center mb-12">
@@ -562,13 +568,27 @@ const AltcomPage = () => {
         </motion.div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {displayReviews.map((review, index) => (
-          <motion.div key={review._id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: index * 0.1 }}>
-            <ReviewCard review={review} />
-          </motion.div>
-        ))}
-      </div>
+      {displayReviews.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {displayReviews.map((review, index) => (
+            <motion.div 
+              key={review._id} 
+              initial={{ opacity: 0, y: 20 }} 
+              whileInView={{ opacity: 1, y: 0 }} 
+              viewport={{ once: true }} 
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+            >
+              <ReviewCard review={review} />
+            </motion.div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-purple-50 rounded-3xl border border-dashed border-purple-200">
+          <Star className="w-10 h-10 mx-auto mb-4 text-purple-600" />
+          <p className="text-lg font-bold text-gray-700 mb-2">Aucun avis disponible pour le moment</p>
+          <p className="text-sm text-gray-500">Les témoignages de nos clients seront bientôt disponibles</p>
+        </div>
+      )}
     </div>
   </section>
 
