@@ -10,14 +10,17 @@ import {
 import { 
     Sparkles, 
     Loader2 as IconSpinner, 
-    ArrowRight
+    ArrowRight,
+    Star
 } from 'lucide-react';
 
 import HeroSlider from '../components/HeroSliderAlt'; 
 import AltimmoContact from '../components/AltimmoContact'; 
 import PropertyCard from '../components/PropertyCard';
+import ReviewCard from '../components/ReviewCard';
 import CtaCommission from '../components/CtaCommission';
 import { getLatestPropertiesByPole } from '../services/propertyService';
+import { getAltimmoReviews } from '../services/reviewService';
 
 const realEstateServices = [
     { 
@@ -26,7 +29,7 @@ const realEstateServices = [
         description: 'Nous vous accompagnons à chaque étape pour vendre votre propriété au meilleur prix et dans les meilleurs délais.',
         gradient: 'from-blue-600 to-sky-500', 
         iconColor: 'text-sky-500',
-        slug: 'vente-de-biens' // ✅ Slug explicite
+        slug: 'vente-de-biens'
     },
     { 
         icon: FaBuilding, 
@@ -34,7 +37,7 @@ const realEstateServices = [
         description: 'Confiez-nous la location et la gestion de vos biens pour une tranquillité d\'esprit et une rentabilité optimale.',
         gradient: 'from-emerald-600 to-green-500',
         iconColor: 'text-green-500',
-        slug: 'location-gestion' // ✅ Slug explicite
+        slug: 'location-gestion'
     },
     { 
         icon: FaHandshake, 
@@ -42,13 +45,15 @@ const realEstateServices = [
         description: 'Bénéficiez de notre expertise du marché local pour réaliser des investissements immobiliers judicieux et performants.',
         gradient: 'from-indigo-600 to-violet-500',
         iconColor: 'text-violet-500',
-        slug: 'conseil-investissement' // ✅ Slug explicite
+        slug: 'conseil-investissement'
     },
 ];
 
 const AltimmoPage = () => {
     const [properties, setProperties] = useState([]);
+    const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [reviewsLoading, setReviewsLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const handleScrollToContact = (e) => {
@@ -73,7 +78,22 @@ const AltimmoPage = () => {
                 setLoading(false);
             }
         };
+
+        const fetchAltimmoReviews = async () => {
+            try {
+                setReviewsLoading(true);
+                const reviewsData = await getAltimmoReviews(6);
+                setReviews(reviewsData || []);
+            } catch (err) {
+                console.error('Erreur lors du chargement des avis Altimmo:', err);
+                setReviews([]);
+            } finally {
+                setReviewsLoading(false);
+            }
+        };
+
         fetchAltimmoProperties();
+        fetchAltimmoReviews();
     }, []);
 
     if (loading) {
@@ -92,31 +112,23 @@ const AltimmoPage = () => {
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
                 .font-sans { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-                
-                /* Smooth scrolling */
                 html { scroll-behavior: smooth; }
-                
-                /* Custom gradient animations */
                 @keyframes gradient-shift {
                     0%, 100% { background-position: 0% 50%; }
                     50% { background-position: 100% 50%; }
                 }
-                
                 .animate-gradient {
                     background-size: 200% 200%;
                     animation: gradient-shift 8s ease infinite;
                 }
             `}</style>
 
-            {/* Header Hero Section - Design ultra-moderne */}
+            {/* Header Hero Section */}
             <header className="relative text-white pt-32 pb-24 overflow-hidden h-[75vh] min-h-[600px]">
                 <HeroSlider /> 
-                
-                {/* Overlay gradient subtil */}
                 <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60 z-[1]"></div>
                 
                 <div className="container mx-auto px-4 sm:px-6 text-center relative z-10 max-w-6xl h-full flex flex-col justify-center">
-                    
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -174,7 +186,7 @@ const AltimmoPage = () => {
                 </div>
             </header>
             
-            {/* Section À Propos - Design minimaliste */}
+            {/* Section À Propos */}
             <section className="bg-gradient-to-b from-white to-slate-50 py-16 sm:py-20">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="text-center mb-10">
@@ -203,7 +215,7 @@ const AltimmoPage = () => {
                 </div>
             </section>
 
-            {/* Section Services - Cards modernes */}
+            {/* Section Services */}
             <section className="py-16 sm:py-20 bg-white">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="text-center mb-12 sm:mb-14">
@@ -256,7 +268,7 @@ const AltimmoPage = () => {
                 </div>
             </section>
 
-            {/* Section Annonces - Grid moderne */}
+            {/* Section Annonces */}
             <section className="py-16 sm:py-20 bg-gradient-to-b from-slate-50 to-white">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="text-center mb-12 sm:mb-14">
@@ -326,8 +338,58 @@ const AltimmoPage = () => {
                 </div>
             </section>
 
+            {/* ✅ SECTION AVIS CLIENTS */}
+            <section className="py-16 sm:py-20 bg-white">
+                <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
+                    <div className="text-center mb-12">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 0.6 }}
+                        >
+                            <p className="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wider mb-2">
+                                Témoignages
+                            </p>
+                            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3">
+                                Ils Nous Font Confiance
+                            </h2>
+                            <p className="text-gray-500 text-base sm:text-lg font-light max-w-2xl mx-auto">
+                                Découvrez l'expérience de nos clients avec Altimmo
+                            </p>
+                        </motion.div>
+                    </div>
+                    
+                    {reviewsLoading ? (
+                        <div className="flex justify-center py-10">
+                            <IconSpinner className="w-8 h-8 text-blue-600 animate-spin" />
+                        </div>
+                    ) : reviews.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {reviews.map((review, index) => (
+                                <motion.div 
+                                    key={review._id} 
+                                    initial={{ opacity: 0, y: 20 }} 
+                                    whileInView={{ opacity: 1, y: 0 }} 
+                                    viewport={{ once: true }} 
+                                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                                >
+                                    <ReviewCard review={review} />
+                                </motion.div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-blue-50 rounded-3xl border border-dashed border-blue-200">
+                            <Star className="w-10 h-10 mx-auto mb-4 text-blue-600" />
+                            <p className="text-lg font-bold text-gray-700 mb-2">Aucun avis pour le moment</p>
+                            <p className="text-sm text-gray-500">Soyez le premier à partager votre expérience !</p>
+                        </div>
+                    )}
+                </div>
+            </section>
+
             {/* Section CTA Commission */}
-            <section className="py-14 px-4 sm:px-6 bg-white">
+            <section className="py-14 px-4 sm:px-6 bg-gradient-to-b from-slate-50 to-white">
                 <div className="container mx-auto max-w-6xl">
                     <CtaCommission />
                 </div>
@@ -336,7 +398,7 @@ const AltimmoPage = () => {
             {/* Composant de Contact */}
             <AltimmoContact />
 
-            {/* Footer - Compact & élégant */}
+            {/* Footer */}
             <footer className="bg-gray-900 text-white py-8 border-t border-gray-800">
                 <div className="container mx-auto px-4 sm:px-6 text-center max-w-6xl">
                     <div className="flex items-center justify-center gap-2 mb-3">

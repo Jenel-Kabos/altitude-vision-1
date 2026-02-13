@@ -15,14 +15,19 @@ import {
   Sparkles,
   ArrowRight,
   Video,
-  PartyPopper
+  PartyPopper,
+  Star,
+  MessageSquarePlus
 } from 'lucide-react';
 
 import HeroSlider from '../components/HeroSliderMila';
 import MilaContact from '../components/MilaContact';
+import ReviewCard from '../components/ReviewCard';
 import { getAllEvents } from '../services/eventService';
 import { createQuoteRequest } from '../services/quoteService';
+import { getMilaEventsReviews } from '../services/reviewService';
 import { getFirstValidImage } from '../utils/imageUtils';
+import { useAuth } from '../context/AuthContext';
 
 const EVENTS_PER_PAGE = 6;
 
@@ -256,8 +261,12 @@ const QuoteRequestModal = ({ serviceTitle, onClose, onFormSubmit }) => {
 const MilaEventsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  
   const [events, setEvents] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [selectedService, setSelectedService] = useState('');
@@ -271,7 +280,7 @@ const MilaEventsPage = () => {
   ];
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchEvents = async () => {
       try {
         setLoading(true);
         const data = await getAllEvents();
@@ -282,7 +291,22 @@ const MilaEventsPage = () => {
         setLoading(false);
       }
     };
-    fetch();
+
+    const fetchReviews = async () => {
+      try {
+        setReviewsLoading(true);
+        const reviewsData = await getMilaEventsReviews(6);
+        setReviews(reviewsData || []);
+      } catch (err) {
+        console.error('Erreur chargement avis Mila Events:', err);
+        setReviews([]);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    fetchEvents();
+    fetchReviews();
   }, []);
 
   useEffect(() => {
@@ -305,6 +329,14 @@ const MilaEventsPage = () => {
       setShowNotif({ visible: true, message: err.message || 'Erreur lors de l\'envoi.', type: 'error' });
       setTimeout(() => setShowNotif({ visible: false, message: '', type: 'success' }), 5000);
       throw err;
+    }
+  };
+
+  const handleLeaveReview = () => {
+    if (user) {
+      navigate('/avis/nouveau');
+    } else {
+      navigate('/login', { state: { from: '/avis/nouveau' } });
     }
   };
 
@@ -439,7 +471,89 @@ const MilaEventsPage = () => {
         </div>
       </section>
 
-      {/* ✅ CTA - Section "Prêt à créer votre événement de rêve ?" */}
+      {/* ✅ SECTION AVIS CLIENTS */}
+      <section className="py-16 sm:py-20 bg-white">
+        <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
+          <div className="text-center mb-12">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+            >
+              <p className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-2">
+                Témoignages
+              </p>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3">
+                Ce Que Disent Nos Clients
+              </h2>
+              <p className="text-gray-500 text-base sm:text-lg font-light">
+                Des événements mémorables, des clients satisfaits
+              </p>
+            </motion.div>
+          </div>
+          
+          {reviewsLoading ? (
+            <div className="flex justify-center py-10">
+              <IconSpinner className="w-8 h-8 text-purple-600 animate-spin" />
+            </div>
+          ) : reviews.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {reviews.map((review, index) => (
+                  <motion.div 
+                    key={review._id}
+                    initial={{ opacity: 0, y: 20 }} 
+                    whileInView={{ opacity: 1, y: 0 }} 
+                    viewport={{ once: true }} 
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <ReviewCard review={review} />
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* ✅ Bouton Laisser un avis */}
+              <div className="text-center">
+                <motion.button
+                  onClick={handleLeaveReview}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg rounded-full shadow-2xl hover:shadow-purple-500/50 transition-all"
+                >
+                  <MessageSquarePlus className="w-5 h-5" />
+                  Laisser un avis
+                </motion.button>
+                {!user && (
+                  <p className="text-sm text-gray-500 mt-3">
+                    (Connexion requise)
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-purple-50 rounded-3xl border border-dashed border-purple-200">
+              <Star className="w-10 h-10 mx-auto mb-4 text-purple-600" />
+              <p className="text-lg font-bold text-gray-700 mb-2">Aucun avis disponible</p>
+              <p className="text-sm text-gray-500 mb-6">Soyez le premier à partager votre expérience !</p>
+              
+              <motion.button
+                onClick={handleLeaveReview}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-full shadow-lg hover:shadow-purple-500/50 transition-all"
+              >
+                <MessageSquarePlus className="w-5 h-5" />
+                Laisser le premier avis
+              </motion.button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* CTA */}
       <section className="py-20 px-4 sm:px-6 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white">
         <div className="container mx-auto max-w-4xl text-center">
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
@@ -460,7 +574,7 @@ const MilaEventsPage = () => {
         </div>
       </section>
 
-      {/* ✅ SECTION CONTACT - Avec espacement ajouté */}
+      {/* Contact */}
       <MilaContact />
 
       {/* Footer */}

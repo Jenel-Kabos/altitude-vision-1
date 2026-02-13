@@ -17,39 +17,21 @@ import {
   ArrowRight, 
   Sparkles,
   Radio,
-  Tag,
-  Calendar,
-  Star
+  Star,
+  MessageSquarePlus
 } from 'lucide-react';
 
 import { createAltcomProject } from '../services/altcomService';
 import { createQuoteRequest } from '../services/quoteService';
 import { getAllPortfolioItems } from '../services/portfolioService';
 import { getAltcomReviews } from '../services/reviewService';
+import { useAuth } from '../context/AuthContext';
 import PortfolioCard from "../components/PortfolioCard"; 
 import ReviewCard from "../components/ReviewCard";
 import AltcomProjectFormModal from "../components/AltcomProjectFormModal";
 
 const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
-
 const PORTFOLIO_PER_PAGE = 6;
-
-// Fonction utilitaire pour construire l'URL de l'image correctement
-const getImageUrl = (imagePath) => {
-  if (!imagePath) {
-    return 'https://via.placeholder.com/400x300/3B82F6/FFFFFF?text=Altcom+Project';
-  }
-  
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  
-  if (imagePath.startsWith('/uploads')) {
-    return `${BACKEND_URL}${imagePath}`;
-  }
-  
-  return imagePath;
-};
 
 const defaultServices = [
   { 
@@ -90,17 +72,9 @@ const defaultServices = [
   },
 ];
 
-// ServiceCard intégré avec le style modernisé
 const ServiceCard = ({ service, onQuoteRequest, index }) => {
   const navigate = useNavigate();
-  const baseColorClass = service.color || "text-gray-500";
   const IconComponent = service.icon;
-
-  const handleDetailsClick = (e) => {
-    e.preventDefault();
-    const targetRoute = service.route || `/altcom/service/${service._id}`;
-    navigate(targetRoute);
-  };
 
   return (
     <motion.div
@@ -142,7 +116,7 @@ const ServiceCard = ({ service, onQuoteRequest, index }) => {
           </motion.button>
           
           <button
-            onClick={handleDetailsClick}
+            onClick={() => navigate(service.route)}
             className="inline-flex items-center justify-center gap-2 text-blue-600 hover:text-blue-700 font-semibold text-xs sm:text-sm transition-all duration-200 group/link w-full"
           >
             <span>Détails du Service</span>
@@ -305,12 +279,14 @@ const QuoteRequestModal = ({ serviceTitle, onClose, onFormSubmit }) => {
 const AltcomPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [services, setServices] = useState([]); 
   const [portfolio, setPortfolio] = useState([]); 
   const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [selectedService, setSelectedService] = useState('');
   const [showNotification, setShowNotification] = useState({ visible: false, message: '', type: 'success' });
@@ -332,26 +308,21 @@ const AltcomPage = () => {
       setLoading(true);
       setError(null);
       
-      // Récupérer le portfolio Altcom depuis l'API
       const portfolioData = await getAllPortfolioItems();
-      console.log('📦 Portfolio Altcom chargé:', portfolioData);
-      
-      // Filtrer uniquement les projets Altcom et publiés
       const altcomPortfolio = portfolioData.filter(
         item => item.isPublished && (item.pole === 'Altcom' || !item.pole)
       );
-      
       setPortfolio(altcomPortfolio || []);
       
-      // Récupérer les avis Altcom depuis l'API
       try {
-        const reviewsData = await getAltcomReviews();
-        console.log('⭐ Avis Altcom chargés:', reviewsData);
+        setReviewsLoading(true);
+        const reviewsData = await getAltcomReviews(6);
         setReviews(reviewsData || []);
       } catch (reviewError) {
         console.error('⚠️ Erreur lors du chargement des avis:', reviewError);
-        // On continue avec des avis vides si l'API ne répond pas
         setReviews([]);
+      } finally {
+        setReviewsLoading(false);
       }
       
     } catch (err) {
@@ -412,6 +383,14 @@ const AltcomPage = () => {
       setShowNotification({ visible: true, message: errorMessage, type: 'error' });
       setTimeout(() => setShowNotification({ visible: false, message: '', type: 'success' }), 6000);
       throw error;
+    }
+  };
+
+  const handleLeaveReview = () => {
+    if (user) {
+      navigate('/avis/nouveau');
+    } else {
+      navigate('/login', { state: { from: '/avis/nouveau' } });
     }
   };
   
@@ -514,120 +493,158 @@ const AltcomPage = () => {
               <p className="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wider mb-2">Nos Expertises</p>
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3">Nos Services</h2>
               <p className="text-gray-500 text-base sm:text-lg font-light max-w-2xl mx-auto">Des solutions sur mesure pour amplifier votre message</p>
-          </motion.div>
+            </motion.div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
-        {displayServices.map((service, index) => (
-          <ServiceCard key={service._id} service={service} onQuoteRequest={handleQuoteRequest} index={index} />
-        ))}
-      </div>
-    </div>
-  </section>
+            {displayServices.map((service, index) => (
+              <ServiceCard key={service._id} service={service} onQuoteRequest={handleQuoteRequest} index={index} />
+            ))}
+          </div>
+        </div>
+      </section>
 
-  {/* Portfolio */}
-  <section id="portfolio" className="py-16 sm:py-20 bg-gradient-to-b from-slate-50 to-white">
-    <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
-      <div className="text-center mb-14">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
-          <p className="text-xs sm:text-sm font-bold text-red-600 uppercase tracking-wider mb-2">Portfolio</p>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">Nos Réalisations</h2>
-          <div className="h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent w-24 mx-auto rounded-full mb-5"></div>
-          <Link to="/altcom/annonces" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold text-sm sm:text-base transition-colors group">
-            Voir tous nos projets
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </Link>
-        </motion.div>
-      </div>
-      
-      {currentPortfolio.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-          {currentPortfolio.map((item, index) => (
-            <motion.div key={item._id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.1 }} transition={{ duration: 0.4, delay: index * 0.05 }}>
-              <PortfolioCard item={item} />
+      {/* Portfolio */}
+      <section id="portfolio" className="py-16 sm:py-20 bg-gradient-to-b from-slate-50 to-white">
+        <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
+          <div className="text-center mb-14">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
+              <p className="text-xs sm:text-sm font-bold text-red-600 uppercase tracking-wider mb-2">Portfolio</p>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">Nos Réalisations</h2>
+              <div className="h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent w-24 mx-auto rounded-full mb-5"></div>
+              <Link to="/altcom/annonces" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold text-sm sm:text-base transition-colors group">
+                Voir tous nos projets
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
             </motion.div>
-          ))}
+          </div>
+          
+          {currentPortfolio.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+              {currentPortfolio.map((item, index) => (
+                <motion.div key={item._id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.1 }} transition={{ duration: 0.4, delay: index * 0.05 }}>
+                  <PortfolioCard item={item} />
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-blue-50 rounded-3xl border border-dashed border-blue-200">
+              <Briefcase className="w-10 h-10 mx-auto mb-4 text-blue-600" />
+              <p className="text-lg font-bold text-gray-700">Aucune réalisation disponible</p>
+            </div>
+          )}
+          
+          {displayPortfolio.length > 0 && <Pagination totalPages={totalPages} currentPage={currentPage} onPageChange={handlePageChange} />}
         </div>
-      ) : (
-        <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-blue-50 rounded-3xl border border-dashed border-blue-200">
-          <Briefcase className="w-10 h-10 mx-auto mb-4 text-blue-600" />
-          <p className="text-lg font-bold text-gray-700">Aucune réalisation disponible</p>
-        </div>
-      )}
-      
-      {displayPortfolio.length > 0 && <Pagination totalPages={totalPages} currentPage={currentPage} onPageChange={handlePageChange} />}
-    </div>
-  </section>
+      </section>
 
-  {/* Avis - Section Dynamique */}
-  <section className="py-16 sm:py-20 bg-white">
-    <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
-      <div className="text-center mb-12">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3">Ils Nous Font Confiance</h2>
-          <p className="text-gray-500 text-base sm:text-lg font-light">L'avis de nos clients est notre meilleure publicité</p>
-        </motion.div>
-      </div>
-      
-      {displayReviews.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {displayReviews.map((review, index) => (
-            <motion.div 
-              key={review._id} 
-              initial={{ opacity: 0, y: 20 }} 
-              whileInView={{ opacity: 1, y: 0 }} 
-              viewport={{ once: true }} 
-              transition={{ duration: 0.5, delay: index * 0.1 }}
+      {/* ✅ SECTION AVIS CLIENTS */}
+      <section className="py-16 sm:py-20 bg-white">
+        <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
+          <div className="text-center mb-12">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
+              <p className="text-xs sm:text-sm font-bold text-red-600 uppercase tracking-wider mb-2">Témoignages</p>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3">Ils Nous Font Confiance</h2>
+              <p className="text-gray-500 text-base sm:text-lg font-light">L'avis de nos clients est notre meilleure publicité</p>
+            </motion.div>
+          </div>
+          
+          {reviewsLoading ? (
+            <div className="flex justify-center py-10">
+              <IconSpinner className="w-8 h-8 text-blue-600 animate-spin" />
+            </div>
+          ) : displayReviews.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {displayReviews.map((review, index) => (
+                  <motion.div 
+                    key={review._id} 
+                    initial={{ opacity: 0, y: 20 }} 
+                    whileInView={{ opacity: 1, y: 0 }} 
+                    viewport={{ once: true }} 
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <ReviewCard review={review} />
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* ✅ Bouton Laisser un avis */}
+              <div className="text-center">
+                <motion.button
+                  onClick={handleLeaveReview}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-lg rounded-full shadow-2xl hover:shadow-blue-500/50 transition-all"
+                >
+                  <MessageSquarePlus className="w-5 h-5" />
+                  Laisser un avis
+                </motion.button>
+                {!user && (
+                  <p className="text-sm text-gray-500 mt-3">
+                    (Connexion requise)
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-purple-50 rounded-3xl border border-dashed border-purple-200">
+              <Star className="w-10 h-10 mx-auto mb-4 text-purple-600" />
+              <p className="text-lg font-bold text-gray-700 mb-2">Aucun avis disponible pour le moment</p>
+              <p className="text-sm text-gray-500 mb-6">Soyez le premier à partager votre expérience !</p>
+              
+              <motion.button
+                onClick={handleLeaveReview}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-full shadow-lg hover:shadow-blue-500/50 transition-all"
+              >
+                <MessageSquarePlus className="w-5 h-5" />
+                Laisser le premier avis
+              </motion.button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-20 px-4 sm:px-6 bg-gradient-to-r from-purple-700 via-blue-700 to-purple-700 text-white">
+        <div className="container mx-auto max-w-5xl text-center">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
+            <Zap className="w-16 h-16 mx-auto mb-6 text-white/90" />
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">Prêt à Propulser Votre Marque ?</h2>
+            <p className="text-lg sm:text-xl font-light mb-8 max-w-2xl mx-auto text-white/90">
+              Discutons de votre stratégie de communication pour atteindre de nouveaux sommets
+            </p>
+            <button
+              onClick={() => handleQuoteRequest('Projet Sur Mesure')}
+              className="inline-flex items-center gap-3 px-8 py-4 bg-white text-blue-700 font-semibold text-base rounded-full shadow-2xl hover:bg-gray-50 transition-all duration-300 hover:scale-105"
             >
-              <ReviewCard review={review} />
-            </motion.div>
-          ))}
+              <UserRoundPen className="w-5 h-5" />
+              Contactez l'Équipe Altcom
+            </button>
+          </motion.div>
         </div>
-      ) : (
-        <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-purple-50 rounded-3xl border border-dashed border-purple-200">
-          <Star className="w-10 h-10 mx-auto mb-4 text-purple-600" />
-          <p className="text-lg font-bold text-gray-700 mb-2">Aucun avis disponible pour le moment</p>
-          <p className="text-sm text-gray-500">Les témoignages de nos clients seront bientôt disponibles</p>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-8 border-t border-gray-800">
+        <div className="container mx-auto px-4 sm:px-6 text-center max-w-6xl">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <MessageSquare className="w-5 h-5 text-red-400" />
+            <p className="text-2xl font-bold text-white">Altcom</p>
+          </div>
+          <p className="text-xs sm:text-sm text-gray-400">
+            &copy; {new Date().getFullYear()} Tous droits réservés | 
+            <Link to="/mentions-legales" className="text-gray-400 hover:text-blue-400 transition duration-200 ml-2 underline underline-offset-2">
+              Mentions Légales
+            </Link>
+          </p>
         </div>
-      )}
+      </footer>
     </div>
-  </section>
-
-  {/* CTA */}
-  <section className="py-20 px-4 sm:px-6 bg-gradient-to-r from-purple-700 via-blue-700 to-purple-700 text-white">
-    <div className="container mx-auto max-w-5xl text-center">
-      <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
-        <Zap className="w-16 h-16 mx-auto mb-6 text-white/90" />
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">Prêt à Propulser Votre Marque ?</h2>
-        <p className="text-lg sm:text-xl font-light mb-8 max-w-2xl mx-auto text-white/90">
-          Discutons de votre stratégie de communication pour atteindre de nouveaux sommets
-        </p>
-        <button
-          onClick={() => handleQuoteRequest('Projet Sur Mesure')}
-          className="inline-flex items-center gap-3 px-8 py-4 bg-white text-blue-700 font-semibold text-base rounded-full shadow-2xl hover:bg-gray-50 transition-all duration-300 hover:scale-105"
-        >
-          <UserRoundPen className="w-5 h-5" />
-          Contactez l'Équipe Altcom
-        </button>
-      </motion.div>
-    </div>
-  </section>
-
-  {/* Footer */}
-  <footer className="bg-gray-900 text-white py-8 border-t border-gray-800">
-    <div className="container mx-auto px-4 sm:px-6 text-center max-w-6xl">
-      <div className="flex items-center justify-center gap-2 mb-3">
-        <MessageSquare className="w-5 h-5 text-red-400" />
-        <p className="text-2xl font-bold text-white">Altcom</p>
-      </div>
-      <p className="text-xs sm:text-sm text-gray-400">
-        &copy; {new Date().getFullYear()} Tous droits réservés | 
-        <Link to="/mentions-legales" className="text-gray-400 hover:text-blue-400 transition duration-200 ml-2 underline underline-offset-2">
-          Mentions Légales
-        </Link>
-      </p>
-    </div>
-  </footer>
-</div>
   );
 };
 
