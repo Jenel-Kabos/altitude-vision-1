@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
     FaKey, 
     FaBuilding, 
@@ -11,7 +11,8 @@ import {
     Sparkles, 
     Loader2 as IconSpinner, 
     ArrowRight,
-    Star
+    Star,
+    MessageSquarePlus
 } from 'lucide-react';
 
 import HeroSlider from '../components/HeroSliderAlt'; 
@@ -21,6 +22,7 @@ import ReviewCard from '../components/ReviewCard';
 import CtaCommission from '../components/CtaCommission';
 import { getLatestPropertiesByPole } from '../services/propertyService';
 import { getAltimmoReviews } from '../services/reviewService';
+import { useAuth } from '../context/AuthContext';
 
 const realEstateServices = [
     { 
@@ -50,6 +52,9 @@ const realEstateServices = [
 ];
 
 const AltimmoPage = () => {
+    const navigate = useNavigate();
+    const { user } = useAuth();
+    
     const [properties, setProperties] = useState([]);
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -61,6 +66,14 @@ const AltimmoPage = () => {
         const contactSection = document.getElementById('contact-altimmo');
         if (contactSection) {
             contactSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    const handleLeaveReview = () => {
+        if (user) {
+            navigate('/avis/nouveau');
+        } else {
+            navigate('/login', { state: { from: '/avis/nouveau' } });
         }
     };
 
@@ -365,24 +378,57 @@ const AltimmoPage = () => {
                             <IconSpinner className="w-8 h-8 text-blue-600 animate-spin" />
                         </div>
                     ) : reviews.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {reviews.map((review, index) => (
-                                <motion.div 
-                                    key={review._id} 
-                                    initial={{ opacity: 0, y: 20 }} 
-                                    whileInView={{ opacity: 1, y: 0 }} 
-                                    viewport={{ once: true }} 
-                                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                                {reviews.map((review, index) => (
+                                    <motion.div 
+                                        key={review._id} 
+                                        initial={{ opacity: 0, y: 20 }} 
+                                        whileInView={{ opacity: 1, y: 0 }} 
+                                        viewport={{ once: true }} 
+                                        transition={{ duration: 0.5, delay: index * 0.1 }}
+                                    >
+                                        <ReviewCard review={review} />
+                                    </motion.div>
+                                ))}
+                            </div>
+
+                            {/* ✅ Bouton Laisser un avis */}
+                            <div className="text-center">
+                                <motion.button
+                                    onClick={handleLeaveReview}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }}
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-sky-500 text-white font-bold text-lg rounded-full shadow-2xl hover:shadow-blue-500/50 transition-all"
                                 >
-                                    <ReviewCard review={review} />
-                                </motion.div>
-                            ))}
-                        </div>
+                                    <MessageSquarePlus className="w-5 h-5" />
+                                    Laisser un avis
+                                </motion.button>
+                                {!user && (
+                                    <p className="text-sm text-gray-500 mt-3">
+                                        (Connexion requise)
+                                    </p>
+                                )}
+                            </div>
+                        </>
                     ) : (
                         <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-blue-50 rounded-3xl border border-dashed border-blue-200">
                             <Star className="w-10 h-10 mx-auto mb-4 text-blue-600" />
                             <p className="text-lg font-bold text-gray-700 mb-2">Aucun avis pour le moment</p>
-                            <p className="text-sm text-gray-500">Soyez le premier à partager votre expérience !</p>
+                            <p className="text-sm text-gray-500 mb-6">Soyez le premier à partager votre expérience !</p>
+                            
+                            <motion.button
+                                onClick={handleLeaveReview}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-sky-500 text-white font-semibold rounded-full shadow-lg hover:shadow-blue-500/50 transition-all"
+                            >
+                                <MessageSquarePlus className="w-5 h-5" />
+                                Laisser le premier avis
+                            </motion.button>
                         </div>
                     )}
                 </div>
