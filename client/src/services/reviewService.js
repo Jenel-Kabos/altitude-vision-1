@@ -1,327 +1,138 @@
 import api from './api';
 
 /**
- * Service pour gérer les avis clients (reviews)
- */
-
-/**
- * Récupère tous les avis.
- * @param {Object} params - Paramètres de filtre et tri optionnels
- * @param {string} params.pole - Filtrer par pôle ('Altcom', 'Altvision', 'Altsky')
- * @param {boolean} params.isPublished - Filtrer par statut de publication
- * @param {number} params.minRating - Note minimale
- * @param {number} params.limit - Limite de résultats
- * @param {string} params.sort - Tri (ex: '-rating', 'createdAt')
- * @returns {Promise<Array>} - Promesse résolue avec le tableau des reviews
+ * Récupérer toutes les reviews (avec filtres optionnels)
+ * @param {Object} params - Paramètres de requête (pole, rating, page, limit, sort)
  */
 export const getAllReviews = async (params = {}) => {
   try {
-    const response = await api.get('/reviews', { params });
-
-    // 🛡️ SÉCURITÉ : On vérifie la structure de la réponse pour trouver le tableau
-    // Cela gère les cas { data: { reviews: [] } }, { data: [] } ou { reviews: [] }
-    let reviews = [];
-
-    if (response.data?.data?.reviews && Array.isArray(response.data.data.reviews)) {
-      reviews = response.data.data.reviews;
-    } else if (response.data?.reviews && Array.isArray(response.data.reviews)) {
-      reviews = response.data.reviews;
-    } else if (Array.isArray(response.data)) {
-      reviews = response.data;
-    } else if (Array.isArray(response.data?.data)) {
-      reviews = response.data.data;
-    }
-
-    return reviews;
-
+    const queryString = new URLSearchParams(params).toString();
+    const response = await api.get(`/reviews?${queryString}`);
+    return response.data.data.reviews;
   } catch (error) {
-    console.error('Erreur lors de la récupération des avis :', error);
-    // En cas d'erreur, on renvoie un tableau vide pour ne pas faire planter l'interface
-    return [];
+    console.error('Erreur lors de la récupération des reviews:', error);
+    throw error;
   }
 };
 
 /**
- * Récupérer un avis par son ID
- * @param {string} id - ID de l'avis
- * @returns {Promise<Object>} Avis trouvé
+ * Récupérer les reviews d'un pôle spécifique
+ * @param {String} pole - Nom du pôle (Altimmo, MilaEvents, Altcom)
+ * @param {Number} limit - Nombre maximum d'avis à récupérer
  */
-export const getReviewById = async (id) => {
+export const getReviewsByPole = async (pole, limit = 10) => {
   try {
-    const response = await api.get(`/reviews/${id}`);
-    
-    // Gestion sécurisée de la structure de réponse
-    return response.data?.data?.review || response.data?.data || response.data;
+    const response = await api.get(`/reviews?pole=${pole}&limit=${limit}&sort=-createdAt`);
+    return response.data.data.reviews;
   } catch (error) {
-    console.error(`Erreur lors de la récupération de l'avis ${id}:`, error);
-    throw new Error(error.response?.data?.message || 'Avis introuvable');
+    console.error(`Erreur lors de la récupération des reviews ${pole}:`, error);
+    throw error;
   }
 };
 
 /**
- * Récupérer les avis pour Altcom uniquement (publiés)
- * @param {Object} options - Options supplémentaires
- * @param {number} options.limit - Limite de résultats (optionnel)
- * @param {string} options.sort - Tri (optionnel, ex: '-createdAt', '-rating')
- * @returns {Promise<Array>} Liste des avis Altcom
+ * Récupérer les reviews Altimmo
  */
-export const getAltcomReviews = async (options = {}) => {
-  const params = { 
-    pole: 'Altcom', 
-    isPublished: true,
-    ...options 
-  };
-  
-  return getAllReviews(params);
+export const getAltimmoReviews = async (limit = 6) => {
+  return getReviewsByPole('Altimmo', limit);
 };
 
 /**
- * Récupérer les avis pour Altvision uniquement (publiés)
- * @param {Object} options - Options supplémentaires
- * @returns {Promise<Array>} Liste des avis Altvision
+ * Récupérer les reviews Mila Events
  */
-export const getAltvisionReviews = async (options = {}) => {
-  const params = { 
-    pole: 'Altvision', 
-    isPublished: true,
-    ...options 
-  };
-  
-  return getAllReviews(params);
+export const getMilaEventsReviews = async (limit = 6) => {
+  return getReviewsByPole('MilaEvents', limit);
 };
 
 /**
- * Récupérer les avis pour Altsky uniquement (publiés)
- * @param {Object} options - Options supplémentaires
- * @returns {Promise<Array>} Liste des avis Altsky
+ * Récupérer les reviews Altcom
  */
-export const getAltskyReviews = async (options = {}) => {
-  const params = { 
-    pole: 'Altsky', 
-    isPublished: true,
-    ...options 
-  };
-  
-  return getAllReviews(params);
+export const getAltcomReviews = async (limit = 6) => {
+  return getReviewsByPole('Altcom', limit);
 };
 
 /**
- * Crée un nouvel avis.
- * @param {Object} reviewData - Données de l'avis
- * @param {string} reviewData.author - Nom de l'auteur
- * @param {string} reviewData.content - Contenu de l'avis (ou reviewData.review)
- * @param {number} reviewData.rating - Note (1-5)
- * @param {string} reviewData.company - Entreprise de l'auteur (optionnel)
- * @param {string} reviewData.pole - Pôle concerné ('Altcom', 'Altvision', 'Altsky') (optionnel)
- * @param {string} reviewData.position - Poste de l'auteur (optionnel)
- * @param {string} reviewData.projectType - Type de projet (optionnel)
- * @param {string} reviewData.portfolioItem - ID du projet portfolio lié (optionnel)
- * @returns {Promise<Object>} - Promesse résolue avec l'avis créé
+ * Récupérer tous les témoignages (pour HomePage - tous pôles mélangés)
+ */
+export const getAllTestimonials = async (limit = 10) => {
+  try {
+    const response = await api.get(`/reviews?limit=${limit}&sort=-createdAt`);
+    return response.data.data.reviews;
+  } catch (error) {
+    console.error('Erreur lors de la récupération des témoignages:', error);
+    throw error;
+  }
+};
+
+/**
+ * Créer une nouvelle review
+ * @param {Object} reviewData - { rating, comment, pole }
  */
 export const createReview = async (reviewData) => {
   try {
     const response = await api.post('/reviews', reviewData);
-    
-    // On renvoie l'objet créé (avec gestion sécurisée de la structure)
-    return response.data?.data?.review || response.data?.data || response.data;
+    return response.data.data.review;
   } catch (error) {
-    console.error('Erreur lors de la création de l\'avis :', error);
-    // Ici on relance l'erreur pour pouvoir afficher le Toast.error dans le composant
+    console.error('Erreur lors de la création de la review:', error);
     throw error;
   }
 };
 
 /**
- * Mettre à jour un avis existant
- * @param {string} id - ID de l'avis
- * @param {Object} updateData - Données à mettre à jour
- * @returns {Promise<Object>} Avis mis à jour
+ * Mettre à jour une review
+ * @param {String} reviewId - ID de la review
+ * @param {Object} updateData - { rating, comment }
  */
-export const updateReview = async (id, updateData) => {
+export const updateReview = async (reviewId, updateData) => {
   try {
-    const response = await api.put(`/reviews/${id}`, updateData);
-    
-    // Gestion sécurisée de la structure de réponse
-    return response.data?.data?.review || response.data?.data || response.data;
+    const response = await api.patch(`/reviews/${reviewId}`, updateData);
+    return response.data.data.review;
   } catch (error) {
-    console.error(`Erreur lors de la mise à jour de l'avis ${id}:`, error);
-    throw new Error(error.response?.data?.message || 'Erreur lors de la mise à jour');
-  }
-};
-
-/**
- * Supprime un avis par son ID.
- * @param {string} id - ID de l'avis à supprimer
- * @returns {Promise<boolean>} - true si suppression réussie
- */
-export const deleteReview = async (id) => {
-  try {
-    await api.delete(`/reviews/${id}`);
-    return true;
-  } catch (error) {
-    console.error('Erreur lors de la suppression de l\'avis :', error);
+    console.error('Erreur lors de la mise à jour de la review:', error);
     throw error;
   }
 };
 
 /**
- * Récupérer les statistiques des avis
- * @param {string} pole - Pôle concerné (optionnel: 'Altcom', 'Altvision', 'Altsky')
- * @param {boolean} publishedOnly - Ne compter que les avis publiés (par défaut: true)
- * @returns {Promise<Object>} Statistiques (moyenne, total, répartition)
+ * Supprimer une review (Admin uniquement)
+ * @param {String} reviewId - ID de la review
  */
-export const getReviewStats = async (pole = null, publishedOnly = true) => {
+export const deleteReview = async (reviewId) => {
   try {
-    const params = {};
-    if (pole) params.pole = pole;
-    if (publishedOnly) params.isPublished = true;
-    
-    const reviews = await getAllReviews(params);
-    
-    if (reviews.length === 0) {
-      return {
-        total: 0,
-        averageRating: 0,
-        distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
-      };
-    }
-    
-    const total = reviews.length;
-    const sumRating = reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
-    const averageRating = (sumRating / total).toFixed(1);
-    
-    const distribution = reviews.reduce((acc, review) => {
-      const rating = review.rating || 0;
-      if (rating >= 1 && rating <= 5) {
-        acc[rating] = (acc[rating] || 0) + 1;
-      }
-      return acc;
-    }, { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 });
-    
-    return { 
-      total, 
-      averageRating: parseFloat(averageRating), 
-      distribution 
-    };
+    await api.delete(`/reviews/${reviewId}`);
   } catch (error) {
-    console.error('Erreur lors du calcul des statistiques:', error);
-    return {
-      total: 0,
-      averageRating: 0,
-      distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
-    };
+    console.error('Erreur lors de la suppression de la review:', error);
+    throw error;
   }
 };
 
 /**
- * Récupérer les avis les mieux notés
- * @param {Object} options - Options de filtrage
- * @param {string} options.pole - Pôle concerné (optionnel)
- * @param {number} options.minRating - Note minimale (par défaut: 4)
- * @param {number} options.limit - Nombre maximum d'avis (par défaut: 10)
- * @returns {Promise<Array>} Liste des avis les mieux notés
+ * Ajouter ou modifier la réponse admin à un avis (Admin uniquement)
+ * @param {String} reviewId - ID de la review
+ * @param {String} responseText - Texte de la réponse
  */
-export const getTopReviews = async (options = {}) => {
-  const params = {
-    isPublished: true,
-    minRating: options.minRating || 4,
-    sort: '-rating,-createdAt',
-    limit: options.limit || 10,
-    ...(options.pole && { pole: options.pole })
-  };
-  
-  return getAllReviews(params);
-};
-
-/**
- * Récupérer les avis récents
- * @param {Object} options - Options de filtrage
- * @param {string} options.pole - Pôle concerné (optionnel)
- * @param {number} options.limit - Nombre maximum d'avis (par défaut: 5)
- * @returns {Promise<Array>} Liste des avis récents
- */
-export const getRecentReviews = async (options = {}) => {
-  const params = {
-    isPublished: true,
-    sort: '-createdAt',
-    limit: options.limit || 5,
-    ...(options.pole && { pole: options.pole })
-  };
-  
-  return getAllReviews(params);
-};
-
-/**
- * Basculer le statut de publication d'un avis
- * @param {string} id - ID de l'avis
- * @param {boolean} isPublished - Nouveau statut de publication
- * @returns {Promise<Object>} Avis mis à jour
- */
-export const toggleReviewPublication = async (id, isPublished) => {
+export const addAdminResponse = async (reviewId, responseText) => {
   try {
-    const response = await api.patch(`/reviews/${id}/publish`, { isPublished });
-    
-    return response.data?.data?.review || response.data?.data || response.data;
+    const response = await api.patch(`/reviews/${reviewId}/admin-response`, {
+      responseText,
+    });
+    return response.data.data.review;
   } catch (error) {
-    console.error(`Erreur lors du changement de statut de l'avis ${id}:`, error);
-    throw new Error(error.response?.data?.message || 'Erreur lors du changement de statut');
+    console.error('Erreur lors de l\'ajout de la réponse admin:', error);
+    throw error;
   }
 };
 
 /**
- * Récupérer les avis associés à un projet portfolio spécifique
- * @param {string} portfolioItemId - ID du projet portfolio
- * @returns {Promise<Array>} Liste des avis du projet
+ * Supprimer la réponse admin d'un avis (Admin uniquement)
+ * @param {String} reviewId - ID de la review
  */
-export const getReviewsByPortfolioItem = async (portfolioItemId) => {
+export const deleteAdminResponse = async (reviewId) => {
   try {
-    const params = { 
-      portfolioItem: portfolioItemId,
-      isPublished: true 
-    };
-    
-    return getAllReviews(params);
+    const response = await api.delete(`/reviews/${reviewId}/admin-response`);
+    return response.data.data.review;
   } catch (error) {
-    console.error(`Erreur lors de la récupération des avis du projet ${portfolioItemId}:`, error);
-    return [];
+    console.error('Erreur lors de la suppression de la réponse admin:', error);
+    throw error;
   }
-};
-
-/**
- * Rechercher des avis par mot-clé
- * @param {string} keyword - Mot-clé de recherche
- * @param {Object} options - Options supplémentaires
- * @returns {Promise<Array>} Liste des avis correspondants
- */
-export const searchReviews = async (keyword, options = {}) => {
-  try {
-    const params = {
-      search: keyword,
-      isPublished: true,
-      ...options
-    };
-    
-    return getAllReviews(params);
-  } catch (error) {
-    console.error('Erreur lors de la recherche d\'avis:', error);
-    return [];
-  }
-};
-
-// Export par défaut de toutes les fonctions
-export default {
-  getAllReviews,
-  getReviewById,
-  getAltcomReviews,
-  getAltvisionReviews,
-  getAltskyReviews,
-  createReview,
-  updateReview,
-  deleteReview,
-  getReviewStats,
-  getTopReviews,
-  getRecentReviews,
-  toggleReviewPublication,
-  getReviewsByPortfolioItem,
-  searchReviews
 };

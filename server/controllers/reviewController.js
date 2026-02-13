@@ -1,19 +1,18 @@
 const Review = require('../models/Review');
-const PortfolioItem = require('../models/portfolioItemModel');
 const asyncHandler = require('express-async-handler');
 
 /**
  * @desc    Récupérer toutes les reviews (avec filtres optionnels)
  * @route   GET /api/reviews
- * @query   ?portfolioItem=xxx, ?rating[gte]=4, ?sort=-createdAt
+ * @query   ?pole=Altimmo, ?rating[gte]=4, ?sort=-createdAt
  * @access  Public
  */
 exports.getAllReviews = asyncHandler(async (req, res) => {
   let filter = {};
 
-  // Filtrer par portfolioItem si fourni
-  if (req.params.portfolioItemId) {
-    filter.portfolioItem = req.params.portfolioItemId;
+  // ✅ Filtrer par pôle si fourni
+  if (req.query.pole) {
+    filter.pole = req.query.pole;
   }
 
   // Filtrer par rating si fourni (ex: ?rating[gte]=4)
@@ -40,7 +39,7 @@ exports.getAllReviews = asyncHandler(async (req, res) => {
   query = query.skip(skip).limit(limit);
 
   // Exécuter la requête
-  const reviews = await query.populate('portfolioItem', 'title pole category');
+  const reviews = await query;
 
   // Compter le total
   const total = await Review.countDocuments(filter);
@@ -58,35 +57,35 @@ exports.getAllReviews = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Créer une nouvelle review (route directe)
+ * @desc    Créer une nouvelle review
  * @route   POST /api/reviews
  * @access  Private (utilisateur connecté)
  */
-exports.createReviewDirect = asyncHandler(async (req, res) => {
-  const { rating, comment, portfolioItem } = req.body;
+exports.createReview = asyncHandler(async (req, res) => {
+  const { rating, comment, pole } = req.body;
 
   // Validation des données
-  if (!rating || !comment || !portfolioItem) {
+  if (!rating || !comment || !pole) {
     res.status(400);
-    throw new Error('Veuillez fournir une note, un commentaire et un élément de portfolio');
+    throw new Error('Veuillez fournir une note, un commentaire et un pôle');
   }
 
-  // Vérifier que le portfolioItem existe
-  const portfolio = await PortfolioItem.findById(portfolioItem);
-  if (!portfolio) {
-    res.status(404);
-    throw new Error('Élément de portfolio non trouvé');
+  // Vérifier que le pôle est valide
+  const validPoles = ['Altimmo', 'MilaEvents', 'Altcom'];
+  if (!validPoles.includes(pole)) {
+    res.status(400);
+    throw new Error('Pôle invalide. Choisissez parmi : Altimmo, MilaEvents, Altcom');
   }
 
-  // Vérifier si l'utilisateur a déjà laissé un avis
+  // Vérifier si l'utilisateur a déjà laissé un avis pour ce pôle
   const existingReview = await Review.findOne({
-    portfolioItem: portfolioItem,
+    pole: pole,
     author: req.user._id,
   });
 
   if (existingReview) {
     res.status(400);
-    throw new Error('Vous avez déjà laissé un avis pour cet élément');
+    throw new Error('Vous avez déjà laissé un avis pour ce pôle');
   }
 
   // Créer la review
@@ -94,56 +93,8 @@ exports.createReviewDirect = asyncHandler(async (req, res) => {
     rating,
     comment,
     author: req.user._id,
-    portfolioItem: portfolioItem,
+    pole: pole,
   });
-
-  // Recalculer la note moyenne du portfolioItem
-  await PortfolioItem.calcAverageRating(portfolioItem);
-
-  res.status(201).json({
-    status: 'success',
-    data: {
-      review,
-    },
-  });
-});
-
-/**
- * @desc    Créer une nouvelle review (via portfolio)
- * @route   POST /api/portfolio/:portfolioItemId/reviews
- * @access  Private (utilisateur connecté)
- */
-exports.createReview = asyncHandler(async (req, res) => {
-  const { rating, comment } = req.body;
-
-  // Vérifier que le portfolioItem existe
-  const portfolioItem = await PortfolioItem.findById(req.params.portfolioItemId);
-  if (!portfolioItem) {
-    res.status(404);
-    throw new Error('Élément de portfolio non trouvé');
-  }
-
-  // Vérifier si l'utilisateur a déjà laissé un avis
-  const existingReview = await Review.findOne({
-    portfolioItem: req.params.portfolioItemId,
-    author: req.user._id,
-  });
-
-  if (existingReview) {
-    res.status(400);
-    throw new Error('Vous avez déjà laissé un avis pour cet élément');
-  }
-
-  // Créer la review
-  const review = await Review.create({
-    rating,
-    comment,
-    author: req.user._id,
-    portfolioItem: req.params.portfolioItemId,
-  });
-
-  // Recalculer la note moyenne du portfolioItem
-  await PortfolioItem.calcAverageRating(req.params.portfolioItemId);
 
   res.status(201).json({
     status: 'success',
@@ -166,23 +117,23 @@ exports.updateReview = asyncHandler(async (req, res) => {
     throw new Error('Review non trouvée');
   }
 
-  // Vérifier que l'utilisateur est l'auteur ou un admin
-  if (review.author.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
+  // ✅ Vérifier que l'utilisateur est l'auteur
+  if (review.author._id.toString() !== req.user._id.toString()) {
     res.status(403);
     throw new Error('Vous ne pouvez modifier que vos propres avis');
   }
 
+  // ✅ On ne permet de modifier que rating et comment (pas le pôle)
+  const { rating, comment } = req.body;
+  
   review = await Review.findByIdAndUpdate(
     req.params.id,
-    req.body,
+    { rating, comment },
     {
       new: true,
       runValidators: true,
     }
   );
-
-  // Recalculer la note moyenne
-  await PortfolioItem.calcAverageRating(review.portfolioItem);
 
   res.status(200).json({
     status: 'success',
@@ -195,7 +146,7 @@ exports.updateReview = asyncHandler(async (req, res) => {
 /**
  * @desc    Supprimer une review
  * @route   DELETE /api/reviews/:id
- * @access  Private (auteur ou admin)
+ * @access  Private (Admin uniquement)
  */
 exports.deleteReview = asyncHandler(async (req, res) => {
   const review = await Review.findById(req.params.id);
@@ -205,21 +156,96 @@ exports.deleteReview = asyncHandler(async (req, res) => {
     throw new Error('Review non trouvée');
   }
 
-  // Vérifier les permissions
-  if (review.author.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
+  // ✅ MODIFICATION : Seul l'admin peut supprimer
+  if (req.user.role !== 'Admin') {
     res.status(403);
-    throw new Error('Vous ne pouvez supprimer que vos propres avis');
+    throw new Error('Seul un administrateur peut supprimer un avis');
   }
 
-  const portfolioItemId = review.portfolioItem;
-  
   await review.deleteOne();
-
-  // Recalculer la note moyenne
-  await PortfolioItem.calcAverageRating(portfolioItemId);
 
   res.status(204).json({
     status: 'success',
     data: null,
+  });
+});
+
+/**
+ * @desc    Ajouter ou modifier la réponse admin à un avis
+ * @route   PATCH /api/reviews/:id/admin-response
+ * @access  Private (Admin uniquement)
+ */
+exports.addAdminResponse = asyncHandler(async (req, res) => {
+  const { responseText } = req.body;
+
+  if (!responseText || responseText.trim().length === 0) {
+    res.status(400);
+    throw new Error('Veuillez fournir une réponse');
+  }
+
+  const review = await Review.findById(req.params.id);
+
+  if (!review) {
+    res.status(404);
+    throw new Error('Review non trouvée');
+  }
+
+  // ✅ Seul un admin peut répondre
+  if (req.user.role !== 'Admin') {
+    res.status(403);
+    throw new Error('Seul un administrateur peut répondre aux avis');
+  }
+
+  // Mettre à jour la réponse admin
+  review.adminResponse = {
+    text: responseText.trim(),
+    respondedAt: new Date(),
+    respondedBy: req.user._id,
+  };
+
+  await review.save();
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      review,
+    },
+  });
+});
+
+/**
+ * @desc    Supprimer la réponse admin d'un avis
+ * @route   DELETE /api/reviews/:id/admin-response
+ * @access  Private (Admin uniquement)
+ */
+exports.deleteAdminResponse = asyncHandler(async (req, res) => {
+  const review = await Review.findById(req.params.id);
+
+  if (!review) {
+    res.status(404);
+    throw new Error('Review non trouvée');
+  }
+
+  // ✅ Seul un admin peut supprimer sa réponse
+  if (req.user.role !== 'Admin') {
+    res.status(403);
+    throw new Error('Seul un administrateur peut supprimer une réponse');
+  }
+
+  // Réinitialiser la réponse admin
+  review.adminResponse = {
+    text: null,
+    respondedAt: null,
+    respondedBy: null,
+  };
+
+  await review.save();
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Réponse admin supprimée',
+    data: {
+      review,
+    },
   });
 });

@@ -1,16 +1,17 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { FaStar } from 'react-icons/fa';
-import { Quote, Briefcase, Calendar } from 'lucide-react';
+import { Quote, Calendar, ShieldCheck, MessageSquare } from 'lucide-react';
 
 /**
- * Composant ReviewCard compatible avec votre structure de données existante
- * @param {Object} review - L'objet review contenant rating, comment, author, portfolioItem, etc.
+ * Composant ReviewCard avec support de la réponse admin
+ * @param {Object} review - L'objet review avec pole, rating, comment, author, adminResponse
  */
 const ReviewCard = ({ review }) => {
   // === EXTRACTION DES DONNÉES AVEC FALLBACKS ===
   const rating = review.rating || 5;
   const comment = review.comment || review.content || "Excellent service et très professionnel.";
+  const pole = review.pole || "Service";
   
   // Gestion de l'auteur (peut être un string ou un objet populate)
   const authorName = typeof review.author === 'object' 
@@ -21,11 +22,20 @@ const ReviewCard = ({ review }) => {
     ? review.author?.photo 
     : null;
 
-  // Gestion du projet associé
-  const projectTitle = review.portfolioItem?.title || review.company || "Projet Confidentiel";
-  const projectClient = review.portfolioItem?.client || null;
+  // ✅ Gestion de la réponse admin
+  const hasAdminResponse = review.adminResponse?.text;
+  const adminResponseText = review.adminResponse?.text;
+  const adminRespondedAt = review.adminResponse?.respondedAt 
+    ? new Date(review.adminResponse.respondedAt).toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+    : null;
   
-  // Formatage de la date
+  const adminName = review.adminResponse?.respondedBy?.name || "L'équipe Altitude-Vision";
+  
+  // Formatage de la date de l'avis
   const reviewDate = review.createdAt 
     ? new Date(review.createdAt).toLocaleDateString('fr-FR', {
         year: 'numeric',
@@ -33,6 +43,20 @@ const ReviewCard = ({ review }) => {
         day: 'numeric'
       })
     : null;
+
+  // === GRADIENT PAR PÔLE ===
+  const getPoleGradient = (pole) => {
+    switch(pole) {
+      case 'Altimmo':
+        return 'from-blue-600 to-sky-500';
+      case 'MilaEvents':
+        return 'from-emerald-600 to-green-500';
+      case 'Altcom':
+        return 'from-indigo-600 to-violet-500';
+      default:
+        return 'from-gray-600 to-gray-500';
+    }
+  };
 
   // === RENDU DES ÉTOILES ===
   const renderStars = () => {
@@ -71,6 +95,13 @@ const ReviewCard = ({ review }) => {
 
       {/* Contenu principal */}
       <div className="relative z-10">
+        {/* Badge du pôle */}
+        <div className="mb-3">
+          <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r ${getPoleGradient(pole)} text-white`}>
+            {pole}
+          </span>
+        </div>
+
         {/* Étoiles */}
         {renderStars()}
 
@@ -78,6 +109,26 @@ const ReviewCard = ({ review }) => {
         <p className="text-gray-600 italic mb-4 leading-relaxed">
           "{comment}"
         </p>
+
+        {/* ✅ RÉPONSE ADMIN */}
+        {hasAdminResponse && (
+          <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500">
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldCheck className="w-4 h-4 text-blue-600" />
+              <span className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
+                Réponse de {adminName}
+              </span>
+            </div>
+            <p className="text-sm text-gray-700 leading-relaxed">
+              {adminResponseText}
+            </p>
+            {adminRespondedAt && (
+              <p className="text-xs text-gray-500 mt-2">
+                Répondu le {adminRespondedAt}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Footer avec informations auteur */}
@@ -91,28 +142,18 @@ const ReviewCard = ({ review }) => {
               className="w-10 h-10 rounded-full object-cover border-2 border-blue-500"
             />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+            <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getPoleGradient(pole)} flex items-center justify-center text-white font-bold text-sm`}>
               {getInitial(authorName)}
             </div>
           )}
 
           {/* Nom de l'auteur */}
           <div className="flex-1">
-            <p className="font-semibold text-gray-800 text-right">
-              - {authorName}
+            <p className="font-semibold text-gray-800">
+              {authorName}
             </p>
           </div>
         </div>
-
-        {/* Informations du projet */}
-        {projectTitle && (
-          <div className="flex items-center gap-2 text-gray-600 text-sm mt-2">
-            <Briefcase className="w-4 h-4 text-blue-500" />
-            <span className="line-clamp-1">
-              {projectClient ? `${projectClient} - ${projectTitle}` : projectTitle}
-            </span>
-          </div>
-        )}
 
         {/* Date de l'avis */}
         {reviewDate && (

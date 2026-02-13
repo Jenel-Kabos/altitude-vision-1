@@ -2,9 +2,9 @@ import React, { useEffect, useState } from "react";
 import Slider from "react-slick";
 import { motion } from "framer-motion";
 import { Quote, Loader2, MessageSquarePlus, Star } from "lucide-react";
-import { useNavigate } from "react-router-dom"; // ✅ Import nécessaire pour la redirection
-import { getAllTestimonials } from "../services/testimonialService"; // Vérifie ton chemin
-import { useAuth } from "../context/AuthContext"; // ✅ Import du contexte Auth
+import { useNavigate } from "react-router-dom";
+import { getAllTestimonials } from "../services/reviewService"; // ✅ Service review
+import { useAuth } from "../context/AuthContext";
 
 const Testimonials = () => {
   const [testimonials, setTestimonials] = useState([]);
@@ -14,11 +14,11 @@ const Testimonials = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // 1. Récupération des données dynamiques
+  // 1. Récupération des données dynamiques - TOUS les avis de TOUS les pôles
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const data = await getAllTestimonials();
+        const data = await getAllTestimonials(10); // Récupère 10 avis max
         setTestimonials(data);
       } catch (error) {
         console.error("Erreur chargement témoignages:", error);
@@ -108,13 +108,14 @@ const Testimonials = () => {
                     transition={{ type: "spring", stiffness: 200 }}
                   >
                     <div className="relative">
+                      {/* ✅ Utilise author.name au lieu de t.name */}
                       <img
-                        src={t.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(t.name)}&background=1e293b&color=fff`}
-                        alt={t.name}
+                        src={t.author?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=1e293b&color=fff`}
+                        alt={t.author?.name || 'Client'}
                         className="w-28 h-28 md:w-32 md:h-32 rounded-full object-cover shadow-2xl border-4 border-gray-800 relative z-10 bg-gray-800"
                         onError={(e) => {
                           e.target.onerror = null;
-                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(t.name)}&background=1e293b&color=fff`;
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=1e293b&color=fff`;
                         }}
                       />
                       <motion.div 
@@ -126,7 +127,7 @@ const Testimonials = () => {
                     </div>
                   </motion.div>
 
-                  {/* Note en étoiles (Optionnel si tu as le champ rating) */}
+                  {/* Note en étoiles */}
                   {t.rating && (
                     <div className="flex gap-1 mb-4">
                         {[...Array(5)].map((_, i) => (
@@ -135,13 +136,21 @@ const Testimonials = () => {
                     </div>
                   )}
 
+                  {/* Badge du pôle */}
+                  {t.pole && (
+                    <span className="inline-block px-4 py-1 mb-4 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      {t.pole}
+                    </span>
+                  )}
+
+                  {/* ✅ Utilise comment au lieu de review/message */}
                   <motion.blockquote
                     className="text-lg md:text-xl italic text-gray-300 leading-relaxed mb-8 max-w-3xl relative z-10"
                     initial={{ opacity: 0 }}
                     whileInView={{ opacity: 1 }}
                     transition={{ duration: 0.8, delay: 0.3 }}
                   >
-                    “{t.review || t.message}” {/* Supporte les deux noms de champs */}
+                    "{t.comment}"
                   </motion.blockquote>
 
                   <motion.div
@@ -150,9 +159,10 @@ const Testimonials = () => {
                     transition={{ duration: 0.6, delay: 0.4 }}
                     className="relative z-10 flex flex-col items-center"
                   >
-                    <h4 className="font-bold text-xl text-white tracking-wide">{t.name}</h4>
+                    {/* ✅ Utilise author.name */}
+                    <h4 className="font-bold text-xl text-white tracking-wide">{t.author?.name || 'Client'}</h4>
                     <span className="text-sm font-medium text-blue-400 uppercase tracking-wider mt-1 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
-                      {t.role || "Client"}
+                      Client {t.pole}
                     </span>
                   </motion.div>
                 </motion.div>
@@ -165,7 +175,7 @@ const Testimonials = () => {
           </div>
         )}
 
-        {/* ✅ BOUTON INTELLIGENT (Modifié) */}
+        {/* ✅ BOUTON INTELLIGENT */}
         <div className="text-center mt-20 relative z-10">
             <div className="flex flex-col items-center gap-3">
                 <button 
@@ -180,7 +190,7 @@ const Testimonials = () => {
                 </button>
                 
                 {!user && (
-                    <p className="text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-xs text-gray-500">
                         (Connexion requise)
                     </p>
                 )}
@@ -193,6 +203,15 @@ const Testimonials = () => {
         .slick-dots li { margin: 0 2px; }
         .slick-dots li button:before { display: none; }
         .slick-dots li.slick-active div { background-color: #3b82f6; transform: scale(1.2); }
+        
+        @keyframes pulse-slow {
+          0%, 100% { opacity: 0.2; }
+          50% { opacity: 0.3; }
+        }
+        
+        .animate-pulse-slow {
+          animation: pulse-slow 4s ease-in-out infinite;
+        }
       `}</style>
     </section>
   );

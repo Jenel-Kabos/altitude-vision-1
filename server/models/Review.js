@@ -18,11 +18,28 @@ const reviewSchema = new mongoose.Schema(
       ref: 'User',
       required: [true, 'Une review doit appartenir à un auteur.'],
     },
-    // La review concerne un élément spécifique du portfolio
-    portfolioItem: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'PortfolioItem',
-      required: [true, 'Une review doit être liée à un élément du portfolio.'],
+    // ✅ NOUVEAU : La review concerne un pôle (Altimmo, Mila Events, Altcom)
+    pole: {
+      type: String,
+      enum: ['Altimmo', 'MilaEvents', 'Altcom'],
+      required: [true, 'Une review doit être liée à un pôle.'],
+    },
+    // ✅ NOUVEAU : Réponse de l'administrateur (optionnelle)
+    adminResponse: {
+      text: {
+        type: String,
+        trim: true,
+        default: null,
+      },
+      respondedAt: {
+        type: Date,
+        default: null,
+      },
+      respondedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
     },
   },
   {
@@ -30,14 +47,17 @@ const reviewSchema = new mongoose.Schema(
   }
 );
 
-// Index unique pour empêcher qu’un même utilisateur laisse plusieurs reviews sur le même portfolioItem
-reviewSchema.index({ portfolioItem: 1, author: 1 }, { unique: true });
+// ✅ Index unique : un utilisateur ne peut laisser qu'un seul avis par pôle
+reviewSchema.index({ pole: 1, author: 1 }, { unique: true });
 
-// Pré-remplissage automatique des infos auteur pour toutes les queries "find"
+// ✅ Pré-remplissage automatique des infos auteur pour toutes les queries "find"
 reviewSchema.pre(/^find/, function (next) {
   this.populate({
     path: 'author',
-    select: 'name photo', // On ne récupère que le nom et la photo de l’auteur
+    select: 'name photo email',
+  }).populate({
+    path: 'adminResponse.respondedBy',
+    select: 'name photo',
   });
   next();
 });

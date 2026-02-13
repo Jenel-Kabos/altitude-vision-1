@@ -1,10 +1,34 @@
-// client/src/pages/LeaveReviewPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Star, Send, Loader2, ArrowLeft } from 'lucide-react';
+import { Star, Send, Loader2, ArrowLeft, Building2, Calendar, Briefcase } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { createReview } from '../services/reviewService';
 import { useAuth } from '../context/AuthContext';
+
+// ✅ Liste des pôles disponibles
+const POLES = [
+  { 
+    id: 'Altimmo', 
+    name: 'Altimmo', 
+    icon: Building2,
+    description: 'Immobilier de luxe',
+    gradient: 'from-blue-600 to-sky-500'
+  },
+  { 
+    id: 'MilaEvents', 
+    name: 'Mila Events', 
+    icon: Calendar,
+    description: 'Organisation d\'événements',
+    gradient: 'from-emerald-600 to-green-500'
+  },
+  { 
+    id: 'Altcom', 
+    name: 'Altcom', 
+    icon: Briefcase,
+    description: 'Communication digitale',
+    gradient: 'from-indigo-600 to-violet-500'
+  }
+];
 
 const LeaveReviewPage = () => {
   const navigate = useNavigate();
@@ -14,58 +38,7 @@ const LeaveReviewPage = () => {
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
-  const [portfolioItems, setPortfolioItems] = useState([]);
-  const [selectedPortfolioItem, setSelectedPortfolioItem] = useState('');
-  const [loadingPortfolio, setLoadingPortfolio] = useState(true);
-
-  // ✅ Récupérer la liste des projets portfolio au chargement
-  useEffect(() => {
-    const fetchPortfolioItems = async () => {
-      try {
-        setLoadingPortfolio(true);
-        const response = await fetch('https://altitude-vision.onrender.com/api/portfolio');
-        const data = await response.json();
-        
-        console.log('📦 Données portfolio reçues:', data);
-        
-        // ✅ Gestion robuste de la structure de réponse
-        let items = [];
-        
-        if (data.data?.portfolioItems && Array.isArray(data.data.portfolioItems)) {
-          items = data.data.portfolioItems;
-        } else if (data.data?.data && Array.isArray(data.data.data)) {
-          items = data.data.data;
-        } else if (data.portfolioItems && Array.isArray(data.portfolioItems)) {
-          items = data.portfolioItems;
-        } else if (data.data && Array.isArray(data.data)) {
-          items = data.data;
-        } else if (Array.isArray(data)) {
-          items = data;
-        }
-        
-        console.log('✅ Items extraits:', items);
-        
-        if (items.length === 0) {
-          toast.warning('Aucun projet disponible pour le moment');
-        }
-        
-        setPortfolioItems(items);
-        
-        // ✅ Sélectionner automatiquement le premier item s'il existe
-        if (items.length > 0) {
-          setSelectedPortfolioItem(items[0]._id);
-        }
-      } catch (error) {
-        console.error('❌ Erreur lors du chargement des projets:', error);
-        toast.error('Impossible de charger les projets');
-        setPortfolioItems([]);
-      } finally {
-        setLoadingPortfolio(false);
-      }
-    };
-
-    fetchPortfolioItems();
-  }, []);
+  const [selectedPole, setSelectedPole] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -80,19 +53,18 @@ const LeaveReviewPage = () => {
       return;
     }
 
-    if (!selectedPortfolioItem) {
-      toast.error("Veuillez sélectionner un projet.");
+    if (!selectedPole) {
+      toast.error("Veuillez sélectionner un pôle.");
       return;
     }
 
     try {
       setLoading(true);
       
-      // ✅ Envoyer les bons champs attendus par le backend
       await createReview({
         rating,
         comment,
-        portfolioItem: selectedPortfolioItem,
+        pole: selectedPole,
       });
 
       toast.success("Merci ! Votre avis a été enregistré.");
@@ -126,36 +98,58 @@ const LeaveReviewPage = () => {
         <div className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             
-            {/* ✅ Sélection du projet */}
+            {/* ✅ Sélection du pôle */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
-                Projet concerné <span className="text-red-500">*</span>
+                Pôle concerné <span className="text-red-500">*</span>
               </label>
               
-              {loadingPortfolio ? (
-                <div className="flex items-center justify-center p-4 border border-gray-300 rounded-lg">
-                  <Loader2 className="animate-spin text-blue-600" size={20} />
-                  <span className="ml-2 text-gray-600">Chargement des projets...</span>
-                </div>
-              ) : portfolioItems.length === 0 ? (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
-                  Aucun projet disponible pour le moment. Veuillez réessayer plus tard.
-                </div>
-              ) : (
-                <select
-                  value={selectedPortfolioItem}
-                  onChange={(e) => setSelectedPortfolioItem(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  required
-                >
-                  <option value="">Sélectionnez un projet</option>
-                  {portfolioItems.map((item) => (
-                    <option key={item._id} value={item._id}>
-                      {item.title || item.name || 'Projet sans nom'}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <div className="grid grid-cols-1 gap-3">
+                {POLES.map((pole) => {
+                  const Icon = pole.icon;
+                  const isSelected = selectedPole === pole.id;
+                  
+                  return (
+                    <button
+                      key={pole.id}
+                      type="button"
+                      onClick={() => setSelectedPole(pole.id)}
+                      className={`
+                        relative p-4 rounded-xl border-2 transition-all duration-300 text-left
+                        ${isSelected 
+                          ? `border-blue-500 bg-gradient-to-r ${pole.gradient} bg-opacity-10 shadow-lg` 
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }
+                      `}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`
+                          p-2 rounded-lg flex-shrink-0
+                          ${isSelected 
+                            ? `bg-gradient-to-br ${pole.gradient}` 
+                            : 'bg-gray-100'
+                          }
+                        `}>
+                          <Icon className={`w-5 h-5 ${isSelected ? 'text-white' : 'text-gray-600'}`} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900">{pole.name}</div>
+                          <div className="text-sm text-gray-600">{pole.description}</div>
+                        </div>
+                        {isSelected && (
+                          <div className="flex-shrink-0">
+                            <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Note en Étoiles */}
@@ -215,7 +209,7 @@ const LeaveReviewPage = () => {
             {/* Bouton Soumettre */}
             <button
               type="submit"
-              disabled={loading || !selectedPortfolioItem || portfolioItems.length === 0}
+              disabled={loading || !selectedPole}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? (

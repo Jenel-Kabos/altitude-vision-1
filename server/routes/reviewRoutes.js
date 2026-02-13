@@ -1,9 +1,8 @@
 const express = require('express');
 const reviewController = require('../controllers/reviewController');
-const authController = require('../controllers/authController');
+const { protect, adminOnly } = require('../middleware/authMiddleware');
 
-// mergeParams:true permet à ce routeur de récupérer les paramètres du parent (ex: :portfolioItemId)
-const router = express.Router({ mergeParams: true });
+const router = express.Router();
 
 /* ================================
    🚀 PUBLIC ROUTES
@@ -19,17 +18,31 @@ router
    ================================ */
 
 // Les routes suivantes nécessitent un utilisateur connecté
-router.use(authController.protect);
+router.use(protect);
 
 // ✅ Tous les utilisateurs connectés peuvent créer un avis
 router
   .route('/')
-  .post(reviewController.createReviewDirect);
+  .post(reviewController.createReview);
 
-// ✅ Seul l'auteur de l'avis ou un admin peut le modifier/supprimer
+// ✅ L'auteur peut modifier son avis
 router
   .route('/:id')
-  .patch(reviewController.updateReview)
-  .delete(reviewController.deleteReview);
+  .patch(reviewController.updateReview);
+
+/* ================================
+   🔐 ADMIN ONLY ROUTES
+   ================================ */
+
+// ✅ Seul l'admin peut supprimer un avis
+router
+  .route('/:id')
+  .delete(adminOnly, reviewController.deleteReview);
+
+// ✅ Seul l'admin peut ajouter/modifier/supprimer une réponse
+router
+  .route('/:id/admin-response')
+  .patch(adminOnly, reviewController.addAdminResponse)
+  .delete(adminOnly, reviewController.deleteAdminResponse);
 
 module.exports = router;
