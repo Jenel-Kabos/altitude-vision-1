@@ -48,7 +48,11 @@ import ManagePropertiesPage from "./pages/dashboard/ManagePropertiesPage";
 import AddPropertyPage from "./pages/dashboard/AddPropertyPage";
 import ManageEventsPage from "./pages/dashboard/ManageEventsPage";
 import ManageQuotesPage from "./pages/dashboard/ManageQuotesPage";
-import ModerationPage from "./pages/dashboard/ModerationPage";
+
+// ✅ NOUVEAU : Pages de Modération séparées
+import PropertyModerationPage from "./pages/dashboard/PropertyModerationPage";
+import ReviewModerationPage from "./pages/dashboard/ReviewModerationPage";
+
 import UsersPanel from "./pages/dashboard/UsersPanel";
 import ActiveSessionsPage from "./pages/dashboard/ActiveSessionsPage"; 
 
@@ -65,7 +69,7 @@ import MessagesPage from './pages/MessagesPage';
 
 // Utilisateur / Propriétaire
 import AccountPage from "./pages/AccountPage";
-import ProfilePage from "./services/ProfilePage"; // Vérifie que ce fichier est bien dans services, sinon change pour "./pages/ProfilePage"
+import ProfilePage from "./services/ProfilePage";
 
 // Layout Propriétaire et Composant de gestion
 import OwnerDashboard from "./pages/dashboard/OwnerDashboard";
@@ -118,7 +122,7 @@ function App() {
                 {/* SERVICES ALTIMMO */}
                 <Route path="/altimmo/services/vente-de-biens" element={<MainLayout><VenteDeBiensPage /></MainLayout>} />
                 <Route path="/altimmo/services/location-gestion" element={<MainLayout><LocationGestionPage /></MainLayout>} />
-                <Route path="/altimmo/services/conseil-en-investissement" element={<MainLayout><ConseilInvestissementPage /></MainLayout>} />
+                <Route path="/altimmo/services/conseil-investissement" element={<MainLayout><ConseilInvestissementPage /></MainLayout>} />
                 
                 {/* MILA EVENTS */}
                 <Route path="/mila-events" element={<MainLayout><MilaEventsPage /></MainLayout>} />
@@ -168,19 +172,20 @@ function App() {
                     <Route element={<AdminRoute />}>
                         <Route path="/dashboard" element={<AdminDashboard />}>
                             <Route index element={<DashboardHome />} />
+                            
+                            {/* GESTION DES PÔLES */}
                             <Route path="properties" element={<ManagePropertiesPage />} />
                             <Route path="properties/add" element={<AddPropertyPage />} />
                             <Route path="events" element={<ManageEventsPage />} />
                             <Route path="quotes" element={<ManageQuotesPage />} />
-                            <Route path="moderation" element={<ModerationPage />} />
-                            
-                            {/* GESTION UTILISATEURS */}
-                            <Route path="users" element={<UsersPanel />} />
-                            
-                            {/* GESTION DES PROJETS ALTCOM */}
                             <Route path="altcom" element={<ManageAltcomPage />} />
                             
-                            {/* SESSIONS ACTIVES */}
+                            {/* ✅ NOUVEAU : MODÉRATION (2 pages distinctes) */}
+                            <Route path="moderation/properties" element={<PropertyModerationPage />} />
+                            <Route path="moderation/reviews" element={<ReviewModerationPage />} />
+                            
+                            {/* GESTION UTILISATEURS & SÉCURITÉ */}
+                            <Route path="users" element={<UsersPanel />} />
                             <Route path="active-sessions" element={<ActiveSessionsPage />} />
 
                             {/* GESTION DES COMMUNICATIONS ADMIN */}

@@ -1,9 +1,10 @@
-// src/pages/dashboard/ModerationPage.jsx
+// src/pages/dashboard/PropertyModerationPage.jsx
+// (Renommage de ModerationPage.jsx pour la cohérence)
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api'; 
 import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
 
-const ModerationPage = () => {
+const PropertyModerationPage = () => {
   const [properties, setProperties] = useState([]);
   const [filteredProperties, setFilteredProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,9 +34,9 @@ const ModerationPage = () => {
       };
       setStats(newStats);
       
-      console.log('✅ [ModerationPage] Propriétés chargées:', newStats);
+      console.log('✅ [PropertyModerationPage] Propriétés chargées:', newStats);
     } catch (err) {
-      console.error('❌ [ModerationPage] Erreur:', err);
+      console.error('❌ [PropertyModerationPage] Erreur:', err);
       setError(err.response?.data?.message || "Impossible de charger les annonces.");
     } finally {
       setLoading(false);
@@ -58,7 +59,6 @@ const ModerationPage = () => {
   // Valider ou rejeter une propriété
   const handleModeration = async (id, action) => {
     try {
-      // ✅ CORRECTION : Utilisation de la route /admin/:id/:action
       await api.patch(`/properties/admin/${id}/${action}`);
 
       // Mise à jour locale de la liste (suppression de l'élément traité)
@@ -79,7 +79,7 @@ const ModerationPage = () => {
       
       alert(`Annonce ${action === 'validate' ? 'validée' : 'rejetée'} avec succès !`);
     } catch (err) {
-      console.error('❌ [ModerationPage] Erreur modération:', err);
+      console.error('❌ [PropertyModerationPage] Erreur modération:', err);
       alert(err.response?.data?.message || "Une erreur est survenue.");
     }
   };
@@ -123,7 +123,7 @@ const ModerationPage = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">Modération des Annonces</h1>
+        <h1 className="text-3xl font-bold text-gray-800 mb-4">Modération des Biens Immobiliers</h1>
         
         {/* Statistiques */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -309,4 +309,4 @@ const ModerationPage = () => {
   );
 };
 
-export default ModerationPage;
+export default PropertyModerationPage;

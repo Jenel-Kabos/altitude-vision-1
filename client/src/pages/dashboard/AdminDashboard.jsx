@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { 
-  Home, Calendar, Briefcase, LogOut, BarChart3, Globe, Users, CheckCircle2, ShieldCheck, Mail, Menu, X 
+  Home, Calendar, Briefcase, LogOut, BarChart3, Globe, Users, CheckCircle2, ShieldCheck, Mail, Menu, X, Star
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
@@ -123,16 +123,32 @@ const AdminDashboard = () => {
               <Briefcase size={18} /> Altcom
             </NavLink>
 
-            {/* Modération des biens */}
-            <NavLink
-              to="/dashboard/moderation"
-              onClick={closeMobileSidebar}
-              className={({ isActive }) =>
-                navLinkClass({ isActive, colorClass: "bg-purple-600 text-white" })
-              }
-            >
-              <CheckCircle2 size={18} /> Modération
-            </NavLink>
+            {/* --- MODÉRATION --- */}
+            <div className="border-t border-gray-200 pt-2 mt-2">
+              <p className="text-xs text-gray-500 font-semibold uppercase mb-1">Modération</p>
+
+              {/* Modération des biens */}
+              <NavLink
+                to="/dashboard/moderation/properties"
+                onClick={closeMobileSidebar}
+                className={({ isActive }) =>
+                  navLinkClass({ isActive, colorClass: "bg-purple-600 text-white" })
+                }
+              >
+                <CheckCircle2 size={18} /> Modération Biens
+              </NavLink>
+
+              {/* Modération des avis */}
+              <NavLink
+                to="/dashboard/moderation/reviews"
+                onClick={closeMobileSidebar}
+                className={({ isActive }) =>
+                  navLinkClass({ isActive, colorClass: "bg-indigo-600 text-white" })
+                }
+              >
+                <Star size={18} /> Modération Avis
+              </NavLink>
+            </div>
             
             {/* --- ADMINISTRATION & SÉCURITÉ --- */}
             <div className="border-t border-gray-200 pt-2 mt-2">
