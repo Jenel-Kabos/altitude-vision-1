@@ -44,15 +44,14 @@ exports.getAllReviews = asyncHandler(async (req, res) => {
   // Compter le total
   const total = await Review.countDocuments(filter);
 
+  // ✅ CORRECTION : Retourner reviews directement dans data (pas data.reviews)
   res.status(200).json({
     status: 'success',
     results: reviews.length,
     total,
     page,
     pages: Math.ceil(total / limit),
-    data: {
-      reviews,
-    },
+    data: reviews,  // ← CHANGÉ : data est maintenant directement le tableau
   });
 });
 
