@@ -31,25 +31,86 @@ const ReviewModerationPage = () => {
   const fetchReviews = async () => {
     setLoading(true);
     try {
+      console.log('🔍 [ReviewModerationPage] Début du chargement des avis...');
+      
       const res = await api.get('/reviews', {
         params: { limit: 1000, sort: '-createdAt' }
       });
       
-      // ✅ CORRECTION : Gérer les différents formats de réponse
+      console.log('📦 [ReviewModerationPage] Réponse brute:', res);
+      console.log('📦 [ReviewModerationPage] res.data:', res.data);
+      console.log('📦 [ReviewModerationPage] res.data.data:', res.data.data);
+      
+      // ✅ CORRECTION : Gérer la structure réelle de l'API
       let reviewsData = [];
+      
+      // Structure observée: { status, results, data: {...} }
       if (Array.isArray(res.data)) {
-        // Format direct: res.data = [...]
+        // Format 1: res.data = [...]
+        console.log('✅ Format détecté: Array direct (res.data)');
         reviewsData = res.data;
       } else if (res.data.data && Array.isArray(res.data.data)) {
-        // Format avec wrapper: res.data.data = [...]
+        // Format 2: res.data.data = [...]
+        console.log('✅ Format détecté: res.data.data (Array)');
         reviewsData = res.data.data;
+      } else if (res.data.data && res.data.data.reviews && Array.isArray(res.data.data.reviews)) {
+        // Format 3: res.data.data.reviews = [...]
+        console.log('✅ Format détecté: res.data.data.reviews');
+        reviewsData = res.data.data.reviews;
       } else if (res.data.reviews && Array.isArray(res.data.reviews)) {
-        // Format alternatif: res.data.reviews = [...]
+        // Format 4: res.data.reviews = [...]
+        console.log('✅ Format détecté: res.data.reviews');
         reviewsData = res.data.reviews;
+      } else {
+        // Recherche intelligente dans l'objet data.data
+        console.warn('⚠️ Format non standard détecté');
+        console.warn('⚠️ res.data:', res.data);
+        console.warn('⚠️ res.data.data:', res.data.data);
+        
+        if (res.data.data && typeof res.data.data === 'object') {
+          console.log('🔍 Recherche de tableaux dans res.data.data...');
+          console.log('🔍 Clés disponibles:', Object.keys(res.data.data));
+          
+          // Chercher le premier tableau dans data.data
+          const arrays = Object.entries(res.data.data).filter(([key, value]) => Array.isArray(value));
+          console.log('🔍 Tableaux trouvés:', arrays.map(([key, value]) => `${key} (${value.length})`));
+          
+          if (arrays.length > 0) {
+            const [key, value] = arrays[0];
+            console.log(`✅ Utilisation du tableau: ${key}`);
+            reviewsData = value;
+          }
+        } else if (res.data && typeof res.data === 'object') {
+          // Chercher dans res.data directement
+          console.log('🔍 Recherche de tableaux dans res.data...');
+          const arrays = Object.entries(res.data).filter(([key, value]) => Array.isArray(value));
+          console.log('🔍 Tableaux trouvés:', arrays.map(([key, value]) => `${key} (${value.length})`));
+          
+          if (arrays.length > 0) {
+            const [key, value] = arrays[0];
+            console.log(`✅ Utilisation du tableau: ${key}`);
+            reviewsData = value;
+          }
+        }
       }
       
-      console.log('✅ [ReviewModerationPage] Type de reviewsData:', Array.isArray(reviewsData) ? 'Array' : typeof reviewsData);
-      console.log('✅ [ReviewModerationPage] Nombre d\'avis:', reviewsData.length);
+      console.log('📊 [ReviewModerationPage] reviewsData final:', reviewsData);
+      console.log('📊 [ReviewModerationPage] Type:', Array.isArray(reviewsData) ? 'Array' : typeof reviewsData);
+      console.log('📊 [ReviewModerationPage] Nombre d\'avis:', reviewsData.length);
+      
+      // Vérifier que c'est bien un tableau
+      if (!Array.isArray(reviewsData)) {
+        console.error('❌ reviewsData n\'est pas un tableau!', reviewsData);
+        setError('Format de données incorrect reçu du serveur. Vérifiez la console pour plus de détails.');
+        setReviews([]);
+        setFilteredReviews([]);
+        setStats({ total: 0, Altimmo: 0, MilaEvents: 0, Altcom: 0 });
+        return;
+      }
+      
+      if (reviewsData.length === 0) {
+        console.warn('⚠️ Aucun avis trouvé dans la réponse');
+      }
       
       setReviews(reviewsData);
       setFilteredReviews(reviewsData);
@@ -63,10 +124,18 @@ const ReviewModerationPage = () => {
       };
       setStats(newStats);
       
-      console.log('✅ [ReviewModerationPage] Avis chargés:', newStats);
+      console.log('✅ [ReviewModerationPage] Statistiques:', newStats);
     } catch (err) {
       console.error('❌ [ReviewModerationPage] Erreur:', err);
+      console.error('❌ [ReviewModerationPage] Erreur complète:', {
+        message: err.message,
+        response: err.response,
+        data: err.response?.data
+      });
       setError(err.response?.data?.message || "Impossible de charger les avis.");
+      setReviews([]);
+      setFilteredReviews([]);
+      setStats({ total: 0, Altimmo: 0, MilaEvents: 0, Altcom: 0 });
     } finally {
       setLoading(false);
     }
