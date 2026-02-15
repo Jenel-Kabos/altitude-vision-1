@@ -35,7 +35,22 @@ const ReviewModerationPage = () => {
         params: { limit: 1000, sort: '-createdAt' }
       });
       
-      const reviewsData = res.data.data || res.data;
+      // ✅ CORRECTION : Gérer les différents formats de réponse
+      let reviewsData = [];
+      if (Array.isArray(res.data)) {
+        // Format direct: res.data = [...]
+        reviewsData = res.data;
+      } else if (res.data.data && Array.isArray(res.data.data)) {
+        // Format avec wrapper: res.data.data = [...]
+        reviewsData = res.data.data;
+      } else if (res.data.reviews && Array.isArray(res.data.reviews)) {
+        // Format alternatif: res.data.reviews = [...]
+        reviewsData = res.data.reviews;
+      }
+      
+      console.log('✅ [ReviewModerationPage] Type de reviewsData:', Array.isArray(reviewsData) ? 'Array' : typeof reviewsData);
+      console.log('✅ [ReviewModerationPage] Nombre d\'avis:', reviewsData.length);
+      
       setReviews(reviewsData);
       setFilteredReviews(reviewsData);
       
