@@ -1,6 +1,6 @@
 // controllers/emailController.js
 
-const Email = require('../models/emailModel');
+const Email = require('../models/Email');
 
 /**
  * @desc    Récupérer tous les emails
