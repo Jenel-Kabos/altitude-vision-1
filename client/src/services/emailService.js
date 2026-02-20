@@ -8,9 +8,9 @@ import api from './api';
 export const getAllEmails = async () => {
   try {
     console.log("📤 [emailService] Chargement des emails...");
-    const response = await api.get('/company-emails');
-    console.log("✅ [emailService] Emails chargés:", response.data.data.emails.length);
-    return response.data.data.emails;
+    const response = await api.get('/emails');
+    console.log("✅ [emailService] Emails chargés:", response.data.length);
+    return response.data;
   } catch (error) {
     console.error("❌ [emailService] Erreur lors du chargement des emails:", error);
     throw error;
@@ -23,9 +23,9 @@ export const getAllEmails = async () => {
  */
 export const getActiveEmails = async () => {
   try {
-    const response = await api.get('/company-emails/active');
-    console.log("✅ [emailService] Emails actifs chargés:", response.data.data.emails.length);
-    return response.data.data.emails;
+    const response = await api.get('/emails/active');
+    console.log("✅ [emailService] Emails actifs chargés:", response.data.length);
+    return response.data;
   } catch (error) {
     console.error("❌ [emailService] Erreur:", error);
     throw error;
@@ -39,9 +39,9 @@ export const getActiveEmails = async () => {
  */
 export const getEmailById = async (emailId) => {
   try {
-    const response = await api.get(`/company-emails/${emailId}`);
+    const response = await api.get(`/emails/${emailId}`);
     console.log(`✅ [emailService] Email ${emailId} chargé`);
-    return response.data.data.email;
+    return response.data;
   } catch (error) {
     console.error(`❌ [emailService] Erreur lors du chargement de l'email ${emailId}:`, error);
     throw error;
@@ -56,9 +56,9 @@ export const getEmailById = async (emailId) => {
 export const createEmail = async (emailData) => {
   try {
     console.log("📤 [emailService] Création d'un nouvel email:", emailData);
-    const response = await api.post('/company-emails', emailData);
+    const response = await api.post('/emails', emailData);
     console.log("✅ [emailService] Email créé avec succès");
-    return response.data.data.email;
+    return response.data;
   } catch (error) {
     console.error("❌ [emailService] Erreur lors de la création:", error);
     throw error;
@@ -74,9 +74,9 @@ export const createEmail = async (emailData) => {
 export const updateEmail = async (emailId, emailData) => {
   try {
     console.log(`📤 [emailService] Mise à jour de l'email ${emailId}`);
-    const response = await api.put(`/company-emails/${emailId}`, emailData);
+    const response = await api.put(`/emails/${emailId}`, emailData);
     console.log("✅ [emailService] Email mis à jour avec succès");
-    return response.data.data.email;
+    return response.data;
   } catch (error) {
     console.error(`❌ [emailService] Erreur lors de la mise à jour de l'email ${emailId}:`, error);
     throw error;
@@ -91,7 +91,7 @@ export const updateEmail = async (emailId, emailData) => {
 export const deleteEmail = async (emailId) => {
   try {
     console.log(`🗑️ [emailService] Suppression de l'email ${emailId}`);
-    await api.delete(`/company-emails/${emailId}`);
+    await api.delete(`/emails/${emailId}`);
     console.log("✅ [emailService] Email supprimé avec succès");
   } catch (error) {
     console.error(`❌ [emailService] Erreur lors de la suppression de l'email ${emailId}:`, error);
@@ -107,9 +107,9 @@ export const deleteEmail = async (emailId) => {
 export const toggleEmailStatus = async (emailId) => {
   try {
     console.log(`📤 [emailService] Basculement du statut de l'email ${emailId}`);
-    const response = await api.patch(`/company-emails/${emailId}/toggle-status`);
+    const response = await api.patch(`/emails/${emailId}/toggle`);
     console.log("✅ [emailService] Statut mis à jour");
-    return response.data.data.email;
+    return response.data;
   } catch (error) {
     console.error(`❌ [emailService] Erreur lors du changement de statut:`, error);
     throw error;
@@ -125,9 +125,9 @@ export const toggleEmailStatus = async (emailId) => {
 export const updateNotifications = async (emailId, notifications) => {
   try {
     console.log(`📤 [emailService] Mise à jour des notifications de l'email ${emailId}`);
-    const response = await api.patch(`/company-emails/${emailId}/notifications`, { notifications });
+    const response = await api.patch(`/emails/${emailId}/notifications`, { notifications });
     console.log("✅ [emailService] Notifications mises à jour");
-    return response.data.data.email;
+    return response.data;
   } catch (error) {
     console.error(`❌ [emailService] Erreur lors de la mise à jour des notifications:`, error);
     throw error;
@@ -140,9 +140,9 @@ export const updateNotifications = async (emailId, notifications) => {
  */
 export const getGlobalStats = async () => {
   try {
-    const response = await api.get('/company-emails/stats');
+    const response = await api.get('/emails/stats/global');
     console.log("✅ [emailService] Statistiques chargées");
-    return response.data.data;
+    return response.data;
   } catch (error) {
     console.error("❌ [emailService] Erreur lors du chargement des statistiques:", error);
     throw error;
@@ -155,8 +155,8 @@ export const getGlobalStats = async () => {
  */
 export const getQuoteNotificationEmails = async () => {
   try {
-    const response = await api.get('/company-emails/notifications/quotes');
-    return response.data.data.emails;
+    const response = await api.get('/emails/notifications/quotes');
+    return response.data;
   } catch (error) {
     console.error("❌ [emailService] Erreur:", error);
     throw error;
@@ -169,8 +169,8 @@ export const getQuoteNotificationEmails = async () => {
  */
 export const getContactNotificationEmails = async () => {
   try {
-    const response = await api.get('/company-emails/notifications/contact');
-    return response.data.data.emails;
+    const response = await api.get('/emails/notifications/contact');
+    return response.data;
   } catch (error) {
     console.error("❌ [emailService] Erreur:", error);
     throw error;
@@ -184,10 +184,53 @@ export const getContactNotificationEmails = async () => {
  */
 export const getEmailsByUser = async (userId) => {
   try {
-    const response = await api.get(`/company-emails/user/${userId}`);
-    return response.data.data.emails;
+    const response = await api.get(`/emails/user/${userId}`);
+    return response.data;
   } catch (error) {
     console.error("❌ [emailService] Erreur:", error);
     throw error;
+  }
+};
+
+/**
+ * ✅ NOUVELLE FONCTION
+ * @description Envoyer un email via Zoho Mail
+ * @param {string} fromEmail - Email expéditeur
+ * @param {string} toEmail - Email destinataire
+ * @param {string} subject - Sujet de l'email
+ * @param {string} content - Contenu HTML de l'email
+ * @returns {Promise<Object>} - Résultat de l'envoi
+ */
+export const sendEmailViaZoho = async (fromEmail, toEmail, subject, content) => {
+  try {
+    console.log(`📤 [emailService] Envoi d'un email de ${fromEmail} vers ${toEmail}`);
+    const response = await api.post('/emails/send', {
+      fromEmail,
+      toEmail,
+      subject,
+      content
+    });
+    console.log("✅ [emailService] Email envoyé avec succès");
+    return response.data;
+  } catch (error) {
+    console.error("❌ [emailService] Erreur lors de l'envoi de l'email:", error);
+    throw new Error(error.response?.data?.message || 'Erreur lors de l\'envoi de l\'email');
+  }
+};
+
+/**
+ * ✅ NOUVELLE FONCTION
+ * @description Synchroniser les emails avec Zoho Mail
+ * @returns {Promise<Object>} - Résultats de la synchronisation
+ */
+export const syncWithZoho = async () => {
+  try {
+    console.log("📤 [emailService] Synchronisation avec Zoho Mail...");
+    const response = await api.post('/emails/sync-zoho');
+    console.log("✅ [emailService] Synchronisation réussie");
+    return response.data;
+  } catch (error) {
+    console.error("❌ [emailService] Erreur lors de la synchronisation:", error);
+    throw new Error(error.response?.data?.message || 'Erreur lors de la synchronisation');
   }
 };
