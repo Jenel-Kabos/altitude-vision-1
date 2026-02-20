@@ -1,106 +1,57 @@
+// routes/emailRoutes.js
+
 const express = require('express');
 const router = express.Router();
 const {
   getAllEmails,
+  getActiveEmails,
+  getGlobalStats,
+  getQuoteNotificationEmails,
+  getContactNotificationEmails,
+  getEmailsByUser,
+  getEmailById,
   createEmail,
   updateEmail,
   deleteEmail,
   toggleEmailStatus,
   updateNotifications,
-  getGlobalStats,
   sendEmailViaZoho,
   syncWithZoho
-} = require('../services/emailService');
+} = require('../controllers/emailController');
 
-// Récupérer tous les emails
-router.get('/', async (req, res) => {
-  try {
-    const emails = await getAllEmails();
-    res.json(emails);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+// ⚠️ IMPORTANT : Les routes spécifiques DOIVENT être déclarées
+// AVANT les routes avec paramètres dynamiques (/:id)
+// sinon Express interprète "stats", "active", etc. comme des :id
 
-// Créer un nouvel email
-router.post('/', async (req, res) => {
-  try {
-    const email = await createEmail(req.body);
-    res.status(201).json(email);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
+// ─────────────────────────────────────────────
+// 📋 Routes GET spécifiques (sans paramètre)
+// ─────────────────────────────────────────────
+router.get('/active',                   getActiveEmails);
+router.get('/stats/global',             getGlobalStats);
+router.get('/notifications/quotes',     getQuoteNotificationEmails);
+router.get('/notifications/contact',    getContactNotificationEmails);
+router.get('/user/:userId',             getEmailsByUser);
 
-// Mettre à jour un email
-router.put('/:id', async (req, res) => {
-  try {
-    const email = await updateEmail(req.params.id, req.body);
-    res.json(email);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
+// ─────────────────────────────────────────────
+// 📋 Routes CRUD de base
+// ─────────────────────────────────────────────
+router.get('/',    getAllEmails);
+router.post('/',   createEmail);
 
-// Supprimer un email
-router.delete('/:id', async (req, res) => {
-  try {
-    await deleteEmail(req.params.id);
-    res.json({ message: 'Email supprimé avec succès' });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
+// ─────────────────────────────────────────────
+// 📤 Routes d'action (sans :id)
+// ─────────────────────────────────────────────
+router.post('/send',       sendEmailViaZoho);
+router.post('/sync-zoho',  syncWithZoho);
 
-// Activer/Désactiver un email
-router.patch('/:id/toggle', async (req, res) => {
-  try {
-    const email = await toggleEmailStatus(req.params.id);
-    res.json(email);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
-
-// Mettre à jour les notifications
-router.patch('/:id/notifications', async (req, res) => {
-  try {
-    const email = await updateNotifications(req.params.id, req.body.notifications);
-    res.json(email);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
-
-// Obtenir les statistiques
-router.get('/stats/global', async (req, res) => {
-  try {
-    const stats = await getGlobalStats();
-    res.json(stats);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Envoyer un email via Zoho
-router.post('/send', async (req, res) => {
-  try {
-    const { fromEmail, toEmail, subject, content } = req.body;
-    const result = await sendEmailViaZoho(fromEmail, toEmail, subject, content);
-    res.json(result);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
-
-// Synchroniser avec Zoho
-router.post('/sync-zoho', async (req, res) => {
-  try {
-    const result = await syncWithZoho();
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+// ─────────────────────────────────────────────
+// 🔑 Routes avec paramètre dynamique /:id
+// Ces routes DOIVENT être en dernier
+// ─────────────────────────────────────────────
+router.get('/:id',                      getEmailById);
+router.put('/:id',                      updateEmail);
+router.delete('/:id',                   deleteEmail);
+router.patch('/:id/toggle',             toggleEmailStatus);
+router.patch('/:id/notifications',      updateNotifications);
 
 module.exports = router;
