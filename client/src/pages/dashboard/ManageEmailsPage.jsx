@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mail, Plus, Edit2, Trash2, Search, X, Loader2, AlertCircle, Save,
-  CheckCircle, XCircle, Bell, BellOff, Users, TrendingUp, Shield, Eye, EyeOff
+  CheckCircle, XCircle, Bell, BellOff, Users, TrendingUp, Shield, Eye, EyeOff, Send
 } from 'lucide-react';
 import {
   getAllEmails,
@@ -12,7 +12,8 @@ import {
   deleteEmail,
   toggleEmailStatus,
   updateNotifications,
-  getGlobalStats
+  getGlobalStats,
+  sendEmailViaZoho
 } from '../../services/emailService';
 import { useAuth } from '../../context/AuthContext';
 
@@ -129,6 +130,45 @@ const ManageEmailsPage = () => {
     }
   };
 
+  // ✅ NOUVELLE FONCTION : Envoyer un email de test
+  const handleSendTestEmail = async (emailAddress) => {
+    try {
+      showNotification('Envoi en cours...', 'success');
+      
+      const result = await sendEmailViaZoho(
+        emailAddress,
+        'thibautkabos@gmail.com',
+        'Email de test - Altitude Vision',
+        `<html>
+          <body style="font-family: Arial, sans-serif; padding: 20px; background-color: #f5f5f5;">
+            <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h1 style="color: #0066cc; border-bottom: 3px solid #0066cc; padding-bottom: 10px;">
+                🎉 Test depuis l'application
+              </h1>
+              <p style="font-size: 16px; line-height: 1.6; color: #333;">
+                Cet email a été envoyé depuis votre application <strong>Altitude Vision</strong> !
+              </p>
+              <div style="background-color: #e8f4fd; padding: 15px; border-left: 4px solid #0066cc; margin: 20px 0;">
+                <p style="margin: 0;"><strong>Expéditeur:</strong> ${emailAddress}</p>
+                <p style="margin: 10px 0 0 0;"><strong>Date:</strong> ${new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Brazzaville' })}</p>
+              </div>
+              <p style="font-size: 14px; color: #999; text-align: center; margin-top: 30px;">
+                © 2026 Altitude Vision Agency - Brazzaville, Congo
+              </p>
+            </div>
+          </body>
+        </html>`
+      );
+      
+      showNotification(`✅ Email envoyé avec succès ! Total envoyé: ${result.emailsSent}`, 'success');
+      fetchEmails(); // Rafraîchir pour voir le compteur mis à jour
+      fetchStats(); // Rafraîchir les statistiques
+    } catch (error) {
+      console.error('Erreur envoi test:', error);
+      showNotification(error.message || 'Erreur lors de l\'envoi de l\'email de test', 'error');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -216,6 +256,7 @@ const ManageEmailsPage = () => {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onToggleStatus={handleToggleStatus}
+              onSendTest={handleSendTestEmail}
             />
           ))}
         </div>
@@ -240,15 +281,8 @@ const ManageEmailsPage = () => {
 
 // Composant Carte de Statistique
 const StatCard = ({ title, value, icon: Icon, color }) => {
-  const colors = {
-    blue: 'bg-blue-500',
-    green: 'bg-green-500',
-    purple: 'bg-purple-500',
-    yellow: 'bg-yellow-500',
-  };
-
   return (
-    <div className="bg-white p-6 rounded-xl shadow-md">
+    <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition">
       <div className="flex items-center justify-between mb-2">
         <span className="text-gray-600 text-sm font-medium">{title}</span>
         <Icon className={`w-5 h-5 text-${color}-500`} />
@@ -258,8 +292,8 @@ const StatCard = ({ title, value, icon: Icon, color }) => {
   );
 };
 
-// Composant Carte d'Email
-const EmailCard = ({ email, onEdit, onDelete, onToggleStatus }) => {
+// ✅ COMPOSANT EmailCard MIS À JOUR
+const EmailCard = ({ email, onEdit, onDelete, onToggleStatus, onSendTest }) => {
   const hasNotifications = Object.values(email.notifications || {}).some(v => v === true);
 
   return (
@@ -295,6 +329,14 @@ const EmailCard = ({ email, onEdit, onDelete, onToggleStatus }) => {
             </span>
           </div>
 
+          {/* Compteur d'emails envoyés */}
+          {email.emailsSent > 0 && (
+            <div className="flex items-center text-sm text-purple-600">
+              <TrendingUp className="w-4 h-4 mr-2" />
+              <span>{email.emailsSent} email{email.emailsSent > 1 ? 's' : ''} envoyé{email.emailsSent > 1 ? 's' : ''}</span>
+            </div>
+          )}
+
           {email.assignedTo && (
             <div className="flex items-center text-sm text-gray-600">
               <Users className="w-4 h-4 mr-2" />
@@ -314,17 +356,26 @@ const EmailCard = ({ email, onEdit, onDelete, onToggleStatus }) => {
           )}
         </div>
 
+        {/* ✅ BOUTONS MIS À JOUR AVEC LE BOUTON TEST */}
         <div className="flex gap-2">
           <button
+            onClick={() => onSendTest(email.email)}
+            className="flex-1 flex items-center justify-center gap-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition text-sm"
+            title="Envoyer un email de test"
+          >
+            <Send className="w-4 h-4" />
+            Test
+          </button>
+          <button
             onClick={() => onEdit(email)}
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+            className="flex-1 flex items-center justify-center gap-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition text-sm"
           >
             <Edit2 className="w-4 h-4" />
             Modifier
           </button>
           <button
             onClick={() => onDelete(email._id)}
-            className="flex-1 flex items-center justify-center gap-2 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition"
+            className="flex-1 flex items-center justify-center gap-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition text-sm"
           >
             <Trash2 className="w-4 h-4" />
             Supprimer
@@ -565,5 +616,3 @@ const EmailModal = ({ mode, email, onClose, onSubmit, showPassword, setShowPassw
 };
 
 export default ManageEmailsPage;
-
-//FIN MANAGEEMAILSPAGE

@@ -163,6 +163,7 @@ const internalMailRoutes = require("./routes/internalMailRoutes");
 const companyEmailRoutes = require("./routes/companyEmailRoutes");
 const altcomRoutes = require('./routes/altcomRoutes');
 const contactRoutes = require('./routes/contactRoutes');
+const emailRoutes = require('./routes/emailRoutes'); //
 
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
@@ -195,6 +196,7 @@ app.use("/api/conversations", conversationRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/internal-mails", internalMailRoutes);
 app.use("/api/company-emails", companyEmailRoutes);
+app.use("/api/emails", emailRoutes);
 
 // ❤️ Social & Contact
 app.use("/api/likes", likeRoutes);
