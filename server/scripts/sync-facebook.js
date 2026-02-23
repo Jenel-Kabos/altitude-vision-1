@@ -1,7 +1,6 @@
 require('dotenv').config();
 const axios = require('axios');
 const mongoose = require('mongoose');
-const connectDB = require('../config/db');
 
 const ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN;
 const PAGES_IMMO = [
@@ -19,7 +18,7 @@ const facebookPostSchema = new mongoose.Schema({
   date_sync: Date
 });
 
-const FacebookPost = mongoose.model('FacebookPost', facebookPostSchema);
+const FacebookPost = mongoose.models.FacebookPost || mongoose.model('FacebookPost', facebookPostSchema);
 
 async function recupererPosts(pageId) {
   const url = `https://graph.facebook.com/v25.0/${pageId}/posts`;
@@ -34,8 +33,6 @@ async function recupererPosts(pageId) {
 }
 
 async function syncFacebook() {
-  await connectDB();
-
   for (const page of PAGES_IMMO) {
     console.log(`Synchronisation de : ${page.name}`);
     const posts = await recupererPosts(page.id);
@@ -58,8 +55,6 @@ async function syncFacebook() {
     }
     console.log(`✅ ${posts.length} posts synchronisés pour ${page.name}`);
   }
-
-  await mongoose.connection.close();
   console.log("✅ Synchronisation terminée !");
 }
 
