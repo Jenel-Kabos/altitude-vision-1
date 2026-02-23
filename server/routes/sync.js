@@ -12,3 +12,5 @@ router.post('/facebook', async (req, res) => {
 });
 
 module.exports = router;
+
+// Ce fichier définit une route POST /api/sync/facebook qui déclenche la synchronisation des posts Facebook.
