@@ -59,3 +59,5 @@ async function syncFacebook() {
 }
 
 module.exports = { syncFacebook };
+
+// version 2
