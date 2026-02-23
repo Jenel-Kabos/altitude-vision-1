@@ -455,4 +455,4 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
     );
 };
 
-export default PropertyCard;
+export default PropertyCard;s

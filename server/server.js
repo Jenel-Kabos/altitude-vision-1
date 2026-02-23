@@ -200,6 +200,9 @@ app.use("/api/likes", likeRoutes);
 app.use("/api/comments", commentRoutes);
 app.use('/api/contact', contactRoutes);
 
+// ✅ sync Facebook 
+app.use('/api/sync', require('./routes/sync'));
+
 // ============================================================
 // 🔍 ROUTES DE TEST
 // ============================================================

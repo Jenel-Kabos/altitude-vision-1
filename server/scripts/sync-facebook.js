@@ -63,4 +63,4 @@ async function syncFacebook() {
   console.log("✅ Synchronisation terminée !");
 }
 
-syncFacebook();
+module.exports = { syncFacebook };
