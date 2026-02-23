@@ -1,8 +1,16 @@
 // server.js 
 
+// ============================================================
+// ✅ DOTENV EN PREMIER - avant tous les autres imports
+// ============================================================
+const dotenv = require("dotenv");
+dotenv.config();
+
+// ✅ Log de vérification (tu peux le supprimer après confirmation)
+console.log("🔍 MONGO_URI chargé:", process.env.MONGO_URI ? "✅ OK" : "❌ UNDEFINED");
+
 // --- Importations principales ---
 const express = require("express");
-const dotenv = require("dotenv");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
@@ -10,26 +18,24 @@ const path = require("path");
 const fs = require("fs");
 const connectDB = require("./config/db");
 
-// --- Configuration de base ---
-dotenv.config();
+// --- Connexion MongoDB ---
 connectDB();
+
 const app = express();
 
 // ============================================================
 // 🛡️ SÉCURITÉ (Helmet & Logs)
 // ============================================================
-// ✅ CORRECTION : Configuration optimisée pour autoriser les images
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }, 
     contentSecurityPolicy: false,
-    // ✅ AJOUT : Autoriser le chargement d'images depuis différentes origines
     crossOriginEmbedderPolicy: false,
   })
 );
 
 app.use(morgan("dev"));
-app.use(express.json({ limit: '50mb' })); // ✅ Augmenter la limite pour les uploads
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // ============================================================
@@ -42,27 +48,24 @@ const allowedOrigins = [
   "https://altitude-vision-frontend.onrender.com",
   "http://localhost:5173",
   "http://localhost:3000",
-  "http://localhost:5174", // Vite en cas de conflit de port
+  "http://localhost:5174",
   process.env.FRONTEND_URL 
-].filter(Boolean); // Enlever les valeurs undefined
+].filter(Boolean);
 
 console.log('🌍 [CORS] Origines autorisées:', allowedOrigins);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // ✅ Autoriser les requêtes sans origine (Postman, applis mobiles, curl)
     if (!origin) {
       console.log('✅ [CORS] Requête sans origine autorisée');
       return callback(null, true);
     }
     
-    // ✅ Vérifier si l'origine est dans la liste
     if (allowedOrigins.includes(origin)) {
       console.log('✅ [CORS] Origine autorisée:', origin);
       callback(null, true);
     } else {
       console.log('🚫 [CORS] Origine bloquée:', origin);
-      // ✅ En développement, autoriser quand même pour faciliter le debug
       if (process.env.NODE_ENV === 'development') {
         console.log('⚠️ [CORS] Mode dev: origine autorisée malgré tout');
         callback(null, true);
@@ -74,8 +77,8 @@ app.use(cors({
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
-  exposedHeaders: ["Content-Range", "X-Content-Range"], // Pour la pagination
-  maxAge: 86400 // Cache CORS pendant 24h
+  exposedHeaders: ["Content-Range", "X-Content-Range"],
+  maxAge: 86400
 }));
 
 // ✅ MIDDLEWARE PREFLIGHT pour toutes les routes
@@ -102,23 +105,17 @@ uploadDirs.forEach((dir) => {
 // ============================================================
 // 📸 GESTION DES FICHIERS STATIQUES (IMAGES)
 // ============================================================
-// ✅ CORRECTION : Servir les fichiers statiques AVANT les routes API
-// Important pour que les images soient accessibles
-
-// Middleware de log pour déboguer les requêtes d'images
 app.use('/uploads', (req, res, next) => {
   console.log(`📸 [Static] Requête image: ${req.path}`);
   next();
 });
 
-// Servir le dossier uploads en static avec headers CORS explicites
 app.use('/uploads', 
   express.static(path.join(__dirname, 'uploads'), {
     setHeaders: (res, path) => {
-      // ✅ Headers CORS pour les images
       res.set('Access-Control-Allow-Origin', '*');
       res.set('Cross-Origin-Resource-Policy', 'cross-origin');
-      res.set('Cache-Control', 'public, max-age=31536000'); // Cache 1 an
+      res.set('Cache-Control', 'public, max-age=31536000');
     }
   })
 );
@@ -163,7 +160,7 @@ const internalMailRoutes = require("./routes/internalMailRoutes");
 const companyEmailRoutes = require("./routes/companyEmailRoutes");
 const altcomRoutes = require('./routes/altcomRoutes');
 const contactRoutes = require('./routes/contactRoutes');
-const emailRoutes = require('./routes/emailRoutes'); //
+const emailRoutes = require('./routes/emailRoutes');
 
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
@@ -204,7 +201,7 @@ app.use("/api/comments", commentRoutes);
 app.use('/api/contact', contactRoutes);
 
 // ============================================================
-// 🔍 ROUTE DE TEST
+// 🔍 ROUTES DE TEST
 // ============================================================
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -219,7 +216,6 @@ app.get("/", (req, res) => {
   });
 });
 
-// ✅ Route de santé pour monitoring
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
@@ -233,7 +229,7 @@ app.get('/api/health', (req, res) => {
 // 🚨 GESTION D'ERREURS
 // ============================================================
 
-// ✅ 404 pour images manquantes - Log spécifique
+// 404 pour images manquantes
 app.use('/uploads/*', (req, res) => {
   const requestedPath = path.join(__dirname, req.path);
   console.error(`❌ [Static] Image non trouvée: ${req.path}`);
@@ -263,7 +259,6 @@ app.use("*", (req, res) => {
 
 // Gestionnaire global d'erreurs
 app.use((err, req, res, next) => {
-  // Gestion spécifique CORS
   if (err.message === "Not allowed by CORS") {
     console.error('❌ [CORS] Requête bloquée:', req.headers.origin);
     return res.status(403).json({ 
@@ -274,7 +269,6 @@ app.use((err, req, res, next) => {
     });
   }
 
-  // Erreur Multer (upload)
   if (err.name === 'MulterError') {
     console.error('❌ [Upload] Erreur Multer:', err.message);
     return res.status(400).json({
@@ -290,7 +284,6 @@ app.use((err, req, res, next) => {
   res.status(statusCode).json({
     status: "error",
     message: err.message || "Erreur interne du serveur.",
-    // Stack trace uniquement en dev
     ...(process.env.NODE_ENV === "development" && { stack: err.stack })
   });
 });
@@ -316,15 +309,12 @@ app.listen(PORT, () => {
 // ============================================================
 const gracefulShutdown = (signal) => {
   console.log(`\n⚠️ Signal ${signal} reçu. Arrêt gracieux du serveur...`);
-  
-  // Fermer les nouvelles connexions
   process.exit(0);
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Gestion des erreurs non capturées
 process.on('unhandledRejection', (err) => {
   console.error('❌ [UNHANDLED REJECTION]', err);
   gracefulShutdown('UNHANDLED_REJECTION');
