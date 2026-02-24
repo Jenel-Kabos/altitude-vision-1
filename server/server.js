@@ -211,6 +211,7 @@ const emailRoutes = require('./routes/emailRoutes');
 // ✅ Utilisateurs & Admin
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
+app.use('/api/auth', require('./routes/authRoutes'));
 
 // 🏠 Pôle Altimmo
 app.use("/api/properties", propertyRoutes);

@@ -5,18 +5,17 @@ const { promisify } = require('util');
 const User = require('../models/User');
 const sendEmail = require('../utils/email');
 
-// Utilitaire pour générer le token (Intégré ici pour simplicité si tu n'as pas utils/generateToken)
+// ======================================================
+// 🔑 UTILITAIRES JWT
+// ======================================================
 const signToken = (id, tokenVersion) => {
     return jwt.sign({ id, tokenVersion }, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRES_IN || '90d',
     });
 };
 
-// Utility: create & send token
 const createSendToken = (user, statusCode, res) => {
-    // On passe la tokenVersion pour qu'elle soit dans le payload
-    const token = signToken(user._id, user.tokenVersion); 
-
+    const token = signToken(user._id, user.tokenVersion);
     user.password = undefined;
 
     res.status(statusCode).json({
@@ -28,7 +27,7 @@ const createSendToken = (user, statusCode, res) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                phone: user.phone || null, 
+                phone: user.phone || null,
                 photo: user.photo || null,
                 isEmailVerified: user.isEmailVerified,
             },
@@ -36,9 +35,9 @@ const createSendToken = (user, statusCode, res) => {
     });
 };
 
-// ============================================================
+// ======================================================
 // 1. INSCRIPTION
-// ============================================================
+// ======================================================
 exports.signup = async (req, res) => {
     try {
         const { name, email, password, passwordConfirm, role, phone } = req.body;
@@ -62,20 +61,22 @@ exports.signup = async (req, res) => {
             photo: req.file ? req.file.path : undefined,
         });
 
-        // Génération du token de vérification d'email
+        // Génération du token de vérification
         const verificationToken = newUser.createEmailVerificationToken();
         await newUser.save({ validateBeforeSave: false });
 
-        // URL de vérification
         const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
 
-        const message = `Bonjour ${newUser.name},\n\nBienvenue chez Altitude Vision ! 🎉\n\nPour activer votre compte, cliquez ici :\n${verifyURL}\n\nCe lien expire dans 24h.`;
-
         try {
+            // ✅ Envoi de l'email HTML avec le nouveau template
             await sendEmail({
                 email: newUser.email,
-                subject: 'Altitude Vision - Activez votre compte',
-                message,
+                subject: '✅ Altitude Vision — Activez votre compte',
+                type: 'verification',       // ← déclenche le template HTML
+                name: newUser.name,
+                verifyURL,
+                // Fallback texte brut
+                message: `Bonjour ${newUser.name},\n\nActivez votre compte ici : ${verifyURL}\n\nCe lien expire dans 24h.`,
             });
 
             res.status(200).json({
@@ -84,10 +85,12 @@ exports.signup = async (req, res) => {
             });
 
         } catch (err) {
+            // Si l'envoi échoue, on nettoie le token pour permettre de réessayer
             newUser.emailVerificationToken = undefined;
             newUser.emailVerificationExpires = undefined;
             await newUser.save({ validateBeforeSave: false });
 
+            console.error('❌ Erreur envoi email vérification:', err);
             return res.status(500).json({
                 status: 'error',
                 message: 'Erreur d\'envoi d\'email. Réessayez plus tard.',
@@ -95,16 +98,20 @@ exports.signup = async (req, res) => {
         }
 
     } catch (error) {
+        console.error('❌ Erreur signup:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
 
-// ============================================================
-// 2. VERIFICATION EMAIL
-// ============================================================
+// ======================================================
+// 2. VÉRIFICATION EMAIL (via le lien cliqué)
+// ======================================================
 exports.verifyEmail = async (req, res) => {
     try {
-        const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(req.params.token)
+            .digest('hex');
 
         const user = await User.findOne({
             emailVerificationToken: hashedToken,
@@ -112,26 +119,86 @@ exports.verifyEmail = async (req, res) => {
         });
 
         if (!user) {
-            return res.status(400).json({ status: 'fail', message: 'Lien invalide ou expiré.' });
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Lien de vérification invalide ou expiré. Veuillez vous réinscrire ou demander un nouveau lien.',
+            });
         }
 
+        // ✅ Activation du compte
         user.isEmailVerified = true;
         user.emailVerificationToken = undefined;
         user.emailVerificationExpires = undefined;
         if (!user.tokenVersion) user.tokenVersion = 0;
-        
+
         await user.save({ validateBeforeSave: false });
 
+        // Connexion automatique après vérification
         createSendToken(user, 200, res);
 
     } catch (error) {
+        console.error('❌ Erreur verifyEmail:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
 
-// ============================================================
-// 3. LOGIN
-// ============================================================
+// ======================================================
+// 3. RENVOYER L'EMAIL DE VÉRIFICATION
+// ======================================================
+exports.resendVerificationEmail = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ status: 'fail', message: 'Email requis.' });
+        }
+
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            // Sécurité : ne pas révéler si l'email existe ou non
+            return res.status(200).json({
+                status: 'success',
+                message: 'Si cet email existe, un nouveau lien a été envoyé.',
+            });
+        }
+
+        if (user.isEmailVerified) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Cet email est déjà vérifié.',
+            });
+        }
+
+        // Génère un nouveau token
+        const verificationToken = user.createEmailVerificationToken();
+        await user.save({ validateBeforeSave: false });
+
+        const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+
+        await sendEmail({
+            email: user.email,
+            subject: '✅ Altitude Vision — Nouveau lien d\'activation',
+            type: 'verification',
+            name: user.name,
+            verifyURL,
+            message: `Bonjour ${user.name},\n\nVoici votre nouveau lien d'activation : ${verifyURL}\n\nCe lien expire dans 24h.`,
+        });
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Un nouveau lien de vérification a été envoyé à votre adresse email.',
+        });
+
+    } catch (error) {
+        console.error('❌ Erreur resendVerification:', error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+// ======================================================
+// 4. LOGIN
+// ======================================================
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -142,28 +209,33 @@ exports.login = async (req, res) => {
 
         const user = await User.findOne({ email }).select('+password');
 
-        // ✅ Harmonisation : on utilise 'matchPassword' comme dans User.js
         if (!user || !(await user.matchPassword(password, user.password))) {
             return res.status(401).json({ status: 'fail', message: 'Email ou mot de passe incorrect.' });
         }
 
+        // ✅ Blocage si email non vérifié
         if (!user.isEmailVerified) {
-            return res.status(401).json({ status: 'fail', message: 'Veuillez vérifier votre email.' });
+            return res.status(401).json({
+                status: 'fail',
+                message: 'Veuillez vérifier votre email avant de vous connecter.',
+                action: 'VERIFY_EMAIL', // ← Le frontend peut utiliser ça pour afficher le bouton "Renvoyer"
+            });
         }
-        
-        // Mise à jour de la dernière connexion
+
         user.lastLoginAt = new Date();
         await user.save({ validateBeforeSave: false });
 
         createSendToken(user, 200, res);
+
     } catch (error) {
+        console.error('❌ Erreur login:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
 
-// ============================================================
-// 4. AUTH OPTIONNELLE
-// ============================================================
+// ======================================================
+// 5. AUTH OPTIONNELLE
+// ======================================================
 exports.optionalAuth = async (req, res, next) => {
     try {
         let token;
@@ -180,6 +252,7 @@ exports.optionalAuth = async (req, res, next) => {
         if (currentUser.tokenVersion > decoded.tokenVersion) return next();
         if (currentUser.changedPasswordAfter(decoded.iat)) return next();
 
+        console.log(`✅ [OptionalAuth] Utilisateur connecté : ${currentUser.email}`);
         req.user = currentUser;
         return next();
     } catch (err) {
@@ -187,9 +260,9 @@ exports.optionalAuth = async (req, res, next) => {
     }
 };
 
-// ============================================================
-// 5. PROTECT (Auth Obligatoire)
-// ============================================================
+// ======================================================
+// 6. PROTECT (Auth Obligatoire)
+// ======================================================
 exports.protect = async (req, res, next) => {
     try {
         let token;
@@ -208,10 +281,9 @@ exports.protect = async (req, res, next) => {
         if (!currentUser) {
             return res.status(401).json({ status: 'fail', message: 'Utilisateur introuvable.' });
         }
-        
-        // 🔒 Sécurité : Si le token a été invalidé (ex: bouton "Révoquer" cliqué)
-        // On compare la version du token avec celle en base
-        if (currentUser.tokenVersion && decoded.tokenVersion && currentUser.tokenVersion > decoded.tokenVersion) { 
+
+        if (currentUser.tokenVersion && decoded.tokenVersion !== undefined
+            && currentUser.tokenVersion > decoded.tokenVersion) {
             return res.status(401).json({
                 status: 'fail',
                 message: 'Session expirée ou révoquée. Veuillez vous reconnecter.',
@@ -219,10 +291,12 @@ exports.protect = async (req, res, next) => {
         }
 
         if (currentUser.changedPasswordAfter(decoded.iat)) {
-            return res.status(401).json({ status: 'fail', message: 'Mot de passe changé. Reconnectez-vous.' });
+            return res.status(401).json({
+                status: 'fail',
+                message: 'Mot de passe changé. Reconnectez-vous.',
+            });
         }
 
-        // ✅ PERF : Mise à jour légère du timestamp (sans hooks)
         await User.findByIdAndUpdate(currentUser._id, { lastActivityAt: new Date() });
 
         req.user = currentUser;
@@ -232,9 +306,9 @@ exports.protect = async (req, res, next) => {
     }
 };
 
-// ============================================================
-// 6. RESTRICTION (Rôles)
-// ============================================================
+// ======================================================
+// 7. RESTRICTION (Rôles)
+// ======================================================
 exports.restrictTo = (...roles) => {
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {
@@ -244,39 +318,41 @@ exports.restrictTo = (...roles) => {
     };
 };
 
-// ============================================================
-// 7. MISE À JOUR MOT DE PASSE
-// ============================================================
+// ======================================================
+// 8. MISE À JOUR MOT DE PASSE
+// ======================================================
 exports.updateMyPassword = async (req, res) => {
     try {
         const { passwordCurrent, password, passwordConfirm } = req.body;
         const user = await User.findById(req.user.id).select('+password');
 
-        // ✅ Utilisation de matchPassword
         if (!user || !(await user.matchPassword(passwordCurrent, user.password))) {
             return res.status(401).json({ status: 'fail', message: 'Mot de passe actuel incorrect.' });
         }
 
         user.password = password;
         user.passwordConfirm = passwordConfirm;
-        // On incrémente la version du token pour déconnecter les autres appareils si nécessaire
         user.tokenVersion = (user.tokenVersion || 0) + 1;
-        
-        await user.save(); 
+
+        await user.save();
 
         createSendToken(user, 200, res);
     } catch (error) {
+        console.error('❌ Erreur updateMyPassword:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
 
-// ============================================================
-// 8. UPDATE ME (Infos générales)
-// ============================================================
+// ======================================================
+// 9. UPDATE ME
+// ======================================================
 exports.updateMe = async (req, res) => {
     try {
         if (req.body.password || req.body.passwordConfirm) {
-            return res.status(400).json({ status: 'fail', message: 'Utilisez /updateMyPassword pour le mot de passe.' });
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Utilisez /updateMyPassword pour le mot de passe.',
+            });
         }
 
         const filteredBody = {
@@ -286,8 +362,9 @@ exports.updateMe = async (req, res) => {
         };
         if (req.file) filteredBody.photo = req.file.path;
 
-        // Nettoyage des undefined
-        Object.keys(filteredBody).forEach(key => filteredBody[key] === undefined && delete filteredBody[key]);
+        Object.keys(filteredBody).forEach(
+            (key) => filteredBody[key] === undefined && delete filteredBody[key]
+        );
 
         const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, {
             new: true,
@@ -299,6 +376,7 @@ exports.updateMe = async (req, res) => {
             data: { user: updatedUser },
         });
     } catch (error) {
+        console.error('❌ Erreur updateMe:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };

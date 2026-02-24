@@ -3,12 +3,14 @@ const nodemailer = require('nodemailer');
 const sendEmail = async (options) => {
   // 1) Créer un transporteur (Le camion du facteur)
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USERNAME,
-      pass: process.env.EMAIL_PASSWORD,
-    },
-  });
+  host: 'smtp.zoho.com',
+  port: 465,
+  secure: true, // SSL
+  auth: {
+    user: process.env.EMAIL_USERNAME,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+});
 
   // 2) Définir les options de l'email
   const mailOptions = {

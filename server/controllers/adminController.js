@@ -1,5 +1,5 @@
 /**
- * @fileoverview Contrôleur d’administration pour la gestion des utilisateurs, propriétés et statistiques.
+ * @fileoverview Contrôleur d'administration pour la gestion des utilisateurs, propriétés et statistiques.
  * Toutes les fonctions sont protégées via authMiddleware et réservées aux rôles 'Admin' ou 'Collaborateur'.
  */
 
@@ -12,10 +12,9 @@ const AppError = require('../utils/appError');
    📊 DASHBOARD ADMIN – STATISTIQUES GLOBALES
 ============================================================ */
 exports.getDashboardStats = catchAsync(async (req, res) => {
-    // Exécution en parallèle pour la performance
     const [totalUsers, totalOwners, totalProperties, pendingProperties] = await Promise.all([
         User.countDocuments(),
-        User.countDocuments({ role: { $in: ['Propriétaire', 'Proprietaire'] } }), // Gère les deux orthographes
+        User.countDocuments({ role: { $in: ['Propriétaire', 'Proprietaire'] } }),
         Property.countDocuments(),
         Property.countDocuments({ adminStatus: 'pending' }),
     ]);
@@ -37,13 +36,13 @@ exports.getDashboardStats = catchAsync(async (req, res) => {
 
 // 🔹 Liste des utilisateurs actifs récemment
 exports.getConnectedUsers = catchAsync(async (req, res) => {
-    const ACTIVE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+    const ACTIVE_THRESHOLD = 5 * 60 * 1000;
     const activeSince = new Date(Date.now() - ACTIVE_THRESHOLD);
 
     const activeUsers = await User.find({
         isActive: true,
         lastActivityAt: { $gte: activeSince },
-        _id: { $ne: req.user.id }, // Exclure l'admin actuel
+        _id: { $ne: req.user.id },
     }).select('name email role status lastActivityAt photo');
 
     res.status(200).json({
@@ -53,17 +52,15 @@ exports.getConnectedUsers = catchAsync(async (req, res) => {
     });
 });
 
-// 🔹 Bannir un utilisateur (Désactivation + Invalidation Token)
+// 🔹 Bannir un utilisateur
 exports.banUser = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.params.id);
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
-    // Logique de bannissement
     user.isActive = false;
-    user.status = 'banned'; // Si tu as un champ status
-    // On invalide le token pour forcer la déconnexion immédiate
-    user.tokenVersion = (user.tokenVersion || 0) + 1; 
-    
+    user.status = 'banned';
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+
     await user.save({ validateBeforeSave: false });
 
     res.status(200).json({
@@ -85,8 +82,8 @@ exports.getAllUsers = catchAsync(async (req, res) => {
 
 // 🔹 Liste de tous les propriétaires
 exports.getAllOwners = catchAsync(async (req, res) => {
-    const owners = await User.find({ 
-        role: { $in: ['Propriétaire', 'Proprietaire'] } 
+    const owners = await User.find({
+        role: { $in: ['Propriétaire', 'Proprietaire'] }
     }).select('-password').sort('-createdAt');
 
     res.status(200).json({
@@ -109,7 +106,6 @@ exports.getUser = catchAsync(async (req, res, next) => {
 
 // 🔹 Modifier un utilisateur spécifique
 exports.updateUser = catchAsync(async (req, res, next) => {
-    // Champs interdits à la modification directe via cette route
     const forbiddenFields = ['password', 'passwordConfirm', 'tokenInvalidatedAt'];
     const filteredBody = {};
 
@@ -131,23 +127,19 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     });
 });
 
-// 🔹 Vérifier un propriétaire
+// 🔹 Vérifier un utilisateur (sans restriction de rôle)
 exports.verifyOwner = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.params.id);
 
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
-    // Vérification souple du rôle (avec ou sans accent)
-    if (!['Propriétaire', 'Proprietaire'].includes(user.role)) {
-        return next(new AppError('Cet utilisateur n’est pas un propriétaire.', 400));
-    }
-
-    user.isEmailVerified = true; // Ou user.isVerified selon ton modèle
+    // ✅ Aucune restriction de rôle — tous les utilisateurs peuvent être vérifiés
+    user.isEmailVerified = true;
     await user.save({ validateBeforeSave: false });
 
     res.status(200).json({
         status: 'success',
-        message: 'Propriétaire vérifié avec succès.',
+        message: 'Utilisateur vérifié avec succès.',
         data: { user },
     });
 });
@@ -158,7 +150,6 @@ exports.suspendUser = catchAsync(async (req, res, next) => {
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
     user.isActive = false;
-    // On invalide aussi la session
     user.tokenVersion = (user.tokenVersion || 0) + 1;
 
     await user.save({ validateBeforeSave: false });
@@ -176,8 +167,8 @@ exports.activateUser = catchAsync(async (req, res, next) => {
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
     user.isActive = true;
-    user.status = 'active'; // Reset du status si nécessaire
-    
+    user.status = 'active';
+
     await user.save({ validateBeforeSave: false });
 
     res.status(200).json({
@@ -192,10 +183,7 @@ exports.deleteUser = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.params.id);
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
-    // Suppression en cascade des propriétés
     await Property.deleteMany({ owner: user._id });
-    
-    // Suppression de l'utilisateur
     await user.deleteOne();
 
     res.status(204).json({
@@ -240,8 +228,6 @@ exports.approveProperty = catchAsync(async (req, res, next) => {
     if (!property) return next(new AppError('Propriété non trouvée.', 404));
 
     property.adminStatus = 'approved';
-    // property.status = 'available'; // Optionnel : rendre dispo immédiatement
-    
     await property.save({ validateBeforeSave: false });
 
     res.status(200).json({
@@ -269,7 +255,6 @@ exports.rejectProperty = catchAsync(async (req, res, next) => {
 // 🔹 Supprimer une propriété
 exports.deleteProperty = catchAsync(async (req, res, next) => {
     const property = await Property.findByIdAndDelete(req.params.id);
-    
     if (!property) return next(new AppError('Propriété non trouvée.', 404));
 
     res.status(204).json({
@@ -279,7 +264,7 @@ exports.deleteProperty = catchAsync(async (req, res, next) => {
 });
 
 /* ============================================================
-   🧾 RAPPORT D’ACTIVITÉ ADMIN
+   🧾 RAPPORT D'ACTIVITÉ ADMIN
 ============================================================ */
 exports.getActivityReport = catchAsync(async (req, res) => {
     const last30days = new Date();
