@@ -1,25 +1,23 @@
-// server.js 
-
-// ============================================================
-// ✅ DOTENV EN PREMIER - avant tous les autres imports
-// ============================================================
-const dotenv = require("dotenv");
-dotenv.config();
-
-// ✅ Log de vérification (tu peux le supprimer après confirmation)
-console.log("🔍 MONGO_URI chargé:", process.env.MONGO_URI ? "✅ OK" : "❌ UNDEFINED");
-
-// --- Importations principales ---
-const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const morgan = require("morgan");
-const path = require("path");
-const fs = require("fs");
-const connectDB = require("./config/db");
-
 // --- Connexion MongoDB ---
 connectDB();
+
+// ============================================================
+// ⏰ CRON JOB - Synchronisation Facebook automatique
+// ============================================================
+const cron = require('node-cron');
+const { syncFacebook } = require('./scripts/sync-facebook');
+
+cron.schedule('0 * * * *', async () => {
+  console.log('⏰ [CRON] Démarrage synchronisation Facebook...');
+  try {
+    await syncFacebook();
+    console.log('✅ [CRON] Synchronisation Facebook terminée');
+  } catch (error) {
+    console.error('❌ [CRON] Erreur synchronisation:', error.message);
+  }
+});
+
+console.log('⏰ [CRON] Planificateur Facebook activé (toutes les heures)');
 
 const app = express();
 
