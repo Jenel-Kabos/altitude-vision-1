@@ -6,7 +6,7 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 
 // ✅ IMPORT 2 : Configuration Cloudinary (Pour les pièces jointes sur Render)
-const upload = require('../config/cloudinary');
+const { upload } = require('../config/cloudinary');
 
 // ✅ IMPORT 3 : Le Contrôleur
 const internalMailController = require('../controllers/internalMailController');
