@@ -29,7 +29,7 @@ router.get('/recent', async (req, res) => {
 router.get('/actus', async (req, res) => {
   try {
     const cinqJoursAvant = new Date();
-    cinqJoursAvant.setDate(cinqJoursAvant.getDate() - 5);
+    cinqJoursAvant.setDate(cinqJoursAvant.getDate() - 30);
 
     const posts = await FacebookPost.find({
       date_publication: { $gte: cinqJoursAvant }
