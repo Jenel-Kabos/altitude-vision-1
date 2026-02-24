@@ -4,7 +4,7 @@ const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
 
 // ✅ MODIFICATION : On utilise Cloudinary pour les photos de profil (important pour Render)
-const upload = require('../config/cloudinary'); 
+const { upload } = require('../config/cloudinary'); 
 
 const router = express.Router();
 
