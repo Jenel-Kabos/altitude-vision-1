@@ -27,10 +27,21 @@ connectDB();
 const cron = require('node-cron');
 const { syncFacebook } = require('./scripts/sync-facebook');
 
+// 🔄 Sync au démarrage du serveur (dès que MongoDB est connecté)
+mongoose.connection.once('open', async () => {
+  console.log('🔄 [STARTUP] Sync Facebook au démarrage...');
+  try {
+    await syncFacebook();
+    console.log('✅ [STARTUP] Sync Facebook terminée');
+  } catch (error) {
+    console.error('❌ [STARTUP] Erreur sync:', error.message);
+  }
+});
+
+// ⏰ Sync automatique toutes les heures
 cron.schedule('0 * * * *', async () => {
   console.log('⏰ [CRON] Démarrage synchronisation Facebook...');
   try {
-    // Sync nouveaux posts
     await syncFacebook();
     console.log('✅ [CRON] Synchronisation Facebook terminée');
 
@@ -40,7 +51,7 @@ cron.schedule('0 * * * *', async () => {
       const cinqJoursAvant = new Date();
       cinqJoursAvant.setDate(cinqJoursAvant.getDate() - 5);
       const deleted = await FacebookPost.deleteMany({
-        date_publication: { $lt: cinqJoursAvant }
+        date_sync: { $lt: cinqJoursAvant }
       });
       console.log(`🧹 [CRON] ${deleted.deletedCount} vieux posts supprimés`);
     }
