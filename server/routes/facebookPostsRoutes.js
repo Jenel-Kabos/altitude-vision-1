@@ -25,14 +25,14 @@ router.get('/recent', async (req, res) => {
   }
 });
 
-// GET /api/facebook-posts/actus → posts des 5 derniers jours (page actualités)
+// GET /api/facebook-posts/actus → posts synchronisés dans les 5 derniers jours (page actualités)
 router.get('/actus', async (req, res) => {
   try {
     const cinqJoursAvant = new Date();
     cinqJoursAvant.setDate(cinqJoursAvant.getDate() - 5);
 
     const posts = await FacebookPost.find({
-      date_publication: { $gte: cinqJoursAvant }
+      date_sync: { $gte: cinqJoursAvant }
     }).sort({ date_publication: -1 });
 
     res.json({ success: true, data: posts });
