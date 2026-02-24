@@ -6,7 +6,6 @@
 const dotenv = require("dotenv");
 dotenv.config();
 
-// ✅ Log de vérification (tu peux le supprimer après confirmation)
 console.log("🔍 MONGO_URI chargé:", process.env.MONGO_URI ? "✅ OK" : "❌ UNDEFINED");
 
 // --- Importations principales ---
@@ -16,6 +15,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path");
 const fs = require("fs");
+const mongoose = require("mongoose");
 const connectDB = require("./config/db");
 
 // --- Connexion MongoDB ---
@@ -30,10 +30,23 @@ const { syncFacebook } = require('./scripts/sync-facebook');
 cron.schedule('0 * * * *', async () => {
   console.log('⏰ [CRON] Démarrage synchronisation Facebook...');
   try {
+    // Sync nouveaux posts
     await syncFacebook();
     console.log('✅ [CRON] Synchronisation Facebook terminée');
+
+    // Nettoyage posts > 5 jours
+    const FacebookPost = mongoose.models.FacebookPost;
+    if (FacebookPost) {
+      const cinqJoursAvant = new Date();
+      cinqJoursAvant.setDate(cinqJoursAvant.getDate() - 5);
+      const deleted = await FacebookPost.deleteMany({
+        date_publication: { $lt: cinqJoursAvant }
+      });
+      console.log(`🧹 [CRON] ${deleted.deletedCount} vieux posts supprimés`);
+    }
+
   } catch (error) {
-    console.error('❌ [CRON] Erreur synchronisation:', error.message);
+    console.error('❌ [CRON] Erreur:', error.message);
   }
 });
 
@@ -218,8 +231,11 @@ app.use("/api/likes", likeRoutes);
 app.use("/api/comments", commentRoutes);
 app.use('/api/contact', contactRoutes);
 
-// ✅ sync Facebook 
+// ✅ Sync Facebook
 app.use('/api/sync', require('./routes/sync'));
+
+// 📘 Facebook Posts
+app.use('/api/facebook-posts', require('./routes/facebookPostsRoutes'));
 
 // ============================================================
 // 🔍 ROUTES DE TEST
@@ -228,7 +244,7 @@ app.get("/", (req, res) => {
   res.status(200).json({
     status: "success",
     message: "🚀 API Altitude-Vision est en ligne.",
-    version: "1.5.1",
+    version: "1.5.2",
     service: "Backend",
     maintenance: false,
     environment: process.env.NODE_ENV || 'development',
@@ -273,6 +289,8 @@ app.use("*", (req, res) => {
       '/api/properties',
       '/api/events', 
       '/api/dashboard',
+      '/api/facebook-posts/recent',
+      '/api/facebook-posts/actus',
       '/uploads/:folder/:filename'
     ]
   });
