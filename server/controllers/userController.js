@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 /* ======================================================
-   🧭 UTILITAIRE : Récupère l’ID de l’utilisateur connecté
+   🧭 UTILITAIRE : Récupère l'ID de l'utilisateur connecté
 ====================================================== */
 exports.getMe = (req, res, next) => {
   req.params.id = req.user.id;
@@ -65,7 +65,7 @@ exports.getUser = async (req, res) => {
     console.error('Erreur getUser:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Erreur serveur lors de la récupération de l’utilisateur.',
+      message: 'Erreur serveur lors de la récupération de l\'utilisateur.',
     });
   }
 };
@@ -159,94 +159,87 @@ exports.updateUser = async (req, res) => {
     console.error('Erreur updateUser:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Erreur serveur lors de la mise à jour de l’utilisateur.',
+      message: 'Erreur serveur lors de la mise à jour de l\'utilisateur.',
     });
   }
 };
 
-// --- Fichier : server/controllers/userController.js ---
-
-// (collez ce code à l'intérieur de votre fichier, avec les autres fonctions)
-
 /* ======================================================
-   ✅ ADMIN : Vérifier un propriétaire
+   ✅ ADMIN : Vérifier un propriétaire (KYC)
 ====================================================== */
 exports.verifyOwner = async (req, res, next) => {
-  try {
-    // Nous supposons que vous avez un champ 'isVerified' dans votre modèle User
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { isVerified: true, status: 'Actif' }, // Mettez à jour les champs pertinents
-      { new: true, runValidators: true, select: '-password' }
-    );
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { isVerified: true, status: 'Actif' },
+      { new: true, select: '-password' } // ✅ runValidators retiré
+    );
 
-    if (!user) {
-      return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
-    }
+    if (!user) {
+      return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
+    }
 
-    res.status(200).json({
-      status: 'success',
-      message: '✅ Propriétaire vérifié avec succès.',
-      data: { user },
-    });
-  } catch (error) {
-    console.error('Erreur verifyOwner:', error);
-    next(error); // Transmet l'erreur au gestionnaire global
-  }
+    res.status(200).json({
+      status: 'success',
+      message: '✅ Propriétaire vérifié avec succès.',
+      data: { user },
+    });
+  } catch (error) {
+    console.error('Erreur verifyOwner:', error);
+    next(error);
+  }
 };
 
 /* ======================================================
-   ⚠️ ADMIN : Suspendre un utilisateur
+   ⚠️ ADMIN : Suspendre un utilisateur
 ====================================================== */
 exports.suspendUser = async (req, res, next) => {
-  try {
-    // Nous supposons que vous avez un champ 'status' dans votre modèle User
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { status: 'Suspendu' }, // Mettez à jour le statut
-      { new: true, runValidators: true, select: '-password' }
-    );
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { status: 'Suspendu', isActive: false },
+      { new: true, select: '-password' } // ✅ runValidators retiré
+    );
 
-    if (!user) {
-      return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
-    }
+    if (!user) {
+      return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
+    }
 
-    res.status(200).json({
-      status: 'success',
-      message: '⚠️ Compte suspendu avec succès.',
-      data: { user },
-    });
-  } catch (error) {
-    console.error('Erreur suspendUser:', error);
-    next(error); // Transmet l'erreur au gestionnaire global
-  }
+    res.status(200).json({
+      status: 'success',
+      message: '⚠️ Compte suspendu avec succès.',
+      data: { user },
+    });
+  } catch (error) {
+    console.error('Erreur suspendUser:', error);
+    next(error);
+  }
 };
 
 /* ======================================================
-   🔄 ADMIN : Réactiver un utilisateur
+   🔄 ADMIN : Réactiver un utilisateur
 ====================================================== */
 exports.activateUser = async (req, res, next) => {
-  try {
-    // Nous supposons que vous avez un champ 'status' dans votre modèle User
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { status: 'Actif' }, // Mettez à jour le statut
-      { new: true, runValidators: true, select: '-password' }
-    );
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { status: 'Actif', isActive: true },
+      { new: true, select: '-password' } // ✅ runValidators retiré
+    );
 
-    if (!user) {
-      return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
-    }
+    if (!user) {
+      return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
+    }
 
-    res.status(200).json({
-      status: 'success',
-      message: '✅ Compte réactivé avec succès.',
-      data: { user },
-    });
-  } catch (error) {
-    console.error('Erreur activateUser:', error);
-    next(error); // Transmet l'erreur au gestionnaire global
-  }
+    res.status(200).json({
+      status: 'success',
+      message: '✅ Compte réactivé avec succès.',
+      data: { user },
+    });
+  } catch (error) {
+    console.error('Erreur activateUser:', error);
+    next(error);
+  }
 };
 
 /* ======================================================
@@ -267,7 +260,7 @@ exports.deleteUser = async (req, res) => {
     console.error('Erreur deleteUser:', error);
     res.status(500).json({
       status: 'error',
-      message: 'Erreur serveur lors de la suppression de l’utilisateur.',
+      message: 'Erreur serveur lors de la suppression de l\'utilisateur.',
     });
   }
 };
