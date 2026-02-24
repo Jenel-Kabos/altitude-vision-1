@@ -11,13 +11,12 @@ import {
 import HeroSlider from "../components/HeroSlider";
 import HomeSlider from "../components/HomeSlider";
 import CtaCommission from "../components/CtaCommission";
-// 1. Import du nouveau composant (ajustez le chemin selon votre structure)
 import Testimonials from "../components/Testimonials"; 
+import FacebookFeed from "../components/FacebookFeed";
 
 import { getLatestPropertiesByPoles } from "../services/propertyService";
 import { getAllEvents } from "../services/eventService";
 import { getAllPortfolioItems } from "../services/portfolioService";
-// Note : Plus besoin d'importer getAllTestimonials ni Slider ici !
 
 const poles = [
     { 
@@ -51,14 +50,11 @@ const HomePage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [activePole, setActivePole] = useState(poles[0].id);
 
-    // Suppression du state 'testimonials' car géré dans le composant enfant
-
     useEffect(() => {
         console.log("🚀 [HomePage] Composant monté");
 
         const fetchData = async () => {
             try {
-                // On a retiré l'appel aux témoignages ici
                 const [propertiesResults, allEvents, allPortfolio] = await Promise.all([
                     getLatestPropertiesByPoles(["Altimmo"], 5),
                     getAllEvents(),
@@ -202,7 +198,7 @@ const HomePage = () => {
                 </div>
             </section>
 
-            {/* Section Annonces avec Onglets Modernes */}
+            {/* Section Annonces avec Onglets */}
             <section className="py-16 sm:py-20 bg-gradient-to-b from-slate-50 to-white">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="text-center mb-12 sm:mb-14">
@@ -220,7 +216,7 @@ const HomePage = () => {
                         </motion.div>
                     </div>
 
-                    {/* Onglets Modernes */}
+                    {/* Onglets */}
                     <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-10">
                         {poles.map((pole) => (
                             <motion.button
@@ -253,7 +249,6 @@ const HomePage = () => {
                             <h3 className="text-xl sm:text-2xl font-bold text-gray-800">
                                 {activePoleData?.name}
                             </h3>
-                            
                             <Link
                                 to={activePoleData?.route}
                                 className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold text-sm sm:text-base transition-colors group"
@@ -288,19 +283,18 @@ const HomePage = () => {
                 </div>
             </section>
 
-            {/* 🚀 NOUVELLE SECTION TÉMOIGNAGES (Composant intégré) */}
-            {/* Le composant gère lui-même son fond sombre, ses données et ses animations */}
+            {/* 📘 FIL D'ACTUALITÉ FACEBOOK */}
+            <FacebookFeed />
+
+            {/* Témoignages */}
             <Testimonials />
 
-            {/* Section CTA Commission */}
+            {/* CTA Commission */}
             <section className="py-14 px-4 sm:px-6 bg-gradient-to-b from-slate-50 to-white">
                 <div className="container mx-auto max-w-6xl">
                     <CtaCommission />
                 </div>
             </section>
-
-            {/* Footer */}
-            
         </div>
     );
 };

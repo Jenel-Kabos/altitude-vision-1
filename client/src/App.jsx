@@ -26,6 +26,7 @@ import RegisterPage from "./pages/RegisterPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import MentionsLegales from "./pages/MentionsLegales";
+import ActualitesPage from "./pages/ActualitesPage";
 
 // Page de vérification d'email
 import VerifyEmailPage from "./pages/VerifyEmailPage";
@@ -88,7 +89,6 @@ import PublicAuthRoute from "./components/routing/PublicAuthRoute";
 const MainLayout = ({ children }) => {
     const location = useLocation();
 
-    // Exclusion du header/footer uniquement sur les tableaux de bord
     const isDashboard =
         location.pathname.startsWith("/dashboard") ||
         location.pathname.startsWith("/mes-biens");
@@ -112,6 +112,9 @@ function App() {
             <Routes>
                 {/* === PAGES PUBLIQUES === */}
                 <Route path="/" element={<MainLayout><HomePage /></MainLayout>} />
+
+                {/* 📘 ACTUALITÉS FACEBOOK */}
+                <Route path="/actualites" element={<MainLayout><ActualitesPage /></MainLayout>} />
                 
                 {/* ALTIMMO */}
                 <Route path="/altimmo" element={<MainLayout><AltimmoPage /></MainLayout>} />
@@ -146,7 +149,7 @@ function App() {
                 <Route path="/contact" element={<MainLayout><ContactPage /></MainLayout>} />
                 <Route path="/unauthorized" element={<MainLayout><UnauthorizedPage /></MainLayout>} />
 
-                {/* ROUTE VALIDATION EMAIL (Accessible à tous) */}
+                {/* ROUTE VALIDATION EMAIL */}
                 <Route path="/verify-email/:token" element={<MainLayout><VerifyEmailPage /></MainLayout>} />
 
                 {/* === ROUTES PUBLIQUES AUTHENTIFICATION === */}
@@ -157,14 +160,11 @@ function App() {
 
                 {/* === ROUTES PROTÉGÉES (UTILISATEURS CONNECTÉS) === */}
                 <Route element={<ProtectedRoute />}>
-                    {/* Pages utilisateur accessibles à tous les rôles connectés */}
                     <Route path="/mon-compte" element={<MainLayout><AccountPage /></MainLayout>} />
                     <Route path="/profile" element={<MainLayout><ProfilePage /></MainLayout>} />
                     
-                    {/* ✅ PAGE AVIS : Accessible uniquement si connecté */}
                     <Route path="/avis/nouveau" element={<MainLayout><LeaveReviewPage /></MainLayout>} />
                     
-                    {/* MESSAGERIE CLIENT/PROPRIÉTAIRE & FAVORIS */}
                     <Route path="/favoris" element={<MainLayout><FavoritesPage /></MainLayout>} />
                     <Route path="/messages" element={<MainLayout><MessagesPage /></MainLayout>} />
 
@@ -173,22 +173,18 @@ function App() {
                         <Route path="/dashboard" element={<AdminDashboard />}>
                             <Route index element={<DashboardHome />} />
                             
-                            {/* GESTION DES PÔLES */}
                             <Route path="properties" element={<ManagePropertiesPage />} />
                             <Route path="properties/add" element={<AddPropertyPage />} />
                             <Route path="events" element={<ManageEventsPage />} />
                             <Route path="quotes" element={<ManageQuotesPage />} />
                             <Route path="altcom" element={<ManageAltcomPage />} />
                             
-                            {/* ✅ NOUVEAU : MODÉRATION (2 pages distinctes) */}
                             <Route path="moderation/properties" element={<PropertyModerationPage />} />
                             <Route path="moderation/reviews" element={<ReviewModerationPage />} />
                             
-                            {/* GESTION UTILISATEURS & SÉCURITÉ */}
                             <Route path="users" element={<UsersPanel />} />
                             <Route path="active-sessions" element={<ActiveSessionsPage />} />
 
-                            {/* GESTION DES COMMUNICATIONS ADMIN */}
                             <Route path="emails" element={<ManageEmailsPage />} />
                             <Route path="messages" element={<InternalMessagingPage />} />
                         </Route>
