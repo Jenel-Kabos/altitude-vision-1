@@ -33,7 +33,7 @@ export const getDrafts = async () => {
 // ✍️ ACTIONS
 // =======================
 
-export const sendMail = async (data) => {
+export const  = async (data) => {
   const res = await api.post('/mail/send', data);
   return res.data.data.mail;
 };
