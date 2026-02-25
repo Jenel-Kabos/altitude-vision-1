@@ -11,6 +11,7 @@ const UsersPanel = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const ENDPOINT = `${API_URL}/admin/owners`;
 
@@ -37,6 +38,7 @@ const UsersPanel = () => {
   }, []);
 
   const handleAction = async (userId, action) => {
+    setActionLoading(true);
     try {
       const token = localStorage.getItem('token');
       let url = `${ENDPOINT}/${userId}`;
@@ -51,22 +53,23 @@ const UsersPanel = () => {
         default: return;
       }
 
-      const res = await axios({
+      await axios({
         url, method, data: {},
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (action === 'delete') {
-        setUsers(users.filter((u) => u._id !== userId));
-      } else {
-        setUsers(users.map((u) => (u._id === userId ? res.data.data.user || res.data.data.owner : u)));
-      }
       toast.success(successMessage);
       setSelectedUser(null);
+
+      // ✅ Refetch complet pour avoir les données à jour
+      await fetchUsers();
+
     } catch (err) {
       console.error('Erreur action:', err);
-      toast.error("Erreur lors de l'action.");
+      toast.error(err.response?.data?.message || "Erreur lors de l'action.");
       setSelectedUser(null);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -74,23 +77,51 @@ const UsersPanel = () => {
     const status = user.status || 'Actif';
     const styles = {
       'Actif':    'bg-green-100 text-green-800',
+      'active':   'bg-green-100 text-green-800',
       'Suspendu': 'bg-yellow-100 text-yellow-800',
       'Banni':    'bg-red-100 text-red-800',
       'Supprimé': 'bg-gray-100 text-gray-500',
     };
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-semibold ${styles[status] || 'bg-gray-100 text-gray-600'}`}>
-        {status}
+        {status === 'active' ? 'Actif' : status}
       </span>
     );
   };
 
   const getVerifiedBadge = (user) => {
     return user.isVerified ? (
-      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">✔ Vérifié</span>
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+        Vérifié
+      </span>
     ) : (
-      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Non vérifié</span>
+      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+        Non vérifié
+      </span>
     );
+  };
+
+  const getActionLabel = (action) => {
+    const labels = {
+      verify:   'Vérifier le KYC',
+      suspend:  'Suspendre le compte',
+      activate: 'Réactiver le compte',
+      delete:   "Supprimer l'utilisateur",
+    };
+    return labels[action] || action;
+  };
+
+  const getActionColor = (action) => {
+    const colors = {
+      verify:   'bg-blue-600 hover:bg-blue-700',
+      suspend:  'bg-yellow-500 hover:bg-yellow-600',
+      activate: 'bg-green-600 hover:bg-green-700',
+      delete:   'bg-red-600 hover:bg-red-700',
+    };
+    return colors[action] || 'bg-blue-600 hover:bg-blue-700';
   };
 
   if (loading) return (
@@ -110,6 +141,7 @@ const UsersPanel = () => {
     <div className="p-6">
       <ToastContainer position="top-right" autoClose={3000} />
 
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gestion des Propriétaires</h1>
@@ -123,6 +155,7 @@ const UsersPanel = () => {
         </button>
       </div>
 
+      {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <table className="min-w-full">
           <thead className="bg-gray-50 border-b border-gray-100">
@@ -135,61 +168,77 @@ const UsersPanel = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {users.map((user) => (
-              <tr key={user._id} className="hover:bg-gray-50 transition">
-                <td className="px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                      <span className="text-blue-700 text-sm font-bold">
-                        {user.name?.charAt(0).toUpperCase()}
-                      </span>
+            {users.map((user) => {
+              const status = user.status || 'Actif';
+              const isActive = status === 'Actif' || status === 'active';
+
+              return (
+                <tr key={user._id} className="hover:bg-gray-50 transition">
+
+                  {/* Nom */}
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <span className="text-blue-700 text-sm font-bold">
+                          {user.name?.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <span className="font-medium text-gray-900">{user.name}</span>
                     </div>
-                    <span className="font-medium text-gray-900">{user.name}</span>
-                  </div>
-                </td>
-                <td className="px-5 py-4 text-sm text-gray-600">{user.email}</td>
-                <td className="px-5 py-4">{getStatusBadge(user)}</td>
-                <td className="px-5 py-4">{getVerifiedBadge(user)}</td>
-                <td className="px-5 py-4">
-                  <div className="flex gap-2 flex-wrap">
-                    {/* ✅ Bouton Vérifier KYC — basé sur isVerified */}
-                    {!user.isVerified && (
-                      <button
-                        onClick={() => setSelectedUser({ ...user, actionType: 'verify' })}
-                        className="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded-lg text-xs font-semibold border border-blue-200 transition"
-                      >
-                        Vérifier
-                      </button>
-                    )}
+                  </td>
 
-                    {/* ✅ Bouton Suspendre/Réactiver — basé sur status */}
-                    {user.status === 'Actif' ? (
-                      <button
-                        onClick={() => setSelectedUser({ ...user, actionType: 'suspend' })}
-                        className="text-yellow-600 hover:bg-yellow-50 px-3 py-1 rounded-lg text-xs font-semibold border border-yellow-200 transition"
-                      >
-                        Suspendre
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setSelectedUser({ ...user, actionType: 'activate' })}
-                        className="text-green-600 hover:bg-green-50 px-3 py-1 rounded-lg text-xs font-semibold border border-green-200 transition"
-                      >
-                        Réactiver
-                      </button>
-                    )}
+                  {/* Email */}
+                  <td className="px-5 py-4 text-sm text-gray-600">{user.email}</td>
 
-                    {/* 🗑️ Bouton Supprimer */}
-                    <button
-                      onClick={() => setSelectedUser({ ...user, actionType: 'delete' })}
-                      className="text-red-600 hover:bg-red-50 px-3 py-1 rounded-lg text-xs font-semibold border border-red-200 transition"
-                    >
-                      Supprimer
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  {/* Statut */}
+                  <td className="px-5 py-4">{getStatusBadge(user)}</td>
+
+                  {/* KYC */}
+                  <td className="px-5 py-4">{getVerifiedBadge(user)}</td>
+
+                  {/* Actions */}
+                  <td className="px-5 py-4">
+                    <div className="flex gap-2 flex-wrap">
+
+                      {/* Vérifier KYC */}
+                      {!user.isVerified && (
+                        <button
+                          onClick={() => setSelectedUser({ ...user, actionType: 'verify' })}
+                          className="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded-lg text-xs font-semibold border border-blue-200 transition"
+                        >
+                          Vérifier
+                        </button>
+                      )}
+
+                      {/* Suspendre / Réactiver */}
+                      {isActive ? (
+                        <button
+                          onClick={() => setSelectedUser({ ...user, actionType: 'suspend' })}
+                          className="text-yellow-600 hover:bg-yellow-50 px-3 py-1 rounded-lg text-xs font-semibold border border-yellow-200 transition"
+                        >
+                          Suspendre
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setSelectedUser({ ...user, actionType: 'activate' })}
+                          className="text-green-600 hover:bg-green-50 px-3 py-1 rounded-lg text-xs font-semibold border border-green-200 transition"
+                        >
+                          Réactiver
+                        </button>
+                      )}
+
+                      {/* Supprimer */}
+                      <button
+                        onClick={() => setSelectedUser({ ...user, actionType: 'delete' })}
+                        className="text-red-600 hover:bg-red-50 px-3 py-1 rounded-lg text-xs font-semibold border border-red-200 transition"
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
@@ -205,25 +254,65 @@ const UsersPanel = () => {
       {selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white p-6 rounded-2xl shadow-2xl w-96 mx-4">
-            <h3 className="font-bold text-lg mb-2 text-gray-900">Confirmer l'action</h3>
-            <p className="mb-1 text-gray-600">
-              Action : <span className="font-semibold capitalize">{selectedUser.actionType}</span>
+
+            {/* Icône selon l'action */}
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              selectedUser.actionType === 'delete'   ? 'bg-red-100' :
+              selectedUser.actionType === 'suspend'  ? 'bg-yellow-100' :
+              selectedUser.actionType === 'verify'   ? 'bg-blue-100' : 'bg-green-100'
+            }`}>
+              {selectedUser.actionType === 'delete' && (
+                <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              )}
+              {selectedUser.actionType === 'suspend' && (
+                <svg className="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z" />
+                </svg>
+              )}
+              {selectedUser.actionType === 'verify' && (
+                <svg className="w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              )}
+              {selectedUser.actionType === 'activate' && (
+                <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+
+            <h3 className="font-bold text-lg text-center mb-1 text-gray-900">Confirmer l'action</h3>
+            <p className="text-center text-gray-700 mb-1 text-sm">
+              <span className="font-semibold">{getActionLabel(selectedUser.actionType)}</span>
             </p>
-            <p className="mb-5 text-gray-600">
-              Utilisateur : <span className="font-semibold">{selectedUser.name}</span>
+            <p className="text-center text-gray-500 text-sm mb-6">
+              Utilisateur : <span className="font-semibold text-gray-700">{selectedUser.name}</span>
             </p>
+
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setSelectedUser(null)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-semibold transition"
+                disabled={actionLoading}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-semibold transition disabled:opacity-50"
               >
                 Annuler
               </button>
               <button
                 onClick={() => handleAction(selectedUser._id, selectedUser.actionType)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition"
+                disabled={actionLoading}
+                className={`px-4 py-2 text-white rounded-lg text-sm font-semibold transition disabled:opacity-50 flex items-center gap-2 ${getActionColor(selectedUser.actionType)}`}
               >
-                Confirmer
+                {actionLoading ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    En cours...
+                  </>
+                ) : 'Confirmer'}
               </button>
             </div>
           </div>
