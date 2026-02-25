@@ -27,6 +27,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import MentionsLegales from "./pages/MentionsLegales";
 import ActualitesPage from "./pages/ActualitesPage";
+import VerifyEmailPendingPage from "./pages/VerifyEmailPendingPage";
 
 // Page de vérification d'email
 import VerifyEmailPage from "./pages/VerifyEmailPage";
@@ -112,6 +113,7 @@ function App() {
             <Routes>
                 {/* === PAGES PUBLIQUES === */}
                 <Route path="/" element={<MainLayout><HomePage /></MainLayout>} />
+                
 
                 {/* 📘 ACTUALITÉS FACEBOOK */}
                 <Route path="/actualites" element={<MainLayout><ActualitesPage /></MainLayout>} />
@@ -156,6 +158,7 @@ function App() {
                 <Route element={<PublicAuthRoute />}>
                     <Route path="/login" element={<MainLayout><LoginPage /></MainLayout>} />
                     <Route path="/register" element={<MainLayout><RegisterPage /></MainLayout>} />
+                    <Route path="/verify-email-pending" element={<VerifyEmailPendingPage />} />
                 </Route>
 
                 {/* === ROUTES PROTÉGÉES (UTILISATEURS CONNECTÉS) === */}
