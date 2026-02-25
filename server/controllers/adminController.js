@@ -58,7 +58,7 @@ exports.banUser = catchAsync(async (req, res, next) => {
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
     user.isActive = false;
-    user.status = 'banned';
+    user.status = 'Banni';
     user.tokenVersion = (user.tokenVersion || 0) + 1;
 
     await user.save({ validateBeforeSave: false });
@@ -127,14 +127,15 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     });
 });
 
-// 🔹 Vérifier un utilisateur (sans restriction de rôle)
+// 🔹 Vérifier un utilisateur (KYC)
 exports.verifyOwner = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.params.id);
-
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
-    // ✅ Aucune restriction de rôle — tous les utilisateurs peuvent être vérifiés
-    user.isEmailVerified = true;
+    // ✅ isVerified = KYC validé (pas isEmailVerified qui est pour l'email)
+    user.isVerified = true;
+    user.status = 'Actif';
+
     await user.save({ validateBeforeSave: false });
 
     res.status(200).json({
@@ -150,6 +151,7 @@ exports.suspendUser = catchAsync(async (req, res, next) => {
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
     user.isActive = false;
+    user.status = 'Suspendu'; // ✅ Status cohérent avec le frontend
     user.tokenVersion = (user.tokenVersion || 0) + 1;
 
     await user.save({ validateBeforeSave: false });
@@ -167,7 +169,7 @@ exports.activateUser = catchAsync(async (req, res, next) => {
     if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
 
     user.isActive = true;
-    user.status = 'active';
+    user.status = 'Actif'; // ✅ Cohérent avec le frontend (était 'active' en minuscule)
 
     await user.save({ validateBeforeSave: false });
 
