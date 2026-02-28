@@ -107,10 +107,10 @@ const MainLayout = ({ children }) => {
 // Application Principale
 // ==========================================================
 function App() {
-    // 🏓 Wake-up ping pour Render (évite le timeout au premier appel)
     useEffect(() => {
-        fetch("https://altitude-vision.onrender.com/api/portfolio")
-            .catch(() => {}); // silencieux, juste pour réveiller le serveur
+        fetch("https://altitude-vision.onrender.com/api/health")
+            .then(() => console.log("✅ Serveur réveillé !"))
+            .catch(() => {});
     }, []);
     return (
         <>
