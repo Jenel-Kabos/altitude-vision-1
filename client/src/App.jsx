@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
@@ -107,6 +107,11 @@ const MainLayout = ({ children }) => {
 // Application Principale
 // ==========================================================
 function App() {
+    // 🏓 Wake-up ping pour Render (évite le timeout au premier appel)
+    useEffect(() => {
+        fetch("https://altitude-vision.onrender.com/api/portfolio")
+            .catch(() => {}); // silencieux, juste pour réveiller le serveur
+    }, []);
     return (
         <>
             <Toaster position="top-right" />

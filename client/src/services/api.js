@@ -13,7 +13,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 30000, // 30 secondes pour l'upload de fichiers
+  timeout: 90000, // 90 secondes pour l'upload de fichiers
 });
 
 // ⭐ CORRECTION CRITIQUE : Intercepteur de requête amélioré
