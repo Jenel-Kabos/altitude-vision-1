@@ -215,5 +215,3 @@ function App() {
 }
 
 export default App;
-
-//FIN APP
