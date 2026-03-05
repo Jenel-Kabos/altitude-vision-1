@@ -28,11 +28,7 @@ import UnauthorizedPage from "./pages/UnauthorizedPage";
 import MentionsLegales from "./pages/MentionsLegales";
 import ActualitesPage from "./pages/ActualitesPage";
 import VerifyEmailPendingPage from "./pages/VerifyEmailPendingPage";
-
-// Page de vérification d'email
 import VerifyEmailPage from "./pages/VerifyEmailPage";
-
-// ✅ NOUVEAU : Page pour laisser un avis
 import LeaveReviewPage from "./pages/LeaveReviewPage";
 
 // Pages Services Altimmo
@@ -50,30 +46,23 @@ import ManagePropertiesPage from "./pages/dashboard/ManagePropertiesPage";
 import AddPropertyPage from "./pages/dashboard/AddPropertyPage";
 import ManageEventsPage from "./pages/dashboard/ManageEventsPage";
 import ManageQuotesPage from "./pages/dashboard/ManageQuotesPage";
-
-// ✅ NOUVEAU : Pages de Modération séparées
 import PropertyModerationPage from "./pages/dashboard/PropertyModerationPage";
 import ReviewModerationPage from "./pages/dashboard/ReviewModerationPage";
-
 import UsersPanel from "./pages/dashboard/UsersPanel";
-import ActiveSessionsPage from "./pages/dashboard/ActiveSessionsPage"; 
-
-// Page de gestion Altcom
+import ActiveSessionsPage from "./pages/dashboard/ActiveSessionsPage";
 import ManageAltcomPage from "./pages/dashboard/ManageAltcomPage";
-
-// Pages Emails & Messagerie
 import ManageEmailsPage from "./pages/dashboard/ManageEmailsPage";
 import InternalMessagingPage from "./pages/dashboard/InternalMessagingPage";
 
-// Pages interactives - Likes, Commentaires, Messagerie
-import FavoritesPage from './pages/FavoritesPage';
-import MessagesPage from './pages/MessagesPage';
+// Pages interactives
+import FavoritesPage from "./pages/FavoritesPage";
+import MessagesPage from "./pages/MessagesPage";
 
 // Utilisateur / Propriétaire
 import AccountPage from "./pages/AccountPage";
-import ProfilePage from "./services/ProfilePage";
+import ProfilePage from "./pages/ProfilePage"; // ✅ CORRECTION : était "./services/ProfilePage"
 
-// Layout Propriétaire et Composant de gestion
+// Layout Propriétaire
 import OwnerDashboard from "./pages/dashboard/OwnerDashboard";
 import OwnerPropertyManagement from "./pages/dashboard/OwnerPropertyManagement";
 
@@ -82,7 +71,6 @@ import ProtectedRoute from "./components/routing/ProtectedRoute";
 import AdminRoute from "./components/routing/AdminRoute";
 import OwnerRoute from "./components/routing/OwnerRoute";
 import PublicAuthRoute from "./components/routing/PublicAuthRoute";
-
 
 // ==========================================================
 // Layout principal (Header/Footer global)
@@ -97,7 +85,7 @@ const MainLayout = ({ children }) => {
     return (
         <div className="flex flex-col min-h-screen bg-gray-50">
             {!isDashboard && <Header />}
-            <main className="flex-grow">{children}</main> 
+            <main className="flex-grow">{children}</main>
             {!isDashboard && <Footer />}
         </div>
     );
@@ -108,106 +96,102 @@ const MainLayout = ({ children }) => {
 // ==========================================================
 function App() {
     useEffect(() => {
+        // Réveil du serveur Render (cold start)
         fetch("https://altitude-vision.onrender.com/api/health")
             .then(() => console.log("✅ Serveur réveillé !"))
             .catch(() => {});
     }, []);
+
     return (
         <>
             <Toaster position="top-right" />
             <Routes>
                 {/* === PAGES PUBLIQUES === */}
                 <Route path="/" element={<MainLayout><HomePage /></MainLayout>} />
-                
 
-                {/* 📘 ACTUALITÉS FACEBOOK */}
+                {/* ACTUALITÉS */}
                 <Route path="/actualites" element={<MainLayout><ActualitesPage /></MainLayout>} />
-                
+
                 {/* ALTIMMO */}
                 <Route path="/altimmo" element={<MainLayout><AltimmoPage /></MainLayout>} />
                 <Route path="/altimmo/annonces" element={<MainLayout><AltimmoAnnonces /></MainLayout>} />
                 <Route path="/altimmo/property/:propertyId" element={<MainLayout><PropertyDetailPage /></MainLayout>} />
                 <Route path="/trouve-ta-commission" element={<MainLayout><CommissionCalculatorPage /></MainLayout>} />
-                
+
                 {/* SERVICES ALTIMMO */}
                 <Route path="/altimmo/services/vente-de-biens" element={<MainLayout><VenteDeBiensPage /></MainLayout>} />
                 <Route path="/altimmo/services/location-gestion" element={<MainLayout><LocationGestionPage /></MainLayout>} />
                 <Route path="/altimmo/services/conseil-investissement" element={<MainLayout><ConseilInvestissementPage /></MainLayout>} />
-                
+
                 {/* MILA EVENTS */}
                 <Route path="/mila-events" element={<MainLayout><MilaEventsPage /></MainLayout>} />
                 <Route path="/mila-events/annonces" element={<MainLayout><MilaEventsAnnonces /></MainLayout>} />
                 <Route path="/mila-events/event/:eventId" element={<MainLayout><EventDetailPage /></MainLayout>} />
                 <Route path="/mila-events/creer-projet" element={<MainLayout><CreateProjectPage /></MainLayout>} />
-                
+
                 {/* ALTCOM */}
                 <Route path="/altcom" element={<MainLayout><AltcomPage /></MainLayout>} />
                 <Route path="/altcom/annonces" element={<MainLayout><AltcomAnnonces /></MainLayout>} />
                 <Route path="/altcom/service/:serviceId" element={<MainLayout><AltcomServiceDetailPage /></MainLayout>} />
                 <Route path="/altcom/portfolio/:portfolioId" element={<MainLayout><AltcomPortfolioDetailPage /></MainLayout>} />
-                
+
                 {/* SERVICES ALTCOM */}
                 <Route path="/altcom/couverture-mediatique" element={<MainLayout><CouvertureMediatiquePage /></MainLayout>} />
-                
-                {/* PAGES LÉGALES & INFORMATIONS */}
+
+                {/* LÉGAL */}
                 <Route path="/mentions-legales" element={<MainLayout><MentionsLegales /></MainLayout>} />
-                
+
                 {/* AUTRES */}
                 <Route path="/contact" element={<MainLayout><ContactPage /></MainLayout>} />
                 <Route path="/unauthorized" element={<MainLayout><UnauthorizedPage /></MainLayout>} />
-
-                {/* ROUTE VALIDATION EMAIL */}
                 <Route path="/verify-email/:token" element={<MainLayout><VerifyEmailPage /></MainLayout>} />
 
-                {/* === ROUTES PUBLIQUES AUTHENTIFICATION === */}
+                {/* === AUTH PUBLIQUE === */}
                 <Route element={<PublicAuthRoute />}>
                     <Route path="/login" element={<MainLayout><LoginPage /></MainLayout>} />
                     <Route path="/register" element={<MainLayout><RegisterPage /></MainLayout>} />
                     <Route path="/verify-email-pending" element={<VerifyEmailPendingPage />} />
                 </Route>
 
-                {/* === ROUTES PROTÉGÉES (UTILISATEURS CONNECTÉS) === */}
+                {/* === ROUTES PROTÉGÉES === */}
                 <Route element={<ProtectedRoute />}>
                     <Route path="/mon-compte" element={<MainLayout><AccountPage /></MainLayout>} />
                     <Route path="/profile" element={<MainLayout><ProfilePage /></MainLayout>} />
-                    
                     <Route path="/avis/nouveau" element={<MainLayout><LeaveReviewPage /></MainLayout>} />
-                    
                     <Route path="/favoris" element={<MainLayout><FavoritesPage /></MainLayout>} />
                     <Route path="/messages" element={<MainLayout><MessagesPage /></MainLayout>} />
 
-                    {/* === TABLEAU DE BORD ADMIN / COLLABORATEUR === */}
+                    {/* DASHBOARD ADMIN */}
                     <Route element={<AdminRoute />}>
                         <Route path="/dashboard" element={<AdminDashboard />}>
                             <Route index element={<DashboardHome />} />
-                            
                             <Route path="properties" element={<ManagePropertiesPage />} />
                             <Route path="properties/add" element={<AddPropertyPage />} />
                             <Route path="events" element={<ManageEventsPage />} />
                             <Route path="quotes" element={<ManageQuotesPage />} />
                             <Route path="altcom" element={<ManageAltcomPage />} />
-                            
                             <Route path="moderation/properties" element={<PropertyModerationPage />} />
                             <Route path="moderation/reviews" element={<ReviewModerationPage />} />
-                            
                             <Route path="users" element={<UsersPanel />} />
                             <Route path="active-sessions" element={<ActiveSessionsPage />} />
-
                             <Route path="emails" element={<ManageEmailsPage />} />
                             <Route path="messages" element={<InternalMessagingPage />} />
                         </Route>
                     </Route>
 
-                    {/* === TABLEAU DE BORD PROPRIÉTAIRE === */}
-                    <Route element={<OwnerRoute />}> 
+                    {/* DASHBOARD PROPRIÉTAIRE */}
+                    <Route element={<OwnerRoute />}>
                         <Route path="/mes-biens" element={<OwnerDashboard />}>
                             <Route index element={<OwnerPropertyManagement />} />
-                            <Route path="securite" element={<h1 className="text-3xl font-bold p-6">Sécurité du Compte (Propriétaire)</h1>} />
+                            <Route
+                                path="securite"
+                                element={<h1 className="text-3xl font-bold p-6">Sécurité du Compte (Propriétaire)</h1>}
+                            />
                         </Route>
                     </Route>
                 </Route>
 
-                {/* === 404 === */}
+                {/* 404 */}
                 <Route path="*" element={<MainLayout><NotFoundPage /></MainLayout>} />
             </Routes>
         </>
