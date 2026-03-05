@@ -407,12 +407,6 @@ const AltcomPage = () => {
 
   return (
     <div className="min-h-screen bg-white font-sans">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-        .font-sans { font-family: 'Inter', sans-serif; }
-        html { scroll-behavior: smooth; }
-      `}</style>
-
       <AnimatePresence>
         {showNotification.visible && (
           <motion.div

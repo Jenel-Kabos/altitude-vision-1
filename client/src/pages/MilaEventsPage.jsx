@@ -353,12 +353,6 @@ const MilaEventsPage = () => {
 
   return (
     <div className="min-h-screen bg-white font-sans">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-        .font-sans { font-family: 'Inter', sans-serif; }
-        html { scroll-behavior: smooth; }
-      `}</style>
-      
       <AnimatePresence>
         {showNotif.visible && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white ${showNotif.type === 'success' ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 'bg-gradient-to-r from-red-500 to-pink-600'}`}>

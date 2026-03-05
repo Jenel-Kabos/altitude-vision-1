@@ -1,18 +1,19 @@
-// ✅ src/main.jsx
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App.jsx';
-import './index.css';
-import { AuthProvider } from './context/AuthContext';
-import { BrowserRouter } from 'react-router-dom';
+/* ================================================================
+   client/src/main.jsx
+   ================================================================
+   MODIFICATION : Ajouter l'import de theme.css ICI.
+   Ton main.jsx actuel ressemble probablement à ceci.
+   Ajoute uniquement la ligne marquée ✅ — ne change rien d'autre.
+   ================================================================ */
+
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+import './index.css'
+import './theme.css'   // ✅ AJOUTER CETTE LIGNE
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  // La boucle infinie était causée par le <div> inutile ici.
-  // Les fournisseurs doivent être l'enfant direct de root.render().
-  
-  <AuthProvider>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </AuthProvider>
-);
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)

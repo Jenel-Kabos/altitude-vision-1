@@ -1,0 +1,242 @@
+/* ================================================================
+   ALTITUDE-VISION — THÈME GLOBAL
+   Fichier : client/src/theme.css
+   À importer UNE SEULE FOIS dans client/src/main.jsx
+   ================================================================ */
+
+/* ----------------------------------------------------------------
+   1. VARIABLES CSS — Palette issue du logo Altitude-Vision
+   ---------------------------------------------------------------- */
+:root {
+  /* — Couleurs principales — */
+  --av-gold:        #C8872A;   /* Or/Ambre   — triangle haut du logo  */
+  --av-gold-light:  #E5A84B;   /* Or clair   — hover, accents         */
+  --av-gold-dark:   #A0671A;   /* Or foncé   — texte sur fond clair   */
+
+  --av-blue:        #2E7BB5;   /* Bleu acier — courbe dynamique logo  */
+  --av-blue-light:  #4A9DD4;   /* Bleu clair — hover, fonds           */
+  --av-blue-dark:   #1A5A8A;   /* Bleu foncé — titres, CTA            */
+
+  --av-red:         #D42B2B;   /* Rouge vif  — appareil / bandeau     */
+  --av-red-light:   #E84E4E;   /* Rouge clair — hover                 */
+  --av-red-dark:    #A01E1E;   /* Rouge foncé — texte                 */
+
+  /* — Neutres — */
+  --av-white:       #FFFFFF;
+  --av-off-white:   #F8F6F2;   /* Blanc cassé chaud, proche de l'or  */
+  --av-gray-50:     #F9F9F7;
+  --av-gray-100:    #F0EDEA;
+  --av-gray-200:    #DDD9D4;
+  --av-gray-400:    #9C9589;
+  --av-gray-600:    #5C5650;
+  --av-gray-800:    #2C2924;
+  --av-black:       #1A1714;
+
+  /* — Couleurs par pôle — */
+  --altimmo-primary:   #2E7BB5;   /* Bleu acier  */
+  --altimmo-secondary: #1A5A8A;
+  --altimmo-accent:    #C8872A;   /* Or — badge "Exclusivité" */
+
+  --mila-primary:      #D42B2B;   /* Rouge Mila Events       */
+  --mila-secondary:    #A01E1E;
+  --mila-accent:       #C8872A;   /* Or — touches luxe       */
+
+  --altcom-primary:    #C8872A;   /* Or Altcom               */
+  --altcom-secondary:  #A0671A;
+  --altcom-accent:     #2E7BB5;   /* Bleu — accents digitaux */
+
+  /* — Gradients réutilisables — */
+  --gradient-gold:   linear-gradient(135deg, #C8872A 0%, #E5A84B 100%);
+  --gradient-blue:   linear-gradient(135deg, #1A5A8A 0%, #2E7BB5 100%);
+  --gradient-red:    linear-gradient(135deg, #A01E1E 0%, #D42B2B 100%);
+  --gradient-dark:   linear-gradient(135deg, #1A1714 0%, #2C2924 100%);
+
+  /* — Ombres — */
+  --shadow-sm:   0 1px 3px rgba(26, 23, 20, 0.08);
+  --shadow-md:   0 4px 16px rgba(26, 23, 20, 0.12);
+  --shadow-lg:   0 8px 32px rgba(26, 23, 20, 0.16);
+  --shadow-gold: 0 8px 32px rgba(200, 135, 42, 0.25);
+  --shadow-blue: 0 8px 32px rgba(46, 123, 181, 0.25);
+
+  /* — Rayons — */
+  --radius-sm:  8px;
+  --radius-md:  16px;
+  --radius-lg:  24px;
+  --radius-xl:  32px;
+  --radius-full: 9999px;
+
+  /* — Transitions — */
+  --transition-fast:   150ms ease;
+  --transition-base:   300ms ease;
+  --transition-slow:   500ms ease;
+  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ----------------------------------------------------------------
+   2. TYPOGRAPHIE GLOBALE
+   ---------------------------------------------------------------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--av-gray-800);
+  background-color: var(--av-white);
+}
+
+/* Titres — Cormorant Garamond */
+h1, h2, h3,
+.font-display {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+h1 { font-size: clamp(2.5rem, 5vw, 4.5rem); font-weight: 700; }
+h2 { font-size: clamp(2rem, 4vw, 3.5rem);   font-weight: 600; }
+h3 { font-size: clamp(1.4rem, 2.5vw, 2rem); font-weight: 600; }
+
+/* Corps — Outfit */
+p, span, a, li, label, input, textarea, select, button {
+  font-family: 'Outfit', sans-serif;
+}
+
+/* ----------------------------------------------------------------
+   3. CLASSES UTILITAIRES ALTITUDE-VISION
+   ---------------------------------------------------------------- */
+
+/* Textes */
+.text-av-gold      { color: var(--av-gold); }
+.text-av-blue      { color: var(--av-blue); }
+.text-av-red       { color: var(--av-red); }
+
+/* Fonds */
+.bg-av-gold        { background-color: var(--av-gold); }
+.bg-av-blue        { background-color: var(--av-blue); }
+.bg-av-red         { background-color: var(--av-red); }
+.bg-av-off-white   { background-color: var(--av-off-white); }
+.bg-av-dark        { background-color: var(--av-black); }
+
+/* Gradients */
+.bg-gradient-gold  { background: var(--gradient-gold); }
+.bg-gradient-blue  { background: var(--gradient-blue); }
+.bg-gradient-red   { background: var(--gradient-red); }
+
+/* Bouton principal — Or */
+.btn-av-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: var(--gradient-gold);
+  color: var(--av-white);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-base);
+  box-shadow: var(--shadow-gold);
+  text-decoration: none;
+}
+.btn-av-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(200, 135, 42, 0.35);
+  filter: brightness(1.05);
+}
+.btn-av-primary:active { transform: translateY(0); }
+
+/* Bouton secondaire — Bleu */
+.btn-av-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: var(--gradient-blue);
+  color: var(--av-white);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border-radius: var(--radius-full);
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-base);
+  box-shadow: var(--shadow-blue);
+  text-decoration: none;
+}
+.btn-av-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(46, 123, 181, 0.35);
+  filter: brightness(1.05);
+}
+
+/* Bouton outline */
+.btn-av-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 27px;
+  background: transparent;
+  color: var(--av-white);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border-radius: var(--radius-full);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: var(--transition-base);
+  backdrop-filter: blur(8px);
+  text-decoration: none;
+}
+.btn-av-outline:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+/* ----------------------------------------------------------------
+   4. SCROLLBAR PERSONNALISÉE
+   ---------------------------------------------------------------- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--av-gray-100); }
+::-webkit-scrollbar-thumb {
+  background: var(--av-gold);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--av-gold-dark); }
+
+/* ----------------------------------------------------------------
+   5. SÉLECTION DE TEXTE
+   ---------------------------------------------------------------- */
+::selection {
+  background-color: var(--av-gold);
+  color: var(--av-white);
+}
+
+/* ----------------------------------------------------------------
+   6. FOCUS VISIBLE — Accessibilité clavier
+   ---------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--av-gold);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ----------------------------------------------------------------
+   7. SUPPRESSION DES IMPORTS FONTS INLINE
+      (Remplace tous les <style> @import dans les pages JSX)
+   ---------------------------------------------------------------- */
+/* Plus besoin de :
+   <style>{`@import url('https://fonts.googleapis.com/...')`}</style>
+   dans HomePage, AltimmoPage, AltcomPage, MilaEventsPage
+   → Supprimer ces blocs <style> dans chaque page
+*/

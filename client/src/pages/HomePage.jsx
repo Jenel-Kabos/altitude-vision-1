@@ -105,11 +105,6 @@ const HomePage = () => {
 
     return (
         <div className="min-h-screen bg-white font-sans">
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-                .font-sans { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-                html { scroll-behavior: smooth; }
-            `}</style>
 
             {/* Header Hero Section */}
             <header className="relative text-white pt-32 pb-24 overflow-hidden h-[75vh] min-h-[600px]">
