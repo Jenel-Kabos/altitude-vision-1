@@ -5,107 +5,129 @@ import { useNavigate } from "react-router-dom";
 import { getAllTestimonials } from "../services/reviewService";
 import { useAuth } from "../context/AuthContext";
 
+// ─────────────────────────────────────────────────────────────
+// Couleurs par pôle
+// ─────────────────────────────────────────────────────────────
 const POLE_COLORS = {
-    Altimmo:    { dot: '#2E7BB5', bg: 'rgba(46,123,181,0.1)',  border: 'rgba(46,123,181,0.2)',  text: '#2E7BB5' },
-    MilaEvents: { dot: '#D42B2B', bg: 'rgba(212,43,43,0.1)',   border: 'rgba(212,43,43,0.2)',   text: '#D42B2B' },
-    Altcom:     { dot: '#C8872A', bg: 'rgba(200,135,42,0.1)',  border: 'rgba(200,135,42,0.2)',  text: '#C8872A' },
-    default:    { dot: '#6B7280', bg: 'rgba(107,114,128,0.1)', border: 'rgba(107,114,128,0.2)', text: '#6B7280' },
+    Altimmo:    { dot: '#2E7BB5', bg: 'rgba(46,123,181,0.08)',  border: 'rgba(46,123,181,0.15)',  text: '#2E7BB5' },
+    MilaEvents: { dot: '#D42B2B', bg: 'rgba(212,43,43,0.08)',   border: 'rgba(212,43,43,0.15)',   text: '#D42B2B' },
+    Altcom:     { dot: '#C8872A', bg: 'rgba(200,135,42,0.08)',  border: 'rgba(200,135,42,0.15)',  text: '#C8872A' },
+    default:    { dot: '#9CA3AF', bg: 'rgba(156,163,175,0.08)', border: 'rgba(156,163,175,0.15)', text: '#9CA3AF' },
 };
 const getPole = (pole) => POLE_COLORS[pole] || POLE_COLORS.default;
 
-const SLIDE_DURATION = 5000;
+const SLIDE_DURATION = 6000;
 
-// ─── Card témoignage ────────────────────────────────────────
-const TestimonialCard = ({ t, isActive }) => {
+// ─────────────────────────────────────────────────────────────
+// Card individuelle
+// ─────────────────────────────────────────────────────────────
+const TestimonialCard = ({ t, index }) => {
     const pc = getPole(t.pole);
+
     return (
         <motion.div
-            animate={{ opacity: isActive ? 1 : 0.4, scale: isActive ? 1 : 0.95 }}
-            transition={{ duration: 0.4 }}
-            className="relative bg-white rounded-3xl p-6 border flex flex-col gap-4 h-full select-none"
-            style={{
-                borderColor: isActive ? pc.border : 'rgba(0,0,0,0.05)',
-                boxShadow:   isActive ? `0 16px 48px rgba(0,0,0,0.10), 0 0 0 1px ${pc.border}` : 'none',
-                minHeight:   '260px',
-            }}
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.55, delay: index * 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="relative bg-white rounded-2xl p-6 flex flex-col gap-4 border group hover:shadow-xl transition-all duration-500 hover:-translate-y-1"
+            style={{ borderColor: 'rgba(0,0,0,0.07)' }}
         >
-            {/* Guillemet décoratif */}
-            <div className="absolute top-4 right-5 opacity-8 select-none pointer-events-none"
-                style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '4.5rem', lineHeight: 1, color: pc.dot, opacity: 0.08 }}>
-                "
-            </div>
+            {/* Ligne colorée en haut — apparaît au hover */}
+            <div
+                className="absolute top-0 left-6 right-6 h-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{ backgroundColor: pc.dot }}
+            />
 
-            {/* Avatar + nom */}
-            <div className="flex items-center gap-3 relative z-10">
-                <div className="relative flex-shrink-0">
-                    <img
-                        src={t.author?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=f1f5f9&color=475569&size=80`}
-                        alt={t.author?.name || 'Client'}
-                        className="w-10 h-10 rounded-full object-cover border-2"
-                        style={{ borderColor: pc.dot }}
-                        onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=f1f5f9&color=475569&size=80`; }}
-                    />
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white"
-                        style={{ backgroundColor: pc.dot }}>
-                        <Quote className="w-2 h-2 text-white" fill="currentColor" />
-                    </div>
+            {/* Guillemet décoratif */}
+            <Quote
+                className="absolute top-5 right-5 opacity-[0.06]"
+                style={{ width: 36, height: 36, color: pc.dot }}
+                fill="currentColor"
+            />
+
+            {/* Étoiles */}
+            {t.rating && (
+                <div className="flex gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                        <Star
+                            key={i}
+                            size={13}
+                            className={i < t.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-200"}
+                        />
+                    ))}
                 </div>
+            )}
+
+            {/* Citation */}
+            <blockquote
+                className="text-gray-600 leading-relaxed flex-1 relative z-10"
+                style={{
+                    fontFamily: "'Cormorant Garamond', Georgia, serif",
+                    fontSize:   'clamp(1rem, 1.3vw, 1.08rem)',
+                    fontStyle:  'italic',
+                }}
+            >
+                "{t.comment}"
+            </blockquote>
+
+            {/* Séparateur */}
+            <div className="h-px bg-gray-100" />
+
+            {/* Auteur */}
+            <div className="flex items-center gap-3 relative z-10">
+                <img
+                    src={
+                        t.author?.photo ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=f1f5f9&color=64748b&size=80`
+                    }
+                    alt={t.author?.name || 'Client'}
+                    className="w-9 h-9 rounded-full object-cover border-2 flex-shrink-0"
+                    style={{ borderColor: pc.dot }}
+                    onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=f1f5f9&color=64748b&size=80`;
+                    }}
+                />
                 <div className="min-w-0 flex-1">
-                    <p className="font-bold text-gray-900 text-sm truncate" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    <p
+                        className="font-bold text-gray-900 text-sm truncate leading-tight"
+                        style={{ fontFamily: "'Outfit', sans-serif" }}
+                    >
                         {t.author?.name || 'Client'}
                     </p>
                     {t.pole && (
-                        <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full"
-                            style={{ backgroundColor: pc.bg, color: pc.text, fontFamily: "'Outfit', sans-serif" }}>
+                        <span
+                            className="text-xs font-medium"
+                            style={{ color: pc.dot, fontFamily: "'Outfit', sans-serif" }}
+                        >
                             {t.pole}
                         </span>
                     )}
                 </div>
-                {t.rating && (
-                    <div className="flex gap-0.5 flex-shrink-0">
-                        {[...Array(5)].map((_, i) => (
-                            <Star key={i} size={11} className={i < t.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-200"} />
-                        ))}
-                    </div>
-                )}
             </div>
-
-            {/* Citation */}
-            <blockquote className="text-gray-600 leading-relaxed flex-1 relative z-10"
-                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(0.95rem, 1.4vw, 1.05rem)', fontStyle: 'italic' }}>
-                "{t.comment}"
-            </blockquote>
-
-            {/* Réponse admin condensée */}
-            {t.adminResponse?.text && (
-                <div className="rounded-xl p-3 text-xs leading-relaxed relative z-10 border-l-2"
-                    style={{ backgroundColor: 'rgba(46,123,181,0.05)', borderColor: '#2E7BB5' }}>
-                    <p className="font-semibold text-[#2E7BB5] mb-0.5" style={{ fontFamily: "'Outfit', sans-serif" }}>
-                        Réponse Altitude-Vision
-                    </p>
-                    <p className="text-gray-500 line-clamp-2" style={{ fontFamily: "'Outfit', sans-serif" }}>
-                        {t.adminResponse.text}
-                    </p>
-                </div>
-            )}
         </motion.div>
     );
 };
 
-// ─── Composant principal ─────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Composant principal
+// ─────────────────────────────────────────────────────────────
 const Testimonials = () => {
     const [testimonials, setTestimonials] = useState([]);
     const [isLoading, setIsLoading]       = useState(true);
     const [error, setError]               = useState(null);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const timerRef = useRef(null);
+    const [page, setPage]                 = useState(0);
+    const timerRef                        = useRef(null);
+
     const { user } = useAuth();
     const navigate = useNavigate();
 
+    // ── Chargement ──────────────────────────
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const data = await getAllTestimonials(10);
+                const data = await getAllTestimonials(12);
                 setTestimonials(Array.isArray(data) ? data : []);
             } catch {
                 setError('Impossible de charger les avis');
@@ -116,38 +138,51 @@ const Testimonials = () => {
         fetchData();
     }, []);
 
+    // ── Pagination — 3 cards par page ───────
+    const CARDS_PER_PAGE = 3;
+    const totalPages     = Math.ceil(testimonials.length / CARDS_PER_PAGE);
+    const visibleCards   = testimonials.slice(page * CARDS_PER_PAGE, page * CARDS_PER_PAGE + CARDS_PER_PAGE);
+
+    // ── Timer auto ──────────────────────────
     const resetTimer = useCallback(() => {
         clearInterval(timerRef.current);
-        if (testimonials.length <= 1) return;
+        if (totalPages <= 1) return;
         timerRef.current = setInterval(() => {
-            setCurrentIndex(i => (i + 1) % testimonials.length);
+            setPage(p => (p + 1) % totalPages);
         }, SLIDE_DURATION);
-    }, [testimonials.length]);
+    }, [totalPages]);
 
-    useEffect(() => { resetTimer(); return () => clearInterval(timerRef.current); }, [resetTimer]);
+    useEffect(() => {
+        resetTimer();
+        return () => clearInterval(timerRef.current);
+    }, [resetTimer]);
 
-    const prev = () => { setCurrentIndex(i => (i - 1 + testimonials.length) % testimonials.length); resetTimer(); };
-    const next = () => { setCurrentIndex(i => (i + 1) % testimonials.length); resetTimer(); };
-    const getItem = (offset) => testimonials[(currentIndex + offset + testimonials.length) % testimonials.length];
+    const prev = () => { setPage(p => (p - 1 + totalPages) % totalPages); resetTimer(); };
+    const next = () => { setPage(p => (p + 1) % totalPages); resetTimer(); };
 
-    const handleLeaveReview = () => navigate(user ? '/avis/nouveau' : '/login', { state: user ? undefined : { from: '/avis/nouveau' } });
+    const handleLeaveReview = () =>
+        navigate(user ? '/avis/nouveau' : '/login', {
+            state: user ? undefined : { from: '/avis/nouveau' },
+        });
 
+    // ── États ───────────────────────────────
     if (isLoading) return (
-        <section className="py-16 flex justify-center items-center min-h-[240px]"
-            style={{ background: '#0D1117' }}>
+        <section className="py-16 flex justify-center items-center min-h-[200px] bg-gray-50">
             <Loader2 className="w-7 h-7 animate-spin" style={{ color: '#C8872A' }} />
         </section>
     );
 
     if (error || !testimonials.length) return (
-        <section className="py-16 text-center px-6" style={{ background: '#0D1117' }}>
-            <Star className="w-8 h-8 text-gray-700 mx-auto mb-3" />
-            <p className="text-gray-400 text-sm mb-5" style={{ fontFamily: "'Outfit', sans-serif" }}>
-                {error || "Aucun avis disponible — soyez le premier !"}
+        <section className="py-16 bg-gray-50 text-center px-6">
+            <Star className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 text-sm mb-5" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                {error || "Aucun avis — soyez le premier à partager votre expérience !"}
             </p>
-            <button onClick={handleLeaveReview}
+            <button
+                onClick={handleLeaveReview}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-white text-sm"
-                style={{ background: 'linear-gradient(135deg, #C8872A, #E5A84B)', fontFamily: "'Outfit', sans-serif" }}>
+                style={{ background: 'linear-gradient(135deg, #C8872A, #E5A84B)', fontFamily: "'Outfit', sans-serif" }}
+            >
                 <MessageSquarePlus className="w-4 h-4" />
                 Laisser un avis
             </button>
@@ -155,128 +190,161 @@ const Testimonials = () => {
     );
 
     return (
-        <section className="py-14 sm:py-16 overflow-hidden relative"
-            style={{ background: 'linear-gradient(135deg, #0D1117 0%, #111827 60%, #0D1117 100%)' }}>
+        <section className="py-16 sm:py-20 bg-gray-50 relative overflow-hidden">
 
-            {/* Halos discrets */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute -left-20 top-1/2 -translate-y-1/2 w-56 h-56 rounded-full blur-[80px] opacity-10"
-                    style={{ background: '#2E7BB5' }} />
-                <div className="absolute -right-20 top-1/2 -translate-y-1/2 w-56 h-56 rounded-full blur-[80px] opacity-8"
-                    style={{ background: '#C8872A' }} />
+            {/* Décoration fond */}
+            <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-0 left-0 right-0 h-px"
+                    style={{ background: 'linear-gradient(to right, transparent, rgba(200,135,42,0.2), transparent)' }} />
+                <div className="absolute bottom-0 left-0 right-0 h-px"
+                    style={{ background: 'linear-gradient(to right, transparent, rgba(46,123,181,0.2), transparent)' }} />
             </div>
-
-            {/* Lignes décoratives */}
-            <div className="absolute top-0 left-0 right-0 h-px"
-                style={{ background: 'linear-gradient(to right, transparent, rgba(200,135,42,0.3), transparent)' }} />
-            <div className="absolute bottom-0 left-0 right-0 h-px"
-                style={{ background: 'linear-gradient(to right, transparent, rgba(46,123,181,0.3), transparent)' }} />
 
             <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
 
-                {/* En-tête + flèches sur la même ligne */}
-                <div className="flex items-center justify-between mb-8">
+                {/* ── En-tête ─────────────────────────── */}
+                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-10">
+
                     <motion.div
-                        initial={{ opacity: 0, y: 16 }}
+                        initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
-                        transition={{ duration: 0.5 }}
+                        transition={{ duration: 0.6 }}
                     >
-                        <p className="text-xs font-bold uppercase tracking-widest mb-1.5"
-                            style={{ color: '#C8872A', fontFamily: "'Outfit', sans-serif" }}>
+                        <p
+                            className="text-xs font-bold uppercase tracking-widest mb-2"
+                            style={{ color: '#C8872A', fontFamily: "'Outfit', sans-serif" }}
+                        >
                             Témoignages
                         </p>
-                        <h2 className="text-white"
+                        <h2
+                            className="text-gray-900"
                             style={{
                                 fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                fontSize:   'clamp(1.6rem, 3vw, 2.5rem)',
+                                fontSize:   'clamp(1.8rem, 3.5vw, 2.8rem)',
                                 fontWeight: 700,
                                 lineHeight: 1.1,
-                            }}>
-                            Ce que disent nos clients
-                        </h2>
-                    </motion.div>
-
-                    {testimonials.length > 1 && (
-                        <div className="flex gap-2 flex-shrink-0">
-                            <button onClick={prev} aria-label="Précédent"
-                                className="w-9 h-9 rounded-full border border-white/10 bg-white/5 hover:bg-white/15 flex items-center justify-center transition-all hover:scale-110">
-                                <ChevronLeft className="w-4 h-4 text-white/70" />
-                            </button>
-                            <button onClick={next} aria-label="Suivant"
-                                className="w-9 h-9 rounded-full border border-white/10 bg-white/5 hover:bg-white/15 flex items-center justify-center transition-all hover:scale-110">
-                                <ChevronRight className="w-4 h-4 text-white/70" />
-                            </button>
-                        </div>
-                    )}
-                </div>
-
-                {/* Slider 3 cards — centre visible, côtés partiels */}
-                <div className="relative">
-                    {/* Masques bords */}
-                    <div className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none"
-                        style={{ background: 'linear-gradient(to right, #0D1117, transparent)' }} />
-                    <div className="absolute right-0 top-0 bottom-0 w-12 z-10 pointer-events-none"
-                        style={{ background: 'linear-gradient(to left, #0D1117, transparent)' }} />
-
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={currentIndex}
-                            initial={{ opacity: 0, x: 30 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -30 }}
-                            transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
-                            className="grid gap-4"
-                            style={{
-                                gridTemplateColumns: testimonials.length === 1
-                                    ? '1fr'
-                                    : '80px 1fr 80px',
                             }}
                         >
-                            {testimonials.length > 1 && (
-                                <div className="overflow-hidden rounded-3xl">
-                                    <TestimonialCard t={getItem(-1)} isActive={false} />
-                                </div>
-                            )}
-                            <TestimonialCard t={getItem(0)} isActive={true} />
-                            {testimonials.length > 1 && (
-                                <div className="overflow-hidden rounded-3xl">
-                                    <TestimonialCard t={getItem(1)} isActive={false} />
-                                </div>
-                            )}
-                        </motion.div>
-                    </AnimatePresence>
+                            Ce que disent nos clients
+                        </h2>
+                        <div className="h-0.5 w-12 mt-3 rounded-full"
+                            style={{ background: 'linear-gradient(to right, #C8872A, #2E7BB5)' }} />
+                    </motion.div>
+
+                    {/* Contrôles droite */}
+                    <motion.div
+                        className="flex items-center gap-4 flex-shrink-0"
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.6, delay: 0.2 }}
+                    >
+                        {/* Compteur page */}
+                        {totalPages > 1 && (
+                            <span
+                                className="text-sm text-gray-400 tabular-nums"
+                                style={{ fontFamily: "'Outfit', sans-serif" }}
+                            >
+                                {String(page + 1).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
+                            </span>
+                        )}
+
+                        {/* Flèches */}
+                        {totalPages > 1 && (
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={prev}
+                                    aria-label="Page précédente"
+                                    className="w-9 h-9 rounded-full border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 flex items-center justify-center transition-all duration-200 hover:scale-105 shadow-sm"
+                                >
+                                    <ChevronLeft className="w-4 h-4 text-gray-500" />
+                                </button>
+                                <button
+                                    onClick={next}
+                                    aria-label="Page suivante"
+                                    className="w-9 h-9 rounded-full border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 flex items-center justify-center transition-all duration-200 hover:scale-105 shadow-sm"
+                                >
+                                    <ChevronRight className="w-4 h-4 text-gray-500" />
+                                </button>
+                            </div>
+                        )}
+
+                        {/* CTA */}
+                        <motion.button
+                            onClick={handleLeaveReview}
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.97 }}
+                            className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-white text-sm"
+                            style={{
+                                background: 'linear-gradient(135deg, #C8872A, #E5A84B)',
+                                boxShadow:  '0 4px 16px rgba(200,135,42,0.25)',
+                                fontFamily: "'Outfit', sans-serif",
+                            }}
+                        >
+                            <MessageSquarePlus className="w-4 h-4" />
+                            Laisser un avis
+                        </motion.button>
+                    </motion.div>
                 </div>
 
-                {/* Dots + CTA */}
-                <div className="flex items-center justify-between mt-7">
-                    <div className="flex gap-1.5">
-                        {testimonials.map((_, i) => (
-                            <button key={i} onClick={() => { setCurrentIndex(i); resetTimer(); }}
-                                aria-label={`Avis ${i + 1}`}
-                                className="rounded-full transition-all duration-300"
-                                style={{
-                                    width:           i === currentIndex ? '18px' : '6px',
-                                    height:          '6px',
-                                    backgroundColor: i === currentIndex ? '#C8872A' : 'rgba(255,255,255,0.18)',
-                                }} />
+                {/* ── Grille 3 cards ───────────────────── */}
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={page}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.35 }}
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+                    >
+                        {visibleCards.map((t, i) => (
+                            <TestimonialCard key={t._id || i} t={t} index={i} />
                         ))}
-                    </div>
 
+                        {/* Placeholders si moins de 3 cards sur la dernière page */}
+                        {visibleCards.length < CARDS_PER_PAGE &&
+                            Array.from({ length: CARDS_PER_PAGE - visibleCards.length }).map((_, i) => (
+                                <div key={`ph-${i}`} className="hidden lg:block" />
+                            ))
+                        }
+                    </motion.div>
+                </AnimatePresence>
+
+                {/* ── Dots + CTA mobile ─────────────────── */}
+                <div className="flex items-center justify-between mt-8">
+                    {/* Dots */}
+                    {totalPages > 1 && (
+                        <div className="flex gap-1.5">
+                            {Array.from({ length: totalPages }).map((_, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => { setPage(i); resetTimer(); }}
+                                    aria-label={`Page ${i + 1}`}
+                                    className="rounded-full transition-all duration-300"
+                                    style={{
+                                        width:           i === page ? '20px' : '6px',
+                                        height:          '6px',
+                                        backgroundColor: i === page ? '#C8872A' : '#D1D5DB',
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    )}
+
+                    {/* CTA mobile */}
                     <motion.button
                         onClick={handleLeaveReview}
                         whileHover={{ scale: 1.04 }}
                         whileTap={{ scale: 0.97 }}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-white text-sm"
+                        className="sm:hidden inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-white text-sm ml-auto"
                         style={{
                             background: 'linear-gradient(135deg, #C8872A, #E5A84B)',
-                            boxShadow:  '0 4px 16px rgba(200,135,42,0.3)',
                             fontFamily: "'Outfit', sans-serif",
                         }}
                     >
                         <MessageSquarePlus className="w-4 h-4" />
                         Laisser un avis
-                        {!user && <span className="opacity-50 text-xs font-normal">(connexion requise)</span>}
                     </motion.button>
                 </div>
             </div>
