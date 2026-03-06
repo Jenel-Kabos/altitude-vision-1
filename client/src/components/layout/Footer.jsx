@@ -166,7 +166,7 @@ const Footer = () => {
                                 {
                                     icon: Phone,
                                     color: '#D42B2B',
-                                    lines: ['+242 068 002 151'],
+                                    lines: ['+242 06 800 21 51'],
                                     href: 'tel:+242068002151',
                                 },
                             ].map(({ icon: Icon, color, lines, href }, i) => (
