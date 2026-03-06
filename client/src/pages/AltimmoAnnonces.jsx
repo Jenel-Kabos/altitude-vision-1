@@ -1,521 +1,489 @@
-// src/pages/AltimmoAnnonces.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Home,
-  MapPin,
-  Search,
-  X,
-  Loader2,
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  Grid3x3,
-  List,
-  SlidersHorizontal,
-  Building2,
-  Tag,
+    Home, MapPin, Search, X, AlertCircle,
+    ChevronLeft, ChevronRight, Grid3x3, List,
+    SlidersHorizontal, Building2, Tag, ArrowRight,
 } from 'lucide-react';
 import { getAllProperties } from '../services/propertyService';
-import PropertyCard from '../components/PropertyCard';
+import PropertyCard         from '../components/PropertyCard';
 
-const PROPERTIES_PER_PAGE = 12;
+// ─────────────────────────────────────────────────────────────
+// Constantes
+// ─────────────────────────────────────────────────────────────
+const BLUE       = '#2E7BB5';
+const BLUE_DARK  = '#1A5A8A';
+const GOLD       = '#C8872A';
 
-// ✅ CORRECTION : Aligné avec le modèle backend
-const TRANSACTION_TYPES = ['Tous', 'vente', 'location', 'viager'];
-const PROPERTY_TYPES = ['Tous', 'Appartement', 'Maison', 'Villa', 'Terrain', 'Bureau', 'Commerce'];
-const AVAILABILITY_STATUS = ['Tous', 'Disponible', 'Vendu', 'Loué', 'Réservé'];
+const PROPERTIES_PER_PAGE  = 12;
+const TRANSACTION_TYPES    = ['Tous', 'vente', 'location', 'viager'];
+const PROPERTY_TYPES       = ['Tous', 'Appartement', 'Maison', 'Villa', 'Terrain', 'Bureau', 'Commerce'];
+const AVAILABILITY_STATUS  = ['Tous', 'Disponible', 'Vendu', 'Loué', 'Réservé'];
 
-const AltimmoAnnonces = () => {
-  const navigate = useNavigate();
-  const [properties, setProperties] = useState([]);
-  const [filteredProperties, setFilteredProperties] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('Tous'); // ✅ Renommé de selectedCategory
-  const [selectedType, setSelectedType] = useState('Tous');
-  const [selectedAvailability, setSelectedAvailability] = useState('Tous'); // ✅ Nouveau filtre
-  const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('grid');
-  const [sortBy, setSortBy] = useState('date-desc');
-  const [priceRange, setPriceRange] = useState({ min: '', max: '' });
-
-  useEffect(() => {
-    fetchProperties();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [properties, searchTerm, selectedStatus, selectedType, selectedAvailability, sortBy, priceRange]);
-
-  const fetchProperties = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getAllProperties({ pole: 'Altimmo' });
-      console.log('📦 Propriétés chargées:', data); // Debug
-      setProperties(data || []);
-      setFilteredProperties(data || []);
-    } catch (err) {
-      console.error('❌ Erreur lors du chargement des propriétés:', err);
-      setError('Impossible de charger les annonces. Veuillez réessayer.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
-    let filtered = [...properties];
-
-    // ✅ Filtre par recherche textuelle
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter((property) => {
-        const searchableText = [
-          property.title || '',
-          property.description || '',
-          property.address?.city || '',
-          property.address?.district || '',
-          property.address?.street || '',
-          property.type || '',
-        ].join(' ').toLowerCase();
-        
-        return searchableText.includes(searchLower);
-      });
-    }
-
-    // ✅ Filtre par status (vente/location/viager)
-    if (selectedStatus !== 'Tous') {
-      filtered = filtered.filter((p) => p.status === selectedStatus);
-    }
-
-    // ✅ Filtre par type de bien
-    if (selectedType !== 'Tous') {
-      filtered = filtered.filter((p) => p.type === selectedType);
-    }
-
-    // ✅ Filtre par disponibilité
-    if (selectedAvailability !== 'Tous') {
-      filtered = filtered.filter((p) => p.availability === selectedAvailability);
-    }
-
-    // ✅ Filtre par prix
-    if (priceRange.min && !isNaN(priceRange.min)) {
-      filtered = filtered.filter((p) => p.price >= parseInt(priceRange.min));
-    }
-    if (priceRange.max && !isNaN(priceRange.max)) {
-      filtered = filtered.filter((p) => p.price <= parseInt(priceRange.max));
-    }
-
-    // ✅ Tri
-    switch (sortBy) {
-      case 'date-desc':
-        filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        break;
-      case 'date-asc':
-        filtered.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        break;
-      case 'price-asc':
-        filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
-        break;
-      case 'price-desc':
-        filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
-        break;
-      case 'surface-desc':
-        filtered.sort((a, b) => (b.surface || 0) - (a.surface || 0));
-        break;
-      case 'surface-asc':
-        filtered.sort((a, b) => (a.surface || 0) - (b.surface || 0));
-        break;
-      default:
-        break;
-    }
-
-    setFilteredProperties(filtered);
-    setCurrentPage(1);
-  };
-
-  const resetFilters = () => {
-    setSearchTerm('');
-    setSelectedStatus('Tous');
-    setSelectedType('Tous');
-    setSelectedAvailability('Tous');
-    setSortBy('date-desc');
-    setPriceRange({ min: '', max: '' });
-  };
-
-  const hasActiveFilters = () => {
-    return (
-      searchTerm.trim() ||
-      selectedStatus !== 'Tous' ||
-      selectedType !== 'Tous' ||
-      selectedAvailability !== 'Tous' ||
-      priceRange.min ||
-      priceRange.max
-    );
-  };
-
-  const totalPages = Math.ceil(filteredProperties.length / PROPERTIES_PER_PAGE);
-  const startIndex = (currentPage - 1) * PROPERTIES_PER_PAGE;
-  const currentProperties = filteredProperties.slice(startIndex, startIndex + PROPERTIES_PER_PAGE);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <Loader2 className="w-16 h-16 text-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 text-xl font-semibold">Chargement des annonces...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="bg-red-50 border-l-4 border-red-500 p-8 rounded-lg shadow-md max-w-md">
-          <div className="flex items-center mb-4">
-            <AlertCircle className="text-red-500 w-8 h-8 mr-3" />
-            <h3 className="text-xl font-semibold text-red-800">Erreur</h3>
-          </div>
-          <p className="text-red-700 mb-6">{error}</p>
-          <button
-            onClick={fetchProperties}
-            className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition font-semibold"
-          >
-            Réessayer
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <div
-        className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-20 relative overflow-hidden"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(37, 99, 235, 0.9), rgba(67, 56, 202, 0.9)), url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=2073&auto=format&fit=crop')",
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
-        <div className="container mx-auto px-6 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="text-center"
-          >
-            <h1 className="text-5xl lg:text-6xl font-extrabold mb-4">Nos Biens Immobiliers</h1>
-            <p className="text-xl lg:text-2xl text-blue-100 max-w-3xl mx-auto">
-              Découvrez notre sélection de propriétés exceptionnelles pour votre projet immobilier
-            </p>
-            <div className="mt-8 flex items-center justify-center gap-4 text-lg">
-              <div className="bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full">
-                <Building2 className="w-5 h-5 inline mr-2" />
-                <span className="font-bold">{properties.length}</span> Biens
-              </div>
-              <div className="bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full">
-                <Tag className="w-5 h-5 inline mr-2" />
-                <span className="font-bold">{PROPERTY_TYPES.length - 1}</span> Types
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-6 py-12">
-        {/* Barre de recherche et filtres */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
-          <div className="flex flex-col lg:flex-row gap-4 items-center">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Rechercher un bien, une ville, un quartier..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-lg"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-
+// ─────────────────────────────────────────────────────────────
+// Skeleton card
+// ─────────────────────────────────────────────────────────────
+const PropertySkeleton = () => (
+    <div className="animate-pulse bg-white rounded-3xl overflow-hidden border border-gray-100">
+        <div className="bg-gray-200 h-52" />
+        <div className="p-5 space-y-3">
             <div className="flex gap-2">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition ${
-                  showFilters || hasActiveFilters()
-                    ? 'bg-blue-600 text-white shadow-lg' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <SlidersHorizontal className="w-5 h-5" />
-                Filtres
-                {hasActiveFilters() && !showFilters && (
-                  <span className="ml-1 bg-white text-blue-600 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                    !
-                  </span>
-                )}
-              </button>
-
-              <div className="flex bg-gray-100 rounded-xl p-1">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-lg transition ${
-                    viewMode === 'grid' ? 'bg-white shadow' : 'hover:bg-gray-200'
-                  }`}
-                  title="Vue grille"
-                >
-                  <Grid3x3 className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-lg transition ${
-                    viewMode === 'list' ? 'bg-white shadow' : 'hover:bg-gray-200'
-                  }`}
-                  title="Vue liste"
-                >
-                  <List className="w-5 h-5" />
-                </button>
-              </div>
+                <div className="h-5 bg-gray-100 rounded-full w-16" />
+                <div className="h-5 bg-gray-100 rounded-full w-20" />
             </div>
-          </div>
-
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    
-                    {/* ✅ Filtre Type de Transaction */}
-                    <div>
-                      <label className="block text-gray-700 font-semibold mb-3">Type de transaction</label>
-                      <div className="flex flex-wrap gap-2">
-                        {TRANSACTION_TYPES.map((status) => (
-                          <button
-                            key={status}
-                            onClick={() => setSelectedStatus(status)}
-                            className={`px-4 py-2 rounded-full font-medium transition capitalize ${
-                              selectedStatus === status
-                                ? 'bg-blue-600 text-white shadow-lg'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            {status}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* ✅ Filtre Type de Bien */}
-                    <div>
-                      <label className="block text-gray-700 font-semibold mb-3">Type de bien</label>
-                      <select
-                        value={selectedType}
-                        onChange={(e) => setSelectedType(e.target.value)}
-                        className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
-                      >
-                        {PROPERTY_TYPES.map((type) => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* ✅ Filtre Disponibilité */}
-                    <div>
-                      <label className="block text-gray-700 font-semibold mb-3">Disponibilité</label>
-                      <select
-                        value={selectedAvailability}
-                        onChange={(e) => setSelectedAvailability(e.target.value)}
-                        className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
-                      >
-                        {AVAILABILITY_STATUS.map((avail) => (
-                          <option key={avail} value={avail}>
-                            {avail}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* ✅ Filtre Tri */}
-                    <div>
-                      <label className="block text-gray-700 font-semibold mb-3">Trier par</label>
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value)}
-                        className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
-                      >
-                        <option value="date-desc">Plus récent</option>
-                        <option value="date-asc">Plus ancien</option>
-                        <option value="price-asc">Prix croissant</option>
-                        <option value="price-desc">Prix décroissant</option>
-                        <option value="surface-desc">Surface décroissante</option>
-                        <option value="surface-asc">Surface croissante</option>
-                      </select>
-                    </div>
-
-                    {/* ✅ Filtre Prix */}
-                    <div className="md:col-span-2">
-                      <label className="block text-gray-700 font-semibold mb-3">Fourchette de prix (FCFA)</label>
-                      <div className="flex gap-4">
-                        <input
-                          type="number"
-                          placeholder="Prix min"
-                          value={priceRange.min}
-                          onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
-                          className="flex-1 p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                        <span className="flex items-center text-gray-500 font-bold">—</span>
-                        <input
-                          type="number"
-                          placeholder="Prix max"
-                          value={priceRange.max}
-                          onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
-                          className="flex-1 p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex justify-end">
-                    <button
-                      onClick={resetFilters}
-                      className="flex items-center gap-2 text-gray-600 hover:text-red-600 font-semibold transition"
-                    >
-                      <X className="w-5 h-5" />
-                      Réinitialiser les filtres
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            <div className="h-4 bg-gray-100 rounded-full w-3/4" />
+            <div className="h-3 bg-gray-100 rounded-full w-full" />
+            <div className="h-5 bg-gray-100 rounded-full w-1/3 mt-2" />
         </div>
-
-        {/* Résultats */}
-        <div className="mb-6 flex items-center justify-between">
-          <p className="text-gray-600 text-lg">
-            <span className="font-bold text-gray-800">{filteredProperties.length}</span> bien
-            {filteredProperties.length > 1 ? 's' : ''} trouvé{filteredProperties.length > 1 ? 's' : ''}
-          </p>
-          {hasActiveFilters() && (
-            <button 
-              onClick={resetFilters} 
-              className="text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-2"
-            >
-              <X className="w-4 h-4" />
-              Voir tous les biens
-            </button>
-          )}
-        </div>
-
-        {currentProperties.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-md p-16 text-center"
-          >
-            <Home className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">Aucun bien trouvé</h3>
-            <p className="text-gray-600 mb-6">
-              {hasActiveFilters() 
-                ? 'Essayez de modifier vos critères de recherche ou filtres' 
-                : 'Aucun bien disponible pour le moment'}
-            </p>
-            {hasActiveFilters() && (
-              <button
-                onClick={resetFilters}
-                className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition font-semibold"
-              >
-                Réinitialiser les filtres
-              </button>
-            )}
-          </motion.div>
-        ) : (
-          <>
-            <div
-              className={
-                viewMode === 'grid'
-                  ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8'
-                  : 'space-y-6'
-              }
-            >
-              {currentProperties.map((property, index) => (
-                <motion.div
-                  key={property._id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                >
-                  <PropertyCard
-                    property={property}
-                    index={index}
-                    viewMode={viewMode}
-                  />
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center gap-2 mt-12">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-3 rounded-lg bg-white shadow disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition"
-                >
-                  <ChevronLeft className="w-6 h-6" />
-                </button>
-
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-5 py-3 rounded-lg font-bold text-lg transition ${
-                      page === currentPage
-                        ? 'bg-blue-600 text-white shadow-lg'
-                        : 'bg-white text-gray-700 hover:bg-gray-100 shadow'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="p-3 rounded-lg bg-white shadow disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition"
-                >
-                  <ChevronRight className="w-6 h-6" />
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
     </div>
-  );
+);
+
+// ─────────────────────────────────────────────────────────────
+// Pagination
+// ─────────────────────────────────────────────────────────────
+const Pagination = ({ totalPages, currentPage, onPageChange }) => {
+    if (totalPages <= 1) return null;
+    return (
+        <div className="flex justify-center items-center gap-2 mt-12">
+            <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}
+                className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center disabled:opacity-30 hover:bg-gray-50 transition-all">
+                <ChevronLeft className="w-4 h-4 text-gray-500" />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => onPageChange(p)}
+                    className="min-w-[36px] h-9 px-3 rounded-full font-semibold text-sm transition-all"
+                    style={{
+                        background:  p === currentPage ? `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` : 'white',
+                        color:       p === currentPage ? 'white' : '#6B7280',
+                        border:      `1px solid ${p === currentPage ? 'transparent' : '#E5E7EB'}`,
+                        boxShadow:   p === currentPage ? `0 4px 12px ${BLUE}40` : 'none',
+                        fontFamily:  "'Outfit', sans-serif",
+                    }}>
+                    {p}
+                </button>
+            ))}
+            <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}
+                className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center disabled:opacity-30 hover:bg-gray-50 transition-all">
+                <ChevronRight className="w-4 h-4 text-gray-500" />
+            </button>
+        </div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Page principale
+// ─────────────────────────────────────────────────────────────
+const AltimmoAnnonces = () => {
+    const [properties,   setProperties]  = useState([]);
+    const [filtered,     setFiltered]    = useState([]);
+    const [loading,      setLoading]     = useState(true);
+    const [error,        setError]       = useState(null);
+    const [currentPage,  setPage]        = useState(1);
+    const [searchTerm,   setSearch]      = useState('');
+    const [selStatus,    setSelStatus]   = useState('Tous');
+    const [selType,      setSelType]     = useState('Tous');
+    const [selAvail,     setSelAvail]    = useState('Tous');
+    const [showFilters,  setShowFilters] = useState(false);
+    const [viewMode,     setViewMode]    = useState('grid');
+    const [sortBy,       setSortBy]      = useState('date-desc');
+    const [priceRange,   setPriceRange]  = useState({ min: '', max: '' });
+
+    // ── Fetch ─────────────────────────────────
+    const fetchProperties = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const data = await getAllProperties({ pole: 'Altimmo' });
+            setProperties(data || []);
+            setFiltered(data || []);
+        } catch {
+            setError('Impossible de charger les annonces. Veuillez réessayer.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchProperties(); }, []);
+
+    // ── Filtres ───────────────────────────────
+    useEffect(() => {
+        let f = [...properties];
+
+        if (searchTerm.trim()) {
+            const q = searchTerm.toLowerCase();
+            f = f.filter(p => [
+                p.title || '', p.description || '',
+                p.address?.city || '', p.address?.district || '',
+                p.address?.street || '', p.type || '',
+            ].join(' ').toLowerCase().includes(q));
+        }
+        if (selStatus !== 'Tous') f = f.filter(p => p.status === selStatus);
+        if (selType   !== 'Tous') f = f.filter(p => p.type === selType);
+        if (selAvail  !== 'Tous') f = f.filter(p => p.availability === selAvail);
+        if (priceRange.min && !isNaN(priceRange.min)) f = f.filter(p => p.price >= parseInt(priceRange.min));
+        if (priceRange.max && !isNaN(priceRange.max)) f = f.filter(p => p.price <= parseInt(priceRange.max));
+
+        switch (sortBy) {
+            case 'date-asc':     f.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); break;
+            case 'price-asc':    f.sort((a, b) => (a.price || 0) - (b.price || 0)); break;
+            case 'price-desc':   f.sort((a, b) => (b.price || 0) - (a.price || 0)); break;
+            case 'surface-desc': f.sort((a, b) => (b.surface || 0) - (a.surface || 0)); break;
+            case 'surface-asc':  f.sort((a, b) => (a.surface || 0) - (b.surface || 0)); break;
+            default:             f.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
+        }
+
+        setFiltered(f);
+        setPage(1);
+    }, [properties, searchTerm, selStatus, selType, selAvail, sortBy, priceRange]);
+
+    const resetFilters = () => {
+        setSearch(''); setSelStatus('Tous'); setSelType('Tous');
+        setSelAvail('Tous'); setSortBy('date-desc'); setPriceRange({ min: '', max: '' });
+    };
+
+    const hasFilters = searchTerm.trim() || selStatus !== 'Tous' || selType !== 'Tous' ||
+        selAvail !== 'Tous' || priceRange.min || priceRange.max;
+
+    const totalPages        = Math.ceil(filtered.length / PROPERTIES_PER_PAGE);
+    const currentProperties = filtered.slice((currentPage - 1) * PROPERTIES_PER_PAGE, currentPage * PROPERTIES_PER_PAGE);
+
+    const inputFocus = e => { e.target.style.borderColor = BLUE; e.target.style.boxShadow = `0 0 0 3px ${BLUE}15`; };
+    const inputBlur  = e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; };
+
+    // ── État erreur ───────────────────────────
+    if (error) return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+            <div className="bg-white rounded-3xl border border-red-100 p-8 max-w-md w-full text-center shadow-sm">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                    style={{ background: `${BLUE}12` }}>
+                    <AlertCircle className="w-7 h-7" style={{ color: BLUE }} />
+                </div>
+                <h3 className="font-bold text-gray-900 text-lg mb-2"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    Erreur de chargement
+                </h3>
+                <p className="text-gray-500 text-sm mb-6"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    {error}
+                </p>
+                <button onClick={fetchProperties}
+                    className="px-6 py-2.5 rounded-full font-semibold text-white text-sm"
+                    style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`, fontFamily: "'Outfit', sans-serif" }}>
+                    Réessayer
+                </button>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+
+            {/* ── Hero ─────────────────────────────── */}
+            <div className="relative py-20 text-white overflow-hidden"
+                style={{
+                    backgroundImage: "linear-gradient(to bottom, rgba(26,90,138,0.92), rgba(13,17,23,0.97)), url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=2073&auto=format&fit=crop')",
+                    backgroundSize: 'cover', backgroundPosition: 'center',
+                }}>
+
+                <div className="absolute top-0 left-0 right-0 h-px"
+                    style={{ background: `linear-gradient(to right, transparent, ${BLUE}60, transparent)` }} />
+                <div className="absolute inset-0 pointer-events-none"
+                    style={{ background: `radial-gradient(ellipse at 20% 50%, ${BLUE}20, transparent 60%)` }} />
+
+                <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
+                    <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.7 }}>
+
+                        <p className="text-xs font-bold uppercase tracking-widest mb-4 text-white/60">
+                            Altimmo
+                        </p>
+                        <h1 className="text-white mb-4 max-w-3xl"
+                            style={{
+                                fontFamily: "'Cormorant Garamond', Georgia, serif",
+                                fontSize:   'clamp(2.2rem, 5vw, 4rem)',
+                                fontWeight: 700, lineHeight: 1.1,
+                            }}>
+                            Nos Biens Immobiliers
+                        </h1>
+                        <div className="h-0.5 w-16 rounded-full mb-4"
+                            style={{ background: `linear-gradient(to right, ${BLUE}, ${GOLD})` }} />
+                        <p className="text-white/60 max-w-xl leading-relaxed mb-8">
+                            Découvrez notre sélection de propriétés exceptionnelles pour votre projet immobilier.
+                        </p>
+
+                        {/* Stats */}
+                        <div className="flex flex-wrap gap-3">
+                            {[
+                                { Icon: Building2, value: properties.length, label: 'Biens' },
+                                { Icon: Tag,       value: PROPERTY_TYPES.length - 1, label: 'Types' },
+                            ].map(({ Icon, value, label }, i) => (
+                                <div key={i}
+                                    className="flex items-center gap-2 px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/10 text-sm font-semibold"
+                                    style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                                    <Icon className="w-4 h-4" style={{ color: '#90C8F0' }} />
+                                    <span style={{ color: '#90C8F0' }}>{value}</span>
+                                    {' '}{label}
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                </div>
+            </div>
+
+            {/* ── Contenu ──────────────────────────── */}
+            <div className="container mx-auto px-4 sm:px-6 max-w-6xl py-12">
+
+                {/* Barre recherche + filtres */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 mb-8">
+                    <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+
+                        {/* Search */}
+                        <div className="relative flex-1">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input type="text" placeholder="Rechercher un bien, une ville, un quartier..."
+                                value={searchTerm} onChange={e => setSearch(e.target.value)}
+                                className="w-full pl-11 pr-10 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none focus:bg-white transition-all placeholder-gray-400"
+                                style={{ fontFamily: "'Outfit', sans-serif" }}
+                                onFocus={inputFocus} onBlur={inputBlur} />
+                            {searchTerm && (
+                                <button onClick={() => setSearch('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 transition-colors">
+                                    <X className="w-3.5 h-3.5 text-gray-400" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2 flex-shrink-0">
+                            <button onClick={() => setShowFilters(!showFilters)}
+                                className="flex items-center gap-2 px-4 py-3 rounded-2xl font-semibold text-sm transition-all relative"
+                                style={{
+                                    background:  (showFilters || hasFilters) ? `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` : '#F9FAFB',
+                                    color:       (showFilters || hasFilters) ? 'white' : '#374151',
+                                    border:      `1px solid ${(showFilters || hasFilters) ? 'transparent' : '#E5E7EB'}`,
+                                    fontFamily:  "'Outfit', sans-serif",
+                                }}>
+                                <SlidersHorizontal className="w-4 h-4" />
+                                Filtres
+                                {hasFilters && !showFilters && (
+                                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-xs font-bold flex items-center justify-center text-white"
+                                        style={{ background: GOLD, fontSize: '9px' }}>
+                                        !
+                                    </span>
+                                )}
+                            </button>
+
+                            <div className="flex bg-gray-100 rounded-2xl p-1 gap-1">
+                                {[{ mode: 'grid', Icon: Grid3x3 }, { mode: 'list', Icon: List }].map(({ mode, Icon }) => (
+                                    <button key={mode} onClick={() => setViewMode(mode)}
+                                        className="p-2 rounded-xl transition-all"
+                                        style={{
+                                            background: viewMode === mode ? 'white' : 'transparent',
+                                            boxShadow:  viewMode === mode ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                                        }}>
+                                        <Icon className="w-4 h-4 text-gray-600" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Panneau filtres */}
+                    <AnimatePresence>
+                        {showFilters && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }}
+                                className="overflow-hidden">
+                                <div className="pt-5 mt-5 border-t border-gray-100">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                                        {/* Transaction */}
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
+                                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                                Type de transaction
+                                            </label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {TRANSACTION_TYPES.map(s => (
+                                                    <button key={s} onClick={() => setSelStatus(s)}
+                                                        className="px-3.5 py-2 rounded-full text-xs font-semibold capitalize transition-all"
+                                                        style={{
+                                                            background:  selStatus === s ? `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` : '#F9FAFB',
+                                                            color:       selStatus === s ? 'white' : '#6B7280',
+                                                            border:      `1px solid ${selStatus === s ? 'transparent' : '#E5E7EB'}`,
+                                                            boxShadow:   selStatus === s ? `0 4px 12px ${BLUE}30` : 'none',
+                                                            fontFamily:  "'Outfit', sans-serif",
+                                                        }}>
+                                                        {s}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Type de bien */}
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
+                                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                                Type de bien
+                                            </label>
+                                            <select value={selType} onChange={e => setSelType(e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none transition-all"
+                                                style={{ fontFamily: "'Outfit', sans-serif" }}
+                                                onFocus={inputFocus} onBlur={inputBlur}>
+                                                {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                            </select>
+                                        </div>
+
+                                        {/* Disponibilité */}
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
+                                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                                Disponibilité
+                                            </label>
+                                            <select value={selAvail} onChange={e => setSelAvail(e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none transition-all"
+                                                style={{ fontFamily: "'Outfit', sans-serif" }}
+                                                onFocus={inputFocus} onBlur={inputBlur}>
+                                                {AVAILABILITY_STATUS.map(a => <option key={a} value={a}>{a}</option>)}
+                                            </select>
+                                        </div>
+
+                                        {/* Tri */}
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
+                                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                                Trier par
+                                            </label>
+                                            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none transition-all"
+                                                style={{ fontFamily: "'Outfit', sans-serif" }}
+                                                onFocus={inputFocus} onBlur={inputBlur}>
+                                                <option value="date-desc">Plus récent</option>
+                                                <option value="date-asc">Plus ancien</option>
+                                                <option value="price-asc">Prix croissant</option>
+                                                <option value="price-desc">Prix décroissant</option>
+                                                <option value="surface-desc">Surface décroissante</option>
+                                                <option value="surface-asc">Surface croissante</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Prix */}
+                                        <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
+                                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                                Fourchette de prix (FCFA)
+                                            </label>
+                                            <div className="flex gap-3 items-center">
+                                                <input type="number" placeholder="Prix min"
+                                                    value={priceRange.min}
+                                                    onChange={e => setPriceRange(p => ({ ...p, min: e.target.value }))}
+                                                    className="flex-1 px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm focus:outline-none transition-all"
+                                                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                                                    onFocus={inputFocus} onBlur={inputBlur} />
+                                                <span className="text-gray-400 font-bold">—</span>
+                                                <input type="number" placeholder="Prix max"
+                                                    value={priceRange.max}
+                                                    onChange={e => setPriceRange(p => ({ ...p, max: e.target.value }))}
+                                                    className="flex-1 px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm focus:outline-none transition-all"
+                                                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                                                    onFocus={inputFocus} onBlur={inputBlur} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {hasFilters && (
+                                        <div className="flex justify-end mt-5">
+                                            <button onClick={resetFilters}
+                                                className="flex items-center gap-1.5 text-sm font-semibold text-gray-400 hover:text-gray-700 transition-colors"
+                                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                                <X className="w-4 h-4" />
+                                                Réinitialiser
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Compteur résultats */}
+                <div className="flex items-center justify-between mb-6 px-1">
+                    <p className="text-sm text-gray-500" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        <span className="font-bold text-gray-900">{filtered.length}</span>{' '}
+                        bien{filtered.length > 1 ? 's' : ''} trouvé{filtered.length > 1 ? 's' : ''}
+                    </p>
+                    {hasFilters && (
+                        <button onClick={resetFilters}
+                            className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:opacity-80"
+                            style={{ color: BLUE, fontFamily: "'Outfit', sans-serif" }}>
+                            <X className="w-3.5 h-3.5" />
+                            Voir tous les biens
+                        </button>
+                    )}
+                </div>
+
+                {/* Grille / Liste */}
+                {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {[1,2,3,4,5,6].map(i => <PropertySkeleton key={i} />)}
+                    </div>
+                ) : currentProperties.length === 0 ? (
+                    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                        className="text-center py-20 rounded-3xl border border-dashed"
+                        style={{ borderColor: `${BLUE}25`, backgroundColor: `${BLUE}03` }}>
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                            style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` }}>
+                            <Home className="w-8 h-8 text-white" />
+                        </div>
+                        <h3 className="font-bold text-gray-800 text-xl mb-2"
+                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            Aucun bien trouvé
+                        </h3>
+                        <p className="text-gray-500 text-sm mb-6"
+                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            {hasFilters ? 'Essayez de modifier vos critères de recherche' : 'Aucun bien disponible pour le moment'}
+                        </p>
+                        {hasFilters && (
+                            <button onClick={resetFilters}
+                                className="px-6 py-2.5 rounded-full font-semibold text-white text-sm"
+                                style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`, fontFamily: "'Outfit', sans-serif" }}>
+                                Réinitialiser les filtres
+                            </button>
+                        )}
+                    </motion.div>
+                ) : (
+                    <>
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={`${viewMode}-${currentPage}`}
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.3 }}
+                                className={viewMode === 'grid'
+                                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'
+                                    : 'flex flex-col gap-4'}
+                            >
+                                {currentProperties.map((property, i) => (
+                                    <motion.div key={property._id}
+                                        initial={{ opacity: 0, y: 16 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.3, delay: i * 0.04 }}>
+                                        <PropertyCard property={property} index={i} viewMode={viewMode} />
+                                    </motion.div>
+                                ))}
+                            </motion.div>
+                        </AnimatePresence>
+                        <Pagination totalPages={totalPages} currentPage={currentPage}
+                            onPageChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+                    </>
+                )}
+            </div>
+        </div>
+    );
 };
 
 export default AltimmoAnnonces;

@@ -2,66 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles,
-  Search,
-  Filter,
-  Loader2,
-  Grid3x3,
-  List,
-  ChevronLeft,
-  ChevronRight,
-  Star,
-  Calendar,
-  Tag,
-  X,
-  SlidersHorizontal,
+    Sparkles, Search, Loader2, Grid3x3, List,
+    ChevronLeft, ChevronRight, Star, Calendar,
+    Tag, X, SlidersHorizontal, Briefcase, ArrowRight,
 } from 'lucide-react';
 import { getAllPortfolioItems } from '../services/portfolioService';
 
-const ITEMS_PER_PAGE = 12;
+// ─────────────────────────────────────────────────────────────
+// Constantes
+// ─────────────────────────────────────────────────────────────
+const GOLD        = '#C8872A';
+const GOLD_DARK   = '#A06820';
+const GOLD_LIGHT  = '#E5A84B';
+const BLUE        = '#2E7BB5';
+
 const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
+const ITEMS_PER_PAGE = 12;
 
-// 🔧 FONCTION UTILITAIRE POUR CONSTRUIRE L'URL DE L'IMAGE CORRECTEMENT
-const getImageUrl = (imagePath) => {
-  if (!imagePath) {
-    return 'https://via.placeholder.com/400x300/3B82F6/FFFFFF?text=Altcom+Project';
-  }
-  
-  // Si l'image commence par http:// ou https://, c'est déjà une URL complète
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  
-  // Si l'image commence par /uploads, ajouter le BACKEND_URL
-  if (imagePath.startsWith('/uploads')) {
-    return `${BACKEND_URL}${imagePath}`;
-  }
-  
-  // Par défaut, retourner l'image telle quelle
-  return imagePath;
-};
-
-const AltcomAnnonces = () => {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // États
-  const [portfolio, setPortfolio] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('grid'); // grid ou list
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showFilters, setShowFilters] = useState(false);
-
-  // Filtres
-  const [filters, setFilters] = useState({
-    search: searchParams.get('search') || '',
-    category: searchParams.get('category') || 'all',
-    sortBy: searchParams.get('sortBy') || 'recent',
-  });
-
-  // Catégories disponibles
-  const categories = [
+const CATEGORIES = [
     'all',
     'Communication Digitale',
     'Branding & Design',
@@ -69,442 +27,550 @@ const AltcomAnnonces = () => {
     'Campagne Publicitaire',
     'Site Web',
     'Réseaux Sociaux',
-  ];
+];
 
-  // Charger les données
-  useEffect(() => {
-    fetchPortfolio();
-  }, []);
+const getImageUrl = (imagePath) => {
+    if (!imagePath) return `https://placehold.co/600x400/${GOLD.replace('#','')}/FFFFFF?text=Altcom`;
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath;
+    if (imagePath.startsWith('/uploads')) return `${BACKEND_URL}${imagePath}`;
+    return imagePath;
+};
 
-  // Mettre à jour l'URL quand les filtres changent
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (filters.search) params.set('search', filters.search);
-    if (filters.category !== 'all') params.set('category', filters.category);
-    if (filters.sortBy !== 'recent') params.set('sortBy', filters.sortBy);
-    setSearchParams(params);
-    setCurrentPage(1);
-  }, [filters]);
-
-  const fetchPortfolio = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getAllPortfolioItems('Altcom');
-      console.log('📦 Portfolio chargé:', data);
-      setPortfolio(data || []);
-    } catch (err) {
-      console.error('❌ Erreur lors du chargement du portfolio:', err);
-      setError('Impossible de charger le portfolio');
-      setPortfolio([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Filtrer et trier les données
-  const getFilteredPortfolio = () => {
-    let filtered = [...portfolio];
-
-    // Filtre de recherche
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.title?.toLowerCase().includes(searchLower) ||
-          item.description?.toLowerCase().includes(searchLower) ||
-          item.client?.toLowerCase().includes(searchLower) ||
-          item.tags?.some((tag) => tag.toLowerCase().includes(searchLower))
-      );
-    }
-
-    // Filtre de catégorie
-    if (filters.category !== 'all') {
-      filtered = filtered.filter((item) => item.category === filters.category);
-    }
-
-    // Tri
-    switch (filters.sortBy) {
-      case 'recent':
-        filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        break;
-      case 'oldest':
-        filtered.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        break;
-      case 'rating':
-        filtered.sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
-        break;
-      case 'title':
-        filtered.sort((a, b) => a.title.localeCompare(b.title));
-        break;
-      default:
-        break;
-    }
-
-    return filtered;
-  };
-
-  const filteredPortfolio = getFilteredPortfolio();
-  const totalPages = Math.ceil(filteredPortfolio.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const currentPortfolio = filteredPortfolio.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
-  const handleFilterChange = (key, value) => {
-    setFilters({ ...filters, [key]: value });
-  };
-
-  const resetFilters = () => {
-    setFilters({
-      search: '',
-      category: 'all',
-      sortBy: 'recent',
-    });
-  };
-
-  // Animations
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 },
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 text-lg">Chargement du portfolio...</p>
+// ─────────────────────────────────────────────────────────────
+// Skeleton card
+// ─────────────────────────────────────────────────────────────
+const CardSkeleton = () => (
+    <div className="animate-pulse bg-white rounded-3xl overflow-hidden border border-gray-100">
+        <div className="bg-gray-200 h-52" />
+        <div className="p-5 space-y-3">
+            <div className="h-3 bg-gray-100 rounded-full w-1/3" />
+            <div className="h-4 bg-gray-100 rounded-full w-3/4" />
+            <div className="h-3 bg-gray-100 rounded-full w-full" />
+            <div className="h-3 bg-gray-100 rounded-full w-2/3" />
+            <div className="flex justify-between mt-4">
+                <div className="h-3 bg-gray-100 rounded-full w-1/4" />
+                <div className="h-3 bg-gray-100 rounded-full w-1/4" />
+            </div>
         </div>
-      </div>
-    );
-  }
+    </div>
+);
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4">
-        {/* Header */}
+// ─────────────────────────────────────────────────────────────
+// Card portfolio — vue grille
+// ─────────────────────────────────────────────────────────────
+const PortfolioCardGrid = ({ item }) => {
+    const navigate = useNavigate();
+    const imageUrl = getImageUrl(item.images?.[0]);
+
+    return (
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+            whileHover={{ y: -5 }}
+            onClick={() => navigate(`/altcom/portfolio/${item._id}`)}
+            className="group bg-white rounded-3xl border overflow-hidden cursor-pointer transition-all duration-500 hover:shadow-xl"
+            style={{ borderColor: 'rgba(0,0,0,0.06)' }}
         >
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl">
-              <Sparkles className="w-8 h-8 text-white" />
+            {/* Image */}
+            <div className="relative h-52 overflow-hidden">
+                <img src={imageUrl} alt={item.title}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    onError={e => { e.target.onerror = null; e.target.src = `https://placehold.co/600x400/C8872A/FFFFFF?text=Altcom`; }} />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+
+                {/* Rating badge */}
+                {item.averageRating > 0 && (
+                    <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm">
+                        <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                        <span className="text-xs font-bold text-gray-900"
+                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            {item.averageRating.toFixed(1)}
+                        </span>
+                    </div>
+                )}
+
+                {/* Hover line */}
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    style={{ backgroundColor: GOLD }} />
             </div>
-            <div>
-              <h1 className="text-4xl font-bold text-gray-800">Portfolio Altcom</h1>
-              <p className="text-gray-600">
-                Découvrez nos {filteredPortfolio.length} projet{filteredPortfolio.length > 1 ? 's' : ''} de communication
-              </p>
+
+            {/* Contenu */}
+            <div className="p-5">
+                {/* Badge catégorie */}
+                <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full mb-3"
+                    style={{ backgroundColor: `${GOLD}12`, color: GOLD, fontFamily: "'Outfit', sans-serif" }}>
+                    {item.category}
+                </span>
+
+                <h3 className="font-bold text-gray-900 mb-2 line-clamp-1 text-lg transition-colors group-hover:text-[#C8872A]"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    {item.title}
+                </h3>
+                <p className="text-sm text-gray-500 mb-4 line-clamp-2 leading-relaxed"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    {item.description}
+                </p>
+
+                <div className="flex items-center justify-between text-xs text-gray-400 pt-3 border-t border-gray-100">
+                    {item.client && (
+                        <span className="flex items-center gap-1.5"
+                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            <Tag className="w-3.5 h-3.5" style={{ color: GOLD }} />
+                            {item.client}
+                        </span>
+                    )}
+                    {item.projectDate && (
+                        <span className="flex items-center gap-1.5"
+                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            <Calendar className="w-3.5 h-3.5" style={{ color: BLUE }} />
+                            {new Date(item.projectDate).getFullYear()}
+                        </span>
+                    )}
+                </div>
             </div>
-          </div>
         </motion.div>
+    );
+};
 
-        {/* Barre de recherche et filtres */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Recherche */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Rechercher par titre, description, client, tags..."
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+// ─────────────────────────────────────────────────────────────
+// Card portfolio — vue liste
+// ─────────────────────────────────────────────────────────────
+const PortfolioCardList = ({ item }) => {
+    const navigate = useNavigate();
+    const imageUrl = getImageUrl(item.images?.[0]);
+
+    return (
+        <motion.div
+            whileHover={{ x: 4 }}
+            onClick={() => navigate(`/altcom/portfolio/${item._id}`)}
+            className="group bg-white rounded-3xl border overflow-hidden cursor-pointer transition-all duration-400 hover:shadow-lg flex flex-col sm:flex-row"
+            style={{ borderColor: 'rgba(0,0,0,0.06)' }}
+        >
+            {/* Image */}
+            <div className="relative sm:w-56 h-44 sm:h-auto flex-shrink-0 overflow-hidden">
+                <img src={imageUrl} alt={item.title}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    onError={e => { e.target.onerror = null; e.target.src = `https://placehold.co/600x400/C8872A/FFFFFF?text=Altcom`; }} />
+                <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black/30 to-transparent" />
             </div>
 
-            {/* Boutons d'action */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition font-semibold"
-              >
-                <SlidersHorizontal className="w-5 h-5" />
-                Filtres
-              </button>
-
-              <button
-                onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                className="p-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
-                title={viewMode === 'grid' ? 'Vue liste' : 'Vue grille'}
-              >
-                {viewMode === 'grid' ? <List className="w-5 h-5" /> : <Grid3x3 className="w-5 h-5" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Panneau de filtres */}
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="mt-4 pt-4 border-t border-gray-200"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Catégorie */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Catégorie
-                    </label>
-                    <select
-                      value={filters.category}
-                      onChange={(e) => handleFilterChange('category', e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      {categories.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat === 'all' ? 'Toutes les catégories' : cat}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Tri */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Trier par
-                    </label>
-                    <select
-                      value={filters.sortBy}
-                      onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="recent">Plus récent</option>
-                      <option value="oldest">Plus ancien</option>
-                      <option value="rating">Mieux notés</option>
-                      <option value="title">Titre (A-Z)</option>
-                    </select>
-                  </div>
+            {/* Contenu */}
+            <div className="flex-1 p-6 flex flex-col justify-between">
+                <div>
+                    <div className="flex items-start justify-between mb-3 gap-3">
+                        <div>
+                            <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full mb-2"
+                                style={{ backgroundColor: `${GOLD}12`, color: GOLD, fontFamily: "'Outfit', sans-serif" }}>
+                                {item.category}
+                            </span>
+                            <h3 className="font-bold text-gray-900 text-xl line-clamp-1 transition-colors group-hover:text-[#C8872A]"
+                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                {item.title}
+                            </h3>
+                        </div>
+                        {item.averageRating > 0 && (
+                            <div className="flex items-center gap-1 flex-shrink-0 px-2.5 py-1.5 rounded-full border"
+                                style={{ borderColor: `${GOLD}25`, backgroundColor: `${GOLD}08` }}>
+                                <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                                <span className="text-xs font-bold" style={{ color: GOLD_DARK, fontFamily: "'Outfit', sans-serif" }}>
+                                    {item.averageRating.toFixed(1)}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                    <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed"
+                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        {item.description}
+                    </p>
                 </div>
 
-                <button
-                  onClick={resetFilters}
-                  className="mt-4 flex items-center gap-2 text-blue-600 hover:text-blue-800 font-semibold"
-                >
-                  <X className="w-4 h-4" />
-                  Réinitialiser les filtres
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Message d'erreur */}
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
-
-        {/* Grille de portfolio */}
-        {currentPortfolio.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-md p-12 text-center">
-            <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-700 mb-2">
-              Aucun projet trouvé
-            </h3>
-            <p className="text-gray-500">
-              Essayez de modifier vos critères de recherche
-            </p>
-          </div>
-        ) : (
-          <>
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className={
-                viewMode === 'grid'
-                  ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-                  : 'space-y-6'
-              }
-            >
-              {currentPortfolio.map((item) => (
-                <motion.div key={item._id} variants={itemVariants}>
-                  <PortfolioCard item={item} viewMode={viewMode} />
-                </motion.div>
-              ))}
-            </motion.div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Composant Carte Portfolio - CORRIGÉ
-const PortfolioCard = ({ item, viewMode }) => {
-  const navigate = useNavigate();
-  
-  // 🔧 UTILISER LA FONCTION getImageUrl POUR CONSTRUIRE L'URL CORRECTEMENT
-  const imageUrl = getImageUrl(item.images?.[0]);
-
-  console.log('🖼️ Image URL pour', item.title, ':', imageUrl);
-
-  if (viewMode === 'list') {
-    return (
-      <motion.div
-        whileHover={{ scale: 1.01 }}
-        onClick={() => navigate(`/altcom/portfolio/${item._id}`)}
-        className="bg-white rounded-xl shadow-md hover:shadow-xl transition cursor-pointer overflow-hidden flex"
-      >
-        <img
-          src={imageUrl}
-          alt={item.title}
-          className="w-48 h-48 object-cover"
-          onError={(e) => {
-            console.error('❌ Erreur chargement image (list):', imageUrl);
-            e.target.src = 'https://via.placeholder.com/400x300/3B82F6/FFFFFF?text=Altcom';
-            e.target.onerror = null;
-          }}
-          onLoad={() => {
-            console.log('✅ Image chargée (list):', imageUrl);
-          }}
-        />
-        <div className="flex-1 p-6">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">{item.title}</h3>
-              <span className="inline-block px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold">
-                {item.category}
-              </span>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400 mt-4 pt-3 border-t border-gray-100">
+                    {item.client && (
+                        <span className="flex items-center gap-1.5" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            <Tag className="w-3.5 h-3.5" style={{ color: GOLD }} />
+                            {item.client}
+                        </span>
+                    )}
+                    {item.projectDate && (
+                        <span className="flex items-center gap-1.5" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            <Calendar className="w-3.5 h-3.5" style={{ color: BLUE }} />
+                            {new Date(item.projectDate).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' })}
+                        </span>
+                    )}
+                    <span className="ml-auto flex items-center gap-1.5 font-semibold transition-all group-hover:gap-2.5"
+                        style={{ color: GOLD, fontFamily: "'Outfit', sans-serif" }}>
+                        Voir le projet
+                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                </div>
             </div>
-            {item.averageRating > 0 && (
-              <div className="flex items-center gap-1">
-                <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                <span className="font-bold text-lg">{item.averageRating.toFixed(1)}</span>
-              </div>
-            )}
-          </div>
-          <p className="text-gray-600 mb-4 line-clamp-2">{item.description}</p>
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            {item.client && (
-              <span className="flex items-center gap-1">
-                <Tag className="w-4 h-4" />
-                {item.client}
-              </span>
-            )}
-            {item.projectDate && (
-              <span className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                {new Date(item.projectDate).toLocaleDateString('fr-FR', {
-                  year: 'numeric',
-                  month: 'long',
-                })}
-              </span>
-            )}
-          </div>
-        </div>
-      </motion.div>
+        </motion.div>
     );
-  }
-
-  return (
-    <motion.div
-      whileHover={{ scale: 1.03 }}
-      onClick={() => navigate(`/altcom/portfolio/${item._id}`)}
-      className="bg-white rounded-xl shadow-md hover:shadow-xl transition cursor-pointer overflow-hidden"
-    >
-      <div className="relative">
-        <img
-          src={imageUrl}
-          alt={item.title}
-          className="w-full h-56 object-cover"
-          onError={(e) => {
-            console.error('❌ Erreur chargement image (grid):', imageUrl);
-            e.target.src = 'https://via.placeholder.com/400x300/3B82F6/FFFFFF?text=Altcom';
-            e.target.onerror = null;
-          }}
-          onLoad={() => {
-            console.log('✅ Image chargée (grid):', imageUrl);
-          }}
-        />
-        {item.averageRating > 0 && (
-          <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1">
-            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-            <span className="font-bold">{item.averageRating.toFixed(1)}</span>
-          </div>
-        )}
-      </div>
-      <div className="p-5">
-        <span className="inline-block px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold mb-3">
-          {item.category}
-        </span>
-        <h3 className="text-xl font-bold text-gray-800 mb-2 line-clamp-1">{item.title}</h3>
-        <p className="text-gray-600 mb-4 line-clamp-2">{item.description}</p>
-        <div className="flex items-center justify-between text-sm text-gray-500">
-          {item.client && (
-            <span className="flex items-center gap-1">
-              <Tag className="w-4 h-4" />
-              {item.client}
-            </span>
-          )}
-          {item.projectDate && (
-            <span className="flex items-center gap-1">
-              <Calendar className="w-4 h-4" />
-              {new Date(item.projectDate).getFullYear()}
-            </span>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
 };
 
-// Composant Pagination
-const Pagination = ({ currentPage, totalPages, onPageChange }) => (
-  <div className="flex justify-center items-center gap-2 mt-12">
-    <button
-      onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-      disabled={currentPage === 1}
-      className="p-2 rounded-lg bg-white shadow disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-    >
-      <ChevronLeft className="w-5 h-5" />
-    </button>
+// ─────────────────────────────────────────────────────────────
+// Pagination
+// ─────────────────────────────────────────────────────────────
+const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+    if (totalPages <= 1) return null;
+    return (
+        <div className="flex justify-center items-center gap-2 mt-12">
+            <button onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1}
+                className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center disabled:opacity-30 hover:bg-gray-50 transition-all">
+                <ChevronLeft className="w-4 h-4 text-gray-500" />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => onPageChange(p)}
+                    className="min-w-[36px] h-9 px-3 rounded-full font-semibold text-sm transition-all"
+                    style={{
+                        background:  p === currentPage ? `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})` : 'white',
+                        color:       p === currentPage ? 'white' : '#6B7280',
+                        border:      `1px solid ${p === currentPage ? 'transparent' : '#E5E7EB'}`,
+                        boxShadow:   p === currentPage ? `0 4px 12px ${GOLD}40` : 'none',
+                        fontFamily:  "'Outfit', sans-serif",
+                    }}>
+                    {p}
+                </button>
+            ))}
+            <button onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages}
+                className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center disabled:opacity-30 hover:bg-gray-50 transition-all">
+                <ChevronRight className="w-4 h-4 text-gray-500" />
+            </button>
+        </div>
+    );
+};
 
-    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-      <button
-        key={page}
-        onClick={() => onPageChange(page)}
-        className={`px-4 py-2 rounded-lg font-semibold transition ${
-          page === currentPage
-            ? 'bg-blue-600 text-white shadow-lg'
-            : 'bg-white text-gray-700 hover:bg-gray-100 shadow'
-        }`}
-      >
-        {page}
-      </button>
-    ))}
+// ─────────────────────────────────────────────────────────────
+// Page principale
+// ─────────────────────────────────────────────────────────────
+const AltcomAnnonces = () => {
+    const navigate     = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
 
-    <button
-      onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-      disabled={currentPage === totalPages}
-      className="p-2 rounded-lg bg-white shadow disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-    >
-      <ChevronRight className="w-5 h-5" />
-    </button>
-  </div>
-);
+    const [portfolio,    setPortfolio]   = useState([]);
+    const [loading,      setLoading]     = useState(true);
+    const [error,        setError]       = useState(null);
+    const [viewMode,     setViewMode]    = useState('grid');
+    const [currentPage,  setPage]        = useState(1);
+    const [showFilters,  setShowFilters] = useState(false);
+
+    const [filters, setFilters] = useState({
+        search:   searchParams.get('search')   || '',
+        category: searchParams.get('category') || 'all',
+        sortBy:   searchParams.get('sortBy')   || 'recent',
+    });
+
+    // ── Fetch ────────────────────────────────
+    const fetchPortfolio = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const data = await getAllPortfolioItems('Altcom');
+            setPortfolio(data || []);
+        } catch {
+            setError('Impossible de charger le portfolio');
+            setPortfolio([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchPortfolio(); }, []);
+
+    // ── Sync URL ─────────────────────────────
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (filters.search)              params.set('search',   filters.search);
+        if (filters.category !== 'all')  params.set('category', filters.category);
+        if (filters.sortBy   !== 'recent')params.set('sortBy',  filters.sortBy);
+        setSearchParams(params);
+        setPage(1);
+    }, [filters]);
+
+    // ── Filtres + tri ────────────────────────
+    const filtered = (() => {
+        let f = [...portfolio];
+        if (filters.search) {
+            const q = filters.search.toLowerCase();
+            f = f.filter(i =>
+                i.title?.toLowerCase().includes(q) ||
+                i.description?.toLowerCase().includes(q) ||
+                i.client?.toLowerCase().includes(q) ||
+                i.tags?.some(t => t.toLowerCase().includes(q))
+            );
+        }
+        if (filters.category !== 'all') f = f.filter(i => i.category === filters.category);
+        switch (filters.sortBy) {
+            case 'oldest':  f.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); break;
+            case 'rating':  f.sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0)); break;
+            case 'title':   f.sort((a, b) => a.title.localeCompare(b.title)); break;
+            default:        f.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
+        }
+        return f;
+    })();
+
+    const totalPages      = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const currentPortfolio = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+    const hasFilters      = filters.search || filters.category !== 'all';
+
+    const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+    const resetFilters   = () => setFilters({ search: '', category: 'all', sortBy: 'recent' });
+
+    const inputFocus = e => { e.target.style.borderColor = GOLD; e.target.style.boxShadow = `0 0 0 3px ${GOLD}15`; };
+    const inputBlur  = e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; };
+
+    return (
+        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+
+            {/* ── Hero ─────────────────────────────── */}
+            <div className="relative py-20 text-white overflow-hidden"
+                style={{
+                    backgroundImage: "linear-gradient(to bottom, rgba(100,60,5,0.92), rgba(13,17,23,0.97)), url('https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=1974&auto=format&fit=crop')",
+                    backgroundSize: 'cover', backgroundPosition: 'center',
+                }}>
+
+                <div className="absolute top-0 left-0 right-0 h-px"
+                    style={{ background: `linear-gradient(to right, transparent, ${GOLD}60, transparent)` }} />
+                {/* Halo or */}
+                <div className="absolute inset-0 pointer-events-none"
+                    style={{ background: `radial-gradient(ellipse at 20% 50%, ${GOLD}20, transparent 60%)` }} />
+
+                <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
+                    <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.7 }}>
+                        <p className="text-xs font-bold uppercase tracking-widest mb-4 text-white/60">
+                            Altcom
+                        </p>
+                        <h1 className="text-white mb-4 max-w-3xl"
+                            style={{
+                                fontFamily: "'Cormorant Garamond', Georgia, serif",
+                                fontSize:   'clamp(2.2rem, 5vw, 4rem)',
+                                fontWeight: 700, lineHeight: 1.1,
+                            }}>
+                            Portfolio & Réalisations
+                        </h1>
+                        <div className="h-0.5 w-16 rounded-full mb-4"
+                            style={{ background: `linear-gradient(to right, ${GOLD}, ${BLUE})` }} />
+                        <p className="text-white/60 max-w-xl leading-relaxed mb-8">
+                            Découvrez nos projets de communication réalisés avec passion, créativité et expertise.
+                        </p>
+
+                        {/* Stats */}
+                        <div className="flex flex-wrap gap-3">
+                            {[
+                                { value: portfolio.length, label: 'Projets' },
+                                { value: CATEGORIES.length - 1, label: 'Catégories' },
+                            ].map(({ value, label }, i) => (
+                                <div key={i}
+                                    className="px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/10 text-sm font-semibold"
+                                    style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                                    <span style={{ color: GOLD_LIGHT }}>{value}</span>
+                                    {' '}{label}
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                </div>
+            </div>
+
+            {/* ── Contenu ──────────────────────────── */}
+            <div className="container mx-auto px-4 sm:px-6 max-w-6xl py-12">
+
+                {/* Barre recherche + filtres */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 mb-8">
+                    <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+
+                        {/* Search */}
+                        <div className="relative flex-1">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input type="text" placeholder="Rechercher par titre, client, tags..."
+                                value={filters.search} onChange={e => setFilter('search', e.target.value)}
+                                className="w-full pl-11 pr-10 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none focus:bg-white transition-all placeholder-gray-400"
+                                style={{ fontFamily: "'Outfit', sans-serif" }}
+                                onFocus={inputFocus} onBlur={inputBlur} />
+                            {filters.search && (
+                                <button onClick={() => setFilter('search', '')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 transition-colors">
+                                    <X className="w-3.5 h-3.5 text-gray-400" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2 flex-shrink-0">
+                            <button onClick={() => setShowFilters(!showFilters)}
+                                className="flex items-center gap-2 px-4 py-3 rounded-2xl font-semibold text-sm transition-all"
+                                style={{
+                                    background:  showFilters ? `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})` : '#F9FAFB',
+                                    color:       showFilters ? 'white' : '#374151',
+                                    border:      `1px solid ${showFilters ? 'transparent' : '#E5E7EB'}`,
+                                    fontFamily:  "'Outfit', sans-serif",
+                                }}>
+                                <SlidersHorizontal className="w-4 h-4" />
+                                Filtres
+                            </button>
+
+                            <div className="flex bg-gray-100 rounded-2xl p-1 gap-1">
+                                {[{ mode: 'grid', Icon: Grid3x3 }, { mode: 'list', Icon: List }].map(({ mode, Icon }) => (
+                                    <button key={mode} onClick={() => setViewMode(mode)}
+                                        className="p-2 rounded-xl transition-all"
+                                        style={{
+                                            background: viewMode === mode ? 'white' : 'transparent',
+                                            boxShadow:  viewMode === mode ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                                        }}>
+                                        <Icon className="w-4 h-4 text-gray-600" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Panneau filtres */}
+                    <AnimatePresence>
+                        {showFilters && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }}
+                                className="overflow-hidden">
+                                <div className="pt-5 mt-5 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                                    {/* Catégories */}
+                                    <div>
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
+                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            Catégorie
+                                        </label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {CATEGORIES.map(cat => (
+                                                <button key={cat} onClick={() => setFilter('category', cat)}
+                                                    className="px-3.5 py-2 rounded-full text-xs font-semibold transition-all"
+                                                    style={{
+                                                        background:  filters.category === cat ? `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})` : '#F9FAFB',
+                                                        color:       filters.category === cat ? 'white' : '#6B7280',
+                                                        border:      `1px solid ${filters.category === cat ? 'transparent' : '#E5E7EB'}`,
+                                                        boxShadow:   filters.category === cat ? `0 4px 12px ${GOLD}30` : 'none',
+                                                        fontFamily:  "'Outfit', sans-serif",
+                                                    }}>
+                                                    {cat === 'all' ? 'Toutes' : cat}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Tri */}
+                                    <div>
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
+                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            Trier par
+                                        </label>
+                                        <select value={filters.sortBy} onChange={e => setFilter('sortBy', e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none transition-all"
+                                            style={{ fontFamily: "'Outfit', sans-serif" }}
+                                            onFocus={inputFocus} onBlur={inputBlur}>
+                                            <option value="recent">Plus récent</option>
+                                            <option value="oldest">Plus ancien</option>
+                                            <option value="rating">Mieux notés</option>
+                                            <option value="title">Titre (A–Z)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {hasFilters && (
+                                    <div className="flex justify-end mt-4">
+                                        <button onClick={resetFilters}
+                                            className="flex items-center gap-1.5 text-sm font-semibold text-gray-400 hover:text-gray-700 transition-colors"
+                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            <X className="w-4 h-4" />
+                                            Réinitialiser
+                                        </button>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Compteur */}
+                <div className="flex items-center justify-between mb-6 px-1">
+                    <p className="text-sm text-gray-500" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        <span className="font-bold text-gray-900">{filtered.length}</span>{' '}
+                        projet{filtered.length > 1 ? 's' : ''} trouvé{filtered.length > 1 ? 's' : ''}
+                    </p>
+                    {hasFilters && (
+                        <button onClick={resetFilters}
+                            className="text-sm font-semibold transition-colors hover:opacity-80"
+                            style={{ color: GOLD, fontFamily: "'Outfit', sans-serif" }}>
+                            Voir tous les projets
+                        </button>
+                    )}
+                </div>
+
+                {/* Erreur */}
+                {error && (
+                    <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl mb-8">
+                        <span>⚠️</span>
+                        <p className="text-red-700 text-sm font-medium">{error}</p>
+                        <button onClick={fetchPortfolio}
+                            className="ml-auto text-sm font-semibold px-4 py-1.5 rounded-full text-white"
+                            style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, fontFamily: "'Outfit', sans-serif" }}>
+                            Réessayer
+                        </button>
+                    </div>
+                )}
+
+                {/* Contenu */}
+                {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {[1,2,3,4,5,6].map(i => <CardSkeleton key={i} />)}
+                    </div>
+                ) : currentPortfolio.length === 0 ? (
+                    <div className="text-center py-20 rounded-3xl border border-dashed"
+                        style={{ borderColor: `${GOLD}25`, backgroundColor: `${GOLD}03` }}>
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                            style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})` }}>
+                            <Briefcase className="w-8 h-8 text-white" />
+                        </div>
+                        <h3 className="font-bold text-gray-800 text-xl mb-2"
+                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            Aucun projet trouvé
+                        </h3>
+                        <p className="text-gray-500 text-sm mb-6"
+                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            Essayez de modifier vos critères de recherche
+                        </p>
+                        {hasFilters && (
+                            <button onClick={resetFilters}
+                                className="px-6 py-2.5 rounded-full font-semibold text-white text-sm"
+                                style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, fontFamily: "'Outfit', sans-serif" }}>
+                                Réinitialiser les filtres
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <>
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={`${viewMode}-${currentPage}`}
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.3 }}
+                                className={viewMode === 'grid'
+                                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'
+                                    : 'flex flex-col gap-4'}
+                            >
+                                {currentPortfolio.map(item =>
+                                    viewMode === 'grid'
+                                        ? <PortfolioCardGrid key={item._id} item={item} />
+                                        : <PortfolioCardList key={item._id} item={item} />
+                                )}
+                            </motion.div>
+                        </AnimatePresence>
+                        <Pagination currentPage={currentPage} totalPages={totalPages}
+                            onPageChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
 
 export default AltcomAnnonces;
