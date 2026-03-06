@@ -1,48 +1,113 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Quote, Loader2, MessageSquarePlus, Star, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
+import { Quote, Loader2, MessageSquarePlus, Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getAllTestimonials } from "../services/reviewService";
 import { useAuth } from "../context/AuthContext";
 
-// ─────────────────────────────────────────────────────────────
-// Couleur par pôle — palette Altitude-Vision
-// ─────────────────────────────────────────────────────────────
 const POLE_COLORS = {
-    Altimmo:    { bg: 'rgba(46,123,181,0.15)',  border: 'rgba(46,123,181,0.3)',  text: '#7BB8E0',  dot: '#2E7BB5' },
-    MilaEvents: { bg: 'rgba(212,43,43,0.15)',   border: 'rgba(212,43,43,0.3)',   text: '#F08080',  dot: '#D42B2B' },
-    Altcom:     { bg: 'rgba(200,135,42,0.15)',  border: 'rgba(200,135,42,0.3)',  text: '#E5A84B',  dot: '#C8872A' },
-    default:    { bg: 'rgba(255,255,255,0.08)', border: 'rgba(255,255,255,0.15)', text: '#9CA3AF', dot: '#6B7280' },
+    Altimmo:    { dot: '#2E7BB5', bg: 'rgba(46,123,181,0.1)',  border: 'rgba(46,123,181,0.2)',  text: '#2E7BB5' },
+    MilaEvents: { dot: '#D42B2B', bg: 'rgba(212,43,43,0.1)',   border: 'rgba(212,43,43,0.2)',   text: '#D42B2B' },
+    Altcom:     { dot: '#C8872A', bg: 'rgba(200,135,42,0.1)',  border: 'rgba(200,135,42,0.2)',  text: '#C8872A' },
+    default:    { dot: '#6B7280', bg: 'rgba(107,114,128,0.1)', border: 'rgba(107,114,128,0.2)', text: '#6B7280' },
+};
+const getPole = (pole) => POLE_COLORS[pole] || POLE_COLORS.default;
+
+const SLIDE_DURATION = 5000;
+
+// ─── Card témoignage ────────────────────────────────────────
+const TestimonialCard = ({ t, isActive }) => {
+    const pc = getPole(t.pole);
+    return (
+        <motion.div
+            animate={{ opacity: isActive ? 1 : 0.4, scale: isActive ? 1 : 0.95 }}
+            transition={{ duration: 0.4 }}
+            className="relative bg-white rounded-3xl p-6 border flex flex-col gap-4 h-full select-none"
+            style={{
+                borderColor: isActive ? pc.border : 'rgba(0,0,0,0.05)',
+                boxShadow:   isActive ? `0 16px 48px rgba(0,0,0,0.10), 0 0 0 1px ${pc.border}` : 'none',
+                minHeight:   '260px',
+            }}
+        >
+            {/* Guillemet décoratif */}
+            <div className="absolute top-4 right-5 opacity-8 select-none pointer-events-none"
+                style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '4.5rem', lineHeight: 1, color: pc.dot, opacity: 0.08 }}>
+                "
+            </div>
+
+            {/* Avatar + nom */}
+            <div className="flex items-center gap-3 relative z-10">
+                <div className="relative flex-shrink-0">
+                    <img
+                        src={t.author?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=f1f5f9&color=475569&size=80`}
+                        alt={t.author?.name || 'Client'}
+                        className="w-10 h-10 rounded-full object-cover border-2"
+                        style={{ borderColor: pc.dot }}
+                        onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=f1f5f9&color=475569&size=80`; }}
+                    />
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white"
+                        style={{ backgroundColor: pc.dot }}>
+                        <Quote className="w-2 h-2 text-white" fill="currentColor" />
+                    </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                    <p className="font-bold text-gray-900 text-sm truncate" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        {t.author?.name || 'Client'}
+                    </p>
+                    {t.pole && (
+                        <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full"
+                            style={{ backgroundColor: pc.bg, color: pc.text, fontFamily: "'Outfit', sans-serif" }}>
+                            {t.pole}
+                        </span>
+                    )}
+                </div>
+                {t.rating && (
+                    <div className="flex gap-0.5 flex-shrink-0">
+                        {[...Array(5)].map((_, i) => (
+                            <Star key={i} size={11} className={i < t.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-200"} />
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Citation */}
+            <blockquote className="text-gray-600 leading-relaxed flex-1 relative z-10"
+                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(0.95rem, 1.4vw, 1.05rem)', fontStyle: 'italic' }}>
+                "{t.comment}"
+            </blockquote>
+
+            {/* Réponse admin condensée */}
+            {t.adminResponse?.text && (
+                <div className="rounded-xl p-3 text-xs leading-relaxed relative z-10 border-l-2"
+                    style={{ backgroundColor: 'rgba(46,123,181,0.05)', borderColor: '#2E7BB5' }}>
+                    <p className="font-semibold text-[#2E7BB5] mb-0.5" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        Réponse Altitude-Vision
+                    </p>
+                    <p className="text-gray-500 line-clamp-2" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        {t.adminResponse.text}
+                    </p>
+                </div>
+            )}
+        </motion.div>
+    );
 };
 
-const getPoleColor = (pole) => POLE_COLORS[pole] || POLE_COLORS.default;
-
-const SLIDE_DURATION = 6000;
-
-// ─────────────────────────────────────────────────────────────
-// Composant principal
-// ─────────────────────────────────────────────────────────────
+// ─── Composant principal ─────────────────────────────────────
 const Testimonials = () => {
     const [testimonials, setTestimonials] = useState([]);
     const [isLoading, setIsLoading]       = useState(true);
     const [error, setError]               = useState(null);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [direction, setDirection]       = useState(1);
     const timerRef = useRef(null);
+    const { user } = useAuth();
+    const navigate = useNavigate();
 
-    const { user }   = useAuth();
-    const navigate   = useNavigate();
-
-    // ── Chargement des avis ─────────────────
     useEffect(() => {
         const fetchData = async () => {
             try {
-                setIsLoading(true);
-                setError(null);
                 const data = await getAllTestimonials(10);
                 setTestimonials(Array.isArray(data) ? data : []);
             } catch {
-                setTestimonials([]);
                 setError('Impossible de charger les avis');
             } finally {
                 setIsLoading(false);
@@ -51,329 +116,168 @@ const Testimonials = () => {
         fetchData();
     }, []);
 
-    // ── Timer auto ─────────────────────────
     const resetTimer = useCallback(() => {
         clearInterval(timerRef.current);
         if (testimonials.length <= 1) return;
         timerRef.current = setInterval(() => {
-            setDirection(1);
-            setCurrentIndex(prev => (prev + 1) % testimonials.length);
+            setCurrentIndex(i => (i + 1) % testimonials.length);
         }, SLIDE_DURATION);
     }, [testimonials.length]);
 
-    useEffect(() => {
-        resetTimer();
-        return () => clearInterval(timerRef.current);
-    }, [resetTimer]);
+    useEffect(() => { resetTimer(); return () => clearInterval(timerRef.current); }, [resetTimer]);
 
-    // ── Navigation ──────────────────────────
-    const prev = () => {
-        if (testimonials.length <= 1) return;
-        setDirection(-1);
-        setCurrentIndex(prev => (prev - 1 + testimonials.length) % testimonials.length);
-        resetTimer();
-    };
+    const prev = () => { setCurrentIndex(i => (i - 1 + testimonials.length) % testimonials.length); resetTimer(); };
+    const next = () => { setCurrentIndex(i => (i + 1) % testimonials.length); resetTimer(); };
+    const getItem = (offset) => testimonials[(currentIndex + offset + testimonials.length) % testimonials.length];
 
-    const next = () => {
-        if (testimonials.length <= 1) return;
-        setDirection(1);
-        setCurrentIndex(prev => (prev + 1) % testimonials.length);
-        resetTimer();
-    };
+    const handleLeaveReview = () => navigate(user ? '/avis/nouveau' : '/login', { state: user ? undefined : { from: '/avis/nouveau' } });
 
-    const goTo = (i) => {
-        setDirection(i > currentIndex ? 1 : -1);
-        setCurrentIndex(i);
-        resetTimer();
-    };
+    if (isLoading) return (
+        <section className="py-16 flex justify-center items-center min-h-[240px]"
+            style={{ background: '#0D1117' }}>
+            <Loader2 className="w-7 h-7 animate-spin" style={{ color: '#C8872A' }} />
+        </section>
+    );
 
-    const handleLeaveReview = () => {
-        navigate(user ? '/avis/nouveau' : '/login', {
-            state: user ? undefined : { from: '/avis/nouveau' }
-        });
-    };
-
-    // ── Variants animation ──────────────────
-    const variants = {
-        enter:  (dir) => ({ x: dir > 0 ? '60%' : '-60%', opacity: 0 }),
-        center: { x: '0%', opacity: 1, transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] } },
-        exit:   (dir) => ({ x: dir < 0 ? '60%' : '-60%', opacity: 0, transition: { duration: 0.4, ease: [0.55, 0, 1, 0.45] } }),
-    };
-
-    // ── État chargement ─────────────────────
-    if (isLoading) {
-        return (
-            <section className="py-24 bg-gray-900 flex justify-center items-center min-h-[400px]">
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-10 h-10 text-[#C8872A] animate-spin" />
-                    <p className="text-gray-400" style={{ fontFamily: "'Outfit', sans-serif" }}>
-                        Chargement des avis...
-                    </p>
-                </div>
-            </section>
-        );
-    }
-
-    // ── État erreur ─────────────────────────
-    if (error) {
-        return (
-            <section className="py-24 bg-gray-900 text-white text-center">
-                <p className="text-gray-400 mb-6">{error}</p>
-                <button
-                    onClick={() => window.location.reload()}
-                    className="px-6 py-3 bg-[#2E7BB5] hover:bg-[#1A5A8A] rounded-full transition-colors text-sm font-semibold"
-                >
-                    Réessayer
-                </button>
-            </section>
-        );
-    }
-
-    const current = testimonials[currentIndex];
+    if (error || !testimonials.length) return (
+        <section className="py-16 text-center px-6" style={{ background: '#0D1117' }}>
+            <Star className="w-8 h-8 text-gray-700 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm mb-5" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                {error || "Aucun avis disponible — soyez le premier !"}
+            </p>
+            <button onClick={handleLeaveReview}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-white text-sm"
+                style={{ background: 'linear-gradient(135deg, #C8872A, #E5A84B)', fontFamily: "'Outfit', sans-serif" }}>
+                <MessageSquarePlus className="w-4 h-4" />
+                Laisser un avis
+            </button>
+        </section>
+    );
 
     return (
-        <section className="py-24 bg-gradient-to-br from-gray-950 via-[#0D1117] to-gray-900 text-white relative overflow-hidden">
+        <section className="py-14 sm:py-16 overflow-hidden relative"
+            style={{ background: 'linear-gradient(135deg, #0D1117 0%, #111827 60%, #0D1117 100%)' }}>
 
-            {/* ── Halos de fond aux couleurs du logo ── */}
+            {/* Halos discrets */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full blur-[120px] opacity-10"
+                <div className="absolute -left-20 top-1/2 -translate-y-1/2 w-56 h-56 rounded-full blur-[80px] opacity-10"
                     style={{ background: '#2E7BB5' }} />
-                <div className="absolute bottom-0 right-1/4 w-96 h-96 rounded-full blur-[120px] opacity-8"
+                <div className="absolute -right-20 top-1/2 -translate-y-1/2 w-56 h-56 rounded-full blur-[80px] opacity-8"
                     style={{ background: '#C8872A' }} />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full blur-[100px] opacity-6"
-                    style={{ background: '#D42B2B' }} />
             </div>
 
-            <div className="container mx-auto px-6 md:px-12 lg:px-24 relative z-10">
+            {/* Lignes décoratives */}
+            <div className="absolute top-0 left-0 right-0 h-px"
+                style={{ background: 'linear-gradient(to right, transparent, rgba(200,135,42,0.3), transparent)' }} />
+            <div className="absolute bottom-0 left-0 right-0 h-px"
+                style={{ background: 'linear-gradient(to right, transparent, rgba(46,123,181,0.3), transparent)' }} />
 
-                {/* ── En-tête ─────────────────────────── */}
-                <motion.div
-                    className="text-center mb-16"
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.6 }}
-                >
-                    <p className="text-xs font-bold uppercase tracking-widest mb-3"
-                        style={{ color: '#C8872A', fontFamily: "'Outfit', sans-serif" }}>
-                        Témoignages
-                    </p>
-                    <h2
-                        className="mb-4"
-                        style={{
-                            fontFamily: "'Cormorant Garamond', Georgia, serif",
-                            fontSize: 'clamp(2rem, 4vw, 3.5rem)',
-                            fontWeight: 700,
-                            lineHeight: 1.1,
-                        }}
+            <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
+
+                {/* En-tête + flèches sur la même ligne */}
+                <div className="flex items-center justify-between mb-8">
+                    <motion.div
+                        initial={{ opacity: 0, y: 16 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.5 }}
                     >
-                        Ce que disent nos clients
-                    </h2>
-                    <div className="h-0.5 w-20 mx-auto rounded-full"
-                        style={{ background: 'linear-gradient(to right, #C8872A, transparent)' }} />
-                </motion.div>
-
-                {/* ── Slider ──────────────────────────── */}
-                {testimonials.length > 0 ? (
-                    <div className="relative max-w-4xl mx-auto">
-
-                        {/* Flèche gauche */}
-                        {testimonials.length > 1 && (
-                            <button
-                                onClick={prev}
-                                aria-label="Avis précédent"
-                                className="absolute -left-4 sm:-left-12 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/15 backdrop-blur-sm flex items-center justify-center transition-all duration-200 hover:scale-110"
-                            >
-                                <ChevronLeft className="w-5 h-5 text-white/70" />
-                            </button>
-                        )}
-
-                        {/* Flèche droite */}
-                        {testimonials.length > 1 && (
-                            <button
-                                onClick={next}
-                                aria-label="Avis suivant"
-                                className="absolute -right-4 sm:-right-12 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full border border-white/10 bg-white/5 hover:bg-white/15 backdrop-blur-sm flex items-center justify-center transition-all duration-200 hover:scale-110"
-                            >
-                                <ChevronRight className="w-5 h-5 text-white/70" />
-                            </button>
-                        )}
-
-                        {/* Card témoignage */}
-                        <div className="overflow-hidden px-1 py-2">
-                            <AnimatePresence initial={false} custom={direction} mode="wait">
-                                {current && (
-                                    <motion.div
-                                        key={current._id || currentIndex}
-                                        custom={direction}
-                                        variants={variants}
-                                        initial="enter"
-                                        animate="center"
-                                        exit="exit"
-                                        className="flex flex-col items-center text-center"
-                                    >
-                                        {/* Avatar */}
-                                        <div className="relative mb-6">
-                                            <img
-                                                src={
-                                                    current.author?.photo ||
-                                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(current.author?.name || 'Client')}&background=1e293b&color=fff&size=128`
-                                                }
-                                                alt={current.author?.name || 'Client'}
-                                                className="w-24 h-24 rounded-full object-cover border-2 shadow-2xl"
-                                                style={{ borderColor: getPoleColor(current.pole).dot }}
-                                                onError={(e) => {
-                                                    e.target.onerror = null;
-                                                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(current.author?.name || 'Client')}&background=1e293b&color=fff&size=128`;
-                                                }}
-                                            />
-                                            {/* Icône quote */}
-                                            <div
-                                                className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-gray-950"
-                                                style={{ backgroundColor: getPoleColor(current.pole).dot }}
-                                            >
-                                                <Quote className="w-3.5 h-3.5 text-white" fill="currentColor" />
-                                            </div>
-                                        </div>
-
-                                        {/* Étoiles */}
-                                        {current.rating && (
-                                            <div className="flex gap-1 mb-3">
-                                                {[...Array(5)].map((_, i) => (
-                                                    <Star
-                                                        key={i}
-                                                        className={i < current.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-700"}
-                                                        size={15}
-                                                    />
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {/* Badge pôle */}
-                                        {current.pole && (
-                                            <span
-                                                className="inline-block px-4 py-1 mb-5 rounded-full text-xs font-semibold border"
-                                                style={{
-                                                    backgroundColor: getPoleColor(current.pole).bg,
-                                                    borderColor:     getPoleColor(current.pole).border,
-                                                    color:           getPoleColor(current.pole).text,
-                                                    fontFamily:      "'Outfit', sans-serif",
-                                                }}
-                                            >
-                                                {current.pole}
-                                            </span>
-                                        )}
-
-                                        {/* Citation */}
-                                        <blockquote
-                                            className="text-lg md:text-xl text-gray-300 leading-relaxed mb-6 max-w-2xl italic"
-                                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.1rem, 2vw, 1.35rem)' }}
-                                        >
-                                            "{current.comment}"
-                                        </blockquote>
-
-                                        {/* Auteur */}
-                                        <div>
-                                            <p className="font-bold text-white text-lg"
-                                                style={{ fontFamily: "'Outfit', sans-serif" }}>
-                                                {current.author?.name || 'Client'}
-                                            </p>
-                                            <p className="text-sm mt-0.5"
-                                                style={{ color: getPoleColor(current.pole).text, fontFamily: "'Outfit', sans-serif" }}>
-                                                Client {current.pole}
-                                            </p>
-                                        </div>
-
-                                        {/* Réponse admin */}
-                                        {current.adminResponse?.text && (
-                                            <motion.div
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: 0.3 }}
-                                                className="mt-6 max-w-xl w-full text-left rounded-2xl p-5 border backdrop-blur-sm"
-                                                style={{
-                                                    backgroundColor: 'rgba(46,123,181,0.08)',
-                                                    borderColor:     'rgba(46,123,181,0.2)',
-                                                }}
-                                            >
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <ShieldCheck className="w-4 h-4 text-[#2E7BB5]" />
-                                                    <span className="text-xs font-semibold text-[#7BB8E0]"
-                                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
-                                                        Réponse de l'équipe Altitude-Vision
-                                                    </span>
-                                                </div>
-                                                <p className="text-sm text-gray-300 leading-relaxed italic"
-                                                    style={{ fontFamily: "'Outfit', sans-serif" }}>
-                                                    {current.adminResponse.text}
-                                                </p>
-                                            </motion.div>
-                                        )}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-
-                        {/* Dots */}
-                        {testimonials.length > 1 && (
-                            <div className="flex justify-center gap-2 mt-10">
-                                {testimonials.map((_, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => goTo(i)}
-                                        aria-label={`Avis ${i + 1}`}
-                                        className="rounded-full transition-all duration-300"
-                                        style={{
-                                            width:           i === currentIndex ? '24px' : '8px',
-                                            height:          '8px',
-                                            backgroundColor: i === currentIndex
-                                                ? (current ? getPoleColor(current.pole).dot : '#C8872A')
-                                                : 'rgba(255,255,255,0.2)',
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    /* ── État vide ────────────────────── */
-                    <div className="text-center py-10">
-                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/5 border border-white/10 mb-6">
-                            <Star className="w-9 h-9 text-gray-600" />
-                        </div>
-                        <p className="text-gray-400 text-lg mb-1"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
-                            Aucun avis disponible
+                        <p className="text-xs font-bold uppercase tracking-widest mb-1.5"
+                            style={{ color: '#C8872A', fontFamily: "'Outfit', sans-serif" }}>
+                            Témoignages
                         </p>
-                        <p className="text-gray-600 text-sm"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
-                            Soyez le premier à partager votre expérience !
-                        </p>
-                    </div>
-                )}
+                        <h2 className="text-white"
+                            style={{
+                                fontFamily: "'Cormorant Garamond', Georgia, serif",
+                                fontSize:   'clamp(1.6rem, 3vw, 2.5rem)',
+                                fontWeight: 700,
+                                lineHeight: 1.1,
+                            }}>
+                            Ce que disent nos clients
+                        </h2>
+                    </motion.div>
 
-                {/* ── Bouton laisser un avis ───────────── */}
-                <div className="text-center mt-16 relative z-10">
+                    {testimonials.length > 1 && (
+                        <div className="flex gap-2 flex-shrink-0">
+                            <button onClick={prev} aria-label="Précédent"
+                                className="w-9 h-9 rounded-full border border-white/10 bg-white/5 hover:bg-white/15 flex items-center justify-center transition-all hover:scale-110">
+                                <ChevronLeft className="w-4 h-4 text-white/70" />
+                            </button>
+                            <button onClick={next} aria-label="Suivant"
+                                className="w-9 h-9 rounded-full border border-white/10 bg-white/5 hover:bg-white/15 flex items-center justify-center transition-all hover:scale-110">
+                                <ChevronRight className="w-4 h-4 text-white/70" />
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Slider 3 cards — centre visible, côtés partiels */}
+                <div className="relative">
+                    {/* Masques bords */}
+                    <div className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none"
+                        style={{ background: 'linear-gradient(to right, #0D1117, transparent)' }} />
+                    <div className="absolute right-0 top-0 bottom-0 w-12 z-10 pointer-events-none"
+                        style={{ background: 'linear-gradient(to left, #0D1117, transparent)' }} />
+
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={currentIndex}
+                            initial={{ opacity: 0, x: 30 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -30 }}
+                            transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+                            className="grid gap-4"
+                            style={{
+                                gridTemplateColumns: testimonials.length === 1
+                                    ? '1fr'
+                                    : '80px 1fr 80px',
+                            }}
+                        >
+                            {testimonials.length > 1 && (
+                                <div className="overflow-hidden rounded-3xl">
+                                    <TestimonialCard t={getItem(-1)} isActive={false} />
+                                </div>
+                            )}
+                            <TestimonialCard t={getItem(0)} isActive={true} />
+                            {testimonials.length > 1 && (
+                                <div className="overflow-hidden rounded-3xl">
+                                    <TestimonialCard t={getItem(1)} isActive={false} />
+                                </div>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
+                </div>
+
+                {/* Dots + CTA */}
+                <div className="flex items-center justify-between mt-7">
+                    <div className="flex gap-1.5">
+                        {testimonials.map((_, i) => (
+                            <button key={i} onClick={() => { setCurrentIndex(i); resetTimer(); }}
+                                aria-label={`Avis ${i + 1}`}
+                                className="rounded-full transition-all duration-300"
+                                style={{
+                                    width:           i === currentIndex ? '18px' : '6px',
+                                    height:          '6px',
+                                    backgroundColor: i === currentIndex ? '#C8872A' : 'rgba(255,255,255,0.18)',
+                                }} />
+                        ))}
+                    </div>
+
                     <motion.button
                         onClick={handleLeaveReview}
-                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileHover={{ scale: 1.04 }}
                         whileTap={{ scale: 0.97 }}
-                        className="inline-flex items-center gap-3 px-8 py-4 rounded-full font-semibold text-white shadow-2xl transition-all duration-300"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-white text-sm"
                         style={{
-                            background:  'linear-gradient(135deg, #C8872A, #E5A84B)',
-                            boxShadow:   '0 8px 32px rgba(200,135,42,0.35)',
-                            fontFamily:  "'Outfit', sans-serif",
+                            background: 'linear-gradient(135deg, #C8872A, #E5A84B)',
+                            boxShadow:  '0 4px 16px rgba(200,135,42,0.3)',
+                            fontFamily: "'Outfit', sans-serif",
                         }}
                     >
-                        <MessageSquarePlus className="w-5 h-5" />
+                        <MessageSquarePlus className="w-4 h-4" />
                         Laisser un avis
+                        {!user && <span className="opacity-50 text-xs font-normal">(connexion requise)</span>}
                     </motion.button>
-                    {!user && (
-                        <p className="text-xs text-gray-600 mt-3"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
-                            (Connexion requise)
-                        </p>
-                    )}
                 </div>
             </div>
         </section>
