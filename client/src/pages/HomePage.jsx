@@ -182,8 +182,8 @@ const HomePage = () => {
                             <div className="space-y-2 mb-8">
                                 {[
                                     { icon: MapPin, text: 'Brazzaville, République du Congo' },
-                                    { icon: Phone,  text: '+242 06 000 00 00' },
-                                    { icon: Mail,   text: 'contact@altitude-vision.com' },
+                                    { icon: Phone,  text: '+242 06 800 21 51' },
+                                    { icon: Mail,   text: 'contact@altitudevision.agency' },
                                 ].map(({ icon: Icon, text }, i) => (
                                     <div key={i} className="flex items-center gap-3 text-sm text-gray-500">
                                         <Icon className="w-4 h-4 flex-shrink-0" style={{ color: '#C8872A' }} />
