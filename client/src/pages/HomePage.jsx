@@ -13,6 +13,7 @@ import HomeSlider from "../components/HomeSlider";
 import CtaCommission from "../components/CtaCommission";
 import Testimonials from "../components/Testimonials"; 
 import FacebookFeed from "../components/FacebookFeed";
+import StatsCounter from "../components/StatsCounter";
 
 import { getLatestPropertiesByPoles } from "../services/propertyService";
 import { getAllEvents } from "../services/eventService";
@@ -139,6 +140,8 @@ const HomePage = () => {
                     </motion.p>
                 </div>
             </section>
+
+            <StatsCounter />
 
             {/* Section Nos Pôles */}
             <section id="nos-poles" className="py-16 sm:py-20 bg-white">
