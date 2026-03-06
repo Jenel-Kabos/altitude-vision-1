@@ -1,195 +1,246 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Send, MessageSquare } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, MessageSquare, Clock, CheckCircle } from 'lucide-react';
 
-// Composant pour le champ de formulaire réutilisable
-const FormInput = ({ label, id, type = 'text', required = false, isTextArea = false }) => (
-    <div className="mb-5">
-        <label htmlFor={id} className="block text-sm font-semibold text-gray-700 mb-2">
-            {label} {required && <span className="text-red-500">*</span>}
+const MILA_RED      = '#D42B2B';
+const MILA_RED_DARK = '#A01E1E';
+const MILA_GOLD     = '#C8872A';
+
+const CONTACT_INFO = [
+    {
+        icon:  MapPin,
+        title: "Adresse de l'agence",
+        lines: ['24 Rue de Mfoa, Poto-Poto', 'Derrière Canal Olympia', 'Brazzaville, Congo'],
+        color: MILA_RED,
+    },
+    {
+        icon:  Mail,
+        title: 'Email professionnel',
+        lines: ['Milaevents@altitudevision.agency'],
+        href:  'mailto:Milaevents@altitudevision.agency',
+        color: MILA_GOLD,
+    },
+    {
+        icon:  Phone,
+        title: 'Téléphone',
+        lines: ['+242 05 330 16 75'],
+        href:  'tel:+242053301675',
+        color: MILA_RED,
+    },
+];
+
+const HORAIRES = [
+    { day: 'Lundi – Vendredi', time: '8h30 – 17h30', closed: false },
+    { day: 'Samedi',           time: '9h00 – 12h00', closed: false },
+    { day: 'Dimanche',         time: 'Fermé',         closed: true  },
+];
+
+// ─── Champ formulaire ────────────────────────────────────────
+const Field = ({ label, id, type = 'text', required, isTextArea }) => (
+    <div>
+        <label htmlFor={id}
+            className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5"
+            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            {label}{required && <span className="text-red-400 ml-1">*</span>}
         </label>
         {isTextArea ? (
-            <textarea
-                id={id}
-                name={id}
-                rows="5"
-                required={required}
-                className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-300 resize-none"
-                placeholder={`Décrivez votre projet...`}
+            <textarea id={id} name={id} rows={4} required={required}
+                className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm resize-none transition-all focus:outline-none focus:bg-white hover:border-gray-300 placeholder-gray-400"
+                style={{
+                    fontFamily: "'Outfit', sans-serif",
+                    '--tw-ring-color': `${MILA_RED}20`,
+                }}
+                onFocus={e => { e.target.style.borderColor = MILA_RED; e.target.style.boxShadow = `0 0 0 3px ${MILA_RED}15`; }}
+                onBlur={e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
+                placeholder="Décrivez votre projet événementiel..."
             />
         ) : (
-            <input
-                type={type}
-                id={id}
-                name={id}
-                required={required}
-                className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white hover:border-gray-300"
+            <input type={type} id={id} name={id} required={required}
+                className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm transition-all focus:outline-none focus:bg-white hover:border-gray-300 placeholder-gray-400"
+                style={{ fontFamily: "'Outfit', sans-serif" }}
+                onFocus={e => { e.target.style.borderColor = MILA_RED; e.target.style.boxShadow = `0 0 0 3px ${MILA_RED}15`; }}
+                onBlur={e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
                 placeholder={`Votre ${label.toLowerCase().replace(' *', '')}`}
             />
         )}
     </div>
 );
 
+// ─── Composant principal ─────────────────────────────────────
 const MilaContact = () => {
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: {
-                staggerChildren: 0.1,
-            },
-        },
-    };
+    const [sent, setSent] = useState(false);
 
-    const itemVariants = {
-        hidden: { opacity: 0, y: 20 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        setSent(true);
+        setTimeout(() => setSent(false), 4000);
     };
-
-    const contactInfo = [
-        {
-            icon: MapPin,
-            title: 'Adresse de l\'Agence',
-            content: '24 Rue de Mfoa, Poto-poto\nDerrière Canal Olympia\nBrazzaville-Congo',
-            gradient: 'from-blue-600 to-blue-500'
-        },
-        {
-            icon: Mail,
-            title: 'Email Professionnel',
-            content: 'Milaevents@altitudevision.agency',
-            link: 'mailto:Milaevents@altitudevision.agency',
-            gradient: 'from-sky-600 to-blue-500'
-        },
-        {
-            icon: Phone,
-            title: 'Numéro de Téléphone',
-            content: '+242 05 330 16 75',
-            link: 'tel:+242053301675',
-            gradient: 'from-indigo-600 to-blue-500'
-        }
-    ];
 
     return (
-        <section id="contact-mila" className="py-16 sm:py-20 bg-gradient-to-b from-slate-50 to-white">
-            <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
-                
-                <motion.div
-                    initial="hidden"
-                    whileInView="visible"
-                    viewport={{ once: true, amount: 0.2 }}
-                    variants={containerVariants}
-                >
-                    {/* Header */}
-                    <motion.div variants={itemVariants} className="text-center mb-12 sm:mb-14">
-                        <p className="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wider mb-2">Contactez-nous</p>
-                        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-3">
-                            Prenons Contact
-                        </h2>
-                        <div className="h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent w-24 mx-auto rounded-full mb-4"></div>
-                        <p className="text-gray-600 text-base sm:text-lg font-light max-w-2xl mx-auto">
-                            Notre équipe est à votre disposition pour répondre à toutes vos questions évènementielles. 
-                            N'hésitez pas à nous contacter pour discuter de votre projet ou pour toute demande d'information.
-                        </p>
+        <section id="contact-mila" className="py-20 sm:py-24 bg-white relative overflow-hidden">
+
+            {/* Décoration */}
+            <div className="absolute top-0 left-0 right-0 h-px"
+                style={{ background: `linear-gradient(to right, transparent, ${MILA_RED}25, transparent)` }} />
+            <div className="absolute -left-32 top-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-[140px] opacity-[0.04] pointer-events-none"
+                style={{ background: MILA_RED }} />
+
+            <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
+
+                {/* En-tête */}
+                <motion.div className="mb-14"
+                    initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }} transition={{ duration: 0.6 }}>
+                    <p className="text-xs font-bold uppercase tracking-widest mb-3"
+                        style={{ color: MILA_RED, fontFamily: "'Outfit', sans-serif" }}>
+                        Contactez-nous
+                    </p>
+                    <h2 className="text-gray-900"
+                        style={{
+                            fontFamily: "'Cormorant Garamond', Georgia, serif",
+                            fontSize:   'clamp(2rem, 4vw, 3rem)',
+                            fontWeight: 700,
+                            lineHeight: 1.1,
+                        }}>
+                        Prenons Contact
+                    </h2>
+                    <div className="h-0.5 w-12 mt-3 rounded-full"
+                        style={{ background: `linear-gradient(to right, ${MILA_RED}, ${MILA_GOLD})` }} />
+                </motion.div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+
+                    {/* Formulaire */}
+                    <motion.div initial={{ opacity: 0, x: -24 }} whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }} transition={{ duration: 0.6 }}>
+                        <div className="bg-white rounded-3xl border border-gray-100 p-7 shadow-sm hover:shadow-lg transition-shadow duration-500">
+
+                            <div className="flex items-center gap-3 mb-7 pb-5 border-b border-gray-100">
+                                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                                    style={{ background: `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})` }}>
+                                    <MessageSquare className="w-4 h-4 text-white" />
+                                </div>
+                                <h3 className="font-bold text-gray-900 text-lg"
+                                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                    Envoyez-nous un message
+                                </h3>
+                            </div>
+
+                            {sent ? (
+                                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                                    className="flex flex-col items-center justify-center py-12 gap-4">
+                                    <div className="w-14 h-14 rounded-full flex items-center justify-center"
+                                        style={{ background: `${MILA_RED}12` }}>
+                                        <CheckCircle className="w-7 h-7" style={{ color: MILA_RED }} />
+                                    </div>
+                                    <p className="font-bold text-gray-900 text-lg"
+                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                        Message envoyé !
+                                    </p>
+                                    <p className="text-gray-500 text-sm text-center"
+                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                        Notre équipe vous répondra sous 24h.
+                                    </p>
+                                </motion.div>
+                            ) : (
+                                <form onSubmit={handleSubmit} className="space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <Field label="Nom complet" id="fullName" required />
+                                        <Field label="Téléphone"   id="phone" type="tel" />
+                                    </div>
+                                    <Field label="Adresse email" id="email"   type="email" required />
+                                    <Field label="Votre message" id="message" required isTextArea />
+
+                                    <motion.button type="submit"
+                                        whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                                        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-white text-sm transition-all"
+                                        style={{
+                                            background: `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})`,
+                                            boxShadow:  `0 4px 20px ${MILA_RED}30`,
+                                            fontFamily: "'Outfit', sans-serif",
+                                        }}>
+                                        <Send className="w-4 h-4" />
+                                        Envoyer le message
+                                    </motion.button>
+                                    <p className="text-center text-xs text-gray-400"
+                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                        Réponse garantie sous 24h ouvrées
+                                    </p>
+                                </form>
+                            )}
+                        </div>
                     </motion.div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
-                        
-                        {/* Formulaire de Contact */}
-                        <motion.div variants={itemVariants}>
-                            <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300">
-                                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
-                                    <div className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-blue-500">
-                                        <MessageSquare className="w-5 h-5 text-white" />
-                                    </div>
-                                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900">Envoyez-nous un Message</h3>
+                    {/* Coordonnées */}
+                    <motion.div initial={{ opacity: 0, x: 24 }} whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }} transition={{ duration: 0.6, delay: 0.1 }}
+                        className="space-y-4">
+
+                        {CONTACT_INFO.map(({ icon: Icon, title, lines, href, color }, i) => (
+                            <motion.div key={i}
+                                initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.1 }}
+                                className="group flex items-start gap-4 p-5 rounded-2xl border bg-white hover:shadow-md transition-all duration-300"
+                                style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
+                                    style={{ backgroundColor: `${color}12`, border: `1px solid ${color}20` }}>
+                                    <Icon className="w-5 h-5" style={{ color }} />
                                 </div>
-                                
-                                <form className="space-y-5">
-                                    <FormInput label="Nom complet" id="fullName" required />
-                                    <FormInput label="Adresse Email" id="email" type="email" required />
-                                    <FormInput label="Téléphone" id="phone" type="tel" />
-                                    <FormInput label="Votre message" id="message" required isTextArea />
-
-                                    <motion.button
-                                        type="submit"
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold text-base rounded-full shadow-lg hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300"
-                                    >
-                                        <Send className="w-5 h-5" />
-                                        Envoyer le Message
-                                    </motion.button>
-                                </form>
-                            </div>
-                        </motion.div>
-
-                        {/* Coordonnées de l'Agence */}
-                        <motion.div variants={itemVariants} className="space-y-5">
-                            <div className="mb-6 lg:mb-8">
-                                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Nos Coordonnées</h3>
-                                <p className="text-gray-600 text-sm sm:text-base leading-relaxed">
-                                    N'hésitez pas à nous appeler ou à nous rendre visite. Notre équipe est disponible pour vous accompagner.
-                                </p>
-                            </div>
-
-                            <div className="space-y-4">
-                                {contactInfo.map((info, index) => (
-                                    <motion.div
-                                        key={index}
-                                        variants={itemVariants}
-                                        whileHover={{ scale: 1.02 }}
-                                        className="group bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-200 transition-all duration-300"
-                                    >
-                                        <div className="flex items-start gap-4">
-                                            <div className={`p-3 rounded-xl bg-gradient-to-br ${info.gradient} group-hover:scale-110 transition-transform duration-300`}>
-                                                <info.icon className="w-5 h-5 text-white" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">
-                                                    {info.title}
-                                                </p>
-                                                {info.link ? (
-                                                    <a 
-                                                        href={info.link}
-                                                        className="text-blue-600 hover:text-blue-700 transition-colors text-sm sm:text-base font-medium break-all"
-                                                    >
-                                                        {info.content}
-                                                    </a>
-                                                ) : (
-                                                    <p className="text-gray-600 text-sm sm:text-base leading-relaxed whitespace-pre-line">
-                                                        {info.content}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                ))}
-                            </div>
-
-                            {/* Carte d'information supplémentaire */}
-                            <motion.div
-                                variants={itemVariants}
-                                className="bg-gradient-to-br from-blue-50 to-sky-50 p-6 rounded-2xl border border-blue-100 mt-6"
-                            >
-                                <h4 className="font-bold text-gray-900 mb-2 text-base sm:text-lg">Horaires d'Ouverture</h4>
-                                <div className="space-y-1 text-sm text-gray-600">
-                                    <p className="flex justify-between">
-                                        <span className="font-medium">Lundi - Vendredi</span>
-                                        <span>8h30 - 17h30</span>
+                                <div className="min-w-0">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1"
+                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                        {title}
                                     </p>
-                                    <p className="flex justify-between">
-                                        <span className="font-medium">Samedi</span>
-                                        <span>9h00 - 12h00</span>
-                                    </p>
-                                    <p className="flex justify-between">
-                                        <span className="font-medium">Dimanche</span>
-                                        <span className="text-red-500 font-medium">Fermé</span>
-                                    </p>
+                                    {lines.map((line, j) =>
+                                        href && j === 0 ? (
+                                            <a key={j} href={href}
+                                                className="block text-sm font-semibold transition-colors duration-200 hover:opacity-80"
+                                                style={{ color, fontFamily: "'Outfit', sans-serif" }}>
+                                                {line}
+                                            </a>
+                                        ) : (
+                                            <p key={j} className="text-sm text-gray-600"
+                                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                                {line}
+                                            </p>
+                                        )
+                                    )}
                                 </div>
                             </motion.div>
+                        ))}
+
+                        {/* Horaires */}
+                        <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.35 }}
+                            className="p-5 rounded-2xl border"
+                            style={{ backgroundColor: `${MILA_RED}04`, borderColor: `${MILA_RED}15` }}>
+                            <div className="flex items-center gap-2.5 mb-4">
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                    style={{ backgroundColor: `${MILA_RED}12` }}>
+                                    <Clock className="w-4 h-4" style={{ color: MILA_RED }} />
+                                </div>
+                                <h4 className="font-bold text-gray-900 text-sm"
+                                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                    Horaires d'ouverture
+                                </h4>
+                            </div>
+                            <div className="space-y-2">
+                                {HORAIRES.map(({ day, time, closed }, i) => (
+                                    <div key={i} className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-600 font-medium"
+                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            {day}
+                                        </span>
+                                        <span className="font-semibold"
+                                            style={{ color: closed ? MILA_RED : MILA_RED_DARK, fontFamily: "'Outfit', sans-serif" }}>
+                                            {time}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
                         </motion.div>
-                    </div>
-                </motion.div>
+                    </motion.div>
+                </div>
             </div>
         </section>
     );
