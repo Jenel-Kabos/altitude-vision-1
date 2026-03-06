@@ -14,6 +14,7 @@ import CtaCommission from "../components/CtaCommission";
 import Testimonials from "../components/Testimonials"; 
 import FacebookFeed from "../components/FacebookFeed";
 import StatsCounter from "../components/StatsCounter";
+import WhyChooseUs from "../components/WhyChooseUs";
 
 import { getLatestPropertiesByPoles } from "../services/propertyService";
 import { getAllEvents } from "../services/eventService";
@@ -286,6 +287,8 @@ const HomePage = () => {
 
             {/* Témoignages */}
             <Testimonials />
+
+            <WhyChooseUs />
 
             {/* CTA Commission */}
             <section className="py-14 px-4 sm:px-6 bg-gradient-to-b from-slate-50 to-white">
