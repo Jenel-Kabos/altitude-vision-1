@@ -1,275 +1,388 @@
 import React, { useState } from 'react';
-import { 
-  MapPin, Mail, Phone, Send, Loader, CheckCircle, AlertTriangle, 
-  Sparkles, MessageSquare, User, FileText
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  MapPin, Mail, Phone, Send, Loader2, CheckCircle,
+  AlertTriangle, MessageSquare, User, FileText, Navigation,
+  ArrowUpRight,
 } from 'lucide-react';
 
+const BLUE = '#2E7BB5';
+const GOLD = '#C8872A';
+const RED  = '#D42B2B';
+
+// Coordonnées précises : Rue Mfoa n°24, Poto-Poto, Brazzaville
+const AGENCY_LAT = -4.2519;
+const AGENCY_LNG = 15.2825;
+
+// URL Maps avec marqueur agence + itinéraire
+const MAPS_EMBED = `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3978.96!2d${AGENCY_LNG}!3d${AGENCY_LAT}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1a6a33b2e3f6e5a7%3A0x0!2sRue+Mfoa+24%2C+Poto-Poto%2C+Brazzaville!5e0!3m2!1sfr!2scg!4v1700000000000!5m2!1sfr!2scg`;
+const DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${AGENCY_LAT},${AGENCY_LNG}&destination_place_id=ChIJ&travelmode=driving`;
+
+// ─── Toast ────────────────────────────────────────────────────
+const Toast = ({ msg, type, onDone }) => {
+  React.useEffect(() => {
+    const t = setTimeout(onDone, 4000);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -48, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -48, scale: 0.96 }}
+      className="fixed top-5 right-5 z-[100] flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl text-white text-sm font-medium"
+      style={{
+        background: type === 'success'
+          ? 'linear-gradient(135deg, #166534, #16A34A)'
+          : `linear-gradient(135deg, #991B1B, ${RED})`,
+        fontFamily: "'Outfit', sans-serif",
+        backdropFilter: 'blur(12px)',
+      }}>
+      {type === 'success'
+        ? <CheckCircle size={18} />
+        : <AlertTriangle size={18} />}
+      {msg}
+    </motion.div>
+  );
+};
+
+// ─── Input Field ──────────────────────────────────────────────
+const Field = ({ label, icon: Icon, accent = BLUE, children }) => (
+  <div className="space-y-1.5">
+    <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
+      style={{ color: accent, fontFamily: "'Outfit', sans-serif" }}>
+      <Icon size={12} />
+      {label} <span style={{ color: RED }}>*</span>
+    </label>
+    {children}
+  </div>
+);
+
+// ─── Contact Info Card ────────────────────────────────────────
+const InfoCard = ({ icon: Icon, label, value, href, color, delay }) => (
+  <motion.a
+    href={href || '#'}
+    target={href?.startsWith('http') ? '_blank' : undefined}
+    rel="noopener noreferrer"
+    initial={{ opacity: 0, x: 24 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ delay, duration: 0.45 }}
+    whileHover={{ x: 6 }}
+    className="flex items-center gap-4 p-4 rounded-2xl group transition-all cursor-pointer"
+    style={{ background: `${color}0A`, border: `1px solid ${color}20` }}>
+    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110"
+      style={{ background: `${color}18` }}>
+      <Icon size={18} style={{ color }} />
+    </div>
+    <div className="min-w-0 flex-1">
+      <p className="text-xs font-semibold uppercase tracking-widest mb-0.5"
+        style={{ color: `${color}80`, fontFamily: "'Outfit', sans-serif" }}>{label}</p>
+      <p className="text-sm font-medium text-white truncate"
+        style={{ fontFamily: "'Outfit', sans-serif" }}>{value}</p>
+    </div>
+    <ArrowUpRight size={14} className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+      style={{ color }} />
+  </motion.a>
+);
+
+// ─── MAIN ────────────────────────────────────────────────────
 const ContactPage = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    subject: '',
-    message: ''
-  });
-  const [status, setStatus] = useState('');
-  const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+  const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
+  const [status, setStatus] = useState('idle'); // idle | sending | success | error
+  const [toast, setToast] = useState(null);
+  const [focused, setFocused] = useState(null);
 
-  const showNotification = (message, type = 'success') => {
-    setNotification({ show: true, message, type });
-    setTimeout(() => setNotification({ show: false, message: '', type: 'success' }), 4000);
-  };
+  const showToast = (msg, type = 'success') => setToast({ msg, type });
 
-  const handleChange = (e) => {
+  const handleChange = e => {
     const { name, value } = e.target;
-    setFormData(prevState => ({ ...prevState, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
+
+  const inputStyle = (field) => ({
+    fontFamily: "'Outfit', sans-serif",
+    background: '#161B22',
+    border: `1px solid ${focused === field ? BLUE : 'rgba(255,255,255,0.08)'}`,
+    boxShadow: focused === field ? `0 0 0 3px ${BLUE}25` : 'none',
+    color: '#F1F5F9',
+    borderRadius: '12px',
+    transition: 'all 0.2s',
+  });
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.email || !formData.subject || !formData.message) {
-      showNotification('Veuillez remplir tous les champs obligatoires', 'error');
+      showToast('Veuillez remplir tous les champs obligatoires.', 'error');
       return;
     }
-
     setStatus('sending');
-    
-    // Simulation d'envoi (remplacez par votre logique réelle)
     try {
-      // await sendContactMessage(formData);
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulation
+      await new Promise(resolve => setTimeout(resolve, 1500));
       setStatus('success');
-      showNotification('Message envoyé avec succès ! Nous vous répondrons bientôt.', 'success');
+      showToast('Message envoyé ! Nous vous répondrons très bientôt.');
       setFormData({ name: '', email: '', subject: '', message: '' });
-    } catch (error) {
+    } catch {
       setStatus('error');
-      showNotification('Une erreur est survenue. Veuillez réessayer.', 'error');
+      showToast('Une erreur est survenue. Veuillez réessayer.', 'error');
     } finally {
-      setTimeout(() => setStatus(''), 2000);
+      setTimeout(() => setStatus('idle'), 2000);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 font-sans">
+    <div className="min-h-screen" style={{ background: '#0D1117', fontFamily: "'Outfit', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        .font-sans { font-family: 'Inter', sans-serif; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
-        .animate-slideUp { animation: slideUp 0.4s ease-out; }
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+        ::placeholder { color: rgba(148,163,184,0.5); }
+        textarea { resize: vertical; }
+        .map-wrapper iframe { display: block; }
       `}</style>
 
-      {/* Notification */}
-      {notification.show && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg text-white animate-slideUp ${
-          notification.type === 'success' ? 'bg-gradient-to-r from-emerald-500 to-green-600' : 'bg-gradient-to-r from-red-500 to-pink-600'
-        }`}>
-          <div className="flex items-center gap-3">
-            {notification.type === 'success' ? (
-              <CheckCircle className="w-5 h-5" />
-            ) : (
-              <AlertTriangle className="w-5 h-5" />
-            )}
-            <span>{notification.message}</span>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
+      </AnimatePresence>
 
-      {/* Bannière Hero */}
-      <section className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white py-20 overflow-hidden">
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')]"></div>
+      {/* ── Hero ──────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden pt-24 pb-20 px-6">
+        {/* Fond décoratif */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full opacity-10 blur-3xl"
+            style={{ background: `radial-gradient(ellipse, ${BLUE}, transparent)` }} />
+          <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-8 blur-3xl"
+            style={{ background: `radial-gradient(ellipse, ${GOLD}, transparent)` }} />
+          {/* Lignes décoratives */}
+          <svg className="absolute inset-0 w-full h-full opacity-5" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+                <path d="M 48 0 L 0 0 0 48" fill="none" stroke="white" strokeWidth="0.5"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
+          </svg>
         </div>
-        <div className="container mx-auto px-4 text-center relative z-10 animate-slideUp">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-2xl">
-              <Sparkles className="w-8 h-8" />
-            </div>
-            <h1 className="text-5xl sm:text-6xl font-black">Contactez-Nous</h1>
-          </div>
-          <p className="mt-4 text-xl font-medium max-w-2xl mx-auto">
-            Nous sommes à votre écoute pour toute question ou projet immobilier, événementiel ou de communication. N'hésitez pas à nous contacter, notre équipe se fera un plaisir de vous répondre rapidement.
-          </p>
+
+        <div className="relative z-10 max-w-3xl mx-auto text-center">
+          {/* Badge */}
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 text-xs font-semibold uppercase tracking-widest"
+            style={{ background: `${BLUE}18`, border: `1px solid ${BLUE}30`, color: BLUE }}>
+            <MessageSquare size={12} />
+            Contactez-nous
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className="text-5xl sm:text-6xl font-bold text-white mb-5 leading-tight"
+            style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+            Parlons de{' '}
+            <span style={{
+              background: `linear-gradient(135deg, ${GOLD}, ${BLUE})`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}>
+              votre projet
+            </span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+            className="text-base text-gray-400 leading-relaxed max-w-xl mx-auto">
+            Notre équipe est à votre écoute pour tout projet immobilier, événementiel ou de communication. Répondons ensemble à vos ambitions.
+          </motion.p>
+
+          {/* Séparateur ornemental */}
+          <motion.div initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }}
+            transition={{ delay: 0.3 }}
+            className="flex items-center justify-center gap-3 mt-8">
+            <div className="h-px w-16" style={{ background: `linear-gradient(to right, transparent, ${GOLD})` }} />
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: GOLD }} />
+            <div className="h-px w-16" style={{ background: `linear-gradient(to left, transparent, ${GOLD})` }} />
+          </motion.div>
         </div>
       </section>
 
-      {/* Contenu principal */}
-      <div className="container mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
-          {/* Formulaire de contact */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-gray-100 animate-slideUp">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl text-white">
-                <MessageSquare className="w-6 h-6" />
+      {/* ── Contenu principal ─────────────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-6 pb-24">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+          {/* ── Formulaire — 3 colonnes ──────────────────────── */}
+          <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="lg:col-span-3 rounded-3xl p-8 space-y-6"
+            style={{ background: '#161B22', border: '1px solid rgba(255,255,255,0.06)' }}>
+
+            <div className="flex items-center gap-3 pb-4"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: `${BLUE}20` }}>
+                <Send size={16} style={{ color: BLUE }} />
               </div>
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              <h2 className="text-xl font-bold text-white"
+                style={{ fontFamily: "'Cormorant Garamond', serif" }}>
                 Envoyez-nous un message
               </h2>
             </div>
 
-            <div className="space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <User className="w-4 h-4 text-indigo-600" />
-                  Votre Nom <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="Ex: Jean Dupont"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 hover:border-gray-300"
-                />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <Field label="Votre nom" icon={User} accent={BLUE}>
+                <input type="text" name="name" value={formData.name} onChange={handleChange}
+                  placeholder="Jean Dupont"
+                  onFocus={() => setFocused('name')} onBlur={() => setFocused(null)}
+                  className="w-full px-4 py-3 text-sm outline-none"
+                  style={inputStyle('name')} />
+              </Field>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-indigo-600" />
-                  Votre Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="Ex: jean.dupont@email.com"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 hover:border-gray-300"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-indigo-600" />
-                  Sujet <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="subject"
-                  value={formData.subject}
-                  onChange={handleChange}
-                  placeholder="Ex: Demande de devis pour un événement"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 hover:border-gray-300"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-indigo-600" />
-                  Votre Message <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  name="message"
-                  value={formData.message}
-                  onChange={handleChange}
-                  placeholder="Décrivez votre projet ou votre demande..."
-                  rows="6"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 resize-y hover:border-gray-300"
-                ></textarea>
-              </div>
-
-              <button
-                onClick={handleSubmit}
-                disabled={status === 'sending'}
-                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all duration-200 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {status === 'sending' ? (
-                  <>
-                    <Loader className="w-5 h-5 animate-spin" />
-                    <span>Envoi en cours...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-5 h-5" />
-                    <span>Envoyer le message</span>
-                  </>
-                )}
-              </button>
+              <Field label="Votre email" icon={Mail} accent={BLUE}>
+                <input type="email" name="email" value={formData.email} onChange={handleChange}
+                  placeholder="jean@email.com"
+                  onFocus={() => setFocused('email')} onBlur={() => setFocused(null)}
+                  className="w-full px-4 py-3 text-sm outline-none"
+                  style={inputStyle('email')} />
+              </Field>
             </div>
-          </div>
 
-          {/* Informations de contact */}
-          <div className="space-y-6 animate-slideUp" style={{ animationDelay: '0.1s' }}>
+            <Field label="Sujet" icon={FileText} accent={GOLD}>
+              <input type="text" name="subject" value={formData.subject} onChange={handleChange}
+                placeholder="Ex : Demande de devis pour un événement"
+                onFocus={() => setFocused('subject')} onBlur={() => setFocused(null)}
+                className="w-full px-4 py-3 text-sm outline-none"
+                style={inputStyle('subject')} />
+            </Field>
+
+            <Field label="Votre message" icon={MessageSquare} accent={GOLD}>
+              <textarea name="message" value={formData.message} onChange={handleChange}
+                placeholder="Décrivez votre projet ou votre demande en détail…"
+                rows={6}
+                onFocus={() => setFocused('message')} onBlur={() => setFocused(null)}
+                className="w-full px-4 py-3 text-sm outline-none"
+                style={inputStyle('message')} />
+            </Field>
+
+            <button onClick={handleSubmit} disabled={status === 'sending'}
+              className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl text-white font-semibold text-sm transition-all hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: `linear-gradient(135deg, #1A5A8A, ${BLUE})`,
+                boxShadow: `0 6px 24px ${BLUE}35`,
+                fontFamily: "'Outfit', sans-serif",
+              }}>
+              {status === 'sending' ? (
+                <><Loader2 size={17} className="animate-spin" /> Envoi en cours…</>
+              ) : (
+                <><Send size={16} /> Envoyer le message</>
+              )}
+            </button>
+          </motion.div>
+
+          {/* ── Infos + Carte — 2 colonnes ───────────────────── */}
+          <div className="lg:col-span-2 flex flex-col gap-5">
+
             {/* Coordonnées */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-gray-100">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl text-white">
-                  <Phone className="w-6 h-6" />
+            <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="rounded-3xl p-6 space-y-3"
+              style={{ background: '#161B22', border: '1px solid rgba(255,255,255,0.06)' }}>
+
+              <div className="flex items-center gap-3 pb-4"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: `${GOLD}20` }}>
+                  <Phone size={16} style={{ color: GOLD }} />
                 </div>
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                <h2 className="text-xl font-bold text-white"
+                  style={{ fontFamily: "'Cormorant Garamond', serif" }}>
                   Nos Coordonnées
                 </h2>
               </div>
 
-              <div className="space-y-5">
-                <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl hover:shadow-md transition-all duration-200">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <MapPin className="w-5 h-5 text-red-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800 mb-1">Adresse</h3>
-                    <p className="text-gray-600">Rue Mfoa n°24, Poto-Poto, Brazzaville</p>
-                  </div>
-                </div>
+              <InfoCard icon={MapPin} label="Adresse" color={RED}
+                value="Rue Mfoa n°24, Poto-Poto, Brazzaville"
+                href={DIRECTIONS_URL}
+                delay={0.3} />
 
-                <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl hover:shadow-md transition-all duration-200">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <Mail className="w-5 h-5 text-indigo-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800 mb-1">Email</h3>
-                    <a 
-                      href="mailto:contact@altitudevision.cg" 
-                      className="text-indigo-600 hover:text-indigo-700 font-medium hover:underline transition-colors"
-                    >
-                      contact@altitudevision.agency
-                    </a>
-                  </div>
-                </div>
+              <InfoCard icon={Mail} label="Email" color={BLUE}
+                value="contact@altitudevision.agency"
+                href="mailto:contact@altitudevision.agency"
+                delay={0.35} />
 
-                <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-pink-50 to-red-50 rounded-xl hover:shadow-md transition-all duration-200">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <Phone className="w-5 h-5 text-green-500" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800 mb-1">Téléphone</h3>
-                    <a 
-                      href="tel:+24206800215" 
-                      className="text-green-600 hover:text-green-700 font-medium hover:underline transition-colors"
-                    >
-                      +242 06 800 21 51 / +242 05 330 16 75
-                    </a>
-                  </div>
-                </div>
+              <InfoCard icon={Phone} label="Téléphone" color={GOLD}
+                value="+242 06 800 21 51 / 05 330 16 75"
+                href="tel:+24206800215"
+                delay={0.4} />
+            </motion.div>
+
+            {/* Carte Maps */}
+            <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="rounded-3xl overflow-hidden flex-1"
+              style={{
+                border: '1px solid rgba(255,255,255,0.06)',
+                minHeight: '280px',
+                position: 'relative',
+              }}>
+
+              {/* Badge agence sur la carte */}
+              <div className="absolute top-3 left-3 z-10 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold shadow-lg"
+                style={{
+                  background: '#0D1117EE',
+                  border: `1px solid ${GOLD}40`,
+                  color: GOLD,
+                  fontFamily: "'Outfit', sans-serif",
+                  backdropFilter: 'blur(8px)',
+                }}>
+                <MapPin size={12} style={{ color: GOLD }} />
+                Altitude-Vision — Poto-Poto
               </div>
-            </div>
 
-            {/* Carte */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-gray-100">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-gradient-to-br from-red-500 to-pink-600 rounded-xl text-white">
-                  <MapPin className="w-6 h-6" />
-                </div>
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent">
-                  Notre Emplacement
-                </h2>
-              </div>
-              <div className="rounded-xl overflow-hidden shadow-lg border-2 border-gray-200 hover:border-indigo-300 transition-all">
-                <iframe 
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3978.937865768843!2d15.28383331476084!3d-4.260830996960132!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1a6a32e8d3b7a1c5%3A0x6e9f6b4e4a0f4d3c!2sCanal%20Olympia%20Poto-Poto!5e0!3m2!1sfr!2scg!4v1672834512345!5m2!1sfr!2scg" 
-                  width="100%" 
-                  height="300" 
-                  style={{ border: 0 }} 
-                  allowFullScreen="" 
-                  loading="lazy" 
+              {/* Bouton Itinéraire */}
+              <a href={DIRECTIONS_URL} target="_blank" rel="noopener noreferrer"
+                className="absolute bottom-3 right-3 z-10 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-white shadow-lg transition-all hover:scale-105"
+                style={{
+                  background: `linear-gradient(135deg, #1A5A8A, ${BLUE})`,
+                  boxShadow: `0 4px 16px ${BLUE}40`,
+                  fontFamily: "'Outfit', sans-serif",
+                }}>
+                <Navigation size={13} />
+                Itinéraire
+              </a>
+
+              {/* iFrame Google Maps — centré sur Poto-Poto, marqueur agence */}
+              <div className="map-wrapper w-full h-full" style={{ minHeight: '280px' }}>
+                <iframe
+                  title="Localisation Altitude-Vision — Rue Mfoa n°24, Poto-Poto, Brazzaville"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0, minHeight: '280px', display: 'block' }}
+                  loading="lazy"
+                  allowFullScreen
                   referrerPolicy="no-referrer-when-downgrade"
-                  title="Carte de localisation Altitude-Vision"
-                  className="w-full"
-                ></iframe>
+                  src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d994.7418316498!2d15.28201!3d-4.25190!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNMKwMTUnMDYuOCJTIDE1wrAxNic1NS4yIkU!5e0!3m2!1sfr!2scg!4v1700000000000!5m2!1sfr!2scg&markers=color:red%7Clabel:AV%7C${AGENCY_LAT},${AGENCY_LNG}`}
+                />
               </div>
-            </div>
+            </motion.div>
+
           </div>
         </div>
-      </div>
+
+        {/* ── Pied de section — pôles ────────────────────────── */}
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            { pole:'Altimmo',    desc:'Immobilier & gestion locative',   color:BLUE, icon:'🏢' },
+            { pole:'Mila Events',desc:'Événementiel & organisation',     color:RED,  icon:'🎪' },
+            { pole:'Altcom',     desc:'Communication & stratégie',       color:GOLD, icon:'📣' },
+          ].map(({ pole, desc, color, icon }) => (
+            <div key={pole}
+              className="flex items-center gap-4 p-4 rounded-2xl"
+              style={{ background: `${color}08`, border: `1px solid ${color}20` }}>
+              <span className="text-2xl">{icon}</span>
+              <div>
+                <p className="text-sm font-bold" style={{ color, fontFamily: "'Outfit', sans-serif" }}>{pole}</p>
+                <p className="text-xs text-gray-500" style={{ fontFamily: "'Outfit', sans-serif" }}>{desc}</p>
+              </div>
+            </div>
+          ))}
+        </motion.div>
+      </section>
     </div>
   );
 };
