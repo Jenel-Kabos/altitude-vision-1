@@ -1,22 +1,24 @@
 // src/pages/dashboard/AdminMessagesPage.jsx
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Filter } from 'lucide-react';
+import { MessageCircle, Filter, Inbox, Archive, Loader2 } from 'lucide-react';
 import ConversationList from '../../components/messaging/ConversationList';
 import ChatWindow from '../../components/messaging/ChatWindow';
 import { getUserConversations } from '../../services/conversationService';
 import { useAuth } from '../../context/AuthContext';
 
+const BLUE = '#2E7BB5';
+const GOLD = '#C8872A';
+const RED  = '#D42B2B';
+
 const AdminMessagesPage = () => {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState([]);
-  const [selectedConversation, setSelectedConversation] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('active'); // 'active' | 'archived'
-  const [totalUnread, setTotalUnread] = useState(0);
+  const [conversations, setConversations]       = useState([]);
+  const [selectedConversation, setSelected]     = useState(null);
+  const [loading, setLoading]                   = useState(true);
+  const [filter, setFilter]                     = useState('active');
+  const [totalUnread, setTotalUnread]           = useState(0);
 
-  useEffect(() => {
-    fetchConversations();
-  }, [filter]);
+  useEffect(() => { fetchConversations(); }, [filter]);
 
   const fetchConversations = async () => {
     try {
@@ -24,115 +26,150 @@ const AdminMessagesPage = () => {
       const data = await getUserConversations(1, 50, filter);
       setConversations(data.conversations);
       setTotalUnread(data.totalUnread);
-    } catch (error) {
-      console.error('Erreur:', error);
+    } catch {
+      // erreur silencieuse — l'UI gère l'état vide
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectConversation = (conversation) => {
-    setSelectedConversation(conversation);
-    
-    setConversations(conversations.map(conv => 
-      conv._id === conversation._id 
-        ? { ...conv, unreadCount: 0 }
-        : conv
-    ));
-    
-    setTotalUnread(Math.max(0, totalUnread - conversation.unreadCount));
+  const handleSelect = (conv) => {
+    setSelected(conv);
+    setConversations(prev =>
+      prev.map(c => c._id === conv._id ? { ...c, unreadCount: 0 } : c)
+    );
+    setTotalUnread(prev => Math.max(0, prev - (conv.unreadCount || 0)));
   };
 
-  const handleArchive = () => {
-    setSelectedConversation(null);
-    fetchConversations();
-  };
+  const handleArchive = () => { setSelected(null); fetchConversations(); };
+
+  const activeCount   = conversations.filter(c => c.status === 'active').length;
+  const archivedCount = conversations.filter(c => c.status !== 'active').length;
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* En-tête */}
-      <div className="bg-white border-b p-4">
-        <div className="flex items-center justify-between mb-4">
+    <div className="flex flex-col h-full" style={{ background: '#F8FAFC' }}>
+
+      {/* ── En-tête ────────────────────────────────────────── */}
+      <div className="bg-white border-b border-gray-100 px-5 py-4 shadow-sm flex-shrink-0">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <MessageCircle className="w-8 h-8 text-blue-600" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: `${BLUE}15` }}>
+              <MessageCircle size={20} style={{ color: BLUE }} />
+            </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">Messagerie Admin</h1>
-              <p className="text-sm text-gray-500">
-                Gérez les conversations avec les clients
+              <h1 className="font-bold text-gray-900 text-base leading-tight"
+                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                Messagerie
+              </h1>
+              <p className="text-xs text-gray-400"
+                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                Conversations avec les clients
               </p>
             </div>
           </div>
 
           {totalUnread > 0 && (
-            <div className="bg-red-600 text-white px-4 py-2 rounded-full font-bold">
+            <span className="text-white text-xs font-bold px-3 py-1.5 rounded-full"
+              style={{ background: RED, fontFamily: "'Outfit', sans-serif" }}>
               {totalUnread} non lu{totalUnread > 1 ? 's' : ''}
-            </div>
+            </span>
           )}
         </div>
 
         {/* Filtres */}
         <div className="flex items-center gap-2">
-          <Filter size={18} className="text-gray-600" />
-          <button
-            onClick={() => setFilter('active')}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
-              filter === 'active'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Actives ({conversations.filter(c => c.status === 'active').length})
-          </button>
-          <button
-            onClick={() => setFilter('archived')}
-            className={`px-4 py-2 rounded-lg font-medium transition ${
-              filter === 'archived'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Archivées
-          </button>
+          <Filter size={14} className="text-gray-400 flex-shrink-0" />
+          {[
+            { id: 'active',   label: 'Actives',   count: activeCount,   Icon: Inbox   },
+            { id: 'archived', label: 'Archivées',  count: archivedCount, Icon: Archive },
+          ].map(({ id, label, count, Icon }) => (
+            <button key={id} onClick={() => setFilter(id)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
+              style={{
+                fontFamily: "'Outfit', sans-serif",
+                background: filter === id ? `linear-gradient(135deg, #1A5A8A, ${BLUE})` : '#F1F5F9',
+                color:      filter === id ? '#fff' : '#64748B',
+                boxShadow:  filter === id ? `0 2px 8px ${BLUE}30` : 'none',
+              }}>
+              <Icon size={12} />
+              {label}
+              <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${
+                filter === id ? 'bg-white/20 text-white' : 'bg-white text-gray-500'
+              }`}>
+                {count}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Contenu */}
+      {/* ── Contenu ─────────────────────────────────────────── */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Chargement...</p>
+            <Loader2 size={32} className="animate-spin mx-auto mb-3" style={{ color: BLUE }} />
+            <p className="text-sm text-gray-400" style={{ fontFamily: "'Outfit', sans-serif" }}>
+              Chargement des conversations…
+            </p>
           </div>
         </div>
       ) : (
         <div className="flex-1 flex overflow-hidden">
-          {/* Liste */}
-          <div className="w-1/3 bg-white border-r overflow-y-auto">
-            <ConversationList
-              conversations={conversations}
-              selectedConversationId={selectedConversation?._id}
-              onSelectConversation={handleSelectConversation}
-              currentUserId={user.id}
-            />
+
+          {/* Liste conversations */}
+          <div className="w-full md:w-80 lg:w-96 bg-white border-r border-gray-100 overflow-y-auto flex-shrink-0"
+            style={{ display: selectedConversation ? 'none' : undefined }}>
+            <div className="md:block" style={{ display: '' }}>
+              {conversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                    style={{ background: `${BLUE}12` }}>
+                    <Inbox size={24} style={{ color: BLUE }} />
+                  </div>
+                  <p className="font-semibold text-gray-600 mb-1"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    Aucune conversation
+                  </p>
+                  <p className="text-xs text-gray-400"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    {filter === 'active' ? 'Les nouvelles conversations apparaîtront ici.' : 'Aucune conversation archivée.'}
+                  </p>
+                </div>
+              ) : (
+                <ConversationList
+                  conversations={conversations}
+                  selectedConversationId={selectedConversation?._id}
+                  onSelectConversation={handleSelect}
+                  currentUserId={user?.id}
+                />
+              )}
+            </div>
           </div>
 
-          {/* Chat */}
-          <div className="w-2/3 bg-gray-50">
+          {/* Fenêtre de chat */}
+          <div className="flex-1 flex flex-col" style={{ background: '#F8FAFC' }}>
             {selectedConversation ? (
               <ChatWindow
                 conversation={selectedConversation}
-                onBack={() => setSelectedConversation(null)}
+                onBack={() => setSelected(null)}
                 onArchive={handleArchive}
               />
             ) : (
-              <div className="h-full flex items-center justify-center text-center p-8">
-                <div>
-                  <MessageCircle className="w-24 h-24 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">
+              /* État vide desktop */
+              <div className="hidden md:flex flex-1 items-center justify-center p-8">
+                <div className="text-center">
+                  <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-5"
+                    style={{ background: `${BLUE}10` }}>
+                    <MessageCircle size={36} style={{ color: `${BLUE}60` }} />
+                  </div>
+                  <h3 className="font-bold text-gray-700 mb-2"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}>
                     Sélectionnez une conversation
                   </h3>
-                  <p className="text-gray-500">
-                    Les conversations avec vos clients apparaîtront ici
+                  <p className="text-sm text-gray-400"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    Choisissez une conversation dans la liste pour commencer.
                   </p>
                 </div>
               </div>
