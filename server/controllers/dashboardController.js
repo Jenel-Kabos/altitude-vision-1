@@ -1,7 +1,8 @@
 // server/controllers/dashboardController.js
-const User         = require('../models/User');
-const Property     = require('../models/Property');
-const Event        = require('../models/Event');
+const User          = require('../models/User');
+const Property      = require('../models/Property');
+const Event         = require('../models/Event');
+const PortfolioItem = require('../models/PortfolioItem'); // ← import au top niveau
 
 /**
  * @DESC   Obtenir les statistiques du Dashboard
@@ -10,21 +11,13 @@ const Event        = require('../models/Event');
  */
 exports.getDashboardStats = async (req, res) => {
   try {
-    const [usersCount, propertiesCount, eventsCount, ownersCount] = await Promise.all([
+    const [usersCount, propertiesCount, eventsCount, ownersCount, portfolioCount] = await Promise.all([
       User.countDocuments(),
       Property.countDocuments(),
       Event.countDocuments(),
       User.countDocuments({ role: 'Proprietaire' }),
+      PortfolioItem.countDocuments({ isPublished: true }),
     ]);
-
-    // Altcom = portfolio items publiés
-    let portfolioCount = 0;
-    try {
-      const PortfolioItem = require('../models/PortfolioItem');
-      portfolioCount = await PortfolioItem.countDocuments({ isPublished: true });
-    } catch (e) {
-      // Modèle introuvable → reste à 0
-    }
 
     const statsData = {
       Altimmo:    propertiesCount,
@@ -47,5 +40,3 @@ exports.getDashboardStats = async (req, res) => {
     });
   }
 };
-
-//fin

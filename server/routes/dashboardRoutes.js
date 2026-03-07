@@ -1,15 +1,13 @@
 // server/routes/dashboardRoutes.js
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
 
-const Property     = require('../models/Property');
-const Event        = require('../models/Event');
-const User         = require('../models/User');
+const Property       = require('../models/Property');
+const Event          = require('../models/Event');
+const User           = require('../models/User');
+const PortfolioItem  = require('../models/PortfolioItem'); // ← import au top niveau
 const authController = require('../controllers/authController');
 
-// ============================================================
-// 🔒 SÉCURITÉ : Toutes les routes ci-dessous sont protégées
-// ============================================================
 router.use(authController.protect);
 router.use(authController.restrictTo('Admin', 'Collaborateur'));
 
@@ -19,21 +17,13 @@ router.use(authController.restrictTo('Admin', 'Collaborateur'));
  */
 router.get('/stats', async (req, res) => {
   try {
-    const [propertyCount, eventCount, usersCount, ownersCount] = await Promise.all([
+    const [propertyCount, eventCount, usersCount, ownersCount, portfolioCount] = await Promise.all([
       Property.countDocuments(),
       Event.countDocuments(),
       User.countDocuments(),
       User.countDocuments({ role: 'Proprietaire' }),
+      PortfolioItem.countDocuments({ isPublished: true }),
     ]);
-
-    // Altcom = portfolio items publiés
-    let portfolioCount = 0;
-    try {
-      const PortfolioItem = require('../models/PortfolioItem');
-      portfolioCount = await PortfolioItem.countDocuments({ isPublished: true });
-    } catch (e) {
-      // Modèle introuvable → reste à 0
-    }
 
     const statsData = {
       Altimmo:    propertyCount,
@@ -58,5 +48,3 @@ router.get('/stats', async (req, res) => {
 });
 
 module.exports = router;
-
-//fin 
