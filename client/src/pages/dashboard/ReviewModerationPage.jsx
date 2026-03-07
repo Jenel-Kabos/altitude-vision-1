@@ -1,551 +1,528 @@
-// src/pages/dashboard/ReviewModerationPage.jsx
 import React, { useEffect, useState } from 'react';
-import api from '../../services/api'; 
-import { 
-  Filter, 
-  CheckCircle2, 
-  XCircle, 
-  Eye, 
-  Star, 
-  User, 
-  MessageSquare,
-  Calendar,
-  AlertTriangle,
-  Trash2,
-  Reply
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Star, MessageSquare, Reply, Trash2, Eye, Filter,
+  Loader2, AlertCircle, X, Calendar, User, CheckCircle, Search,
 } from 'lucide-react';
+import api from '../../services/api';
 
+const BLUE = '#2E7BB5';
+const RED  = '#D42B2B';
+const GOLD = '#C8872A';
+
+const POLE_META = {
+  Altimmo:   { color: BLUE, bg: `${BLUE}15`,  label: 'Altimmo' },
+  MilaEvents:{ color: RED,  bg: `${RED}15`,   label: 'Mila Events' },
+  Altcom:    { color: GOLD, bg: `${GOLD}15`,  label: 'Altcom' },
+};
+
+// ─── Toast ────────────────────────────────────────────────────
+const Toast = ({ msg, type, onDone }) => {
+  useEffect(() => { const t = setTimeout(onDone, 3500); return () => clearTimeout(t); }, [onDone]);
+  const bg = type === 'success' ? '#16A34A' : '#DC2626';
+  return (
+    <motion.div initial={{ opacity:0, y:-40 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-40 }}
+      className="fixed top-5 right-5 z-[100] px-5 py-3.5 rounded-xl shadow-xl text-white text-sm font-medium"
+      style={{ background: bg, fontFamily:"'Outfit', sans-serif" }}>
+      {msg}
+    </motion.div>
+  );
+};
+
+// ─── ConfirmDialog ────────────────────────────────────────────
+const ConfirmDialog = ({ message, onConfirm, onCancel, variant = 'red' }) => {
+  const accent = variant === 'red' ? RED : BLUE;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <motion.div initial={{ opacity:0, scale:0.92 }} animate={{ opacity:1, scale:1 }}
+        className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+        <div className="w-11 h-11 rounded-full flex items-center justify-center mx-auto mb-4"
+          style={{ background: `${accent}18` }}>
+          <AlertCircle size={22} style={{ color: accent }} />
+        </div>
+        <p className="text-center text-gray-700 text-sm mb-6 leading-relaxed"
+          style={{ fontFamily:"'Outfit', sans-serif" }}>{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition"
+            style={{ fontFamily:"'Outfit', sans-serif" }}>
+            Annuler
+          </button>
+          <button onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition hover:opacity-90"
+            style={{ background: accent, fontFamily:"'Outfit', sans-serif" }}>
+            Confirmer
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// ─── Stars ────────────────────────────────────────────────────
+const Stars = ({ rating, size = 14 }) => (
+  <div className="flex gap-0.5">
+    {[1,2,3,4,5].map(s => (
+      <Star key={s} size={size}
+        className={s <= rating ? 'fill-amber-400 text-amber-400' : 'text-gray-200'} />
+    ))}
+  </div>
+);
+
+// ─── Avatar ───────────────────────────────────────────────────
+const Avatar = ({ user, size = 40 }) => {
+  const letter = user?.name?.charAt(0).toUpperCase() || 'U';
+  return user?.photo
+    ? <img src={user.photo} alt={user.name}
+        className="rounded-full object-cover flex-shrink-0"
+        style={{ width:size, height:size }} />
+    : <div className="rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold"
+        style={{ width:size, height:size, background:`linear-gradient(135deg, ${BLUE}, ${GOLD})`,
+          fontSize: size * 0.38, fontFamily:"'Outfit', sans-serif" }}>
+        {letter}
+      </div>;
+};
+
+// ─── Review Card ──────────────────────────────────────────────
+const ReviewCard = ({ review, onClick }) => {
+  const meta = POLE_META[review.pole] || POLE_META.Altimmo;
+  return (
+    <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
+      whileHover={{ y:-3 }} transition={{ duration:0.2 }}
+      onClick={() => onClick(review)}
+      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 cursor-pointer hover:shadow-md transition-all flex flex-col gap-3">
+
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold px-3 py-1 rounded-full"
+          style={{ background: meta.bg, color: meta.color, fontFamily:"'Outfit', sans-serif" }}>
+          {meta.label}
+        </span>
+        <Stars rating={review.rating} />
+      </div>
+
+      <div className="flex items-center gap-2.5">
+        <Avatar user={review.author} size={36} />
+        <div className="min-w-0">
+          <p className="font-semibold text-gray-800 text-sm truncate"
+            style={{ fontFamily:"'Outfit', sans-serif" }}>
+            {review.author?.name || 'Utilisateur'}
+          </p>
+          <p className="text-xs text-gray-400" style={{ fontFamily:"'Outfit', sans-serif" }}>
+            {new Date(review.createdAt).toLocaleDateString('fr-FR')}
+          </p>
+        </div>
+      </div>
+
+      <p className="text-sm text-gray-600 line-clamp-3 italic leading-relaxed"
+        style={{ fontFamily:"'Outfit', sans-serif" }}>
+        « {review.comment} »
+      </p>
+
+      <div className="flex items-center gap-2 pt-2 border-t border-gray-50 mt-auto">
+        {review.adminResponse && (
+          <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full"
+            style={{ background:'#16A34A18', color:'#16A34A', fontFamily:"'Outfit', sans-serif" }}>
+            <Reply size={10} /> Répondu
+          </span>
+        )}
+        {review.rating === 5 && (
+          <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full"
+            style={{ background:'#F59E0B18', color:'#D97706', fontFamily:"'Outfit', sans-serif" }}>
+            <Star size={10} className="fill-current" /> Excellent
+          </span>
+        )}
+        <span className="ml-auto text-xs font-semibold flex items-center gap-1"
+          style={{ color: BLUE, fontFamily:"'Outfit', sans-serif" }}>
+          <Eye size={12} /> Voir
+        </span>
+      </div>
+    </motion.div>
+  );
+};
+
+// ─── Detail Modal ─────────────────────────────────────────────
+const DetailModal = ({ review, onClose, onDelete, onDeleteResponse, onSubmitResponse }) => {
+  const [response, setResponse] = useState('');
+  const [focused, setFocused] = useState(false);
+  const meta = POLE_META[review.pole] || POLE_META.Altimmo;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <motion.div initial={{ opacity:0, scale:0.94 }} animate={{ opacity:1, scale:1 }}
+        exit={{ opacity:0, scale:0.94 }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold px-3 py-1 rounded-full"
+              style={{ background: meta.bg, color: meta.color, fontFamily:"'Outfit', sans-serif" }}>
+              {meta.label}
+            </span>
+            <Stars rating={review.rating} size={16} />
+          </div>
+          <button onClick={onClose}
+            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition">
+            <X size={16} className="text-gray-500" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Auteur */}
+          <div className="flex items-center gap-4">
+            <Avatar user={review.author} size={52} />
+            <div>
+              <p className="font-bold text-gray-900 text-base"
+                style={{ fontFamily:"'Cormorant Garamond', serif" }}>
+                {review.author?.name || 'Utilisateur'}
+              </p>
+              <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5"
+                style={{ fontFamily:"'Outfit', sans-serif" }}>
+                <Calendar size={11} />
+                {new Date(review.createdAt).toLocaleDateString('fr-FR', {
+                  day:'numeric', month:'long', year:'numeric'
+                })}
+              </p>
+            </div>
+          </div>
+
+          {/* Commentaire */}
+          <div className="rounded-xl p-4" style={{ background:`${BLUE}08` }}>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-2"
+              style={{ color: BLUE, fontFamily:"'Outfit', sans-serif" }}>
+              Commentaire
+            </p>
+            <p className="text-gray-700 text-sm leading-relaxed italic"
+              style={{ fontFamily:"'Outfit', sans-serif" }}>
+              « {review.comment} »
+            </p>
+          </div>
+
+          {/* Réponse admin existante */}
+          {review.adminResponse && (
+            <div className="rounded-xl p-4 border-l-4" style={{ background:'#16A34A0A', borderColor:'#16A34A' }}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
+                  style={{ color:'#16A34A', fontFamily:"'Outfit', sans-serif" }}>
+                  <Reply size={12} /> Réponse administration
+                </p>
+                <button onClick={() => onDeleteResponse(review._id)}
+                  className="text-gray-400 hover:text-red-500 transition p-1 rounded">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              <p className="text-gray-700 text-sm leading-relaxed"
+                style={{ fontFamily:"'Outfit', sans-serif" }}>
+                {review.adminResponse.text}
+              </p>
+              <p className="text-xs text-gray-400 mt-2" style={{ fontFamily:"'Outfit', sans-serif" }}>
+                Par {review.adminResponse.respondedBy?.name || 'Admin'} ·{' '}
+                {new Date(review.adminResponse.respondedAt).toLocaleDateString('fr-FR')}
+              </p>
+            </div>
+          )}
+
+          {/* Formulaire réponse */}
+          {!review.adminResponse && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5"
+                style={{ color: BLUE, fontFamily:"'Outfit', sans-serif" }}>
+                <Reply size={12} /> Répondre à cet avis
+              </p>
+              <textarea
+                value={response}
+                onChange={e => setResponse(e.target.value)}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                rows={3}
+                placeholder="Votre réponse en tant qu'administrateur..."
+                className="w-full rounded-xl border text-sm p-3 resize-none outline-none transition-all"
+                style={{
+                  fontFamily:"'Outfit', sans-serif",
+                  borderColor: focused ? BLUE : '#E2E8F0',
+                  boxShadow: focused ? `0 0 0 3px ${BLUE}20` : 'none',
+                }} />
+              <button
+                onClick={() => { if (response.trim()) { onSubmitResponse(review._id, response); onClose(); } }}
+                className="mt-2 flex items-center gap-2 text-white text-sm font-semibold px-5 py-2 rounded-xl transition hover:opacity-90"
+                style={{ background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, fontFamily:"'Outfit', sans-serif" }}>
+                <Reply size={14} /> Publier la réponse
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Footer actions */}
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          <button onClick={() => onDelete(review._id)}
+            className="flex items-center gap-2 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition hover:opacity-90"
+            style={{ background:`linear-gradient(135deg, #991B1B, ${RED})`, fontFamily:"'Outfit', sans-serif" }}>
+            <Trash2 size={15} /> Supprimer l'avis
+          </button>
+          <button onClick={onClose}
+            className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-white transition"
+            style={{ fontFamily:"'Outfit', sans-serif" }}>
+            Fermer
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// ─── MAIN ────────────────────────────────────────────────────
 const ReviewModerationPage = () => {
-  const [reviews, setReviews] = useState([]);
-  const [filteredReviews, setFilteredReviews] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedReview, setSelectedReview] = useState(null);
-  const [selectedPole, setSelectedPole] = useState('Tous');
-  const [adminResponse, setAdminResponse] = useState('');
-  const [stats, setStats] = useState({ total: 0, Altimmo: 0, MilaEvents: 0, Altcom: 0 });
+  const [reviews, setReviews]         = useState([]);
+  const [filtered, setFiltered]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
+  const [selectedReview, setSelected] = useState(null);
+  const [selectedPole, setPole]       = useState('Tous');
+  const [search, setSearch]           = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [stats, setStats]             = useState({ total:0, Altimmo:0, MilaEvents:0, Altcom:0 });
+  const [confirm, setConfirm]         = useState(null);
+  const [toast, setToast]             = useState(null);
 
-  const poles = ['Tous', 'Altimmo', 'MilaEvents', 'Altcom'];
+  const showToast = (msg, type = 'success') => setToast({ msg, type });
 
-  // Récupération de tous les avis
   const fetchReviews = async () => {
     setLoading(true);
     try {
-      console.log('🔍 [ReviewModerationPage] Début du chargement des avis...');
-      
-      const res = await api.get('/reviews', {
-        params: { limit: 1000, sort: '-createdAt' }
+      const res = await api.get('/reviews', { params: { limit:1000, sort:'-createdAt' } });
+      let data = [];
+      if (Array.isArray(res.data))                                    data = res.data;
+      else if (Array.isArray(res.data?.data))                         data = res.data.data;
+      else if (Array.isArray(res.data?.data?.reviews))                data = res.data.data.reviews;
+      else if (Array.isArray(res.data?.reviews))                      data = res.data.reviews;
+      else {
+        const found = Object.values(res.data?.data || res.data || {}).find(Array.isArray);
+        if (found) data = found;
+      }
+      setReviews(data);
+      setStats({
+        total:      data.length,
+        Altimmo:    data.filter(r => r.pole === 'Altimmo').length,
+        MilaEvents: data.filter(r => r.pole === 'MilaEvents').length,
+        Altcom:     data.filter(r => r.pole === 'Altcom').length,
       });
-      
-      console.log('📦 [ReviewModerationPage] Réponse brute:', res);
-      console.log('📦 [ReviewModerationPage] res.data:', res.data);
-      console.log('📦 [ReviewModerationPage] res.data.data:', res.data.data);
-      
-      // ✅ CORRECTION : Gérer la structure réelle de l'API
-      let reviewsData = [];
-      
-      // Structure observée: { status, results, data: {...} }
-      if (Array.isArray(res.data)) {
-        // Format 1: res.data = [...]
-        console.log('✅ Format détecté: Array direct (res.data)');
-        reviewsData = res.data;
-      } else if (res.data.data && Array.isArray(res.data.data)) {
-        // Format 2: res.data.data = [...]
-        console.log('✅ Format détecté: res.data.data (Array)');
-        reviewsData = res.data.data;
-      } else if (res.data.data && res.data.data.reviews && Array.isArray(res.data.data.reviews)) {
-        // Format 3: res.data.data.reviews = [...]
-        console.log('✅ Format détecté: res.data.data.reviews');
-        reviewsData = res.data.data.reviews;
-      } else if (res.data.reviews && Array.isArray(res.data.reviews)) {
-        // Format 4: res.data.reviews = [...]
-        console.log('✅ Format détecté: res.data.reviews');
-        reviewsData = res.data.reviews;
-      } else {
-        // Recherche intelligente dans l'objet data.data
-        console.warn('⚠️ Format non standard détecté');
-        console.warn('⚠️ res.data:', res.data);
-        console.warn('⚠️ res.data.data:', res.data.data);
-        
-        if (res.data.data && typeof res.data.data === 'object') {
-          console.log('🔍 Recherche de tableaux dans res.data.data...');
-          console.log('🔍 Clés disponibles:', Object.keys(res.data.data));
-          
-          // Chercher le premier tableau dans data.data
-          const arrays = Object.entries(res.data.data).filter(([key, value]) => Array.isArray(value));
-          console.log('🔍 Tableaux trouvés:', arrays.map(([key, value]) => `${key} (${value.length})`));
-          
-          if (arrays.length > 0) {
-            const [key, value] = arrays[0];
-            console.log(`✅ Utilisation du tableau: ${key}`);
-            reviewsData = value;
-          }
-        } else if (res.data && typeof res.data === 'object') {
-          // Chercher dans res.data directement
-          console.log('🔍 Recherche de tableaux dans res.data...');
-          const arrays = Object.entries(res.data).filter(([key, value]) => Array.isArray(value));
-          console.log('🔍 Tableaux trouvés:', arrays.map(([key, value]) => `${key} (${value.length})`));
-          
-          if (arrays.length > 0) {
-            const [key, value] = arrays[0];
-            console.log(`✅ Utilisation du tableau: ${key}`);
-            reviewsData = value;
-          }
-        }
-      }
-      
-      console.log('📊 [ReviewModerationPage] reviewsData final:', reviewsData);
-      console.log('📊 [ReviewModerationPage] Type:', Array.isArray(reviewsData) ? 'Array' : typeof reviewsData);
-      console.log('📊 [ReviewModerationPage] Nombre d\'avis:', reviewsData.length);
-      
-      // Vérifier que c'est bien un tableau
-      if (!Array.isArray(reviewsData)) {
-        console.error('❌ reviewsData n\'est pas un tableau!', reviewsData);
-        setError('Format de données incorrect reçu du serveur. Vérifiez la console pour plus de détails.');
-        setReviews([]);
-        setFilteredReviews([]);
-        setStats({ total: 0, Altimmo: 0, MilaEvents: 0, Altcom: 0 });
-        return;
-      }
-      
-      if (reviewsData.length === 0) {
-        console.warn('⚠️ Aucun avis trouvé dans la réponse');
-      }
-      
-      setReviews(reviewsData);
-      setFilteredReviews(reviewsData);
-      
-      // Calcul des statistiques
-      const newStats = {
-        total: reviewsData.length,
-        Altimmo: reviewsData.filter(r => r.pole === 'Altimmo').length,
-        MilaEvents: reviewsData.filter(r => r.pole === 'MilaEvents').length,
-        Altcom: reviewsData.filter(r => r.pole === 'Altcom').length,
-      };
-      setStats(newStats);
-      
-      console.log('✅ [ReviewModerationPage] Statistiques:', newStats);
-    } catch (err) {
-      console.error('❌ [ReviewModerationPage] Erreur:', err);
-      console.error('❌ [ReviewModerationPage] Erreur complète:', {
-        message: err.message,
-        response: err.response,
-        data: err.response?.data
-      });
-      setError(err.response?.data?.message || "Impossible de charger les avis.");
-      setReviews([]);
-      setFilteredReviews([]);
-      setStats({ total: 0, Altimmo: 0, MilaEvents: 0, Altcom: 0 });
+    } catch {
+      setError('Impossible de charger les avis.');
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => { fetchReviews(); }, []);
+
   useEffect(() => {
-    fetchReviews();
-  }, []);
-
-  // Filtrer par pôle
-  useEffect(() => {
-    if (selectedPole === 'Tous') {
-      setFilteredReviews(reviews);
-    } else {
-      setFilteredReviews(reviews.filter(r => r.pole === selectedPole));
+    let data = selectedPole === 'Tous' ? reviews : reviews.filter(r => r.pole === selectedPole);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      data = data.filter(r =>
+        r.author?.name?.toLowerCase().includes(q) ||
+        r.comment?.toLowerCase().includes(q)
+      );
     }
-  }, [selectedPole, reviews]);
+    setFiltered(data);
+  }, [selectedPole, search, reviews]);
 
-  // Supprimer un avis
-  const handleDeleteReview = async (id) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet avis ? Cette action est irréversible.')) {
-      return;
-    }
-
-    try {
-      await api.delete(`/reviews/${id}`);
-
-      // Mise à jour locale
-      const reviewToDelete = reviews.find(r => r._id === id);
-      const updatedReviews = reviews.filter(r => r._id !== id);
-      setReviews(updatedReviews);
-      
-      // Mise à jour des stats
-      if (reviewToDelete) {
-        setStats(prev => ({
-          ...prev,
-          total: prev.total - 1,
-          [reviewToDelete.pole]: prev[reviewToDelete.pole] - 1
-        }));
-      }
-
-      setSelectedReview(null);
-      alert('Avis supprimé avec succès !');
-    } catch (err) {
-      console.error('❌ [ReviewModerationPage] Erreur suppression:', err);
-      alert(err.response?.data?.message || "Une erreur est survenue lors de la suppression.");
-    }
-  };
-
-  // Ajouter/Modifier une réponse admin
-  const handleAdminResponse = async (reviewId) => {
-    if (!adminResponse.trim()) {
-      alert('Veuillez saisir une réponse.');
-      return;
-    }
-
-    try {
-      await api.patch(`/reviews/${reviewId}/admin-response`, {
-        responseText: adminResponse
-      });
-
-      // Mise à jour locale
-      const updatedReviews = reviews.map(r => {
-        if (r._id === reviewId) {
-          return {
-            ...r,
-            adminResponse: {
-              text: adminResponse,
-              respondedAt: new Date().toISOString(),
-              respondedBy: { name: 'Admin' } // Sera remplacé par les vraies données du serveur
-            }
-          };
+  const handleDelete = (id) => {
+    setConfirm({
+      message: 'Supprimer cet avis ? Cette action est irréversible.',
+      variant: 'red',
+      onConfirm: async () => {
+        setConfirm(null);
+        try {
+          await api.delete(`/reviews/${id}`);
+          const updated = reviews.filter(r => r._id !== id);
+          setReviews(updated);
+          setSelected(null);
+          showToast('Avis supprimé avec succès.');
+        } catch {
+          showToast('Erreur lors de la suppression.', 'error');
         }
-        return r;
-      });
-      
-      setReviews(updatedReviews);
-      setAdminResponse('');
-      
-      // Rafraîchir les données pour avoir la vraie réponse du serveur
-      fetchReviews();
-      
-      alert('Réponse ajoutée avec succès !');
-      setSelectedReview(null);
-    } catch (err) {
-      console.error('❌ [ReviewModerationPage] Erreur réponse admin:', err);
-      alert(err.response?.data?.message || "Une erreur est survenue.");
-    }
+      },
+    });
   };
 
-  // Supprimer la réponse admin
-  const handleDeleteAdminResponse = async (reviewId) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer votre réponse ?')) {
-      return;
-    }
-
-    try {
-      await api.delete(`/reviews/${reviewId}/admin-response`);
-
-      // Mise à jour locale
-      const updatedReviews = reviews.map(r => {
-        if (r._id === reviewId) {
-          const { adminResponse, ...rest } = r;
-          return rest;
+  const handleDeleteResponse = (reviewId) => {
+    setConfirm({
+      message: 'Supprimer votre réponse à cet avis ?',
+      variant: 'red',
+      onConfirm: async () => {
+        setConfirm(null);
+        try {
+          await api.delete(`/reviews/${reviewId}/admin-response`);
+          setReviews(reviews.map(r =>
+            r._id === reviewId ? { ...r, adminResponse: undefined } : r
+          ));
+          setSelected(null);
+          showToast('Réponse supprimée.');
+        } catch {
+          showToast('Erreur lors de la suppression.', 'error');
         }
-        return r;
-      });
-      
-      setReviews(updatedReviews);
-      setAdminResponse('');
-      
-      alert('Réponse supprimée avec succès !');
-      setSelectedReview(null);
-    } catch (err) {
-      console.error('❌ [ReviewModerationPage] Erreur suppression réponse:', err);
-      alert(err.response?.data?.message || "Une erreur est survenue.");
+      },
+    });
+  };
+
+  const handleSubmitResponse = async (reviewId, text) => {
+    if (!text.trim()) { showToast('La réponse ne peut pas être vide.', 'error'); return; }
+    try {
+      await api.patch(`/reviews/${reviewId}/admin-response`, { responseText: text });
+      await fetchReviews();
+      showToast('Réponse publiée avec succès.');
+    } catch {
+      showToast('Erreur lors de la publication.', 'error');
     }
   };
 
-  // Rendu des étoiles
-  const renderStars = (rating) => {
-    return (
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            size={18}
-            className={star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
-          />
-        ))}
-      </div>
-    );
-  };
+  const poles = ['Tous', 'Altimmo', 'MilaEvents', 'Altcom'];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Chargement des avis...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-64">
+      <Loader2 size={36} className="animate-spin" style={{ color: BLUE }} />
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded">
-          <p className="font-bold">Erreur</p>
-          <p>{error}</p>
-        </div>
+  if (error) return (
+    <div className="p-6">
+      <div className="flex items-center gap-3 p-4 rounded-xl border"
+        style={{ background:`${RED}08`, borderColor:`${RED}30` }}>
+        <AlertCircle size={20} style={{ color: RED }} />
+        <p className="text-sm" style={{ color: RED, fontFamily:"'Outfit', sans-serif" }}>{error}</p>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">Modération des Avis</h1>
-        
-        {/* Statistiques */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4 rounded-lg shadow">
-            <p className="text-sm opacity-90">Total Avis</p>
-            <p className="text-3xl font-bold">{stats.total}</p>
-          </div>
-          <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-4 rounded-lg shadow">
-            <p className="text-sm opacity-90">Altimmo</p>
-            <p className="text-3xl font-bold">{stats.Altimmo}</p>
-          </div>
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-4 rounded-lg shadow">
-            <p className="text-sm opacity-90">MilaEvents</p>
-            <p className="text-3xl font-bold">{stats.MilaEvents}</p>
-          </div>
-          <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-4 rounded-lg shadow">
-            <p className="text-sm opacity-90">Altcom</p>
-            <p className="text-3xl font-bold">{stats.Altcom}</p>
-          </div>
-        </div>
+    <div className="p-6 space-y-6">
+      <AnimatePresence>
+        {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
+      </AnimatePresence>
 
-        {/* Filtres */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Filter className="text-gray-600" size={20} />
-          <span className="text-gray-600 font-medium">Filtrer par pôle :</span>
-          {poles.map((pole) => (
-            <button
-              key={pole}
-              onClick={() => setSelectedPole(pole)}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                selectedPole === pole
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              {pole}
-              {pole !== 'Tous' && (
-                <span className="ml-2 bg-white bg-opacity-30 px-2 py-0.5 rounded-full text-xs">
-                  {stats[pole]}
-                </span>
-              )}
-            </button>
-          ))}
+      {confirm && (
+        <ConfirmDialog
+          message={confirm.message}
+          variant={confirm.variant}
+          onConfirm={confirm.onConfirm}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background:`${BLUE}18` }}>
+          <MessageSquare size={22} style={{ color: BLUE }} />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900"
+            style={{ fontFamily:"'Cormorant Garamond', serif" }}>
+            Modération des Avis
+          </h1>
+          <p className="text-xs text-gray-400" style={{ fontFamily:"'Outfit', sans-serif" }}>
+            {stats.total} avis au total
+          </p>
         </div>
       </div>
 
-      {/* Liste des avis */}
-      {filteredReviews.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg">
-            Aucun avis {selectedPole !== 'Tous' && `pour ${selectedPole}`}.
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label:'Total',      value:stats.total,      color:'#7C3AED' },
+          { label:'Altimmo',    value:stats.Altimmo,    color:BLUE      },
+          { label:'Mila Events',value:stats.MilaEvents, color:RED       },
+          { label:'Altcom',     value:stats.Altcom,     color:GOLD      },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1"
+              style={{ color, fontFamily:"'Outfit', sans-serif" }}>{label}</p>
+            <p className="text-3xl font-extrabold text-gray-900"
+              style={{ fontFamily:"'Outfit', sans-serif" }}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtres + Recherche */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Filter size={15} className="text-gray-400 flex-shrink-0" />
+          {poles.map(pole => {
+            const meta = POLE_META[pole];
+            const isActive = selectedPole === pole;
+            return (
+              <button key={pole} onClick={() => setPole(pole)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
+                style={{
+                  background: isActive ? (meta?.color || BLUE) : '#F1F5F9',
+                  color:      isActive ? '#fff'                 : '#64748B',
+                  fontFamily:"'Outfit', sans-serif",
+                }}>
+                {pole === 'Tous' ? 'Tous' : meta?.label}
+                {pole !== 'Tous' && (
+                  <span className="ml-1.5 opacity-70">{stats[pole]}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="relative sm:ml-auto">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            placeholder="Rechercher auteur, commentaire…"
+            className="pl-8 pr-4 py-2 text-sm rounded-xl border outline-none transition-all w-64"
+            style={{
+              fontFamily:"'Outfit', sans-serif",
+              borderColor: searchFocused ? BLUE : '#E2E8F0',
+              boxShadow:   searchFocused ? `0 0 0 3px ${BLUE}20` : 'none',
+            }} />
+        </div>
+      </div>
+
+      {/* Grille */}
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 rounded-3xl border-2 border-dashed border-gray-200">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+            style={{ background:`${BLUE}12` }}>
+            <MessageSquare size={26} style={{ color: BLUE }} />
+          </div>
+          <p className="text-gray-500 font-semibold" style={{ fontFamily:"'Outfit', sans-serif" }}>
+            Aucun avis {selectedPole !== 'Tous' ? `pour ${selectedPole}` : ''}
           </p>
+          {search && (
+            <button onClick={() => setSearch('')}
+              className="mt-3 text-xs font-semibold px-4 py-1.5 rounded-full"
+              style={{ background:`${BLUE}15`, color:BLUE, fontFamily:"'Outfit', sans-serif" }}>
+              Réinitialiser la recherche
+            </button>
+          )}
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredReviews.map((review) => (
-            <div
-              key={review._id}
-              className="border rounded-lg shadow-md p-4 flex flex-col cursor-pointer hover:shadow-xl transition-all duration-300 bg-white"
-              onClick={() => setSelectedReview(review)}
-            >
-              {/* En-tête avec pôle et note */}
-              <div className="flex items-start justify-between mb-3">
-                <span className={`px-3 py-1 rounded-full text-xs font-bold text-white ${
-                  review.pole === 'Altimmo' ? 'bg-blue-500' :
-                  review.pole === 'MilaEvents' ? 'bg-purple-500' :
-                  'bg-orange-500'
-                }`}>
-                  {review.pole}
-                </span>
-                {renderStars(review.rating)}
-              </div>
-              
-              {/* Auteur */}
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                  {review.author?.photo ? (
-                    <img src={review.author.photo} alt={review.author.name} className="w-full h-full rounded-full object-cover" />
-                  ) : (
-                    review.author?.name?.charAt(0).toUpperCase() || 'U'
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-800 truncate">{review.author?.name || 'Utilisateur'}</p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(review.createdAt).toLocaleDateString('fr-FR')}
-                  </p>
-                </div>
-              </div>
-              
-              {/* Commentaire */}
-              <p className="text-sm text-gray-600 mb-3 line-clamp-3 italic">
-                "{review.comment}"
-              </p>
-
-              {/* Indicateurs */}
-              <div className="flex items-center gap-2 mt-auto pt-3 border-t">
-                {review.adminResponse && (
-                  <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                    <Reply size={12} />
-                    Répondu
-                  </span>
-                )}
-                {review.rating === 5 && (
-                  <span className="flex items-center gap-1 text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
-                    <Star size={12} className="fill-current" />
-                    Excellent
-                  </span>
-                )}
-              </div>
-
-              <button className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
-                <Eye size={18} />
-                Voir les détails
-              </button>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map(review => (
+            <ReviewCard key={review._id} review={review} onClick={setSelected} />
           ))}
         </div>
       )}
 
-      {/* Modal Détails */}
-      {selectedReview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-3xl p-6 relative max-h-[90vh] overflow-y-auto">
-            <button
-              className="absolute top-4 right-4 text-gray-700 hover:text-red-600 text-2xl font-bold transition"
-              onClick={() => {
-                setSelectedReview(null);
-                setAdminResponse('');
-              }}
-            >
-              &times;
-            </button>
-            
-            {/* En-tête */}
-            <div className="flex items-start justify-between mb-4">
-              <span className={`inline-block px-4 py-2 rounded-full text-sm font-bold text-white ${
-                selectedReview.pole === 'Altimmo' ? 'bg-blue-500' :
-                selectedReview.pole === 'MilaEvents' ? 'bg-purple-500' :
-                'bg-orange-500'
-              }`}>
-                {selectedReview.pole}
-              </span>
-              {renderStars(selectedReview.rating)}
-            </div>
-
-            {/* Auteur */}
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-2xl font-bold">
-                {selectedReview.author?.photo ? (
-                  <img src={selectedReview.author.photo} alt={selectedReview.author.name} className="w-full h-full rounded-full object-cover" />
-                ) : (
-                  selectedReview.author?.name?.charAt(0).toUpperCase() || 'U'
-                )}
-              </div>
-              <div>
-                <p className="text-xl font-bold text-gray-800">{selectedReview.author?.name || 'Utilisateur'}</p>
-                <p className="text-sm text-gray-500 flex items-center gap-2">
-                  <Calendar size={14} />
-                  {new Date(selectedReview.createdAt).toLocaleDateString('fr-FR', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </p>
-              </div>
-            </div>
-
-            {/* Commentaire */}
-            <div className="mb-6">
-              <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                <MessageSquare size={20} className="text-blue-600" />
-                Commentaire
-              </h3>
-              <p className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg italic">
-                "{selectedReview.comment}"
-              </p>
-            </div>
-
-            {/* Réponse admin existante */}
-            {selectedReview.adminResponse && (
-              <div className="mb-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-600">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-bold text-lg flex items-center gap-2">
-                    <Reply size={20} className="text-blue-600" />
-                    Réponse de l'administration
-                  </h3>
-                  <button
-                    onClick={() => handleDeleteAdminResponse(selectedReview._id)}
-                    className="text-red-500 hover:text-red-700 transition"
-                    title="Supprimer la réponse"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-                <p className="text-gray-700 mb-2">{selectedReview.adminResponse.text}</p>
-                <p className="text-xs text-gray-500">
-                  Par {selectedReview.adminResponse.respondedBy?.name || 'Admin'} le{' '}
-                  {new Date(selectedReview.adminResponse.respondedAt).toLocaleDateString('fr-FR')}
-                </p>
-              </div>
-            )}
-
-            {/* Formulaire de réponse admin */}
-            {!selectedReview.adminResponse && (
-              <div className="mb-6">
-                <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
-                  <Reply size={20} className="text-blue-600" />
-                  Répondre à cet avis
-                </h3>
-                <textarea
-                  value={adminResponse}
-                  onChange={(e) => setAdminResponse(e.target.value)}
-                  placeholder="Votre réponse en tant qu'administrateur..."
-                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                  rows="4"
-                />
-                <button
-                  onClick={() => handleAdminResponse(selectedReview._id)}
-                  className="mt-2 flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium"
-                >
-                  <Reply size={18} />
-                  Publier la réponse
-                </button>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex justify-end gap-3 flex-wrap border-t pt-4">
-              <button
-                onClick={() => handleDeleteReview(selectedReview._id)}
-                className="flex items-center gap-2 bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition font-medium shadow-lg"
-              >
-                <Trash2 size={20} />
-                Supprimer l'avis
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedReview(null);
-                  setAdminResponse('');
-                }}
-                className="bg-gray-300 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-400 transition font-medium"
-              >
-                Fermer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal détail */}
+      <AnimatePresence>
+        {selectedReview && (
+          <DetailModal
+            review={selectedReview}
+            onClose={() => setSelected(null)}
+            onDelete={handleDelete}
+            onDeleteResponse={handleDeleteResponse}
+            onSubmitResponse={handleSubmitResponse}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

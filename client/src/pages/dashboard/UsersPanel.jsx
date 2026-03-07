@@ -1,19 +1,135 @@
-// src/pages/dashboard/UsersPanel.jsx
 import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Users, ShieldCheck, ShieldOff, UserX, RefreshCw,
+  Loader2, AlertCircle, CheckCircle, Search,
+} from 'lucide-react';
 import axios from 'axios';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+
+const BLUE = '#2E7BB5';
+const RED  = '#D42B2B';
+const GOLD = '#C8872A';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://altitude-vision.onrender.com/api';
+const ENDPOINT = `${API_URL}/admin/owners`;
 
+// ─── Toast ────────────────────────────────────────────────────
+const Toast = ({ msg, type, onDone }) => {
+  useEffect(() => { const t = setTimeout(onDone, 3500); return () => clearTimeout(t); }, [onDone]);
+  const bg = type === 'success' ? '#16A34A' : '#DC2626';
+  return (
+    <motion.div initial={{ opacity:0, y:-40 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-40 }}
+      className="fixed top-5 right-5 z-[100] px-5 py-3.5 rounded-xl shadow-xl text-white text-sm font-medium"
+      style={{ background: bg, fontFamily:"'Outfit', sans-serif" }}>
+      {msg}
+    </motion.div>
+  );
+};
+
+// ─── ConfirmDialog ────────────────────────────────────────────
+const ConfirmDialog = ({ message, onConfirm, onCancel, variant = 'blue' }) => {
+  const accent = variant === 'red' ? RED : variant === 'gold' ? GOLD : BLUE;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <motion.div initial={{ opacity:0, scale:0.92 }} animate={{ opacity:1, scale:1 }}
+        className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+        <div className="w-11 h-11 rounded-full flex items-center justify-center mx-auto mb-4"
+          style={{ background:`${accent}18` }}>
+          <AlertCircle size={22} style={{ color: accent }} />
+        </div>
+        <p className="text-center text-gray-700 text-sm mb-6 leading-relaxed"
+          style={{ fontFamily:"'Outfit', sans-serif" }}>{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition"
+            style={{ fontFamily:"'Outfit', sans-serif" }}>
+            Annuler
+          </button>
+          <button onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition hover:opacity-90"
+            style={{ background: accent, fontFamily:"'Outfit', sans-serif" }}>
+            Confirmer
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// ─── Avatar initiale ──────────────────────────────────────────
+const Avatar = ({ name }) => (
+  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold text-sm"
+    style={{ background:`linear-gradient(135deg, ${BLUE}, ${GOLD})`, fontFamily:"'Outfit', sans-serif" }}>
+    {name?.charAt(0).toUpperCase() || 'U'}
+  </div>
+);
+
+// ─── STATUS BADGE ─────────────────────────────────────────────
+const StatusBadge = ({ status }) => {
+  const s = status || 'Actif';
+  const map = {
+    'Actif':    { bg:'#16A34A15', color:'#16A34A' },
+    'active':   { bg:'#16A34A15', color:'#16A34A' },
+    'Suspendu': { bg:`${GOLD}18`,  color: GOLD      },
+    'Banni':    { bg:`${RED}15`,   color: RED        },
+    'Supprimé': { bg:'#64748B15', color:'#64748B'  },
+  };
+  const { bg, color } = map[s] || map['Actif'];
+  return (
+    <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
+      style={{ background: bg, color, fontFamily:"'Outfit', sans-serif" }}>
+      {s === 'active' ? 'Actif' : s}
+    </span>
+  );
+};
+
+// ─── KYC BADGE ───────────────────────────────────────────────
+const KycBadge = ({ verified }) => verified ? (
+  <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
+    style={{ background:`${BLUE}15`, color:BLUE, fontFamily:"'Outfit', sans-serif" }}>
+    <CheckCircle size={11} /> Vérifié
+  </span>
+) : (
+  <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
+    style={{ background:'#94A3B815', color:'#94A3B8', fontFamily:"'Outfit', sans-serif" }}>
+    Non vérifié
+  </span>
+);
+
+// ─── ACTION BUTTON ────────────────────────────────────────────
+const ActionBtn = ({ label, color, onClick }) => (
+  <button onClick={onClick}
+    className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition hover:opacity-80"
+    style={{
+      color, borderColor:`${color}40`,
+      background:`${color}0A`,
+      fontFamily:"'Outfit', sans-serif",
+    }}>
+    {label}
+  </button>
+);
+
+// ─── ACTION CONFIG ────────────────────────────────────────────
+const ACTION_META = {
+  verify:   { label:'Vérifier KYC',         variant:'blue', color:BLUE, msg:'Marquer ce propriétaire comme vérifié ?' },
+  suspend:  { label:'Suspendre le compte',   variant:'gold', color:GOLD, msg:'Suspendre le compte de cet utilisateur ?' },
+  activate: { label:'Réactiver le compte',   variant:'blue', color:BLUE, msg:'Réactiver le compte de cet utilisateur ?' },
+  delete:   { label:"Supprimer l'utilisateur",variant:'red', color:RED,  msg:"Supprimer définitivement cet utilisateur ? Action irréversible." },
+};
+
+// ─── MAIN ────────────────────────────────────────────────────
 const UsersPanel = () => {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [users, setUsers]           = useState([]);
+  const [filtered, setFiltered]     = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [search, setSearch]         = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [confirm, setConfirm]       = useState(null);
+  const [toast, setToast]           = useState(null);
 
-  const ENDPOINT = `${API_URL}/admin/owners`;
+  const showToast = (msg, type = 'success') => setToast({ msg, type });
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -22,302 +138,235 @@ const UsersPanel = () => {
       const res = await axios.get(ENDPOINT, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setUsers(res.data.data.owners || res.data.data.users || []);
+      const data = res.data.data?.owners || res.data.data?.users || [];
+      setUsers(data);
+      setFiltered(data);
       setError(null);
-    } catch (err) {
-      console.error('Erreur fetch users:', err);
+    } catch {
       setError('Impossible de charger les utilisateurs.');
-      toast.error('Erreur connexion serveur.');
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => { fetchUsers(); }, []);
+
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (!search.trim()) { setFiltered(users); return; }
+    const q = search.toLowerCase();
+    setFiltered(users.filter(u =>
+      u.name?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q)
+    ));
+  }, [search, users]);
 
-  const handleAction = async (userId, action) => {
-    setActionLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      let url = `${ENDPOINT}/${userId}`;
-      let method = 'patch';
-      let successMessage = '';
-
-      switch (action) {
-        case 'verify':   url += '/verify';   successMessage = '✅ Propriétaire vérifié !'; break;
-        case 'suspend':  url += '/suspend';  successMessage = '⚠️ Compte suspendu !'; break;
-        case 'activate': url += '/activate'; successMessage = '✅ Compte réactivé !'; break;
-        case 'delete':   method = 'delete';  successMessage = '🗑️ Utilisateur supprimé !'; break;
-        default: return;
-      }
-
-      await axios({
-        url, method, data: {},
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      toast.success(successMessage);
-      setSelectedUser(null);
-
-      // ✅ Refetch complet pour avoir les données à jour
-      await fetchUsers();
-
-    } catch (err) {
-      console.error('Erreur action:', err);
-      toast.error(err.response?.data?.message || "Erreur lors de l'action.");
-      setSelectedUser(null);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const getStatusBadge = (user) => {
-    const status = user.status || 'Actif';
-    const styles = {
-      'Actif':    'bg-green-100 text-green-800',
-      'active':   'bg-green-100 text-green-800',
-      'Suspendu': 'bg-yellow-100 text-yellow-800',
-      'Banni':    'bg-red-100 text-red-800',
-      'Supprimé': 'bg-gray-100 text-gray-500',
-    };
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${styles[status] || 'bg-gray-100 text-gray-600'}`}>
-        {status === 'active' ? 'Actif' : status}
-      </span>
-    );
-  };
-
-  const getVerifiedBadge = (user) => {
-    return user.isVerified ? (
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-        </svg>
-        Vérifié
-      </span>
-    ) : (
-      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
-        Non vérifié
-      </span>
-    );
-  };
-
-  const getActionLabel = (action) => {
-    const labels = {
-      verify:   'Vérifier le KYC',
-      suspend:  'Suspendre le compte',
-      activate: 'Réactiver le compte',
-      delete:   "Supprimer l'utilisateur",
-    };
-    return labels[action] || action;
-  };
-
-  const getActionColor = (action) => {
-    const colors = {
-      verify:   'bg-blue-600 hover:bg-blue-700',
-      suspend:  'bg-yellow-500 hover:bg-yellow-600',
-      activate: 'bg-green-600 hover:bg-green-700',
-      delete:   'bg-red-600 hover:bg-red-700',
-    };
-    return colors[action] || 'bg-blue-600 hover:bg-blue-700';
+  const triggerAction = (user, actionType) => {
+    const meta = ACTION_META[actionType];
+    setConfirm({
+      message: `${meta.msg}\n\nUtilisateur : ${user.name}`,
+      variant: meta.variant,
+      onConfirm: async () => {
+        setConfirm(null);
+        setActionLoading(true);
+        try {
+          const token = localStorage.getItem('token');
+          const url = actionType === 'delete'
+            ? `${ENDPOINT}/${user._id}`
+            : `${ENDPOINT}/${user._id}/${actionType}`;
+          await axios({
+            url,
+            method: actionType === 'delete' ? 'delete' : 'patch',
+            data: {},
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          showToast(`Action réalisée : ${meta.label}.`);
+          await fetchUsers();
+        } catch (err) {
+          showToast(err.response?.data?.message || "Erreur lors de l'action.", 'error');
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
   if (loading) return (
-    <div className="flex items-center justify-center p-16">
-      <div className="text-center">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-        <p className="text-gray-500">Chargement des utilisateurs...</p>
-      </div>
+    <div className="flex items-center justify-center min-h-64">
+      <Loader2 size={36} className="animate-spin" style={{ color: BLUE }} />
     </div>
   );
 
   if (error) return (
-    <div className="p-6 text-center text-red-500 bg-red-50 rounded-xl m-6">{error}</div>
+    <div className="p-6">
+      <div className="flex items-center gap-3 p-4 rounded-xl border"
+        style={{ background:`${RED}08`, borderColor:`${RED}30` }}>
+        <AlertCircle size={20} style={{ color: RED }} />
+        <p className="text-sm" style={{ color: RED, fontFamily:"'Outfit', sans-serif" }}>{error}</p>
+      </div>
+    </div>
   );
 
   return (
-    <div className="p-6">
-      <ToastContainer position="top-right" autoClose={3000} />
+    <div className="p-6 space-y-6">
+      <AnimatePresence>
+        {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
+      </AnimatePresence>
+
+      {confirm && (
+        <ConfirmDialog
+          message={confirm.message}
+          variant={confirm.variant}
+          onConfirm={confirm.onConfirm}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestion des Propriétaires</h1>
-          <p className="text-sm text-gray-500 mt-1">{users.length} propriétaire(s) enregistré(s)</p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background:`${BLUE}18` }}>
+            <Users size={22} style={{ color: BLUE }} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900"
+              style={{ fontFamily:"'Cormorant Garamond', serif" }}>
+              Gestion des Propriétaires
+            </h1>
+            <p className="text-xs text-gray-400" style={{ fontFamily:"'Outfit', sans-serif" }}>
+              {users.length} propriétaire{users.length !== 1 ? 's' : ''} enregistré{users.length !== 1 ? 's' : ''}
+            </p>
+          </div>
         </div>
-        <button
-          onClick={fetchUsers}
-          className="text-sm text-blue-600 hover:text-blue-700 font-semibold border border-blue-200 px-4 py-2 rounded-lg hover:bg-blue-50 transition"
-        >
-          🔄 Actualiser
+
+        <button onClick={fetchUsers} disabled={actionLoading}
+          className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border transition hover:bg-white disabled:opacity-50"
+          style={{ borderColor:`${BLUE}30`, color:BLUE, fontFamily:"'Outfit', sans-serif" }}>
+          <RefreshCw size={14} className={actionLoading ? 'animate-spin' : ''} />
+          Actualiser
         </button>
       </div>
 
+      {/* Stat pills */}
+      <div className="flex flex-wrap gap-3">
+        {[
+          { label:'Total',         value: users.length,                                     color:'#7C3AED' },
+          { label:'Vérifiés',      value: users.filter(u => u.isVerified).length,            color: BLUE    },
+          { label:'Actifs',        value: users.filter(u => !u.status || u.status === 'Actif' || u.status === 'active').length, color:'#16A34A' },
+          { label:'Suspendus',     value: users.filter(u => u.status === 'Suspendu').length, color: GOLD    },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3 flex items-center gap-3">
+            <span className="text-2xl font-extrabold" style={{ color, fontFamily:"'Outfit', sans-serif" }}>
+              {value}
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400"
+              style={{ fontFamily:"'Outfit', sans-serif" }}>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Barre de recherche */}
+      <div className="relative w-full sm:w-72">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          placeholder="Rechercher nom, email…"
+          className="w-full pl-8 pr-4 py-2 text-sm rounded-xl border outline-none transition-all"
+          style={{
+            fontFamily:"'Outfit', sans-serif",
+            borderColor: searchFocused ? BLUE : '#E2E8F0',
+            boxShadow:   searchFocused ? `0 0 0 3px ${BLUE}20` : 'none',
+          }} />
+      </div>
+
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <table className="min-w-full">
-          <thead className="bg-gray-50 border-b border-gray-100">
+          <thead style={{ background:'#F8FAFC' }}>
             <tr>
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Nom</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">KYC</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+              {['Nom','Email','Statut','KYC','Actions'].map(h => (
+                <th key={h} className={`px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide ${
+                  h === 'Nom' || h === 'Email' ? 'text-left' : 'text-center'
+                }`} style={{ fontFamily:"'Outfit', sans-serif" }}>{h}</th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
-            {users.map((user) => {
-              const status = user.status || 'Actif';
-              const isActive = status === 'Actif' || status === 'active';
+          <tbody>
+            <AnimatePresence>
+              {filtered.map((user, i) => {
+                const isActive = !user.status || user.status === 'Actif' || user.status === 'active';
+                return (
+                  <motion.tr key={user._id}
+                    initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+                    transition={{ delay: i * 0.03 }}
+                    className="border-t border-gray-50 hover:bg-gray-50 transition-colors">
 
-              return (
-                <tr key={user._id} className="hover:bg-gray-50 transition">
-
-                  {/* Nom */}
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <span className="text-blue-700 text-sm font-bold">
-                          {user.name?.charAt(0).toUpperCase()}
-                        </span>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar name={user.name} />
+                        <span className="font-semibold text-gray-800 text-sm"
+                          style={{ fontFamily:"'Outfit', sans-serif" }}>{user.name}</span>
                       </div>
-                      <span className="font-medium text-gray-900">{user.name}</span>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Email */}
-                  <td className="px-5 py-4 text-sm text-gray-600">{user.email}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-500"
+                      style={{ fontFamily:"'Outfit', sans-serif" }}>{user.email}</td>
 
-                  {/* Statut */}
-                  <td className="px-5 py-4">{getStatusBadge(user)}</td>
+                    <td className="px-5 py-3.5 text-center">
+                      <StatusBadge status={user.status} />
+                    </td>
 
-                  {/* KYC */}
-                  <td className="px-5 py-4">{getVerifiedBadge(user)}</td>
+                    <td className="px-5 py-3.5 text-center">
+                      <KycBadge verified={user.isVerified} />
+                    </td>
 
-                  {/* Actions */}
-                  <td className="px-5 py-4">
-                    <div className="flex gap-2 flex-wrap">
-
-                      {/* Vérifier KYC */}
-                      {!user.isVerified && (
-                        <button
-                          onClick={() => setSelectedUser({ ...user, actionType: 'verify' })}
-                          className="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded-lg text-xs font-semibold border border-blue-200 transition"
-                        >
-                          Vérifier
-                        </button>
-                      )}
-
-                      {/* Suspendre / Réactiver */}
-                      {isActive ? (
-                        <button
-                          onClick={() => setSelectedUser({ ...user, actionType: 'suspend' })}
-                          className="text-yellow-600 hover:bg-yellow-50 px-3 py-1 rounded-lg text-xs font-semibold border border-yellow-200 transition"
-                        >
-                          Suspendre
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setSelectedUser({ ...user, actionType: 'activate' })}
-                          className="text-green-600 hover:bg-green-50 px-3 py-1 rounded-lg text-xs font-semibold border border-green-200 transition"
-                        >
-                          Réactiver
-                        </button>
-                      )}
-
-                      {/* Supprimer */}
-                      <button
-                        onClick={() => setSelectedUser({ ...user, actionType: 'delete' })}
-                        className="text-red-600 hover:bg-red-50 px-3 py-1 rounded-lg text-xs font-semibold border border-red-200 transition"
-                      >
-                        Supprimer
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                        {!user.isVerified && (
+                          <ActionBtn label="Vérifier" color={BLUE}
+                            onClick={() => triggerAction(user, 'verify')} />
+                        )}
+                        {isActive ? (
+                          <ActionBtn label="Suspendre" color={GOLD}
+                            onClick={() => triggerAction(user, 'suspend')} />
+                        ) : (
+                          <ActionBtn label="Réactiver" color="#16A34A"
+                            onClick={() => triggerAction(user, 'activate')} />
+                        )}
+                        <ActionBtn label="Supprimer" color={RED}
+                          onClick={() => triggerAction(user, 'delete')} />
+                      </div>
+                    </td>
+                  </motion.tr>
+                );
+              })}
+            </AnimatePresence>
           </tbody>
         </table>
 
-        {users.length === 0 && (
-          <div className="p-10 text-center text-gray-400">
-            <p className="text-lg font-semibold">Aucun propriétaire trouvé</p>
-            <p className="text-sm mt-1">Les propriétaires enregistrés apparaîtront ici</p>
+        {filtered.length === 0 && (
+          <div className="py-16 text-center">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
+              style={{ background:`${BLUE}12` }}>
+              <Users size={22} style={{ color:BLUE }} />
+            </div>
+            <p className="font-semibold text-gray-500 text-sm"
+              style={{ fontFamily:"'Outfit', sans-serif" }}>
+              Aucun propriétaire{search ? ' correspondant à la recherche' : ' enregistré'}
+            </p>
+            {search && (
+              <button onClick={() => setSearch('')}
+                className="mt-3 text-xs font-semibold px-4 py-1.5 rounded-full"
+                style={{ background:`${BLUE}15`, color:BLUE, fontFamily:"'Outfit', sans-serif" }}>
+                Réinitialiser
+              </button>
+            )}
           </div>
         )}
       </div>
-
-      {/* Modal de confirmation */}
-      {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl shadow-2xl w-96 mx-4">
-
-            {/* Icône selon l'action */}
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${
-              selectedUser.actionType === 'delete'   ? 'bg-red-100' :
-              selectedUser.actionType === 'suspend'  ? 'bg-yellow-100' :
-              selectedUser.actionType === 'verify'   ? 'bg-blue-100' : 'bg-green-100'
-            }`}>
-              {selectedUser.actionType === 'delete' && (
-                <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              )}
-              {selectedUser.actionType === 'suspend' && (
-                <svg className="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z" />
-                </svg>
-              )}
-              {selectedUser.actionType === 'verify' && (
-                <svg className="w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              )}
-              {selectedUser.actionType === 'activate' && (
-                <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </div>
-
-            <h3 className="font-bold text-lg text-center mb-1 text-gray-900">Confirmer l'action</h3>
-            <p className="text-center text-gray-700 mb-1 text-sm">
-              <span className="font-semibold">{getActionLabel(selectedUser.actionType)}</span>
-            </p>
-            <p className="text-center text-gray-500 text-sm mb-6">
-              Utilisateur : <span className="font-semibold text-gray-700">{selectedUser.name}</span>
-            </p>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setSelectedUser(null)}
-                disabled={actionLoading}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-semibold transition disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => handleAction(selectedUser._id, selectedUser.actionType)}
-                disabled={actionLoading}
-                className={`px-4 py-2 text-white rounded-lg text-sm font-semibold transition disabled:opacity-50 flex items-center gap-2 ${getActionColor(selectedUser.actionType)}`}
-              >
-                {actionLoading ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    En cours...
-                  </>
-                ) : 'Confirmer'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
