@@ -1,259 +1,198 @@
 // src/pages/AdminDashboard.jsx
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { 
-  Home, Calendar, Briefcase, LogOut, BarChart3, Globe, Users, CheckCircle2, ShieldCheck, Mail, Menu, X, Star
+import {
+  Home, Calendar, Briefcase, LogOut, BarChart3, Globe, Users,
+  CheckCircle2, ShieldCheck, Mail, Menu, X, Star, Mountain,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
+const GOLD = '#C8872A';
+const BLUE = '#2E7BB5';
+
+// ─────────────────────────────────────────────────────────────
+// Config de navigation
+// ─────────────────────────────────────────────────────────────
+const NAV_SECTIONS = [
+  {
+    label: null,
+    links: [
+      { to: '/dashboard',             end: true, Icon: BarChart3,    label: 'Tableau de bord',   accent: BLUE },
+      { to: '/dashboard/properties',  end: false, Icon: Home,         label: 'Altimmo',           accent: BLUE },
+      { to: '/dashboard/events',      end: false, Icon: Calendar,     label: 'Mila Events',       accent: '#D42B2B' },
+      { to: '/dashboard/altcom',      end: false, Icon: Briefcase,    label: 'Altcom',            accent: GOLD },
+    ],
+  },
+  {
+    label: 'Modération',
+    links: [
+      { to: '/dashboard/moderation/properties', end: false, Icon: CheckCircle2, label: 'Modération Biens', accent: '#7C3AED' },
+      { to: '/dashboard/moderation/reviews',    end: false, Icon: Star,         label: 'Modération Avis',  accent: '#6366F1' },
+    ],
+  },
+  {
+    label: 'Administration',
+    links: [
+      { to: '/dashboard/users',           end: false, Icon: Users,      label: 'Utilisateurs',      accent: '#0D9488' },
+      { to: '/dashboard/active-sessions', end: false, Icon: ShieldCheck, label: 'Sessions Actives', accent: '#DC2626' },
+    ],
+  },
+  {
+    label: 'Communications',
+    links: [
+      { to: '/dashboard/messages', end: false, Icon: Mail,       label: 'Boîte de Réception', accent: GOLD },
+      { to: '/dashboard/emails',   end: false, Icon: ShieldCheck, label: 'Gestion des Emails', accent: '#F59E0B' },
+    ],
+  },
+];
+
+// ─────────────────────────────────────────────────────────────
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const { logout, user } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate("/login", { replace: true });
   };
 
-  const handleGoHome = () => {
-    navigate("/");
-  };
-
-  const toggleMobileSidebar = () => {
-    setShowMobileSidebar(!showMobileSidebar);
-  };
-
-  const closeMobileSidebar = () => {
-    setShowMobileSidebar(false);
-  };
-
-  const navLinkClass = ({ isActive, colorClass, hoverClass = "hover:bg-gray-200" }) =>
-    `flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 ${
-      isActive ? colorClass : `text-gray-700 ${hoverClass}`
-    }`;
+  const close = () => setSidebarOpen(false);
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      
-      {/* =======================================================
-          OVERLAY pour fermer la sidebar sur mobile (clic en dehors)
-      ======================================================== */}
-      {showMobileSidebar && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={closeMobileSidebar}
-        />
+    <div className="flex min-h-screen" style={{ background: '#F1F5F9' }}>
+
+      {/* Overlay mobile */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={close} />
       )}
 
-      {/* =======================================================
-          SIDEBAR
-          - Mobile : Slide-in depuis la gauche quand showMobileSidebar = true
-          - Desktop : Toujours visible, largeur fixe (w-64)
-      ======================================================== */}
+      {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside className={`
-        w-64 bg-white shadow-lg p-4 flex flex-col justify-between
-        fixed md:relative h-full z-50 md:z-auto
+        w-64 flex flex-col justify-between
+        fixed md:sticky top-0 h-screen z-50 md:z-auto
         transition-transform duration-300 ease-in-out
-        ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-      `}>
-        {/* Header avec bouton fermeture (mobile only) */}
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `} style={{ background: '#0D1117', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+
+        {/* Header sidebar */}
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-blue-700 text-center">
-                Altitude-Vision
-              </h1>
-              <p className="text-xs text-center text-gray-400 mt-1">
-                Panneau d'administration
-              </p>
+          {/* Brand */}
+          <div className="px-5 py-5 flex items-center justify-between"
+            style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: `linear-gradient(135deg, #A06820, ${GOLD})` }}>
+                <Mountain className="w-3.5 h-3.5 text-white" strokeWidth={2.2} />
+              </div>
+              <div className="leading-none">
+                <span className="block text-white font-bold"
+                  style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: '1rem' }}>
+                  Altitude<span style={{ color: GOLD }}>-</span>Vision
+                </span>
+                <span className="block text-white/30"
+                  style={{ fontFamily: "'Outfit', sans-serif", fontSize: '0.52rem', letterSpacing: '0.2em' }}>
+                  ADMIN
+                </span>
+              </div>
             </div>
-            <button
-              onClick={closeMobileSidebar}
-              className="md:hidden p-2 -mr-2 rounded-lg hover:bg-gray-100 text-gray-600"
-              aria-label="Fermer le menu"
-            >
-              <X size={24} />
+            <button onClick={close}
+              className="md:hidden p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-all"
+              aria-label="Fermer">
+              <X size={18} />
             </button>
           </div>
 
-          <nav className="space-y-2">
-            {/* Tableau de bord */}
-            <NavLink
-              to="/dashboard"
-              end
-              onClick={closeMobileSidebar}
-              className={({ isActive }) =>
-                navLinkClass({ isActive, colorClass: "bg-blue-600 text-white" })
-              }
-            >
-              <BarChart3 size={18} /> Tableau de bord
-            </NavLink>
-
-            {/* Altimmo */}
-            <NavLink
-              to="/dashboard/properties"
-              onClick={closeMobileSidebar}
-              className={({ isActive }) =>
-                navLinkClass({ isActive, colorClass: "bg-blue-600 text-white" })
-              }
-            >
-              <Home size={18} /> Altimmo
-            </NavLink>
-
-            {/* Mila Events */}
-            <NavLink
-              to="/dashboard/events"
-              onClick={closeMobileSidebar}
-              className={({ isActive }) =>
-                navLinkClass({ isActive, colorClass: "bg-blue-600 text-white" })
-              }
-            >
-              <Calendar size={18} /> Mila Events
-            </NavLink>
-
-            {/* Altcom */}
-            <NavLink
-              to="/dashboard/altcom"
-              onClick={closeMobileSidebar}
-              className={({ isActive }) =>
-                navLinkClass({ isActive, colorClass: "bg-blue-600 text-white" })
-              }
-            >
-              <Briefcase size={18} /> Altcom
-            </NavLink>
-
-            {/* --- MODÉRATION --- */}
-            <div className="border-t border-gray-200 pt-2 mt-2">
-              <p className="text-xs text-gray-500 font-semibold uppercase mb-1">Modération</p>
-
-              {/* Modération des biens */}
-              <NavLink
-                to="/dashboard/moderation/properties"
-                onClick={closeMobileSidebar}
-                className={({ isActive }) =>
-                  navLinkClass({ isActive, colorClass: "bg-purple-600 text-white" })
-                }
-              >
-                <CheckCircle2 size={18} /> Modération Biens
-              </NavLink>
-
-              {/* Modération des avis */}
-              <NavLink
-                to="/dashboard/moderation/reviews"
-                onClick={closeMobileSidebar}
-                className={({ isActive }) =>
-                  navLinkClass({ isActive, colorClass: "bg-indigo-600 text-white" })
-                }
-              >
-                <Star size={18} /> Modération Avis
-              </NavLink>
+          {/* User info */}
+          {user && (
+            <div className="px-5 py-3 flex items-center gap-3"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                style={{ background: `linear-gradient(135deg, ${GOLD}, ${BLUE})` }}>
+                {(user.name || 'A')[0].toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="text-white text-xs font-semibold truncate"
+                  style={{ fontFamily: "'Outfit', sans-serif" }}>{user.name || 'Admin'}</p>
+                <p className="text-white/35 text-xs truncate"
+                  style={{ fontFamily: "'Outfit', sans-serif" }}>{user.role || 'Administrateur'}</p>
+              </div>
             </div>
-            
-            {/* --- ADMINISTRATION & SÉCURITÉ --- */}
-            <div className="border-t border-gray-200 pt-2 mt-2">
-                <p className="text-xs text-gray-500 font-semibold uppercase mb-1">Administration & Sécurité</p>
+          )}
 
-                {/* Gestion des utilisateurs */}
-                <NavLink
-                    to="/dashboard/users"
-                    onClick={closeMobileSidebar}
+          {/* Nav */}
+          <nav className="px-3 py-3 space-y-0.5 overflow-y-auto"
+            style={{ maxHeight: 'calc(100vh - 220px)' }}>
+            {NAV_SECTIONS.map((section, si) => (
+              <div key={si}>
+                {section.label && (
+                  <p className="px-3 pt-3 pb-1 text-white/25 text-xs font-semibold uppercase tracking-widest"
+                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    {section.label}
+                  </p>
+                )}
+                {section.links.map(({ to, end, Icon, label, accent }) => (
+                  <NavLink key={to} to={to} end={end} onClick={close}
                     className={({ isActive }) =>
-                        navLinkClass({ isActive, colorClass: "bg-teal-600 text-white" })
+                      `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 ${
+                        isActive
+                          ? 'text-white bg-white/10'
+                          : 'text-white/50 hover:text-white hover:bg-white/6'
+                      }`
                     }
-                >  
-                    <Users size={18} /> Utilisateurs (Général)
-                </NavLink>
-                
-                {/* Sessions Actives (Sécurité) */}
-                <NavLink
-                    to="/dashboard/active-sessions"
-                    onClick={closeMobileSidebar}
-                    className={({ isActive }) =>
-                        navLinkClass({ isActive, colorClass: "bg-red-600 text-white", hoverClass: "hover:bg-red-100" })
-                    }
-                >  
-                    <ShieldCheck size={18} /> Sessions Actives
-                </NavLink>
-            </div>
-
-            {/* --- COMMUNICATIONS --- */}
-            <div className="border-t border-gray-200 pt-2 mt-2">
-              <p className="text-xs text-gray-500 font-semibold uppercase mb-1">Communications</p>
-
-                {/* Boîte de Réception Admin */}
-                <NavLink
-                  to="/dashboard/messages"
-                  onClick={closeMobileSidebar}
-                  className={({ isActive }) =>
-                    navLinkClass({ isActive, colorClass: "bg-amber-600 text-white" })
-                  }
-                >
-                  <Mail size={18} /> Boîte de Réception
-                </NavLink>
-
-              {/* Gestion des Emails */}
-              <NavLink
-                to="/dashboard/emails"
-                onClick={closeMobileSidebar}
-                className={({ isActive }) =>
-                  navLinkClass({ isActive, colorClass: "bg-amber-400 text-white" })
-                }
-              >  
-                <ShieldCheck size={18} /> Gestion des Emails
-              </NavLink>
-            </div>
-
-            {/* Accueil public */}
-            <button
-              onClick={() => {
-                handleGoHome();
-                closeMobileSidebar();
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-yellow-600 hover:bg-yellow-100 mt-4 transition-colors"
-            >
-              <Globe size={18} /> Accueil du site
-            </button>
+                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    {({ isActive }) => (
+                      <>
+                        <Icon size={16} style={{ color: isActive ? accent : undefined, flexShrink: 0 }} />
+                        <span>{label}</span>
+                        {isActive && (
+                          <span className="ml-auto w-1 h-4 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: accent }} />
+                        )}
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            ))}
           </nav>
         </div>
 
-        {/* Bouton Déconnexion */}
-        <button
-          onClick={() => {
-            handleLogout();
-            closeMobileSidebar();
-          }}
-          className="flex items-center gap-2 mt-6 px-3 py-2 rounded-lg text-red-600 hover:bg-red-100 transition-colors"
-        >
-          <LogOut size={18} /> Déconnexion
-        </button>
+        {/* Footer sidebar */}
+        <div className="px-3 py-3 space-y-1"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <button onClick={() => { navigate('/'); close(); }}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-white hover:bg-white/6 transition-all"
+            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <Globe size={16} className="flex-shrink-0" />
+            Accueil du site
+          </button>
+          <button onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition-all"
+            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <LogOut size={16} className="flex-shrink-0" />
+            Déconnexion
+          </button>
+        </div>
       </aside>
 
-      {/* =======================================================
-          CONTENU PRINCIPAL
-          - Mobile : Prend toute la largeur
-          - Desktop : Prend le reste de l'espace (flex-1)
-      ======================================================== */}
+      {/* ── Contenu principal ────────────────────────────────── */}
       <main className="flex-1 flex flex-col min-h-screen">
-        
-        {/* Header Mobile avec bouton Menu */}
-        <div className="md:hidden bg-white border-b shadow-sm sticky top-0 z-30">
-          <div className="flex items-center justify-between p-4">
-            <button
-              onClick={toggleMobileSidebar}
-              className="p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-700 transition-colors"
-              aria-label="Ouvrir le menu"
-            >
-              <Menu size={24} />
-            </button>
-            <h2 className="text-lg font-bold text-gray-800">
-              Dashboard Admin
-            </h2>
-            <div className="w-10" /> {/* Spacer pour centrer le titre */}
-          </div>
+
+        {/* Topbar mobile */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
+          <button onClick={() => setSidebarOpen(true)}
+            className="p-2 -ml-1 rounded-xl hover:bg-gray-100 text-gray-600 transition-all"
+            aria-label="Menu">
+            <Menu size={22} />
+          </button>
+          <span className="text-sm font-bold text-gray-800"
+            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            Dashboard Admin
+          </span>
+          <div className="w-8" />
         </div>
 
-        {/* Contenu de la page */}
         <div className="flex-1 p-4 md:p-6 overflow-y-auto">
           <Outlet />
         </div>

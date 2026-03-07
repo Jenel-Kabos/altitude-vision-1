@@ -1,296 +1,370 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { toast } from "react-hot-toast";
-import { useAuth } from "../../context/AuthContext"; // 🔑 Récupération du contexte
-
+import { useAuth } from "../../context/AuthContext";
 import {
-	getMyProperties,
-	createProperty,
-	updateProperty,
-	deleteProperty,
-	getPropertyById,
+  Building2, Plus, Edit2, Trash2, MapPin, Maximize2, Bed, Bath,
+  Loader2, AlertCircle, Home, X,
+} from "lucide-react";
+import {
+  getMyProperties, createProperty, updateProperty,
+  deleteProperty, getPropertyById,
 } from "../../services/propertyService";
 import PropertyForm from "../../components/dashboard/PropertyForm";
 
-// ==============================================================================
-// 1. Logique et États du Formulaire (Sub-composant d'ajout/édition)
-// ==============================================================================
+const BLUE = '#2E7BB5';
+const GOLD = '#C8872A';
 
-const initialFormData = () => ({
-	title: "",
-	description: "",
-	price: "",
-	pole: "Altimmo",
-	status: "vente",
-	availability: "Disponible",
-	type: "Appartement",
-	address: { street: "", district: "", city: "Brazzaville" },
-	surface: "",
-	bedrooms: "",
-	bathrooms: "",
-	amenities: "",
-	latitude: -4.266,
-	longitude: 15.283,
-	images: [],
+// ─────────────────────────────────────────────────────────────
+// État formulaire initial
+// ─────────────────────────────────────────────────────────────
+const emptyForm = () => ({
+  title:'', description:'', price:'', pole:'Altimmo',
+  status:'vente', availability:'Disponible', type:'Appartement',
+  address:{ street:'', district:'', city:'Brazzaville' },
+  surface:'', bedrooms:'', bathrooms:'', amenities:'',
+  latitude:-4.266, longitude:15.283, images:[],
 });
 
-const PropertyManagementForm = ({
-	propertyId,
-	onSave,
-	onCancel,
-}) => {
-	const isEditing = !!propertyId;
-	const [formData, setFormData] = useState(initialFormData());
-	const [existingImages, setExistingImages] = useState([]);
-	const [loading, setLoading] = useState(false);
+// ─────────────────────────────────────────────────────────────
+// Formulaire (ajout / édition)
+// ─────────────────────────────────────────────────────────────
+const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
+  const isEditing = !!propertyId;
+  const [formData, setFormData]         = useState(emptyForm());
+  const [existingImages, setExistingImages] = useState([]);
+  const [loading, setLoading]           = useState(false);
 
-	// Charger les données pour l'édition
-	useEffect(() => {
-		if (isEditing) {
-			const fetchProperty = async () => {
-				setLoading(true);
-				try {
-					const property = await getPropertyById(propertyId);
-					setFormData({
-						...initialFormData(),
-						...property,
-						address: {
-							district: property.address?.district || property.address_district || "",
-							street: property.address?.street || property.address_street || "",
-							city: property.address?.city || property.address_city || "Brazzaville",
-						},
-						amenities: property.amenities ? property.amenities.join(", ") : "",
-						latitude: property.location?.coordinates[1] || -4.266,
-						longitude: property.location?.coordinates[0] || 15.283,
-						images: [],
-					});
-					setExistingImages(property.images || []);
-				} catch (error) {
-					console.error("Erreur de chargement du bien:", error);
-					toast.error("Erreur lors du chargement des données du bien.");
-					onCancel();
-				} finally {
-					setLoading(false);
-				}
-			};
-			fetchProperty();
-		} else {
-			setFormData(initialFormData());
-			setExistingImages([]);
-		}
-	}, [propertyId, isEditing, onCancel]);
+  useEffect(() => {
+    if (!isEditing) { setFormData(emptyForm()); setExistingImages([]); return; }
+    const load = async () => {
+      setLoading(true);
+      try {
+        const p = await getPropertyById(propertyId);
+        setFormData({
+          ...emptyForm(), ...p,
+          address: {
+            district: p.address?.district || '',
+            street:   p.address?.street   || '',
+            city:     p.address?.city     || 'Brazzaville',
+          },
+          amenities: p.amenities?.join(', ') || '',
+          latitude:  p.location?.coordinates[1] || -4.266,
+          longitude: p.location?.coordinates[0] || 15.283,
+          images: [],
+        });
+        setExistingImages(p.images || []);
+      } catch {
+        toast.error("Erreur lors du chargement du bien.");
+        onCancel();
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [propertyId, isEditing, onCancel]);
 
-	const handleSubmit = async (e) => {
-		e.preventDefault();
-		setLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const fd = new FormData();
+      const { address, amenities, images, ...rest } = formData;
+      Object.entries(rest).forEach(([k,v]) => v !== '' && fd.append(k, v));
+      fd.append("address[street]",   address.street);
+      fd.append("address[district]", address.district);
+      fd.append("address[city]",     address.city);
+      amenities.split(',').map(a=>a.trim()).filter(Boolean).forEach(a=>fd.append("amenities",a));
+      fd.append("location", JSON.stringify({ type:"Point", coordinates:[formData.longitude,formData.latitude] }));
+      images.forEach(f => fd.append("images", f));
+      if (isEditing) existingImages.forEach(u => fd.append("existingImages", u));
 
-		try {
-			const data = new FormData();
-			const { address, amenities, images, ...otherFields } = formData;
+      const result = isEditing
+        ? await updateProperty(propertyId, fd)
+        : await createProperty(fd);
 
-			// 1. Champs principaux
-			Object.entries(otherFields).forEach(([k, v]) => v !== "" && data.append(k, v));
+      toast.success(isEditing ? "Bien mis à jour !" : "Bien ajouté avec succès !");
+      onSave(result, isEditing);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Erreur lors de la sauvegarde.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-			// 2. Adresse
-			data.append("address[street]", address.street);
-			data.append("address[district]", address.district);
-			data.append("address[city]", address.city);
+  if (isEditing && loading) return (
+    <div className="flex items-center justify-center py-20">
+      <Loader2 className="w-8 h-8 animate-spin" style={{ color: BLUE }} />
+    </div>
+  );
 
-			// 3. Équipements
-			amenities.split(",").map(a => a.trim()).filter(Boolean).forEach(a => data.append("amenities", a));
-
-			// 4. Géolocalisation
-			data.append("location", JSON.stringify({
-				type: "Point",
-				coordinates: [formData.longitude, formData.latitude]
-			}));
-
-			// 5. Images (Nouveaux fichiers)
-			images.forEach(file => data.append("images", file));
-
-			let result;
-			if (isEditing) {
-				// 6. Si MISE A JOUR
-				existingImages.forEach(url => data.append("existingImages", url));
-				result = await updateProperty(propertyId, data);
-				toast.success("Bien mis à jour !");
-			} else {
-				// 6. Si CRÉATION
-				result = await createProperty(data);
-				toast.success("Bien ajouté avec succès !");
-			}
-
-			onSave(result, isEditing);
-
-		} catch (error) {
-			console.error(error);
-			const errorMessage = error.response?.data?.message || error.message || "Erreur lors de la sauvegarde.";
-			toast.error(errorMessage);
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	if (isEditing && loading) return <p className="text-center mt-10">Chargement des données du bien...</p>;
-
-	return (
-		<div className="mb-8 border p-4 rounded bg-gray-50">
-			<h3 className="text-xl font-semibold mb-4">{isEditing ? "Modifier le bien" : "Ajouter un nouveau bien"}</h3>
-			<PropertyForm
-				formData={formData}
-				setFormData={setFormData}
-				existingImages={existingImages}
-				setExistingImages={setExistingImages}
-				onSubmit={handleSubmit}
-				loading={loading}
-				isEditing={isEditing}
-			/>
-			<button
-				onClick={onCancel}
-				className="mt-4 text-gray-600 hover:underline"
-			>
-				← Annuler / Retour à la liste
-			</button>
-		</div>
-	);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="font-bold text-gray-900 text-lg" style={{ fontFamily:"'Outfit', sans-serif" }}>
+          {isEditing ? "Modifier le bien" : "Ajouter un bien"}
+        </h3>
+        <button onClick={onCancel}
+          className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+          <X size={18} />
+        </button>
+      </div>
+      <PropertyForm
+        formData={formData}
+        setFormData={setFormData}
+        existingImages={existingImages}
+        setExistingImages={setExistingImages}
+        onSubmit={handleSubmit}
+        loading={loading}
+        isEditing={isEditing}
+      />
+    </div>
+  );
 };
 
-// ==============================================================================
-// 2. Logique de Gestion Principale
-// ==============================================================================
+// ─────────────────────────────────────────────────────────────
+// Carte bien (liste)
+// ─────────────────────────────────────────────────────────────
+const PropertyCard = ({ property, onEdit, onDelete }) => {
+  const img = property.images?.[0] || 'https://placehold.co/600x400/2E7BB5/FFFFFF?text=Altimmo';
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all group">
+      <div className="relative h-44 overflow-hidden">
+        <img src={img} alt={property.title}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          onError={e => { e.target.src='https://placehold.co/600x400/2E7BB5/FFFFFF?text=Altimmo'; }} />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+        <span className="absolute top-3 left-3 text-white text-xs font-semibold px-2.5 py-1 rounded-full"
+          style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})`, fontFamily:"'Outfit', sans-serif" }}>
+          {property.type || 'Bien'}
+        </span>
+        <span className="absolute top-3 right-3 text-white text-xs font-semibold px-2.5 py-1 rounded-full"
+          style={{ background: property.availability==='Disponible' ? 'linear-gradient(135deg,#15803D,#16A34A)' : 'linear-gradient(135deg,#B45309,#D97706)', fontFamily:"'Outfit', sans-serif" }}>
+          {property.availability || property.status}
+        </span>
+        <div className="absolute bottom-3 left-3">
+          <span className="text-white text-sm font-bold"
+            style={{ fontFamily:"'Outfit', sans-serif", textShadow:'0 1px 4px rgba(0,0,0,0.5)' }}>
+            {property.price ? `${Number(property.price).toLocaleString('fr-FR')} FCFA` : '—'}
+          </span>
+        </div>
+      </div>
 
+      <div className="p-4">
+        <h3 className="font-bold text-gray-900 mb-1 line-clamp-1"
+          style={{ fontFamily:"'Outfit', sans-serif" }}>
+          {property.title}
+        </h3>
+        <p className="text-xs text-gray-400 line-clamp-2 mb-3">{property.description}</p>
+
+        <div className="flex flex-wrap gap-3 text-xs text-gray-500 mb-4">
+          {property.address?.city && (
+            <span className="flex items-center gap-1">
+              <MapPin size={11} className="text-red-400" />
+              {property.address.city}
+            </span>
+          )}
+          {property.surface && (
+            <span className="flex items-center gap-1">
+              <Maximize2 size={11} style={{ color:BLUE }} />
+              {property.surface} m²
+            </span>
+          )}
+          {property.bedrooms && (
+            <span className="flex items-center gap-1">
+              <Bed size={11} style={{ color:BLUE }} />
+              {property.bedrooms}
+            </span>
+          )}
+          {property.bathrooms && (
+            <span className="flex items-center gap-1">
+              <Bath size={11} style={{ color:BLUE }} />
+              {property.bathrooms}
+            </span>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={() => onEdit(property)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
+            style={{ background:`${BLUE}15`, color:BLUE, fontFamily:"'Outfit', sans-serif" }}>
+            <Edit2 size={13} /> Modifier
+          </button>
+          <button onClick={() => onDelete(property._id)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
+            style={{ background:'#FEE2E2', color:'#DC2626', fontFamily:"'Outfit', sans-serif" }}>
+            <Trash2 size={13} /> Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Dialog de confirmation
+// ─────────────────────────────────────────────────────────────
+const ConfirmDialog = ({ message, onConfirm, onCancel }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
+        style={{ background:'#FEE2E2' }}>
+        <AlertCircle size={22} className="text-red-500" />
+      </div>
+      <h3 className="font-bold text-gray-900 mb-2" style={{ fontFamily:"'Outfit', sans-serif" }}>Confirmation</h3>
+      <p className="text-sm text-gray-500 mb-6">{message}</p>
+      <div className="flex gap-3">
+        <button onClick={onCancel}
+          className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all"
+          style={{ fontFamily:"'Outfit', sans-serif" }}>
+          Annuler
+        </button>
+        <button onClick={onConfirm}
+          className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
+          style={{ background:'linear-gradient(135deg,#B91C1C,#DC2626)', fontFamily:"'Outfit', sans-serif" }}>
+          Supprimer
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────
+// Composant principal
+// ─────────────────────────────────────────────────────────────
 const OwnerPropertyManagement = () => {
-	// 🔑 Récupération de l'utilisateur et de l'état de chargement du contexte
-	const { user, loading: authLoading } = useAuth(); 
+  const { user, loading: authLoading } = useAuth();
+  const [properties, setProperties]   = useState([]);
+  const [loadingList, setLoadingList] = useState(false);
+  const [view, setView]               = useState("list");   // list | add | edit
+  const [editingId, setEditingId]     = useState(null);
+  const [confirm, setConfirm]         = useState(null);     // { id, message }
 
-	const [properties, setProperties] = useState([]);
-	const [loadingList, setLoadingList] = useState(false);
-	const [currentView, setCurrentView] = useState("list");
-	const [editingPropertyId, setEditingPropertyId] = useState(null);
+  const fetchProperties = useCallback(async () => {
+    if (!user) return;
+    setLoadingList(true);
+    try {
+      const res = await getMyProperties();
+      setProperties(res);
+    } catch {
+      toast.error("Erreur lors du chargement des biens.");
+    } finally {
+      setLoadingList(false);
+    }
+  }, [user]);
 
-	const fetchProperties = useCallback(async () => {
-		// Arrêter l'appel si l'utilisateur n'est pas encore chargé/valide
-		if (!user) return; 
+  useEffect(() => {
+    if (!authLoading && user?._id && view === "list") fetchProperties();
+  }, [view, user?._id, authLoading, fetchProperties]);
 
-		try {
-			setLoadingList(true);
-			const res = await getMyProperties();
-			setProperties(res);
-		} catch (error) {
-			console.error("Erreur lors de la récupération de 'mes propriétés' :", error);
-			// L'intercepteur gère déjà le 401. Ici, on affiche juste l'erreur
-			toast.error("Erreur lors du chargement des biens.");
-		} finally {
-			setLoadingList(false);
-		}
-	}, [user]); 
+  const handleDelete = (id) => {
+    setConfirm({ id, message:"Voulez-vous vraiment supprimer ce bien ? Cette action est irréversible." });
+  };
 
-	// 🔑 MODIFICATION CLÉ : Utiliser l'état de chargement du contexte
-	useEffect(() => {
-		// ⭐ CONDITION CRITIQUE : Ne faire le fetch que si le contexte est chargé (authLoading === false) 
-		// et si un utilisateur avec un ID est présent.
-		if (!authLoading && user?._id && currentView === "list") {
-			fetchProperties();
-		}
-	// Dépendance : currentView, l'ID utilisateur (stable), et l'état de chargement du contexte.
-	}, [currentView, user?._id, authLoading]); 
+  const confirmDelete = async () => {
+    try {
+      await deleteProperty(confirm.id);
+      toast.success("Bien supprimé !");
+      setProperties(prev => prev.filter(p => p._id !== confirm.id));
+    } catch {
+      toast.error("Erreur lors de la suppression.");
+    } finally {
+      setConfirm(null);
+    }
+  };
 
-	const handleDelete = async (id) => {
-		if (!window.confirm("Voulez-vous vraiment supprimer ce bien ?")) return;
-		try {
-			await deleteProperty(id);
-			toast.success("Bien supprimé !");
-			setProperties(properties.filter((p) => p._id !== id));
-		} catch (error) {
-			console.error(error);
-			toast.error("Erreur lors de la suppression.");
-		}
-	};
+  const handleEdit  = (property) => { setEditingId(property._id); setView("edit"); };
+  const handleSave  = (saved, isUpdate) => {
+    setProperties(prev =>
+      isUpdate ? prev.map(p => p._id === saved._id ? saved : p) : [saved, ...prev]
+    );
+    setEditingId(null); setView("list");
+  };
+  const handleCancel = () => { setEditingId(null); setView("list"); };
 
-	const handleEditClick = (propertyId) => {
-		setEditingPropertyId(propertyId);
-		setCurrentView("edit");
-	};
+  if (authLoading) return (
+    <div className="flex items-center justify-center py-20">
+      <Loader2 className="w-8 h-8 animate-spin" style={{ color:BLUE }} />
+    </div>
+  );
 
-	const handleFormSave = (savedProperty, isUpdate) => {
-		if (isUpdate) {
-			setProperties(properties.map(p => p._id === savedProperty._id ? savedProperty : p));
-		} else {
-			setProperties([savedProperty, ...properties]);
-		}
-		setEditingPropertyId(null);
-		setCurrentView("list");
-	};
+  return (
+    <div className="max-w-5xl mx-auto">
 
-	const handleFormCancel = () => {
-		setEditingPropertyId(null);
-		setCurrentView("list");
-	};
+      {/* ── En-tête ── */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900"
+            style={{ fontFamily:"'Outfit', sans-serif" }}>
+            {view === 'list' ? 'Mes Biens Immobiliers' : view === 'add' ? 'Ajouter un bien' : 'Modifier le bien'}
+          </h2>
+          <p className="text-sm text-gray-400 mt-0.5" style={{ fontFamily:"'Outfit', sans-serif" }}>
+            {properties.length} bien{properties.length!==1?'s':''} publiés
+          </p>
+        </div>
+        {view === 'list' && (
+          <button onClick={() => setView("add")}
+            className="flex items-center gap-2 px-4 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105"
+            style={{ background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, boxShadow:`0 4px 16px ${BLUE}35`, fontFamily:"'Outfit', sans-serif" }}>
+            <Plus size={16} /> Ajouter un bien
+          </button>
+        )}
+      </div>
 
-	// 🔑 Gérer l'état de chargement initial du contexte
-	if (authLoading) {
-		return <p className="text-center mt-10 text-gray-700 animate-pulse">Vérification de l'authentification...</p>;
-	}
+      {/* ── Formulaire ── */}
+      {(view === 'add' || view === 'edit') && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+          <PropertyManagementForm
+            propertyId={editingId}
+            onSave={handleSave}
+            onCancel={handleCancel}
+          />
+        </div>
+      )}
 
-	if (loadingList && currentView === "list" && properties.length === 0) {
-		return <p className="text-center mt-10">Chargement de la liste...</p>;
-	}
+      {/* ── Liste ── */}
+      {view === 'list' && (
+        <>
+          {loadingList ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin" style={{ color:BLUE }} />
+            </div>
+          ) : properties.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+                style={{ background:`${BLUE}12` }}>
+                <Home size={28} style={{ color:BLUE }} />
+              </div>
+              <p className="font-bold text-gray-700 mb-1" style={{ fontFamily:"'Outfit', sans-serif" }}>Aucun bien publié</p>
+              <p className="text-sm text-gray-400 mb-5" style={{ fontFamily:"'Outfit', sans-serif" }}>
+                Commencez par ajouter votre premier bien immobilier.
+              </p>
+              <button onClick={() => setView("add")}
+                className="flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105"
+                style={{ background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, fontFamily:"'Outfit', sans-serif" }}>
+                <Plus size={16} /> Ajouter un bien
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {properties.map(p => (
+                <PropertyCard key={p._id} property={p}
+                  onEdit={handleEdit} onDelete={handleDelete} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
-	return (
-		<div className="max-w-5xl mx-auto p-6 bg-white rounded shadow-md">
-			<h2 className="text-2xl font-bold mb-6">Gestion de vos Biens Immobiliers</h2>
-
-			{(currentView === "add" || currentView === "edit") && (
-				<PropertyManagementForm
-					propertyId={editingPropertyId}
-					onSave={handleFormSave}
-					onCancel={handleFormCancel}
-				/>
-			)}
-
-			{currentView === "list" && (
-				<>
-					<div className="mb-6">
-						<button
-							onClick={() => setCurrentView("add")}
-							className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
-						>
-							➕ Ajouter un nouveau bien
-						</button>
-					</div>
-
-					{properties.length === 0 && !loadingList ? (
-						<p>Aucun bien disponible.</p>
-					) : (
-						<div className="space-y-4">
-							{properties.map((property) => (
-								<div key={property._id} className="border p-4 rounded shadow-sm bg-white">
-									<h3 className="text-xl font-semibold text-blue-800">{property.title}</h3>
-									<p className="text-sm text-gray-600 mb-2">
-										Prix : **{property.price.toLocaleString()} FCFA** | Statut : {property.status}
-									</p>
-									<p className="text-sm">Adresse : {property.address_district}, {property.address_street}, {property.address_city}</p>
-									<div className="flex gap-2 mt-3">
-										<button
-											onClick={() => handleEditClick(property._id)}
-											className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition"
-										>
-											Modifier
-										</button>
-										<button
-											onClick={() => handleDelete(property._id)}
-											className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition"
-										>
-											Supprimer
-										</button>
-									</div>
-								</div>
-							))}
-						</div>
-					)}
-				</>
-			)}
-		</div>
-	);
+      {/* ── Dialog confirmation ── */}
+      {confirm && (
+        <ConfirmDialog
+          message={confirm.message}
+          onConfirm={confirmDelete}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+    </div>
+  );
 };
 
 export default OwnerPropertyManagement;
