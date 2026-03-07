@@ -18,6 +18,12 @@ import { getMilaEventsReviews } from '../services/reviewService';
 import { getFirstValidImage }   from '../utils/imageUtils';
 import { useAuth }              from '../context/AuthContext';
 
+<SEOHead
+  title="Mila Events — Événements à Brazzaville"
+  description="Découvrez les meilleurs événements à Brazzaville : concerts, conférences, mariages et soirées organisés par Mila Events."
+  url="/mila-events"
+/>
+
 const EVENTS_PER_PAGE = 6;
 const EVENT_TYPES = ['Tous', 'Mariage', 'Anniversaire', 'Gala', 'Conférence', 'Lancement'];
 

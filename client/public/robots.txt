@@ -1,0 +1,42 @@
+# robots.txt — Altitude-Vision
+# https://altitudevision.agency/robots.txt
+
+User-agent: *
+
+# Autoriser tout le contenu public
+Allow: /
+Allow: /altimmo
+Allow: /mila-events
+Allow: /altcom
+Allow: /contact
+Allow: /actualites
+Allow: /properties/
+Allow: /register
+
+# Bloquer le dashboard et les pages privées
+Disallow: /dashboard/
+Disallow: /dashboard
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login
+Disallow: /account
+Disallow: /profile
+Disallow: /favorites
+
+# Bloquer les paramètres de recherche inutiles
+Disallow: /*?page=
+Disallow: /*?sort=
+Disallow: /*?filter=
+
+# Sitemap
+Sitemap: https://altitudevision.agency/sitemap.xml
+
+# Crawl-delay pour les bots moins prioritaires
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: SemrushBot
+Crawl-delay: 10
+
+User-agent: MJ12bot
+Disallow: /

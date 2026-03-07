@@ -1,5 +1,5 @@
 // server.js 
-
+const generateSitemap = require('./utils/generateSitemap');
 // ============================================================
 // ✅ DOTENV EN PREMIER - avant tous les autres imports
 // ============================================================
@@ -64,6 +64,13 @@ cron.schedule('0 * * * *', async () => {
 console.log('⏰ [CRON] Planificateur Facebook activé (toutes les heures)');
 
 const app = express();
+
+app.get('/sitemap.xml', async (req, res) => {
+  const xml = await generateSitemap();
+  res.header('Content-Type', 'application/xml');
+  res.header('Cache-Control', 'public, max-age=3600');
+  res.send(xml);
+});
 
 // ============================================================
 // 🛡️ SÉCURITÉ (Helmet & Logs)

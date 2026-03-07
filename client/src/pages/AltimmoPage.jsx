@@ -18,6 +18,16 @@ import { getLatestPropertiesByPole } from '../services/propertyService';
 import { getAltimmoReviews }         from '../services/reviewService';
 import { useAuth }                   from '../context/AuthContext';
 
+<SEOHead
+  title="Altimmo — Immobilier à Brazzaville"
+  description="Parcourez les annonces immobilières à Brazzaville : appartements, maisons, terrains et bureaux disponibles à la vente et à la location."
+  url="/altimmo"
+  breadcrumb={[
+    { name: 'Accueil', path: '/' },
+    { name: 'Altimmo', path: '/altimmo' },
+  ]}
+/>
+
 // ─────────────────────────────────────────────────────────────
 // Données statiques
 // ─────────────────────────────────────────────────────────────

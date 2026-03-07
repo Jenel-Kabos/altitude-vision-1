@@ -13,6 +13,8 @@ import { useAuth } from "../../context/AuthContext";
 import { getDashboardStats } from "../../services/dashboardService";
 import { getAllQuotes } from "../../services/quoteService";
 
+<SEOHead title="Dashboard" noIndex={true} />
+
 const BLUE  = '#2E7BB5';
 const GOLD  = '#C8872A';
 const RED   = '#D42B2B';

@@ -9,6 +9,20 @@ import {
 } from 'lucide-react';
 import CommentList from '../components/comments/CommentList';
 
+<SEOHead
+  title={property.title}
+  description={`${property.type || 'Bien'} à ${property.city || 'Brazzaville'} — ${property.description?.slice(0, 120)}…`}
+  image={property.images?.[0]}
+  url={`/properties/${property._id}`}
+  type="property"
+  data={property}
+  breadcrumb={[
+    { name: 'Accueil', path: '/' },
+    { name: 'Altimmo', path: '/altimmo' },
+    { name: property.title, path: `/properties/${property._id}` },
+  ]}
+/>
+
 // ─────────────────────────────────────────────────────────────
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';

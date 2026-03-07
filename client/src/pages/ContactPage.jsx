@@ -6,6 +6,12 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 
+<SEOHead
+  title="Contactez-nous"
+  description="Altitude-Vision — Rue Mfoa n°24, Poto-Poto, Brazzaville. Contactez notre équipe pour vos projets immobiliers, événementiels ou de communication."
+  url="/contact"
+/>
+
 const BLUE = '#2E7BB5';
 const GOLD = '#C8872A';
 const RED  = '#D42B2B';

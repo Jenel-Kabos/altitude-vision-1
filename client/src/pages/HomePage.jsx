@@ -22,6 +22,13 @@ import WhyChooseUs     from "../components/WhyChooseUs";
 import { getLatestPropertiesByPoles } from "../services/propertyService";
 import { getAllEvents }                from "../services/eventService";
 import { getAllPortfolioItems }        from "../services/portfolioService";
+import SEOHead from '../components/SEOHead';
+
+<SEOHead
+  title="Immobilier, Événements & Communication à Brazzaville"
+  description="Altitude-Vision — Trouvez votre bien immobilier, organisez vos événements et boostez votre communication à Brazzaville, Congo."
+  url="/"
+/>
 
 // ─────────────────────────────────────────────────────────────
 // Données des pôles — palette Altitude-Vision

@@ -19,6 +19,12 @@ import PortfolioCard             from '../components/PortfolioCard';
 import ReviewCard                from '../components/ReviewCard';
 import AltcomProjectFormModal    from '../components/AltcomProjectFormModal';
 
+<SEOHead
+  title="Altcom — Communication & Branding"
+  description="Altcom by Altitude-Vision : stratégie digitale, branding, campagnes publicitaires et production audiovisuelle au Congo."
+  url="/altcom"
+/>
+
 // ─────────────────────────────────────────────────────────────
 // Couleurs Altcom
 // ─────────────────────────────────────────────────────────────
