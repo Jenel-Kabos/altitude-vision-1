@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import { HelmetProvider } from "react-helmet-async";
 
 // Layouts
 import Header from "./components/layout/Header";
@@ -67,8 +66,8 @@ import AccountPage from "./pages/AccountPage";
 import ProfilePage from "./pages/ProfilePage";
 
 // Layout Propriétaire
-import OwnerDashboard           from "./pages/dashboard/OwnerDashboard";
-import OwnerPropertyManagement  from "./pages/dashboard/OwnerPropertyManagement";
+import OwnerDashboard          from "./pages/dashboard/OwnerDashboard";
+import OwnerPropertyManagement from "./pages/dashboard/OwnerPropertyManagement";
 
 // Routes protégées
 import ProtectedRoute  from "./components/routing/ProtectedRoute";
@@ -86,7 +85,7 @@ const resolvePageTitle = (pathname) => {
     return "";
 };
 
-// ─── Layout principal (Header/Footer/ChatWidget) ──────────────
+// ─── Layout principal (Header / Footer / ChatWidget) ─────────
 const MainLayout = ({ children }) => {
     const location    = useLocation();
     const isDashboard =
@@ -100,7 +99,6 @@ const MainLayout = ({ children }) => {
             {!isDashboard && <Header />}
             <main className="flex-grow">{children}</main>
             {!isDashboard && <Footer />}
-            {/* ChatWidget masqué sur dashboard/mes-biens */}
             {!isDashboard && <ChatWidget currentPageTitle={pageTitle} />}
         </div>
     );
@@ -109,12 +107,11 @@ const MainLayout = ({ children }) => {
 // ─── Application Principale ───────────────────────────────────
 function App() {
     useEffect(() => {
-        // Réveil du serveur Render (cold start)
         fetch("https://altitude-vision.onrender.com/api/health").catch(() => {});
     }, []);
 
     return (
-        <HelmetProvider>
+        <>
             <Toaster position="top-right" />
             <Routes>
 
@@ -125,36 +122,36 @@ function App() {
                 <Route path="/actualites" element={<MainLayout><ActualitesPage /></MainLayout>} />
 
                 {/* ALTIMMO */}
-                <Route path="/altimmo"                               element={<MainLayout><AltimmoPage /></MainLayout>} />
-                <Route path="/altimmo/annonces"                      element={<MainLayout><AltimmoAnnonces /></MainLayout>} />
-                <Route path="/altimmo/property/:propertyId"          element={<MainLayout><PropertyDetailPage /></MainLayout>} />
-                <Route path="/trouve-ta-commission"                   element={<MainLayout><CommissionCalculatorPage /></MainLayout>} />
+                <Route path="/altimmo"                                element={<MainLayout><AltimmoPage /></MainLayout>} />
+                <Route path="/altimmo/annonces"                       element={<MainLayout><AltimmoAnnonces /></MainLayout>} />
+                <Route path="/altimmo/property/:propertyId"           element={<MainLayout><PropertyDetailPage /></MainLayout>} />
+                <Route path="/trouve-ta-commission"                    element={<MainLayout><CommissionCalculatorPage /></MainLayout>} />
 
                 {/* SERVICES ALTIMMO */}
-                <Route path="/altimmo/services/vente-de-biens"        element={<MainLayout><VenteDeBiensPage /></MainLayout>} />
-                <Route path="/altimmo/services/location-gestion"      element={<MainLayout><LocationGestionPage /></MainLayout>} />
-                <Route path="/altimmo/services/conseil-investissement" element={<MainLayout><ConseilInvestissementPage /></MainLayout>} />
+                <Route path="/altimmo/services/vente-de-biens"         element={<MainLayout><VenteDeBiensPage /></MainLayout>} />
+                <Route path="/altimmo/services/location-gestion"       element={<MainLayout><LocationGestionPage /></MainLayout>} />
+                <Route path="/altimmo/services/conseil-investissement"  element={<MainLayout><ConseilInvestissementPage /></MainLayout>} />
 
                 {/* MILA EVENTS */}
-                <Route path="/mila-events"                           element={<MainLayout><MilaEventsPage /></MainLayout>} />
-                <Route path="/mila-events/annonces"                  element={<MainLayout><MilaEventsAnnonces /></MainLayout>} />
-                <Route path="/mila-events/event/:eventId"            element={<MainLayout><EventDetailPage /></MainLayout>} />
-                <Route path="/mila-events/creer-projet"              element={<MainLayout><CreateProjectPage /></MainLayout>} />
+                <Route path="/mila-events"                            element={<MainLayout><MilaEventsPage /></MainLayout>} />
+                <Route path="/mila-events/annonces"                   element={<MainLayout><MilaEventsAnnonces /></MainLayout>} />
+                <Route path="/mila-events/event/:eventId"             element={<MainLayout><EventDetailPage /></MainLayout>} />
+                <Route path="/mila-events/creer-projet"               element={<MainLayout><CreateProjectPage /></MainLayout>} />
 
                 {/* ALTCOM */}
-                <Route path="/altcom"                                element={<MainLayout><AltcomPage /></MainLayout>} />
-                <Route path="/altcom/annonces"                       element={<MainLayout><AltcomAnnonces /></MainLayout>} />
-                <Route path="/altcom/service/:serviceId"             element={<MainLayout><AltcomServiceDetailPage /></MainLayout>} />
-                <Route path="/altcom/portfolio/:portfolioId"         element={<MainLayout><AltcomPortfolioDetailPage /></MainLayout>} />
+                <Route path="/altcom"                                 element={<MainLayout><AltcomPage /></MainLayout>} />
+                <Route path="/altcom/annonces"                        element={<MainLayout><AltcomAnnonces /></MainLayout>} />
+                <Route path="/altcom/service/:serviceId"              element={<MainLayout><AltcomServiceDetailPage /></MainLayout>} />
+                <Route path="/altcom/portfolio/:portfolioId"          element={<MainLayout><AltcomPortfolioDetailPage /></MainLayout>} />
 
                 {/* SERVICES ALTCOM */}
-                <Route path="/altcom/couverture-mediatique"          element={<MainLayout><CouvertureMediatiquePage /></MainLayout>} />
+                <Route path="/altcom/couverture-mediatique"           element={<MainLayout><CouvertureMediatiquePage /></MainLayout>} />
 
                 {/* LÉGAL & AUTRES */}
-                <Route path="/mentions-legales"                      element={<MainLayout><MentionsLegales /></MainLayout>} />
-                <Route path="/contact"                               element={<MainLayout><ContactPage /></MainLayout>} />
-                <Route path="/unauthorized"                          element={<MainLayout><UnauthorizedPage /></MainLayout>} />
-                <Route path="/verify-email/:token"                   element={<MainLayout><VerifyEmailPage /></MainLayout>} />
+                <Route path="/mentions-legales"                       element={<MainLayout><MentionsLegales /></MainLayout>} />
+                <Route path="/contact"                                element={<MainLayout><ContactPage /></MainLayout>} />
+                <Route path="/unauthorized"                           element={<MainLayout><UnauthorizedPage /></MainLayout>} />
+                <Route path="/verify-email/:token"                    element={<MainLayout><VerifyEmailPage /></MainLayout>} />
 
                 {/* ══ AUTH PUBLIQUE ════════════════════════════════════════ */}
                 <Route element={<PublicAuthRoute />}>
@@ -205,7 +202,7 @@ function App() {
                 <Route path="*" element={<MainLayout><NotFoundPage /></MainLayout>} />
 
             </Routes>
-        </HelmetProvider>
+        </>
     );
 }
 
