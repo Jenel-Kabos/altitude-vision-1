@@ -9,7 +9,7 @@ import {
     MessageSquarePlus, CheckCircle, Target, Camera,
 } from 'lucide-react';
 
-import HeroSliderAltcom          from '../components/HeroSliderAltcom';
+import HeroSliderAltcom          from '../components/HeroSliderAlt';
 import { createAltcomProject }   from '../services/altcomService';
 import { createQuoteRequest }    from '../services/quoteService';
 import { getAllPortfolioItems }   from '../services/portfolioService';
