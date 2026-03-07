@@ -1,7 +1,7 @@
 // server/controllers/dashboardController.js
-const User = require('../models/User');
-const Property = require('../models/Property');
-const Event = require('../models/Event');
+const User         = require('../models/User');
+const Property     = require('../models/Property');
+const Event        = require('../models/Event');
 
 /**
  * @DESC   Obtenir les statistiques du Dashboard
@@ -10,55 +10,40 @@ const Event = require('../models/Event');
  */
 exports.getDashboardStats = async (req, res) => {
   try {
-    console.log('📊 [DashboardController] Requête reçue pour getDashboardStats');
-
-    // 1. Exécuter toutes les requêtes en parallèle pour aller vite
-    const [
-      usersCount,
-      propertiesCount,
-      eventsCount,
-      ownersCount
-    ] = await Promise.all([
+    const [usersCount, propertiesCount, eventsCount, ownersCount] = await Promise.all([
       User.countDocuments(),
       Property.countDocuments(),
       Event.countDocuments(),
-      User.countDocuments({ role: 'Proprietaire' }) // ✅ Sans accent !
+      User.countDocuments({ role: 'Proprietaire' }),
     ]);
 
-    // Comptage des services (Altcom) - gestion si le modèle n'existe pas
-    let serviceCount = 0;
+    // Altcom = portfolio items publiés
+    let portfolioCount = 0;
     try {
-      const Service = require('../models/Service');
-      serviceCount = await Service.countDocuments();
+      const PortfolioItem = require('../models/PortfolioItem');
+      portfolioCount = await PortfolioItem.countDocuments({ isPublished: true });
     } catch (e) {
-      console.log('⚠️ [DashboardController] Modèle Service non trouvé, serviceCount = 0');
+      // Modèle introuvable → reste à 0
     }
 
-    // ✅ Structure des données conforme aux attentes du frontend
     const statsData = {
-      Altimmo: propertiesCount,
+      Altimmo:    propertiesCount,
       MilaEvents: eventsCount,
-      Altcom: serviceCount,
-      Users: usersCount,
-      Owners: ownersCount
+      Altcom:     portfolioCount,
+      Users:      usersCount,
+      Owners:     ownersCount,
     };
 
-    console.log('✅ [DashboardController] Stats calculées:', statsData);
-
-    // 2. Renvoyer les résultats avec la bonne structure
     res.status(200).json({
       status: 'success',
-      data: {
-        stats: statsData
-      }
+      data: { stats: statsData },
     });
 
   } catch (error) {
-    console.error('❌ [DashboardController] Erreur lors du chargement des stats:', error);
     res.status(500).json({
       status: 'error',
       message: 'Impossible de récupérer les statistiques.',
-      error: error.message
+      error: error.message,
     });
   }
 };

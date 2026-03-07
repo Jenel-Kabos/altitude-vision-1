@@ -528,7 +528,7 @@ const ManageAltcomPage = () => {
   );
 
   return (
-    <div className="p-6" style={{ background: '#F8FAFC', minHeight: '100vh' }}>
+    <div className="p-6">
 
       {/* Notification */}
       <AnimatePresence>
