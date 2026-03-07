@@ -2,7 +2,7 @@
 const User          = require('../models/User');
 const Property      = require('../models/Property');
 const Event         = require('../models/Event');
-const PortfolioItem = require('../models/PortfolioItem'); // ← import au top niveau
+const PortfolioItem = require('../models/portfolioItemModel'); // ← import au top niveau
 
 /**
  * @DESC   Obtenir les statistiques du Dashboard

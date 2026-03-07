@@ -5,7 +5,7 @@ const router  = express.Router();
 const Property       = require('../models/Property');
 const Event          = require('../models/Event');
 const User           = require('../models/User');
-const PortfolioItem  = require('../models/PortfolioItem'); // ← import au top niveau
+const PortfolioItem  = require('../models/portfolioItemModel'); // ← import au top niveau
 const authController = require('../controllers/authController');
 
 router.use(authController.protect);
