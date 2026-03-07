@@ -8,17 +8,17 @@ const BLUE      = '#2E7BB5';
 
 const images = [
     {
-        url: 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?q=80&w=1470&auto=format&fit=crop',
+        url: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         title: 'Communication Digitale',
         subtitle: 'Des stratégies percutantes pour amplifier votre présence',
     },
     {
-        url: 'https://images.unsplash.com/photo-1558655146-9f40138edfeb?q=80&w=1528&auto=format&fit=crop',
+        url: 'https://plus.unsplash.com/premium_photo-1688821126516-aad66aa5510d?q=80&w=1976&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         title: 'Branding & Design',
         subtitle: 'Des identités visuelles qui marquent les esprits',
     },
     {
-        url: 'https://images.unsplash.com/photo-1551434678-e076c223a692?q=80&w=1470&auto=format&fit=crop',
+        url: 'https://images.unsplash.com/3/doctype-hi-res.jpg?q=80&w=1165&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         title: 'Couverture Médiatique',
         subtitle: 'Chaque moment capturé avec précision et élégance',
     },
