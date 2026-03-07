@@ -11,13 +11,11 @@ const BLUE = '#2E7BB5';
 const GOLD = '#C8872A';
 const RED  = '#D42B2B';
 
-// Coordonnées précises : Rue Mfoa n°24, Poto-Poto, Brazzaville
-const AGENCY_LAT = -4.2519;
-const AGENCY_LNG = 15.2825;
+// ── Coordonnées réelles Altitude-Vision (P7JJ+VX Brazzaville) ──
+const AGENCY_LAT = -4.2677613;
+const AGENCY_LNG = 15.2824012;
 
-// URL Maps avec marqueur agence + itinéraire
-const MAPS_EMBED = `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3978.96!2d${AGENCY_LNG}!3d${AGENCY_LAT}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1a6a33b2e3f6e5a7%3A0x0!2sRue+Mfoa+24%2C+Poto-Poto%2C+Brazzaville!5e0!3m2!1sfr!2scg!4v1700000000000!5m2!1sfr!2scg`;
-const DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${AGENCY_LAT},${AGENCY_LNG}&destination_place_id=ChIJ&travelmode=driving`;
+const DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${AGENCY_LAT},${AGENCY_LNG}&travelmode=driving`;
 
 // ─── Toast ────────────────────────────────────────────────────
 const Toast = ({ msg, type, onDone }) => {
@@ -39,9 +37,7 @@ const Toast = ({ msg, type, onDone }) => {
         fontFamily: "'Outfit', sans-serif",
         backdropFilter: 'blur(12px)',
       }}>
-      {type === 'success'
-        ? <CheckCircle size={18} />
-        : <AlertTriangle size={18} />}
+      {type === 'success' ? <CheckCircle size={18} /> : <AlertTriangle size={18} />}
       {msg}
     </motion.div>
   );
@@ -50,11 +46,6 @@ const Toast = ({ msg, type, onDone }) => {
 // ─── Input Field ──────────────────────────────────────────────
 const Field = ({ label, icon: Icon, accent = BLUE, children }) => (
   <div className="space-y-1.5">
-    <SEOHead
-  title="Contactez-nous"
-  description="Altitude-Vision — Rue Mfoa n°24, Poto-Poto, Brazzaville. Contactez notre équipe pour vos projets immobiliers, événementiels ou de communication."
-  url="/contact"
-/>
     <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
       style={{ color: accent, fontFamily: "'Outfit', sans-serif" }}>
       <Icon size={12} />
@@ -94,9 +85,9 @@ const InfoCard = ({ icon: Icon, label, value, href, color, delay }) => (
 // ─── MAIN ────────────────────────────────────────────────────
 const ContactPage = () => {
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
-  const [status, setStatus] = useState('idle'); // idle | sending | success | error
-  const [toast, setToast] = useState(null);
-  const [focused, setFocused] = useState(null);
+  const [status,   setStatus]   = useState('idle');
+  const [toast,    setToast]    = useState(null);
+  const [focused,  setFocused]  = useState(null);
 
   const showToast = (msg, type = 'success') => setToast({ msg, type });
 
@@ -136,6 +127,11 @@ const ContactPage = () => {
 
   return (
     <div className="min-h-screen" style={{ background: '#0D1117', fontFamily: "'Outfit', sans-serif" }}>
+      <SEOHead
+        title="Contactez-nous"
+        description="Altitude-Vision — 24 Rue de la Mfoa, Poto-Poto, Brazzaville. Contactez notre équipe pour vos projets immobiliers, événementiels ou de communication."
+        url="/contact"
+      />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
         ::placeholder { color: rgba(148,163,184,0.5); }
@@ -149,13 +145,11 @@ const ContactPage = () => {
 
       {/* ── Hero ──────────────────────────────────────────────── */}
       <section className="relative overflow-hidden pt-24 pb-20 px-6">
-        {/* Fond décoratif */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full opacity-10 blur-3xl"
             style={{ background: `radial-gradient(ellipse, ${BLUE}, transparent)` }} />
           <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-8 blur-3xl"
             style={{ background: `radial-gradient(ellipse, ${GOLD}, transparent)` }} />
-          {/* Lignes décoratives */}
           <svg className="absolute inset-0 w-full h-full opacity-5" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
@@ -167,7 +161,6 @@ const ContactPage = () => {
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto text-center">
-          {/* Badge */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 text-xs font-semibold uppercase tracking-widest"
             style={{ background: `${BLUE}18`, border: `1px solid ${BLUE}30`, color: BLUE }}>
@@ -195,7 +188,6 @@ const ContactPage = () => {
             Notre équipe est à votre écoute pour tout projet immobilier, événementiel ou de communication. Répondons ensemble à vos ambitions.
           </motion.p>
 
-          {/* Séparateur ornemental */}
           <motion.div initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }}
             transition={{ delay: 0.3 }}
             className="flex items-center justify-center gap-3 mt-8">
@@ -210,7 +202,7 @@ const ContactPage = () => {
       <section className="max-w-7xl mx-auto px-6 pb-24">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
-          {/* ── Formulaire — 3 colonnes ──────────────────────── */}
+          {/* ── Formulaire ───────────────────────────────────── */}
           <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
             className="lg:col-span-3 rounded-3xl p-8 space-y-6"
@@ -278,7 +270,7 @@ const ContactPage = () => {
             </button>
           </motion.div>
 
-          {/* ── Infos + Carte — 2 colonnes ───────────────────── */}
+          {/* ── Infos + Carte ─────────────────────────────────── */}
           <div className="lg:col-span-2 flex flex-col gap-5">
 
             {/* Coordonnées */}
@@ -300,7 +292,7 @@ const ContactPage = () => {
               </div>
 
               <InfoCard icon={MapPin} label="Adresse" color={RED}
-                value="Rue Mfoa n°24, Poto-Poto, Brazzaville"
+                value="24 Rue de la Mfoa, Poto-Poto, Brazzaville"
                 href={DIRECTIONS_URL}
                 delay={0.3} />
 
@@ -325,7 +317,7 @@ const ContactPage = () => {
                 position: 'relative',
               }}>
 
-              {/* Badge agence sur la carte */}
+              {/* Badge agence */}
               <div className="absolute top-3 left-3 z-10 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold shadow-lg"
                 style={{
                   background: '#0D1117EE',
@@ -350,21 +342,20 @@ const ContactPage = () => {
                 Itinéraire
               </a>
 
-              {/* iFrame Google Maps — centré sur Poto-Poto, marqueur agence */}
+              {/* iFrame — centrée sur P7JJ+VX avec marqueur rouge sur l'agence */}
               <div className="map-wrapper w-full h-full" style={{ minHeight: '280px' }}>
                 <iframe
-                  title="Localisation Altitude-Vision — Rue Mfoa n°24, Poto-Poto, Brazzaville"
+                  title="Localisation Altitude-Vision — 24 Rue de la Mfoa, Poto-Poto, Brazzaville"
                   width="100%"
                   height="100%"
                   style={{ border: 0, minHeight: '280px', display: 'block' }}
                   loading="lazy"
                   allowFullScreen
                   referrerPolicy="no-referrer-when-downgrade"
-                  src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d994.7418316498!2d15.28201!3d-4.25190!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNMKwMTUnMDYuOCJTIDE1wrAxNic1NS4yIkU!5e0!3m2!1sfr!2scg!4v1700000000000!5m2!1sfr!2scg&markers=color:red%7Clabel:AV%7C${AGENCY_LAT},${AGENCY_LNG}`}
+                  src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d500!2d${AGENCY_LNG}!3d${AGENCY_LAT}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1a6a3300675588e7%3A0xc89ac7561533b6f8!2sAltitude-Vision!5e0!3m2!1sfr!2scg!4v1700000000000!5m2!1sfr!2scg`}
                 />
               </div>
             </motion.div>
-
           </div>
         </div>
 
@@ -373,9 +364,9 @@ const ContactPage = () => {
           transition={{ delay: 0.5 }}
           className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { pole:'Altimmo',    desc:'Immobilier & gestion locative',   color:BLUE, icon:'🏢' },
-            { pole:'Mila Events',desc:'Événementiel & organisation',     color:RED,  icon:'🎪' },
-            { pole:'Altcom',     desc:'Communication & stratégie',       color:GOLD, icon:'📣' },
+            { pole:'Altimmo',     desc:'Immobilier & gestion locative', color:BLUE, icon:'🏢' },
+            { pole:'Mila Events', desc:'Événementiel & organisation',   color:RED,  icon:'🎪' },
+            { pole:'Altcom',      desc:'Communication & stratégie',     color:GOLD, icon:'📣' },
           ].map(({ pole, desc, color, icon }) => (
             <div key={pole}
               className="flex items-center gap-4 p-4 rounded-2xl"
