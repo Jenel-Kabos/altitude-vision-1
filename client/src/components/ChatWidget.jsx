@@ -12,7 +12,7 @@ import {
 const BLUE = '#2E7BB5';
 const GOLD = '#C8872A';
 const RED  = '#D42B2B';
-const WHATSAPP_NUMBER = '24206800215'; // sans +
+const WHATSAPP_NUMBER = '242068002151'; // sans +
 
 // ─── FAQ par catégorie ────────────────────────────────────────
 const FAQ = [
