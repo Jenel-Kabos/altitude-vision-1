@@ -3,7 +3,7 @@ import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     Menu, X, LayoutDashboard, Building, LogOut,
     UserCircle, Heart, MessageCircle, UserPlus,
-    LogIn, ChevronDown, Home, Phone, Newspaper, Mountain,
+    LogIn, ChevronDown, Home, Phone, Newspaper,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getTotalUnreadCount } from '../../services/unreadCountService';
@@ -22,8 +22,12 @@ const NAV_LINKS = [
     { to: '/contact',     label: 'Contact',     Icon: Phone     },
 ];
 
-// ─────────────────────────────────────────────────────────────
-// Hook messages non lus
+const PROFILE_LINKS = [
+    { to:'/profile',  Icon:UserCircle,   label:'Mon Profil',  color: BLUE },
+    { to:'/favoris',  Icon:Heart,        label:'Mes Favoris', color: RED  },
+    { to:'/messages', Icon:MessageCircle,label:'Messagerie',  color: GOLD },
+];
+
 // ─────────────────────────────────────────────────────────────
 const useUnreadCount = () => {
     const [count, setCount] = useState(0);
@@ -39,38 +43,26 @@ const useUnreadCount = () => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Wordmark — remplace le logo image
+// Wordmark — texte seul, sans icône
 // ─────────────────────────────────────────────────────────────
 const Wordmark = () => (
-    <Link to="/" className="flex items-center gap-2.5 flex-shrink-0 group select-none">
-        {/* Icône */}
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-110"
+    <Link to="/" className="flex-shrink-0 select-none group leading-none">
+        <span className="block text-white font-bold transition-opacity duration-200 group-hover:opacity-80"
             style={{
-                background: `linear-gradient(135deg, #A06820, ${GOLD})`,
-                boxShadow:  `0 2px 10px ${GOLD}45`,
+                fontFamily:    "'Cormorant Garamond', Georgia, serif",
+                fontSize:      '1.25rem',
+                letterSpacing: '-0.01em',
             }}>
-            <Mountain className="w-4 h-4 text-white" strokeWidth={2.2} />
-        </div>
-
-        {/* Texte */}
-        <div className="leading-none">
-            <span className="block text-white font-bold"
-                style={{
-                    fontFamily:    "'Cormorant Garamond', Georgia, serif",
-                    fontSize:      '1.15rem',
-                    letterSpacing: '-0.01em',
-                }}>
-                Altitude<span style={{ color: GOLD }}>-</span>Vision
-            </span>
-            <span className="block text-white/30"
-                style={{
-                    fontFamily:    "'Outfit', sans-serif",
-                    fontSize:      '0.58rem',
-                    letterSpacing: '0.2em',
-                }}>
-                AGENCY
-            </span>
-        </div>
+            Altitude<span style={{ color: GOLD }}>-</span>Vision
+        </span>
+        <span className="block text-white/30"
+            style={{
+                fontFamily:    "'Outfit', sans-serif",
+                fontSize:      '0.55rem',
+                letterSpacing: '0.22em',
+            }}>
+            AGENCY
+        </span>
     </Link>
 );
 
@@ -114,16 +106,10 @@ const Header = () => {
         ? 'bg-[#0D1117]/95 backdrop-blur-md shadow-xl shadow-black/20 border-b border-white/5'
         : 'bg-transparent';
 
-    const navCls = (isActive) =>
+    const navCls = isActive =>
         `relative text-sm font-medium transition-all duration-200 py-1 px-1 ${
             isActive ? 'text-white' : 'text-white/60 hover:text-white'
         }`;
-
-    const PROFILE_LINKS = [
-        { to:'/profile',  Icon:UserCircle,   label:'Mon Profil',  color: BLUE },
-        { to:'/favoris',  Icon:Heart,        label:'Mes Favoris', color: RED  },
-        { to:'/messages', Icon:MessageCircle,label:'Messagerie',  color: GOLD },
-    ];
 
     return (
         <>
