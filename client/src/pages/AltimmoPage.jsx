@@ -17,16 +17,7 @@ import CtaCommission   from '../components/CtaCommission';
 import { getLatestPropertiesByPole } from '../services/propertyService';
 import { getAltimmoReviews }         from '../services/reviewService';
 import { useAuth }                   from '../context/AuthContext';
-
-<SEOHead
-  title="Altimmo — Immobilier à Brazzaville"
-  description="Parcourez les annonces immobilières à Brazzaville : appartements, maisons, terrains et bureaux disponibles à la vente et à la location."
-  url="/altimmo"
-  breadcrumb={[
-    { name: 'Accueil', path: '/' },
-    { name: 'Altimmo', path: '/altimmo' },
-  ]}
-/>
+import SEOHead                       from '../components/SEOHead';
 
 // ─────────────────────────────────────────────────────────────
 // Données statiques
@@ -147,6 +138,17 @@ const AltimmoPage = () => {
 
     return (
         <div className="min-h-screen bg-white" style={{ fontFamily: "'Outfit', sans-serif" }}>
+
+
+            <SEOHead
+                title="Altimmo — Immobilier à Brazzaville"
+                description="Parcourez les annonces immobilières à Brazzaville : appartements, maisons, terrains et bureaux disponibles à la vente et à la location."
+                url="/altimmo"
+                breadcrumb={[
+                    { name: 'Accueil', path: '/' },
+                    { name: 'Altimmo', path: '/altimmo' },
+                ]}
+            />
 
             {/* ══════════════════════════════════════════
                 HERO + BARRE DE RECHERCHE

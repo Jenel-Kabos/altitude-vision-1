@@ -18,12 +18,7 @@ import { useAuth }               from '../context/AuthContext';
 import PortfolioCard             from '../components/PortfolioCard';
 import ReviewCard                from '../components/ReviewCard';
 import AltcomProjectFormModal    from '../components/AltcomProjectFormModal';
-
-<SEOHead
-  title="Altcom — Communication & Branding"
-  description="Altcom by Altitude-Vision : stratégie digitale, branding, campagnes publicitaires et production audiovisuelle au Congo."
-  url="/altcom"
-/>
+import SEOHead                       from '../components/SEOHead';
 
 // ─────────────────────────────────────────────────────────────
 // Couleurs Altcom
@@ -115,6 +110,7 @@ const ServiceCard = ({ service, onQuote, index }) => {
     const Icon = service.icon;
 
     return (
+      
         <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -123,10 +119,18 @@ const ServiceCard = ({ service, onQuote, index }) => {
             whileHover={{ y: -6 }}
             className="group relative bg-white rounded-3xl p-7 border flex flex-col h-full transition-all duration-500 hover:shadow-xl overflow-hidden"
             style={{ borderColor: `${service.color}20` }}
+
+            
         >
             {/* Ligne colorée haut */}
             <div className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                 style={{ backgroundColor: service.color }} />
+
+                <SEOHead
+  title="Altcom — Communication & Branding"
+  description="Altcom by Altitude-Vision : stratégie digitale, branding, campagnes publicitaires et production audiovisuelle au Congo."
+  url="/altcom"
+/>
             {/* Halo fond */}
             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
                 style={{ background: `radial-gradient(circle at 30% 50%, ${service.color}08, transparent 70%)` }} />
@@ -153,6 +157,7 @@ const ServiceCard = ({ service, onQuote, index }) => {
             </p>
 
             <div className="space-y-2.5 relative z-10 mt-auto">
+              
                 <motion.button
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     onClick={() => onQuote(service.title)}

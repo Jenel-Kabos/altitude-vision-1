@@ -8,20 +8,8 @@ import {
     Phone, Clock, Scale, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import CommentList from '../components/comments/CommentList';
+import SEOHead                       from '../components/SEOHead';
 
-<SEOHead
-  title={property.title}
-  description={`${property.type || 'Bien'} à ${property.city || 'Brazzaville'} — ${property.description?.slice(0, 120)}…`}
-  image={property.images?.[0]}
-  url={`/properties/${property._id}`}
-  type="property"
-  data={property}
-  breadcrumb={[
-    { name: 'Accueil', path: '/' },
-    { name: 'Altimmo', path: '/altimmo' },
-    { name: property.title, path: `/properties/${property._id}` },
-  ]}
-/>
 
 // ─────────────────────────────────────────────────────────────
 const BLUE      = '#2E7BB5';
@@ -144,6 +132,19 @@ const PropertyDetailPage = () => {
 
     return (
         <div className="min-h-screen bg-gray-50" style={{ fontFamily:"'Outfit', sans-serif" }}>
+          <SEOHead
+  title={property.title}
+  description={`${property.type || 'Bien'} à ${property.city || 'Brazzaville'} — ${property.description?.slice(0, 120)}…`}
+  image={property.images?.[0]}
+  url={`/properties/${property._id}`}
+  type="property"
+  data={property}
+  breadcrumb={[
+    { name: 'Accueil', path: '/' },
+    { name: 'Altimmo', path: '/altimmo' },
+    { name: property.title, path: `/properties/${property._id}` },
+  ]}
+/>
 
             {/* ── Header / Breadcrumb ───────────────────────── */}
             <div className="bg-white border-b border-gray-100 sticky top-0 z-30 backdrop-blur-md">

@@ -24,11 +24,7 @@ import { getAllEvents }                from "../services/eventService";
 import { getAllPortfolioItems }        from "../services/portfolioService";
 import SEOHead from '../components/SEOHead';
 
-<SEOHead
-  title="Immobilier, Événements & Communication à Brazzaville"
-  description="Altitude-Vision — Trouvez votre bien immobilier, organisez vos événements et boostez votre communication à Brazzaville, Congo."
-  url="/"
-/>
+
 
 // ─────────────────────────────────────────────────────────────
 // Données des pôles — palette Altitude-Vision
@@ -138,6 +134,11 @@ const HomePage = () => {
 
     return (
         <div className="min-h-screen bg-white" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <SEOHead
+  title="Immobilier, Événements & Communication à Brazzaville"
+  description="Altitude-Vision — Trouvez votre bien immobilier, organisez vos événements et boostez votre communication à Brazzaville, Congo."
+  url="/"
+/>
 
             {/* ══════════════════════════════════════════
                 HERO

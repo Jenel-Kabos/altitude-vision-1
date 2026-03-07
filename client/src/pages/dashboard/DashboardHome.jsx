@@ -12,8 +12,9 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { getDashboardStats } from "../../services/dashboardService";
 import { getAllQuotes } from "../../services/quoteService";
+import SEOHead                       from '../components/SEOHead';
 
-<SEOHead title="Dashboard" noIndex={true} />
+
 
 const BLUE  = '#2E7BB5';
 const GOLD  = '#C8872A';
@@ -102,6 +103,7 @@ const DashboardHome = () => {
 
   return (
     <div className="flex h-[calc(100vh-64px)] md:h-screen overflow-hidden" style={{ background:'#F8FAFC' }}>
+        <SEOHead title="Dashboard" noIndex={true} />
 
       {/* ── Menu latéral ──────────────────────────────────── */}
       <aside className={`

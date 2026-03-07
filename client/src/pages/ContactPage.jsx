@@ -5,12 +5,7 @@ import {
   AlertTriangle, MessageSquare, User, FileText, Navigation,
   ArrowUpRight,
 } from 'lucide-react';
-
-<SEOHead
-  title="Contactez-nous"
-  description="Altitude-Vision — Rue Mfoa n°24, Poto-Poto, Brazzaville. Contactez notre équipe pour vos projets immobiliers, événementiels ou de communication."
-  url="/contact"
-/>
+import SEOHead from '../components/SEOHead';
 
 const BLUE = '#2E7BB5';
 const GOLD = '#C8872A';
@@ -55,6 +50,11 @@ const Toast = ({ msg, type, onDone }) => {
 // ─── Input Field ──────────────────────────────────────────────
 const Field = ({ label, icon: Icon, accent = BLUE, children }) => (
   <div className="space-y-1.5">
+    <SEOHead
+  title="Contactez-nous"
+  description="Altitude-Vision — Rue Mfoa n°24, Poto-Poto, Brazzaville. Contactez notre équipe pour vos projets immobiliers, événementiels ou de communication."
+  url="/contact"
+/>
     <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
       style={{ color: accent, fontFamily: "'Outfit', sans-serif" }}>
       <Icon size={12} />

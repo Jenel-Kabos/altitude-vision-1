@@ -17,6 +17,7 @@ import { createQuoteRequest }   from '../services/quoteService';
 import { getMilaEventsReviews } from '../services/reviewService';
 import { getFirstValidImage }   from '../utils/imageUtils';
 import { useAuth }              from '../context/AuthContext';
+import SEOHead from '../components/SEOHead';
 
 <SEOHead
   title="Mila Events — Événements à Brazzaville"
@@ -70,6 +71,11 @@ const EventCard = ({ event, index }) => {
             onClick={() => navigate(`/mila-events/event/${d._id}`)}
         >
             <div className="relative h-52 overflow-hidden">
+              <SEOHead
+  title="Mila Events — Événements à Brazzaville"
+  description="Découvrez les meilleurs événements à Brazzaville : concerts, conférences, mariages et soirées organisés par Mila Events."
+  url="/mila-events"
+/>
                 <img src={d.imageUrl} alt={d.title}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     onError={e => { e.target.src = 'https://placehold.co/600x400/D42B2B/FFFFFF?text=Mila+Events'; }} />
