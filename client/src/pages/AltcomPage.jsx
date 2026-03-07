@@ -9,6 +9,7 @@ import {
     MessageSquarePlus, CheckCircle, Target, Camera,
 } from 'lucide-react';
 
+import HeroSliderAltcom          from '../components/HeroSliderAltcom';
 import { createAltcomProject }   from '../services/altcomService';
 import { createQuoteRequest }    from '../services/quoteService';
 import { getAllPortfolioItems }   from '../services/portfolioService';
@@ -478,18 +479,11 @@ const AltcomPage = () => {
             <header className="relative text-white overflow-hidden"
                 style={{ height: 'calc(100vh - 0px)', minHeight: '640px', maxHeight: '860px' }}>
 
-                {/* Background */}
-                <div className="absolute inset-0"
-                    style={{
-                        backgroundImage: "url('https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=1974&auto=format&fit=crop')",
-                        backgroundSize: 'cover', backgroundPosition: 'center',
-                    }} />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/75" />
-                {/* Halo or */}
-                <div className="absolute inset-0 pointer-events-none"
-                    style={{ background: `radial-gradient(ellipse at 20% 50%, ${GOLD}15, transparent 60%)` }} />
+                {/* Slider */}
+                <HeroSliderAltcom />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/10 to-black/60 z-[1]" />
 
-                <div className="absolute inset-0 z-10 flex flex-col justify-center px-4 sm:px-8 lg:px-16">
+                <div className="absolute inset-0 z-10 flex flex-col justify-center px-4 sm:px-8 lg:px-16" style={{ zIndex: 5 }}>
                     <div className="max-w-6xl mx-auto w-full">
 
                         {/* Badge */}
@@ -560,7 +554,7 @@ const AltcomPage = () => {
                 </div>
 
                 {/* Atouts en bas */}
-                <div className="absolute bottom-0 left-0 right-0 z-10">
+                <div className="absolute bottom-0 left-0 right-0" style={{ zIndex: 5 }}>
                     <div className="h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)' }} />
                     <div className="backdrop-blur-md bg-black/30 grid grid-cols-2 sm:grid-cols-4 divide-x divide-white/10">
                         {ATOUTS.map(({ icon: Icon, label, color }, i) => (
