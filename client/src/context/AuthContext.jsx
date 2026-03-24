@@ -79,6 +79,8 @@ export const AuthProvider = ({ children }) => {
     //    (notamment photo, phone, etc.)
     const updateUser = useCallback((updatedData) => {
         console.log("🔄 Mise à jour utilisateur:", Object.keys(updatedData).join(', '));
+        console.log('🔄 updatedData reçu:', updatedData);
+console.log('🔄 photo dans updatedData:', updatedData.photo);
 
         setUser(prev => {
             // 🔧 Merge : on garde tout l'ancien user et on écrase seulement
