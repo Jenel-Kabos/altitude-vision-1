@@ -1,7 +1,7 @@
 // server/models/User.js
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
+const bcrypt   = require('bcryptjs');
+const crypto   = require('crypto');
 
 // ======================================================
 // 🧩 SCHÉMA UTILISATEUR
@@ -9,17 +9,17 @@ const crypto = require('crypto');
 const userSchema = new mongoose.Schema(
     {
         name: {
-            type: String,
-            required: [true, 'Un nom est requis.'],
-            trim: true,
-            minlength: [2, 'Le nom doit contenir au moins 2 caractères.'],
+            type:      String,
+            required:  [true, 'Un nom est requis.'],
+            trim:      true,
+            minlength: [2,  'Le nom doit contenir au moins 2 caractères.'],
             maxlength: [50, 'Le nom ne doit pas dépasser 50 caractères.'],
         },
 
         email: {
-            type: String,
-            required: [true, 'Un email est requis.'],
-            unique: true,
+            type:      String,
+            required:  [true, 'Un email est requis.'],
+            unique:    true,
             lowercase: true,
             match: [
                 /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
@@ -27,95 +27,83 @@ const userSchema = new mongoose.Schema(
             ],
         },
 
+        // 🔧 default null (plus de 'default.jpg' incompatible avec Cloudinary)
         photo: {
-            type: String,
-            default: 'default.jpg',
+            type:    String,
+            default: null,
         },
 
         role: {
             type: String,
-            // 'Proprietaire' (sans accent) pour compatibilité Frontend
-            enum: ['User', 'Client', 'Proprietaire', 'Collaborateur', 'Admin', 'Prestataire'],
+            // 'Proprietaire' sans accent pour compatibilité frontend
+            enum:    ['User', 'Client', 'Proprietaire', 'Collaborateur', 'Admin', 'Prestataire'],
             default: 'User',
         },
 
         password: {
-            type: String,
-            required: [true, 'Un mot de passe est requis.'],
+            type:      String,
+            required:  [true, 'Un mot de passe est requis.'],
             minlength: [8, 'Le mot de passe doit contenir au moins 8 caractères.'],
-            select: false,
+            select:    false,
         },
 
         passwordConfirm: {
-            type: String,
+            type:     String,
             required: [true, 'Veuillez confirmer votre mot de passe'],
             validate: {
                 validator: function (el) {
-                    // Fonctionne uniquement au CREATE et SAVE
-                    return el === this.password;
+                    return el === this.password; // Fonctionne uniquement au CREATE et SAVE
                 },
                 message: 'Les mots de passe ne sont pas identiques !',
             },
         },
 
+        // 🔧 Numéro de téléphone avec indicatif (ex: "+242 06 123 4567")
         phone: {
-            type: String,
-            trim: true,
-            default: '',
+            type:    String,
+            trim:    true,
+            default: null,
         },
 
         bio: {
-            type: String,
-            trim: true,
+            type:      String,
+            trim:      true,
             maxlength: [300, 'La biographie ne peut pas dépasser 300 caractères.'],
+            default:   null,
         },
 
         // 🔹 Statut général du compte
         isActive: {
-            type: Boolean,
+            type:    Boolean,
             default: true,
-            select: true,
+            select:  true,
         },
 
         // 🔹 Vérification Email
-        isEmailVerified: {
-            type: Boolean,
-            default: false,
-        },
-        emailVerificationToken: String,
+        isEmailVerified:          { type: Boolean, default: false },
+        emailVerificationToken:   String,
         emailVerificationExpires: Date,
 
         // 🔹 Vérification Propriétaire (KYC Admin)
-        isVerified: {
-            type: Boolean,
-            default: false,
-        },
+        isVerified: { type: Boolean, default: false },
 
         // 🔹 Statut de contrôle global
         status: {
-            type: String,
-            enum: ['Actif', 'Suspendu', 'Banni', 'Supprimé'],
+            type:    String,
+            enum:    ['Actif', 'Suspendu', 'Banni', 'Supprimé'],
             default: 'Actif',
         },
 
-        // 🔹 SÉCURITÉ & SESSIONS (Critique pour ActiveSessionsPage)
-        tokenVersion: {
-            type: Number,
-            default: 0,
-        },
-        lastLoginAt: Date,
-        lastActivityAt: { 
-            type: Date, 
-            default: Date.now 
-        },
+        // 🔹 Sécurité & Sessions
+        tokenVersion:    { type: Number, default: 0 },
+        lastLoginAt:     Date,
+        lastActivityAt:  { type: Date, default: Date.now },
 
-        passwordChangedAt: Date,
+        passwordChangedAt:  Date,
         passwordResetToken: String,
         passwordResetExpires: Date,
     },
-    {
-        timestamps: true,
-    }
+    { timestamps: true }
 );
 
 // ======================================================
@@ -123,7 +111,7 @@ const userSchema = new mongoose.Schema(
 // ======================================================
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
-    this.password = await bcrypt.hash(this.password, 12);
+    this.password        = await bcrypt.hash(this.password, 12);
     this.passwordConfirm = undefined;
     next();
 });
@@ -141,7 +129,7 @@ userSchema.pre('save', function (next) {
 // 🔐 Méthodes d'Instance
 // ======================================================
 
-// Vérification du mot de passe (Renommé en matchPassword pour le standard)
+// Vérification du mot de passe
 userSchema.methods.matchPassword = async function (candidatePassword, userPassword) {
     return await bcrypt.compare(candidatePassword, userPassword);
 };
@@ -164,13 +152,13 @@ userSchema.methods.createEmailVerificationToken = function () {
         .update(resetToken)
         .digest('hex');
 
-    this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+    this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24h
 
     return resetToken;
 };
 
 // ======================================================
-// ⚙️ Méthodes Administratives (Helpers)
+// ⚙️ Méthodes Administratives
 // ======================================================
 
 // Force la déconnexion de toutes les sessions
@@ -181,21 +169,20 @@ userSchema.methods.invalidateTokens = async function () {
 
 userSchema.methods.ban = async function () {
     if (this.role === 'Admin') throw new Error('Impossible de bannir un administrateur.');
-    this.status = 'Banni';
+    this.status   = 'Banni';
     this.isActive = false;
     await this.invalidateTokens();
 };
 
 userSchema.methods.suspend = async function () {
     if (this.role === 'Admin') throw new Error('Impossible de suspendre un administrateur.');
-    this.status = 'Suspendu';
+    this.status   = 'Suspendu';
     this.isActive = false;
-    // On invalide aussi le token pour une suspension immédiate
-    await this.invalidateTokens(); 
+    await this.invalidateTokens(); // déconnecte immédiatement toutes les sessions
 };
 
 userSchema.methods.activate = async function () {
-    this.status = 'Actif';
+    this.status   = 'Actif';
     this.isActive = true;
     await this.save({ validateBeforeSave: false });
 };
