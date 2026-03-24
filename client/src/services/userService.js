@@ -16,15 +16,17 @@ export const getAllUsers = async () => {
 
 /**
  * 🔹 Met à jour les informations de profil (nom, email, téléphone, photo)
- * Accepte un objet JSON ou un FormData (si photo jointe)
+ *
+ * ⚠️  IMPORTANT — Ne jamais forcer "Content-Type: multipart/form-data" manuellement.
+ *     Quand on passe un FormData, le navigateur (et axios) génèrent automatiquement
+ *     le header avec le boundary correct (ex: multipart/form-data; boundary=----XYZ).
+ *     Si on le force manuellement, le boundary est absent → multer ne parse pas le body
+ *     → req.file est undefined → la photo n'est pas uploadée.
  */
 export const updateMe = async (data) => {
   try {
-    // 🔧 Content-Type automatique : multipart si FormData, json sinon
-    const isFormData = data instanceof FormData;
-    const response = await api.patch("/users/updateMe", data, {
-      headers: isFormData ? { "Content-Type": "multipart/form-data" } : {},
-    });
+    // Pas de headers manuels : axios détecte FormData et gère le Content-Type tout seul
+    const response = await api.patch("/users/updateMe", data);
     const updatedUser = response.data?.data?.user;
     return {
       success: true,
@@ -41,13 +43,12 @@ export const updateMe = async (data) => {
 
 /**
  * 🔹 Met à jour le mot de passe de l'utilisateur connecté
- * 🔧 Retourne aussi le token frais renvoyé par le backend
  */
 export const updateMyPassword = async (data) => {
   try {
     const response = await api.patch("/users/updateMyPassword", data);
     const updatedUser = response.data?.data?.user;
-    const token       = response.data?.token;         // 🔧 token frais
+    const token       = response.data?.token;
     return {
       success: true,
       user:    updatedUser,

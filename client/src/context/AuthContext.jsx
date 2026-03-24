@@ -1,27 +1,25 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 
-// Créer le contexte
 const AuthContext = createContext();
 
-// Le "Provider" qui enveloppe votre application
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [user,          setUser]          = useState(null);
+    const [loading,       setLoading]       = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
 
-    // ⭐ CORRECTION : Initialisation synchrone du contexte
+    // ── Initialisation depuis localStorage ───────────────────
     useEffect(() => {
         let isMounted = true;
-        
+
         const initializeAuth = () => {
             try {
-                const storedUser = localStorage.getItem('user');
+                const storedUser  = localStorage.getItem('user');
                 const storedToken = localStorage.getItem('token');
-                
+
                 console.log("🔍 Vérification de la session existante...");
                 console.log("   Token présent:", !!storedToken);
-                console.log("   User présent:", !!storedUser);
-                
+                console.log("   User présent:",  !!storedUser);
+
                 if (storedUser && storedToken) {
                     const parsedUser = JSON.parse(storedUser);
                     setUser(parsedUser);
@@ -30,8 +28,7 @@ export const AuthProvider = ({ children }) => {
                     console.log("ℹ️ Aucune session existante");
                 }
             } catch (error) {
-                console.error("❌ Erreur lors de la restauration de la session:", error);
-                // En cas d'erreur, nettoyer le localStorage corrompu
+                console.error("❌ Erreur restauration session:", error);
                 localStorage.removeItem('user');
                 localStorage.removeItem('token');
             } finally {
@@ -43,68 +40,63 @@ export const AuthProvider = ({ children }) => {
             }
         };
 
-        // Exécuter immédiatement (pas de setTimeout)
         initializeAuth();
-
-        return () => {
-            isMounted = false;
-        };
+        return () => { isMounted = false; };
     }, []);
 
-    // ⭐ Fonction login avec logs détaillés
+    // ── Login (connexion initiale ou après changement de mot de passe) ──
+    // 🔧 Ne doit PAS être appelé après updateMe — utiliser updateUser à la place
     const login = useCallback((userData, token) => {
-        console.log("🔓 Connexion en cours...");
-        console.log("   Utilisateur:", userData.email);
-        console.log("   Token reçu:", token ? "✓" : "✗");
-        
+        console.log("🔓 Connexion en cours...", userData?.email);
+
         if (!token) {
-            console.error("❌ Erreur: Token manquant lors de la connexion");
+            console.error("❌ Token manquant lors de la connexion");
             throw new Error("Token manquant");
         }
-
         if (!userData) {
-            console.error("❌ Erreur: Données utilisateur manquantes lors de la connexion");
+            console.error("❌ Données utilisateur manquantes");
             throw new Error("Données utilisateur manquantes");
         }
 
-        // Sauvegarder dans localStorage
-        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('user',  JSON.stringify(userData));
         localStorage.setItem('token', token);
-        
-        // Mettre à jour l'état
         setUser(userData);
-        
-        console.log("✅ Connexion réussie - Token et utilisateur sauvegardés");
-        console.log("   localStorage token:", localStorage.getItem('token') ? "✓" : "✗");
+
+        console.log("✅ Connexion réussie");
     }, []);
 
-    // ⭐ Fonction logout avec logs détaillés
+    // ── Logout ────────────────────────────────────────────────
     const logout = useCallback(() => {
-        console.log("🚪 Déconnexion en cours...");
-        
-        // Nettoyer localStorage
+        console.log("🚪 Déconnexion...");
         localStorage.removeItem('user');
         localStorage.removeItem('token');
-        
-        // Nettoyer l'état
         setUser(null);
-        
-        console.log("✅ Déconnexion réussie - Session nettoyée");
+        console.log("✅ Session nettoyée");
     }, []);
 
-    // ⭐ Fonction pour mettre à jour l'utilisateur
+    // ── updateUser : merge partiel des données ────────────────
+    // 🔧 À utiliser après updateMe pour ne pas perdre les champs existants
+    //    (notamment photo, phone, etc.)
     const updateUser = useCallback((updatedData) => {
-        console.log("🔄 Mise à jour des données utilisateur...");
-        
-        const updatedUser = { ...user, ...updatedData };
-        
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        setUser(updatedUser);
-        
-        console.log("✅ Données utilisateur mises à jour");
-    }, [user]);
+        console.log("🔄 Mise à jour utilisateur:", Object.keys(updatedData).join(', '));
 
-    // Mémorisation de l'objet de valeur du contexte
+        setUser(prev => {
+            // 🔧 Merge : on garde tout l'ancien user et on écrase seulement
+            //    les champs retournés par le backend
+            const merged = { ...prev, ...updatedData };
+
+            // 🔧 Si le backend renvoie photo: null explicitement (removePhoto),
+            //    on respecte ça — sinon on garde l'ancienne photo
+            if (updatedData.photo === undefined) {
+                merged.photo = prev?.photo ?? null;
+            }
+
+            localStorage.setItem('user', JSON.stringify(merged));
+            console.log("✅ User mis à jour — photo:", merged.photo ?? 'aucune');
+            return merged;
+        });
+    }, []);
+
     const value = useMemo(() => ({
         user,
         loading,
@@ -112,15 +104,14 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!user,
         login,
         logout,
-        updateUser
+        updateUser,
     }), [user, loading, isInitialized, login, logout, updateUser]);
 
-    // ⭐ Ne rendre les enfants que lorsque le contexte est initialisé
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-50">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
                     <p className="text-gray-600">Initialisation...</p>
                 </div>
             </div>
@@ -134,7 +125,6 @@ export const AuthProvider = ({ children }) => {
     );
 };
 
-// Le "Hook" personnalisé pour utiliser le contexte facilement
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (context === undefined) {

@@ -196,7 +196,9 @@ const AvatarUpload = ({ user, preview, onFileChange, onRemove, uploading }) => {
 
 // ─────────────────────────────────────────────────────────────
 const AccountPage = () => {
-    const { user, login } = useAuth();
+    // 🔧 updateUser pour les mises à jour de profil (merge partiel)
+    // 🔧 login uniquement pour le changement de mot de passe (nouveau token)
+    const { user, login, updateUser } = useAuth();
 
     const [infoData,    setInfoData]    = useState({ name: '', email: '', phone: '' });
     const [infoLoading, setInfoLoading] = useState(false);
@@ -283,13 +285,15 @@ const AccountPage = () => {
                 if (removePhoto)    fd.append('removePhoto', 'true');
                 payload = fd;
             } else {
-                payload = infoData; // JSON classique — Content-Type auto
+                payload = infoData;
             }
 
-            // 🔧 userService retourne { success, user, message }
             const res = await updateMe(payload);
+
             if (res.success && res.user) {
-                login(res.user, localStorage.getItem('token'));
+                // 🔧 updateUser (merge) au lieu de login (remplacement complet)
+                // Garantit que photo, phone, etc. sont bien persistés
+                updateUser(res.user);
                 setPhotoFile(null);
                 setPhotoPreview(null);
                 setRemovePhoto(false);
@@ -319,9 +323,9 @@ const AccountPage = () => {
         setPassLoading(true);
         const tid = toast.loading('Mise à jour du mot de passe...');
         try {
-            // 🔧 userService retourne { success, user, token, message }
             const res = await updateMyPassword(passData);
             if (res.success && res.user) {
+                // 🔧 login ici car on a un nouveau token à stocker
                 if (res.token) localStorage.setItem('token', res.token);
                 login(res.user, res.token || localStorage.getItem('token'));
                 toast.success('Mot de passe changé avec succès !');
