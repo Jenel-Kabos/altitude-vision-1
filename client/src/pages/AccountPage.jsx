@@ -5,7 +5,7 @@ import { Toaster, toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     User, Mail, Lock, Save, AlertTriangle,
-    Eye, EyeOff, Loader2, ShieldCheck, Camera, Trash2, Upload,
+    Eye, EyeOff, Loader2, ShieldCheck, Camera, Trash2, Upload, Phone,
 } from "lucide-react";
 
 const BLUE      = '#2E7BB5';
@@ -31,6 +31,87 @@ const InputField = ({ label, type = 'text', name, value, onChange, placeholder, 
         </div>
     </div>
 );
+
+// ── Champ téléphone avec indicatif ────────────────────────────
+const DIAL_CODES = [
+    { code: '+242', flag: '🇨🇬', label: 'Congo' },
+    { code: '+243', flag: '🇨🇩', label: 'RDC' },
+    { code: '+33',  flag: '🇫🇷', label: 'France' },
+    { code: '+32',  flag: '🇧🇪', label: 'Belgique' },
+    { code: '+41',  flag: '🇨🇭', label: 'Suisse' },
+    { code: '+1',   flag: '🇺🇸', label: 'USA' },
+    { code: '+44',  flag: '🇬🇧', label: 'UK' },
+    { code: '+212', flag: '🇲🇦', label: 'Maroc' },
+    { code: '+225', flag: '🇨🇮', label: "Côte d'Ivoire" },
+    { code: '+237', flag: '🇨🇲', label: 'Cameroun' },
+    { code: '+221', flag: '🇸🇳', label: 'Sénégal' },
+    { code: '+241', flag: '🇬🇦', label: 'Gabon' },
+];
+
+const parsePhone = (val = '') => {
+    const match = DIAL_CODES.find(d => val.startsWith(d.code));
+    return match
+        ? { dialCode: match.code, local: val.slice(match.code.length).trim() }
+        : { dialCode: '+242', local: val };
+};
+
+const PhoneField = ({ value, onChange }) => {
+    const { dialCode, local } = parsePhone(value);
+    const selected = DIAL_CODES.find(d => d.code === dialCode) || DIAL_CODES[0];
+
+    const handleDialChange = e => onChange(`${e.target.value} ${local}`.trim());
+    const handleLocalChange = e => {
+        const clean = e.target.value.replace(/[^\d\s\-]/g, '');
+        onChange(`${dialCode} ${clean}`.trim());
+    };
+
+    return (
+        <div>
+            <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5"
+                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                Téléphone
+                <span className="normal-case font-normal tracking-normal text-gray-300" style={{ fontSize: '0.65rem' }}>
+                    (optionnel)
+                </span>
+            </label>
+            <div className="flex gap-2">
+                {/* Sélecteur indicatif */}
+                <div className="relative flex-shrink-0">
+                    <select value={dialCode} onChange={handleDialChange}
+                        className="h-full pl-3 pr-7 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm focus:outline-none appearance-none cursor-pointer transition-all"
+                        style={{ fontFamily: "'Outfit', sans-serif", minWidth: '90px' }}
+                        onFocus={focusIn} onBlur={focusOut}>
+                        {DIAL_CODES.map(d => (
+                            <option key={d.code} value={d.code}>{d.flag} {d.code}</option>
+                        ))}
+                    </select>
+                    <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+
+                {/* Numéro local */}
+                <div className="relative flex-1">
+                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <input type="tel" value={local} onChange={handleLocalChange}
+                        placeholder="06 123 45 67"
+                        className={inputCls}
+                        style={{ fontFamily: "'Outfit', sans-serif" }}
+                        onFocus={focusIn} onBlur={focusOut} />
+                </div>
+            </div>
+
+            {/* Aperçu numéro complet */}
+            {local && (
+                <p className="text-xs text-gray-400 mt-1.5 pl-1" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    {selected.flag} Numéro complet :{' '}
+                    <span className="text-gray-500 font-medium">{dialCode} {local}</span>
+                </p>
+            )}
+        </div>
+    );
+};
 
 // ── Champ mot de passe ────────────────────────────────────────
 const PassField = ({ label, name, value, onChange, placeholder, error, show, onToggle }) => (
@@ -70,33 +151,22 @@ const AvatarUpload = ({ user, preview, onFileChange, onRemove, uploading }) => {
 
     return (
         <div className="flex flex-col items-center gap-3">
-            {/* Avatar */}
             <div className="relative group" style={{ width: 96, height: 96 }}>
-                <div
-                    className="w-24 h-24 rounded-2xl overflow-hidden flex items-center justify-center"
+                <div className="w-24 h-24 rounded-2xl overflow-hidden flex items-center justify-center"
                     style={{
                         background: hasPhoto ? 'transparent' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
                         boxShadow: `0 0 0 3px rgba(46,123,181,0.15)`,
-                    }}
-                >
+                    }}>
                     {hasPhoto
                         ? <img src={preview || user.photo} alt="Photo de profil" className="w-full h-full object-cover" />
                         : <User className="w-10 h-10 text-white opacity-80" />
                     }
                 </div>
-
-                {/* Overlay au hover */}
-                <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
+                <button type="button" onClick={() => fileRef.current?.click()}
                     className="absolute inset-0 rounded-2xl flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-                    style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
-                    title="Changer la photo"
-                >
+                    style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}>
                     <Camera className="w-6 h-6 text-white" />
                 </button>
-
-                {/* Loader pendant l'upload */}
                 {uploading && (
                     <div className="absolute inset-0 rounded-2xl flex items-center justify-center"
                         style={{ background: 'rgba(0,0,0,0.5)' }}>
@@ -105,37 +175,18 @@ const AvatarUpload = ({ user, preview, onFileChange, onRemove, uploading }) => {
                 )}
             </div>
 
-            {/* Boutons */}
             <div className="flex items-center gap-2">
-                <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
+                <button type="button" onClick={() => fileRef.current?.click()}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
-                    style={{
-                        background: `${BLUE}12`,
-                        color: BLUE,
-                        fontFamily: "'Outfit', sans-serif",
-                        border: `1px solid ${BLUE}20`,
-                    }}
-                >
+                    style={{ background: `${BLUE}12`, color: BLUE, fontFamily: "'Outfit', sans-serif", border: `1px solid ${BLUE}20` }}>
                     <Upload className="w-3 h-3" />
                     {hasPhoto ? 'Changer' : 'Ajouter une photo'}
                 </button>
-
                 {hasPhoto && (
-                    <button
-                        type="button"
-                        onClick={onRemove}
+                    <button type="button" onClick={onRemove}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
-                        style={{
-                            background: '#FEF2F2',
-                            color: '#EF4444',
-                            fontFamily: "'Outfit', sans-serif",
-                            border: '1px solid #FECACA',
-                        }}
-                    >
-                        <Trash2 className="w-3 h-3" />
-                        Supprimer
+                        style={{ background: '#FEF2F2', color: '#EF4444', fontFamily: "'Outfit', sans-serif", border: '1px solid #FECACA' }}>
+                        <Trash2 className="w-3 h-3" /> Supprimer
                     </button>
                 )}
             </div>
@@ -143,15 +194,8 @@ const AvatarUpload = ({ user, preview, onFileChange, onRemove, uploading }) => {
             <p className="text-xs text-gray-400" style={{ fontFamily: "'Outfit', sans-serif" }}>
                 JPG, PNG ou WebP · Max 5 Mo
             </p>
-
-            {/* Input file caché */}
-            <input
-                ref={fileRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={onFileChange}
-            />
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp"
+                className="hidden" onChange={onFileChange} />
         </div>
     );
 };
@@ -160,10 +204,9 @@ const AvatarUpload = ({ user, preview, onFileChange, onRemove, uploading }) => {
 const AccountPage = () => {
     const { user, login } = useAuth();
 
-    const [infoData,    setInfoData]    = useState({ name: '', email: '' });
+    const [infoData,    setInfoData]    = useState({ name: '', email: '', phone: '' });
     const [infoLoading, setInfoLoading] = useState(false);
 
-    // Photo
     const [photoFile,      setPhotoFile]      = useState(null);
     const [photoPreview,   setPhotoPreview]   = useState(null);
     const [photoUploading, setPhotoUploading] = useState(false);
@@ -175,10 +218,13 @@ const AccountPage = () => {
     const [showFields,  setShowFields]  = useState({ current: false, newp: false, confirm: false });
 
     useEffect(() => {
-        if (user) setInfoData({ name: user.name || '', email: user.email || '' });
+        if (user) setInfoData({
+            name:  user.name  || '',
+            email: user.email || '',
+            phone: user.phone || '',
+        });
     }, [user]);
 
-    // Libérer l'URL objet au démontage
     useEffect(() => {
         return () => { if (photoPreview) URL.revokeObjectURL(photoPreview); };
     }, [photoPreview]);
@@ -186,7 +232,9 @@ const AccountPage = () => {
     const handleInfoChange = e =>
         setInfoData(d => ({ ...d, [e.target.name]: e.target.value }));
 
-    // ── Gestion photo ─────────────────────────────────────────
+    const handlePhoneChange = val =>
+        setInfoData(d => ({ ...d, phone: val }));
+
     const handleFileChange = e => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -194,7 +242,6 @@ const AccountPage = () => {
             return toast.error('La photo ne doit pas dépasser 5 Mo.');
         if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
             return toast.error('Format non supporté. Utilisez JPG, PNG ou WebP.');
-
         setPhotoFile(file);
         setRemovePhoto(false);
         if (photoPreview) URL.revokeObjectURL(photoPreview);
@@ -236,12 +283,12 @@ const AccountPage = () => {
         try {
             let payload;
             if (photoFile || removePhoto) {
-                // On utilise FormData pour envoyer le fichier
                 const fd = new FormData();
-                fd.append('name', infoData.name);
+                fd.append('name',  infoData.name);
                 fd.append('email', infoData.email);
-                if (photoFile)    fd.append('photo', photoFile);
-                if (removePhoto)  fd.append('removePhoto', 'true');
+                if (infoData.phone) fd.append('phone', infoData.phone);
+                if (photoFile)      fd.append('photo', photoFile);
+                if (removePhoto)    fd.append('removePhoto', 'true');
                 payload = fd;
             } else {
                 payload = infoData;
@@ -331,7 +378,6 @@ const AccountPage = () => {
                     style={{ background: `linear-gradient(to right, transparent, ${BLUE}50, transparent)` }} />
 
                 <div className="container mx-auto max-w-4xl px-4 sm:px-6 relative z-10 text-center">
-                    {/* Avatar hero — reflète la photo sélectionnée en temps réel */}
                     <motion.div
                         key={heroPhoto || 'default'}
                         initial={{ scale: 0.9, opacity: 0 }}
@@ -355,7 +401,17 @@ const AccountPage = () => {
                     </h1>
                     <div className="h-0.5 w-12 rounded-full mx-auto mb-3"
                         style={{ background: `linear-gradient(to right, ${BLUE}, ${GOLD})` }} />
-                    <p className="text-white/50 text-sm">{user.name} · {user.email}</p>
+                    <div className="flex items-center justify-center gap-3 text-white/50 text-sm flex-wrap">
+                        <span>{user.name} · {user.email}</span>
+                        {user.phone && (
+                            <>
+                                <span className="opacity-30">·</span>
+                                <span className="flex items-center gap-1">
+                                    <Phone className="w-3 h-3" /> {user.phone}
+                                </span>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -381,7 +437,7 @@ const AccountPage = () => {
 
                         <form onSubmit={handleSubmitInfo} className="px-7 py-6 space-y-5">
 
-                            {/* ── Section photo de profil ── */}
+                            {/* Photo */}
                             <div className="pb-5 border-b border-gray-100">
                                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
                                     style={{ fontFamily: "'Outfit', sans-serif" }}>
@@ -394,8 +450,6 @@ const AccountPage = () => {
                                     onRemove={handleRemovePhoto}
                                     uploading={photoUploading}
                                 />
-
-                                {/* Indicateur changement en attente */}
                                 <AnimatePresence>
                                     {(photoFile || removePhoto) && (
                                         <motion.div
@@ -422,8 +476,12 @@ const AccountPage = () => {
 
                             <InputField label="Nom complet" name="name" value={infoData.name}
                                 onChange={handleInfoChange} placeholder="Votre nom complet" Icon={User} />
+
                             <InputField label="Adresse email" type="email" name="email" value={infoData.email}
                                 onChange={handleInfoChange} placeholder="exemple@email.com" Icon={Mail} />
+
+                            {/* Téléphone */}
+                            <PhoneField value={infoData.phone} onChange={handlePhoneChange} />
 
                             <motion.button type="submit" disabled={infoLoading}
                                 whileHover={{ scale: infoLoading ? 1 : 1.02 }} whileTap={{ scale: 0.98 }}
@@ -495,6 +553,7 @@ const AccountPage = () => {
                             </div>
                         </form>
                     </motion.div>
+
                 </div>
             </div>
         </div>
