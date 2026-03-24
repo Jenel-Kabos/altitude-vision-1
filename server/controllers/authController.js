@@ -4,7 +4,7 @@ const jwt       = require('jsonwebtoken');
 const { promisify } = require('util');
 const User      = require('../models/User');
 const sendEmail = require('../utils/email');
-const { destroyFromCloudinary } = require('../config/cloudinary'); // 🔧 pour updateMe
+const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 
 // ======================================================
 // 🔑 UTILITAIRES JWT
@@ -14,7 +14,6 @@ const signToken = (id, tokenVersion) =>
         expiresIn: process.env.JWT_EXPIRES_IN || '90d',
     });
 
-// 🔧 phone ajouté dans la réponse
 const createSendToken = (user, statusCode, res) => {
     const token = signToken(user._id, user.tokenVersion);
     user.password = undefined;
@@ -52,6 +51,17 @@ exports.signup = async (req, res) => {
             return res.status(400).json({ status: 'fail', message: 'Adresse email déjà utilisée.' });
         }
 
+        // Photo de profil à l'inscription si envoyée
+        let photoUrl;
+        if (req.file) {
+            const result = await uploadToCloudinary(req.file.buffer, {
+                folder:    'altitude-vision/users',
+                public_id: `user-signup-${Date.now()}`,
+                overwrite: true,
+            });
+            photoUrl = result.secure_url;
+        }
+
         const newUser = await User.create({
             name,
             email,
@@ -59,7 +69,7 @@ exports.signup = async (req, res) => {
             passwordConfirm,
             role:  role  || 'Client',
             phone: phone || '',
-            photo: req.file ? req.file.path : undefined,
+            photo: photoUrl || undefined,
         });
 
         const verificationToken = newUser.createEmailVerificationToken();
@@ -194,7 +204,6 @@ exports.login = async (req, res) => {
 
         const user = await User.findOne({ email }).select('+password');
 
-        // 🔧 matchPassword (nom correct selon le modèle)
         if (!user || !(await user.matchPassword(password, user.password))) {
             return res.status(401).json({ status: 'fail', message: 'Email ou mot de passe incorrect.' });
         }
@@ -231,9 +240,9 @@ exports.optionalAuth = async (req, res, next) => {
         const decoded     = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
         const currentUser = await User.findById(decoded.id);
 
-        if (!currentUser)                                          return next();
-        if (currentUser.tokenVersion > decoded.tokenVersion)      return next();
-        if (currentUser.changedPasswordAfter(decoded.iat))        return next();
+        if (!currentUser)                                     return next();
+        if (currentUser.tokenVersion > decoded.tokenVersion) return next();
+        if (currentUser.changedPasswordAfter(decoded.iat))   return next();
 
         req.user = currentUser;
         return next();
@@ -302,7 +311,6 @@ exports.restrictTo = (...roles) => (req, res, next) => {
 
 // ======================================================
 // 8. MISE À JOUR MOT DE PASSE
-// 🔧 Utilise matchPassword + incrémente tokenVersion + renvoie token frais
 // ======================================================
 exports.updateMyPassword = async (req, res) => {
     try {
@@ -314,18 +322,16 @@ exports.updateMyPassword = async (req, res) => {
             return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
         }
 
-        // 🔧 matchPassword (nom correct selon le modèle)
         if (!(await user.matchPassword(passwordCurrent, user.password))) {
             return res.status(401).json({ status: 'fail', message: 'Mot de passe actuel incorrect.' });
         }
 
         user.password        = password;
         user.passwordConfirm = passwordConfirm;
-        user.tokenVersion    = (user.tokenVersion || 0) + 1; // invalide les autres sessions
+        user.tokenVersion    = (user.tokenVersion || 0) + 1;
 
         await user.save();
 
-        // Renvoie un nouveau token avec le tokenVersion à jour
         createSendToken(user, 200, res);
     } catch (error) {
         console.error('❌ Erreur updateMyPassword:', error);
@@ -335,7 +341,9 @@ exports.updateMyPassword = async (req, res) => {
 
 // ======================================================
 // 9. UPDATE ME
-// 🔧 Gère removePhoto (Cloudinary destroy) + phone
+// ✅ Upload Cloudinary via buffer (multer memoryStorage)
+// ✅ Gère removePhoto
+// ✅ Gère phone
 // ======================================================
 exports.updateMe = async (req, res) => {
     try {
@@ -353,22 +361,34 @@ exports.updateMe = async (req, res) => {
             if (req.body[field] !== undefined) filteredBody[field] = req.body[field];
         });
 
-        // Cas 1 : nouvelle photo uploadée via Cloudinary (multer memoryStorage)
+        // ✅ Cas 1 : nouvelle photo
+        // Avec multer memoryStorage, req.file.path n'existe PAS.
+        // Il faut uploader le buffer manuellement vers Cloudinary.
         if (req.file) {
+            console.log('📸 [updateMe] Fichier reçu:', req.file.originalname, req.file.size, 'bytes');
+            const result = await uploadToCloudinary(req.file.buffer, {
+                folder:         'altitude-vision/users',
+                public_id:      `user-${req.user.id}`,
+                overwrite:      true,
+                invalidate:     true,
+                transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }],
+            });
             await destroyFromCloudinary(currentUser?.photo);
-            filteredBody.photo = req.file.path; // URL https://res.cloudinary.com/...
+            filteredBody.photo = result.secure_url;
+            console.log('✅ [updateMe] Photo Cloudinary:', filteredBody.photo);
         }
 
-        // Cas 2 : suppression explicite demandée par AccountPage
+        // ✅ Cas 2 : suppression explicite
         else if (req.body.removePhoto === 'true') {
             await destroyFromCloudinary(currentUser?.photo);
             filteredBody.photo = null;
+            console.log('🗑️  [updateMe] Photo supprimée pour user:', req.user.id);
         }
 
         const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, {
-            new:            true,
-            runValidators:  true,
-            select:         '-password',
+            new:           true,
+            runValidators: true,
+            select:        '-password',
         });
 
         res.status(200).json({ status: 'success', data: { user: updatedUser } });
