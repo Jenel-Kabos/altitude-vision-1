@@ -3,408 +3,405 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Building2, Calendar, Briefcase } from 'lucide-react';
 
-// ─────────────────────────────────────────────
-// Données des slides
-// ─────────────────────────────────────────────
 const slides = [
-    {
-        title: "L'Immobilier\nde Prestige",
-        subtitle: "Trouvez le bien qui vous ressemble — vente, location, conseil expert à Brazzaville",
-        image: "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1600&q=80",
-        cta: { label: "Découvrir Altimmo", route: "/altimmo" },
-        accent: "#2E7BB5",   // Bleu Altimmo
-        pole: "Altimmo",
-    },
-    {
-        title: "L'Art de\nl'Événementiel",
-        subtitle: "Mariages, galas, conférences — nous transformons chaque moment en souvenir inoubliable",
-        image: "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?q=80&w=1170&auto=format&fit=crop",
-        cta: { label: "Découvrir Mila Events", route: "/mila-events" },
-        accent: "#D42B2B",   // Rouge Mila Events
-        pole: "Mila Events",
-    },
-    {
-        title: "La Communication\nQui Impacte",
-        subtitle: "Stratégie, branding, visibilité digitale — propulsez votre image au niveau supérieur",
-        image: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1170&auto=format&fit=crop",
-        cta: { label: "Découvrir Altcom", route: "/altcom" },
-        accent: "#C8872A",   // Or Altcom
-        pole: "Altcom",
-    },
+  {
+    title: "L'Immobilier\nde Prestige",
+    subtitle: "Trouvez le bien qui vous ressemble — vente, location, conseil expert à Brazzaville",
+    image: "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1600&q=80",
+    cta: { label: "Découvrir Altimmo", route: "/altimmo" },
+    accent: "#2E7BB5",
+    pole: "Altimmo",
+  },
+  {
+    title: "L'Art de\nl'Événementiel",
+    subtitle: "Mariages, galas, conférences — nous transformons chaque moment en souvenir inoubliable",
+    image: "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?q=80&w=1170&auto=format&fit=crop",
+    cta: { label: "Découvrir Mila Events", route: "/mila-events" },
+    accent: "#D42B2B",
+    pole: "Mila Events",
+  },
+  {
+    title: "La Communication\nQui Impacte",
+    subtitle: "Stratégie, branding, visibilité digitale — propulsez votre image au niveau supérieur",
+    image: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1170&auto=format&fit=crop",
+    cta: { label: "Découvrir Altcom", route: "/altcom" },
+    accent: "#C8872A",
+    pole: "Altcom",
+  },
 ];
 
-// Bandeau pôles en bas du hero
 const poles = [
-    { label: "Altimmo",     sub: "Immobilier",    icon: Building2, route: "/altimmo",     color: "#2E7BB5" },
-    { label: "Mila Events", sub: "Événementiel",  icon: Calendar,  route: "/mila-events", color: "#D42B2B" },
-    { label: "Altcom",      sub: "Communication", icon: Briefcase, route: "/altcom",      color: "#C8872A" },
+  { label: "Altimmo",     sub: "Immobilier",    icon: Building2, route: "/altimmo",     color: "#2E7BB5" },
+  { label: "Mila Events", sub: "Événementiel",  icon: Calendar,  route: "/mila-events", color: "#D42B2B" },
+  { label: "Altcom",      sub: "Communication", icon: Briefcase, route: "/altcom",      color: "#C8872A" },
 ];
 
 const SLIDE_DURATION = 7000;
 
-// ─────────────────────────────────────────────
-// Composant principal
-// ─────────────────────────────────────────────
 const HeroSlider = () => {
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [direction, setDirection]       = useState(1);
-    const [progress, setProgress]         = useState(0);
-    const timerRef    = useRef(null);
-    const progressRef = useRef(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection]       = useState(1);
+  const [progress, setProgress]         = useState(0);
+  const timerRef    = useRef(null);
+  const progressRef = useRef(null);
 
-    // ── Gestion des timers ──────────────────
-    const resetTimers = useCallback(() => {
-        clearInterval(timerRef.current);
-        clearInterval(progressRef.current);
-        setProgress(0);
+  const resetTimers = useCallback(() => {
+    clearInterval(timerRef.current);
+    clearInterval(progressRef.current);
+    setProgress(0);
+    timerRef.current = setInterval(() => {
+      setDirection(1);
+      setCurrentIndex(prev => (prev + 1) % slides.length);
+      setProgress(0);
+    }, SLIDE_DURATION);
+    progressRef.current = setInterval(() => {
+      setProgress(prev => Math.min(prev + 100 / (SLIDE_DURATION / 50), 100));
+    }, 50);
+  }, []);
 
-        timerRef.current = setInterval(() => {
-            setDirection(1);
-            setCurrentIndex(prev => (prev + 1) % slides.length);
-            setProgress(0);
-        }, SLIDE_DURATION);
+  useEffect(() => {
+    resetTimers();
+    return () => { clearInterval(timerRef.current); clearInterval(progressRef.current); };
+  }, [resetTimers]);
 
-        progressRef.current = setInterval(() => {
-            setProgress(prev => Math.min(prev + 100 / (SLIDE_DURATION / 50), 100));
-        }, 50);
-    }, []);
+  const goTo = (index) => {
+    if (index === currentIndex) return;
+    setDirection(index > currentIndex ? 1 : -1);
+    setCurrentIndex(index);
+    resetTimers();
+  };
 
-    useEffect(() => {
-        resetTimers();
-        return () => {
-            clearInterval(timerRef.current);
-            clearInterval(progressRef.current);
-        };
-    }, [resetTimers]);
+  const prev = () => { setDirection(-1); setCurrentIndex(p => (p - 1 + slides.length) % slides.length); resetTimers(); };
+  const next = () => { setDirection(1);  setCurrentIndex(p => (p + 1) % slides.length); resetTimers(); };
 
-    // ── Navigation ──────────────────────────
-    const goTo = (index) => {
-        if (index === currentIndex) return;
-        setDirection(index > currentIndex ? 1 : -1);
-        setCurrentIndex(index);
-        resetTimers();
-    };
+  const slideVariants = {
+    enter:  (dir) => ({ x: dir > 0 ? '100%' : '-100%', opacity: 0 }),
+    center: { x: '0%', opacity: 1, transition: { duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] } },
+    exit:   (dir) => ({ x: dir < 0 ? '100%' : '-100%', opacity: 0, transition: { duration: 0.65, ease: [0.55, 0, 1, 0.45] } }),
+  };
 
-    const prev = () => {
-        setDirection(-1);
-        setCurrentIndex(prev => (prev - 1 + slides.length) % slides.length);
-        resetTimers();
-    };
+  const textVariants = {
+    hidden:  { opacity: 0, y: 36 },
+    visible: (delay) => ({
+      opacity: 1, y: 0,
+      transition: { duration: 0.75, delay, ease: [0.25, 0.46, 0.45, 0.94] },
+    }),
+  };
 
-    const next = () => {
-        setDirection(1);
-        setCurrentIndex(prev => (prev + 1) % slides.length);
-        resetTimers();
-    };
+  const current = slides[currentIndex];
 
-    // ── Variants d'animation ────────────────
-    const slideVariants = {
-        enter: (dir) => ({
-            x: dir > 0 ? '100%' : '-100%',
-            opacity: 0,
-        }),
-        center: {
-            x: '0%',
-            opacity: 1,
-            transition: { duration: 0.75, ease: [0.25, 0.46, 0.45, 0.94] },
-        },
-        exit: (dir) => ({
-            x: dir < 0 ? '100%' : '-100%',
-            opacity: 0,
-            transition: { duration: 0.6, ease: [0.55, 0, 1, 0.45] },
-        }),
-    };
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
 
-    const textVariants = {
-        hidden: { opacity: 0, y: 32 },
-        visible: (delay) => ({
-            opacity: 1,
-            y: 0,
-            transition: { duration: 0.7, delay, ease: [0.25, 0.46, 0.45, 0.94] },
-        }),
-    };
+      {/* ── Slides ── */}
+      <AnimatePresence initial={false} custom={direction} mode="wait">
+        <motion.div
+          key={currentIndex}
+          custom={direction}
+          variants={slideVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          style={{ position: 'absolute', inset: 0 }}
+        >
+          {/* Image Ken Burns */}
+          <motion.div
+            style={{
+              position: 'absolute', inset: 0,
+              backgroundImage: `url(${current.image})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+            initial={{ scale: 1.08 }}
+            animate={{ scale: 1.02 }}
+            transition={{ duration: SLIDE_DURATION / 1000, ease: 'linear' }}
+          />
 
-    const current = slides[currentIndex];
+          {/* Overlays */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(105deg, rgba(5,8,12,0.88) 0%, rgba(5,8,12,0.55) 50%, rgba(5,8,12,0.25) 100%)',
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(to top, rgba(5,8,12,0.75) 0%, transparent 45%)',
+          }} />
 
-    return (
-        <div className="absolute inset-0 overflow-hidden">
+          {/* Accent coloré vertical */}
+          <motion.div
+            style={{
+              position: 'absolute', top: 0, left: 0,
+              width: '2px', height: '100%',
+              background: `linear-gradient(to bottom, transparent, ${current.accent}, transparent)`,
+            }}
+            initial={{ scaleY: 0, originY: 0 }}
+            animate={{ scaleY: 1 }}
+            transition={{ duration: 1.2, delay: 0.2 }}
+          />
+        </motion.div>
+      </AnimatePresence>
 
-            {/* ── Slides ─────────────────────────── */}
-            <AnimatePresence initial={false} custom={direction} mode="wait">
-                <motion.div
-                    key={currentIndex}
-                    custom={direction}
-                    variants={slideVariants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    className="absolute inset-0"
-                >
-                    {/* Image Ken Burns */}
-                    <motion.div
-                        className="absolute inset-0 bg-cover bg-center"
-                        style={{ backgroundImage: `url(${current.image})` }}
-                        initial={{ scale: 1.08 }}
-                        animate={{ scale: 1.02 }}
-                        transition={{ duration: SLIDE_DURATION / 1000, ease: 'linear' }}
-                    />
+      {/* ── Contenu texte ── */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 10,
+        display: 'flex', flexDirection: 'column', justifyContent: 'center',
+        padding: '0 64px 160px',
+      }}>
+        <AnimatePresence mode="wait">
+          <div key={currentIndex}>
 
-                    {/* Overlay multicouche — dégradé dramatique */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/20" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
-
-                    {/* Accent coloré discret en bas-gauche */}
-                    <motion.div
-                        className="absolute bottom-0 left-0 w-1 h-full opacity-60"
-                        style={{ background: `linear-gradient(to top, ${current.accent}, transparent)` }}
-                        initial={{ scaleY: 0, originY: 1 }}
-                        animate={{ scaleY: 1 }}
-                        transition={{ duration: 1, delay: 0.3 }}
-                    />
-                </motion.div>
-            </AnimatePresence>
-
-            {/* ── Contenu texte ───────────────────── */}
-            <div className="absolute inset-0 z-10 flex flex-col justify-center px-8 sm:px-16 lg:px-24 pb-32">
-                <AnimatePresence mode="wait">
-                    <div key={currentIndex}>
-
-                        {/* Badge pôle */}
-                        <motion.div
-                            custom={0.1}
-                            variants={textVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="mb-4"
-                        >
-                            <span
-                                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest text-white border border-white/20 backdrop-blur-sm"
-                                style={{ backgroundColor: `${current.accent}33` }}
-                            >
-                                <span
-                                    className="w-1.5 h-1.5 rounded-full animate-pulse"
-                                    style={{ backgroundColor: current.accent }}
-                                />
-                                {current.pole}
-                            </span>
-                        </motion.div>
-
-                        {/* Titre — Cormorant Garamond */}
-                        <motion.h1
-                            custom={0.25}
-                            variants={textVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="text-white mb-5 max-w-3xl"
-                            style={{
-                                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                fontSize: 'clamp(2.8rem, 6vw, 5.5rem)',
-                                fontWeight: 700,
-                                lineHeight: 1.1,
-                                letterSpacing: '-0.02em',
-                                whiteSpace: 'pre-line',
-                            }}
-                        >
-                            {current.title}
-                        </motion.h1>
-
-                        {/* Ligne dorée décorative */}
-                        <motion.div
-                            custom={0.35}
-                            variants={textVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="mb-5"
-                        >
-                            <div
-                                className="h-0.5 w-20 rounded-full"
-                                style={{ background: `linear-gradient(to right, ${current.accent}, transparent)` }}
-                            />
-                        </motion.div>
-
-                        {/* Sous-titre — Outfit */}
-                        <motion.p
-                            custom={0.4}
-                            variants={textVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="text-white/80 mb-8 max-w-xl leading-relaxed"
-                            style={{
-                                fontFamily: "'Outfit', sans-serif",
-                                fontSize: 'clamp(1rem, 1.8vw, 1.2rem)',
-                                fontWeight: 300,
-                            }}
-                        >
-                            {current.subtitle}
-                        </motion.p>
-
-                        {/* Boutons CTA */}
-                        <motion.div
-                            custom={0.55}
-                            variants={textVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="flex flex-wrap gap-3"
-                        >
-                            <Link
-                                to={current.cta.route}
-                                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full font-semibold text-white text-sm transition-all duration-300 hover:scale-105 hover:shadow-2xl"
-                                style={{
-                                    background: `linear-gradient(135deg, ${current.accent}, ${current.accent}cc)`,
-                                    fontFamily: "'Outfit', sans-serif",
-                                    boxShadow: `0 8px 32px ${current.accent}50`,
-                                }}
-                            >
-                                {current.cta.label}
-                                <span className="text-base">→</span>
-                            </Link>
-
-                            <Link
-                                to="/contact"
-                                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full font-semibold text-white text-sm border border-white/30 backdrop-blur-sm hover:bg-white/15 transition-all duration-300 hover:scale-105"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}
-                            >
-                                Nous contacter
-                            </Link>
-                        </motion.div>
-                    </div>
-                </AnimatePresence>
-            </div>
-
-            {/* ── Navigation gauche/droite ────────── */}
-            <button
-                onClick={prev}
-                aria-label="Slide précédente"
-                className="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/25 backdrop-blur-md border border-white/15 text-white transition-all duration-300 hover:scale-110 active:scale-95"
+            {/* Badge pôle */}
+            <motion.div
+              custom={0.1} variants={textVariants} initial="hidden" animate="visible"
+              style={{ marginBottom: '20px' }}
             >
-                <ChevronLeft className="w-5 h-5" />
-            </button>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                padding: '6px 16px', borderRadius: '40px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                backdropFilter: 'blur(8px)',
+                background: `${current.accent}22`,
+                fontSize: '0.65rem', fontWeight: 400,
+                letterSpacing: '0.28em', textTransform: 'uppercase',
+                color: 'rgba(255,255,255,0.9)',
+              }}>
+                <span style={{
+                  width: '5px', height: '5px', borderRadius: '50%',
+                  background: current.accent,
+                  animation: 'avPulse 2s ease-in-out infinite',
+                }} />
+                {current.pole}
+              </span>
+            </motion.div>
 
-            <button
-                onClick={next}
-                aria-label="Slide suivante"
-                className="absolute right-4 sm:right-6 top-1/2 -translate-y-1/2 z-20 p-3 rounded-full bg-white/10 hover:bg-white/25 backdrop-blur-md border border-white/15 text-white transition-all duration-300 hover:scale-110 active:scale-95"
+            {/* Titre */}
+            <motion.h1
+              custom={0.25} variants={textVariants} initial="hidden" animate="visible"
+              style={{
+                fontFamily: "'Cormorant Garamond', Georgia, serif",
+                fontSize: 'clamp(3rem, 6.5vw, 6rem)',
+                fontWeight: 300,
+                lineHeight: 1.0,
+                letterSpacing: '-0.02em',
+                color: '#fff',
+                marginBottom: '20px',
+                maxWidth: '700px',
+                whiteSpace: 'pre-line',
+              }}
             >
-                <ChevronRight className="w-5 h-5" />
-            </button>
+              {current.title}
+            </motion.h1>
 
-            {/* ── Compteur discret ────────────────── */}
-            <div className="absolute top-6 right-6 z-20 text-white/40 text-xs font-light tracking-widest select-none pointer-events-none"
-                style={{ fontFamily: "'Outfit', sans-serif" }}>
-                {String(currentIndex + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
-            </div>
+            {/* Ligne décorative */}
+            <motion.div
+              custom={0.38} variants={textVariants} initial="hidden" animate="visible"
+              style={{ marginBottom: '20px' }}
+            >
+              <div style={{
+                height: '1px', width: '60px', borderRadius: '1px',
+                background: `linear-gradient(to right, ${current.accent}, transparent)`,
+              }} />
+            </motion.div>
 
-            {/* ── Indicateurs + barre progression ─── */}
-            <div className="absolute bottom-[7.5rem] right-6 sm:right-8 z-20 flex flex-col items-end gap-3">
-                {/* Barre de progression verticale */}
-                <div className="w-0.5 h-16 bg-white/15 rounded-full overflow-hidden">
-                    <motion.div
-                        className="w-full rounded-full"
-                        style={{
-                            height: `${progress}%`,
-                            background: current.accent,
-                        }}
-                        transition={{ ease: 'linear' }}
-                    />
-                </div>
+            {/* Sous-titre */}
+            <motion.p
+              custom={0.45} variants={textVariants} initial="hidden" animate="visible"
+              style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 'clamp(0.9rem, 1.6vw, 1.1rem)',
+                fontWeight: 300,
+                color: 'rgba(255,255,255,0.65)',
+                maxWidth: '460px',
+                lineHeight: 1.8,
+                marginBottom: '40px',
+              }}
+            >
+              {current.subtitle}
+            </motion.p>
 
-                {/* Dots */}
-                <div className="flex flex-col gap-2">
-                    {slides.map((s, i) => (
-                        <button
-                            key={i}
-                            onClick={() => goTo(i)}
-                            aria-label={`Aller à la slide ${i + 1}`}
-                            className="rounded-full transition-all duration-400"
-                            style={{
-                                width: i === currentIndex ? '10px' : '6px',
-                                height: i === currentIndex ? '10px' : '6px',
-                                backgroundColor: i === currentIndex ? current.accent : 'rgba(255,255,255,0.35)',
-                                boxShadow: i === currentIndex ? `0 0 8px ${current.accent}` : 'none',
-                            }}
-                        />
-                    ))}
-                </div>
-            </div>
+            {/* CTAs */}
+            <motion.div
+              custom={0.55} variants={textVariants} initial="hidden" animate="visible"
+              style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}
+            >
+              <Link to={current.cta.route} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                padding: '13px 28px', borderRadius: '40px',
+                background: current.accent,
+                color: '#0A0C0F', fontFamily: "'DM Sans', sans-serif",
+                fontSize: '0.78rem', fontWeight: 500,
+                letterSpacing: '0.08em', textTransform: 'uppercase',
+                textDecoration: 'none', transition: '0.25s',
+                boxShadow: `0 8px 32px ${current.accent}50`,
+              }}>
+                {current.cta.label} <span style={{ fontSize: '1rem' }}>→</span>
+              </Link>
 
-            {/* ── Bandeau pôles en bas ─────────────── */}
-            <div className="absolute bottom-0 left-0 right-0 z-20">
-                {/* Ligne séparatrice */}
-                <div className="h-px bg-white/10" />
+              <Link to="/contact" style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                padding: '12px 28px', borderRadius: '40px',
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.2)',
+                backdropFilter: 'blur(8px)',
+                color: 'rgba(255,255,255,0.8)',
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: '0.78rem', fontWeight: 300,
+                letterSpacing: '0.08em', textTransform: 'uppercase',
+                textDecoration: 'none', transition: '0.25s',
+              }}>
+                Nous contacter
+              </Link>
+            </motion.div>
+          </div>
+        </AnimatePresence>
+      </div>
 
-                <div className="backdrop-blur-md bg-black/40 grid grid-cols-3">
-                    {poles.map((pole, i) => {
-                        const Icon = pole.icon;
-                        const isActive = slides[currentIndex].pole === pole.label;
+      {/* ── Flèches nav ── */}
+      <button onClick={prev} aria-label="Slide précédente" style={{
+        position: 'absolute', left: '20px', top: '50%',
+        transform: 'translateY(-50%)', zIndex: 20,
+        padding: '10px', borderRadius: '50%',
+        background: 'rgba(255,255,255,0.06)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+        display: 'flex', transition: '0.2s',
+      }}>
+        <ChevronLeft size={20} />
+      </button>
 
-                        return (
-                            <Link
-                                key={i}
-                                to={pole.route}
-                                className="group flex items-center gap-3 px-5 py-4 transition-all duration-300 hover:bg-white/10 relative overflow-hidden"
-                            >
-                                {/* Indicateur coloré en haut */}
-                                <div
-                                    className="absolute top-0 left-0 right-0 h-0.5 transition-all duration-300"
-                                    style={{
-                                        backgroundColor: pole.color,
-                                        opacity: isActive ? 1 : 0,
-                                    }}
-                                />
-                                <div
-                                    className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-all duration-300"
-                                    style={{ backgroundColor: pole.color }}
-                                />
+      <button onClick={next} aria-label="Slide suivante" style={{
+        position: 'absolute', right: '20px', top: '50%',
+        transform: 'translateY(-50%)', zIndex: 20,
+        padding: '10px', borderRadius: '50%',
+        background: 'rgba(255,255,255,0.06)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+        display: 'flex', transition: '0.2s',
+      }}>
+        <ChevronRight size={20} />
+      </button>
 
-                                {/* Icône */}
-                                <div
-                                    className="p-2 rounded-xl flex-shrink-0 transition-all duration-300"
-                                    style={{
-                                        backgroundColor: isActive ? `${pole.color}30` : 'rgba(255,255,255,0.08)',
-                                    }}
-                                >
-                                    <Icon
-                                        className="w-4 h-4 sm:w-5 sm:h-5"
-                                        style={{ color: isActive ? pole.color : 'rgba(255,255,255,0.6)' }}
-                                    />
-                                </div>
+      {/* ── Compteur ── */}
+      <div style={{
+        position: 'absolute', top: '24px', right: '24px', zIndex: 20,
+        fontFamily: "'DM Sans', sans-serif",
+        fontSize: '0.65rem', letterSpacing: '0.25em',
+        color: 'rgba(255,255,255,0.25)',
+        userSelect: 'none', pointerEvents: 'none',
+      }}>
+        {String(currentIndex + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
+      </div>
 
-                                {/* Texte */}
-                                <div className="hidden sm:block min-w-0">
-                                    <p
-                                        className="text-sm font-semibold truncate transition-colors duration-300"
-                                        style={{
-                                            fontFamily: "'Outfit', sans-serif",
-                                            color: isActive ? 'white' : 'rgba(255,255,255,0.7)',
-                                        }}
-                                    >
-                                        {pole.label}
-                                    </p>
-                                    <p
-                                        className="text-xs truncate"
-                                        style={{
-                                            fontFamily: "'Outfit', sans-serif",
-                                            color: isActive ? pole.color : 'rgba(255,255,255,0.4)',
-                                        }}
-                                    >
-                                        {pole.sub}
-                                    </p>
-                                </div>
-
-                                {/* Flèche hover */}
-                                <span
-                                    className="ml-auto text-xs opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:translate-x-1 hidden sm:block"
-                                    style={{ color: pole.color }}
-                                >
-                                    →
-                                </span>
-                            </Link>
-                        );
-                    })}
-                </div>
-            </div>
+      {/* ── Progress + dots ── */}
+      <div style={{
+        position: 'absolute', bottom: '140px', right: '24px', zIndex: 20,
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px',
+      }}>
+        {/* Barre progression */}
+        <div style={{
+          width: '1px', height: '56px',
+          background: 'rgba(255,255,255,0.1)', borderRadius: '1px', overflow: 'hidden',
+        }}>
+          <motion.div style={{
+            width: '100%', borderRadius: '1px',
+            height: `${progress}%`,
+            background: current.accent,
+          }} />
         </div>
-    );
+        {/* Dots */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {slides.map((_, i) => (
+            <button key={i} onClick={() => goTo(i)}
+              aria-label={`Slide ${i + 1}`}
+              style={{
+                border: 'none', cursor: 'pointer', padding: 0,
+                borderRadius: '50%', transition: '0.3s',
+                width: i === currentIndex ? '8px' : '5px',
+                height: i === currentIndex ? '8px' : '5px',
+                background: i === currentIndex ? current.accent : 'rgba(255,255,255,0.25)',
+                boxShadow: i === currentIndex ? `0 0 8px ${current.accent}` : 'none',
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ── Bandeau pôles bas ── */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20 }}>
+        <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+          background: 'rgba(5,8,12,0.55)',
+          backdropFilter: 'blur(20px)',
+        }}>
+          {poles.map((pole, i) => {
+            const Icon = pole.icon;
+            const isActive = slides[currentIndex].pole === pole.label;
+            return (
+              <Link key={i} to={pole.route} style={{
+                display: 'flex', alignItems: 'center', gap: '14px',
+                padding: '18px 28px', textDecoration: 'none',
+                borderRight: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                position: 'relative', overflow: 'hidden', transition: '0.3s',
+                background: 'transparent',
+              }}>
+                {/* Accent top */}
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
+                  background: pole.color,
+                  opacity: isActive ? 1 : 0, transition: '0.3s',
+                }} />
+
+                {/* Icône */}
+                <div style={{
+                  padding: '8px', borderRadius: '10px',
+                  background: isActive ? `${pole.color}22` : 'rgba(255,255,255,0.05)',
+                  flexShrink: 0, display: 'flex', transition: '0.3s',
+                }}>
+                  <Icon size={16} style={{ color: isActive ? pole.color : 'rgba(255,255,255,0.45)' }} />
+                </div>
+
+                {/* Texte */}
+                <div className="hidden sm:block" style={{ minWidth: 0 }}>
+                  <p style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: '0.82rem', fontWeight: isActive ? 400 : 300,
+                    color: isActive ? '#fff' : 'rgba(255,255,255,0.55)',
+                    transition: '0.3s', whiteSpace: 'nowrap',
+                  }}>
+                    {pole.label}
+                  </p>
+                  <p style={{
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: '0.65rem', letterSpacing: '0.1em',
+                    color: isActive ? pole.color : 'rgba(255,255,255,0.3)',
+                    transition: '0.3s',
+                  }}>
+                    {pole.sub}
+                  </p>
+                </div>
+
+                <span className="hidden sm:block" style={{
+                  marginLeft: 'auto', fontSize: '0.7rem',
+                  color: pole.color, opacity: 0, transition: '0.3s',
+                }}>→</span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Keyframe pulse inline */}
+      <style>{`
+        @keyframes avPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%       { opacity: 0.6; transform: scale(1.3); }
+        }
+      `}</style>
+    </div>
+  );
 };
 
 export default HeroSlider;

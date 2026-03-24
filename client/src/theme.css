@@ -1,82 +1,58 @@
 /* ================================================================
-   ALTITUDE-VISION — THÈME GLOBAL
-   Fichier : client/src/theme.css
-   À importer UNE SEULE FOIS dans client/src/main.jsx
+   ALTITUDE-VISION — THÈME GLOBAL v2
+   Fichier : src/theme.css
    ================================================================ */
 
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');
+
 /* ----------------------------------------------------------------
-   1. VARIABLES CSS — Palette issue du logo Altitude-Vision
+   1. CSS VARIABLES
    ---------------------------------------------------------------- */
 :root {
-  /* — Couleurs principales — */
-  --av-gold:        #C8872A;   /* Or/Ambre   — triangle haut du logo  */
-  --av-gold-light:  #E5A84B;   /* Or clair   — hover, accents         */
-  --av-gold-dark:   #A0671A;   /* Or foncé   — texte sur fond clair   */
+  --gold:        #C8872A;
+  --gold-light:  #E5A84B;
+  --gold-dark:   #A0671A;
+  --gold-subtle: rgba(200, 135, 42, 0.08);
 
-  --av-blue:        #2E7BB5;   /* Bleu acier — courbe dynamique logo  */
-  --av-blue-light:  #4A9DD4;   /* Bleu clair — hover, fonds           */
-  --av-blue-dark:   #1A5A8A;   /* Bleu foncé — titres, CTA            */
+  --blue:        #2E7BB5;
+  --blue-light:  #4A9DD4;
+  --blue-dark:   #1A5A8A;
+  --blue-subtle: rgba(46, 123, 181, 0.08);
 
-  --av-red:         #D42B2B;   /* Rouge vif  — appareil / bandeau     */
-  --av-red-light:   #E84E4E;   /* Rouge clair — hover                 */
-  --av-red-dark:    #A01E1E;   /* Rouge foncé — texte                 */
+  --red:         #D42B2B;
+  --red-light:   #E84E4E;
+  --red-dark:    #A01E1E;
+  --red-subtle:  rgba(212, 43, 43, 0.08);
 
-  /* — Neutres — */
-  --av-white:       #FFFFFF;
-  --av-off-white:   #F8F6F2;   /* Blanc cassé chaud, proche de l'or  */
-  --av-gray-50:     #F9F9F7;
-  --av-gray-100:    #F0EDEA;
-  --av-gray-200:    #DDD9D4;
-  --av-gray-400:    #9C9589;
-  --av-gray-600:    #5C5650;
-  --av-gray-800:    #2C2924;
-  --av-black:       #1A1714;
+  --dark:        #0A0C0F;
+  --dark2:       #111418;
+  --dark3:       #181C22;
 
-  /* — Couleurs par pôle — */
-  --altimmo-primary:   #2E7BB5;   /* Bleu acier  */
-  --altimmo-secondary: #1A5A8A;
-  --altimmo-accent:    #C8872A;   /* Or — badge "Exclusivité" */
+  --text:        #E8E4DC;
+  --text-muted:  rgba(232, 228, 220, 0.45);
+  --text-faint:  rgba(232, 228, 220, 0.2);
 
-  --mila-primary:      #D42B2B;   /* Rouge Mila Events       */
-  --mila-secondary:    #A01E1E;
-  --mila-accent:       #C8872A;   /* Or — touches luxe       */
+  --border:      rgba(232, 228, 220, 0.07);
+  --border-gold: rgba(200, 135, 42, 0.2);
 
-  --altcom-primary:    #C8872A;   /* Or Altcom               */
-  --altcom-secondary:  #A0671A;
-  --altcom-accent:     #2E7BB5;   /* Bleu — accents digitaux */
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body:    'DM Sans', -apple-system, sans-serif;
 
-  /* — Gradients réutilisables — */
-  --gradient-gold:   linear-gradient(135deg, #C8872A 0%, #E5A84B 100%);
-  --gradient-blue:   linear-gradient(135deg, #1A5A8A 0%, #2E7BB5 100%);
-  --gradient-red:    linear-gradient(135deg, #A01E1E 0%, #D42B2B 100%);
-  --gradient-dark:   linear-gradient(135deg, #1A1714 0%, #2C2924 100%);
+  --radius-sm:   6px;
+  --radius-md:   12px;
+  --radius-lg:   20px;
+  --radius-pill: 40px;
 
-  /* — Ombres — */
-  --shadow-sm:   0 1px 3px rgba(26, 23, 20, 0.08);
-  --shadow-md:   0 4px 16px rgba(26, 23, 20, 0.12);
-  --shadow-lg:   0 8px 32px rgba(26, 23, 20, 0.16);
-  --shadow-gold: 0 8px 32px rgba(200, 135, 42, 0.25);
-  --shadow-blue: 0 8px 32px rgba(46, 123, 181, 0.25);
-
-  /* — Rayons — */
-  --radius-sm:  8px;
-  --radius-md:  16px;
-  --radius-lg:  24px;
-  --radius-xl:  32px;
-  --radius-full: 9999px;
-
-  /* — Transitions — */
-  --transition-fast:   150ms ease;
-  --transition-base:   300ms ease;
-  --transition-slow:   500ms ease;
-  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ----------------------------------------------------------------
-   2. TYPOGRAPHIE GLOBALE
+   2. RESET & BASE
    ---------------------------------------------------------------- */
 *, *::before, *::after {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 html {
@@ -86,157 +62,165 @@ html {
 }
 
 body {
-  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-body);
   font-size: 16px;
+  font-weight: 300;
   line-height: 1.6;
-  color: var(--av-gray-800);
-  background-color: var(--av-white);
+  color: var(--text);
+  background-color: var(--dark);
 }
 
-/* Titres — Cormorant Garamond */
-h1, h2, h3,
-.font-display {
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  line-height: 1.15;
+h1, h2, h3, h4, .display {
+  font-family: var(--font-display);
+  line-height: 1.1;
   letter-spacing: -0.01em;
 }
 
-h1 { font-size: clamp(2.5rem, 5vw, 4.5rem); font-weight: 700; }
-h2 { font-size: clamp(2rem, 4vw, 3.5rem);   font-weight: 600; }
-h3 { font-size: clamp(1.4rem, 2.5vw, 2rem); font-weight: 600; }
-
-/* Corps — Outfit */
-p, span, a, li, label, input, textarea, select, button {
-  font-family: 'Outfit', sans-serif;
-}
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; font-family: var(--font-body); }
+img { max-width: 100%; display: block; }
 
 /* ----------------------------------------------------------------
-   3. CLASSES UTILITAIRES ALTITUDE-VISION
+   3. SCROLLBAR
    ---------------------------------------------------------------- */
-
-/* Textes */
-.text-av-gold      { color: var(--av-gold); }
-.text-av-blue      { color: var(--av-blue); }
-.text-av-red       { color: var(--av-red); }
-
-/* Fonds */
-.bg-av-gold        { background-color: var(--av-gold); }
-.bg-av-blue        { background-color: var(--av-blue); }
-.bg-av-red         { background-color: var(--av-red); }
-.bg-av-off-white   { background-color: var(--av-off-white); }
-.bg-av-dark        { background-color: var(--av-black); }
-
-/* Gradients */
-.bg-gradient-gold  { background: var(--gradient-gold); }
-.bg-gradient-blue  { background: var(--gradient-blue); }
-.bg-gradient-red   { background: var(--gradient-red); }
-
-/* Bouton principal — Or */
-.btn-av-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 28px;
-  background: var(--gradient-gold);
-  color: var(--av-white);
-  font-family: 'Outfit', sans-serif;
-  font-weight: 600;
-  font-size: 0.95rem;
-  border-radius: var(--radius-full);
-  border: none;
-  cursor: pointer;
-  transition: var(--transition-base);
-  box-shadow: var(--shadow-gold);
-  text-decoration: none;
-}
-.btn-av-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(200, 135, 42, 0.35);
-  filter: brightness(1.05);
-}
-.btn-av-primary:active { transform: translateY(0); }
-
-/* Bouton secondaire — Bleu */
-.btn-av-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 28px;
-  background: var(--gradient-blue);
-  color: var(--av-white);
-  font-family: 'Outfit', sans-serif;
-  font-weight: 600;
-  font-size: 0.95rem;
-  border-radius: var(--radius-full);
-  border: none;
-  cursor: pointer;
-  transition: var(--transition-base);
-  box-shadow: var(--shadow-blue);
-  text-decoration: none;
-}
-.btn-av-secondary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(46, 123, 181, 0.35);
-  filter: brightness(1.05);
-}
-
-/* Bouton outline */
-.btn-av-outline {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 27px;
-  background: transparent;
-  color: var(--av-white);
-  font-family: 'Outfit', sans-serif;
-  font-weight: 600;
-  font-size: 0.95rem;
-  border-radius: var(--radius-full);
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  transition: var(--transition-base);
-  backdrop-filter: blur(8px);
-  text-decoration: none;
-}
-.btn-av-outline:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.8);
-}
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--dark2); }
+::-webkit-scrollbar-thumb { background: var(--gold-dark); border-radius: 2px; }
 
 /* ----------------------------------------------------------------
-   4. SCROLLBAR PERSONNALISÉE
+   4. SELECTION
    ---------------------------------------------------------------- */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--av-gray-100); }
-::-webkit-scrollbar-thumb {
-  background: var(--av-gold);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover { background: var(--av-gold-dark); }
+::selection { background: var(--gold); color: var(--dark); }
 
 /* ----------------------------------------------------------------
-   5. SÉLECTION DE TEXTE
-   ---------------------------------------------------------------- */
-::selection {
-  background-color: var(--av-gold);
-  color: var(--av-white);
-}
-
-/* ----------------------------------------------------------------
-   6. FOCUS VISIBLE — Accessibilité clavier
+   5. FOCUS
    ---------------------------------------------------------------- */
 :focus-visible {
-  outline: 2px solid var(--av-gold);
+  outline: 1px solid var(--gold);
   outline-offset: 3px;
   border-radius: 4px;
 }
 
 /* ----------------------------------------------------------------
-   7. SUPPRESSION DES IMPORTS FONTS INLINE
-      (Remplace tous les <style> @import dans les pages JSX)
+   6. UTILITIES
    ---------------------------------------------------------------- */
-/* Plus besoin de :
-   <style>{`@import url('https://fonts.googleapis.com/...')`}</style>
-   dans HomePage, AltimmoPage, AltcomPage, MilaEventsPage
-   → Supprimer ces blocs <style> dans chaque page
-*/
+.av-eyebrow {
+  font-size: 0.68rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.av-eyebrow::before {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 1px;
+  background: var(--gold);
+  flex-shrink: 0;
+}
+
+.av-section {
+  padding: 120px 48px;
+}
+
+.av-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.av-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(200,135,42,0.25), rgba(46,123,181,0.15), transparent);
+  margin: 0 48px;
+}
+
+/* Buttons */
+.btn-gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 30px;
+  border-radius: var(--radius-pill);
+  background: var(--gold);
+  color: var(--dark);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: none;
+  transition: var(--transition);
+}
+.btn-gold:hover {
+  background: var(--gold-light);
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 30px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  border: 1px solid rgba(232, 228, 220, 0.2);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: var(--transition);
+}
+.btn-outline:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* ----------------------------------------------------------------
+   7. LEAFLET (conservé)
+   ---------------------------------------------------------------- */
+.leaflet-container {
+  height: 300px;
+  width: 100%;
+}
+
+/* ----------------------------------------------------------------
+   8. INPUT STYLE
+   ---------------------------------------------------------------- */
+.input-style {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--dark2);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 300;
+  transition: var(--transition);
+  outline: none;
+}
+.input-style:focus {
+  border-color: var(--gold);
+  background: var(--dark3);
+}
+.input-style::placeholder {
+  color: var(--text-faint);
+}
