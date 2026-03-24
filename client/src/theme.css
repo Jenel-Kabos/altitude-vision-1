@@ -1,59 +1,37 @@
 /* ================================================================
-   ALTITUDE-VISION — THÈME GLOBAL v2
-   Fichier : src/theme.css
+   ALTITUDE-VISION — THÈME GLOBAL v2 (responsive)
    ================================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');
 
-/* ----------------------------------------------------------------
-   1. CSS VARIABLES
-   ---------------------------------------------------------------- */
 :root {
   --gold:        #C8872A;
   --gold-light:  #E5A84B;
   --gold-dark:   #A0671A;
-  --gold-subtle: rgba(200, 135, 42, 0.08);
-
   --blue:        #2E7BB5;
-  --blue-light:  #4A9DD4;
   --blue-dark:   #1A5A8A;
-  --blue-subtle: rgba(46, 123, 181, 0.08);
-
   --red:         #D42B2B;
-  --red-light:   #E84E4E;
   --red-dark:    #A01E1E;
-  --red-subtle:  rgba(212, 43, 43, 0.08);
-
   --dark:        #0A0C0F;
   --dark2:       #111418;
   --dark3:       #181C22;
-
   --text:        #E8E4DC;
-  --text-muted:  rgba(232, 228, 220, 0.45);
-  --text-faint:  rgba(232, 228, 220, 0.2);
-
-  --border:      rgba(232, 228, 220, 0.07);
-  --border-gold: rgba(200, 135, 42, 0.2);
-
-  --font-display: 'Cormorant Garamond', Georgia, serif;
-  --font-body:    'DM Sans', -apple-system, sans-serif;
-
+  --muted:       rgba(232,228,220,0.45);
+  --faint:       rgba(232,228,220,0.2);
+  --border:      rgba(232,228,220,0.07);
+  --font-display:'Cormorant Garamond', Georgia, serif;
+  --font-body:   'DM Sans', -apple-system, sans-serif;
   --radius-sm:   6px;
   --radius-md:   12px;
   --radius-lg:   20px;
   --radius-pill: 40px;
-
-  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition:  0.3s cubic-bezier(0.4,0,0.2,1);
+  /* Padding responsive via clamp */
+  --px: clamp(16px, 5vw, 48px);
+  --py: clamp(56px, 10vw, 120px);
 }
 
-/* ----------------------------------------------------------------
-   2. RESET & BASE
-   ---------------------------------------------------------------- */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
   scroll-behavior: smooth;
@@ -67,160 +45,59 @@ body {
   font-weight: 300;
   line-height: 1.6;
   color: var(--text);
-  background-color: var(--dark);
+  background: var(--dark);
+  overflow-x: hidden;
 }
 
-h1, h2, h3, h4, .display {
-  font-family: var(--font-display);
-  line-height: 1.1;
-  letter-spacing: -0.01em;
-}
-
+h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.1; letter-spacing: -0.01em; }
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font-family: var(--font-body); }
 img { max-width: 100%; display: block; }
 
-/* ----------------------------------------------------------------
-   3. SCROLLBAR
-   ---------------------------------------------------------------- */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--dark2); }
 ::-webkit-scrollbar-thumb { background: var(--gold-dark); border-radius: 2px; }
-
-/* ----------------------------------------------------------------
-   4. SELECTION
-   ---------------------------------------------------------------- */
 ::selection { background: var(--gold); color: var(--dark); }
-
-/* ----------------------------------------------------------------
-   5. FOCUS
-   ---------------------------------------------------------------- */
-:focus-visible {
-  outline: 1px solid var(--gold);
-  outline-offset: 3px;
-  border-radius: 4px;
-}
-
-/* ----------------------------------------------------------------
-   6. UTILITIES
-   ---------------------------------------------------------------- */
-.av-eyebrow {
-  font-size: 0.68rem;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--gold);
-  font-weight: 400;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.av-eyebrow::before {
-  content: '';
-  display: block;
-  width: 24px;
-  height: 1px;
-  background: var(--gold);
-  flex-shrink: 0;
-}
-
-.av-section {
-  padding: 120px 48px;
-}
-
-.av-container {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.av-divider {
-  height: 1px;
-  background: linear-gradient(to right, transparent, rgba(200,135,42,0.25), rgba(46,123,181,0.15), transparent);
-  margin: 0 48px;
-}
+:focus-visible { outline: 1px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
 
 /* Buttons */
 .btn-gold {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 13px 30px;
-  border-radius: var(--radius-pill);
-  background: var(--gold);
-  color: var(--dark);
-  font-size: 0.78rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border: none;
-  transition: var(--transition);
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 28px; border-radius: var(--radius-pill);
+  background: var(--gold); color: var(--dark);
+  font-size: 0.78rem; font-weight: 500;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  border: none; transition: var(--transition); white-space: nowrap;
 }
-.btn-gold:hover {
-  background: var(--gold-light);
-  transform: translateY(-1px);
-}
+.btn-gold:hover { background: var(--gold-light); transform: translateY(-1px); }
 
 .btn-outline {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 30px;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  border: 1px solid rgba(232, 228, 220, 0.2);
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  font-weight: 400;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  transition: var(--transition);
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 28px; border-radius: var(--radius-pill);
+  background: transparent; border: 1px solid rgba(232,228,220,0.2);
+  color: var(--muted); font-size: 0.78rem; font-weight: 400;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  transition: var(--transition); white-space: nowrap;
 }
-.btn-outline:hover {
-  border-color: var(--text);
-  color: var(--text);
-}
+.btn-outline:hover { border-color: var(--text); color: var(--text); }
 
 /* Animations */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(28px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes ticker {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
+@keyframes avFadeUp    { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
+@keyframes avFadeIn    { from{opacity:0} to{opacity:1} }
+@keyframes avTicker    { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+@keyframes avPulse     { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.3)} }
+@keyframes avSkeleton  { 0%,100%{opacity:.4} 50%{opacity:.8} }
 
-/* ----------------------------------------------------------------
-   7. LEAFLET (conservé)
-   ---------------------------------------------------------------- */
-.leaflet-container {
-  height: 300px;
-  width: 100%;
-}
+/* Leaflet */
+.leaflet-container { height: 300px; width: 100%; }
 
-/* ----------------------------------------------------------------
-   8. INPUT STYLE
-   ---------------------------------------------------------------- */
+/* Input */
 .input-style {
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--dark2);
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: 0.9rem;
-  font-weight: 300;
-  transition: var(--transition);
-  outline: none;
+  width: 100%; padding: 12px 16px;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--dark2); color: var(--text);
+  font-family: var(--font-body); font-size: 0.9rem; font-weight: 300;
+  transition: var(--transition); outline: none;
 }
-.input-style:focus {
-  border-color: var(--gold);
-  background: var(--dark3);
-}
-.input-style::placeholder {
-  color: var(--text-faint);
-}
+.input-style:focus { border-color: var(--gold); background: var(--dark3); }
+.input-style::placeholder { color: var(--faint); }
