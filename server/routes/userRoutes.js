@@ -26,10 +26,10 @@ router.get('/me', userController.getMe, userController.getUser);
 // ✅ Mise à jour profil + photo (Cloudinary)
 //    AccountPage envoie soit un FormData (avec "photo" ou "removePhoto")
 //    soit un JSON classique — upload.single gère les deux cas
-router.patch('/updateMe',         upload.single('photo'), userController.updateMe);
+router.patch('/updateMe',         upload.single('photo'), authController.updateMe);
 
 // ✅ Mise à jour mot de passe (pas de fichier → pas de multer)
-router.patch('/updateMyPassword',                         userController.updateMyPassword);
+router.patch('/updateMyPassword',                         authController.updateMyPassword);
 
 /* =======================================
    👑 ROUTES ADMIN UNIQUEMENT
