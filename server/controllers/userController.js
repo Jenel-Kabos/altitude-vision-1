@@ -1,7 +1,6 @@
 // --- server/controllers/userController.js ---
 const User = require('../models/User');
-const fs = require('fs');
-const path = require('path');
+const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 
 /* ======================================================
    🧭 UTILITAIRE : Récupère l'ID de l'utilisateur connecté
@@ -24,10 +23,7 @@ exports.getAllUsers = async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur getAllUsers:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Erreur serveur lors de la récupération des utilisateurs.',
-    });
+    res.status(500).json({ status: 'error', message: 'Erreur serveur lors de la récupération des utilisateurs.' });
   }
 };
 
@@ -44,10 +40,7 @@ exports.getAllOwners = async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur getAllOwners:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Erreur serveur lors de la récupération des propriétaires.',
-    });
+    res.status(500).json({ status: 'error', message: 'Erreur serveur lors de la récupération des propriétaires.' });
   }
 };
 
@@ -57,21 +50,20 @@ exports.getAllOwners = async (req, res) => {
 exports.getUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password');
-    if (!user) {
-      return res.status(404).json({ status: 'fail', message: 'Aucun utilisateur trouvé avec cet ID.' });
-    }
+    if (!user) return res.status(404).json({ status: 'fail', message: 'Aucun utilisateur trouvé avec cet ID.' });
     res.status(200).json({ status: 'success', data: { user } });
   } catch (error) {
     console.error('Erreur getUser:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Erreur serveur lors de la récupération de l\'utilisateur.',
-    });
+    res.status(500).json({ status: 'error', message: "Erreur serveur lors de la récupération de l'utilisateur." });
   }
 };
 
 /* ======================================================
    ✏️ USER : Mettre à jour son profil
+   Attendu depuis AccountPage :
+     - FormData avec champ "photo"        → upload Cloudinary
+     - FormData avec "removePhoto: true"  → suppression photo
+     - JSON { name, email }               → mise à jour sans photo
 ====================================================== */
 exports.updateMe = async (req, res) => {
   try {
@@ -82,13 +74,30 @@ exports.updateMe = async (req, res) => {
       if (allowedFields.includes(key)) updates[key] = req.body[key];
     });
 
+    // Ancienne photo pour nettoyage éventuel
+    const currentUser = await User.findById(req.user.id).select('photo');
+
+    // Cas 1 : nouvelle photo → upload via stream puis suppression de l'ancienne
     if (req.file) {
-      updates.photo = path.join('uploads/users', req.file.filename);
-      const user = await User.findById(req.user.id);
-      if (user?.photo) {
-        const oldPhotoPath = path.join(process.cwd(), user.photo);
-        if (fs.existsSync(oldPhotoPath)) fs.unlinkSync(oldPhotoPath);
-      }
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder:          'altitude-vision/users',
+        transformation:  [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }],
+        public_id:       `user-${req.user.id}`,    // écrase l'ancienne version automatiquement
+        overwrite:       true,
+        invalidate:      true,                     // purge le CDN
+      });
+
+      // Si le public_id change (premier upload), on détruit l'éventuelle ancienne entrée
+      await destroyFromCloudinary(currentUser?.photo);
+      updates.photo = result.secure_url;
+      console.log('🖼️  [updateMe] Photo Cloudinary:', updates.photo);
+    }
+
+    // Cas 2 : suppression explicite demandée par AccountPage
+    else if (req.body.removePhoto === 'true') {
+      await destroyFromCloudinary(currentUser?.photo);
+      updates.photo = null;
+      console.log('🗑️  [updateMe] Photo supprimée pour user:', req.user.id);
     }
 
     const user = await User.findByIdAndUpdate(req.user.id, updates, {
@@ -100,10 +109,7 @@ exports.updateMe = async (req, res) => {
     res.status(200).json({ status: 'success', data: { user } });
   } catch (error) {
     console.error('Erreur updateMe:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Erreur serveur lors de la mise à jour du profil.',
-    });
+    res.status(500).json({ status: 'error', message: 'Erreur serveur lors de la mise à jour du profil.' });
   }
 };
 
@@ -120,17 +126,17 @@ exports.updateMyPassword = async (req, res) => {
     const isCorrect = await user.correctPassword(passwordCurrent, user.password);
     if (!isCorrect) return res.status(401).json({ status: 'fail', message: 'Mot de passe actuel incorrect.' });
 
-    user.password = password;
+    user.password        = password;
     user.passwordConfirm = passwordConfirm;
     await user.save();
 
-    res.status(200).json({ status: 'success', data: { user: user.toObject({ getters: true, virtuals: true }) } });
+    res.status(200).json({
+      status: 'success',
+      data: { user: user.toObject({ getters: true, virtuals: true }) },
+    });
   } catch (error) {
     console.error('Erreur updateMyPassword:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Erreur serveur lors de la mise à jour du mot de passe.',
-    });
+    res.status(500).json({ status: 'error', message: 'Erreur serveur lors de la mise à jour du mot de passe.' });
   }
 };
 
@@ -157,10 +163,7 @@ exports.updateUser = async (req, res) => {
     res.status(200).json({ status: 'success', data: { user } });
   } catch (error) {
     console.error('Erreur updateUser:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Erreur serveur lors de la mise à jour de l\'utilisateur.',
-    });
+    res.status(500).json({ status: 'error', message: "Erreur serveur lors de la mise à jour de l'utilisateur." });
   }
 };
 
@@ -172,18 +175,10 @@ exports.verifyOwner = async (req, res, next) => {
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { isVerified: true, status: 'Actif' },
-      { new: true, select: '-password' } // ✅ runValidators retiré
+      { new: true, select: '-password' }
     );
-
-    if (!user) {
-      return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: '✅ Propriétaire vérifié avec succès.',
-      data: { user },
-    });
+    if (!user) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
+    res.status(200).json({ status: 'success', message: '✅ Propriétaire vérifié avec succès.', data: { user } });
   } catch (error) {
     console.error('Erreur verifyOwner:', error);
     next(error);
@@ -198,18 +193,10 @@ exports.suspendUser = async (req, res, next) => {
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { status: 'Suspendu', isActive: false },
-      { new: true, select: '-password' } // ✅ runValidators retiré
+      { new: true, select: '-password' }
     );
-
-    if (!user) {
-      return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: '⚠️ Compte suspendu avec succès.',
-      data: { user },
-    });
+    if (!user) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
+    res.status(200).json({ status: 'success', message: '⚠️ Compte suspendu avec succès.', data: { user } });
   } catch (error) {
     console.error('Erreur suspendUser:', error);
     next(error);
@@ -224,18 +211,10 @@ exports.activateUser = async (req, res, next) => {
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { status: 'Actif', isActive: true },
-      { new: true, select: '-password' } // ✅ runValidators retiré
+      { new: true, select: '-password' }
     );
-
-    if (!user) {
-      return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: '✅ Compte réactivé avec succès.',
-      data: { user },
-    });
+    if (!user) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
+    res.status(200).json({ status: 'success', message: '✅ Compte réactivé avec succès.', data: { user } });
   } catch (error) {
     console.error('Erreur activateUser:', error);
     next(error);
@@ -250,17 +229,11 @@ exports.deleteUser = async (req, res) => {
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
 
-    if (user.photo) {
-      const photoPath = path.join(process.cwd(), user.photo);
-      if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath);
-    }
+    await destroyFromCloudinary(user.photo);
 
     res.status(204).json({ status: 'success', message: 'Utilisateur supprimé avec succès.' });
   } catch (error) {
     console.error('Erreur deleteUser:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Erreur serveur lors de la suppression de l\'utilisateur.',
-    });
+    res.status(500).json({ status: 'error', message: "Erreur serveur lors de la suppression de l'utilisateur." });
   }
 };
