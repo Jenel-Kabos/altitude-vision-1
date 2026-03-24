@@ -2,13 +2,11 @@
 import api from "./api";
 
 /**
- * 🔹 Récupérer tous les utilisateurs (pour le sélecteur de destinataires)
- * @returns {Promise<Array>} - Liste des utilisateurs
+ * 🔹 Récupérer tous les utilisateurs
  */
 export const getAllUsers = async () => {
   try {
     const response = await api.get("/users");
-    // Adapter selon la structure de réponse de ton backend
     return response.data?.data?.users || response.data?.data || response.data || [];
   } catch (error) {
     console.error("Erreur getAllUsers:", error);
@@ -17,19 +15,20 @@ export const getAllUsers = async () => {
 };
 
 /**
- * 🔹 Met à jour les informations de profil utilisateur (nom, email, photo)
- * @param {FormData} data - FormData contenant { name, email, photo }
- * @returns {Promise<{ success: boolean, user?: Object, message?: string }>}
+ * 🔹 Met à jour les informations de profil (nom, email, téléphone, photo)
+ * Accepte un objet JSON ou un FormData (si photo jointe)
  */
 export const updateMe = async (data) => {
   try {
+    // 🔧 Content-Type automatique : multipart si FormData, json sinon
+    const isFormData = data instanceof FormData;
     const response = await api.patch("/users/updateMe", data, {
-      headers: { "Content-Type": "multipart/form-data" },
+      headers: isFormData ? { "Content-Type": "multipart/form-data" } : {},
     });
     const updatedUser = response.data?.data?.user;
     return {
       success: true,
-      user: updatedUser,
+      user:    updatedUser,
       message: "Profil mis à jour avec succès ✅",
     };
   } catch (error) {
@@ -42,16 +41,17 @@ export const updateMe = async (data) => {
 
 /**
  * 🔹 Met à jour le mot de passe de l'utilisateur connecté
- * @param {Object} data - { passwordCurrent, password, passwordConfirm }
- * @returns {Promise<{ success: boolean, user?: Object, message?: string }>}
+ * 🔧 Retourne aussi le token frais renvoyé par le backend
  */
 export const updateMyPassword = async (data) => {
   try {
     const response = await api.patch("/users/updateMyPassword", data);
     const updatedUser = response.data?.data?.user;
+    const token       = response.data?.token;         // 🔧 token frais
     return {
       success: true,
-      user: updatedUser,
+      user:    updatedUser,
+      token,
       message: "Mot de passe mis à jour avec succès 🔐",
     };
   } catch (error) {

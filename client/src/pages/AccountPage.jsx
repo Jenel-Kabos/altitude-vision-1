@@ -59,7 +59,7 @@ const PhoneField = ({ value, onChange }) => {
     const { dialCode, local } = parsePhone(value);
     const selected = DIAL_CODES.find(d => d.code === dialCode) || DIAL_CODES[0];
 
-    const handleDialChange = e => onChange(`${e.target.value} ${local}`.trim());
+    const handleDialChange  = e => onChange(`${e.target.value} ${local}`.trim());
     const handleLocalChange = e => {
         const clean = e.target.value.replace(/[^\d\s\-]/g, '');
         onChange(`${dialCode} ${clean}`.trim());
@@ -75,7 +75,6 @@ const PhoneField = ({ value, onChange }) => {
                 </span>
             </label>
             <div className="flex gap-2">
-                {/* Sélecteur indicatif */}
                 <div className="relative flex-shrink-0">
                     <select value={dialCode} onChange={handleDialChange}
                         className="h-full pl-3 pr-7 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm focus:outline-none appearance-none cursor-pointer transition-all"
@@ -90,8 +89,6 @@ const PhoneField = ({ value, onChange }) => {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
                 </div>
-
-                {/* Numéro local */}
                 <div className="relative flex-1">
                     <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                     <input type="tel" value={local} onChange={handleLocalChange}
@@ -101,8 +98,6 @@ const PhoneField = ({ value, onChange }) => {
                         onFocus={focusIn} onBlur={focusOut} />
                 </div>
             </div>
-
-            {/* Aperçu numéro complet */}
             {local && (
                 <p className="text-xs text-gray-400 mt-1.5 pl-1" style={{ fontFamily: "'Outfit', sans-serif" }}>
                     {selected.flag} Numéro complet :{' '}
@@ -146,7 +141,7 @@ const PassField = ({ label, name, value, onChange, placeholder, error, show, onT
 
 // ── Avatar Upload ─────────────────────────────────────────────
 const AvatarUpload = ({ user, preview, onFileChange, onRemove, uploading }) => {
-    const fileRef = useRef(null);
+    const fileRef  = useRef(null);
     const hasPhoto = preview || user?.photo;
 
     return (
@@ -155,7 +150,7 @@ const AvatarUpload = ({ user, preview, onFileChange, onRemove, uploading }) => {
                 <div className="w-24 h-24 rounded-2xl overflow-hidden flex items-center justify-center"
                     style={{
                         background: hasPhoto ? 'transparent' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
-                        boxShadow: `0 0 0 3px rgba(46,123,181,0.15)`,
+                        boxShadow:  `0 0 0 3px rgba(46,123,181,0.15)`,
                     }}>
                     {hasPhoto
                         ? <img src={preview || user.photo} alt="Photo de profil" className="w-full h-full object-cover" />
@@ -190,7 +185,6 @@ const AvatarUpload = ({ user, preview, onFileChange, onRemove, uploading }) => {
                     </button>
                 )}
             </div>
-
             <p className="text-xs text-gray-400" style={{ fontFamily: "'Outfit', sans-serif" }}>
                 JPG, PNG ou WebP · Max 5 Mo
             </p>
@@ -229,11 +223,8 @@ const AccountPage = () => {
         return () => { if (photoPreview) URL.revokeObjectURL(photoPreview); };
     }, [photoPreview]);
 
-    const handleInfoChange = e =>
-        setInfoData(d => ({ ...d, [e.target.name]: e.target.value }));
-
-    const handlePhoneChange = val =>
-        setInfoData(d => ({ ...d, phone: val }));
+    const handleInfoChange  = e => setInfoData(d => ({ ...d, [e.target.name]: e.target.value }));
+    const handlePhoneChange = val => setInfoData(d => ({ ...d, phone: val }));
 
     const handleFileChange = e => {
         const file = e.target.files?.[0];
@@ -261,7 +252,8 @@ const AccountPage = () => {
         if (name === 'passwordConfirm') {
             setErrors(er => ({
                 ...er,
-                passwordConfirm: value && value !== passData.password ? 'Les mots de passe ne correspondent pas.' : null,
+                passwordConfirm: value && value !== passData.password
+                    ? 'Les mots de passe ne correspondent pas.' : null,
             }));
         }
         if (name === 'password') {
@@ -291,18 +283,19 @@ const AccountPage = () => {
                 if (removePhoto)    fd.append('removePhoto', 'true');
                 payload = fd;
             } else {
-                payload = infoData;
+                payload = infoData; // JSON classique — Content-Type auto
             }
 
+            // 🔧 userService retourne { success, user, message }
             const res = await updateMe(payload);
-            if (res?.data?.user) {
-                login(res.data.user, localStorage.getItem('token'));
+            if (res.success && res.user) {
+                login(res.user, localStorage.getItem('token'));
                 setPhotoFile(null);
                 setPhotoPreview(null);
                 setRemovePhoto(false);
                 toast.success('Profil mis à jour avec succès !');
             } else {
-                toast.error('Impossible de mettre à jour le profil.');
+                toast.error(res.message || 'Impossible de mettre à jour le profil.');
             }
         } catch (err) {
             toast.error(err?.message || 'Erreur de mise à jour du profil.');
@@ -326,15 +319,16 @@ const AccountPage = () => {
         setPassLoading(true);
         const tid = toast.loading('Mise à jour du mot de passe...');
         try {
+            // 🔧 userService retourne { success, user, token, message }
             const res = await updateMyPassword(passData);
-            if (res?.token && res?.data?.user) {
-                localStorage.setItem('token', res.token);
-                login(res.data.user, res.token);
+            if (res.success && res.user) {
+                if (res.token) localStorage.setItem('token', res.token);
+                login(res.user, res.token || localStorage.getItem('token'));
                 toast.success('Mot de passe changé avec succès !');
                 setPassData({ passwordCurrent: '', password: '', passwordConfirm: '' });
                 setErrors({});
             } else {
-                toast.error('Erreur inattendue lors du changement de mot de passe.');
+                toast.error(res.message || 'Erreur inattendue lors du changement de mot de passe.');
             }
         } catch (err) {
             toast.error(err?.message || 'Échec du changement de mot de passe.');
@@ -386,7 +380,7 @@ const AccountPage = () => {
                         className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center mx-auto mb-4"
                         style={{
                             background: heroPhoto ? 'transparent' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
-                            boxShadow: `0 0 0 3px rgba(46,123,181,0.2), 0 8px 32px rgba(0,0,0,0.4)`,
+                            boxShadow:  `0 0 0 3px rgba(46,123,181,0.2), 0 8px 32px rgba(0,0,0,0.4)`,
                         }}
                     >
                         {heroPhoto
@@ -459,8 +453,8 @@ const AccountPage = () => {
                                             className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
                                             style={{
                                                 background: photoFile ? `${BLUE}08` : '#FEF2F2',
-                                                color: photoFile ? BLUE : '#EF4444',
-                                                border: `1px solid ${photoFile ? `${BLUE}18` : '#FECACA'}`,
+                                                color:      photoFile ? BLUE : '#EF4444',
+                                                border:     `1px solid ${photoFile ? `${BLUE}18` : '#FECACA'}`,
                                                 fontFamily: "'Outfit', sans-serif",
                                             }}
                                         >
@@ -480,7 +474,6 @@ const AccountPage = () => {
                             <InputField label="Adresse email" type="email" name="email" value={infoData.email}
                                 onChange={handleInfoChange} placeholder="exemple@email.com" Icon={Mail} />
 
-                            {/* Téléphone */}
                             <PhoneField value={infoData.phone} onChange={handlePhoneChange} />
 
                             <motion.button type="submit" disabled={infoLoading}
@@ -488,7 +481,7 @@ const AccountPage = () => {
                                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-white text-sm transition-all mt-2"
                                 style={{
                                     background: infoLoading ? '#9CA3AF' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
-                                    boxShadow: infoLoading ? 'none' : `0 4px 16px ${BLUE}30`,
+                                    boxShadow:  infoLoading ? 'none' : `0 4px 16px ${BLUE}30`,
                                     fontFamily: "'Outfit', sans-serif",
                                 }}>
                                 {infoLoading
@@ -535,9 +528,9 @@ const AccountPage = () => {
                                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-white text-sm transition-all mt-2"
                                 style={{
                                     background: passDisabled ? '#9CA3AF' : `linear-gradient(135deg, #7A5520, ${GOLD})`,
-                                    boxShadow: passDisabled ? 'none' : `0 4px 16px ${GOLD}40`,
+                                    boxShadow:  passDisabled ? 'none' : `0 4px 16px ${GOLD}40`,
                                     fontFamily: "'Outfit', sans-serif",
-                                    cursor: passDisabled ? 'not-allowed' : 'pointer',
+                                    cursor:     passDisabled ? 'not-allowed' : 'pointer',
                                 }}>
                                 {passLoading
                                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Mise à jour...</>
