@@ -20,7 +20,7 @@ import {
 import SEOHead   from '../../components/SEOHead';
 import QuoteModal from './QuoteModal';
 import { createQuoteRequest } from '../../services/quoteService';
-import { SERVICES, GOLD, GOLD_DARK, GOLD_LIGHT, BLUE } from '/altcomData';
+import { SERVICES, GOLD, GOLD_DARK, GOLD_LIGHT, BLUE } from './altcomData';
 
 // Mapping slug → service
 const SLUG_MAP = {

@@ -3,7 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Send, ArrowRight } from 'lucide-react';
-import { GOLD, GOLD_DARK } from '/altcomData';
+import { GOLD, GOLD_DARK } from './altcomData';
 
 const ServiceCard = ({ service, onQuote, index }) => {
     const navigate = useNavigate();

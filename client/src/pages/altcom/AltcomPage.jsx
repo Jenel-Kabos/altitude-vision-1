@@ -26,7 +26,7 @@ import { useAuth }              from '../../context/AuthContext';
 import {
     GOLD, GOLD_DARK, GOLD_LIGHT, BLUE,
     SERVICES, ATOUTS, PORTFOLIO_PER_PAGE,
-} from '/altcomData';
+} from './altcomData';
 
 // ── Skeleton ──────────────────────────────────────────────────
 const PortfolioSkeleton = () => (
