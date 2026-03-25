@@ -19,10 +19,10 @@ import MilaEventsPage            from "./pages/MilaEventsPage";
 import MilaEventsAnnonces        from "./pages/MilaEventsAnnonces";
 import EventDetailPage           from "./pages/EventDetailPage";
 import CreateProjectPage         from "./pages/CreateProjectPage";
-import AltcomPage                from "./pages/AltcomPage";
-import AltcomAnnonces            from "./pages/AltcomAnnonces";
-import AltcomServiceDetailPage   from "./pages/AltcomServiceDetailPage";
-import AltcomPortfolioDetailPage from "./pages/AltcomPortfolioDetailPage";
+import AltcomPage                from "./pages/altcom/AltcomPage";
+import AltcomAnnonces            from "./pages/altcom/AltcomAnnonces";
+import AltcomServicePage         from "./pages/altcom/AltcomServicePage";      // 🆕 page générique services
+import AltcomPortfolioDetailPage from "./pages/altcom/AltcomPortfolioDetailPage";
 import ContactPage               from "./pages/ContactPage";
 import LoginPage                 from "./pages/LoginPage";
 import RegisterPage              from "./pages/RegisterPage";
@@ -38,9 +38,6 @@ import LeaveReviewPage           from "./pages/LeaveReviewPage";
 import VenteDeBiensPage          from "./pages/services/VenteDeBiensPage";
 import LocationGestionPage       from "./pages/services/LocationGestionPage";
 import ConseilInvestissementPage from "./pages/services/ConseilInvestissementPage";
-
-// Pages Services Altcom
-import CouvertureMediatiquePage  from "./pages/services/CouvertureMediatiquePage";
 
 // Dashboard Admin/Collaborateur
 import AdminDashboard          from "./pages/dashboard/AdminDashboard";
@@ -125,12 +122,12 @@ function App() {
                 <Route path="/altimmo"                                element={<MainLayout><AltimmoPage /></MainLayout>} />
                 <Route path="/altimmo/annonces"                       element={<MainLayout><AltimmoAnnonces /></MainLayout>} />
                 <Route path="/altimmo/property/:propertyId"           element={<MainLayout><PropertyDetailPage /></MainLayout>} />
-                <Route path="/trouve-ta-commission"                    element={<MainLayout><CommissionCalculatorPage /></MainLayout>} />
+                <Route path="/trouve-ta-commission"                   element={<MainLayout><CommissionCalculatorPage /></MainLayout>} />
 
                 {/* SERVICES ALTIMMO */}
-                <Route path="/altimmo/services/vente-de-biens"         element={<MainLayout><VenteDeBiensPage /></MainLayout>} />
-                <Route path="/altimmo/services/location-gestion"       element={<MainLayout><LocationGestionPage /></MainLayout>} />
-                <Route path="/altimmo/services/conseil-investissement"  element={<MainLayout><ConseilInvestissementPage /></MainLayout>} />
+                <Route path="/altimmo/services/vente-de-biens"        element={<MainLayout><VenteDeBiensPage /></MainLayout>} />
+                <Route path="/altimmo/services/location-gestion"      element={<MainLayout><LocationGestionPage /></MainLayout>} />
+                <Route path="/altimmo/services/conseil-investissement" element={<MainLayout><ConseilInvestissementPage /></MainLayout>} />
 
                 {/* MILA EVENTS */}
                 <Route path="/mila-events"                            element={<MainLayout><MilaEventsPage /></MainLayout>} />
@@ -138,20 +135,24 @@ function App() {
                 <Route path="/mila-events/event/:eventId"             element={<MainLayout><EventDetailPage /></MainLayout>} />
                 <Route path="/mila-events/creer-projet"               element={<MainLayout><CreateProjectPage /></MainLayout>} />
 
-                {/* ALTCOM */}
-                <Route path="/altcom"                                 element={<MainLayout><AltcomPage /></MainLayout>} />
-                <Route path="/altcom/annonces"                        element={<MainLayout><AltcomAnnonces /></MainLayout>} />
-                <Route path="/altcom/service/:serviceId"              element={<MainLayout><AltcomServiceDetailPage /></MainLayout>} />
-                <Route path="/altcom/portfolio/:portfolioId"          element={<MainLayout><AltcomPortfolioDetailPage /></MainLayout>} />
+                {/* ALTCOM
+                    ⚠️  Ordre important : les routes statiques (/annonces, /portfolio/:id)
+                        doivent être déclarées AVANT la route dynamique /:serviceSlug
+                        pour éviter que React Router les intercepte comme un slug. */}
+                <Route path="/altcom"                        element={<MainLayout><AltcomPage /></MainLayout>} />
+                <Route path="/altcom/annonces"               element={<MainLayout><AltcomAnnonces /></MainLayout>} />
+                <Route path="/altcom/portfolio/:portfolioId" element={<MainLayout><AltcomPortfolioDetailPage /></MainLayout>} />
 
-                {/* SERVICES ALTCOM */}
-                <Route path="/altcom/couverture-mediatique"           element={<MainLayout><CouvertureMediatiquePage /></MainLayout>} />
+                {/* Services Altcom — page générique (remplace AltcomServiceDetailPage + CouvertureMediatiquePage) */}
+                {/* Gère : /altcom/communication-digitale, /altcom/branding-design,     */}
+                {/*         /altcom/conseil-strategie,      /altcom/couverture-mediatique */}
+                <Route path="/altcom/:serviceSlug"           element={<MainLayout><AltcomServicePage /></MainLayout>} />
 
                 {/* LÉGAL & AUTRES */}
-                <Route path="/mentions-legales"                       element={<MainLayout><MentionsLegales /></MainLayout>} />
-                <Route path="/contact"                                element={<MainLayout><ContactPage /></MainLayout>} />
-                <Route path="/unauthorized"                           element={<MainLayout><UnauthorizedPage /></MainLayout>} />
-                <Route path="/verify-email/:token"                    element={<MainLayout><VerifyEmailPage /></MainLayout>} />
+                <Route path="/mentions-legales"              element={<MainLayout><MentionsLegales /></MainLayout>} />
+                <Route path="/contact"                       element={<MainLayout><ContactPage /></MainLayout>} />
+                <Route path="/unauthorized"                  element={<MainLayout><UnauthorizedPage /></MainLayout>} />
+                <Route path="/verify-email/:token"           element={<MainLayout><VerifyEmailPage /></MainLayout>} />
 
                 {/* ══ AUTH PUBLIQUE ════════════════════════════════════════ */}
                 <Route element={<PublicAuthRoute />}>

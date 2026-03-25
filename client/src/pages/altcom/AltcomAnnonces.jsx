@@ -6,7 +6,7 @@ import {
     ChevronLeft, ChevronRight, Star, Calendar,
     Tag, X, SlidersHorizontal, Briefcase, ArrowRight,
 } from 'lucide-react';
-import { getAllPortfolioItems } from '../services/portfolioService';
+import { getAllPortfolioItems } from '../../services/portfolioService';
 
 // ─────────────────────────────────────────────────────────────
 // Constantes

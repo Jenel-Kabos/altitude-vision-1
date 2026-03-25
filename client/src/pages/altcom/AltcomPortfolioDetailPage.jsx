@@ -19,7 +19,7 @@ import {
   Award,
   TrendingUp
 } from 'lucide-react';
-import { getPortfolioItem } from '../services/portfolioService';
+import { getPortfolioItem } from '../../services/portfolioService';
 
 const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
 
