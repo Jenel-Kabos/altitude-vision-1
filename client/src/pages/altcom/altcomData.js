@@ -32,8 +32,8 @@ export const SERVICES = [
         // Images Unsplash thématiques
         images: [
             'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=800&q=80', // social media
-            'https://images.unsplash.com/photo-1432888622747-4eb9a8f2c293?w=800&q=80', // content creation
-            'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80', // analytics
+            'https://images.unsplash.com/photo-1586880244406-556ebe35f282?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // content creation
+            'https://images.unsplash.com/photo-1611926653458-09294b3142bf?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // analytics
         ],
         // Processus de livraison
         process: [
