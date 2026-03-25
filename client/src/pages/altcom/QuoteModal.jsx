@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, X, Send, Loader2 } from 'lucide-react';
-import { GOLD, GOLD_DARK, PROJECT_TYPES, BUDGETS } from '/altcomData';
+import { GOLD, GOLD_DARK, PROJECT_TYPES, BUDGETS } from './altcomData';
 
 const inputCls  = "w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm transition-all focus:outline-none focus:bg-white placeholder-gray-400";
 const focusGold = e => { e.target.style.borderColor = GOLD; e.target.style.boxShadow = `0 0 0 3px ${GOLD}15`; };
