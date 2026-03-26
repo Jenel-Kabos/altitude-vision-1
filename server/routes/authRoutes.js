@@ -1,33 +1,32 @@
 // server/routes/authRoutes.js
-const express = require('express');
-const router = express.Router();
+const express        = require('express');
+const router         = express.Router();
 const authController = require('../controllers/authController');
 
 // ======================================================
-// 🔓 ROUTES PUBLIQUES (sans authentification)
+// 🔓 ROUTES PUBLIQUES
 // ======================================================
 
-// Inscription
-router.post('/signup', authController.signup);
+// Inscription & vérification email
+router.post('/signup',               authController.signup);
+router.get('/verify-email/:token',   authController.verifyEmail);
+router.post('/resend-verification',  authController.resendVerificationEmail);
 
 // Connexion
-router.post('/login', authController.login);
+router.post('/login',                authController.login);
 
-// ✅ Vérification email via le lien reçu (token dans l'URL)
-router.get('/verify-email/:token', authController.verifyEmail);
+// ✅ Mot de passe oublié → envoie l'email avec le lien
+router.post('/forgot-password',      authController.forgotPassword);
 
-// ✅ Renvoyer l'email de vérification si lien expiré
-router.post('/resend-verification', authController.resendVerificationEmail);
+// ✅ Réinitialisation avec le token reçu par email
+router.patch('/reset-password/:token', authController.resetPassword);
 
 // ======================================================
-// 🔒 ROUTES PROTÉGÉES (authentification requise)
+// 🔒 ROUTES PROTÉGÉES
 // ======================================================
 router.use(authController.protect);
 
-// Mise à jour du mot de passe
-router.patch('/update-my-password', authController.updateMyPassword);
-
-// Mise à jour du profil
-router.patch('/update-me', authController.updateMe);
+router.patch('/update-my-password',  authController.updateMyPassword);
+router.patch('/update-me',           authController.updateMe);
 
 module.exports = router;

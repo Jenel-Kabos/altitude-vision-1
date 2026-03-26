@@ -33,6 +33,8 @@ import ActualitesPage            from "./pages/ActualitesPage";
 import VerifyEmailPendingPage    from "./pages/VerifyEmailPendingPage";
 import VerifyEmailPage           from "./pages/VerifyEmailPage";
 import LeaveReviewPage           from "./pages/LeaveReviewPage";
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage  from './pages/ResetPasswordPage';
 
 // Pages Services Altimmo
 import VenteDeBiensPage          from "./pages/services/VenteDeBiensPage";
@@ -159,6 +161,8 @@ function App() {
                     <Route path="/login"                element={<MainLayout><LoginPage /></MainLayout>} />
                     <Route path="/register"             element={<MainLayout><RegisterPage /></MainLayout>} />
                     <Route path="/verify-email-pending" element={<VerifyEmailPendingPage />} />
+                    <Route path="/forgot-password"        element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password/:token"  element={<ResetPasswordPage />} />
                 </Route>
 
                 {/* ══ ROUTES PROTÉGÉES ═════════════════════════════════════ */}

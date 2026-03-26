@@ -118,9 +118,11 @@ const LoginPage = () => {
                   onChange={handleChange}
                   placeholder="Mot de passe"
                   required
-                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                />
+                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"/>
               </div>
+              <Link to="/forgot-password" className="text-xs text-blue-600 hover:underline">
+                  Mot de passe oublié ?
+              </Link>
             </div>
 
             <button

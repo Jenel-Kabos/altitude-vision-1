@@ -397,3 +397,142 @@ exports.updateMe = async (req, res) => {
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
+
+// ======================================================
+// 10. MOT DE PASSE OUBLIÉ
+// Route: POST /api/auth/forgot-password
+// ======================================================
+exports.forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ status: 'fail', message: 'Email requis.' });
+        }
+
+        const user = await User.findOne({ email });
+
+        // Réponse générique pour ne pas révéler si l'email existe
+        if (!user) {
+            return res.status(200).json({
+                status:  'success',
+                message: 'Si cet email existe, un lien de réinitialisation a été envoyé.',
+            });
+        }
+
+        // Générer le token de réinitialisation
+        const resetToken = crypto.randomBytes(32).toString('hex');
+
+        user.passwordResetToken = crypto
+            .createHash('sha256')
+            .update(resetToken)
+            .digest('hex');
+
+        // Expire dans 10 minutes
+        user.passwordResetExpires = Date.now() + 10 * 60 * 1000;
+
+        await user.save({ validateBeforeSave: false });
+
+        const resetURL = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+        try {
+            await sendEmail({
+                email:    user.email,
+                subject:  '🔐 Altitude Vision — Réinitialisation de votre mot de passe',
+                type:     'passwordReset',
+                name:     user.name,
+                resetURL,
+                message:  `Bonjour ${user.name},\n\nRéinitialisez votre mot de passe ici : ${resetURL}\n\nCe lien expire dans 10 minutes.\n\nSi vous n'avez pas fait cette demande, ignorez cet email.`,
+            });
+
+            console.log(`✅ [Auth] Email reset envoyé à: ${user.email}`);
+
+            res.status(200).json({
+                status:  'success',
+                message: 'Si cet email existe, un lien de réinitialisation a été envoyé.',
+            });
+        } catch (err) {
+            // Nettoyer le token si l'email échoue
+            user.passwordResetToken   = undefined;
+            user.passwordResetExpires = undefined;
+            await user.save({ validateBeforeSave: false });
+
+            console.error('❌ [Auth] Erreur envoi email reset:', err.message);
+            return res.status(500).json({
+                status:  'error',
+                message: "Erreur lors de l'envoi de l'email. Réessayez dans quelques minutes.",
+            });
+        }
+    } catch (error) {
+        console.error('❌ [Auth] Erreur forgotPassword:', error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+// ======================================================
+// 11. RÉINITIALISATION MOT DE PASSE
+// Route: PATCH /api/auth/reset-password/:token
+// ======================================================
+exports.resetPassword = async (req, res) => {
+    try {
+        const { password, passwordConfirm } = req.body;
+
+        if (!password || !passwordConfirm) {
+            return res.status(400).json({
+                status:  'fail',
+                message: 'Nouveau mot de passe et confirmation requis.',
+            });
+        }
+
+        if (password !== passwordConfirm) {
+            return res.status(400).json({
+                status:  'fail',
+                message: 'Les mots de passe ne correspondent pas.',
+            });
+        }
+
+        if (password.length < 8) {
+            return res.status(400).json({
+                status:  'fail',
+                message: 'Le mot de passe doit contenir au moins 8 caractères.',
+            });
+        }
+
+        // Hasher le token de l'URL pour le comparer à celui en BDD
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(req.params.token)
+            .digest('hex');
+
+        const user = await User.findOne({
+            passwordResetToken:   hashedToken,
+            passwordResetExpires: { $gt: Date.now() },
+        });
+
+        if (!user) {
+            return res.status(400).json({
+                status:  'fail',
+                message: 'Lien de réinitialisation invalide ou expiré. Faites une nouvelle demande.',
+            });
+        }
+
+        // Appliquer le nouveau mot de passe
+        user.password             = password;
+        user.passwordConfirm      = passwordConfirm;
+        user.passwordResetToken   = undefined;
+        user.passwordResetExpires = undefined;
+
+        // Invalider toutes les sessions actives
+        user.tokenVersion = (user.tokenVersion || 0) + 1;
+
+        await user.save();
+
+        console.log(`✅ [Auth] Mot de passe réinitialisé pour: ${user.email}`);
+
+        // Connecter automatiquement l'utilisateur après reset
+        createSendToken(user, 200, res);
+    } catch (error) {
+        console.error('❌ [Auth] Erreur resetPassword:', error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
