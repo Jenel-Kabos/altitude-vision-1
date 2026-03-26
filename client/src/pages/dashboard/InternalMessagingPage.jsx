@@ -620,18 +620,20 @@ const MessageDetail = ({ message, onToggleStar, onDelete, onRestore, uploadBaseU
 };
 
 // =============================================================
-// ✏️ ComposeModal — avec sélecteur d'utilisateurs
+// ✏️ ComposeModal — Interne + Externe
 // =============================================================
 const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
   const fileInputRef = useRef(null);
-  const [searchUser, setSearchUser]       = useState('');
-  const [showDropdown, setShowDropdown]   = useState(false);
-  const dropdownRef                        = useRef(null);
+  const [searchUser, setSearchUser]     = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isExternal, setIsExternal]     = useState(false); // ← NOUVEAU
+  const dropdownRef                      = useRef(null);
 
   const [formData, setFormData] = useState({
     recipient: editingDraft?.receiver
       ? { _id: editingDraft.receiver._id, name: editingDraft.receiver.name, email: editingDraft.receiver.email }
       : null,
+    externalEmail: '',           // ← NOUVEAU
     subject:     editingDraft?.subject  || '',
     content:     editingDraft?.content  || '',
     priority:    editingDraft?.priority || 'Normale',
@@ -640,6 +642,7 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileErrors,   setFileErrors]   = useState([]);
+  const [emailError,   setEmailError]   = useState('');  // ← NOUVEAU
 
   // Fermer le dropdown en cliquant ailleurs
   useEffect(() => {
@@ -651,6 +654,9 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Validation email externe
+  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const filteredUsers = allUsers.filter(u =>
     searchUser === '' ||
@@ -670,12 +676,20 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
 
   const handleChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    if (e.target.name === 'externalEmail') setEmailError('');
+  };
+
+  // Basculer entre interne et externe
+  const handleToggleExternal = (value) => {
+    setIsExternal(value);
+    setEmailError('');
+    setFormData(prev => ({ ...prev, recipient: null, externalEmail: '' }));
+    setSearchUser('');
   };
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     const errors = [];
-
     if (files.length > MAX_FILES) {
       errors.push(`Maximum ${MAX_FILES} fichiers autorisés.`);
       setFileErrors(errors);
@@ -687,7 +701,6 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
       }
     });
     if (errors.length > 0) { setFileErrors(errors); return; }
-
     setFileErrors([]);
     setFormData(prev => ({ ...prev, attachments: files }));
   };
@@ -703,22 +716,41 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
   const handleSubmit = async (e, isDraft = false) => {
     e.preventDefault();
 
-    if (!formData.recipient && !isDraft) {
-      alert('Veuillez sélectionner un destinataire.');
-      return;
-    }
-    if (!formData.content.trim() && formData.attachments.length === 0 && !isDraft) {
-      alert('Veuillez écrire un message ou joindre au moins un fichier.');
-      return;
+    // Validation destinataire
+    if (!isDraft) {
+      if (isExternal) {
+        if (!formData.externalEmail || !isValidEmail(formData.externalEmail)) {
+          setEmailError('Veuillez saisir une adresse email valide.');
+          return;
+        }
+      } else {
+        if (!formData.recipient) {
+          alert('Veuillez sélectionner un destinataire.');
+          return;
+        }
+      }
+      if (!formData.content.trim() && formData.attachments.length === 0) {
+        alert('Veuillez écrire un message ou joindre au moins un fichier.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
 
     const data = new FormData();
-    if (formData.recipient) data.append('receiverId', formData.recipient._id);
-    data.append('subject',  formData.subject);
-    data.append('content',  formData.content);
-    data.append('priority', formData.priority);
+
+    if (isExternal) {
+      // ── Envoi externe via Zoho ──
+      data.append('isExternal', 'true');
+      data.append('receiverEmail', formData.externalEmail);
+    } else {
+      // ── Envoi interne classique ──
+      if (formData.recipient) data.append('receiverId', formData.recipient._id);
+    }
+
+    data.append('subject',     formData.subject);
+    data.append('content',     formData.content);
+    data.append('priority',    formData.priority);
     data.append('messageType', 'Message');
     if (isDraft) data.append('isDraft', 'true');
     formData.attachments.forEach(file => data.append('attachments', file));
@@ -747,6 +779,30 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
           {editingDraft ? 'Éditer le brouillon' : 'Nouveau Message'}
         </h2>
 
+        {/* ── Toggle Interne / Externe ── */}
+        <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-xl w-fit">
+          <button
+            type="button"
+            onClick={() => handleToggleExternal(false)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+              !isExternal ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            Collaborateur interne
+          </button>
+          <button
+            type="button"
+            onClick={() => handleToggleExternal(true)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+              isExternal ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Mail className="w-4 h-4" />
+            Email externe
+          </button>
+        </div>
+
         <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4">
 
           {/* ── Destinataire ── */}
@@ -755,8 +811,35 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
               Destinataire <span className="text-red-500">*</span>
             </label>
 
-            {formData.recipient ? (
-              /* Destinataire sélectionné */
+            {isExternal ? (
+              /* ── Saisie email externe ── */
+              <div>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="email"
+                    name="externalEmail"
+                    value={formData.externalEmail}
+                    onChange={handleChange}
+                    placeholder="destinataire@gmail.com"
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                      emailError ? 'border-red-400 focus:ring-red-400' : 'border-gray-300'
+                    }`}
+                  />
+                </div>
+                {emailError && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{emailError}</span>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                  <Check className="w-3 h-3 text-green-500" />
+                  Envoyé via Zoho Mail depuis votre adresse professionnelle
+                </p>
+              </div>
+            ) : formData.recipient ? (
+              /* ── Destinataire interne sélectionné ── */
               <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
                   {formData.recipient.name?.charAt(0)?.toUpperCase()}
@@ -765,16 +848,12 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
                   <p className="font-semibold text-gray-800 truncate">{formData.recipient.name}</p>
                   <p className="text-sm text-gray-500 truncate">{formData.recipient.email}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleClearRecipient}
-                  className="text-gray-400 hover:text-red-500 transition"
-                >
+                <button type="button" onClick={handleClearRecipient} className="text-gray-400 hover:text-red-500 transition">
                   <X className="w-5 h-5" />
                 </button>
               </div>
             ) : (
-              /* Recherche de destinataire */
+              /* ── Recherche collaborateur interne ── */
               <div ref={dropdownRef} className="relative">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -788,7 +867,6 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
                   />
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 </div>
-
                 {showDropdown && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-56 overflow-y-auto">
                     {filteredUsers.length === 0 ? (
@@ -906,18 +984,20 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
               {isSubmitting ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Envoi...</>
               ) : (
-                <><Send className="w-5 h-5" /> Envoyer</>
+                <><Send className="w-5 h-5" /> {isExternal ? 'Envoyer par email' : 'Envoyer'}</>
               )}
             </button>
-            <button
-              type="button"
-              onClick={(e) => handleSubmit(e, true)}
-              disabled={isSubmitting}
-              className="flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-6 py-4 rounded-lg hover:bg-gray-300 transition font-bold disabled:opacity-50"
-            >
-              <FileEdit className="w-5 h-5" />
-              Sauvegarder
-            </button>
+            {!isExternal && (
+              <button
+                type="button"
+                onClick={(e) => handleSubmit(e, true)}
+                disabled={isSubmitting}
+                className="flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-6 py-4 rounded-lg hover:bg-gray-300 transition font-bold disabled:opacity-50"
+              >
+                <FileEdit className="w-5 h-5" />
+                Sauvegarder
+              </button>
+            )}
           </div>
         </form>
       </motion.div>

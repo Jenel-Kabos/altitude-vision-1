@@ -2,213 +2,153 @@
 const mongoose = require('mongoose');
 
 const internalMailSchema = new mongoose.Schema({
+
+  // ── Expéditeur interne (ObjectId) OU externe (nom/email brut)
   sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    // ✅ Plus required:true — les emails Zoho entrants n'ont pas de sender ObjectId
+    required: false,
   },
+
+  // ── Nouveaux champs pour les emails externes (Zoho webhook) ──
+  senderName:     { type: String,  default: null },   // "Jean Dupont"
+  senderEmail:    { type: String,  default: null },   // "jean@gmail.com"
+  receiverEmail:  { type: String,  default: null },   // email brut du destinataire
+  isExternalMail: { type: Boolean, default: false },  // true = vient de Zoho
+  zohoMessageId:  {                                   // pour éviter les doublons
+    type:   String,
+    unique: true,
+    sparse: true,  // sparse = ignore les documents où le champ est null
+  },
+
   receiver: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: function() {
-      // Le destinataire est requis seulement si ce n'est pas un brouillon
+    required: function () {
       return !this.isDraft;
-    }
+    },
   },
+
   subject: {
-    type: String,
-    default: 'Sans objet',
+    type:     String,
+    default:  'Sans objet',
     maxlength: 200,
   },
+
   content: {
-    type: String,
+    type:     String,
     required: [true, 'Le contenu du message est requis'],
     maxlength: 10000,
   },
+
   priority: {
-    type: String,
-    enum: ['Basse', 'Normale', 'Haute', 'Urgente'],
+    type:    String,
+    enum:    ['Basse', 'Normale', 'Haute', 'Urgente'],
     default: 'Normale',
   },
-  
-  // ========== STATUTS ==========
-  isRead: {
-    type: Boolean,
-    default: false,
-  },
-  readAt: {
-    type: Date,
-  },
-  isStarred: {
-    type: Boolean,
-    default: false,
-  },
-  isDraft: {
-    type: Boolean,
-    default: false,
-  },
-  isDeleted: {
-    type: Boolean,
-    default: false,
-  },
-  deletedAt: {
-    type: Date,
-  },
-  
-  // ========== PIÈCES JOINTES ==========
+
+  // ── Statuts ──────────────────────────────────────────────────
+  isRead:    { type: Boolean, default: false },
+  readAt:    { type: Date },
+  isStarred: { type: Boolean, default: false },
+  isDraft:   { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date },
+
+  // ── Pièces jointes ───────────────────────────────────────────
   attachments: [
     {
       filename: { type: String, required: true },
       filepath: { type: String, required: true },
       mimetype: { type: String },
-      size: { type: Number }
-    }
+      size:     { type: Number },
+    },
   ],
-  
-  // ========== MÉTADONNÉES ==========
-  messageType: {
-    type: String,
-    default: 'Email',
-  },
-  
+
+  // ── Métadonnées ──────────────────────────────────────────────
+  messageType: { type: String, default: 'Email' },
+
 }, {
   timestamps: true,
 });
 
-// ========== INDEX POUR PERFORMANCES ==========
-internalMailSchema.index({ sender: 1, createdAt: -1 });
+// ── Index ─────────────────────────────────────────────────────
+internalMailSchema.index({ sender:   1, createdAt: -1 });
 internalMailSchema.index({ receiver: 1, createdAt: -1 });
-internalMailSchema.index({ receiver: 1, isRead: 1 });
-internalMailSchema.index({ receiver: 1, isStarred: 1 });
-internalMailSchema.index({ sender: 1, isDraft: 1 });
-internalMailSchema.index({ receiver: 1, isDeleted: 1 });
+internalMailSchema.index({ receiver: 1, isRead:    1  });
+internalMailSchema.index({ receiver: 1, isStarred: 1  });
+internalMailSchema.index({ sender:   1, isDraft:   1  });
+internalMailSchema.index({ receiver: 1, isDeleted: 1  });
+// ✅ Index sur les emails externes pour requêtes rapides
+internalMailSchema.index({ isExternalMail: 1, createdAt: -1 });
 
-// ========== MÉTHODES STATIQUES ==========
+// ── Méthodes statiques ────────────────────────────────────────
 
-/**
- * Récupérer les emails reçus (non supprimés, non brouillons)
- */
-internalMailSchema.statics.getInbox = function(userId, options = {}) {
+internalMailSchema.statics.getInbox = function (userId, options = {}) {
   const { page = 1, limit = 20 } = options;
-  const skip = (page - 1) * limit;
-  
-  return this.find({
-    receiver: userId,
-    isDraft: false,
-    isDeleted: false,
-  })
-    .populate('sender', 'name email photo') // ✅ Correction: photo au lieu de avatar
+  return this.find({ receiver: userId, isDraft: false, isDeleted: false })
+    .populate('sender', 'name email photo')
     .sort({ createdAt: -1 })
     .limit(parseInt(limit))
-    .skip(skip);
+    .skip((page - 1) * limit);
 };
 
-/**
- * Récupérer les emails envoyés (non supprimés, non brouillons)
- */
-internalMailSchema.statics.getSent = function(userId, options = {}) {
+internalMailSchema.statics.getSent = function (userId, options = {}) {
   const { page = 1, limit = 20 } = options;
-  const skip = (page - 1) * limit;
-  
-  return this.find({
-    sender: userId,
-    isDraft: false,
-    isDeleted: false,
-  })
-    .populate('receiver', 'name email photo') // ✅ Correction: photo
-    .sort({ createdAt: -1 })
-    .limit(parseInt(limit))
-    .skip(skip);
-};
-
-/**
- * Récupérer les emails non lus
- */
-internalMailSchema.statics.getUnread = function(userId, options = {}) {
-  const { page = 1, limit = 20 } = options;
-  const skip = (page - 1) * limit;
-  
-  return this.find({
-    receiver: userId,
-    isRead: false,
-    isDraft: false,
-    isDeleted: false,
-  })
-    .populate('sender', 'name email photo') // ✅ Correction: photo
-    .sort({ createdAt: -1 })
-    .limit(parseInt(limit))
-    .skip(skip);
-};
-
-/**
- * Récupérer les emails favoris
- */
-internalMailSchema.statics.getStarred = function(userId, options = {}) {
-  const { page = 1, limit = 20 } = options;
-  const skip = (page - 1) * limit;
-  
-  return this.find({
-    $or: [
-      { receiver: userId, isStarred: true },
-      { sender: userId, isStarred: true }
-    ],
-    isDraft: false,
-    isDeleted: false,
-  })
-    .populate('sender', 'name email photo') // ✅ Correction: photo
+  return this.find({ sender: userId, isDraft: false, isDeleted: false })
     .populate('receiver', 'name email photo')
     .sort({ createdAt: -1 })
     .limit(parseInt(limit))
-    .skip(skip);
+    .skip((page - 1) * limit);
 };
 
-/**
- * Récupérer les brouillons
- */
-internalMailSchema.statics.getDrafts = function(userId, options = {}) {
+internalMailSchema.statics.getUnread = function (userId, options = {}) {
   const { page = 1, limit = 20 } = options;
-  const skip = (page - 1) * limit;
-  
-  return this.find({
-    sender: userId,
-    isDraft: true,
-    isDeleted: false,
-  })
-    .populate('receiver', 'name email photo') // ✅ Correction: photo
+  return this.find({ receiver: userId, isRead: false, isDraft: false, isDeleted: false })
+    .populate('sender', 'name email photo')
     .sort({ createdAt: -1 })
     .limit(parseInt(limit))
-    .skip(skip);
+    .skip((page - 1) * limit);
 };
 
-/**
- * Récupérer la corbeille
- */
-internalMailSchema.statics.getTrash = function(userId, options = {}) {
+internalMailSchema.statics.getStarred = function (userId, options = {}) {
   const { page = 1, limit = 20 } = options;
-  const skip = (page - 1) * limit;
-  
   return this.find({
-    $or: [
-      { receiver: userId, isDeleted: true },
-      { sender: userId, isDeleted: true }
-    ],
+    $or: [{ receiver: userId, isStarred: true }, { sender: userId, isStarred: true }],
+    isDraft: false, isDeleted: false,
   })
-    .populate('sender', 'name email photo') // ✅ Correction: photo
+    .populate('sender',   'name email photo')
+    .populate('receiver', 'name email photo')
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit))
+    .skip((page - 1) * limit);
+};
+
+internalMailSchema.statics.getDrafts = function (userId, options = {}) {
+  const { page = 1, limit = 20 } = options;
+  return this.find({ sender: userId, isDraft: true, isDeleted: false })
+    .populate('receiver', 'name email photo')
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit))
+    .skip((page - 1) * limit);
+};
+
+internalMailSchema.statics.getTrash = function (userId, options = {}) {
+  const { page = 1, limit = 20 } = options;
+  return this.find({
+    $or: [{ receiver: userId, isDeleted: true }, { sender: userId, isDeleted: true }],
+  })
+    .populate('sender',   'name email photo')
     .populate('receiver', 'name email photo')
     .sort({ deletedAt: -1 })
     .limit(parseInt(limit))
-    .skip(skip);
+    .skip((page - 1) * limit);
 };
 
-/**
- * Compter les emails non lus
- */
-internalMailSchema.statics.countUnread = function(userId) {
+internalMailSchema.statics.countUnread = function (userId) {
   return this.countDocuments({
-    receiver: userId,
-    isRead: false,
-    isDraft: false,
-    isDeleted: false,
+    receiver: userId, isRead: false, isDraft: false, isDeleted: false,
   });
 };
 

@@ -63,6 +63,42 @@ cron.schedule('0 * * * *', async () => {
 
 console.log('⏰ [CRON] Planificateur Facebook activé (toutes les heures)');
 
+// ============================================================
+// 📬 CRON JOB — Polling IMAP Zoho (emails entrants)
+// À ajouter dans server.js, juste après le cron Facebook existant
+// ============================================================
+
+const { pollZohoInbox } = require('./services/zohoImapService');
+
+// ⏰ Polling toutes les 5 minutes
+cron.schedule('*/5 * * * *', async () => {
+    console.log('⏰ [CRON] Démarrage polling IMAP Zoho...');
+    try {
+        const stats = await pollZohoInbox();
+        if (stats.imported > 0) {
+            console.log(`✅ [CRON] IMAP — ${stats.imported} email(s) importé(s)`);
+        }
+    } catch (error) {
+        console.error('❌ [CRON] Erreur polling IMAP:', error.message);
+    }
+});
+
+console.log('⏰ [CRON] Polling IMAP Zoho activé (toutes les 5 minutes)');
+
+// ── Polling immédiat au démarrage (optionnel) ─────────────────
+mongoose.connection.once('open', async () => {
+    // Attendre 10s que le serveur soit stabilisé avant le premier poll
+    setTimeout(async () => {
+        console.log('🔄 [STARTUP] Premier polling IMAP Zoho...');
+        try {
+            const stats = await pollZohoInbox();
+            console.log(`✅ [STARTUP] IMAP — ${stats.imported} email(s) importé(s)`);
+        } catch (err) {
+            console.error('❌ [STARTUP] Erreur premier poll IMAP:', err.message);
+        }
+    }, 10000);
+});
+
 const app = express();
 
 app.get('/sitemap.xml', async (req, res) => {
@@ -210,6 +246,8 @@ const companyEmailRoutes = require("./routes/companyEmailRoutes");
 const altcomRoutes = require('./routes/altcomRoutes');
 const contactRoutes = require('./routes/contactRoutes');
 const emailRoutes = require('./routes/emailRoutes');
+// ✅ NOUVEAU — Webhook Zoho (sans JWT)
+const webhookRoutes = require('./routes/webhookRoutes');
 
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
@@ -244,6 +282,11 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/internal-mails", internalMailRoutes);
 app.use("/api/company-emails", companyEmailRoutes);
 app.use("/api/emails", emailRoutes);
+
+// ✅ NOUVEAU — Webhook Zoho (sans authentification JWT)
+// ⚠️  Doit être déclaré AVANT les middlewares d'auth globaux
+//     La sécurité est assurée par ZOHO_WEBHOOK_SECRET (HMAC SHA-256)
+app.use("/api/webhooks", webhookRoutes);
 
 // ❤️ Social & Contact
 app.use("/api/likes", likeRoutes);
@@ -310,6 +353,7 @@ app.use("*", (req, res) => {
       '/api/dashboard',
       '/api/facebook-posts/recent',
       '/api/facebook-posts/actus',
+      '/api/webhooks/zoho-incoming',
       '/uploads/:folder/:filename'
     ]
   });
@@ -359,6 +403,7 @@ app.listen(PORT, () => {
   console.log(`📸 Images disponibles sur: http://localhost:${PORT}/uploads`);
   console.log(`🔗 Frontend autorisé: ${process.env.FRONTEND_URL || 'localhost'}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🪝  Webhook Zoho: http://localhost:${PORT}/api/webhooks/zoho-incoming`);
   console.log('='.repeat(60) + '\n');
 });
 
