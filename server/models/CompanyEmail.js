@@ -10,11 +10,11 @@ const companyEmailSchema = new mongoose.Schema(
     email: {
       type: String,
       required: [true, 'Une adresse email est requise.'],
-      unique: true,
+      unique: true,       // ← crée déjà l'index email_1 automatiquement
       lowercase: true,
       trim: true,
       match: [
-        /^[a-zA-Z0-9._-]+@altitudevision\.(cg|agency)$/, // ✅ ACCEPTE .cg ET .agency
+        /^[a-zA-Z0-9._-]+@altitudevision\.(cg|agency)$/,
         'L\'adresse doit se terminer par @altitudevision.cg ou @altitudevision.agency',
       ],
     },
@@ -39,7 +39,7 @@ const companyEmailSchema = new mongoose.Schema(
         'Événementiel',
         'Immobilier',
         'Personnel',
-        'Autre'
+        'Autre',
       ],
       default: 'Contact Général',
     },
@@ -59,11 +59,11 @@ const companyEmailSchema = new mongoose.Schema(
 
     // 📩 Notifications activées
     notifications: {
-      quotes: { type: Boolean, default: false },
+      quotes:          { type: Boolean, default: false },
       contactMessages: { type: Boolean, default: false },
-      systemAlerts: { type: Boolean, default: false },
-      properties: { type: Boolean, default: false },
-      events: { type: Boolean, default: false },
+      systemAlerts:    { type: Boolean, default: false },
+      properties:      { type: Boolean, default: false },
+      events:          { type: Boolean, default: false },
     },
 
     // ✅ Statut actif/inactif
@@ -75,21 +75,21 @@ const companyEmailSchema = new mongoose.Schema(
     // 🔐 Mot de passe de l'email (select: false pour sécurité)
     password: {
       type: String,
-      select: false, 
+      select: false,
     },
 
     // ⚙️ Configuration SMTP (avec valeurs par défaut)
     smtpConfig: {
-      host: { type: String, default: 'mail.privateemail.com' },
-      port: { type: Number, default: 465 },
+      host:   { type: String,  default: 'mail.privateemail.com' },
+      port:   { type: Number,  default: 465 },
       secure: { type: Boolean, default: true },
     },
 
     // 📊 Statistiques
     stats: {
-      emailsSent: { type: Number, default: 0 },
+      emailsSent:     { type: Number, default: 0 },
       emailsReceived: { type: Number, default: 0 },
-      lastUsed: { type: Date, default: Date.now },
+      lastUsed:       { type: Date,   default: Date.now },
     },
 
     // 🧾 Créé par (admin)
@@ -101,35 +101,34 @@ const companyEmailSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
+    toJSON:   { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
 // ======================================================
 // 📊 INDEX
+// ✅ email n'est PAS répété ici car unique:true le crée déjà
 // ======================================================
-companyEmailSchema.index({ email: 1 });
-companyEmailSchema.index({ emailType: 1 });
-companyEmailSchema.index({ assignedTo: 1 });
-companyEmailSchema.index({ isActive: 1 });
+companyEmailSchema.index({ emailType:   1 });
+companyEmailSchema.index({ assignedTo:  1 });
+companyEmailSchema.index({ isActive:    1 });
 
 // ======================================================
 // 🎨 CHAMPS VIRTUELS
 // ======================================================
-companyEmailSchema.virtual('username').get(function() {
+companyEmailSchema.virtual('username').get(function () {
   return this.email.split('@')[0];
 });
 
-companyEmailSchema.virtual('hasNotifications').get(function() {
-  return Object.values(this.notifications).some(value => value === true);
+companyEmailSchema.virtual('hasNotifications').get(function () {
+  return Object.values(this.notifications).some(v => v === true);
 });
 
 // ======================================================
 // 🔧 MIDDLEWARE PRE-SAVE
 // ======================================================
-companyEmailSchema.pre('save', function(next) {
-  // Mise à jour lastUsed si des emails ont été envoyés
+companyEmailSchema.pre('save', function (next) {
   if (this.isModified('stats.emailsSent') || this.isModified('stats.emailsReceived')) {
     this.stats.lastUsed = Date.now();
   }
@@ -140,104 +139,85 @@ companyEmailSchema.pre('save', function(next) {
 // 📋 MÉTHODES D'INSTANCE
 // ======================================================
 
-// Activer l'email
-companyEmailSchema.methods.activate = function() {
+companyEmailSchema.methods.activate = function () {
   this.isActive = true;
   return this.save();
 };
 
-// Désactiver l'email
-companyEmailSchema.methods.deactivate = function() {
+companyEmailSchema.methods.deactivate = function () {
   this.isActive = false;
   return this.save();
 };
 
-// Incrémenter le compteur d'emails envoyés
-companyEmailSchema.methods.incrementSent = function() {
+companyEmailSchema.methods.incrementSent = function () {
   this.stats.emailsSent += 1;
   this.stats.lastUsed = Date.now();
   return this.save();
 };
 
-// Incrémenter le compteur d'emails reçus
-companyEmailSchema.methods.incrementReceived = function() {
+companyEmailSchema.methods.incrementReceived = function () {
   this.stats.emailsReceived += 1;
   this.stats.lastUsed = Date.now();
   return this.save();
 };
 
 // ======================================================
-// 📋 MÉTHODES STATIQUES (Appelées par le contrôleur)
+// 📋 MÉTHODES STATIQUES
 // ======================================================
 
-// Récupérer tous les emails actifs
-companyEmailSchema.statics.getActiveEmails = function() {
+companyEmailSchema.statics.getActiveEmails = function () {
   return this.find({ isActive: true })
-    .populate('assignedTo', 'name email role photo') // ✅ AJOUT DE PHOTO
-    .populate('createdBy', 'name email')
+    .populate('assignedTo', 'name email role photo')
+    .populate('createdBy',  'name email')
     .sort({ createdAt: -1 });
 };
 
-// Récupérer les emails par type
-companyEmailSchema.statics.getByType = function(emailType) {
+companyEmailSchema.statics.getByType = function (emailType) {
   return this.find({ emailType, isActive: true })
-    .populate('assignedTo', 'name email role photo') // ✅ AJOUT DE PHOTO
+    .populate('assignedTo', 'name email role photo')
     .sort({ createdAt: -1 });
 };
 
-// Récupérer les emails assignés à un collaborateur
-companyEmailSchema.statics.getAssignedTo = function(userId) {
+companyEmailSchema.statics.getAssignedTo = function (userId) {
   return this.find({ assignedTo: userId, isActive: true })
     .populate('assignedTo', 'name email role photo')
     .sort({ createdAt: -1 });
 };
 
-// Récupérer les emails recevant les notifications de devis
-companyEmailSchema.statics.getQuoteNotificationEmails = function() {
-  return this.find({ 
-    'notifications.quotes': true, 
-    isActive: true 
-  })
-  .populate('assignedTo', 'name email photo')
-  .select('email displayName assignedTo');
+companyEmailSchema.statics.getQuoteNotificationEmails = function () {
+  return this.find({ 'notifications.quotes': true, isActive: true })
+    .populate('assignedTo', 'name email photo')
+    .select('email displayName assignedTo');
 };
 
-// Récupérer les emails recevant les notifications de contact
-companyEmailSchema.statics.getContactNotificationEmails = function() {
-  return this.find({ 
-    'notifications.contactMessages': true, 
-    isActive: true 
-  })
-  .populate('assignedTo', 'name email photo')
-  .select('email displayName assignedTo');
+companyEmailSchema.statics.getContactNotificationEmails = function () {
+  return this.find({ 'notifications.contactMessages': true, isActive: true })
+    .populate('assignedTo', 'name email photo')
+    .select('email displayName assignedTo');
 };
 
-// Vérifier si un email existe déjà
-companyEmailSchema.statics.emailExists = async function(email) {
+companyEmailSchema.statics.emailExists = async function (email) {
   const count = await this.countDocuments({ email: email.toLowerCase() });
   return count > 0;
 };
 
-// Obtenir les statistiques globales
-companyEmailSchema.statics.getGlobalStats = async function() {
+companyEmailSchema.statics.getGlobalStats = async function () {
   const result = await this.aggregate([
     {
       $group: {
-        _id: null,
-        totalEmails: { $sum: 1 },
-        activeEmails: { 
-          $sum: { $cond: ['$isActive', 1, 0] } 
-        },
-        totalSent: { $sum: '$stats.emailsSent' },
-        totalReceived: { $sum: '$stats.emailsReceived' },
+        _id:            null,
+        totalEmails:    { $sum: 1 },
+        activeEmails:   { $sum: { $cond: ['$isActive', 1, 0] } },
+        totalSent:      { $sum: '$stats.emailsSent' },
+        totalReceived:  { $sum: '$stats.emailsReceived' },
       },
     },
   ]);
-  
+
   return result[0] || {
-    totalEmails: 0,
-    activeEmails: 0,
-    totalSent: 0,
+    totalEmails:   0,
+    activeEmails:  0,
+    totalSent:     0,
     totalReceived: 0,
   };
 };
