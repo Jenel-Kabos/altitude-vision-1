@@ -1,28 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Home, MapPin, Search, X, AlertCircle,
+    Home, Search, X, AlertCircle,
     ChevronLeft, ChevronRight, Grid3x3, List,
-    SlidersHorizontal, Building2, Tag, ArrowRight,
+    SlidersHorizontal, Building2, Tag,
 } from 'lucide-react';
 import { getAllProperties } from '../services/propertyService';
-import PropertyCard         from '../components/PropertyCard';
+import PropertyCard          from '../components/PropertyCard';
 
 // ─────────────────────────────────────────────────────────────
-// Constantes
+// Constantes — valeurs alignées sur le modèle Property
 // ─────────────────────────────────────────────────────────────
-const BLUE       = '#2E7BB5';
-const BLUE_DARK  = '#1A5A8A';
-const GOLD       = '#C8872A';
+const BLUE      = '#2E7BB5';
+const BLUE_DARK = '#1A5A8A';
+const GOLD      = '#C8872A';
 
-const PROPERTIES_PER_PAGE  = 12;
-const TRANSACTION_TYPES    = ['Tous', 'vente', 'location', 'viager'];
-const PROPERTY_TYPES       = ['Tous', 'Appartement', 'Maison', 'Villa', 'Terrain', 'Bureau', 'Commerce'];
-const AVAILABILITY_STATUS  = ['Tous', 'Disponible', 'Vendu', 'Loué', 'Réservé'];
+const PROPERTIES_PER_PAGE = 12;
 
-// ─────────────────────────────────────────────────────────────
-// Skeleton card
+// ✅ status enum BDD : 'vente' | 'location'
+const TRANSACTION_TYPES = ['Tous', 'vente', 'location'];
+
+// ✅ type = champ libre — liste des valeurs courantes
+const PROPERTY_TYPES = ['Tous', 'Appartement', 'Maison', 'Villa', 'Terrain', 'Bureau', 'Commerce'];
+
+// ✅ availability enum BDD : 'Disponible' | 'Vendu' | 'Loué'
+const AVAILABILITY_STATUS = ['Tous', 'Disponible', 'Vendu', 'Loué'];
+
+// Labels d'affichage pour le filtre transaction
+const TRANSACTION_LABELS = { Tous: 'Tous', vente: 'Vente', location: 'Location' };
+
 // ─────────────────────────────────────────────────────────────
 const PropertySkeleton = () => (
     <div className="animate-pulse bg-white rounded-3xl overflow-hidden border border-gray-100">
@@ -39,9 +46,6 @@ const PropertySkeleton = () => (
     </div>
 );
 
-// ─────────────────────────────────────────────────────────────
-// Pagination
-// ─────────────────────────────────────────────────────────────
 const Pagination = ({ totalPages, currentPage, onPageChange }) => {
     if (totalPages <= 1) return null;
     return (
@@ -54,11 +58,11 @@ const Pagination = ({ totalPages, currentPage, onPageChange }) => {
                 <button key={p} onClick={() => onPageChange(p)}
                     className="min-w-[36px] h-9 px-3 rounded-full font-semibold text-sm transition-all"
                     style={{
-                        background:  p === currentPage ? `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` : 'white',
-                        color:       p === currentPage ? 'white' : '#6B7280',
-                        border:      `1px solid ${p === currentPage ? 'transparent' : '#E5E7EB'}`,
-                        boxShadow:   p === currentPage ? `0 4px 12px ${BLUE}40` : 'none',
-                        fontFamily:  "'Outfit', sans-serif",
+                        background: p === currentPage ? `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` : 'white',
+                        color:      p === currentPage ? 'white' : '#6B7280',
+                        border:     `1px solid ${p === currentPage ? 'transparent' : '#E5E7EB'}`,
+                        boxShadow:  p === currentPage ? `0 4px 12px ${BLUE}40` : 'none',
+                        fontFamily: "'Outfit', sans-serif",
                     }}>
                     {p}
                 </button>
@@ -72,58 +76,75 @@ const Pagination = ({ totalPages, currentPage, onPageChange }) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Page principale
-// ─────────────────────────────────────────────────────────────
 const AltimmoAnnonces = () => {
+    // ✅ Lecture des params URL transmis par AltimmoPage
+    const [searchParams, setSearchParams] = useSearchParams();
+
     const [properties,   setProperties]  = useState([]);
     const [filtered,     setFiltered]    = useState([]);
     const [loading,      setLoading]     = useState(true);
     const [error,        setError]       = useState(null);
     const [currentPage,  setPage]        = useState(1);
-    const [searchTerm,   setSearch]      = useState('');
-    const [selStatus,    setSelStatus]   = useState('Tous');
-    const [selType,      setSelType]     = useState('Tous');
-    const [selAvail,     setSelAvail]    = useState('Tous');
     const [showFilters,  setShowFilters] = useState(false);
     const [viewMode,     setViewMode]    = useState('grid');
-    const [sortBy,       setSortBy]      = useState('date-desc');
-    const [priceRange,   setPriceRange]  = useState({ min: '', max: '' });
 
-    // ── Fetch ─────────────────────────────────
-    const fetchProperties = async () => {
+    // ✅ Filtres initialisés depuis les params URL
+    const [searchTerm,  setSearch]     = useState(searchParams.get('search') || '');
+    const [selStatus,   setSelStatus]  = useState(searchParams.get('status') || 'Tous');
+    const [selType,     setSelType]    = useState(searchParams.get('type')   || 'Tous');
+    const [selAvail,    setSelAvail]   = useState(searchParams.get('avail')  || 'Tous');
+    const [sortBy,      setSortBy]     = useState('date-desc');
+    const [priceRange,  setPriceRange] = useState({
+        // ✅ priceMin / priceMax transmis par AltimmoPage (valeurs numériques)
+        min: searchParams.get('priceMin') || '',
+        max: searchParams.get('priceMax') || '',
+    });
+
+    // ── Fetch — toutes les propriétés Altimmo ─────────────────
+    const fetchProperties = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
             const data = await getAllProperties({ pole: 'Altimmo' });
             setProperties(data || []);
-            setFiltered(data || []);
         } catch {
             setError('Impossible de charger les annonces. Veuillez réessayer.');
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    useEffect(() => { fetchProperties(); }, []);
+    useEffect(() => { fetchProperties(); }, [fetchProperties]);
 
-    // ── Filtres ───────────────────────────────
+    // ── Filtres côté client ───────────────────────────────────
     useEffect(() => {
         let f = [...properties];
 
+        // Recherche texte
         if (searchTerm.trim()) {
             const q = searchTerm.toLowerCase();
-            f = f.filter(p => [
-                p.title || '', p.description || '',
-                p.address?.city || '', p.address?.district || '',
-                p.address?.street || '', p.type || '',
-            ].join(' ').toLowerCase().includes(q));
+            f = f.filter(p =>
+                [p.title, p.description, p.address?.city, p.address?.district, p.address?.street, p.type]
+                    .filter(Boolean).join(' ').toLowerCase().includes(q)
+            );
         }
-        if (selStatus !== 'Tous') f = f.filter(p => p.status === selStatus);
-        if (selType   !== 'Tous') f = f.filter(p => p.type === selType);
-        if (selAvail  !== 'Tous') f = f.filter(p => p.availability === selAvail);
-        if (priceRange.min && !isNaN(priceRange.min)) f = f.filter(p => p.price >= parseInt(priceRange.min));
-        if (priceRange.max && !isNaN(priceRange.max)) f = f.filter(p => p.price <= parseInt(priceRange.max));
 
+        // ✅ status : valeurs BDD 'vente' | 'location'
+        if (selStatus !== 'Tous') f = f.filter(p => p.status === selStatus);
+
+        // ✅ type : champ libre, comparaison exacte
+        if (selType !== 'Tous') f = f.filter(p => p.type === selType);
+
+        // ✅ availability : 'Disponible' | 'Vendu' | 'Loué'
+        if (selAvail !== 'Tous') f = f.filter(p => p.availability === selAvail);
+
+        // ✅ Prix : valeurs numériques
+        if (priceRange.min && !isNaN(priceRange.min))
+            f = f.filter(p => (p.price || 0) >= Number(priceRange.min));
+        if (priceRange.max && !isNaN(priceRange.max))
+            f = f.filter(p => (p.price || 0) <= Number(priceRange.max));
+
+        // Tri
         switch (sortBy) {
             case 'date-asc':     f.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); break;
             case 'price-asc':    f.sort((a, b) => (a.price || 0) - (b.price || 0)); break;
@@ -136,6 +157,18 @@ const AltimmoAnnonces = () => {
         setFiltered(f);
         setPage(1);
     }, [properties, searchTerm, selStatus, selType, selAvail, sortBy, priceRange]);
+
+    // ── Synchronise les filtres actifs dans l'URL ─────────────
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (searchTerm)          params.set('search',   searchTerm);
+        if (selStatus !== 'Tous') params.set('status',  selStatus);
+        if (selType   !== 'Tous') params.set('type',    selType);
+        if (selAvail  !== 'Tous') params.set('avail',   selAvail);
+        if (priceRange.min)       params.set('priceMin', priceRange.min);
+        if (priceRange.max)       params.set('priceMax', priceRange.max);
+        setSearchParams(params, { replace: true });
+    }, [searchTerm, selStatus, selType, selAvail, priceRange, setSearchParams]);
 
     const resetFilters = () => {
         setSearch(''); setSelStatus('Tous'); setSelType('Tous');
@@ -151,24 +184,15 @@ const AltimmoAnnonces = () => {
     const inputFocus = e => { e.target.style.borderColor = BLUE; e.target.style.boxShadow = `0 0 0 3px ${BLUE}15`; };
     const inputBlur  = e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; };
 
-    // ── État erreur ───────────────────────────
     if (error) return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
             <div className="bg-white rounded-3xl border border-red-100 p-8 max-w-md w-full text-center shadow-sm">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
-                    style={{ background: `${BLUE}12` }}>
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: `${BLUE}12` }}>
                     <AlertCircle className="w-7 h-7" style={{ color: BLUE }} />
                 </div>
-                <h3 className="font-bold text-gray-900 text-lg mb-2"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
-                    Erreur de chargement
-                </h3>
-                <p className="text-gray-500 text-sm mb-6"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
-                    {error}
-                </p>
-                <button onClick={fetchProperties}
-                    className="px-6 py-2.5 rounded-full font-semibold text-white text-sm"
+                <h3 className="font-bold text-gray-900 text-lg mb-2" style={{ fontFamily: "'Outfit', sans-serif" }}>Erreur de chargement</h3>
+                <p className="text-gray-500 text-sm mb-6" style={{ fontFamily: "'Outfit', sans-serif" }}>{error}</p>
+                <button onClick={fetchProperties} className="px-6 py-2.5 rounded-full font-semibold text-white text-sm"
                     style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`, fontFamily: "'Outfit', sans-serif" }}>
                     Réessayer
                 </button>
@@ -179,66 +203,50 @@ const AltimmoAnnonces = () => {
     return (
         <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
 
-            {/* ── Hero ─────────────────────────────── */}
+            {/* ── Hero ─────────────────────────────────── */}
             <div className="relative py-20 text-white overflow-hidden"
                 style={{
                     backgroundImage: "linear-gradient(to bottom, rgba(26,90,138,0.92), rgba(13,17,23,0.97)), url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=2073&auto=format&fit=crop')",
                     backgroundSize: 'cover', backgroundPosition: 'center',
                 }}>
-
                 <div className="absolute top-0 left-0 right-0 h-px"
                     style={{ background: `linear-gradient(to right, transparent, ${BLUE}60, transparent)` }} />
-                <div className="absolute inset-0 pointer-events-none"
-                    style={{ background: `radial-gradient(ellipse at 20% 50%, ${BLUE}20, transparent 60%)` }} />
-
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
-                    <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.7 }}>
-
-                        <p className="text-xs font-bold uppercase tracking-widest mb-4 text-white/60">
-                            Altimmo
-                        </p>
+                    <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
+                        <p className="text-xs font-bold uppercase tracking-widest mb-4 text-white/60">Altimmo</p>
                         <h1 className="text-white mb-4 max-w-3xl"
-                            style={{
-                                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                fontSize:   'clamp(2.2rem, 5vw, 4rem)',
-                                fontWeight: 700, lineHeight: 1.1,
-                            }}>
+                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2.2rem, 5vw, 4rem)', fontWeight: 700, lineHeight: 1.1 }}>
                             Nos Biens Immobiliers
                         </h1>
-                        <div className="h-0.5 w-16 rounded-full mb-4"
-                            style={{ background: `linear-gradient(to right, ${BLUE}, ${GOLD})` }} />
+                        <div className="h-0.5 w-16 rounded-full mb-4" style={{ background: `linear-gradient(to right, ${BLUE}, ${GOLD})` }} />
                         <p className="text-white/60 max-w-xl leading-relaxed mb-8">
                             Découvrez notre sélection de propriétés exceptionnelles pour votre projet immobilier.
                         </p>
-
-                        {/* Stats */}
                         <div className="flex flex-wrap gap-3">
-                            {[
-                                { Icon: Building2, value: properties.length, label: 'Biens' },
-                                { Icon: Tag,       value: PROPERTY_TYPES.length - 1, label: 'Types' },
-                            ].map(({ Icon, value, label }, i) => (
-                                <div key={i}
-                                    className="flex items-center gap-2 px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/10 text-sm font-semibold"
-                                    style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-                                    <Icon className="w-4 h-4" style={{ color: '#90C8F0' }} />
-                                    <span style={{ color: '#90C8F0' }}>{value}</span>
-                                    {' '}{label}
+                            <div className="flex items-center gap-2 px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/10 text-sm font-semibold"
+                                style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                                <Building2 className="w-4 h-4" style={{ color: '#90C8F0' }} />
+                                <span style={{ color: '#90C8F0' }}>{properties.length}</span> Biens
+                            </div>
+                            {/* Badge filtre actif */}
+                            {selStatus !== 'Tous' && (
+                                <div className="flex items-center gap-2 px-5 py-2.5 rounded-full backdrop-blur-sm border border-white/10 text-sm font-semibold capitalize"
+                                    style={{ backgroundColor: 'rgba(200,135,42,0.2)', color: '#E5A84B' }}>
+                                    <Tag className="w-4 h-4" />
+                                    {TRANSACTION_LABELS[selStatus]}
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </motion.div>
                 </div>
             </div>
 
-            {/* ── Contenu ──────────────────────────── */}
+            {/* ── Contenu ──────────────────────────────── */}
             <div className="container mx-auto px-4 sm:px-6 max-w-6xl py-12">
 
-                {/* Barre recherche + filtres */}
+                {/* Barre recherche */}
                 <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 mb-8">
                     <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-
-                        {/* Search */}
                         <div className="relative flex-1">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <input type="text" placeholder="Rechercher un bien, une ville, un quartier..."
@@ -253,35 +261,27 @@ const AltimmoAnnonces = () => {
                                 </button>
                             )}
                         </div>
-
-                        {/* Actions */}
                         <div className="flex gap-2 flex-shrink-0">
                             <button onClick={() => setShowFilters(!showFilters)}
                                 className="flex items-center gap-2 px-4 py-3 rounded-2xl font-semibold text-sm transition-all relative"
                                 style={{
-                                    background:  (showFilters || hasFilters) ? `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` : '#F9FAFB',
-                                    color:       (showFilters || hasFilters) ? 'white' : '#374151',
-                                    border:      `1px solid ${(showFilters || hasFilters) ? 'transparent' : '#E5E7EB'}`,
-                                    fontFamily:  "'Outfit', sans-serif",
+                                    background: (showFilters || hasFilters) ? `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` : '#F9FAFB',
+                                    color:      (showFilters || hasFilters) ? 'white' : '#374151',
+                                    border:     `1px solid ${(showFilters || hasFilters) ? 'transparent' : '#E5E7EB'}`,
+                                    fontFamily: "'Outfit', sans-serif",
                                 }}>
                                 <SlidersHorizontal className="w-4 h-4" />
                                 Filtres
                                 {hasFilters && !showFilters && (
                                     <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-xs font-bold flex items-center justify-center text-white"
-                                        style={{ background: GOLD, fontSize: '9px' }}>
-                                        !
-                                    </span>
+                                        style={{ background: GOLD, fontSize: '9px' }}>!</span>
                                 )}
                             </button>
-
                             <div className="flex bg-gray-100 rounded-2xl p-1 gap-1">
                                 {[{ mode: 'grid', Icon: Grid3x3 }, { mode: 'list', Icon: List }].map(({ mode, Icon }) => (
                                     <button key={mode} onClick={() => setViewMode(mode)}
                                         className="p-2 rounded-xl transition-all"
-                                        style={{
-                                            background: viewMode === mode ? 'white' : 'transparent',
-                                            boxShadow:  viewMode === mode ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                                        }}>
+                                        style={{ background: viewMode === mode ? 'white' : 'transparent', boxShadow: viewMode === mode ? '0 1px 4px rgba(0,0,0,0.1)' : 'none' }}>
                                         <Icon className="w-4 h-4 text-gray-600" />
                                     </button>
                                 ))}
@@ -292,14 +292,12 @@ const AltimmoAnnonces = () => {
                     {/* Panneau filtres */}
                     <AnimatePresence>
                         {showFilters && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }}
-                                className="overflow-hidden">
+                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
                                 <div className="pt-5 mt-5 border-t border-gray-100">
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                                        {/* Transaction */}
+                                        {/* ✅ Transaction — labels clairs, valeurs BDD */}
                                         <div>
                                             <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}>
@@ -308,21 +306,20 @@ const AltimmoAnnonces = () => {
                                             <div className="flex flex-wrap gap-2">
                                                 {TRANSACTION_TYPES.map(s => (
                                                     <button key={s} onClick={() => setSelStatus(s)}
-                                                        className="px-3.5 py-2 rounded-full text-xs font-semibold capitalize transition-all"
+                                                        className="px-3.5 py-2 rounded-full text-xs font-semibold transition-all"
                                                         style={{
-                                                            background:  selStatus === s ? `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` : '#F9FAFB',
-                                                            color:       selStatus === s ? 'white' : '#6B7280',
-                                                            border:      `1px solid ${selStatus === s ? 'transparent' : '#E5E7EB'}`,
-                                                            boxShadow:   selStatus === s ? `0 4px 12px ${BLUE}30` : 'none',
-                                                            fontFamily:  "'Outfit', sans-serif",
+                                                            background: selStatus === s ? `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` : '#F9FAFB',
+                                                            color:      selStatus === s ? 'white' : '#6B7280',
+                                                            border:     `1px solid ${selStatus === s ? 'transparent' : '#E5E7EB'}`,
+                                                            fontFamily: "'Outfit', sans-serif",
                                                         }}>
-                                                        {s}
+                                                        {TRANSACTION_LABELS[s]}
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
 
-                                        {/* Type de bien */}
+                                        {/* ✅ Type de bien */}
                                         <div>
                                             <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}>
@@ -336,7 +333,7 @@ const AltimmoAnnonces = () => {
                                             </select>
                                         </div>
 
-                                        {/* Disponibilité */}
+                                        {/* ✅ Disponibilité — enum BDD */}
                                         <div>
                                             <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}>
@@ -369,7 +366,7 @@ const AltimmoAnnonces = () => {
                                             </select>
                                         </div>
 
-                                        {/* Prix */}
+                                        {/* ✅ Prix — champs numériques en FCFA */}
                                         <div className="md:col-span-2">
                                             <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}>
@@ -398,8 +395,7 @@ const AltimmoAnnonces = () => {
                                             <button onClick={resetFilters}
                                                 className="flex items-center gap-1.5 text-sm font-semibold text-gray-400 hover:text-gray-700 transition-colors"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}>
-                                                <X className="w-4 h-4" />
-                                                Réinitialiser
+                                                <X className="w-4 h-4" /> Réinitialiser
                                             </button>
                                         </div>
                                     )}
@@ -409,23 +405,28 @@ const AltimmoAnnonces = () => {
                     </AnimatePresence>
                 </div>
 
-                {/* Compteur résultats */}
+                {/* Compteur */}
                 <div className="flex items-center justify-between mb-6 px-1">
                     <p className="text-sm text-gray-500" style={{ fontFamily: "'Outfit', sans-serif" }}>
                         <span className="font-bold text-gray-900">{filtered.length}</span>{' '}
                         bien{filtered.length > 1 ? 's' : ''} trouvé{filtered.length > 1 ? 's' : ''}
+                        {selStatus !== 'Tous' && (
+                            <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs font-bold capitalize"
+                                style={{ background: `${BLUE}12`, color: BLUE }}>
+                                {TRANSACTION_LABELS[selStatus]}
+                            </span>
+                        )}
                     </p>
                     {hasFilters && (
                         <button onClick={resetFilters}
                             className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:opacity-80"
                             style={{ color: BLUE, fontFamily: "'Outfit', sans-serif" }}>
-                            <X className="w-3.5 h-3.5" />
-                            Voir tous les biens
+                            <X className="w-3.5 h-3.5" /> Voir tous les biens
                         </button>
                     )}
                 </div>
 
-                {/* Grille / Liste */}
+                {/* Résultats */}
                 {loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {[1,2,3,4,5,6].map(i => <PropertySkeleton key={i} />)}
@@ -438,17 +439,14 @@ const AltimmoAnnonces = () => {
                             style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` }}>
                             <Home className="w-8 h-8 text-white" />
                         </div>
-                        <h3 className="font-bold text-gray-800 text-xl mb-2"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        <h3 className="font-bold text-gray-800 text-xl mb-2" style={{ fontFamily: "'Outfit', sans-serif" }}>
                             Aucun bien trouvé
                         </h3>
-                        <p className="text-gray-500 text-sm mb-6"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        <p className="text-gray-500 text-sm mb-6" style={{ fontFamily: "'Outfit', sans-serif" }}>
                             {hasFilters ? 'Essayez de modifier vos critères de recherche' : 'Aucun bien disponible pour le moment'}
                         </p>
                         {hasFilters && (
-                            <button onClick={resetFilters}
-                                className="px-6 py-2.5 rounded-full font-semibold text-white text-sm"
+                            <button onClick={resetFilters} className="px-6 py-2.5 rounded-full font-semibold text-white text-sm"
                                 style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`, fontFamily: "'Outfit', sans-serif" }}>
                                 Réinitialiser les filtres
                             </button>
@@ -457,20 +455,14 @@ const AltimmoAnnonces = () => {
                 ) : (
                     <>
                         <AnimatePresence mode="wait">
-                            <motion.div
-                                key={`${viewMode}-${currentPage}`}
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.3 }}
+                            <motion.div key={`${viewMode}-${currentPage}`}
+                                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
                                 className={viewMode === 'grid'
                                     ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'
-                                    : 'flex flex-col gap-4'}
-                            >
+                                    : 'flex flex-col gap-4'}>
                                 {currentProperties.map((property, i) => (
-                                    <motion.div key={property._id}
-                                        initial={{ opacity: 0, y: 16 }}
-                                        animate={{ opacity: 1, y: 0 }}
+                                    <motion.div key={property._id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.3, delay: i * 0.04 }}>
                                         <PropertyCard property={property} index={i} viewMode={viewMode} />
                                     </motion.div>
