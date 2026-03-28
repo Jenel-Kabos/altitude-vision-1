@@ -80,14 +80,27 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
     setLoading(true);
     try {
       const fd = new FormData();
-      const { address, amenities, images, ...rest } = formData;
-      Object.entries(rest).forEach(([k,v]) => v !== '' && fd.append(k, v));
-      fd.append("address[street]",   address.street);
-      fd.append("address[district]", address.district);
-      fd.append("address[city]",     address.city);
-      amenities.split(',').map(a=>a.trim()).filter(Boolean).forEach(a=>fd.append("amenities",a));
-      fd.append("location", JSON.stringify({ type:"Point", coordinates:[formData.longitude,formData.latitude] }));
-      images.forEach(f => fd.append("images", f));
+
+      // ✅ Whitelist explicite — évite d'envoyer _id, owner, statusAdmin,
+      // location (objet), updatedAt, etc. qui provoquent une erreur 500.
+      const ALLOWED = ['title','description','price','pole','status','availability',
+                       'type','surface','bedrooms','bathrooms','livingRooms','kitchens',
+                       'constructionType','latitude','longitude'];
+      ALLOWED.forEach(k => {
+        const v = formData[k];
+        if (v !== '' && v !== undefined && v !== null) fd.append(k, v);
+      });
+
+      fd.append("address[street]",   formData.address.street   || '');
+      fd.append("address[district]", formData.address.district || '');
+      fd.append("address[city]",     formData.address.city     || 'Brazzaville');
+
+      const amenities = formData.amenities || '';
+      amenities.split(',').map(a => a.trim()).filter(Boolean).forEach(a => fd.append("amenities", a));
+
+      fd.append("location", JSON.stringify({ type:"Point", coordinates:[formData.longitude, formData.latitude] }));
+
+      formData.images.forEach(f => fd.append("images", f));
       if (isEditing) existingImages.forEach(u => fd.append("existingImages", u));
 
       const result = isEditing
