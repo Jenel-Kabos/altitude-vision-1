@@ -3,55 +3,72 @@ import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // -- PLUGINS --
-  // Le plugin de base pour faire fonctionner React avec Vite.
-  // Il gère le JSX, le Fast Refresh (HMR), et d'autres optimisations.
-  plugins: [react()],
 
-  // -- SERVEUR DE DÉVELOPPEMENT --
-  server: {
-    // Port sur lequel le serveur de développement frontend va tourner.
-    port: 5173,
-    // Ouvre automatiquement le navigateur au démarrage.
-    open: true,
-    // LA PARTIE LA PLUS IMPORTANTE : Le Proxy
-    // Redirige les requêtes API du frontend vers le backend pour éviter les erreurs CORS.
-    proxy: {
-      // Toutes les requêtes qui commencent par '/api' seront redirigées.
-      '/api': {
-        // L'adresse de votre serveur backend.
-        target: 'https://altitude-vision.onrender.com',
-        // Nécessaire pour que le backend accepte la requête redirigée.
-        changeOrigin: true,
-        // Ne réécrit pas le chemin, '/api/users' reste '/api/users'.
-        rewrite: (path) => path,
-      },
-      
-      // ✅ CORRECTION AJOUTÉE :
-      // Redirige les requêtes pour les images (ou autres fichiers statiques)
-      // vers le backend.
-      '/uploads': {
-        target: 'https://altitude-vision.onrender.com',
-        changeOrigin: true,
-      }
-    },
-  },
+  // ── PLUGINS ───────────────────────────────────────────────────
+  plugins: [react()],
 
-  // -- CONFIGURATION DU BUILD --
-  build: {
-    // Le dossier où les fichiers finaux seront générés après `npm run build`.
-    outDir: 'dist',
-    // Génère des sourcemaps pour faciliter le débogage en production.
-    // Mettre à `false` pour ne pas exposer le code source.
-    sourcemap: true,
-    // Augmente la limite de taille pour les avertissements sur les "chunks".
-    chunkSizeWarningLimit: 1500,
-  },
+  // ── SERVEUR DE DÉVELOPPEMENT ──────────────────────────────────
+  server: {
+    port: 5173,
+    open: true,
+    proxy: {
+      '/api': {
+        target:       'https://altitude-vision.onrender.com',
+        changeOrigin: true,
+        rewrite:      (path) => path,
+      },
+      '/uploads': {
+        target:       'https://altitude-vision.onrender.com',
+        changeOrigin: true,
+      },
+    },
+  },
 
-  // -- CONFIGURATION DE L'APERÇU (après le build) --
-  preview: {
-    // Port pour prévisualiser le build localement avec `npm run preview`.
-    port: 4173,
-    open: true,
-  },
+  // ── BUILD PRODUCTION ──────────────────────────────────────────
+  build: {
+    outDir:    'dist',
+    sourcemap: false, // ✅ false en prod : évite d'exposer le code source sur Netlify
+
+    // ✅ Réduit à 800 (ton 1500 masquait des chunks trop gros)
+    chunkSizeWarningLimit: 800,
+
+    rollupOptions: {
+      output: {
+        // ✅ Code splitting manuel — chaque groupe est mis en cache séparément.
+        // Si React ne change pas entre deux déploiements, le navigateur
+        // utilise sa version en cache au lieu de tout retélécharger.
+        manualChunks: {
+          // React core — change rarement → cache très long
+          'vendor-react':  ['react', 'react-dom', 'react-router-dom'],
+
+          // Framer Motion — ~150Ko, chargé uniquement sur les pages qui l'utilisent
+          'vendor-motion': ['framer-motion'],
+
+          // Leaflet — chargé seulement sur les pages avec carte (PropertyDetailPage)
+          'vendor-map':    ['leaflet', 'react-leaflet'],
+
+          // Lucide — partagé partout, isolé pour le cache
+          'vendor-icons':  ['lucide-react'],
+
+          // Notifications toast
+          'vendor-ui':     ['react-hot-toast'],
+        },
+      },
+    },
+
+    // Les fichiers < 4Ko sont inlinés en base64 → zéro requête réseau supplémentaire
+    assetsInlineLimit: 4096,
+  },
+
+  // ── PRÉVISUALISATION (npm run preview) ────────────────────────
+  preview: {
+    port: 4173,
+    open: true,
+  },
+
+  // ── OPTIMISATION DES DÉPENDANCES (dev server) ─────────────────
+  // Pré-bundle ces dépendances au démarrage pour accélérer le HMR
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom', 'framer-motion'],
+  },
 });

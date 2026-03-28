@@ -5,28 +5,56 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- ================================================
+    <!-- ═══════════════════════════════════════════════════════
          SEO META TAGS
-    ================================================ -->
+    ═══════════════════════════════════════════════════════ -->
+    <title>Altitude-Vision — Agence de Communication & Courtage à Brazzaville</title>
+
     <meta name="description" content="Altitude-Vision — Agence de communication & courtage à Brazzaville. Immobilier de luxe, événementiel haut de gamme et stratégie de communication." />
-    <meta name="keywords" content="immobilier Brazzaville, agence événementielle Congo, communication digitale, Altimmo, Mila Events, Altcom" />
-    <meta name="author" content="Altitude-Vision" />
+    <meta name="keywords"    content="immobilier Brazzaville, agence événementielle Congo, communication digitale, Altimmo, Mila Events, Altcom" />
+    <meta name="author"      content="Altitude-Vision" />
+    <meta name="robots"      content="index, follow" />
 
-    <!-- Open Graph (partage réseaux sociaux) -->
-    <meta property="og:title" content="Altitude-Vision — Agence de Communication & Courtage" />
+    <!-- Open Graph -->
+    <meta property="og:title"       content="Altitude-Vision — Agence de Communication & Courtage" />
     <meta property="og:description" content="Trois pôles d'expertise en synergie : immobilier, événementiel et communication." />
-    <meta property="og:type" content="website" />
-    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:type"        content="website" />
+    <meta property="og:locale"      content="fr_CG" />
+    <meta property="og:url"         content="https://altitudevision.agency/" />
+    <meta property="og:image"       content="https://altitudevision.agency/og-default.jpg" />
+    <meta property="og:site_name"   content="Altitude-Vision" />
 
-    <title>Altitude-Vision</title>
+    <!-- Twitter Card -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="Altitude-Vision — Agence de Communication & Courtage" />
+    <meta name="twitter:description" content="Trois pôles d'expertise en synergie : immobilier, événementiel et communication." />
+    <meta name="twitter:image"       content="https://altitudevision.agency/og-default.jpg" />
 
-    <!-- ================================================
+    <!-- ═══════════════════════════════════════════════════════
+         PERFORMANCE — Préconnexions réseau
+         Ces lignes établissent la connexion TCP/TLS aux serveurs
+         externes AVANT que le navigateur en ait besoin.
+         Gain : 200-400ms sur le LCP.
+    ═══════════════════════════════════════════════════════ -->
+
+    <!-- Google Fonts (déjà présent, conservé) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- ✅ AJOUT : Cloudinary — images des biens immobiliers -->
+    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+
+    <!-- ✅ AJOUT : Backend Render — réduit le TTFB des appels API -->
+    <link rel="dns-prefetch" href="https://altitude-vision.onrender.com" />
+
+    <!-- ═══════════════════════════════════════════════════════
          GOOGLE FONTS — Chargement centralisé
          Cormorant Garamond : titres élégants
          Outfit             : corps de texte moderne
-         ================================================ -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+         display=swap       : ✅ le texte s'affiche immédiatement
+                              avec la police système, puis est
+                              remplacé — élimine le blocage du FCP
+    ═══════════════════════════════════════════════════════ -->
     <link
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700;800&display=swap"
       rel="stylesheet"

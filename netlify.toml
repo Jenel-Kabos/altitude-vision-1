@@ -1,15 +1,78 @@
+# netlify.toml
+
+# ═══════════════════════════════════════════════════════════════
+# BUILD
+# ═══════════════════════════════════════════════════════════════
 [build]
-  # On dit à Netlify d'entrer dans le dossier client
-  base = "client"
-  
-  # La commande pour construire le site
+  # Netlify entre dans le dossier client avant de builder
+  base    = "client"
   command = "npm run build"
-  
-  # Le dossier où Vite crée le site (relatif au dossier client)
+  # Dossier de sortie Vite (relatif au dossier client)
   publish = "dist"
 
-# Redirections pour que le routing React fonctionne (évite les 404 au refresh)
+# ═══════════════════════════════════════════════════════════════
+# SPA REDIRECT — évite les 404 au refresh ou accès direct à une URL
+# ═══════════════════════════════════════════════════════════════
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from   = "/*"
+  to     = "/index.html"
   status = 200
+
+# ═══════════════════════════════════════════════════════════════
+# CACHE HEADERS — correction PageSpeed "Utiliser des durées de
+# mise en cache efficaces" (économie estimée : 34 Ko)
+#
+# Principe : les assets Vite ont un hash dans leur nom
+# (ex: index-Dj3k8aQ.js) — si le fichier change, le nom change.
+# On peut donc les mettre en cache 1 an sans risque.
+# ═══════════════════════════════════════════════════════════════
+
+# JS/CSS compilés par Vite (avec hash — cache 1 an)
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Images statiques dans /public (cache 30 jours)
+[[headers]]
+  for = "/*.jpg"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000"
+
+[[headers]]
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000"
+
+[[headers]]
+  for = "/*.webp"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000"
+
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000"
+
+# Favicon (cache 7 jours)
+[[headers]]
+  for = "/favicon.ico"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+# HTML — pas de cache pour que les mises à jour soient
+# visibles immédiatement après chaque déploiement
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# ═══════════════════════════════════════════════════════════════
+# SÉCURITÉ — headers de base recommandés
+# ═══════════════════════════════════════════════════════════════
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
