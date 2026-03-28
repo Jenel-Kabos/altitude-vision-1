@@ -105,6 +105,7 @@ const PropertyForm = ({
     setExistingImages(existingImages.filter((img) => img !== url));
   };
 
+  console.log("existingImages:", existingImages);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
 
@@ -116,7 +117,7 @@ const PropertyForm = ({
           value={formData.title}
           onChange={handleChange}
           placeholder="Ex: Appartement moderne à Moungali"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
           required
         />
       </div>
@@ -128,7 +129,7 @@ const PropertyForm = ({
           value={formData.description}
           onChange={handleChange}
           placeholder="Décrivez le bien en détail..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
           rows={5}
           required
         />
@@ -142,7 +143,7 @@ const PropertyForm = ({
           value={formData.price}
           onChange={handleChange}
           placeholder="Ex: 150000"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
           required
         />
       </div>
@@ -154,7 +155,7 @@ const PropertyForm = ({
             name="pole"
             value={formData.pole}
             onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             required
           >
             <option value="Altimmo">Altimmo</option>
@@ -169,7 +170,7 @@ const PropertyForm = ({
             name="status"
             value={formData.status}
             onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
           >
             <option value="vente">Vendre</option>
             <option value="location">Louer</option>
@@ -183,7 +184,7 @@ const PropertyForm = ({
           name="availability"
           value={formData.availability}
           onChange={handleChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
         >
           <option>Disponible</option>
           <option>Vendu</option>
@@ -198,7 +199,7 @@ const PropertyForm = ({
           value={formData.type}
           onChange={handleChange}
           placeholder="Ex: Appartement, Villa, Studio"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
         />
       </div>
 
@@ -214,7 +215,7 @@ const PropertyForm = ({
               value={formData.address.district}
               onChange={handleAddressChange}
               placeholder="Ex: Moungali"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
               required
             />
           </div>
@@ -226,7 +227,7 @@ const PropertyForm = ({
               value={formData.address.street}
               onChange={handleAddressChange}
               placeholder="Ex: Avenue de la Paix"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
 
@@ -237,7 +238,7 @@ const PropertyForm = ({
               value={formData.address.city}
               onChange={handleAddressChange}
               placeholder="Brazzaville"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
         </div>
@@ -256,7 +257,7 @@ const PropertyForm = ({
               value={formData.surface}
               onChange={handleChange}
               placeholder="Ex: 62"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
 
@@ -268,7 +269,7 @@ const PropertyForm = ({
               value={formData.bedrooms}
               onChange={handleChange}
               placeholder="Ex: 3"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
 
@@ -280,7 +281,7 @@ const PropertyForm = ({
               value={formData.bathrooms}
               onChange={handleChange}
               placeholder="Ex: 2"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
         </div>
@@ -294,7 +295,7 @@ const PropertyForm = ({
               value={formData.livingRooms}
               onChange={handleChange}
               placeholder="Ex: 1"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
 
@@ -306,7 +307,7 @@ const PropertyForm = ({
               value={formData.kitchens}
               onChange={handleChange}
               placeholder="Ex: 1"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
 
@@ -316,7 +317,7 @@ const PropertyForm = ({
               name="constructionType"
               value={formData.constructionType}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             >
               <option value="Béton armé">Béton armé</option>
               <option value="Briques/Parpaings">Briques/Parpaings</option>
@@ -334,7 +335,7 @@ const PropertyForm = ({
           value={formData.amenities}
           onChange={handleChange}
           placeholder="Ex: Climatisation, Parking, Wifi (séparés par des virgules)"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
         />
         <p className="text-xs text-gray-500 mt-1">Séparez les équipements par des virgules</p>
       </div>
@@ -443,21 +444,21 @@ const PropertyForm = ({
         </div>
         <div className="grid grid-cols-2 gap-3 mt-3">
           <div>
-            <label className="block text-xs text-gray-600">Latitude</label>
+            <label className="block text-xs text-gray-700">Latitude</label>
             <input
               type="number"
               value={formData.latitude}
               readOnly
-              className="w-full px-2 py-1 text-sm border rounded bg-gray-50"
+              className="w-full px-2 py-1 text-sm border rounded bg-gray-50 text-gray-900"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-600">Longitude</label>
+            <label className="block text-xs text-gray-700">Longitude</label>
             <input
               type="number"
               value={formData.longitude}
               readOnly
-              className="w-full px-2 py-1 text-sm border rounded bg-gray-50"
+              className="w-full px-2 py-1 text-sm border rounded bg-gray-50 text-gray-900"
             />
           </div>
         </div>
