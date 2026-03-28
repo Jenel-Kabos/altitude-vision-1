@@ -301,6 +301,7 @@ const PropertyDetailPage = () => {
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState('');
   const [mainIdx,   setMainIdx]   = useState(0);
+  const [lightbox,  setLightbox]  = useState(false); // index ou false
 
   useEffect(() => {
     const load = async () => {
@@ -316,6 +317,25 @@ const PropertyDetailPage = () => {
     };
     load();
   }, [propertyId]);
+
+  // Bloquer le scroll quand le lightbox est ouvert + fermeture clavier
+  // ✅ On n'utilise pas `images` ici (défini plus bas) — on lit la longueur
+  //    depuis property?.images qui est disponible dans la closure.
+  useEffect(() => {
+    if (lightbox === false) return;
+    document.body.style.overflow = 'hidden';
+    const len = property?.images?.length || 1;
+    const onKey = (e) => {
+      if (e.key === 'Escape')      setLightbox(false);
+      if (e.key === 'ArrowRight')  setLightbox(i => (i + 1) % len);
+      if (e.key === 'ArrowLeft')   setLightbox(i => (i - 1 + len) % len);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [lightbox, property]);
 
   if (loading) return (
     <div className="pdp-root">
@@ -468,8 +488,21 @@ const PropertyDetailPage = () => {
                     exit={{ opacity:0 }}
                     transition={{ duration:0.35 }}
                     onError={e=>{ e.target.src=PLACEHOLDER; }}
+                    onClick={() => setLightbox(mainIdx)}
+                    style={{ cursor:'zoom-in' }}
                   />
                 </AnimatePresence>
+                {/* Zoom hint */}
+                <div style={{
+                  position:'absolute', top:12, right:12,
+                  padding:'4px 10px', borderRadius:1,
+                  background:'rgba(26,22,18,0.55)', backdropFilter:'blur(6px)',
+                  fontFamily:"'Jost', sans-serif", fontSize:9, fontWeight:600,
+                  letterSpacing:'0.18em', color:'rgba(255,255,255,0.7)',
+                  pointerEvents:'none',
+                }}>
+                  AGRANDIR
+                </div>
                 {/* Overlays */}
                 <div style={{ position:'absolute', bottom:12, left:12, display:'flex', gap:8, alignItems:'center' }}>
                   <span style={{
@@ -701,6 +734,137 @@ const PropertyDetailPage = () => {
           </motion.aside>
         </div>
       </div>
+    </div>
+
+      {/* ── Lightbox ──────────────────────────────────────── */}
+      <AnimatePresence>
+        {lightbox !== false && (
+          <motion.div
+            initial={{ opacity:0 }}
+            animate={{ opacity:1 }}
+            exit={{ opacity:0 }}
+            transition={{ duration:0.25 }}
+            onClick={() => setLightbox(false)}
+            style={{
+              position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:1000,
+              background:'rgba(10,8,6,0.96)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              padding:24,
+            }}>
+
+            {/* Image */}
+            <motion.img
+              key={lightbox}
+              src={buildImageUrl(images[lightbox])}
+              alt={`Photo ${lightbox + 1}`}
+              initial={{ opacity:0, scale:0.94 }}
+              animate={{ opacity:1, scale:1 }}
+              exit={{ opacity:0, scale:0.96 }}
+              transition={{ duration:0.3, ease:[0.22,1,0.36,1] }}
+              onClick={e => e.stopPropagation()}
+              onError={e=>{ e.target.src=PLACEHOLDER; }}
+              style={{
+                maxWidth:'90vw', maxHeight:'85vh',
+                objectFit:'contain', borderRadius:2,
+                boxShadow:'0 32px 80px rgba(0,0,0,0.6)',
+              }}
+            />
+
+            {/* Fermer */}
+            <button
+              onClick={() => setLightbox(false)}
+              style={{
+                position:'fixed', top:20, right:20,
+                width:40, height:40, borderRadius:1,
+                background:'rgba(250,248,245,0.08)',
+                border:'1px solid rgba(200,135,42,0.25)',
+                color:'rgba(255,255,255,0.7)', fontSize:20,
+                cursor:'pointer', display:'flex',
+                alignItems:'center', justifyContent:'center',
+                transition:'background 0.2s',
+              }}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(200,135,42,0.25)'}
+              onMouseLeave={e=>e.currentTarget.style.background='rgba(250,248,245,0.08)'}>
+              ×
+            </button>
+
+            {/* Compteur */}
+            <div style={{
+              position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
+              fontFamily:"'Jost', sans-serif", fontSize:11, fontWeight:500,
+              letterSpacing:'0.2em', color:'rgba(255,255,255,0.45)',
+            }}>
+              {lightbox + 1} / {images.length}
+            </div>
+
+            {/* Flèche gauche */}
+            {images.length > 1 && (
+              <>
+                <button
+                  onClick={e => { e.stopPropagation(); setLightbox(i => (i - 1 + images.length) % images.length); }}
+                  style={{
+                    position:'fixed', left:16, top:'50%', transform:'translateY(-50%)',
+                    width:44, height:44, borderRadius:1,
+                    background:'rgba(26,22,18,0.6)', backdropFilter:'blur(8px)',
+                    border:'1px solid rgba(200,135,42,0.2)',
+                    color:'#fff', cursor:'pointer', fontSize:20,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    transition:'border-color 0.2s',
+                  }}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(200,135,42,0.2)'}>
+                  ‹
+                </button>
+                <button
+                  onClick={e => { e.stopPropagation(); setLightbox(i => (i + 1) % images.length); }}
+                  style={{
+                    position:'fixed', right:16, top:'50%', transform:'translateY(-50%)',
+                    width:44, height:44, borderRadius:1,
+                    background:'rgba(26,22,18,0.6)', backdropFilter:'blur(8px)',
+                    border:'1px solid rgba(200,135,42,0.2)',
+                    color:'#fff', cursor:'pointer', fontSize:20,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    transition:'border-color 0.2s',
+                  }}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=GOLD}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(200,135,42,0.2)'}>
+                  ›
+                </button>
+              </>
+            )}
+
+            {/* Strip miniatures en bas */}
+            {images.length > 1 && (
+              <div style={{
+                position:'fixed', bottom:52, left:'50%', transform:'translateX(-50%)',
+                display:'flex', gap:6, padding:'8px 12px',
+                background:'rgba(26,22,18,0.7)', backdropFilter:'blur(10px)',
+                borderRadius:2, border:'1px solid rgba(200,135,42,0.15)',
+                maxWidth:'80vw', overflowX:'auto',
+              }}
+                onClick={e => e.stopPropagation()}>
+                {images.map((img, i) => (
+                  <img
+                    key={i}
+                    src={buildImageUrl(img)}
+                    alt={`Miniature ${i+1}`}
+                    onClick={() => setLightbox(i)}
+                    onError={e=>{ e.target.src=PLACEHOLDER; }}
+                    style={{
+                      width:52, height:36, objectFit:'cover',
+                      borderRadius:1, cursor:'pointer', flexShrink:0,
+                      outline: i === lightbox ? `2px solid ${GOLD}` : '2px solid transparent',
+                      outlineOffset:1,
+                      opacity: i === lightbox ? 1 : 0.5,
+                      transition:'opacity 0.2s, outline 0.2s',
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
