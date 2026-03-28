@@ -16,7 +16,7 @@ import PropertyCard    from '../components/PropertyCard';
 import ReviewCard      from '../components/ReviewCard';
 import CtaCommission   from '../components/CtaCommission';
 import SEOHead         from '../components/SEOHead';
-import EstimationForm from '../components/EstimationForm';
+import EstimationForm  from '../components/EstimationForm';
 
 import { getLatestPropertiesByPole } from '../services/propertyService';
 import { getAltimmoReviews }         from '../services/reviewService';
@@ -31,9 +31,9 @@ const BLUE_DARK = '#1A5A8A';
 const GOLD      = '#C8872A';
 
 const SERVICES = [
-    { icon: Key,        title: 'Vente de Biens',          desc: 'Nous vous accompagnons à chaque étape pour vendre votre propriété au meilleur prix.', slug: 'vente-de-biens',       color: BLUE,      stat: '+120 ventes' },
-    { icon: Building2,  title: 'Location & Gestion',       desc: "Confiez-nous la gestion de vos biens pour une tranquillité d'esprit optimale.",      slug: 'location-gestion',     color: BLUE_DARK, stat: '+80 biens gérés' },
-    { icon: TrendingUp, title: 'Conseil en Investissement', desc: 'Bénéficiez de notre expertise pour des investissements judicieux et performants.',   slug: 'conseil-investissement', color: GOLD,     stat: '+50 projets' },
+    { icon: Key,        title: 'Vente de Biens',           desc: 'Nous vous accompagnons à chaque étape pour vendre votre propriété au meilleur prix.', slug: 'vente-de-biens',        color: BLUE,      stat: '+120 ventes'    },
+    { icon: Building2,  title: 'Location & Gestion',        desc: "Confiez-nous la gestion de vos biens pour une tranquillité d'esprit optimale.",      slug: 'location-gestion',      color: BLUE_DARK, stat: '+80 biens gérés' },
+    { icon: TrendingUp, title: 'Conseil en Investissement', desc: 'Bénéficiez de notre expertise pour des investissements judicieux et performants.',   slug: 'conseil-investissement', color: GOLD,      stat: '+50 projets'    },
 ];
 
 const TYPES_BIENS  = ['Tous', 'Appartement', 'Maison', 'Villa', 'Terrain', 'Bureau', 'Commerce'];
@@ -54,18 +54,6 @@ const ATOUTS = [
     { icon: Award,       label: 'Experts certifiés',         color: BLUE },
     { icon: MapPin,      label: 'Ancrage local Brazzaville', color: GOLD },
 ];
-
-// Formulaire d'estimation — champs
-const TYPES_BIENS_EST  = ['Appartement', 'Maison', 'Villa', 'Terrain', 'Bureau', 'Commerce', 'Autre'];
-const ETATS_BIEN       = ['Neuf', 'Très bon état', 'Bon état', 'À rénover'];
-const DISPONIBILITES   = ['Immédiatement', 'Dans la semaine', 'Dans le mois', 'Flexible'];
-
-const INITIAL_FORM = {
-    nom: '', email: '', telephone: '',
-    typeBien: '', transaction: 'vente', adresse: '',
-    surface: '', chambres: '', etat: '',
-    description: '', disponibilite: '',
-};
 
 // ─────────────────────────────────────────────────────────────
 const PropertySkeleton = () => (
@@ -91,15 +79,9 @@ const AltimmoPage = () => {
     const [error,          setError]          = useState(null);
 
     // Barre de recherche hero
-    const [typeBien,    setTypeBien]   = useState('Tous');
-    const [transaction, setTransaction]= useState('vente');
-    const [budgetIdx,   setBudgetIdx]  = useState(0);
-
-    // Formulaire estimation
-    const [form,        setForm]       = useState(INITIAL_FORM);
-    const [sending,     setSending]    = useState(false);
-    const [estStatus,   setEstStatus]  = useState(null); // 'success' | 'error' | null
-    const [formErrors,  setFormErrors] = useState({});
+    const [typeBien,    setTypeBien]    = useState('Tous');
+    const [transaction, setTransaction] = useState('vente');
+    const [budgetIdx,   setBudgetIdx]   = useState(0);
 
     const handleSearch = () => {
         const params = new URLSearchParams();
@@ -117,7 +99,9 @@ const AltimmoPage = () => {
     };
 
     const handleLeaveReview = () =>
-        navigate(user ? '/avis/nouveau' : '/login', { state: user ? undefined : { from: '/avis/nouveau' } });
+        navigate(user ? '/avis/nouveau' : '/login', {
+            state: user ? undefined : { from: '/avis/nouveau' },
+        });
 
     useEffect(() => {
         const fetchProperties = async () => {
@@ -125,7 +109,7 @@ const AltimmoPage = () => {
                 const result = await getLatestPropertiesByPole('Altimmo', 6);
                 setProperties(result || []);
             } catch { setError('Impossible de charger les annonces.'); }
-            finally { setLoading(false); }
+            finally   { setLoading(false); }
         };
         const fetchReviews = async () => {
             try { setReviews((await getAltimmoReviews(6)) || []); }
@@ -136,63 +120,30 @@ const AltimmoPage = () => {
         fetchReviews();
     }, []);
 
-    // ── Formulaire estimation ─────────────────────────────────
-    const setField = (k, v) => {
-        setForm(f => ({ ...f, [k]: v }));
-        if (formErrors[k]) setFormErrors(e => ({ ...e, [k]: null }));
-    };
-
-    const validateForm = () => {
-        const errs = {};
-        if (!form.nom.trim())      errs.nom      = 'Votre nom est requis.';
-        if (!form.email.trim())    errs.email    = 'Votre email est requis.';
-        else if (!/\S+@\S+\.\S+/.test(form.email)) errs.email = 'Email invalide.';
-        if (!form.typeBien)        errs.typeBien = 'Sélectionnez le type de bien.';
-        if (!form.adresse.trim())  errs.adresse  = "L'adresse est requise.";
-        if (!form.surface.trim())  errs.surface  = 'La surface est requise.';
-        return errs;
-    };
-
-    const handleEstimationSubmit = async (e) => {
-        e.preventDefault();
-        const errs = validateForm();
-        if (Object.keys(errs).length > 0) { setFormErrors(errs); return; }
-
-        setSending(true);
-        setEstStatus(null);
-        try {
-            await api.post('/estimation', form);
-            setEstStatus('success');
-            setForm(INITIAL_FORM);
-            setFormErrors({});
-        } catch {
-            setEstStatus('error');
-        } finally {
-            setSending(false);
-        }
-    };
-
-    const inputCls = (field) =>
-        `w-full px-4 py-3 rounded-xl text-sm border transition-all focus:outline-none bg-white/8 text-white placeholder-white/30 focus:border-[${BLUE}]/60 ${
-            formErrors[field] ? 'border-red-400' : 'border-white/12'
-        }`;
-
-    const selectCls = (field) =>
-        `w-full px-4 py-3 rounded-xl text-sm border transition-all focus:outline-none bg-white/10 focus:bg-white/15 text-white ${
-            formErrors[field] ? 'border-red-400' : 'border-white/12'
-        }`;
-
     return (
         <div className="min-h-screen bg-white" style={{ fontFamily: "'Outfit', sans-serif" }}>
 
+            {/* ══ SEO ══════════════════════════════════════════════════
+                title       → apparaît dans l'onglet et les résultats Google
+                description → texte affiché sous le titre dans Google (160 chars max)
+                              ✅ Contient les mots-clés locaux : Brazzaville, Congo,
+                              appartement, maison, vente, location — pour le référencement
+                url         → chemin canonique de cette page
+                image       → image affichée quand on partage sur WhatsApp/Facebook
+                breadcrumb  → fil d'Ariane structuré (JSON-LD) pour Google
+            ════════════════════════════════════════════════════════ */}
             <SEOHead
-                title="Altimmo — Immobilier à Brazzaville"
-                description="Parcourez les annonces immobilières à Brazzaville : appartements, maisons, terrains et bureaux disponibles à la vente et à la location."
+                title="Altimmo — Achat, Vente & Location Immobilière à Brazzaville"
+                description="Altimmo by Altitude-Vision : trouvez des appartements, maisons et villas à vendre ou à louer à Brazzaville, Congo. Estimation gratuite, accompagnement juridique inclus."
                 url="/altimmo"
-                breadcrumb={[{ name: 'Accueil', path: '/' }, { name: 'Altimmo', path: '/altimmo' }]}
+                image="/og-altimmo.jpg"
+                breadcrumb={[
+                    { name: 'Accueil', path: '/' },
+                    { name: 'Altimmo', path: '/altimmo' },
+                ]}
             />
 
-            {/* ══ HERO ══════════════════════════════════ */}
+            {/* ══ HERO ═════════════════════════════════════════════════ */}
             <header className="relative text-white overflow-hidden"
                 style={{ height: 'calc(100vh - 0px)', minHeight: '640px', maxHeight: '860px' }}>
                 <HeroSliderAlt />
@@ -290,6 +241,7 @@ const AltimmoPage = () => {
                     </div>
                 </div>
 
+                {/* Bande atouts en bas du hero */}
                 <div className="absolute bottom-0 left-0 right-0 z-10">
                     <div className="h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)' }} />
                     <div className="backdrop-blur-md bg-black/30 grid grid-cols-2 sm:grid-cols-4 divide-x divide-white/10">
@@ -303,39 +255,61 @@ const AltimmoPage = () => {
                 </div>
             </header>
 
-            {/* ══ À PROPOS ══════════════════════════════ */}
+            {/* ══ À PROPOS ═════════════════════════════════════════════ */}
             <section className="py-20 sm:py-24 bg-white overflow-hidden">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
-                        <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }} className="mb-12 lg:mb-0">
+                        <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }}
+                            viewport={{ once: true }} transition={{ duration: 0.7 }} className="mb-12 lg:mb-0">
                             <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: BLUE }}>Notre approche</p>
-                            <h2 className="text-gray-900 mb-5" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3.2rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            <h2 className="text-gray-900 mb-5"
+                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3.2rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 L'Excellence au Service de Vos Projets
                             </h2>
                             <div className="h-0.5 w-16 rounded-full mb-6" style={{ background: `linear-gradient(to right, ${BLUE}, ${GOLD})` }} />
                             <p className="text-gray-600 leading-relaxed mb-6 text-base sm:text-lg">
-                                Forts d'une connaissance approfondie du marché, nous offrons une approche personnalisée, alliant{' '}
+                                Forts d'une connaissance approfondie du marché immobilier de Brazzaville, nous offrons une approche personnalisée, alliant{' '}
                                 <span className="font-semibold text-gray-900">innovation</span>,{' '}
                                 <span className="font-semibold text-gray-900">expertise légale</span> et{' '}
                                 <span className="font-semibold text-gray-900">écoute attentive</span>.
                             </p>
                             <ul className="space-y-3 mb-8">
-                                {['Estimation gratuite et sans engagement', 'Accompagnement juridique inclus', "Réseau d'acquéreurs qualifiés", 'Transparence totale sur les frais'].map((item, i) => (
+                                {[
+                                    'Estimation gratuite et sans engagement',
+                                    'Accompagnement juridique inclus',
+                                    "Réseau d'acquéreurs qualifiés",
+                                    'Transparence totale sur les frais',
+                                ].map((item, i) => (
                                     <li key={i} className="flex items-center gap-3 text-sm text-gray-600">
-                                        <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: BLUE }} /> {item}
+                                        <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: BLUE }} />
+                                        {item}
                                     </li>
                                 ))}
                             </ul>
-                            <Link to="/altimmo/annonces" className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white text-sm hover:scale-105 hover:shadow-xl transition-all group"
+                            <Link to="/altimmo/annonces"
+                                className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white text-sm hover:scale-105 hover:shadow-xl transition-all group"
                                 style={{ background: `linear-gradient(135deg, ${BLUE}, ${BLUE_DARK})`, boxShadow: `0 4px 20px ${BLUE}30`, fontFamily: "'Outfit', sans-serif" }}>
                                 Découvrir nos biens <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                             </Link>
                         </motion.div>
-                        <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.7, delay: 0.1 }} className="grid grid-cols-2 gap-4">
-                            {[{ value: '200+', label: 'Biens vendus', color: BLUE }, { value: '98%', label: 'Clients satisfaits', color: GOLD }, { value: '5 ans', label: "D'expérience", color: BLUE_DARK }, { value: '24h', label: 'Délai de réponse', color: BLUE }].map(({ value, label, color }, i) => (
-                                <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 + i * 0.1 }}
-                                    className="p-6 rounded-2xl border text-center" style={{ backgroundColor: `${color}08`, borderColor: `${color}20` }}>
-                                    <p className="mb-1" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '2.5rem', fontWeight: 700, color, lineHeight: 1 }}>{value}</p>
+
+                        <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }}
+                            viewport={{ once: true }} transition={{ duration: 0.7, delay: 0.1 }}
+                            className="grid grid-cols-2 gap-4">
+                            {[
+                                { value: '200+', label: 'Biens vendus',       color: BLUE      },
+                                { value: '98%',  label: 'Clients satisfaits', color: GOLD      },
+                                { value: '5 ans',label: "D'expérience",       color: BLUE_DARK },
+                                { value: '24h',  label: 'Délai de réponse',   color: BLUE      },
+                            ].map(({ value, label, color }, i) => (
+                                <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }} transition={{ delay: 0.2 + i * 0.1 }}
+                                    className="p-6 rounded-2xl border text-center"
+                                    style={{ backgroundColor: `${color}08`, borderColor: `${color}20` }}>
+                                    <p className="mb-1"
+                                        style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '2.5rem', fontWeight: 700, color, lineHeight: 1 }}>
+                                        {value}
+                                    </p>
                                     <p className="text-xs text-gray-500 font-medium">{label}</p>
                                 </motion.div>
                             ))}
@@ -344,12 +318,13 @@ const AltimmoPage = () => {
                 </div>
             </section>
 
-            {/* ══ SERVICES ══════════════════════════════ */}
+            {/* ══ SERVICES ═════════════════════════════════════════════ */}
             <section className="py-16 sm:py-20 bg-gray-50">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <motion.div className="text-center mb-12" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                         <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: BLUE }}>Nos Engagements</p>
-                        <h2 className="text-gray-900 mb-3" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                        <h2 className="text-gray-900 mb-3"
+                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, lineHeight: 1.1 }}>
                             Une Expertise à Votre Mesure
                         </h2>
                     </motion.div>
@@ -362,15 +337,21 @@ const AltimmoPage = () => {
                                     whileHover={{ y: -6 }}
                                     className="group relative bg-white rounded-3xl p-7 border transition-all duration-500 hover:shadow-xl overflow-hidden"
                                     style={{ borderColor: `${service.color}20` }}>
-                                    <div className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: service.color }} />
+                                    <div className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        style={{ backgroundColor: service.color }} />
                                     <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-sm"
                                         style={{ backgroundColor: `${service.color}15`, border: `1px solid ${service.color}25` }}>
                                         <Icon className="w-6 h-6" style={{ color: service.color }} />
                                     </div>
-                                    <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full mb-3" style={{ backgroundColor: `${service.color}12`, color: service.color }}>{service.stat}</span>
+                                    <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full mb-3"
+                                        style={{ backgroundColor: `${service.color}12`, color: service.color }}>
+                                        {service.stat}
+                                    </span>
                                     <h3 className="font-bold text-gray-900 text-lg mb-2" style={{ fontFamily: "'Outfit', sans-serif" }}>{service.title}</h3>
                                     <p className="text-gray-500 text-sm leading-relaxed mb-5">{service.desc}</p>
-                                    <Link to={`/altimmo/services/${service.slug}`} className="inline-flex items-center gap-2 text-sm font-semibold group-hover:gap-3 transition-all" style={{ color: service.color }}>
+                                    <Link to={`/altimmo/services/${service.slug}`}
+                                        className="inline-flex items-center gap-2 text-sm font-semibold group-hover:gap-3 transition-all"
+                                        style={{ color: service.color }}>
                                         En savoir plus <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </Link>
                                 </motion.div>
@@ -380,27 +361,33 @@ const AltimmoPage = () => {
                 </div>
             </section>
 
-            {/* ══ BIENS RÉCENTS ═════════════════════════ */}
+            {/* ══ BIENS RÉCENTS ════════════════════════════════════════ */}
             <section className="py-16 sm:py-20 bg-white">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-12">
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: BLUE }}>Notre Sélection</p>
-                            <h2 className="text-gray-900" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            <h2 className="text-gray-900"
+                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Biens Immobiliers Récents
                             </h2>
                         </motion.div>
-                        <Link to="/altimmo/annonces" className="inline-flex items-center gap-2 text-sm font-semibold group flex-shrink-0" style={{ color: BLUE }}>
+                        <Link to="/altimmo/annonces"
+                            className="inline-flex items-center gap-2 text-sm font-semibold group flex-shrink-0"
+                            style={{ color: BLUE }}>
                             Voir toutes les annonces <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </Link>
                     </div>
+
                     {loading ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                             {[1,2,3].map(i => <PropertySkeleton key={i} />)}
                         </div>
                     ) : properties.length === 0 ? (
-                        <div className="text-center py-16 rounded-3xl border border-dashed" style={{ borderColor: `${BLUE}30`, backgroundColor: `${BLUE}04` }}>
-                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: `linear-gradient(135deg, ${BLUE}, ${BLUE_DARK})` }}>
+                        <div className="text-center py-16 rounded-3xl border border-dashed"
+                            style={{ borderColor: `${BLUE}30`, backgroundColor: `${BLUE}04` }}>
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                                style={{ background: `linear-gradient(135deg, ${BLUE}, ${BLUE_DARK})` }}>
                                 <Home className="w-8 h-8 text-white" />
                             </div>
                             <p className="font-bold text-gray-700 mb-1">Aucune annonce disponible</p>
@@ -419,14 +406,15 @@ const AltimmoPage = () => {
                 </div>
             </section>
 
-            {/* ══ ESTIMATION GRATUITE ═══════════════════ */}
+            {/* ══ ESTIMATION GRATUITE ══════════════════════════════════ */}
             <section id="estimation" className="py-16 sm:py-20 relative overflow-hidden"
                 style={{ background: 'linear-gradient(135deg, #0D1117 0%, #0e1e30 60%, #0D1117 100%)' }}>
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute top-0 left-1/4 w-80 h-80 rounded-full blur-[120px] opacity-10" style={{ background: BLUE }} />
                     <div className="absolute bottom-0 right-1/4 w-80 h-80 rounded-full blur-[120px] opacity-8" style={{ background: GOLD }} />
                 </div>
-                <div className="absolute top-0 left-0 right-0 h-px" style={{ background: `linear-gradient(to right, transparent, ${BLUE}40, transparent)` }} />
+                <div className="absolute top-0 left-0 right-0 h-px"
+                    style={{ background: `linear-gradient(to right, transparent, ${BLUE}40, transparent)` }} />
 
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
                     <div className="lg:grid lg:grid-cols-5 lg:gap-16 lg:items-start">
@@ -440,19 +428,21 @@ const AltimmoPage = () => {
                                 <Calculator className="w-6 h-6 text-white" />
                             </div>
                             <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GOLD }}>Estimation gratuite</p>
-                            <h2 className="text-white mb-4" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            <h2 className="text-white mb-4"
+                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Quelle est la valeur de votre bien ?
                             </h2>
                             <div className="h-0.5 w-12 rounded-full mb-5" style={{ background: `linear-gradient(to right, ${GOLD}, ${BLUE})` }} />
                             <p className="text-white/60 leading-relaxed mb-6 text-sm">
-                                Remplissez le formulaire ci-contre. Notre équipe analyse votre dossier et vous contacte sous <strong className="text-white/80">24h</strong> avec une estimation personnalisée et sans engagement.
+                                Remplissez le formulaire ci-contre. Notre équipe analyse votre dossier et vous contacte sous{' '}
+                                <strong className="text-white/80">24h</strong> avec une estimation personnalisée et sans engagement.
                             </p>
                             <ul className="space-y-3">
                                 {[
-                                    { icon: CheckCircle, text: '100% gratuit, sans engagement' },
-                                    { icon: Clock,       text: 'Réponse garantie sous 24h' },
-                                    { icon: ShieldCheck, text: 'Expertise marché local Brazzaville' },
-                                    { icon: Mail,        text: 'Confirmation par email immédiate' },
+                                    { icon: CheckCircle, text: '100% gratuit, sans engagement'           },
+                                    { icon: Clock,       text: 'Réponse garantie sous 24h'               },
+                                    { icon: ShieldCheck, text: 'Expertise marché local Brazzaville'      },
+                                    { icon: Mail,        text: 'Confirmation par email immédiate'        },
                                 ].map(({ icon: Icon, text }, i) => (
                                     <li key={i} className="flex items-center gap-2.5 text-sm text-white/60">
                                         <Icon className="w-4 h-4 flex-shrink-0" style={{ color: GOLD }} /> {text}
@@ -461,25 +451,24 @@ const AltimmoPage = () => {
                             </ul>
                         </motion.div>
 
-                        {/* Colonne droite — formulaire complet */}
+                        {/* Colonne droite — formulaire */}
                         <motion.div className="lg:col-span-3"
                             initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }}
                             viewport={{ once: true }} transition={{ duration: 0.7, delay: 0.1 }}>
-
-                           <EstimationForm />
-
+                            <EstimationForm />
                         </motion.div>
                     </div>
                 </div>
             </section>
 
-            {/* ══ AVIS ══════════════════════════════════ */}
+            {/* ══ AVIS ═════════════════════════════════════════════════ */}
             <section className="py-16 sm:py-20 bg-gray-50">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10">
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: BLUE }}>Témoignages</p>
-                            <h2 className="text-gray-900" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            <h2 className="text-gray-900"
+                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Ils Nous Font Confiance
                             </h2>
                         </motion.div>
@@ -496,8 +485,17 @@ const AltimmoPage = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                             {[1,2,3].map(i => (
                                 <div key={i} className="animate-pulse bg-white rounded-3xl p-6 border border-gray-100">
-                                    <div className="flex gap-3 mb-4"><div className="w-10 h-10 bg-gray-200 rounded-full" /><div className="flex-1 space-y-2"><div className="h-3 bg-gray-200 rounded-full w-2/3" /><div className="h-2 bg-gray-100 rounded-full w-1/3" /></div></div>
-                                    <div className="space-y-2"><div className="h-3 bg-gray-100 rounded-full" /><div className="h-3 bg-gray-100 rounded-full w-4/5" /></div>
+                                    <div className="flex gap-3 mb-4">
+                                        <div className="w-10 h-10 bg-gray-200 rounded-full" />
+                                        <div className="flex-1 space-y-2">
+                                            <div className="h-3 bg-gray-200 rounded-full w-2/3" />
+                                            <div className="h-2 bg-gray-100 rounded-full w-1/3" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="h-3 bg-gray-100 rounded-full" />
+                                        <div className="h-3 bg-gray-100 rounded-full w-4/5" />
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -511,7 +509,8 @@ const AltimmoPage = () => {
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-14 rounded-3xl border border-dashed" style={{ borderColor: `${BLUE}25`, backgroundColor: `${BLUE}03` }}>
+                        <div className="text-center py-14 rounded-3xl border border-dashed"
+                            style={{ borderColor: `${BLUE}25`, backgroundColor: `${BLUE}03` }}>
                             <Star className="w-8 h-8 mx-auto mb-3 text-gray-300" />
                             <p className="font-bold text-gray-700 mb-1">Aucun avis pour le moment</p>
                             <p className="text-sm text-gray-500">Soyez le premier à partager votre expérience !</p>
@@ -520,11 +519,14 @@ const AltimmoPage = () => {
                 </div>
             </section>
 
+            {/* ══ CTA COMMISSION ═══════════════════════════════════════ */}
             <section className="py-14 px-4 sm:px-6 bg-white">
                 <div className="container mx-auto max-w-6xl"><CtaCommission /></div>
             </section>
 
+            {/* ══ CONTACT ══════════════════════════════════════════════ */}
             <AltimmoContact />
+
         </div>
     );
 };

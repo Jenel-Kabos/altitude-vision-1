@@ -28,7 +28,7 @@ import {
     SERVICES, ATOUTS, PORTFOLIO_PER_PAGE,
 } from './altcomData';
 
-// ── Skeleton ──────────────────────────────────────────────────
+// ─── Skeleton ─────────────────────────────────────────────────
 const PortfolioSkeleton = () => (
     <div className="animate-pulse bg-white rounded-3xl overflow-hidden border border-gray-100">
         <div className="bg-gray-200 h-52" />
@@ -40,7 +40,7 @@ const PortfolioSkeleton = () => (
     </div>
 );
 
-// ── Pagination ────────────────────────────────────────────────
+// ─── Pagination ───────────────────────────────────────────────
 const Pagination = ({ totalPages, currentPage, onPageChange }) => {
     if (totalPages <= 1) return null;
     return (
@@ -76,15 +76,15 @@ const AltcomPage = () => {
     const location = useLocation();
     const { user } = useAuth();
 
-    const [loading,        setLoading]       = useState(true);
-    const [portfolio,      setPortfolio]     = useState([]);
-    const [reviews,        setReviews]       = useState([]);
-    const [reviewsLoading, setReviewsLoading]= useState(true);
-    const [showQuoteModal, setShowModal]     = useState(false);
-    const [selectedSvc,    setSelectedSvc]   = useState('');
-    const [notif,          setNotif]         = useState({ visible: false, msg: '', ok: true });
-    const [currentPage,    setCurrentPage]   = useState(1);
-    const [showProject,    setShowProject]   = useState(false);
+    const [loading,        setLoading]        = useState(true);
+    const [portfolio,      setPortfolio]      = useState([]);
+    const [reviews,        setReviews]        = useState([]);
+    const [reviewsLoading, setReviewsLoading] = useState(true);
+    const [showQuoteModal, setShowModal]      = useState(false);
+    const [selectedSvc,    setSelectedSvc]    = useState('');
+    const [notif,          setNotif]          = useState({ visible: false, msg: '', ok: true });
+    const [currentPage,    setCurrentPage]    = useState(1);
+    const [showProject,    setShowProject]    = useState(false);
 
     const openQuote = (svc) => { setSelectedSvc(svc); setShowModal(true); };
 
@@ -121,10 +121,19 @@ const AltcomPage = () => {
         [portfolio, currentPage]
     );
 
-    const handleQuoteSubmit   = async (fd) => { await createQuoteRequest(fd); showNotif(`Demande pour "${fd.service}" enregistrée. Réponse sous 24h !`); };
+    const handleQuoteSubmit   = async (fd) => {
+        await createQuoteRequest(fd);
+        showNotif(`Demande pour "${fd.service}" enregistrée. Réponse sous 24h !`);
+    };
     const handleProjectSubmit = async (fd) => {
-        try { await createAltcomProject(fd); showNotif(`Projet "${fd.projectName}" soumis avec succès.`); }
-        catch (err) { const m = err.response?.data?.message || err.message || 'Erreur.'; showNotif(m, false); throw err; }
+        try {
+            await createAltcomProject(fd);
+            showNotif(`Projet "${fd.projectName}" soumis avec succès.`);
+        } catch (err) {
+            const m = err.response?.data?.message || err.message || 'Erreur.';
+            showNotif(m, false);
+            throw err;
+        }
     };
 
     const handleLeaveReview = () =>
@@ -133,32 +142,62 @@ const AltcomPage = () => {
     return (
         <div className="min-h-screen bg-white" style={{ fontFamily: "'Outfit', sans-serif" }}>
 
+            {/* ══ SEO ══════════════════════════════════════════════════
+                title       → mots-clés : communication, branding, Brazzaville, Congo
+                description → services principaux listés pour le référencement local
+                image       → créer /public/og-altcom.jpg (1200×630px)
+                breadcrumb  → fil d'Ariane JSON-LD pour Google
+            ════════════════════════════════════════════════════════ */}
             <SEOHead
-                title="Altcom — Communication & Branding"
-                description="Altcom by Altitude-Vision : stratégie digitale, branding, campagnes publicitaires et production audiovisuelle au Congo."
+                title="Altcom — Agence de Communication & Branding à Brazzaville"
+                description="Altcom by Altitude-Vision : stratégie digitale, création de marque, campagnes publicitaires et production audiovisuelle à Brazzaville, Congo. Devis gratuit."
                 url="/altcom"
+                image="/og-altcom.jpg"
+                breadcrumb={[
+                    { name: 'Accueil', path: '/' },
+                    { name: 'Altcom',  path: '/altcom' },
+                ]}
             />
 
             {/* Toast */}
             <AnimatePresence>
                 {notif.visible && (
                     <motion.div
-                        initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
                         className="fixed top-20 right-4 z-50 px-5 py-3.5 rounded-2xl shadow-2xl text-white text-sm font-semibold max-w-sm"
-                        style={{ background: notif.ok ? 'linear-gradient(135deg,#16a34a,#15803d)' : 'linear-gradient(135deg,#D42B2B,#A01E1E)', fontFamily: "'Outfit',sans-serif" }}>
+                        style={{
+                            background:  notif.ok
+                                ? 'linear-gradient(135deg,#16a34a,#15803d)'
+                                : 'linear-gradient(135deg,#D42B2B,#A01E1E)',
+                            fontFamily: "'Outfit', sans-serif",
+                        }}>
                         {notif.msg}
                     </motion.div>
                 )}
             </AnimatePresence>
 
             <AnimatePresence>
-                {showQuoteModal && <QuoteModal serviceTitle={selectedSvc} onClose={() => setShowModal(false)} onSubmit={handleQuoteSubmit} />}
-            </AnimatePresence>
-            <AnimatePresence>
-                {showProject && <AltcomProjectFormModal onClose={() => setShowProject(false)} onFormSubmit={handleProjectSubmit} />}
+                {showQuoteModal && (
+                    <QuoteModal
+                        serviceTitle={selectedSvc}
+                        onClose={() => setShowModal(false)}
+                        onSubmit={handleQuoteSubmit}
+                    />
+                )}
             </AnimatePresence>
 
-            {/* ══ HERO ══════════════════════════════════════ */}
+            <AnimatePresence>
+                {showProject && (
+                    <AltcomProjectFormModal
+                        onClose={() => setShowProject(false)}
+                        onFormSubmit={handleProjectSubmit}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* ══ HERO ═════════════════════════════════════════════════ */}
             <header className="relative text-white overflow-hidden"
                 style={{ height: 'calc(100vh - 0px)', minHeight: '640px', maxHeight: '860px' }}>
                 <HeroSliderAltcom />
@@ -176,7 +215,7 @@ const AltcomPage = () => {
                         <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.15, duration: 0.7 }}
                             className="text-white mb-4 max-w-3xl"
-                            style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 'clamp(2.5rem,5.5vw,5rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
+                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2.5rem, 5.5vw, 5rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
                             Altcom
                             <span className="block" style={{ color: GOLD_LIGHT }}>Stratégie & Créativité</span>
                         </motion.h1>
@@ -184,12 +223,12 @@ const AltcomPage = () => {
                         <motion.div initial={{ width: 0 }} animate={{ width: '64px' }}
                             transition={{ delay: 0.4, duration: 0.6 }}
                             className="h-0.5 rounded-full mb-5"
-                            style={{ background: `linear-gradient(to right,${GOLD},${BLUE})` }} />
+                            style={{ background: `linear-gradient(to right, ${GOLD}, ${BLUE})` }} />
 
                         <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.3, duration: 0.7 }}
                             className="text-white/75 max-w-xl mb-8 leading-relaxed"
-                            style={{ fontSize: 'clamp(0.95rem,1.6vw,1.15rem)', fontWeight: 300 }}>
+                            style={{ fontSize: 'clamp(0.95rem, 1.6vw, 1.15rem)', fontWeight: 300 }}>
                             Votre Vision, Notre Mission. Des solutions de communication percutantes et sur mesure pour propulser votre marque.
                         </motion.p>
 
@@ -198,12 +237,12 @@ const AltcomPage = () => {
                             className="flex flex-wrap gap-3">
                             <button onClick={() => setShowProject(true)}
                                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white text-sm transition-all hover:scale-105"
-                                style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})`, boxShadow: `0 4px 20px ${GOLD}50`, fontFamily: "'Outfit',sans-serif" }}>
+                                style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, boxShadow: `0 4px 20px ${GOLD}50`, fontFamily: "'Outfit', sans-serif" }}>
                                 <Presentation className="w-4 h-4" /> Démarrer votre projet
                             </button>
                             <Link to="/altcom/annonces"
                                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white text-sm border border-white/20 hover:bg-white/15 backdrop-blur-sm transition-all"
-                                style={{ fontFamily: "'Outfit',sans-serif" }}>
+                                style={{ fontFamily: "'Outfit', sans-serif" }}>
                                 <Briefcase className="w-4 h-4" /> Voir nos réalisations
                             </Link>
                         </motion.div>
@@ -212,7 +251,7 @@ const AltcomPage = () => {
 
                 {/* Atouts bande bas */}
                 <div className="absolute bottom-0 left-0 right-0" style={{ zIndex: 5 }}>
-                    <div className="h-px" style={{ background: 'linear-gradient(to right,transparent,rgba(255,255,255,0.1),transparent)' }} />
+                    <div className="h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)' }} />
                     <div className="backdrop-blur-md bg-black/30 grid grid-cols-2 sm:grid-cols-4 divide-x divide-white/10">
                         {ATOUTS.map(({ icon: Icon, label, color }, i) => (
                             <div key={i} className="flex items-center gap-2.5 px-5 py-3.5">
@@ -224,7 +263,7 @@ const AltcomPage = () => {
                 </div>
             </header>
 
-            {/* ══ À PROPOS ══════════════════════════════════ */}
+            {/* ══ À PROPOS ═════════════════════════════════════════════ */}
             <section className="py-20 sm:py-24 bg-white overflow-hidden">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
@@ -232,17 +271,22 @@ const AltcomPage = () => {
                             viewport={{ once: true }} transition={{ duration: 0.7 }} className="mb-12 lg:mb-0">
                             <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD }}>Notre approche</p>
                             <h2 className="text-gray-900 mb-5"
-                                style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 'clamp(2rem,4vw,3.2rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3.2rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Qui Sommes-Nous ?
                             </h2>
-                            <div className="h-0.5 w-16 rounded-full mb-6" style={{ background: `linear-gradient(to right,${GOLD},${BLUE})` }} />
+                            <div className="h-0.5 w-16 rounded-full mb-6" style={{ background: `linear-gradient(to right, ${GOLD}, ${BLUE})` }} />
                             <p className="text-gray-600 leading-relaxed mb-6 text-base sm:text-lg">
                                 Altcom est le pôle de communication d'Altitude-Vision, spécialisé dans la création de{' '}
-                                <span className="font-semibold text-gray-900">stratégies percutantes</span>. Nous aidons les marques à raconter leur histoire et à{' '}
+                                <span className="font-semibold text-gray-900">stratégies percutantes</span> à Brazzaville. Nous aidons les marques à raconter leur histoire et à{' '}
                                 <span className="font-semibold text-gray-900">engager leur audience</span> grâce à des solutions créatives et sur mesure.
                             </p>
                             <ul className="space-y-2.5 mb-8">
-                                {['Stratégie de communication 360°', 'Création de contenus visuels et digitaux', 'Gestion des réseaux sociaux', 'Couverture médiatique professionnelle'].map((item, i) => (
+                                {[
+                                    'Stratégie de communication 360°',
+                                    'Création de contenus visuels et digitaux',
+                                    'Gestion des réseaux sociaux',
+                                    'Couverture médiatique professionnelle',
+                                ].map((item, i) => (
                                     <li key={i} className="flex items-center gap-3 text-sm text-gray-600">
                                         <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: GOLD }} />
                                         {item}
@@ -251,7 +295,7 @@ const AltcomPage = () => {
                             </ul>
                             <button onClick={() => setShowProject(true)}
                                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white text-sm transition-all hover:scale-105 hover:shadow-xl group"
-                                style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})`, boxShadow: `0 4px 20px ${GOLD}30`, fontFamily: "'Outfit',sans-serif" }}>
+                                style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, boxShadow: `0 4px 20px ${GOLD}30`, fontFamily: "'Outfit', sans-serif" }}>
                                 Démarrer un projet
                                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                             </button>
@@ -260,22 +304,29 @@ const AltcomPage = () => {
                         <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }}
                             viewport={{ once: true }} transition={{ duration: 0.7, delay: 0.1 }}
                             className="grid grid-cols-2 gap-4">
-                            {[{ value: '80+', label: 'Projets réalisés', color: GOLD }, { value: '98%', label: 'Clients satisfaits', color: BLUE }, { value: '5 ans', label: "D'expérience", color: GOLD }, { value: '24h', label: 'Délai de réponse', color: BLUE }]
-                                .map(({ value, label, color }, i) => (
-                                    <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-                                        viewport={{ once: true }} transition={{ delay: 0.2 + i * 0.1 }}
-                                        className="p-6 rounded-2xl border text-center"
-                                        style={{ backgroundColor: `${color}08`, borderColor: `${color}20` }}>
-                                        <p className="mb-1" style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '2.5rem', fontWeight: 700, color, lineHeight: 1 }}>{value}</p>
-                                        <p className="text-xs text-gray-500 font-medium">{label}</p>
-                                    </motion.div>
-                                ))}
+                            {[
+                                { value: '80+',  label: 'Projets réalisés', color: GOLD },
+                                { value: '98%',  label: 'Clients satisfaits', color: BLUE },
+                                { value: '5 ans',label: "D'expérience",       color: GOLD },
+                                { value: '24h',  label: 'Délai de réponse',   color: BLUE },
+                            ].map(({ value, label, color }, i) => (
+                                <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }} transition={{ delay: 0.2 + i * 0.1 }}
+                                    className="p-6 rounded-2xl border text-center"
+                                    style={{ backgroundColor: `${color}08`, borderColor: `${color}20` }}>
+                                    <p className="mb-1"
+                                        style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '2.5rem', fontWeight: 700, color, lineHeight: 1 }}>
+                                        {value}
+                                    </p>
+                                    <p className="text-xs text-gray-500 font-medium">{label}</p>
+                                </motion.div>
+                            ))}
                         </motion.div>
                     </div>
                 </div>
             </section>
 
-            {/* ══ SERVICES ══════════════════════════════════ */}
+            {/* ══ SERVICES ═════════════════════════════════════════════ */}
             <section className="py-16 sm:py-20 bg-gray-50">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <motion.div className="text-center mb-12"
@@ -283,7 +334,7 @@ const AltcomPage = () => {
                         viewport={{ once: true }} transition={{ duration: 0.6 }}>
                         <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GOLD }}>Nos Expertises</p>
                         <h2 className="text-gray-900 mb-3"
-                            style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 'clamp(2rem,4vw,3rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, lineHeight: 1.1 }}>
                             Nos Services
                         </h2>
                         <p className="text-gray-500 text-sm max-w-xl mx-auto">
@@ -296,17 +347,20 @@ const AltcomPage = () => {
                 </div>
             </section>
 
-            {/* ══ PORTFOLIO ═════════════════════════════════ */}
+            {/* ══ PORTFOLIO ════════════════════════════════════════════ */}
             <section id="portfolio" className="py-16 sm:py-20 bg-white">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-12">
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: GOLD }}>Portfolio</p>
-                            <h2 className="text-gray-900" style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 'clamp(1.8rem,3.5vw,2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            <h2 className="text-gray-900"
+                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Nos Réalisations
                             </h2>
                         </motion.div>
-                        <Link to="/altcom/annonces" className="inline-flex items-center gap-2 text-sm font-semibold group flex-shrink-0" style={{ color: GOLD }}>
+                        <Link to="/altcom/annonces"
+                            className="inline-flex items-center gap-2 text-sm font-semibold group flex-shrink-0"
+                            style={{ color: GOLD }}>
                             Voir tous les projets <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </Link>
                     </div>
@@ -326,11 +380,16 @@ const AltcomPage = () => {
                                 ))}
                             </div>
                             <Pagination totalPages={totalPages} currentPage={currentPage}
-                                onPageChange={p => { setCurrentPage(p); document.getElementById('portfolio')?.scrollIntoView({ behavior: 'smooth' }); }} />
+                                onPageChange={p => {
+                                    setCurrentPage(p);
+                                    document.getElementById('portfolio')?.scrollIntoView({ behavior: 'smooth' });
+                                }} />
                         </>
                     ) : (
-                        <div className="text-center py-16 rounded-3xl border border-dashed" style={{ borderColor: `${GOLD}30`, backgroundColor: `${GOLD}04` }}>
-                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})` }}>
+                        <div className="text-center py-16 rounded-3xl border border-dashed"
+                            style={{ borderColor: `${GOLD}30`, backgroundColor: `${GOLD}04` }}>
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                                style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})` }}>
                                 <Briefcase className="w-8 h-8 text-white" />
                             </div>
                             <p className="font-bold text-gray-700 mb-1">Aucune réalisation disponible</p>
@@ -340,19 +399,20 @@ const AltcomPage = () => {
                 </div>
             </section>
 
-            {/* ══ AVIS ══════════════════════════════════════ */}
+            {/* ══ AVIS ═════════════════════════════════════════════════ */}
             <section className="py-16 sm:py-20 bg-gray-50">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10">
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: GOLD }}>Témoignages</p>
-                            <h2 className="text-gray-900" style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 'clamp(1.8rem,3.5vw,2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            <h2 className="text-gray-900"
+                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Ils Nous Font Confiance
                             </h2>
                         </motion.div>
                         <motion.button onClick={handleLeaveReview} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
                             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-white text-sm flex-shrink-0"
-                            style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})`, boxShadow: `0 4px 16px ${GOLD}30`, fontFamily: "'Outfit',sans-serif" }}>
+                            style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, boxShadow: `0 4px 16px ${GOLD}30`, fontFamily: "'Outfit', sans-serif" }}>
                             <MessageSquarePlus className="w-4 h-4" />
                             Laisser un avis
                             {!user && <span className="opacity-50 text-xs font-normal">(connexion)</span>}
@@ -387,7 +447,8 @@ const AltcomPage = () => {
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-14 rounded-3xl border border-dashed" style={{ borderColor: `${GOLD}25`, backgroundColor: `${GOLD}03` }}>
+                        <div className="text-center py-14 rounded-3xl border border-dashed"
+                            style={{ borderColor: `${GOLD}25`, backgroundColor: `${GOLD}03` }}>
                             <Star className="w-8 h-8 mx-auto mb-3 text-gray-300" />
                             <p className="font-bold text-gray-700 mb-1">Aucun avis pour le moment</p>
                             <p className="text-sm text-gray-500">Soyez le premier à partager votre expérience !</p>
@@ -396,40 +457,41 @@ const AltcomPage = () => {
                 </div>
             </section>
 
-            {/* ══ CTA FINAL ═════════════════════════════════ */}
+            {/* ══ CTA FINAL ════════════════════════════════════════════ */}
             <section className="py-20 relative overflow-hidden"
-                style={{ background: 'linear-gradient(135deg,#0D1117 0%,#1a1505 50%,#0D1117 100%)' }}>
+                style={{ background: 'linear-gradient(135deg, #0D1117 0%, #1a1505 50%, #0D1117 100%)' }}>
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute top-0 left-1/4 w-80 h-80 rounded-full blur-[120px] opacity-15" style={{ background: GOLD }} />
-                    <div className="absolute bottom-0 right-1/4 w-80 h-80 rounded-full blur-[120px] opacity-8" style={{ background: BLUE }} />
+                    <div className="absolute bottom-0 right-1/4 w-80 h-80 rounded-full blur-[120px] opacity-8"  style={{ background: BLUE }} />
                 </div>
-                <div className="absolute top-0 left-0 right-0 h-px" style={{ background: `linear-gradient(to right,transparent,${GOLD}50,transparent)` }} />
+                <div className="absolute top-0 left-0 right-0 h-px"
+                    style={{ background: `linear-gradient(to right, transparent, ${GOLD}50, transparent)` }} />
 
                 <div className="container mx-auto px-4 sm:px-6 max-w-4xl text-center relative z-10">
                     <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                         <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-6"
-                            style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})` }}>
+                            style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})` }}>
                             <Zap className="w-7 h-7 text-white" />
                         </div>
                         <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD_LIGHT }}>Propulsez votre marque</p>
                         <h2 className="text-white mb-5"
-                            style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 'clamp(2rem,4vw,3.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                             Prêt à Propulser Votre Marque ?
                         </h2>
                         <p className="text-white/60 mb-10 max-w-2xl mx-auto leading-relaxed"
-                            style={{ fontSize: 'clamp(0.95rem,1.5vw,1.1rem)' }}>
+                            style={{ fontSize: 'clamp(0.95rem, 1.5vw, 1.1rem)' }}>
                             Discutons de votre stratégie de communication pour atteindre de nouveaux sommets ensemble.
                         </p>
                         <div className="flex flex-wrap justify-center gap-4">
                             <motion.button onClick={() => openQuote('Projet Sur Mesure')}
                                 whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
                                 className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-semibold text-white text-base"
-                                style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})`, boxShadow: `0 8px 32px ${GOLD}40`, fontFamily: "'Outfit',sans-serif" }}>
+                                style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, boxShadow: `0 8px 32px ${GOLD}40`, fontFamily: "'Outfit', sans-serif" }}>
                                 <UserRoundPen className="w-5 h-5" /> Contacter l'équipe Altcom
                             </motion.button>
                             <Link to="/altcom/annonces"
                                 className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-semibold text-white/80 text-base border border-white/15 hover:bg-white/10 transition-all"
-                                style={{ fontFamily: "'Outfit',sans-serif" }}>
+                                style={{ fontFamily: "'Outfit', sans-serif" }}>
                                 <Briefcase className="w-5 h-5" /> Voir nos projets
                             </Link>
                         </div>
