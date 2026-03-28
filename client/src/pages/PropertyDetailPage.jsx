@@ -734,7 +734,6 @@ const PropertyDetailPage = () => {
           </motion.aside>
         </div>
       </div>
-    </div>
 
       {/* ── Lightbox ──────────────────────────────────────── */}
       <AnimatePresence>
