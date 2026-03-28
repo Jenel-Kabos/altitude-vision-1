@@ -46,7 +46,7 @@ const CARD_STYLES = `
     --gold-pale: rgba(200,135,42,0.08);
     --ink: #1A1612;
     --ink-mid: #4A3F35;
-    --ink-soft: #8C7B6E;
+    --ink-soft: #6B5D52;
     --cream: #FAF8F5;
     --cream-dark: #F0EDE8;
     --border: rgba(200,135,42,0.2);
@@ -180,7 +180,8 @@ const CARD_STYLES = `
     font-weight: 500;
     letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: var(--gold);
+    /* ✅ #8B5E1A ratio 5.1:1 sur fond crème ✅ */
+    color: #8B5E1A;
     margin-bottom: 6px;
   }
 
@@ -297,18 +298,26 @@ const CARD_STYLES = `
   }
 
   /* CTA link */
+  /* ✅ CORRECTION ZONE TACTILE : padding-block assure 44px de hauteur cliquable
+     sans changer l'apparence visuelle du texte */
   .pcard-cta {
     font-family: 'Jost', sans-serif;
     font-size: 10px;
-    font-weight: 500;
+    font-weight: 600;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: var(--gold);
+    /* ✅ CORRECTION CONTRASTE : #C8872A sur #FDFCFA = ratio 2.8:1 ❌
+       Solution : on assombrit légèrement pour passer 4.5:1.
+       #8B5E1A sur #FDFCFA = ratio 5.1:1 ✅ */
+    color: #8B5E1A;
     display: flex;
     align-items: center;
     gap: 6px;
     transition: gap 0.2s;
+    min-height: 44px;
+    padding-block: 8px;
   }
+  .pcard-grid:hover .pcard-cta { color: var(--gold); }
   .pcard-grid:hover .pcard-cta { gap: 10px; }
   .pcard-cta::after {
     content: '→';
@@ -375,7 +384,7 @@ const CARD_STYLES = `
   .pcard-list-price span {
     font-family: 'Jost', sans-serif;
     font-size: 12px;
-    color: var(--ink-soft);
+    color: var(--ink-soft); /* ✅ fixed via --ink-soft var */
     letter-spacing: 0.1em;
     margin-left: 4px;
   }
