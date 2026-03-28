@@ -225,7 +225,17 @@ const updateProperty = asyncHandler(async (req, res) => {
   excludedFields.forEach(field => delete updateData[field]);
 
   // Gestion des images — URL relative propre
-  const newImages = req.files ? req.files.map(fileToUrl) : [];
+  const newImages = req.files
+  ? req.files
+      .filter(file => file && file.path)          // ← ignore les fichiers sans path
+      .map(file => '/' + file.path.replace(/\\/g, '/').replace(/^\//, ''))
+  : [];
+
+console.log("req.files brut:", JSON.stringify(req.files?.map(f => ({
+  fieldname: f.fieldname,
+  path: f.path,
+  filename: f.filename
+})), null, 2));
   console.log("📸 Nouvelles images:", newImages);
 
   let existingImages = req.body.existingImages || [];
