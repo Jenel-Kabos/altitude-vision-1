@@ -14,6 +14,18 @@ import PropertyForm from "../../components/dashboard/PropertyForm";
 const BLUE = '#2E7BB5';
 const GOLD = '#C8872A';
 
+// ✅ Préfixe les URLs relatives avec l'URL du backend.
+// Le controller sauvegarde les chemins sous la forme "/uploads/events/photo.jpg"
+// (chemin relatif au serveur), pas une URL absolue — il faut donc ajouter le domaine.
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const normalized = url.replace(/\\/g, "/").replace(/^\//, "");
+  return `${API_URL}/${normalized}`;
+};
+
 // ─────────────────────────────────────────────────────────────
 // État formulaire initial
 // ─────────────────────────────────────────────────────────────
@@ -30,9 +42,9 @@ const emptyForm = () => ({
 // ─────────────────────────────────────────────────────────────
 const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
   const isEditing = !!propertyId;
-  const [formData, setFormData]         = useState(emptyForm());
+  const [formData, setFormData]             = useState(emptyForm());
   const [existingImages, setExistingImages] = useState([]);
-  const [loading, setLoading]           = useState(false);
+  const [loading, setLoading]               = useState(false);
 
   useEffect(() => {
     if (!isEditing) { setFormData(emptyForm()); setExistingImages([]); return; }
@@ -125,7 +137,13 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
 // Carte bien (liste)
 // ─────────────────────────────────────────────────────────────
 const PropertyCard = ({ property, onEdit, onDelete }) => {
-  const img = property.images?.[0] || 'https://placehold.co/600x400/2E7BB5/FFFFFF?text=Altimmo';
+  // ✅ Correction : préfixer l'URL avec le domaine du backend.
+  // Sans ça, "/uploads/events/photo.jpg" est interprété comme une URL
+  // relative au frontend (ex: altitudevision.agency/uploads/...) au lieu
+  // du backend (ex: api.altitudevision.agency/uploads/...).
+  const img = getImageUrl(property.images?.[0])
+    || 'https://placehold.co/600x400/2E7BB5/FFFFFF?text=Altimmo';
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all group">
       <div className="relative h-44 overflow-hidden">
@@ -272,8 +290,8 @@ const OwnerPropertyManagement = () => {
     }
   };
 
-  const handleEdit  = (property) => { setEditingId(property._id); setView("edit"); };
-  const handleSave  = (saved, isUpdate) => {
+  const handleEdit   = (property) => { setEditingId(property._id); setView("edit"); };
+  const handleSave   = (saved, isUpdate) => {
     setProperties(prev =>
       isUpdate ? prev.map(p => p._id === saved._id ? saved : p) : [saved, ...prev]
     );

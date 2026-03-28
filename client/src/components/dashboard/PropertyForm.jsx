@@ -11,6 +11,19 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
+// ✅ Préfixe les URLs relatives avec l'URL du backend.
+// file.path retourne "uploads/events/photo.jpg" (sans slash ni domaine),
+// ce qui n'est pas une URL valide pour <img src="...">.
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  // Normalise les backslashes Windows et assure un slash initial
+  const normalized = url.replace(/\\/g, "/").replace(/^\//, "");
+  return `${API_URL}/${normalized}`;
+};
+
 const PropertyForm = ({
   formData,
   setFormData,
@@ -105,7 +118,6 @@ const PropertyForm = ({
     setExistingImages(existingImages.filter((img) => img !== url));
   };
 
-  console.log("existingImages:", existingImages);
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
 
@@ -352,7 +364,7 @@ const PropertyForm = ({
               {existingImages.map((img, i) => (
                 <div key={i} className="relative w-24 h-24">
                   <img
-                    src={img}
+                    src={getImageUrl(img)}
                     alt={`Image existante ${i}`}
                     className="object-cover w-full h-full rounded border-2 border-gray-300"
                   />
