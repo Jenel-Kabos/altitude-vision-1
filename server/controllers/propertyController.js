@@ -3,18 +3,22 @@ const asyncHandler = require('express-async-handler');
 const Property = require('../models/Property');
 const User = require('../models/User');
 const APIFeatures = require('../utils/apiFeatures');
+const { uploadToCloudinary } = require('../config/cloudinary');
 
 // ============================================================
 // 🛠️ UTILITAIRES
 // ============================================================
 
 /**
- * Convertit file.path (ex: "uploads\events\photo.jpg" ou "uploads/events/photo.jpg")
- * en URL relative propre : "/uploads/events/photo.jpg"
- * Compatible Windows (backslashes) et Linux (forward slashes).
+ * Upload tous les fichiers en mémoire (multer.memoryStorage) vers Cloudinary.
+ * Retourne un tableau d'URLs sécurisées (secure_url).
  */
-const fileToUrl = (file) => {
-  return '/' + file.path.replace(/\\/g, '/').replace(/^\//, '');
+const uploadFilesToCloudinary = async (files = [], folder = 'altitude-vision/properties') => {
+  if (!files || files.length === 0) return [];
+  const uploads = await Promise.all(
+    files.map(file => uploadToCloudinary(file.buffer, { folder, resource_type: 'image' }))
+  );
+  return uploads.map(result => result.secure_url).filter(Boolean);
 };
 
 /**
@@ -46,11 +50,11 @@ const parseAmenities = (amenities) => {
  * @route POST /api/properties
  */
 const createProperty = asyncHandler(async (req, res, next) => {
-  console.log("--- 🆕 Création de propriété ---");
+  console.log('--- 🆕 Création de propriété ---');
 
-  // 1. Gestion des images — URL relative propre (ex: /uploads/events/photo.jpg)
-  const imagePaths = req.files ? req.files.map(fileToUrl) : [];
-  console.log("📸 Images sauvegardées:", imagePaths);
+  // 1. Upload des images vers Cloudinary (fichiers en mémoire via multer.memoryStorage)
+  const imagePaths = await uploadFilesToCloudinary(req.files);
+  console.log('📸 Images Cloudinary:', imagePaths);
 
   // 2. Préparation des données
   const {
@@ -87,30 +91,30 @@ const createProperty = asyncHandler(async (req, res, next) => {
 
   // 5. Création en base
   const newProperty = await Property.create({
-    owner: req.user.id,
+    owner:           req.user.id,
     title,
     description,
-    price:          parseFloat(price),
+    price:           parseFloat(price),
     pole,
     status,
     availability,
     type,
-    address:        finalAddress,
-    surface:        parseFloat(surface),
-    bedrooms:       parseInt(bedrooms  || 0),
-    bathrooms:      parseInt(bathrooms || 0),
-    livingRooms:    parseInt(livingRooms || 0),
-    kitchens:       parseInt(kitchens    || 0),
+    address:         finalAddress,
+    surface:         parseFloat(surface),
+    bedrooms:        parseInt(bedrooms   || 0),
+    bathrooms:       parseInt(bathrooms  || 0),
+    livingRooms:     parseInt(livingRooms || 0),
+    kitchens:        parseInt(kitchens    || 0),
     constructionType,
-    amenities:      parseAmenities(amenities),
+    amenities:       parseAmenities(amenities),
     longitude,
     latitude,
-    location:       finalLocation,
-    images:         imagePaths,
-    statusAdmin:    'En attente'
+    location:        finalLocation,
+    images:          imagePaths,
+    statusAdmin:     'En attente'
   });
 
-  console.log(`✅ Propriété créée : ${newProperty._id}`);
+  console.log('✅ Propriété créée :', newProperty._id);
 
   res.status(201).json({
     status: 'success',
@@ -149,13 +153,13 @@ const getAllProperties = asyncHandler(async (req, res) => {
  * @route GET /api/properties/status/pending
  */
 const getPendingProperties = asyncHandler(async (req, res) => {
-  console.log("📡 [Admin] Récupération des annonces en attente...");
+  console.log('📡 [Admin] Récupération des annonces en attente...');
 
   const properties = await Property.find({ statusAdmin: 'En attente' })
     .populate('owner', 'name email photo role phone')
     .sort('-createdAt');
 
-  console.log(`✅ ${properties.length} annonces en attente.`);
+  console.log('✅', properties.length, 'annonces en attente.');
 
   res.status(200).json({
     status: 'success',
@@ -168,8 +172,8 @@ const getPendingProperties = asyncHandler(async (req, res) => {
  * @description Middleware pour les dernières propriétés
  */
 const getLatestProperties = (req, res, next) => {
-  req.query.limit      = '5';
-  req.query.sort       = '-createdAt';
+  req.query.limit       = '5';
+  req.query.sort        = '-createdAt';
   req.query.statusAdmin = 'Validée';
   next();
 };
@@ -187,7 +191,8 @@ const getProperty = asyncHandler(async (req, res) => {
   }
 
   const isAdmin = req.user && req.user.role === 'Admin';
-  const isOwner = req.user && property.owner && property.owner._id.toString() === req.user.id.toString();
+  const isOwner = req.user && property.owner &&
+    property.owner._id.toString() === req.user.id.toString();
 
   if (property.statusAdmin !== 'Validée' && !isAdmin && !isOwner) {
     res.status(403);
@@ -224,42 +229,30 @@ const updateProperty = asyncHandler(async (req, res) => {
   const updateData = { ...req.body };
   excludedFields.forEach(field => delete updateData[field]);
 
-  // Gestion des images — URL relative propre
-  const newImages = req.files
-  ? req.files
-      .filter(file => file && file.path)          // ← ignore les fichiers sans path
-      .map(file => '/' + file.path.replace(/\\/g, '/').replace(/^\//, ''))
-  : [];
+  // 1. Upload des nouvelles images vers Cloudinary
+  const newImages = await uploadFilesToCloudinary(req.files);
+  console.log('📸 Nouvelles images Cloudinary:', newImages);
 
-console.log("req.files brut:", JSON.stringify(req.files?.map(f => ({
-  fieldname: f.fieldname,
-  path: f.path,
-  filename: f.filename
-})), null, 2));
-  console.log("📸 Nouvelles images:", newImages);
-
+  // 2. Récupérer les images existantes envoyées par le frontend
   let existingImages = req.body.existingImages || [];
-
-  // Parsing existingImages si string JSON
   if (typeof existingImages === 'string') {
     try { existingImages = JSON.parse(existingImages); }
     catch (e) { existingImages = [existingImages]; }
   }
   if (!Array.isArray(existingImages)) existingImages = [];
 
-  // Combiner images existantes + nouvelles si nécessaire
+  // 3. Combiner images existantes + nouvelles
   if (newImages.length > 0 || existingImages.length > 0) {
     updateData.images = [...existingImages, ...newImages];
   }
-  // Sinon on ne touche pas au champ images (MongoDB garde l'ancien)
 
-  // Parsing Adresse
+  // 4. Parsing Adresse
   if (typeof updateData.address === 'string') {
     try { updateData.address = JSON.parse(updateData.address); }
     catch (e) { delete updateData.address; }
   }
 
-  // Parsing Location (GPS)
+  // 5. Parsing Location (GPS)
   if (updateData.longitude && updateData.latitude) {
     updateData.location = {
       type: 'Point',
@@ -286,8 +279,8 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
   const { id, action } = req.params;
   let newStatusAdmin;
 
-  if (action === 'validate')      newStatusAdmin = 'Validée';
-  else if (action === 'reject')   newStatusAdmin = 'Rejetée';
+  if (action === 'validate')    newStatusAdmin = 'Validée';
+  else if (action === 'reject') newStatusAdmin = 'Rejetée';
   else {
     res.status(400);
     throw new Error('Action invalide (validate ou reject attendu).');
