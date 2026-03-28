@@ -62,27 +62,26 @@ const STYLES = `
     margin: 10px 0 18px;
   }
 
-  /* Gallery */
+  /* Gallery — compact: image 280px + strip 68px thumbnails */
   .pdp-main-img {
-    width: 100%; height: 520px;
-    object-fit: cover;
-    display: block;
-    transition: transform 0.8s cubic-bezier(0.25,0.46,0.45,0.94);
+    width: 100%; height: 280px;
+    object-fit: cover; display: block;
+    transition: transform 0.7s cubic-bezier(0.25,0.46,0.45,0.94);
   }
-  .pdp-gallery-wrap:hover .pdp-main-img { transform: scale(1.025); }
+  .pdp-gallery-wrap:hover .pdp-main-img { transform: scale(1.03); }
 
+  .pdp-strip {
+    display: flex; gap: 3px; margin-top: 3px;
+    height: 68px; overflow: hidden;
+  }
   .pdp-thumb {
-    width: 100%; aspect-ratio: 4/3;
-    object-fit: cover;
-    cursor: pointer;
-    transition: opacity 0.2s, transform 0.2s;
-    filter: saturate(0.7);
+    flex: 1; min-width: 0; height: 100%;
+    object-fit: cover; cursor: pointer; border-radius: 1px;
+    transition: filter 0.2s, transform 0.2s;
+    filter: saturate(0.6) brightness(0.9);
   }
-  .pdp-thumb:hover, .pdp-thumb.active {
-    filter: saturate(1);
-    transform: scale(1.03);
-  }
-  .pdp-thumb.active { outline: 2px solid ${GOLD}; outline-offset: 2px; }
+  .pdp-thumb:hover { filter: saturate(1) brightness(1); }
+  .pdp-thumb.active { filter: saturate(1) brightness(1); outline: 2px solid ${GOLD}; outline-offset: -2px; }
 
   /* Cards */
   .pdp-card {
@@ -410,11 +409,11 @@ const PropertyDetailPage = () => {
         </div>
       </div>
 
-      <div style={{ maxWidth:1200, margin:'0 auto', padding:'52px 24px 80px' }}>
+      <div style={{ maxWidth:1200, margin:'0 auto', padding:'36px 24px 80px' }}>
 
         {/* ── Hero header ─────────────────────────────────── */}
         <motion.div initial={{ opacity:0, y:18 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.55, ease:[0.22,1,0.36,1] }}
-          style={{ marginBottom:40 }}>
+          style={{ marginBottom:24 }}>
 
           <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:16, marginBottom:12 }}>
             <div>
@@ -450,103 +449,79 @@ const PropertyDetailPage = () => {
           </div>
         </motion.div>
 
-        {/* ── Gallery ─────────────────────────────────────── */}
+        {/* ── Main layout: galerie + infos + sidebar côte à côte ── */}
+        {/* Galerie compacte au-dessus, puis grille 3 colonnes en dessous */}
         <motion.div initial={{ opacity:0, y:24 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1, duration:0.55, ease:[0.22,1,0.36,1] }}
-          style={{ marginBottom:48 }}>
-
+          style={{ marginBottom:24 }}>
           {images.length > 0 ? (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 200px', gap:3 }}
-              className="pdp-gallery-wrap"
-              onMouseLeave={()=>{}}>
-
-              {/* Main */}
-              <div style={{ position:'relative', overflow:'hidden', borderRadius:2 }}>
+            <div className="pdp-gallery-wrap" style={{ borderRadius:2, overflow:'hidden', position:'relative' }}>
+              {/* Image principale */}
+              <div style={{ position:'relative', overflow:'hidden' }}>
                 <AnimatePresence mode="wait">
                   <motion.img
                     key={mainIdx}
                     src={mainImage}
                     alt="Vue principale"
                     className="pdp-main-img"
-                    initial={{ opacity:0, scale:1.04 }}
-                    animate={{ opacity:1, scale:1 }}
+                    initial={{ opacity:0 }}
+                    animate={{ opacity:1 }}
                     exit={{ opacity:0 }}
-                    transition={{ duration:0.4 }}
+                    transition={{ duration:0.35 }}
                     onError={e=>{ e.target.src=PLACEHOLDER; }}
                   />
                 </AnimatePresence>
-
-                {/* Counter */}
-                <div style={{
-                  position:'absolute', bottom:16, left:16,
-                  padding:'5px 12px', borderRadius:1,
-                  background:'rgba(26,22,18,0.6)', backdropFilter:'blur(8px)',
-                  fontFamily:"'Jost', sans-serif", fontSize:11, fontWeight:500,
-                  letterSpacing:'0.12em', color:'rgba(255,255,255,0.85)',
-                }}>
-                  {mainIdx + 1} / {images.length}
+                {/* Overlays */}
+                <div style={{ position:'absolute', bottom:12, left:12, display:'flex', gap:8, alignItems:'center' }}>
+                  <span style={{
+                    padding:'4px 10px', borderRadius:1,
+                    background:'rgba(26,22,18,0.65)', backdropFilter:'blur(8px)',
+                    fontFamily:"'Jost', sans-serif", fontSize:10, fontWeight:500,
+                    letterSpacing:'0.14em', color:'rgba(255,255,255,0.85)',
+                  }}>
+                    {mainIdx + 1} / {images.length}
+                  </span>
                 </div>
-
-                {/* Price overlay */}
                 <div style={{
-                  position:'absolute', bottom:16, right:16,
-                  padding:'8px 16px', borderRadius:1,
-                  background:'rgba(26,22,18,0.75)', backdropFilter:'blur(8px)',
-                  border:'1px solid rgba(200,135,42,0.3)',
+                  position:'absolute', bottom:12, right:12,
+                  padding:'6px 14px', borderRadius:1,
+                  background:'rgba(26,22,18,0.78)', backdropFilter:'blur(8px)',
+                  border:'1px solid rgba(200,135,42,0.35)',
                 }}>
-                  <p style={{ fontFamily:"'Cormorant Garamond', serif", fontSize:20, fontWeight:600, color:'#fff', lineHeight:1 }}>
+                  <p style={{ fontFamily:"'Cormorant Garamond', serif", fontSize:18, fontWeight:600, color:'#fff', lineHeight:1 }}>
                     {priceFormatter.format(property.price || 0)}
                   </p>
                 </div>
-
                 {images.length > 1 && (
                   <>
-                    <button className="pdp-arrow pdp-arrow-left" onClick={prevImg}>
-                      <ChevronLeft size={18} />
-                    </button>
-                    <button className="pdp-arrow pdp-arrow-right" onClick={nextImg}>
-                      <ChevronRight size={18} />
-                    </button>
+                    <button className="pdp-arrow pdp-arrow-left" onClick={prevImg}><ChevronLeft size={16} /></button>
+                    <button className="pdp-arrow pdp-arrow-right" onClick={nextImg}><ChevronRight size={16} /></button>
                   </>
                 )}
               </div>
-
-              {/* Thumbnails column */}
-              <div style={{ display:'flex', flexDirection:'column', gap:3, overflow:'hidden', borderRadius:2 }}>
-                {images.slice(0, 5).map((img, i) => (
-                  <div key={i} style={{ overflow:'hidden', flex:1, borderRadius:2 }}>
+              {/* Strip de thumbnails */}
+              {images.length > 1 && (
+                <div className="pdp-strip">
+                  {images.map((img, i) => (
                     <img
+                      key={i}
                       src={buildImageUrl(img)}
                       alt={`Vue ${i+1}`}
-                      className={`pdp-thumb ${i === mainIdx ? 'active' : ''}`}
-                      style={{ height:'100%' }}
+                      className={`pdp-thumb${i === mainIdx ? ' active' : ''}`}
                       onClick={() => setMainIdx(i)}
                       onError={e=>{ e.target.src=PLACEHOLDER; }}
                     />
-                  </div>
-                ))}
-                {images.length > 5 && (
-                  <div style={{
-                    flex:1, display:'flex', alignItems:'center', justifyContent:'center',
-                    background:INK, color:GOLD, borderRadius:2,
-                    fontFamily:"'Jost', sans-serif", fontSize:11, fontWeight:600,
-                    letterSpacing:'0.15em', cursor:'pointer',
-                  }}
-                    onClick={() => setMainIdx(5)}>
-                    +{images.length - 5} PHOTOS
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div style={{
-              height:420, borderRadius:2, border:`1px dashed rgba(200,135,42,0.25)`,
+              height:200, borderRadius:2, border:'1px dashed rgba(200,135,42,0.25)',
               background:GOLD_PALE, display:'flex', alignItems:'center', justifyContent:'center',
-              flexDirection:'column', gap:12, color:INK_SOFT,
+              flexDirection:'column', gap:10, color:INK_SOFT,
             }}>
-              <MapPin size={32} style={{ opacity:0.3 }} />
-              <p style={{ fontFamily:"'Jost', sans-serif", fontSize:12, letterSpacing:'0.1em' }}>
-                AUCUNE IMAGE DISPONIBLE
-              </p>
+              <MapPin size={24} style={{ opacity:0.3 }} />
+              <p style={{ fontFamily:"'Jost', sans-serif", fontSize:11, letterSpacing:'0.12em' }}>AUCUNE IMAGE</p>
             </div>
           )}
         </motion.div>
