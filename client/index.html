@@ -32,20 +32,52 @@
 
     <!-- ═══════════════════════════════════════════════════════
          PERFORMANCE — Préconnexions réseau
+         Établit la connexion TCP/TLS AVANT que le navigateur
+         en ait besoin → gain 200-400ms sur le LCP.
     ═══════════════════════════════════════════════════════ -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
     <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+    <!-- Pinterest CDN pour HeroSliderMila (2 images viennent de i.pinimg.com) -->
+    <link rel="preconnect" href="https://i.pinimg.com" crossorigin />
     <link rel="dns-prefetch" href="https://altitude-vision.onrender.com" />
+    <!-- Unsplash+ CDN pour HeroSliderAltcom (images premium) -->
+    <link rel="dns-prefetch" href="https://plus.unsplash.com" />
 
-    <!-- ✅ CORRECTION LCP — préchargement de la 1ère image hero
-         Sans cette ligne : le navigateur découvre l'image seulement
-         après avoir chargé React + le JS du slider → LCP ~7s
-         Avec cette ligne : l'image se charge en parallèle du JS → LCP ~3s
-         
-         IMPORTANT : si tu changes l'ordre des images dans HeroSliderAlt.jsx,
-         change aussi l'URL ici pour qu'elle pointe toujours vers la 1ère image. -->
+    <!-- ═══════════════════════════════════════════════════════
+         PRELOAD IMAGES HERO — LCP critique
+
+         Principe : le navigateur commence à télécharger ces images
+         AVANT même que React soit chargé.
+         Sans preload : HTML → JS React → rendu slider → découverte image → téléchargement
+         Avec preload : HTML → téléchargement immédiat en parallèle du JS
+
+         ⚠️  RÈGLE : ne preloader QUE la 1ère image de chaque slider
+             (index 0), celle affichée à l'arrivée sur la page.
+             Les autres se chargent en lazy via loading="lazy".
+
+         ⚠️  IMPORTANT : si tu changes l'ordre des images dans
+             un fichier HeroSlider*.jsx, mets à jour l'URL ici.
+    ═══════════════════════════════════════════════════════ -->
+
+    <!--
+      PAGE D'ACCUEIL (/) — HeroSlider.jsx, slide 0
+      Image : photo-1507089947368 (appartement moderne)
+    -->
+    <link
+      rel="preload"
+      as="image"
+      href="https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1600&q=80"
+      fetchpriority="high"
+    />
+
+    <!--
+      PAGE ALTIMMO (/altimmo) — HeroSliderAlt.jsx, slide 0
+      Image : photo-1600596542815 (villa moderne)
+      Chargée seulement sur /altimmo → preload conditionnel non possible en HTML statique.
+      On la preload quand même car c'est la page principale du site.
+    -->
     <link
       rel="preload"
       as="image"
@@ -53,25 +85,37 @@
       fetchpriority="high"
     />
 
+    <!--
+      PAGE MILA EVENTS (/mila-events) — HeroSliderMila.jsx, slide 0
+      Image : photo-1735679356705 (événement d'entreprise)
+      Note : preconnect vers images.unsplash.com déjà déclaré ci-dessus.
+    -->
+    <link
+      rel="preload"
+      as="image"
+      href="https://images.unsplash.com/photo-1735679356705-7c06b780c7a4?q=80&w=1460&auto=format&fit=crop"
+      fetchpriority="high"
+    />
+
+    <!--
+      PAGE ALTCOM (/altcom) — HeroSliderAltcom.jsx, slide 0
+      Image : photo-1517245386807 (communication digitale)
+      Vient de plus.unsplash.com (Unsplash+, domaine différent).
+    -->
+    <link
+      rel="preload"
+      as="image"
+      href="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=2070&auto=format&fit=crop"
+      fetchpriority="high"
+    />
+
     <!-- ═══════════════════════════════════════════════════════
          GOOGLE FONTS — Chargement NON BLOQUANT
-         
-         PROBLÈME : <link rel="stylesheet"> bloque le rendu
-         pendant ~1250ms le temps que Google Fonts réponde.
-         
-         SOLUTION en 3 étapes :
-         
-         1. media="print" → le navigateur charge la feuille
-            en arrière-plan sans bloquer l'affichage
-         2. onload="this.media='all'" → une fois chargée,
-            on l'active pour tous les médias
-         3. <noscript> → fallback si JS est désactivé
-         
-         Résultat : les polices se chargent en parallèle,
-         le texte s'affiche immédiatement avec la police
-         système (grâce à display=swap), puis bascule
-         vers Cormorant/Outfit une fois disponible.
-         Gain estimé : -800ms à -1200ms sur le FCP.
+
+         media="print" + onload="this.media='all'" :
+         → charge en arrière-plan sans bloquer le rendu
+         → display=swap évite le FOIT (Flash Of Invisible Text)
+         Gain estimé : -450ms sur les requêtes bloquantes.
     ═══════════════════════════════════════════════════════ -->
     <link
       rel="preload"
@@ -98,7 +142,6 @@
          Évite le FOIT (Flash Of Invisible Text).
     ═══════════════════════════════════════════════════════ -->
     <style>
-      /* Polices système en attendant Google Fonts */
       body {
         font-family: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
       }
