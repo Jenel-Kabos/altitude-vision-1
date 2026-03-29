@@ -143,9 +143,10 @@ const HeroSliderAltcom = () => {
             {/* ── CONTENU ───────────────────────────────────────────── */}
             <div style={{
                 position: 'absolute', inset: 0, zIndex: 10,
-                display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                // Plus de padding bas pour ne pas empiéter sur la bande atouts
-                padding: 'clamp(80px,11vw,100px) clamp(24px,6vw,80px) clamp(120px,18vw,160px)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'flex-start',
+                // padding-top : header fixe 72px + marge 20px = 92px minimum
+                // padding-bottom : bande atouts 52px + marge = suffisant
+                padding: 'clamp(110px,14vw,140px) clamp(24px,6vw,80px) clamp(80px,12vw,120px)',
             }}>
                 <AnimatePresence mode="wait">
                     <div key={"text-" + idx} style={{ maxWidth: '520px' }}>
