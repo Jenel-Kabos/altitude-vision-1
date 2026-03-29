@@ -6,8 +6,7 @@ import {
     Search, Home, Building2, TrendingUp, Key,
     Handshake, MapPin, ChevronDown, Calculator,
     ShieldCheck, Clock, Award, CheckCircle,
-    User, Mail, Phone, Send, Loader2, AlertTriangle,
-    BedDouble, Maximize2, Wrench, CalendarClock, X,
+    Mail, X,
 } from 'lucide-react';
 
 import HeroSliderAlt   from '../components/HeroSliderAlt';
@@ -21,11 +20,8 @@ import EstimationForm  from '../components/EstimationForm';
 import { getLatestPropertiesByPole } from '../services/propertyService';
 import { getAltimmoReviews }         from '../services/reviewService';
 import { useAuth }                   from '../context/AuthContext';
-import api                           from '../services/api';
 
-// ─────────────────────────────────────────────────────────────
-// Données statiques
-// ─────────────────────────────────────────────────────────────
+// ─── Palette ──────────────────────────────────────────────────
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
 const GOLD      = '#C8872A';
@@ -55,7 +51,6 @@ const ATOUTS = [
     { icon: MapPin,      label: 'Ancrage local Brazzaville', color: GOLD },
 ];
 
-// ─────────────────────────────────────────────────────────────
 const PropertySkeleton = () => (
     <div className="animate-pulse bg-white rounded-3xl overflow-hidden border border-gray-100">
         <div className="bg-gray-200 h-52" />
@@ -67,6 +62,121 @@ const PropertySkeleton = () => (
     </div>
 );
 
+// ─── Panneau de recherche flottant ────────────────────────────
+const SearchPanel = ({ onClose, onSearch }) => {
+    const [typeBien,    setTypeBien]    = useState('Tous');
+    const [transaction, setTransaction] = useState('vente');
+    const [budgetIdx,   setBudgetIdx]   = useState(0);
+
+    const handleSubmit = () => {
+        onSearch({ typeBien, transaction, budgetIdx });
+        onClose();
+    };
+
+    const selectClass = "w-full appearance-none bg-white/10 border border-white/20 text-white text-sm rounded-xl px-4 py-3 pr-8 focus:outline-none focus:border-white/40 cursor-pointer";
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 12, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.97 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+                position: 'absolute',
+                bottom: 'calc(100% + 12px)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 'min(92vw, 680px)',
+                background: 'rgba(10,12,15,0.92)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '20px',
+                padding: '20px',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+                zIndex: 30,
+            }}
+        >
+            {/* En-tête panneau */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <p style={{ fontFamily: "'Outfit', sans-serif", fontSize: '0.75rem', fontWeight: 600,
+                    letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
+                    Rechercher un bien
+                </p>
+                <button onClick={onClose}
+                    style={{ padding: '4px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                    <X size={14} />
+                </button>
+            </div>
+
+            {/* Filtres */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                {/* Transaction */}
+                <div style={{ position: 'relative' }}>
+                    <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.15em',
+                        textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>
+                        Transaction
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                        <select value={transaction} onChange={e => setTransaction(e.target.value)}
+                            className={selectClass} style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            {TRANSACTIONS.map(t => <option key={t.value} value={t.value} className="text-gray-900">{t.label}</option>)}
+                        </select>
+                        <ChevronDown style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                            width: '14px', height: '14px', color: 'rgba(255,255,255,0.35)', pointerEvents: 'none' }} />
+                    </div>
+                </div>
+
+                {/* Type de bien */}
+                <div style={{ position: 'relative' }}>
+                    <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.15em',
+                        textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>
+                        Type de bien
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                        <select value={typeBien} onChange={e => setTypeBien(e.target.value)}
+                            className={selectClass} style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            {TYPES_BIENS.map(t => <option key={t} value={t} className="text-gray-900">{t}</option>)}
+                        </select>
+                        <ChevronDown style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                            width: '14px', height: '14px', color: 'rgba(255,255,255,0.35)', pointerEvents: 'none' }} />
+                    </div>
+                </div>
+
+                {/* Budget */}
+                <div style={{ position: 'relative' }}>
+                    <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.15em',
+                        textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>
+                        Budget
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                        <select value={budgetIdx} onChange={e => setBudgetIdx(Number(e.target.value))}
+                            className={selectClass} style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            {BUDGETS.map((b, i) => <option key={i} value={i} className="text-gray-900">{b.label}</option>)}
+                        </select>
+                        <ChevronDown style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                            width: '14px', height: '14px', color: 'rgba(255,255,255,0.35)', pointerEvents: 'none' }} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Bouton recherche */}
+            <button onClick={handleSubmit}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                    padding: '12px', borderRadius: '12px', fontFamily: "'Outfit', sans-serif",
+                    fontSize: '0.82rem', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
+                    color: '#fff', cursor: 'pointer', border: 'none',
+                    background: `linear-gradient(135deg, ${BLUE}, ${BLUE_DARK})`,
+                    boxShadow: `0 4px 20px ${BLUE}50` }}>
+                <Search size={15} aria-hidden="true" />
+                Rechercher
+            </button>
+        </motion.div>
+    );
+};
+
 // ─────────────────────────────────────────────────────────────
 const AltimmoPage = () => {
     const navigate  = useNavigate();
@@ -76,14 +186,11 @@ const AltimmoPage = () => {
     const [reviews,        setReviews]        = useState([]);
     const [loading,        setLoading]        = useState(true);
     const [reviewsLoading, setReviewsLoading] = useState(true);
-    const [error,          setError]          = useState(null);
 
-    // Barre de recherche hero
-    const [typeBien,    setTypeBien]    = useState('Tous');
-    const [transaction, setTransaction] = useState('vente');
-    const [budgetIdx,   setBudgetIdx]   = useState(0);
+    // Panneau recherche
+    const [searchOpen, setSearchOpen] = useState(false);
 
-    const handleSearch = () => {
+    const handleSearch = ({ typeBien, transaction, budgetIdx }) => {
         const params = new URLSearchParams();
         params.set('status', transaction);
         if (typeBien !== 'Tous') params.set('type', typeBien);
@@ -108,8 +215,8 @@ const AltimmoPage = () => {
             try {
                 const result = await getLatestPropertiesByPole('Altimmo', 6);
                 setProperties(result || []);
-            } catch { setError('Impossible de charger les annonces.'); }
-            finally   { setLoading(false); }
+            } catch { /* silently ignore */ }
+            finally { setLoading(false); }
         };
         const fetchReviews = async () => {
             try { setReviews((await getAltimmoReviews(6)) || []); }
@@ -123,15 +230,6 @@ const AltimmoPage = () => {
     return (
         <div className="min-h-screen bg-white" style={{ fontFamily: "'Outfit', sans-serif" }}>
 
-            {/* ══ SEO ══════════════════════════════════════════════════
-                title       → apparaît dans l'onglet et les résultats Google
-                description → texte affiché sous le titre dans Google (160 chars max)
-                              ✅ Contient les mots-clés locaux : Brazzaville, Congo,
-                              appartement, maison, vente, location — pour le référencement
-                url         → chemin canonique de cette page
-                image       → image affichée quand on partage sur WhatsApp/Facebook
-                breadcrumb  → fil d'Ariane structuré (JSON-LD) pour Google
-            ════════════════════════════════════════════════════════ */}
             <SEOHead
                 title="Altimmo — Achat, Vente & Location Immobilière à Brazzaville"
                 description="Altimmo by Altitude-Vision : trouvez des appartements, maisons et villas à vendre ou à louer à Brazzaville, Congo. Estimation gratuite, accompagnement juridique inclus."
@@ -143,111 +241,133 @@ const AltimmoPage = () => {
                 ]}
             />
 
-            {/* ══ HERO ═════════════════════════════════════════════════ */}
+            {/* ══ HERO ═════════════════════════════════════════════════
+                Le HeroSliderAlt gère TOUT le contenu narratif (titre,
+                sous-titre, eyebrow, CTA, stat, citation). Cette section
+                ne contient que les éléments UI propres à la page :
+                - Le slider en fond
+                - Le raccourci recherche flottant (pill icône loupe)
+                - La bande d'atouts en pied de hero
+            ════════════════════════════════════════════════════════ */}
             <header className="relative text-white overflow-hidden"
                 style={{ height: 'calc(100vh - 0px)', minHeight: '640px', maxHeight: '860px' }}>
+
+                {/* Slider narratif — contient le texte complet */}
                 <HeroSliderAlt />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/70 z-[1]" />
 
-                <div className="absolute inset-0 z-10 flex flex-col justify-center px-4 sm:px-8 lg:px-16">
-                    <div className="max-w-6xl mx-auto w-full">
+                {/* ── Raccourci recherche + CTA liens ─────────────────
+                    Positionné en bas du hero, au-dessus de la bande atouts.
+                    Le pill "Rechercher un bien" ouvre le panneau SearchPanel.
+                ──────────────────────────────────────────────────── */}
+                <div style={{
+                    position: 'absolute',
+                    bottom: '72px', // au-dessus de la bande atouts (~52px)
+                    left: 0, right: 0,
+                    zIndex: 20,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    padding: '0 24px',
+                }}>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
 
-                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest text-white border border-white/20 backdrop-blur-sm mb-5"
-                            style={{ backgroundColor: 'rgba(46,123,181,0.25)' }}>
-                            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: BLUE }} />
-                            Altimmo — Immobilier de Prestige
-                        </motion.div>
+                        {/* Panneau filtres (s'ouvre au-dessus) */}
+                        <AnimatePresence>
+                            {searchOpen && (
+                                <SearchPanel
+                                    onClose={() => setSearchOpen(false)}
+                                    onSearch={handleSearch}
+                                />
+                            )}
+                        </AnimatePresence>
 
-                        <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.15, duration: 0.7 }}
-                            className="text-white mb-4 max-w-3xl"
-                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2.5rem, 5.5vw, 5rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
-                            Immobilier de Luxe
-                            <span className="block" style={{ color: '#7BB8E0' }}>& Conseil Expert</span>
-                        </motion.h1>
+                        {/* ✅ Pill principal — icône loupe + label */}
+                        <motion.button
+                            onClick={() => setSearchOpen(!searchOpen)}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.5, duration: 0.5 }}
+                            style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                                padding: '11px 20px',
+                                borderRadius: '40px',
+                                background: searchOpen
+                                    ? `linear-gradient(135deg, ${BLUE}, ${BLUE_DARK})`
+                                    : 'rgba(10,12,15,0.55)',
+                                backdropFilter: 'blur(16px)',
+                                WebkitBackdropFilter: 'blur(16px)',
+                                border: searchOpen
+                                    ? `1px solid ${BLUE}60`
+                                    : '1px solid rgba(255,255,255,0.18)',
+                                color: '#fff',
+                                fontFamily: "'Outfit', sans-serif",
+                                fontSize: '0.78rem', fontWeight: 500,
+                                letterSpacing: '0.06em', textTransform: 'uppercase',
+                                cursor: 'pointer',
+                                boxShadow: searchOpen ? `0 6px 24px ${BLUE}45` : '0 4px 20px rgba(0,0,0,0.3)',
+                                transition: 'all 0.25s ease',
+                            }}
+                            aria-label="Rechercher un bien immobilier"
+                            aria-expanded={searchOpen}
+                        >
+                            <Search size={15} aria-hidden="true" />
+                            Rechercher un bien
+                            <ChevronDown size={12} style={{
+                                opacity: 0.6,
+                                transform: searchOpen ? 'rotate(180deg)' : 'rotate(0)',
+                                transition: 'transform 0.25s',
+                            }} />
+                        </motion.button>
 
-                        <motion.div initial={{ width: 0 }} animate={{ width: '64px' }}
-                            transition={{ delay: 0.4, duration: 0.6 }}
-                            className="h-0.5 rounded-full mb-5"
-                            style={{ background: `linear-gradient(to right, ${BLUE}, ${GOLD})` }} />
-
-                        <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3, duration: 0.7 }}
-                            className="text-white/75 max-w-xl mb-8 leading-relaxed"
-                            style={{ fontSize: 'clamp(0.95rem, 1.6vw, 1.15rem)', fontWeight: 300 }}>
-                            Votre partenaire de confiance pour concrétiser vos ambitions immobilières avec élégance et sérénité.
-                        </motion.p>
-
-                        {/* Barre de recherche */}
-                        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.5, duration: 0.7 }}
-                            className="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-3 max-w-3xl">
-                            <div className="flex flex-col sm:flex-row gap-2">
-                                <div className="relative flex-1">
-                                    <label className="absolute -top-2 left-3 text-[10px] font-bold uppercase tracking-wider text-white/60 px-1">Transaction</label>
-                                    <div className="relative">
-                                        <select value={transaction} onChange={e => setTransaction(e.target.value)}
-                                            className="w-full appearance-none bg-white/10 border border-white/15 text-white text-sm rounded-xl px-4 py-3 pr-8 focus:outline-none cursor-pointer"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
-                                            {TRANSACTIONS.map(t => <option key={t.value} value={t.value} className="text-gray-900">{t.label}</option>)}
-                                        </select>
-                                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
-                                    </div>
-                                </div>
-                                <div className="relative flex-1">
-                                    <label className="absolute -top-2 left-3 text-[10px] font-bold uppercase tracking-wider text-white/60 px-1">Type de bien</label>
-                                    <div className="relative">
-                                        <select value={typeBien} onChange={e => setTypeBien(e.target.value)}
-                                            className="w-full appearance-none bg-white/10 border border-white/15 text-white text-sm rounded-xl px-4 py-3 pr-8 focus:outline-none cursor-pointer"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
-                                            {TYPES_BIENS.map(t => <option key={t} value={t} className="text-gray-900">{t}</option>)}
-                                        </select>
-                                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
-                                    </div>
-                                </div>
-                                <div className="relative flex-1">
-                                    <label className="absolute -top-2 left-3 text-[10px] font-bold uppercase tracking-wider text-white/60 px-1">Budget</label>
-                                    <div className="relative">
-                                        <select value={budgetIdx} onChange={e => setBudgetIdx(Number(e.target.value))}
-                                            className="w-full appearance-none bg-white/10 border border-white/15 text-white text-sm rounded-xl px-4 py-3 pr-8 focus:outline-none cursor-pointer"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
-                                            {BUDGETS.map((b, i) => <option key={i} value={i} className="text-gray-900">{b.label}</option>)}
-                                        </select>
-                                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
-                                    </div>
-                                </div>
-                                <button onClick={handleSearch}
-                                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-white text-sm hover:scale-105 transition-all flex-shrink-0"
-                                    style={{ background: `linear-gradient(135deg, ${BLUE}, ${BLUE_DARK})`, boxShadow: `0 4px 20px ${BLUE}40`, fontFamily: "'Outfit', sans-serif" }}>
-                                    <Search className="w-4 h-4" /> Rechercher
-                                </button>
-                            </div>
-                        </motion.div>
-
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
-                            className="mt-5 flex flex-wrap gap-3">
+                        {/* CTA secondaires */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.6, duration: 0.5 }}
+                            style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}
+                        >
                             <Link to="/altimmo/annonces"
-                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white border border-white/20 hover:bg-white/15 backdrop-blur-sm transition-all"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>
-                                <Sparkles className="w-4 h-4" /> Voir tous nos biens
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                    padding: '10px 18px', borderRadius: '40px',
+                                    background: 'rgba(255,255,255,0.08)',
+                                    backdropFilter: 'blur(12px)',
+                                    border: '1px solid rgba(255,255,255,0.14)',
+                                    color: 'rgba(255,255,255,0.85)',
+                                    fontFamily: "'Outfit', sans-serif",
+                                    fontSize: '0.75rem', fontWeight: 400,
+                                    letterSpacing: '0.05em', textTransform: 'uppercase',
+                                    textDecoration: 'none', transition: '0.2s',
+                                }}>
+                                <Sparkles size={13} aria-hidden="true" />
+                                Toutes les annonces
                             </Link>
                             <a href="#contact-altimmo" onClick={handleScrollToContact}
-                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white border border-white/20 hover:bg-white/15 backdrop-blur-sm transition-all"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>
-                                <Handshake className="w-4 h-4" /> Nous contacter
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                    padding: '10px 18px', borderRadius: '40px',
+                                    background: 'rgba(255,255,255,0.08)',
+                                    backdropFilter: 'blur(12px)',
+                                    border: '1px solid rgba(255,255,255,0.14)',
+                                    color: 'rgba(255,255,255,0.85)',
+                                    fontFamily: "'Outfit', sans-serif",
+                                    fontSize: '0.75rem', fontWeight: 400,
+                                    letterSpacing: '0.05em', textTransform: 'uppercase',
+                                    textDecoration: 'none', transition: '0.2s',
+                                }}>
+                                <Handshake size={13} aria-hidden="true" />
+                                Nous contacter
                             </a>
                         </motion.div>
                     </div>
                 </div>
 
-                {/* Bande atouts en bas du hero */}
+                {/* ── Bande atouts bas du hero ─────────────────────── */}
                 <div className="absolute bottom-0 left-0 right-0 z-10">
-                    <div className="h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)' }} />
+                    <div className="h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)' }} />
                     <div className="backdrop-blur-md bg-black/30 grid grid-cols-2 sm:grid-cols-4 divide-x divide-white/10">
                         {ATOUTS.map(({ icon: Icon, label, color }, i) => (
                             <div key={i} className="flex items-center gap-2.5 px-5 py-3.5">
-                                <Icon className="w-4 h-4 flex-shrink-0" style={{ color }} />
+                                <Icon className="w-4 h-4 flex-shrink-0" style={{ color }} aria-hidden="true" />
                                 <span className="text-white/70 text-xs font-medium">{label}</span>
                             </div>
                         ))}
@@ -415,11 +535,8 @@ const AltimmoPage = () => {
                 </div>
                 <div className="absolute top-0 left-0 right-0 h-px"
                     style={{ background: `linear-gradient(to right, transparent, ${BLUE}40, transparent)` }} />
-
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
                     <div className="lg:grid lg:grid-cols-5 lg:gap-16 lg:items-start">
-
-                        {/* Colonne gauche — intro */}
                         <motion.div className="lg:col-span-2 mb-10 lg:mb-0"
                             initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }}
                             viewport={{ once: true }} transition={{ duration: 0.7 }}>
@@ -439,10 +556,10 @@ const AltimmoPage = () => {
                             </p>
                             <ul className="space-y-3">
                                 {[
-                                    { icon: CheckCircle, text: '100% gratuit, sans engagement'           },
-                                    { icon: Clock,       text: 'Réponse garantie sous 24h'               },
-                                    { icon: ShieldCheck, text: 'Expertise marché local Brazzaville'      },
-                                    { icon: Mail,        text: 'Confirmation par email immédiate'        },
+                                    { icon: CheckCircle, text: '100% gratuit, sans engagement'      },
+                                    { icon: Clock,       text: 'Réponse garantie sous 24h'          },
+                                    { icon: ShieldCheck, text: 'Expertise marché local Brazzaville' },
+                                    { icon: Mail,        text: 'Confirmation par email immédiate'   },
                                 ].map(({ icon: Icon, text }, i) => (
                                     <li key={i} className="flex items-center gap-2.5 text-sm text-white/60">
                                         <Icon className="w-4 h-4 flex-shrink-0" style={{ color: GOLD }} /> {text}
@@ -450,8 +567,6 @@ const AltimmoPage = () => {
                                 ))}
                             </ul>
                         </motion.div>
-
-                        {/* Colonne droite — formulaire */}
                         <motion.div className="lg:col-span-3"
                             initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }}
                             viewport={{ once: true }} transition={{ duration: 0.7, delay: 0.1 }}>

@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Loader2, ChevronLeft, ChevronRight,
     Briefcase, Presentation, UserRoundPen,
-    ArrowRight, Sparkles, Star,
-    MessageSquarePlus, CheckCircle, Zap, Send, Camera, TrendingUp,
+    ArrowRight, Star,
+    MessageSquarePlus, CheckCircle, Zap,
 } from 'lucide-react';
 
 import HeroSliderAltcom       from '../../components/HeroSliderAltcom';
@@ -142,12 +142,6 @@ const AltcomPage = () => {
     return (
         <div className="min-h-screen bg-white" style={{ fontFamily: "'Outfit', sans-serif" }}>
 
-            {/* ══ SEO ══════════════════════════════════════════════════
-                title       → mots-clés : communication, branding, Brazzaville, Congo
-                description → services principaux listés pour le référencement local
-                image       → créer /public/og-altcom.jpg (1200×630px)
-                breadcrumb  → fil d'Ariane JSON-LD pour Google
-            ════════════════════════════════════════════════════════ */}
             <SEOHead
                 title="Altcom — Agence de Communication & Branding à Brazzaville"
                 description="Altcom by Altitude-Vision : stratégie digitale, création de marque, campagnes publicitaires et production audiovisuelle à Brazzaville, Congo. Devis gratuit."
@@ -197,65 +191,98 @@ const AltcomPage = () => {
                 )}
             </AnimatePresence>
 
-            {/* ══ HERO ═════════════════════════════════════════════════ */}
+            {/* ══ HERO ═════════════════════════════════════════════════
+                Le HeroSliderAltcom gère tout le contenu narratif.
+                Cette section ne contient que :
+                - Le slider en fond
+                - Deux CTAs flottants en bas (avant la bande atouts)
+                - La bande d'atouts
+            ════════════════════════════════════════════════════════ */}
             <header className="relative text-white overflow-hidden"
                 style={{ height: 'calc(100vh - 0px)', minHeight: '640px', maxHeight: '860px' }}>
+
+                {/* Slider narratif — contient tout le texte */}
                 <HeroSliderAltcom />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/10 to-black/60 z-[1]" />
 
-                <div className="absolute inset-0 flex flex-col justify-center px-4 sm:px-8 lg:px-16" style={{ zIndex: 5 }}>
-                    <div className="max-w-6xl mx-auto w-full">
-                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest text-white border border-white/20 backdrop-blur-sm mb-5"
-                            style={{ backgroundColor: `${GOLD}25` }}>
-                            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: GOLD_LIGHT }} />
-                            Altcom — Communication & Créativité
-                        </motion.div>
+                {/* ── CTAs flottants ───────────────────────────────────
+                    Positionnés au-dessus de la bande atouts (~52px).
+                    Palette or Altcom : bouton principal gradient or,
+                    bouton secondaire verre sombre.
+                ──────────────────────────────────────────────────── */}
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5, duration: 0.5 }}
+                    style={{
+                        position: 'absolute',
+                        bottom: '72px',
+                        left: 0, right: 0,
+                        zIndex: 20,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        padding: '0 24px',
+                        flexWrap: 'wrap',
+                    }}
+                >
+                    {/* CTA principal — Démarrer un projet */}
+                    <button
+                        onClick={() => setShowProject(true)}
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '8px',
+                            padding: '11px 22px',
+                            borderRadius: '40px',
+                            background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`,
+                            color: '#0A0800',
+                            fontFamily: "'Outfit', sans-serif",
+                            fontSize: '0.78rem', fontWeight: 600,
+                            letterSpacing: '0.06em', textTransform: 'uppercase',
+                            cursor: 'pointer', border: 'none',
+                            boxShadow: `0 6px 24px ${GOLD}50`,
+                            transition: 'transform 0.2s, box-shadow 0.2s',
+                            whiteSpace: 'nowrap',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 10px 32px ${GOLD}65`; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 6px 24px ${GOLD}50`; }}
+                        aria-label="Démarrer votre projet Altcom"
+                    >
+                        <Presentation size={14} aria-hidden="true" />
+                        Démarrer un projet
+                    </button>
 
-                        <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.15, duration: 0.7 }}
-                            className="text-white mb-4 max-w-3xl"
-                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2.5rem, 5.5vw, 5rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
-                            Altcom
-                            <span className="block" style={{ color: GOLD_LIGHT }}>Stratégie & Créativité</span>
-                        </motion.h1>
+                    {/* CTA secondaire — Voir les réalisations */}
+                    <Link
+                        to="/altcom/annonces"
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '8px',
+                            padding: '10px 20px',
+                            borderRadius: '40px',
+                            background: 'rgba(10,8,0,0.45)',
+                            backdropFilter: 'blur(14px)',
+                            WebkitBackdropFilter: 'blur(14px)',
+                            border: `1px solid ${GOLD}35`,
+                            color: GOLD_LIGHT,
+                            fontFamily: "'Outfit', sans-serif",
+                            fontSize: '0.75rem', fontWeight: 400,
+                            letterSpacing: '0.05em', textTransform: 'uppercase',
+                            textDecoration: 'none', transition: '0.2s',
+                            whiteSpace: 'nowrap',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = `${GOLD}18`; e.currentTarget.style.borderColor = `${GOLD}60`; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(10,8,0,0.45)'; e.currentTarget.style.borderColor = `${GOLD}35`; }}
+                    >
+                        <Briefcase size={13} aria-hidden="true" />
+                        Nos réalisations
+                    </Link>
+                </motion.div>
 
-                        <motion.div initial={{ width: 0 }} animate={{ width: '64px' }}
-                            transition={{ delay: 0.4, duration: 0.6 }}
-                            className="h-0.5 rounded-full mb-5"
-                            style={{ background: `linear-gradient(to right, ${GOLD}, ${BLUE})` }} />
-
-                        <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3, duration: 0.7 }}
-                            className="text-white/75 max-w-xl mb-8 leading-relaxed"
-                            style={{ fontSize: 'clamp(0.95rem, 1.6vw, 1.15rem)', fontWeight: 300 }}>
-                            Votre Vision, Notre Mission. Des solutions de communication percutantes et sur mesure pour propulser votre marque.
-                        </motion.p>
-
-                        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.5 }}
-                            className="flex flex-wrap gap-3">
-                            <button onClick={() => setShowProject(true)}
-                                className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white text-sm transition-all hover:scale-105"
-                                style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, boxShadow: `0 4px 20px ${GOLD}50`, fontFamily: "'Outfit', sans-serif" }}>
-                                <Presentation className="w-4 h-4" /> Démarrer votre projet
-                            </button>
-                            <Link to="/altcom/annonces"
-                                className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white text-sm border border-white/20 hover:bg-white/15 backdrop-blur-sm transition-all"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>
-                                <Briefcase className="w-4 h-4" /> Voir nos réalisations
-                            </Link>
-                        </motion.div>
-                    </div>
-                </div>
-
-                {/* Atouts bande bas */}
-                <div className="absolute bottom-0 left-0 right-0" style={{ zIndex: 5 }}>
-                    <div className="h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)' }} />
+                {/* ── Bande atouts bas du hero ─────────────────────── */}
+                <div className="absolute bottom-0 left-0 right-0" style={{ zIndex: 10 }}>
+                    <div className="h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)' }} />
                     <div className="backdrop-blur-md bg-black/30 grid grid-cols-2 sm:grid-cols-4 divide-x divide-white/10">
                         {ATOUTS.map(({ icon: Icon, label, color }, i) => (
                             <div key={i} className="flex items-center gap-2.5 px-5 py-3.5">
-                                <Icon className="w-4 h-4 flex-shrink-0" style={{ color }} />
+                                <Icon className="w-4 h-4 flex-shrink-0" style={{ color }} aria-hidden="true" />
                                 <span className="text-white/70 text-xs font-medium">{label}</span>
                             </div>
                         ))}
@@ -305,7 +332,7 @@ const AltcomPage = () => {
                             viewport={{ once: true }} transition={{ duration: 0.7, delay: 0.1 }}
                             className="grid grid-cols-2 gap-4">
                             {[
-                                { value: '80+',  label: 'Projets réalisés', color: GOLD },
+                                { value: '80+',  label: 'Projets réalisés',   color: GOLD },
                                 { value: '98%',  label: 'Clients satisfaits', color: BLUE },
                                 { value: '5 ans',label: "D'expérience",       color: GOLD },
                                 { value: '24h',  label: 'Délai de réponse',   color: BLUE },
