@@ -32,33 +32,80 @@
 
     <!-- ═══════════════════════════════════════════════════════
          PERFORMANCE — Préconnexions réseau
-         Ces lignes établissent la connexion TCP/TLS aux serveurs
-         externes AVANT que le navigateur en ait besoin.
-         Gain : 200-400ms sur le LCP.
     ═══════════════════════════════════════════════════════ -->
-
-    <!-- Google Fonts (déjà présent, conservé) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-    <!-- ✅ AJOUT : Cloudinary — images des biens immobiliers -->
     <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
-
-    <!-- ✅ AJOUT : Backend Render — réduit le TTFB des appels API -->
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
     <link rel="dns-prefetch" href="https://altitude-vision.onrender.com" />
 
+    <!-- ✅ CORRECTION LCP — préchargement de la 1ère image hero
+         Sans cette ligne : le navigateur découvre l'image seulement
+         après avoir chargé React + le JS du slider → LCP ~7s
+         Avec cette ligne : l'image se charge en parallèle du JS → LCP ~3s
+         
+         IMPORTANT : si tu changes l'ordre des images dans HeroSliderAlt.jsx,
+         change aussi l'URL ici pour qu'elle pointe toujours vers la 1ère image. -->
+    <link
+      rel="preload"
+      as="image"
+      href="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1175&auto=format&fit=crop"
+      fetchpriority="high"
+    />
+
     <!-- ═══════════════════════════════════════════════════════
-         GOOGLE FONTS — Chargement centralisé
-         Cormorant Garamond : titres élégants
-         Outfit             : corps de texte moderne
-         display=swap       : ✅ le texte s'affiche immédiatement
-                              avec la police système, puis est
-                              remplacé — élimine le blocage du FCP
+         GOOGLE FONTS — Chargement NON BLOQUANT
+         
+         PROBLÈME : <link rel="stylesheet"> bloque le rendu
+         pendant ~1250ms le temps que Google Fonts réponde.
+         
+         SOLUTION en 3 étapes :
+         
+         1. media="print" → le navigateur charge la feuille
+            en arrière-plan sans bloquer l'affichage
+         2. onload="this.media='all'" → une fois chargée,
+            on l'active pour tous les médias
+         3. <noscript> → fallback si JS est désactivé
+         
+         Résultat : les polices se chargent en parallèle,
+         le texte s'affiche immédiatement avec la police
+         système (grâce à display=swap), puis bascule
+         vers Cormorant/Outfit une fois disponible.
+         Gain estimé : -800ms à -1200ms sur le FCP.
     ═══════════════════════════════════════════════════════ -->
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700;800&display=swap"
-      rel="stylesheet"
     />
+    <link
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700;800&display=swap"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700;800&display=swap"
+      />
+    </noscript>
+
+    <!-- ═══════════════════════════════════════════════════════
+         CSS CRITIQUE INLINE — polices de secours
+         Affiche le texte immédiatement avec une police système
+         pendant que Cormorant/Outfit se chargent.
+         Évite le FOIT (Flash Of Invisible Text).
+    ═══════════════════════════════════════════════════════ -->
+    <style>
+      /* Polices système en attendant Google Fonts */
+      body {
+        font-family: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      }
+      h1, h2, h3, .serif {
+        font-family: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
