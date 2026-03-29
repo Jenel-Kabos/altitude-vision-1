@@ -32,6 +32,15 @@ const buildImageUrl = (path) => {
   return `${BACKEND_URL}/${path.replace(/^\//, '')}`;
 };
 
+// ✅ Optimisation URL Cloudinary — WebP + compression + redimensionnement
+// Identique à PropertyCard.jsx pour cohérence.
+// width=1200 pour la galerie plein écran, 800 pour les thumbnails.
+const optimizeCloudinaryUrl = (url, width = 1200) => {
+  if (!url || !url.includes('res.cloudinary.com')) return url;
+  if (url.includes('/f_auto')) return url; // déjà optimisée
+  return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width},c_limit/`);
+};
+
 const priceFormatter = new Intl.NumberFormat('fr-CG', {
   style: 'currency', currency: 'XAF', maximumFractionDigits: 0,
 });
@@ -367,7 +376,7 @@ const PropertyDetailPage = () => {
 
   const images = Array.isArray(property.images) && property.images.length > 0
     ? property.images : [];
-  const mainImage = images.length > 0 ? buildImageUrl(images[mainIdx]) : PLACEHOLDER;
+  const mainImage = images.length > 0 ? optimizeCloudinaryUrl(buildImageUrl(images[mainIdx]), 1200) : PLACEHOLDER;
   const displayAddress = property.address
     ? [property.address.street, property.address.district, property.address.city].filter(Boolean).join(' — ')
     : 'Adresse non disponible';
@@ -398,7 +407,7 @@ const PropertyDetailPage = () => {
       <SEOHead
         title={property.title}
         description={`${property.type || 'Bien'} à ${property.address?.city || 'Brazzaville'} — ${property.description?.slice(0, 120)}…`}
-        image={property.images?.[0]}
+        image={optimizeCloudinaryUrl(property.images?.[0], 800)}
         url={`/properties/${property._id}`}
         type="property"
         data={property}
@@ -537,7 +546,7 @@ const PropertyDetailPage = () => {
                   {images.map((img, i) => (
                     <img
                       key={i}
-                      src={buildImageUrl(img)}
+                      src={optimizeCloudinaryUrl(buildImageUrl(img), 200)}
                       alt={`Vue ${i+1}`}
                       className={`pdp-thumb${i === mainIdx ? ' active' : ''}`}
                       onClick={() => setMainIdx(i)}
@@ -754,7 +763,7 @@ const PropertyDetailPage = () => {
             {/* Image */}
             <motion.img
               key={lightbox}
-              src={buildImageUrl(images[lightbox])}
+              src={optimizeCloudinaryUrl(buildImageUrl(images[lightbox]), 1600)}
               alt={`Photo ${lightbox + 1}`}
               initial={{ opacity:0, scale:0.94 }}
               animate={{ opacity:1, scale:1 }}
@@ -845,7 +854,7 @@ const PropertyDetailPage = () => {
                 {images.map((img, i) => (
                   <img
                     key={i}
-                    src={buildImageUrl(img)}
+                    src={optimizeCloudinaryUrl(buildImageUrl(img), 200)}
                     alt={`Miniature ${i+1}`}
                     onClick={() => setLightbox(i)}
                     onError={e=>{ e.target.src=PLACEHOLDER; }}

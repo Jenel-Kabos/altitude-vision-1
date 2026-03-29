@@ -25,6 +25,17 @@ const getBackendUrl = () => {
 };
 const BACKEND_URL = getBackendUrl();
 
+// ✅ CORRECTION IMAGES 101 Ko — optimisation URL Cloudinary
+// Injecte f_auto (WebP), q_auto (compression), w_N (redimensionnement)
+// dans les URLs Cloudinary existantes sans re-uploader.
+// Économie estimée : 40-60% sur le poids des images.
+const optimizeCloudinaryUrl = (url, width = 800) => {
+  if (!url || !url.includes('res.cloudinary.com')) return url;
+  // Évite la double transformation si déjà optimisée
+  if (url.includes('/f_auto')) return url;
+  return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width},c_limit/`);
+};
+
 // ─── Helpers ────────────────────────────────────────────────
 const formatDate = (d) => {
   if (!d) return 'N/D';
@@ -404,16 +415,18 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
   injectStyles();
   const [imageError, setImageError] = useState(false);
 
-  const getImageUrl = () => {
+  const getImageUrl = (width = 800) => {
     if (property.images?.length > 0) {
       const first = property.images[0];
-      if (typeof first === 'string' && first.match(/^https?:\/\//)) return first;
+      if (typeof first === 'string' && first.match(/^https?:\/\//))
+        return optimizeCloudinaryUrl(first, width);
       if (typeof first === 'string' && first.trim()) {
         return `${BACKEND_URL}/${first.replace(/\\/g, '/').replace(/^\//, '')}`;
       }
     }
     if (property.mainImage) {
-      if (property.mainImage.match(/^https?:\/\//)) return property.mainImage;
+      if (property.mainImage.match(/^https?:\/\//))
+        return optimizeCloudinaryUrl(property.mainImage, width);
       return `${BACKEND_URL}/${property.mainImage.replace(/\\/g, '/').replace(/^\//, '')}`;
     }
     return null;
@@ -438,7 +451,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
     return [];
   };
 
-  const imgUrl     = getImageUrl();
+  const imgUrl     = getImageUrl(800);
   const price      = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(property.price || 0);
   const statusKey  = (property.status || 'vente').toLowerCase();
   const amenities  = getAmenities();

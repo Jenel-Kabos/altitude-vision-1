@@ -11,12 +11,28 @@ const { uploadToCloudinary } = require('../config/cloudinary');
 
 /**
  * Upload tous les fichiers en mémoire (multer.memoryStorage) vers Cloudinary.
- * Retourne un tableau d'URLs sécurisées (secure_url).
+ * ✅ OPTIMISATION IMAGES :
+ *   - quality:'auto'      → Cloudinary choisit la compression optimale
+ *   - fetch_format:'auto' → WebP si le navigateur le supporte, sinon JPEG
+ *   - width:1200          → redimensionne si l'image dépasse 1200px
+ *   - crop:'limit'        → ne redimensionne PAS si déjà < 1200px
+ *
+ * Résultat : une photo de 3 Mo devient ~150-300 Ko selon le contenu.
+ * Économie estimée par PageSpeed : 101 Ko sur la page d'accueil.
  */
 const uploadFilesToCloudinary = async (files = [], folder = 'altitude-vision/properties') => {
   if (!files || files.length === 0) return [];
   const uploads = await Promise.all(
-    files.map(file => uploadToCloudinary(file.buffer, { folder, resource_type: 'image' }))
+    files.map(file =>
+      uploadToCloudinary(file.buffer, {
+        folder,
+        resource_type: 'image',
+        quality:        'auto',   // ✅ compression intelligente
+        fetch_format:   'auto',   // ✅ WebP si supporté par le navigateur
+        width:          1200,     // ✅ largeur max en pixels
+        crop:           'limit',  // ✅ ne redimensionne pas les petites images
+      })
+    )
   );
   return uploads.map(result => result.secure_url).filter(Boolean);
 };
@@ -52,7 +68,7 @@ const parseAmenities = (amenities) => {
 const createProperty = asyncHandler(async (req, res, next) => {
   console.log('--- 🆕 Création de propriété ---');
 
-  // 1. Upload des images vers Cloudinary (fichiers en mémoire via multer.memoryStorage)
+  // 1. Upload des images vers Cloudinary (avec optimisation WebP)
   const imagePaths = await uploadFilesToCloudinary(req.files);
   console.log('📸 Images Cloudinary:', imagePaths);
 
@@ -101,8 +117,8 @@ const createProperty = asyncHandler(async (req, res, next) => {
     type,
     address:         finalAddress,
     surface:         parseFloat(surface),
-    bedrooms:        parseInt(bedrooms   || 0),
-    bathrooms:       parseInt(bathrooms  || 0),
+    bedrooms:        parseInt(bedrooms    || 0),
+    bathrooms:       parseInt(bathrooms   || 0),
     livingRooms:     parseInt(livingRooms || 0),
     kitchens:        parseInt(kitchens    || 0),
     constructionType,
@@ -183,7 +199,8 @@ const getLatestProperties = (req, res, next) => {
  * @route GET /api/properties/:id
  */
 const getProperty = asyncHandler(async (req, res) => {
-  const property = await Property.findById(req.params.id).populate('owner', 'name email photo phone');
+  const property = await Property.findById(req.params.id)
+    .populate('owner', 'name email photo phone');
 
   if (!property) {
     res.status(404);
@@ -229,7 +246,7 @@ const updateProperty = asyncHandler(async (req, res) => {
   const updateData = { ...req.body };
   excludedFields.forEach(field => delete updateData[field]);
 
-  // 1. Upload des nouvelles images vers Cloudinary
+  // 1. Upload des nouvelles images vers Cloudinary (avec optimisation WebP)
   const newImages = await uploadFilesToCloudinary(req.files);
   console.log('📸 Nouvelles images Cloudinary:', newImages);
 
@@ -255,15 +272,16 @@ const updateProperty = asyncHandler(async (req, res) => {
   // 5. Parsing Location (GPS)
   if (updateData.longitude && updateData.latitude) {
     updateData.location = {
-      type: 'Point',
+      type:        'Point',
       coordinates: [parseFloat(updateData.longitude), parseFloat(updateData.latitude)]
     };
   }
 
-  const updatedProperty = await Property.findByIdAndUpdate(req.params.id, updateData, {
-    new: true,
-    runValidators: true
-  });
+  const updatedProperty = await Property.findByIdAndUpdate(
+    req.params.id,
+    updateData,
+    { new: true, runValidators: true }
+  );
 
   res.status(200).json({
     status: 'success',
