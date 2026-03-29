@@ -45,7 +45,7 @@ const slides = [
         width:  1470, height: 980,
         alt:    'Production photo et vidéo professionnelle — Altcom',
         eyebrow:     'Production Média',
-        headline:    'Chaque moment capturé\navec précision.',
+        headline:    'Chaque moment\ncapturé avec précision.',
         body:        'Photographie corporate, films institutionnels, couverture événementielle — nos équipes créatives immortalisent vos instants clés avec un niveau de qualité premium.',
         quote:       '"Les photos de notre événement ont été partagées des centaines de fois."',
         cta:         { label: 'Contacter l\'équipe', to: '/altcom' },
@@ -146,7 +146,7 @@ const HeroSliderAltcom = () => {
                 display: 'flex', flexDirection: 'column', justifyContent: 'flex-start',
                 // padding-top : header fixe 72px + marge 20px = 92px minimum
                 // padding-bottom : bande atouts 52px + marge = suffisant
-                padding: 'clamp(110px,14vw,140px) clamp(24px,6vw,80px) clamp(80px,12vw,120px)',
+                padding: 'clamp(110px,14vw,140px) clamp(24px,6vw,80px) clamp(140px,20vw,175px)',
             }}>
                 <AnimatePresence mode="wait">
                     <div key={"text-" + idx} style={{ maxWidth: '520px' }}>
