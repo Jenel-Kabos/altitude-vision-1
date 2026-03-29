@@ -54,7 +54,6 @@ const useBreakpoint = () => {
   return bp;
 };
 
-// ── Avatar : photo si disponible, sinon initiale ─────────────
 const UserAvatar = ({ user, size = 26 }) => {
   const [imgError, setImgError] = useState(false);
   const hasPhoto = user?.photo && !imgError;
@@ -65,27 +64,17 @@ const UserAvatar = ({ user, size = 26 }) => {
       alt={user.name || 'Avatar'}
       onError={() => setImgError(true)}
       style={{
-        width:        size,
-        height:       size,
-        borderRadius: '50%',
-        objectFit:    'cover',
-        flexShrink:   0,
-        border:       '1.5px solid rgba(200,135,42,0.4)',
+        width: size, height: size, borderRadius: '50%',
+        objectFit: 'cover', flexShrink: 0,
+        border: '1.5px solid rgba(200,135,42,0.4)',
       }}
     />
   ) : (
     <div style={{
-      width:           size,
-      height:          size,
-      borderRadius:    '50%',
-      background:      'linear-gradient(135deg, #C8872A, #2E7BB5)',
-      display:         'flex',
-      alignItems:      'center',
-      justifyContent:  'center',
-      fontSize:        size * 0.38,
-      fontWeight:      500,
-      color:           '#fff',
-      flexShrink:      0,
+      width: size, height: size, borderRadius: '50%',
+      background: 'linear-gradient(135deg, #C8872A, #2E7BB5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.38, fontWeight: 500, color: '#fff', flexShrink: 0,
     }}>
       {(user?.name || 'U')[0].toUpperCase()}
     </div>
@@ -108,6 +97,7 @@ const Header = () => {
   const isMobile  = bp === 'xs' || bp === 'sm';
 
   const headerHeight  = isMobile ? '60px' : isTablet ? '66px' : '72px';
+  const headerHeightPx = isMobile ? 60 : isTablet ? 66 : 72;
   const headerPadding = isMobile ? '0 16px' : isTablet ? '0 28px' : '0 48px';
 
   useEffect(() => {
@@ -154,7 +144,7 @@ const Header = () => {
           transition: 'all 0.4s ease',
         }}
       >
-        {/* ── WORDMARK ── */}
+        {/* WORDMARK */}
         <Link to="/" style={{ textDecoration: 'none', flexShrink: 0 }}>
           <span style={{
             display: 'block', fontFamily: "'Cormorant Garamond', serif",
@@ -174,7 +164,7 @@ const Header = () => {
           )}
         </Link>
 
-        {/* ── NAV DESKTOP ── */}
+        {/* NAV DESKTOP */}
         {isDesktop && (
           <nav style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
             {NAV_LINKS.map(({ to, label }) => (
@@ -202,7 +192,7 @@ const Header = () => {
           </nav>
         )}
 
-        {/* ── NAV TABLETTE ── */}
+        {/* NAV TABLETTE */}
         {isTablet && (
           <nav style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
             {NAV_LINKS.slice(0, 4).map(({ to, label }) => (
@@ -229,9 +219,8 @@ const Header = () => {
           </nav>
         )}
 
-        {/* ── ACTIONS DROITE ── */}
+        {/* ACTIONS DROITE */}
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px' }}>
-
           {!isMobile && user ? (
             <>
               {isAdmin && (
@@ -267,7 +256,7 @@ const Header = () => {
                 <UnreadMessagesBadge count={unreadCount} className="absolute -top-0.5 -right-0.5" />
               </Link>
 
-              {/* ── DROPDOWN PROFIL ── */}
+              {/* DROPDOWN PROFIL */}
               <div ref={profileRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => setProfile(!profileOpen)}
@@ -279,10 +268,7 @@ const Header = () => {
                     fontSize: isTablet ? '0.74rem' : '0.8rem', cursor: 'pointer',
                   }}
                 >
-                  {/* 🆕 Photo ou initiale */}
                   <UserAvatar user={user} size={isTablet ? 24 : 28} />
-
-                  {/* Nom — masqué en tablette */}
                   {!isTablet && (
                     <span style={{
                       maxWidth: '80px', overflow: 'hidden',
@@ -292,7 +278,6 @@ const Header = () => {
                       {user.name || 'Profil'}
                     </span>
                   )}
-
                   <ChevronDown size={12} style={{
                     opacity: 0.4,
                     transform: profileOpen ? 'rotate(180deg)' : 'rotate(0)',
@@ -311,13 +296,11 @@ const Header = () => {
                     overflow: 'hidden', zIndex: 100,
                     animation: 'fadeSlideDown 0.18s ease',
                   }}>
-                    {/* ── En-tête dropdown avec photo ── */}
                     <div style={{
                       padding: '16px 20px',
                       borderBottom: '1px solid rgba(232,228,220,0.06)',
                       display: 'flex', alignItems: 'center', gap: '12px',
                     }}>
-                      {/* 🆕 Grande photo dans le dropdown */}
                       <UserAvatar user={user} size={40} />
                       <div style={{ minWidth: 0 }}>
                         <p style={{
@@ -389,7 +372,6 @@ const Header = () => {
             </>
           ) : null}
 
-          {/* Mobile : badge messages */}
           {isMobile && user && (
             <Link to="/messages" style={{
               position: 'relative', padding: '8px', borderRadius: '10px',
@@ -400,44 +382,63 @@ const Header = () => {
             </Link>
           )}
 
-          {/* Burger */}
           {!isDesktop && (
             <button onClick={() => setMobile(!mobileOpen)}
               style={{
                 padding: '8px', borderRadius: '10px',
                 background: mobileOpen ? 'rgba(232,228,220,0.06)' : 'none',
                 border: 'none', color: '#E8E4DC', cursor: 'pointer', transition: '0.2s',
+                minWidth: '44px', minHeight: '44px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
-              aria-label={mobileOpen ? 'Fermer le menu' : 'Ouvrir le menu'}>
+              aria-label={mobileOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+              aria-expanded={mobileOpen}
+            >
               {mobileOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           )}
         </div>
       </header>
 
-      {/* ── MENU MOBILE / TABLETTE ── */}
+      {/* ── MENU MOBILE / TABLETTE ─────────────────────────────────
+          ✅ FIX : le panneau commence SOUS le header (top = headerHeight)
+          et non pas depuis le haut de l'écran avec paddingTop.
+          Avant : position fixed inset:0 + paddingTop → le contenu démarrait
+                  avec un padding mais le div overlay commençait à top:0,
+                  ce qui masquait les premiers liens derrière le header.
+          Après : le panneau de contenu a top = headerHeight directement,
+                  et maxHeight = 100vh - headerHeight pour ne pas déborder.
+      ═══════════════════════════════════════════════════════════ */}
       {mobileOpen && !isDesktop && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 40, paddingTop: headerHeight }}>
+        <>
+          {/* Fond semi-transparent derrière le menu */}
           <div
-            style={{
-              position: 'absolute', inset: 0,
-              background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
-              WebkitBackdropFilter: 'blur(4px)', animation: 'fadeIn 0.2s ease',
-            }}
             onClick={() => setMobile(false)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 38,
+              background: 'rgba(0,0,0,0.65)',
+              backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+              animation: 'fadeIn 0.2s ease',
+              top: headerHeight, // ✅ commence sous le header, pas depuis le haut
+            }}
           />
 
+          {/* Panneau de navigation */}
           <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0,
-            background: 'rgba(8,10,13,0.99)', backdropFilter: 'blur(32px)',
-            WebkitBackdropFilter: 'blur(32px)',
+            position: 'fixed',
+            top: headerHeight,    // ✅ commence exactement sous le header
+            left: 0, right: 0,
+            zIndex: 39,
+            background: 'rgba(8,10,13,0.99)',
+            backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
             borderBottom: '1px solid rgba(232,228,220,0.06)',
             padding: isMobile ? '12px 12px 20px' : '16px 24px 24px',
             animation: 'slideDown 0.25s cubic-bezier(0.16,1,0.3,1)',
-            maxHeight: `calc(100vh - ${headerHeight})`, overflowY: 'auto',
+            maxHeight: `calc(100vh - ${headerHeightPx}px)`,
+            overflowY: 'auto',
           }}>
 
-            {/* Grille nav */}
+            {/* Grille nav — TOUS les liens visibles sans scroll */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)',
@@ -456,6 +457,8 @@ const Header = () => {
                     border: `1px solid ${isActive ? 'rgba(200,135,42,0.15)' : 'rgba(232,228,220,0.04)'}`,
                     fontSize: isMobile ? '0.82rem' : '0.78rem', fontWeight: 300,
                     textDecoration: 'none', transition: '0.2s', letterSpacing: '0.04em',
+                    // ✅ Zone tactile minimum 44px
+                    minHeight: '44px',
                   })}>
                   {({ isActive }) => (
                     <>
@@ -472,7 +475,6 @@ const Header = () => {
 
             {user ? (
               <>
-                {/* 🆕 Info utilisateur avec photo */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
                   padding: '10px 14px', borderRadius: '12px',
@@ -504,6 +506,7 @@ const Header = () => {
                       border: '1px solid rgba(232,228,220,0.04)',
                       color: 'rgba(232,228,220,0.5)', fontSize: '0.82rem',
                       fontWeight: 300, textDecoration: 'none', transition: '0.2s',
+                      minHeight: '44px',
                     }}>
                       <Icon size={15} style={{ color, flexShrink: 0 }} />
                       {label}
@@ -521,6 +524,7 @@ const Header = () => {
                         border: '1px solid rgba(232,228,220,0.08)',
                         color: 'rgba(232,228,220,0.5)', fontSize: '0.78rem',
                         fontWeight: 300, textDecoration: 'none',
+                        minHeight: '44px',
                       }}>
                         <LayoutDashboard size={14} /> Dashboard
                       </Link>
@@ -533,6 +537,7 @@ const Header = () => {
                         border: '1px solid rgba(232,228,220,0.08)',
                         color: 'rgba(232,228,220,0.5)', fontSize: '0.78rem',
                         fontWeight: 300, textDecoration: 'none',
+                        minHeight: '44px',
                       }}>
                         <Building size={14} /> Mes Biens
                       </Link>
@@ -544,7 +549,8 @@ const Header = () => {
                   display: 'flex', alignItems: 'center', gap: '10px',
                   width: '100%', padding: '12px 14px', borderRadius: '12px',
                   color: 'rgba(212,43,43,0.75)', fontSize: '0.82rem', fontWeight: 300,
-                  background: 'rgba(212,43,43,0.05)', border: '1px solid rgba(212,43,43,0.08)', cursor: 'pointer',
+                  background: 'rgba(212,43,43,0.05)', border: '1px solid rgba(212,43,43,0.08)',
+                  cursor: 'pointer', minHeight: '44px',
                 }}>
                   <LogOut size={15} style={{ color: '#D42B2B' }} /> Déconnexion
                 </button>
@@ -557,6 +563,7 @@ const Header = () => {
                   border: '1px solid rgba(232,228,220,0.12)',
                   color: 'rgba(232,228,220,0.7)', fontSize: '0.82rem',
                   fontWeight: 400, letterSpacing: '0.06em', textTransform: 'uppercase', textDecoration: 'none',
+                  minHeight: '44px',
                 }}>
                   <LogIn size={14} /> Connexion
                 </Link>
@@ -566,19 +573,20 @@ const Header = () => {
                   background: '#C8872A', color: '#0A0C0F',
                   fontSize: '0.82rem', fontWeight: 500,
                   letterSpacing: '0.06em', textTransform: 'uppercase', textDecoration: 'none',
+                  minHeight: '44px',
                 }}>
                   <UserPlus size={14} /> S'inscrire
                 </Link>
               </div>
             )}
           </div>
-        </div>
+        </>
       )}
 
       <style>{`
-        @keyframes fadeIn      { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideDown   { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes fadeSlideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn        { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideDown     { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeSlideDown { from { opacity: 0; transform: translateY(-6px);  } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </>
   );
