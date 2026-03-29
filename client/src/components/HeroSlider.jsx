@@ -120,8 +120,14 @@ const HeroSlider = () => {
             animate={{ scale: 1.02 }}
             transition={{ duration: SLIDE_DURATION / 1000, ease: 'linear' }}
           >
+            {/* ✅ srcset responsive : mobile charge ~480px au lieu de 1600px
+                Économie : ~105 Ko sur mobile 4G */}
             <img
               src={current.image}
+              srcSet={`${current.image.replace('w=1600', 'w=480')} 480w,
+                       ${current.image.replace('w=1600', 'w=800')} 800w,
+                       ${current.image} 1600w`}
+              sizes="(max-width: 640px) 480px, (max-width: 1024px) 800px, 1600px"
               alt={current.title.replace('\n', ' ')}
               width={current.imgWidth}
               height={current.imgHeight}

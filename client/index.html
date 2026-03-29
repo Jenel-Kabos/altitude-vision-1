@@ -5,11 +5,8 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- ═══════════════════════════════════════════════════════
-         SEO META TAGS
-    ═══════════════════════════════════════════════════════ -->
+    <!-- SEO -->
     <title>Altitude-Vision — Agence de Communication & Courtage à Brazzaville</title>
-
     <meta name="description" content="Altitude-Vision — Agence de communication & courtage à Brazzaville. Immobilier de luxe, événementiel haut de gamme et stratégie de communication." />
     <meta name="keywords"    content="immobilier Brazzaville, agence événementielle Congo, communication digitale, Altimmo, Mila Events, Altcom" />
     <meta name="author"      content="Altitude-Vision" />
@@ -31,58 +28,54 @@
     <meta name="twitter:image"       content="https://altitudevision.agency/og-default.jpg" />
 
     <!-- ═══════════════════════════════════════════════════════
-         PERFORMANCE — Préconnexions réseau
+         PRECONNECT — Max 4, origines critiques uniquement.
 
-         ⚠️  Google recommande MAX 4 preconnect.
-         Au-delà, le navigateur ouvre trop de connexions TCP
-         simultanées → congestion réseau → LCP dégradé.
-
-         RÈGLE : preconnect uniquement pour les origines
-         critiques au-dessus du fold (visible sans scroll).
-         Pour les autres : dns-prefetch suffit (plus léger).
+         Leçon du rapport PageSpeed (image 7) :
+         - res.cloudinary.com avec crossorigin="" → "Préconnexion inutilisée"
+           CAUSE : les images Cloudinary sont des requêtes "no-cors"
+           (balise <img>), pas des requêtes CORS. Le crossorigin ne s'applique
+           que pour fetch/XHR/fonts. On retire crossorigin sur Cloudinary.
+         - Google suggère d'ajouter altitude-vision.onrender.com (+300ms).
+           On le passe de dns-prefetch à preconnect.
     ═══════════════════════════════════════════════════════ -->
 
-    <!-- 1. Google Fonts — bloque le rendu si absent → preconnect obligatoire -->
+    <!-- 1 & 2 : Google Fonts — critique, bloque les polices -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-    <!-- 2. Unsplash — image hero slide 0 page d'accueil → critique LCP -->
-    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+    <!-- 3 : Unsplash — image hero LCP page d'accueil -->
+    <link rel="preconnect" href="https://images.unsplash.com" />
 
-    <!-- 3. Cloudinary — images des biens immobiliers (chargées juste après le hero) -->
-    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+    <!-- 4 : Render backend — API calls démarrent dès React chargé (+300ms selon PageSpeed) -->
+    <link rel="preconnect" href="https://altitude-vision.onrender.com" />
 
-    <!-- DNS-prefetch pour les origines secondaires (moins critique) -->
-    <link rel="dns-prefetch" href="https://altitude-vision.onrender.com" />
+    <!-- DNS-prefetch pour les origines secondaires -->
+    <!-- Cloudinary : pas de crossorigin (images = requêtes no-cors) -->
+    <link rel="dns-prefetch" href="https://res.cloudinary.com" />
     <link rel="dns-prefetch" href="https://i.pinimg.com" />
     <link rel="dns-prefetch" href="https://plus.unsplash.com" />
 
     <!-- ═══════════════════════════════════════════════════════
-         PRELOAD IMAGE HERO — LCP page d'accueil uniquement
-
-         ✅ On ne preload QUE l'image de la page d'accueil (/).
-            Les images des pages /altimmo, /mila-events, /altcom
-            sont gérées par fetchpriority="high" dans leurs
-            HeroSlider respectifs — ce qui est suffisant et évite
-            la compétition réseau qui dégradait le LCP à 8,7s.
-
-         Avant (4 preloads) : les 4 images se battaient pour
-            la bande passante → toutes arrivaient tard → LCP 8,7s
-         Après (1 preload)  : l'image de l'accueil arrive vite,
-            les autres se chargent en background → LCP ↓
+         PRELOAD image hero page d'accueil — LCP critique
+         Version 480w pour mobile (375px d'écran).
+         Le navigateur choisira la bonne taille via srcset dans HeroSlider.jsx.
     ═══════════════════════════════════════════════════════ -->
     <link
       rel="preload"
       as="image"
-      href="https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1600&q=80"
+      href="https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=480&q=80"
+      imagesrcset="https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=480&q=80 480w,
+                   https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=800&q=80 800w,
+                   https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1600&q=80 1600w"
+      imagesizes="(max-width: 640px) 480px, (max-width: 1024px) 800px, 1600px"
       fetchpriority="high"
     />
 
     <!-- ═══════════════════════════════════════════════════════
-         GOOGLE FONTS — Chargement NON BLOQUANT
+         GOOGLE FONTS — Chargement non bloquant
          media="print" + onload → charge en arrière-plan
-         display=swap → texte visible immédiatement
-         Gain : -450ms sur les requêtes bloquantes.
+         Le CSS Tailwind (index-DEk2g8-5.css) est inévitable
+         mais les polices ne doivent pas s'y ajouter.
     ═══════════════════════════════════════════════════════ -->
     <link
       rel="preload"
@@ -96,23 +89,15 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700;800&display=swap"
     />
     <noscript>
-      <link
-        rel="stylesheet"
+      <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700;800&display=swap"
       />
     </noscript>
 
-    <!-- ═══════════════════════════════════════════════════════
-         CSS CRITIQUE INLINE — polices de secours
-         Évite le FOIT (Flash Of Invisible Text).
-    ═══════════════════════════════════════════════════════ -->
+    <!-- CSS critique inline — polices de secours (évite FOIT) -->
     <style>
-      body {
-        font-family: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
-      }
-      h1, h2, h3, .serif {
-        font-family: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
-      }
+      body { font-family: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif; }
+      h1, h2, h3 { font-family: 'Cormorant Garamond', 'Georgia', serif; }
     </style>
   </head>
   <body>
