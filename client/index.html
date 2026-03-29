@@ -32,39 +32,45 @@
 
     <!-- ═══════════════════════════════════════════════════════
          PERFORMANCE — Préconnexions réseau
-         Établit la connexion TCP/TLS AVANT que le navigateur
-         en ait besoin → gain 200-400ms sur le LCP.
+
+         ⚠️  Google recommande MAX 4 preconnect.
+         Au-delà, le navigateur ouvre trop de connexions TCP
+         simultanées → congestion réseau → LCP dégradé.
+
+         RÈGLE : preconnect uniquement pour les origines
+         critiques au-dessus du fold (visible sans scroll).
+         Pour les autres : dns-prefetch suffit (plus léger).
     ═══════════════════════════════════════════════════════ -->
+
+    <!-- 1. Google Fonts — bloque le rendu si absent → preconnect obligatoire -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+
+    <!-- 2. Unsplash — image hero slide 0 page d'accueil → critique LCP -->
     <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
-    <!-- Pinterest CDN pour HeroSliderMila (2 images viennent de i.pinimg.com) -->
-    <link rel="preconnect" href="https://i.pinimg.com" crossorigin />
+
+    <!-- 3. Cloudinary — images des biens immobiliers (chargées juste après le hero) -->
+    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
+
+    <!-- DNS-prefetch pour les origines secondaires (moins critique) -->
     <link rel="dns-prefetch" href="https://altitude-vision.onrender.com" />
-    <!-- Unsplash+ CDN pour HeroSliderAltcom (images premium) -->
+    <link rel="dns-prefetch" href="https://i.pinimg.com" />
     <link rel="dns-prefetch" href="https://plus.unsplash.com" />
 
     <!-- ═══════════════════════════════════════════════════════
-         PRELOAD IMAGES HERO — LCP critique
+         PRELOAD IMAGE HERO — LCP page d'accueil uniquement
 
-         Principe : le navigateur commence à télécharger ces images
-         AVANT même que React soit chargé.
-         Sans preload : HTML → JS React → rendu slider → découverte image → téléchargement
-         Avec preload : HTML → téléchargement immédiat en parallèle du JS
+         ✅ On ne preload QUE l'image de la page d'accueil (/).
+            Les images des pages /altimmo, /mila-events, /altcom
+            sont gérées par fetchpriority="high" dans leurs
+            HeroSlider respectifs — ce qui est suffisant et évite
+            la compétition réseau qui dégradait le LCP à 8,7s.
 
-         ⚠️  RÈGLE : ne preloader QUE la 1ère image de chaque slider
-             (index 0), celle affichée à l'arrivée sur la page.
-             Les autres se chargent en lazy via loading="lazy".
-
-         ⚠️  IMPORTANT : si tu changes l'ordre des images dans
-             un fichier HeroSlider*.jsx, mets à jour l'URL ici.
+         Avant (4 preloads) : les 4 images se battaient pour
+            la bande passante → toutes arrivaient tard → LCP 8,7s
+         Après (1 preload)  : l'image de l'accueil arrive vite,
+            les autres se chargent en background → LCP ↓
     ═══════════════════════════════════════════════════════ -->
-
-    <!--
-      PAGE D'ACCUEIL (/) — HeroSlider.jsx, slide 0
-      Image : photo-1507089947368 (appartement moderne)
-    -->
     <link
       rel="preload"
       as="image"
@@ -72,50 +78,11 @@
       fetchpriority="high"
     />
 
-    <!--
-      PAGE ALTIMMO (/altimmo) — HeroSliderAlt.jsx, slide 0
-      Image : photo-1600596542815 (villa moderne)
-      Chargée seulement sur /altimmo → preload conditionnel non possible en HTML statique.
-      On la preload quand même car c'est la page principale du site.
-    -->
-    <link
-      rel="preload"
-      as="image"
-      href="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1175&auto=format&fit=crop"
-      fetchpriority="high"
-    />
-
-    <!--
-      PAGE MILA EVENTS (/mila-events) — HeroSliderMila.jsx, slide 0
-      Image : photo-1735679356705 (événement d'entreprise)
-      Note : preconnect vers images.unsplash.com déjà déclaré ci-dessus.
-    -->
-    <link
-      rel="preload"
-      as="image"
-      href="https://images.unsplash.com/photo-1735679356705-7c06b780c7a4?q=80&w=1460&auto=format&fit=crop"
-      fetchpriority="high"
-    />
-
-    <!--
-      PAGE ALTCOM (/altcom) — HeroSliderAltcom.jsx, slide 0
-      Image : photo-1517245386807 (communication digitale)
-      Vient de plus.unsplash.com (Unsplash+, domaine différent).
-    -->
-    <link
-      rel="preload"
-      as="image"
-      href="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=2070&auto=format&fit=crop"
-      fetchpriority="high"
-    />
-
     <!-- ═══════════════════════════════════════════════════════
          GOOGLE FONTS — Chargement NON BLOQUANT
-
-         media="print" + onload="this.media='all'" :
-         → charge en arrière-plan sans bloquer le rendu
-         → display=swap évite le FOIT (Flash Of Invisible Text)
-         Gain estimé : -450ms sur les requêtes bloquantes.
+         media="print" + onload → charge en arrière-plan
+         display=swap → texte visible immédiatement
+         Gain : -450ms sur les requêtes bloquantes.
     ═══════════════════════════════════════════════════════ -->
     <link
       rel="preload"
@@ -137,8 +104,6 @@
 
     <!-- ═══════════════════════════════════════════════════════
          CSS CRITIQUE INLINE — polices de secours
-         Affiche le texte immédiatement avec une police système
-         pendant que Cormorant/Outfit se chargent.
          Évite le FOIT (Flash Of Invisible Text).
     ═══════════════════════════════════════════════════════ -->
     <style>
