@@ -156,10 +156,12 @@ const HeroSlider = () => {
       </AnimatePresence>
 
       {/* ── Contenu texte ── */}
+      {/* flex-start + padding-top 96px : header fixe (72px) + marge (24px)
+          padding-bottom 180px : bandeau pôles (~70px) + indicateurs + marge */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 10,
-        display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        padding: 'clamp(80px, 10vw, 100px) clamp(20px, 5vw, 64px) clamp(130px, 20vw, 165px)',
+        display: 'flex', flexDirection: 'column', justifyContent: 'flex-start',
+        padding: 'clamp(96px, 12vw, 120px) clamp(20px, 5vw, 64px) clamp(180px, 24vw, 220px)',
       }}>
         <AnimatePresence mode="wait">
           <div key={currentIndex}>
@@ -275,11 +277,12 @@ const HeroSlider = () => {
         {String(currentIndex + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
       </div>
 
-      {/* ── Indicateurs verticaux ── */}
+      {/* ── Indicateurs verticaux — centrés pour ne pas toucher le bandeau pôles ── */}
       <div style={{
-        position: 'absolute', bottom: 'clamp(100px, 18vw, 145px)',
-        right: 'clamp(12px, 2vw, 24px)', zIndex: 20,
-        display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px',
+        position: 'absolute',
+        top: '50%', transform: 'translateY(-50%)',
+        right: 'clamp(12px, 2vw, 20px)', zIndex: 20,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
       }}>
         <div style={{ width: '1px', height: '48px', background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
           {/* ✅ height% → propriété composée via transform: scaleY serait encore mieux
