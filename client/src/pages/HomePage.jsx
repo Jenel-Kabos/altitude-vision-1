@@ -256,7 +256,7 @@ const HomePage = () => {
               maxWidth: '520px',
             }}>
               Trois pôles,
-              <em style={{ fontStyle: 'italic', color: '#C8872A' }}>une seule vision</em>
+              <em style={{ fontStyle: 'italic', color: '#C8872A' }}> une seule vision</em>
             </h2>
           </motion.div>
 
