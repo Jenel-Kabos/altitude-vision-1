@@ -14,8 +14,6 @@ const { cleanupUploadedFiles } = require('../middleware/uploadMiddleware');
  * @access Protected
  */
 exports.sendMessage = asyncHandler(async (req, res) => {
-    // Pour les conversations, on peut recevoir soit conversationId + content, 
-    // soit receiverId + content (pour créer une nouvelle conversation)
     const { conversationId, receiverId, content } = req.body;
     const uploadedFiles = req.files || [];
 
@@ -26,7 +24,6 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         throw new Error('Le contenu et soit conversationId ou receiverId sont requis.');
     }
 
-    // Préparer les pièces jointes
     const attachmentsData = uploadedFiles.map(file => ({
         filename: file.originalname,
         filepath: file.path,
@@ -35,13 +32,31 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     }));
 
     let targetUserId;
-    
-    // ✅ CORRECTION : conversationId représente directement l'ID de l'autre utilisateur
-    // Pas besoin de chercher une conversation dans la base
-    if (conversationId) {
-        targetUserId = conversationId;
-    } else {
+
+    if (receiverId) {
+        // ✅ CAS 1 : receiverId fourni directement → c'est l'ID de l'utilisateur destinataire
         targetUserId = receiverId;
+    } else if (conversationId) {
+        // ✅ CAS 2 : conversationId fourni → chercher l'autre participant dans la conversation
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) {
+            cleanupUploadedFiles(uploadedFiles);
+            res.status(404);
+            throw new Error('Conversation non trouvée.');
+        }
+
+        // L'autre participant = celui qui n'est pas l'expéditeur
+        const otherParticipantId = conversation.participants.find(
+            (p) => p.toString() !== req.user.id.toString()
+        );
+
+        if (!otherParticipantId) {
+            cleanupUploadedFiles(uploadedFiles);
+            res.status(404);
+            throw new Error('Destinataire non trouvé dans la conversation.');
+        }
+
+        targetUserId = otherParticipantId;
     }
 
     // --- 2. Vérifier le destinataire ---
@@ -82,7 +97,6 @@ exports.getMessages = asyncHandler(async (req, res) => {
 
   console.log(`📖 [getMessages] ConversationId: ${conversationId}, User: ${req.user.id}`);
 
-  // Vérifier que conversationId est un ObjectId valide
   if (!conversationId || !conversationId.match(/^[0-9a-fA-F]{24}$/)) {
     res.status(400);
     throw new Error('ID de conversation invalide.');
@@ -90,7 +104,6 @@ exports.getMessages = asyncHandler(async (req, res) => {
 
   const skip = (page - 1) * limit;
 
-  // Trouver les messages entre l'utilisateur et un autre utilisateur
   const messages = await Message.find({
     $or: [
       { sender: req.user.id, receiver: conversationId },
@@ -110,7 +123,6 @@ exports.getMessages = asyncHandler(async (req, res) => {
     ],
   });
 
-  // Marquer les messages reçus comme lus
   await Message.updateMany(
     { sender: conversationId, receiver: req.user.id, isRead: false },
     { isRead: true, readAt: Date.now() }
@@ -143,7 +155,6 @@ exports.markAsRead = asyncHandler(async (req, res) => {
     throw new Error('Message non trouvé.');
   }
 
-  // Vérifier que l'utilisateur est le destinataire
   if (message.receiver.toString() !== req.user.id) {
     res.status(403);
     throw new Error('Non autorisé.');
@@ -176,7 +187,6 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
     throw new Error('Message non trouvé.');
   }
 
-  // Vérifier que l'utilisateur est l'expéditeur ou le destinataire
   if (
     message.sender.toString() !== req.user.id &&
     message.receiver.toString() !== req.user.id
@@ -203,7 +213,6 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
 exports.getConversations = asyncHandler(async (req, res) => {
   console.log(`💬 [getConversations] User: ${req.user.id}`);
 
-  // Trouver tous les utilisateurs avec qui l'utilisateur a échangé
   const messages = await Message.find({
     $or: [{ sender: req.user.id }, { receiver: req.user.id }],
   })
@@ -211,7 +220,6 @@ exports.getConversations = asyncHandler(async (req, res) => {
     .populate('receiver', 'name email avatar')
     .sort({ createdAt: -1 });
 
-  // Créer une map des conversations uniques
   const conversationsMap = new Map();
 
   messages.forEach((message) => {
@@ -234,7 +242,6 @@ exports.getConversations = asyncHandler(async (req, res) => {
     }
   });
 
-  // Compter les messages non lus pour chaque conversation
   for (const [userId, conversation] of conversationsMap.entries()) {
     const unreadCount = await Message.countDocuments({
       sender: userId,
