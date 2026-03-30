@@ -25,15 +25,33 @@ const PROFILE_LINKS = [
 ];
 
 const useUnreadCount = () => {
-  const [count, setCount] = useState(0);
+  const [count, setCount]   = useState(0);
+  const location            = useLocation();
+  const isOnMessagesPage    = location.pathname === '/messages';
+
   useEffect(() => {
+    // ✅ Si l'utilisateur est sur la page messages, badge = 0 immédiatement
+    if (isOnMessagesPage) {
+      setCount(0);
+      return;
+    }
+
     const load = async () => {
-      try { setCount(await getTotalUnreadCount()); } catch { setCount(0); }
+      try {
+        const total = await getTotalUnreadCount();
+        setCount(total);
+      } catch {
+        setCount(0);
+      }
     };
-    load();
-    const id = setInterval(load, 30000);
+
+    load(); // charge immédiatement
+
+    // ✅ Poll toutes les 10s (au lieu de 30s) pour une meilleure réactivité
+    const id = setInterval(load, 10000);
     return () => clearInterval(id);
-  }, []);
+  }, [isOnMessagesPage]);
+
   return count;
 };
 
@@ -96,9 +114,9 @@ const Header = () => {
   const isTablet  = bp === 'md';
   const isMobile  = bp === 'xs' || bp === 'sm';
 
-  const headerHeight  = isMobile ? '60px' : isTablet ? '66px' : '72px';
+  const headerHeight   = isMobile ? '60px' : isTablet ? '66px' : '72px';
   const headerHeightPx = isMobile ? 60 : isTablet ? 66 : 72;
-  const headerPadding = isMobile ? '0 16px' : isTablet ? '0 28px' : '0 48px';
+  const headerPadding  = isMobile ? '0 16px' : isTablet ? '0 28px' : '0 48px';
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
@@ -248,6 +266,7 @@ const Header = () => {
                 </Link>
               )}
 
+              {/* ✅ Icône messages avec badge dynamique */}
               <Link to="/messages" style={{
                 position: 'relative', padding: '8px', borderRadius: '10px',
                 color: 'rgba(232,228,220,0.5)', display: 'flex',
@@ -372,6 +391,7 @@ const Header = () => {
             </>
           ) : null}
 
+          {/* ✅ Icône messages mobile avec badge dynamique */}
           {isMobile && user && (
             <Link to="/messages" style={{
               position: 'relative', padding: '8px', borderRadius: '10px',
@@ -400,18 +420,9 @@ const Header = () => {
         </div>
       </header>
 
-      {/* ── MENU MOBILE / TABLETTE ─────────────────────────────────
-          ✅ FIX : le panneau commence SOUS le header (top = headerHeight)
-          et non pas depuis le haut de l'écran avec paddingTop.
-          Avant : position fixed inset:0 + paddingTop → le contenu démarrait
-                  avec un padding mais le div overlay commençait à top:0,
-                  ce qui masquait les premiers liens derrière le header.
-          Après : le panneau de contenu a top = headerHeight directement,
-                  et maxHeight = 100vh - headerHeight pour ne pas déborder.
-      ═══════════════════════════════════════════════════════════ */}
+      {/* MENU MOBILE / TABLETTE */}
       {mobileOpen && !isDesktop && (
         <>
-          {/* Fond semi-transparent derrière le menu */}
           <div
             onClick={() => setMobile(false)}
             style={{
@@ -419,14 +430,13 @@ const Header = () => {
               background: 'rgba(0,0,0,0.65)',
               backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
               animation: 'fadeIn 0.2s ease',
-              top: headerHeight, // ✅ commence sous le header, pas depuis le haut
+              top: headerHeight,
             }}
           />
 
-          {/* Panneau de navigation */}
           <div style={{
             position: 'fixed',
-            top: headerHeight,    // ✅ commence exactement sous le header
+            top: headerHeight,
             left: 0, right: 0,
             zIndex: 39,
             background: 'rgba(8,10,13,0.99)',
@@ -438,7 +448,6 @@ const Header = () => {
             overflowY: 'auto',
           }}>
 
-            {/* Grille nav — TOUS les liens visibles sans scroll */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)',
@@ -457,7 +466,6 @@ const Header = () => {
                     border: `1px solid ${isActive ? 'rgba(200,135,42,0.15)' : 'rgba(232,228,220,0.04)'}`,
                     fontSize: isMobile ? '0.82rem' : '0.78rem', fontWeight: 300,
                     textDecoration: 'none', transition: '0.2s', letterSpacing: '0.04em',
-                    // ✅ Zone tactile minimum 44px
                     minHeight: '44px',
                   })}>
                   {({ isActive }) => (
