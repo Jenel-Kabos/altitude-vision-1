@@ -18,7 +18,10 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
   const previousMessagesCountRef = useRef(0);
 
   const userId = user?._id || user?.id;
-  const otherParticipant = conversation.participants?.find(p => p._id !== userId) || conversation.user;
+  const conversationId = conversation._id;
+  const otherParticipant =
+    conversation.participants?.find(p => String(p._id) !== String(userId)) ||
+    conversation.user;
 
   const {
     messagesEndRef,
@@ -26,33 +29,27 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
     showScrollButton,
     unreadCount,
     scrollToBottom,
-    handleScroll
+    handleScroll,
   } = useSmartScroll(messages, userId);
 
   useEffect(() => {
-    const conversationUserId = otherParticipant?._id;
+    if (!conversationId) return;
 
-    if (conversationUserId) {
-      fetchMessages(conversationUserId);
-      markAsRead(conversationUserId);
+    fetchMessages(conversationId);
+    markAsRead(conversationId);
 
-      pollIntervalRef.current = setInterval(() => {
-        fetchMessages(conversationUserId, true);
-      }, 3000);
-    }
+    pollIntervalRef.current = setInterval(() => {
+      fetchMessages(conversationId, true);
+    }, 3000);
 
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-    };
-  }, [otherParticipant?._id]);
+    return () => clearInterval(pollIntervalRef.current);
+  }, [conversationId]);
 
-  const fetchMessages = async (conversationUserId, silent = false) => {
+  const fetchMessages = async (convId, silent = false) => {
     try {
       if (!silent) setLoading(true);
 
-      const data = await getMessages(conversationUserId);
+      const data = await getMessages(convId);
       const newMessages = data.messages || [];
       const hasNewMessages = newMessages.length > previousMessagesCountRef.current;
 
@@ -60,7 +57,7 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
       previousMessagesCountRef.current = newMessages.length;
 
       if (hasNewMessages && silent) {
-        markAsRead(conversationUserId);
+        markAsRead(convId);
       }
     } catch (error) {
       console.error('Erreur lors du chargement des messages:', error);
@@ -69,9 +66,9 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
     }
   };
 
-  const markAsRead = async (conversationUserId) => {
+  const markAsRead = async (convId) => {
     try {
-      await markConversationAsRead(conversationUserId);
+      await markConversationAsRead(convId);
     } catch (error) {
       console.error('Erreur mark as read:', error);
     }
@@ -82,9 +79,8 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
 
     setSending(true);
     try {
-      const conversationUserId = otherParticipant?._id;
-      await sendMessage(conversationUserId, content);
-      await fetchMessages(conversationUserId, true);
+      await sendMessage(conversationId, content);
+      await fetchMessages(conversationId, true);
     } catch (error) {
       console.error("Erreur lors de l'envoi:", error);
       alert("Erreur lors de l'envoi du message");
@@ -113,7 +109,7 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
     if (!confirm('Archiver cette conversation ?')) return;
 
     try {
-      await archiveConversation(conversation._id);
+      await archiveConversation(conversationId);
       onArchive();
     } catch (error) {
       console.error("Erreur lors de l'archivage:", error);
@@ -122,8 +118,7 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
   };
 
   const handleRefresh = () => {
-    const conversationUserId = otherParticipant?._id;
-    if (conversationUserId) fetchMessages(conversationUserId);
+    fetchMessages(conversationId);
   };
 
   return (
@@ -216,13 +211,13 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
         ) : (
           <>
             {messages.map((message) => (
-  <MessageBubble
-    key={message._id}
-    message={message}
-    isOwnMessage={String(message.sender?._id) === String(userId)}
-    onDelete={handleDeleteMessage}
-  />
-))}
+              <MessageBubble
+                key={message._id}
+                message={message}
+                isOwnMessage={String(message.sender?._id) === String(userId)}
+                onDelete={handleDeleteMessage}
+              />
+            ))}
             <div ref={messagesEndRef} />
           </>
         )}
