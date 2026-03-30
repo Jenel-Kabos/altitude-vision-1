@@ -20,7 +20,6 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
   const userId = user?._id || user?.id;
   const otherParticipant = conversation.participants?.find(p => p._id !== userId) || conversation.user;
 
-  // Utiliser le hook de scroll intelligent
   const {
     messagesEndRef,
     containerRef,
@@ -32,12 +31,11 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
 
   useEffect(() => {
     const conversationUserId = otherParticipant?._id;
-    
+
     if (conversationUserId) {
       fetchMessages(conversationUserId);
       markAsRead(conversationUserId);
-      
-      // Rafraîchissement automatique toutes les 3 secondes
+
       pollIntervalRef.current = setInterval(() => {
         fetchMessages(conversationUserId, true);
       }, 3000);
@@ -53,21 +51,17 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
   const fetchMessages = async (conversationUserId, silent = false) => {
     try {
       if (!silent) setLoading(true);
-      
+
       const data = await getMessages(conversationUserId);
       const newMessages = data.messages || [];
-      
-      // Détecter s'il y a de nouveaux messages
       const hasNewMessages = newMessages.length > previousMessagesCountRef.current;
-      
+
       setMessages(newMessages);
       previousMessagesCountRef.current = newMessages.length;
-      
-      // Marquer comme lu uniquement s'il y a de nouveaux messages
+
       if (hasNewMessages && silent) {
         markAsRead(conversationUserId);
       }
-      
     } catch (error) {
       console.error('Erreur lors du chargement des messages:', error);
     } finally {
@@ -90,32 +84,25 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
     try {
       const conversationUserId = otherParticipant?._id;
       await sendMessage(conversationUserId, content);
-      
-      // Recharger les messages depuis le serveur
       await fetchMessages(conversationUserId, true);
-      
-      // Le scroll automatique se fera via le hook useSmartScroll
-      // car c'est un message de l'utilisateur actuel
-      
     } catch (error) {
-      console.error('Erreur lors de l\'envoi:', error);
-      alert('Erreur lors de l\'envoi du message');
+      console.error("Erreur lors de l'envoi:", error);
+      alert("Erreur lors de l'envoi du message");
     } finally {
       setSending(false);
     }
   };
 
   const handleDeleteMessage = async (messageId) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce message ?')) return;
-
     try {
       await deleteMessage(messageId);
-      
-      setMessages(messages.map(m => 
-        m._id === messageId 
-          ? { ...m, isDeleted: true, content: 'Message supprimé' }
-          : m
-      ));
+      setMessages(prev =>
+        prev.map(m =>
+          m._id === messageId
+            ? { ...m, isDeleted: true, content: 'Message supprimé' }
+            : m
+        )
+      );
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
       alert('Erreur lors de la suppression du message');
@@ -129,16 +116,14 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
       await archiveConversation(conversation._id);
       onArchive();
     } catch (error) {
-      console.error('Erreur lors de l\'archivage:', error);
-      alert('Erreur lors de l\'archivage');
+      console.error("Erreur lors de l'archivage:", error);
+      alert("Erreur lors de l'archivage");
     }
   };
 
   const handleRefresh = () => {
     const conversationUserId = otherParticipant?._id;
-    if (conversationUserId) {
-      fetchMessages(conversationUserId);
-    }
+    if (conversationUserId) fetchMessages(conversationUserId);
   };
 
   return (
@@ -175,7 +160,6 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
           </div>
         </div>
 
-        {/* Menu */}
         <div className="flex items-center gap-2">
           <button
             onClick={handleRefresh}
@@ -189,7 +173,6 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
             <button className="p-2 hover:bg-gray-200 rounded-lg transition">
               <MoreVertical size={20} />
             </button>
-            
             <div className="hidden group-hover:block absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-10">
               <button
                 onClick={handleArchive}
@@ -210,13 +193,13 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
         className="flex-1 overflow-y-auto p-4 bg-gray-50 scroll-smooth"
         style={{
           scrollbarWidth: 'thin',
-          scrollbarColor: 'rgba(102, 126, 234, 0.3) transparent'
+          scrollbarColor: 'rgba(102, 126, 234, 0.3) transparent',
         }}
       >
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
               <p className="text-gray-600">Chargement des messages...</p>
             </div>
           </div>
@@ -245,14 +228,12 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
         )}
       </div>
 
-      {/* Bouton pour scroller vers les nouveaux messages */}
       <ScrollToBottomButton
         show={showScrollButton}
         unreadCount={unreadCount}
         onClick={() => scrollToBottom('smooth')}
       />
 
-      {/* Input */}
       <MessageInput onSendMessage={handleSendMessage} isLoading={sending} />
     </div>
   );

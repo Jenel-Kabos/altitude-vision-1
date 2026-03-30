@@ -46,9 +46,7 @@ const poles = [
   },
 ];
 
-/* Styles responsive injectés en <style> pour éviter les inline fixes */
 const RESPONSIVE_CSS = `
-  /* Stats grid */
   .av-stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -67,7 +65,6 @@ const RESPONSIVE_CSS = `
   }
   .av-stat-item:last-child { border-right: none; }
 
-  /* Poles grid */
   .av-poles-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -89,7 +86,6 @@ const RESPONSIVE_CSS = `
   .av-pole-card:hover .av-pole-top-accent { opacity: 1 !important; }
   .av-pole-card:hover .av-pole-link { opacity: 1 !important; transform: translateY(0) !important; }
 
-  /* About grid */
   .av-about-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -100,24 +96,21 @@ const RESPONSIVE_CSS = `
     .av-about-grid { grid-template-columns: 1fr; gap: 48px; }
   }
 
-  /* Ticker */
   .av-ticker-inner {
     display: flex;
     animation: avTicker 28s linear infinite;
     white-space: nowrap;
   }
 
-  /* Annonces tabs */
   .av-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 40px; }
-
-  /* Section paddings responsive */
-  .av-section-inner {
-    padding: var(--py) var(--px);
-  }
+  .av-section-inner { padding: var(--py) var(--px); }
   .av-container { max-width: 1200px; margin: 0 auto; }
 `;
 
-/* Eyebrow component */
+// Taille de titre unifiée pour toutes les sections h2
+// Identique à "Qui sommes-nous ?" : clamp(1.9rem,4vw,3.5rem)
+const H2_SIZE = 'clamp(1.9rem,4vw,3.5rem)';
+
 const Eyebrow = ({ children }) => (
   <p style={{
     fontSize: 'clamp(0.6rem, 1.5vw, 0.68rem)',
@@ -130,15 +123,12 @@ const Eyebrow = ({ children }) => (
   </p>
 );
 
-/* Skeleton */
 const PageSkeleton = () => (
   <div style={{ minHeight: '100vh', background: '#0A0C0F' }}>
     <div style={{ height: '100vh', background: 'linear-gradient(160deg,#0D1520,#080B0E)' }} />
-    <style>{`@keyframes avSkeleton{0%,100%{opacity:.3}50%{opacity:.7}}`}</style>
   </div>
 );
 
-/* Ticker */
 const Ticker = () => {
   const items = ['Altimmo — Immobilier', 'Mila Events — Événementiel', 'Altcom — Communication', 'Brazzaville, Congo', 'Votre vision. Notre expertise.'];
   return (
@@ -205,27 +195,23 @@ const HomePage = () => {
         <HeroSlider />
       </header>
 
-      {/* ══ TICKER ══ */}
       <Ticker />
 
       {/* ══ STATS ══ */}
       <div className="av-stats-grid">
         {[
-          { num: '3',    label: "Pôles d'expertise",   color: '#C8872A' },
-          { num: '150+', label: 'Biens immobiliers',    color: '#2E7BB5' },
-          { num: '80+',  label: 'Événements organisés', color: '#D42B2B' },
-          { num: '∞',    label: 'Possibilités offertes',color: '#C8872A' },
+          { num: '3',    label: "Pôles d'expertise",    color: '#C8872A' },
+          { num: '150+', label: 'Biens immobiliers',     color: '#2E7BB5' },
+          { num: '80+',  label: 'Événements organisés',  color: '#D42B2B' },
+          { num: '∞',    label: 'Possibilités offertes', color: '#C8872A' },
         ].map((stat, i) => (
           <motion.div key={i} className="av-stat-item"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: i * 0.1 }}>
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} transition={{ duration: 0.6, delay: i * 0.1 }}>
             <div style={{
               fontFamily: "'Cormorant Garamond',serif",
               fontSize: 'clamp(2rem,5vw,4rem)',
-              fontWeight: 300, lineHeight: 1,
-              letterSpacing: '-0.02em',
+              fontWeight: 300, lineHeight: 1, letterSpacing: '-0.02em',
               color: stat.color, marginBottom: '8px',
             }}>
               {stat.num}
@@ -248,15 +234,16 @@ const HomePage = () => {
             initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }} transition={{ duration: 0.7 }}>
             <Eyebrow>Notre Expertise</Eyebrow>
+            {/* ✅ Même taille que "Qui sommes-nous ?" + nowrap pour tenir sur une ligne */}
             <h2 style={{
               fontFamily: "'Cormorant Garamond',serif",
-              fontSize: 'clamp(2rem,5vw,4rem)',
-              fontWeight: 300, lineHeight: 1,
+              fontSize: H2_SIZE,
+              fontWeight: 300, lineHeight: 1.1,
               letterSpacing: '-0.01em', color: '#E8E4DC',
-              maxWidth: '520px',
+              whiteSpace: 'nowrap',
             }}>
-              Trois pôles,
-              <em style={{ fontStyle: 'italic', color: '#C8872A' }}> une seule vision</em>
+              Trois pôles,{' '}
+              <em style={{ fontStyle: 'italic', color: '#C8872A' }}>une seule vision</em>
             </h2>
           </motion.div>
 
@@ -271,26 +258,18 @@ const HomePage = () => {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.15 }}
                   transition={{ duration: 0.6, delay: i * 0.1 }}>
-
-                  {/* Accent top */}
                   <div className="av-pole-top-accent" style={{
                     position: 'absolute', top: 0, left: 0, right: 0,
-                    height: '1px', background: pole.color,
-                    opacity: 0, transition: '0.3s',
+                    height: '1px', background: pole.color, opacity: 0, transition: '0.3s',
                   }} />
-
-                  {/* Numéro */}
                   <span style={{
-                    display: 'block',
-                    fontFamily: "'Cormorant Garamond',serif",
+                    display: 'block', fontFamily: "'Cormorant Garamond',serif",
                     fontSize: '0.85rem', fontWeight: 300,
                     color: 'rgba(232,228,220,0.2)',
                     letterSpacing: '0.15em', marginBottom: 'clamp(20px,3vw,36px)',
                   }}>
                     {pole.num}
                   </span>
-
-                  {/* Icône */}
                   <div style={{
                     width: '46px', height: '46px', borderRadius: '12px',
                     background: pole.colorLight, border: `1px solid ${pole.colorBorder}`,
@@ -299,8 +278,6 @@ const HomePage = () => {
                   }}>
                     <Icon size={19} style={{ color: pole.color }} />
                   </div>
-
-                  {/* Nom */}
                   <h3 style={{
                     fontFamily: "'Cormorant Garamond',serif",
                     fontSize: 'clamp(1.5rem,3vw,2rem)',
@@ -309,8 +286,6 @@ const HomePage = () => {
                   }}>
                     {pole.name}
                   </h3>
-
-                  {/* Tag */}
                   <p style={{
                     fontSize: '0.62rem', letterSpacing: '0.22em',
                     textTransform: 'uppercase', color: pole.color,
@@ -318,20 +293,14 @@ const HomePage = () => {
                   }}>
                     {pole.tag}
                   </p>
-
                   <div style={{ height: '1px', background: 'rgba(232,228,220,0.06)', marginBottom: '16px' }} />
-
-                  {/* Desc */}
                   <p style={{
                     fontSize: 'clamp(0.8rem,1.8vw,0.85rem)',
                     color: 'rgba(232,228,220,0.42)',
-                    lineHeight: 1.75, marginBottom: 'clamp(16px,3vw,28px)',
-                    fontWeight: 300,
+                    lineHeight: 1.75, marginBottom: 'clamp(16px,3vw,28px)', fontWeight: 300,
                   }}>
                     {pole.description}
                   </p>
-
-                  {/* Lien */}
                   <Link to={pole.pageroute} className="av-pole-link" style={{
                     display: 'inline-flex', alignItems: 'center', gap: '8px',
                     fontSize: '0.7rem', letterSpacing: '0.15em',
@@ -348,7 +317,6 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Divider */}
       <div style={{
         height: '1px', margin: '0 var(--px)',
         background: 'linear-gradient(to right,transparent,rgba(200,135,42,0.25),rgba(46,123,181,0.15),transparent)',
@@ -358,14 +326,12 @@ const HomePage = () => {
       <section className="av-section-inner">
         <div className="av-container">
           <div className="av-about-grid">
-
-            {/* Gauche */}
             <motion.div initial={{ opacity: 0, x: -28 }} whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }} transition={{ duration: 0.8 }}>
               <Eyebrow>À propos</Eyebrow>
               <h2 style={{
                 fontFamily: "'Cormorant Garamond',serif",
-                fontSize: 'clamp(1.9rem,4vw,3.5rem)',
+                fontSize: H2_SIZE,
                 fontWeight: 300, lineHeight: 1.15,
                 color: '#E8E4DC', marginBottom: '22px',
               }}>
@@ -386,8 +352,6 @@ const HomePage = () => {
               }}>
                 Immobilier de prestige, événementiel haut de gamme ou stratégie de communication — une seule agence suffit pour tous vos projets.
               </p>
-
-              {/* Contacts */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '36px' }}>
                 {[
                   { icon: MapPin, text: 'Brazzaville, République du Congo' },
@@ -404,7 +368,6 @@ const HomePage = () => {
                   </div>
                 ))}
               </div>
-
               <Link to="/contact" style={{
                 display: 'inline-flex', alignItems: 'center', gap: '8px',
                 padding: 'clamp(10px,2vw,13px) clamp(18px,3vw,28px)',
@@ -416,7 +379,6 @@ const HomePage = () => {
               </Link>
             </motion.div>
 
-            {/* Droite — mini-cards */}
             <motion.div initial={{ opacity: 0, x: 28 }} whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }} transition={{ duration: 0.8, delay: 0.1 }}
               style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -444,8 +406,7 @@ const HomePage = () => {
                     }}>
                     <div className="mini-acc" style={{
                       position: 'absolute', left: 0, top: 0, bottom: 0,
-                      width: '2px', background: pole.color,
-                      opacity: 0, transition: '0.3s',
+                      width: '2px', background: pole.color, opacity: 0, transition: '0.3s',
                     }} />
                     <div style={{
                       width: '38px', height: '38px', borderRadius: '10px',
@@ -474,7 +435,6 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* ══ STATS COUNTER (composant existant) ══ */}
       <StatsCounter />
 
       {/* ══ ANNONCES ══ */}
@@ -484,9 +444,10 @@ const HomePage = () => {
             initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }} transition={{ duration: 0.7 }}>
             <Eyebrow>Notre Sélection</Eyebrow>
+            {/* ✅ Même taille que "Qui sommes-nous ?" */}
             <h2 style={{
               fontFamily: "'Cormorant Garamond',serif",
-              fontSize: 'clamp(2rem,5vw,4rem)',
+              fontSize: H2_SIZE,
               fontWeight: 300, lineHeight: 1.1,
               letterSpacing: '-0.01em', color: '#E8E4DC',
             }}>
@@ -495,7 +456,6 @@ const HomePage = () => {
             </h2>
           </motion.div>
 
-          {/* Onglets */}
           <div className="av-tabs">
             {poles.map(pole => {
               const Icon = pole.icon;
@@ -514,8 +474,7 @@ const HomePage = () => {
                     fontFamily: "'DM Sans',sans-serif",
                     fontSize: 'clamp(0.68rem,1.5vw,0.78rem)',
                     fontWeight: 400, letterSpacing: '0.06em',
-                    textTransform: 'uppercase', cursor: 'pointer',
-                    transition: '0.3s',
+                    textTransform: 'uppercase', cursor: 'pointer', transition: '0.3s',
                     boxShadow: isActive ? `0 4px 24px ${pole.color}30` : 'none',
                   }}
                   aria-pressed={isActive}>
@@ -525,12 +484,10 @@ const HomePage = () => {
             })}
           </div>
 
-          {/* Contenu */}
           <AnimatePresence mode="wait">
             <motion.div key={activePole}
               initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }}>
-
               <div style={{
                 display: 'flex', alignItems: 'center',
                 justifyContent: 'space-between',
@@ -588,12 +545,10 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* ══ COMPOSANTS EXISTANTS ══ */}
       <WhyChooseUs />
       <FacebookFeed />
       <Testimonials />
 
-      {/* ══ CTA COMMISSION ══ */}
       <section className="av-section-inner">
         <div className="av-container">
           <CtaCommission />
