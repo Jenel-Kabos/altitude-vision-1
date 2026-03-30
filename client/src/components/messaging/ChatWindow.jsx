@@ -79,7 +79,10 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
 
     setSending(true);
     try {
-      await sendMessage(conversationId, content);
+      await sendMessage({
+        recipientId: otherParticipant._id,
+        content,
+      });
       await fetchMessages(conversationId, true);
     } catch (error) {
       console.error("Erreur lors de l'envoi:", error);
