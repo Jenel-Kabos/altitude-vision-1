@@ -4,7 +4,8 @@ import { ArrowLeft, MoreVertical, Archive, RefreshCw, MessageCircle } from 'luci
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import ScrollToBottomButton from './ScrollToBottomButton';
-import { getMessages, sendMessage, deleteMessage } from '../../services/messageService';
+// ✅ CORRECTION : import de deleteConversationMessage au lieu de deleteMessage
+import { getMessages, sendMessage, deleteConversationMessage } from '../../services/messageService';
 import { markConversationAsRead, archiveConversation } from '../../services/conversationService';
 import { useAuth } from '../../context/AuthContext';
 import { useSmartScroll } from '../../hooks/useSmartScroll';
@@ -100,7 +101,8 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
 
   const handleDeleteMessage = async (messageId) => {
     try {
-      await deleteMessage(messageId);
+      // ✅ CORRECTION : utilise DELETE /messages/:id et non /internal-mails/:id/trash
+      await deleteConversationMessage(messageId);
       setMessages(prev =>
         prev.map(m =>
           m._id === messageId
