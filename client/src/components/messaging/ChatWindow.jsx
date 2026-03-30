@@ -216,13 +216,13 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
         ) : (
           <>
             {messages.map((message) => (
-              <MessageBubble
-                key={message._id}
-                message={message}
-                isOwnMessage={String(message.sender?._id) === String(userId)}
-                onDelete={handleDeleteMessage}
-              />
-            ))}
+  <MessageBubble
+    key={message._id}
+    message={message}
+    isOwnMessage={String(message.sender?._id) === String(userId)}
+    onDelete={handleDeleteMessage}
+  />
+))}
             <div ref={messagesEndRef} />
           </>
         )}
