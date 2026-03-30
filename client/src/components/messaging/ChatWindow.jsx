@@ -219,7 +219,7 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
               <MessageBubble
                 key={message._id}
                 message={message}
-                isOwnMessage={message.sender?._id === userId}
+                isOwnMessage={String(message.sender?._id) === String(userId)}
                 onDelete={handleDeleteMessage}
               />
             ))}
