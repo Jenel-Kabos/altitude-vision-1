@@ -79,8 +79,9 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
 
     setSending(true);
     try {
+      // ✅ Le backend attend "conversationId" ou "receiverId"
       await sendMessage({
-        recipientId: otherParticipant._id,
+        conversationId,
         content,
       });
       await fetchMessages(conversationId, true);
