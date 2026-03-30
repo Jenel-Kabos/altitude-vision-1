@@ -255,7 +255,7 @@ const HomePage = () => {
               letterSpacing: '-0.01em', color: '#E8E4DC',
               maxWidth: '520px',
             }}>
-              Trois pôles,{' '}
+              Trois pôles,
               <em style={{ fontStyle: 'italic', color: '#C8872A' }}>une seule vision</em>
             </h2>
           </motion.div>
