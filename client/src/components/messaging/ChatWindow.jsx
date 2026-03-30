@@ -19,9 +19,12 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
 
   const userId = user?._id || user?.id;
   const conversationId = conversation._id;
+
+  // ✅ CORRIGÉ : utilise && au lieu de || pour comparer les deux formats d'ID
   const otherParticipant =
-    conversation.participants?.find(p => String(p._id) !== String(userId)) ||
-    conversation.user;
+    conversation.participants?.find(
+      p => String(p._id) !== String(userId) && String(p._id) !== String(user?.id)
+    ) || conversation.user;
 
   const {
     messagesEndRef,
@@ -79,9 +82,11 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
 
     setSending(true);
     try {
-      // ✅ Le backend attend "conversationId" ou "receiverId"
+      // ✅ CORRIGÉ : ajout de receiverId pour que le backend trouve le destinataire
+      // Si votre backend utilise "recipientId", remplacez receiverId par recipientId
       await sendMessage({
         conversationId,
+        receiverId: otherParticipant?._id,
         content,
       });
       await fetchMessages(conversationId, true);

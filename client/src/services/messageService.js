@@ -331,7 +331,7 @@ export const sendMessage = async (dataOrConversationId, content, attachments = [
     try {
         let messageData;
         
-        // Format 1 : sendMessage({ conversationId: 'xxx', content: 'yyy' })
+        // Format 1 : ({ conversationId: 'xxx', content: 'yyy' })
         if (typeof dataOrConversationId === 'object' && dataOrConversationId !== null) {
             messageData = dataOrConversationId;
         }

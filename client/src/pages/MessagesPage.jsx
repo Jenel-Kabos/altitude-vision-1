@@ -112,7 +112,10 @@ const MessagesPage = () => {
     };
 
     const filtered = convs.filter(c => {
-        const other = c.participants?.find(p => p._id !== user?._id || p._id !== user?.id);
+        // ✅ CORRIGÉ : utilise && pour que les deux conditions soient vraies simultanément
+        const other = c.participants?.find(
+            p => p._id !== user?._id && p._id !== user?.id
+        );
         return !search || (other?.name || '').toLowerCase().includes(search.toLowerCase());
     });
 
@@ -228,7 +231,10 @@ const MessagesPage = () => {
                             ) : (
                                 <AnimatePresence>
                                     {filtered.map((conv, i) => {
-                                        const other   = conv.participants?.find(p => (p._id || p) !== (user?._id || user?.id));
+                                        // ✅ CORRIGÉ : utilise && pour identifier correctement l'autre participant
+                                        const other = conv.participants?.find(
+                                            p => (p._id || p) !== user?._id && (p._id || p) !== user?.id
+                                        );
                                         const isActive = selConv?._id === conv._id;
                                         return (
                                             <motion.button key={conv._id}
@@ -299,7 +305,10 @@ const MessagesPage = () => {
                                     <style>{`@media (max-width:767px){ .back-btn { display:block !important; } }`}</style>
 
                                     {(() => {
-                                        const other = selConv.participants?.find(p => (p._id || p) !== (user?._id || user?.id));
+                                        // ✅ CORRIGÉ : utilise && pour identifier correctement l'autre participant
+                                        const other = selConv.participants?.find(
+                                            p => (p._id || p) !== user?._id && (p._id || p) !== user?.id
+                                        );
                                         return (
                                             <>
                                                 <Avatar name={other?.name} photo={other?.photo} size={40} online />
