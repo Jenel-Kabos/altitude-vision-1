@@ -251,7 +251,7 @@ const HomePage = () => {
             <h2 style={{
               fontFamily: "'Cormorant Garamond',serif",
               fontSize: 'clamp(2rem,5vw,4rem)',
-              fontWeight: 300, lineHeight: 1.1,
+              fontWeight: 300, lineHeight: 1,
               letterSpacing: '-0.01em', color: '#E8E4DC',
               maxWidth: '520px',
             }}>
