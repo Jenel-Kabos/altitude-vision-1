@@ -156,12 +156,10 @@ const HeroSlider = () => {
       </AnimatePresence>
 
       {/* ── Contenu texte ── */}
-      {/* flex-start + padding-top 96px : header fixe (72px) + marge (24px)
-          padding-bottom 180px : bandeau pôles (~70px) + indicateurs + marge */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 10,
-        display: 'flex', flexDirection: 'column', justifyContent: 'flex-start',
-        padding: 'clamp(96px, 12vw, 120px) clamp(20px, 5vw, 64px) clamp(180px, 24vw, 220px)',
+        display: 'flex', flexDirection: 'column', justifyContent: 'center',
+        padding: 'clamp(80px, 10vw, 100px) clamp(20px, 5vw, 64px) clamp(130px, 18vw, 160px)',
       }}>
         <AnimatePresence mode="wait">
           <div key={currentIndex}>
@@ -190,7 +188,7 @@ const HeroSlider = () => {
             <motion.h1 custom={0.25} variants={textV} initial="hidden" animate="visible"
               style={{
                 fontFamily: "'Cormorant Garamond', serif",
-                fontSize: 'clamp(2.4rem, 7vw, 6rem)',
+                fontSize: 'clamp(1.8rem, 4.5vw, 3.8rem)',
                 fontWeight: 300, lineHeight: 1.0,
                 letterSpacing: '-0.02em', color: '#fff',
                 marginBottom: 'clamp(12px, 2vw, 20px)',
