@@ -17,12 +17,11 @@ try {
  * @access Protected
  */
 exports.getConversations = asyncHandler(async (req, res) => {
-  // Option 1 : Si le modèle Conversation existe et est utilisé
   if (Conversation) {
     const conversations = await Conversation.find({
       participants: req.user.id
     })
-      .populate('participants', 'name email photo') // ✅ Correction: photo
+      .populate('participants', 'name email photo')
       .populate('lastMessage')
       .sort({ updatedAt: -1 });
 
@@ -31,20 +30,19 @@ exports.getConversations = asyncHandler(async (req, res) => {
       results: conversations.length,
       data: { conversations },
     });
-  } 
-  
-  // Option 2 (Fallback) : Construire les conversations à partir des messages
+  }
+
+  // Fallback : construire les conversations à partir des messages
   const messages = await Message.find({
     $or: [{ sender: req.user.id }, { receiver: req.user.id }],
   })
-    .populate('sender', 'name email photo') // ✅ Correction: photo
-    .populate('receiver', 'name email photo') // ✅ Correction: photo
+    .populate('sender', 'name email photo')
+    .populate('receiver', 'name email photo')
     .sort({ createdAt: -1 });
 
   const conversationsMap = new Map();
 
   messages.forEach((message) => {
-    // Identifier l'autre personne
     const isSender = message.sender._id.toString() === req.user.id;
     const otherUserId = isSender ? message.receiver._id.toString() : message.sender._id.toString();
     const otherUser = isSender ? message.receiver : message.sender;
@@ -60,7 +58,6 @@ exports.getConversations = asyncHandler(async (req, res) => {
     }
   });
 
-  // Compter les messages non lus pour chaque conversation
   for (const [userId, conversation] of conversationsMap.entries()) {
     const unreadCount = await Message.countDocuments({
       sender: userId,
@@ -88,7 +85,6 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const { page = 1, limit = 50 } = req.query;
 
-  // Validation ID simple
   if (!conversationId) {
     res.status(400);
     throw new Error('ID de conversation invalide.');
@@ -96,29 +92,45 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
 
   const skip = (page - 1) * limit;
 
-  // Récupérer les messages
+  // ✅ CORRECTION : résoudre l'ID de l'autre participant depuis la Conversation
+  let otherUserId = conversationId; // valeur par défaut (fallback ancien comportement)
+
+  if (Conversation) {
+    const conversation = await Conversation.findById(conversationId);
+    if (conversation) {
+      // Trouver l'autre participant (celui qui n'est pas l'utilisateur connecté)
+      const otherParticipant = conversation.participants.find(
+        (p) => p.toString() !== req.user.id.toString()
+      );
+      if (otherParticipant) {
+        otherUserId = otherParticipant.toString();
+      }
+    }
+  }
+
+  // Maintenant chercher les messages entre req.user.id et otherUserId
   const messages = await Message.find({
     $or: [
-      { sender: req.user.id, receiver: conversationId },
-      { sender: conversationId, receiver: req.user.id },
+      { sender: req.user.id, receiver: otherUserId },
+      { sender: otherUserId, receiver: req.user.id },
     ],
   })
-    .populate('sender', 'name email photo') // ✅ Correction: photo
-    .populate('receiver', 'name email photo') // ✅ Correction: photo
+    .populate('sender', 'name email photo')
+    .populate('receiver', 'name email photo')
     .sort({ createdAt: 1 })
     .limit(parseInt(limit))
     .skip(skip);
 
   const total = await Message.countDocuments({
     $or: [
-      { sender: req.user.id, receiver: conversationId },
-      { sender: conversationId, receiver: req.user.id },
+      { sender: req.user.id, receiver: otherUserId },
+      { sender: otherUserId, receiver: req.user.id },
     ],
   });
 
   // Marquer les messages reçus comme lus
   await Message.updateMany(
-    { sender: conversationId, receiver: req.user.id, isRead: false },
+    { sender: otherUserId, receiver: req.user.id, isRead: false },
     { isRead: true, readAt: Date.now() }
   );
 
@@ -140,9 +152,24 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
 exports.markConversationAsRead = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
 
+  // ✅ CORRECTION : résoudre l'otherUserId depuis la Conversation
+  let otherUserId = conversationId;
+
+  if (Conversation) {
+    const conversation = await Conversation.findById(conversationId);
+    if (conversation) {
+      const otherParticipant = conversation.participants.find(
+        (p) => p.toString() !== req.user.id.toString()
+      );
+      if (otherParticipant) {
+        otherUserId = otherParticipant.toString();
+      }
+    }
+  }
+
   const result = await Message.updateMany(
     {
-      sender: conversationId,
+      sender: otherUserId,
       receiver: req.user.id,
       isRead: false,
     },
@@ -178,31 +205,30 @@ exports.createOrGetConversation = asyncHandler(async (req, res) => {
     throw new Error('Participant non trouvé.');
   }
 
-  // Si le modèle Conversation existe
   if (Conversation) {
     let conversation = await Conversation.findOne({
       participants: { $all: [req.user.id, targetUserId] },
-    }).populate('participants', 'name email photo'); // ✅ Correction
+    }).populate('participants', 'name email photo');
 
     if (!conversation) {
       conversation = await Conversation.create({
         participants: [req.user.id, targetUserId],
       });
-      await conversation.populate('participants', 'name email photo'); // ✅ Correction
+      await conversation.populate('participants', 'name email photo');
     }
 
     return res.status(200).json({
       status: 'success',
       data: { conversation },
     });
-  } 
+  }
 
   // Fallback sans modèle Conversation
   res.status(200).json({
     status: 'success',
     data: {
       conversation: {
-        _id: targetUserId, // On utilise l'ID de l'autre user comme ID de conversation
+        _id: targetUserId,
         participants: [
           { _id: req.user.id, name: req.user.name, email: req.user.email, photo: req.user.photo },
           { _id: participant._id, name: participant.name, email: participant.email, photo: participant.photo },
@@ -220,24 +246,38 @@ exports.createOrGetConversation = asyncHandler(async (req, res) => {
 exports.deleteConversation = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
 
+  // ✅ CORRECTION : résoudre l'otherUserId pour supprimer les bons messages
+  let otherUserId = conversationId;
+
+  if (Conversation) {
+    const conversation = await Conversation.findById(conversationId);
+    if (conversation) {
+      const otherParticipant = conversation.participants.find(
+        (p) => p.toString() !== req.user.id.toString()
+      );
+      if (otherParticipant) {
+        otherUserId = otherParticipant.toString();
+      }
+    }
+  }
+
   const result = await Message.deleteMany({
     $or: [
-      { sender: req.user.id, receiver: conversationId },
-      { sender: conversationId, receiver: req.user.id },
+      { sender: req.user.id, receiver: otherUserId },
+      { sender: otherUserId, receiver: req.user.id },
     ],
   });
 
   if (Conversation) {
     try {
-        // Essayer de supprimer par ID ou par participant
-        await Conversation.findOneAndDelete({
-             $or: [
-                 { _id: conversationId }, // Si c'est un vrai ID de conversation
-                 { participants: { $all: [req.user.id, conversationId] } } // Si c'est un ID user
-             ]
-        });
+      await Conversation.findOneAndDelete({
+        $or: [
+          { _id: conversationId },
+          { participants: { $all: [req.user.id, conversationId] } }
+        ]
+      });
     } catch (e) {
-        // Ignorer erreur de cast si ID invalide
+      // Ignorer erreur de cast si ID invalide
     }
   }
 
@@ -252,7 +292,6 @@ exports.deleteConversation = asyncHandler(async (req, res) => {
  * @route GET /api/conversations/count/unread
  * @access Protected
  */
-// ✅ RENOMMAGE ICI : countUnreadMessages -> getUnreadCount
 exports.getUnreadCount = asyncHandler(async (req, res) => {
   const unreadCount = await Message.countDocuments({
     receiver: req.user.id,
