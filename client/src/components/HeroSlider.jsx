@@ -7,7 +7,6 @@ const slides = [
   {
     title:    "L'Immobilier\nde Prestige",
     subtitle: "Trouvez le bien qui vous ressemble — vente, location, conseil expert à Brazzaville",
-    // ✅ Dimensions explicites → CLS = 0
     image:    "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1600&q=80",
     imgWidth: 1600,
     imgHeight:1067,
@@ -44,6 +43,224 @@ const poles = [
 ];
 
 const SLIDE_DURATION = 7000;
+
+/* ─── CSS injecté une seule fois ─── */
+const HERO_CSS = `
+  @keyframes avPulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:.6; transform:scale(1.3); }
+  }
+  @keyframes avTickerHero {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  /* ── Hero layout ── */
+  .av-hero-content {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 0 0 0 0;
+  }
+
+  /* Zone texte — desktop : centré verticalement ; mobile : poussé vers le bas */
+  .av-hero-text-zone {
+    padding: 90px 24px 180px;
+  }
+  @media (min-width: 640px) {
+    .av-hero-text-zone {
+      padding: 100px 48px 200px;
+    }
+  }
+  @media (min-width: 1024px) {
+    .av-hero-text-zone {
+      padding: 100px 64px 180px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      height: 100%;
+    }
+  }
+
+  /* ── Pill pôle ── */
+  .av-pole-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 16px; border-radius: 40px;
+    border: 1px solid rgba(255,255,255,0.14);
+    backdrop-filter: blur(10px);
+    font-size: 0.68rem;          /* mobile : lisible */
+    font-weight: 400; letter-spacing: 0.26em;
+    text-transform: uppercase; color: rgba(255,255,255,0.92);
+    margin-bottom: 18px;
+  }
+  @media (min-width: 768px) {
+    .av-pole-pill { font-size: 0.65rem; margin-bottom: 20px; }
+  }
+
+  /* ── Titre hero ── */
+  .av-hero-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2.6rem, 8vw, 4.2rem);   /* ↑ mobile : 2.6rem au lieu de 1.8rem */
+    font-weight: 300; line-height: 1.0;
+    letter-spacing: -0.02em; color: #fff;
+    margin-bottom: 16px;
+    max-width: 700px; white-space: pre-line;
+  }
+
+  /* ── Sous-titre hero ── */
+  .av-hero-subtitle {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(0.95rem, 2.5vw, 1.05rem);  /* ↑ mobile : 0.95rem */
+    font-weight: 300; color: rgba(255,255,255,0.65);
+    max-width: 480px; line-height: 1.75;
+    margin-bottom: 32px;
+  }
+
+  /* ── Boutons CTA ── */
+  .av-hero-cta-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 28px; border-radius: 40px;
+    color: #0A0C0F;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;               /* mobile : 0.82rem lisible */
+    font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; transition: 0.25s;
+  }
+  @media (min-width: 768px) {
+    .av-hero-cta-primary { font-size: 0.78rem; padding: 13px 28px; }
+  }
+
+  .av-hero-cta-secondary {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 13px 28px; border-radius: 40px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.22);
+    backdrop-filter: blur(8px); color: rgba(255,255,255,0.85);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 300; letter-spacing: 0.06em;
+    text-transform: uppercase; transition: 0.25s;
+  }
+  @media (min-width: 768px) {
+    .av-hero-cta-secondary { font-size: 0.78rem; padding: 12px 28px; }
+  }
+
+  /* Wrap boutons mobile = colonne, desktop = ligne */
+  .av-hero-cta-group {
+    display: flex; gap: 12px; flex-wrap: wrap;
+  }
+  @media (max-width: 480px) {
+    .av-hero-cta-group { flex-direction: column; align-items: flex-start; }
+    .av-hero-cta-primary, .av-hero-cta-secondary { width: 100%; justify-content: center; }
+  }
+
+  /* ── Flèches nav ── */
+  .av-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    z-index: 20; border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.75);
+    display: flex; align-items: center; justify-content: center;
+    transition: 0.2s; cursor: pointer;
+    /* ↑ mobile : cible tactile généreuse */
+    min-width: 48px; min-height: 48px;
+    width: 48px; height: 48px;
+  }
+  @media (min-width: 768px) {
+    .av-arrow { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+  }
+  .av-arrow-left  { left: 14px; }
+  .av-arrow-right { right: 14px; }
+  @media (min-width: 768px) {
+    .av-arrow-left  { left: 20px; }
+    .av-arrow-right { right: 20px; }
+  }
+
+  /* ── Compteur ── */
+  .av-counter {
+    position: absolute; top: 20px;
+    right: 16px;
+    z-index: 20;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.72rem;          /* ↑ mobile lisible */
+    letter-spacing: 0.18em;
+    color: rgba(255,255,255,0.3);
+    user-select: none; pointer-events: none;
+  }
+  @media (min-width: 768px) {
+    .av-counter { font-size: 0.62rem; right: 24px; }
+  }
+
+  /* ── Indicateurs verticaux ── */
+  .av-dots-col {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    right: 14px; z-index: 20;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 10px;
+  }
+  @media (min-width: 768px) {
+    .av-dots-col { right: 20px; }
+  }
+  /* Masquer sur très petits écrans pour laisser place au contenu */
+  @media (max-width: 360px) {
+    .av-dots-col { display: none; }
+  }
+
+  /* ── Bandeau pôles ── */
+  .av-poles-band {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 20;
+  }
+  .av-poles-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    background: rgba(5,8,12,0.7); backdrop-filter: blur(20px);
+  }
+  .av-pole-item {
+    display: flex; align-items: center;
+    gap: 10px;
+    padding: 14px 12px;
+    border-right: 1px solid rgba(255,255,255,0.05);
+    position: relative; overflow: hidden; transition: 0.3s;
+  }
+  .av-pole-item:last-child { border-right: none; }
+  @media (min-width: 640px) {
+    .av-pole-item { padding: 16px 20px; gap: 12px; }
+  }
+  @media (min-width: 1024px) {
+    .av-pole-item { padding: 18px 28px; gap: 14px; }
+  }
+
+  /* Icône pôle */
+  .av-pole-icon {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: 0.3s;
+  }
+  @media (min-width: 640px) {
+    .av-pole-icon { width: 38px; height: 38px; border-radius: 10px; }
+  }
+
+  /* Texte pôle : masqué sur < 360px, visible ensuite */
+  .av-pole-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem; font-weight: 400;
+    white-space: nowrap; transition: 0.3s;
+  }
+  .av-pole-sub {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.6rem; letter-spacing: 0.1em;
+    text-transform: uppercase; white-space: nowrap; transition: 0.3s;
+  }
+  @media (max-width: 359px) {
+    .av-pole-label, .av-pole-sub { display: none; }
+    .av-pole-item { justify-content: center; }
+  }
+  @media (min-width: 768px) {
+    .av-pole-label { font-size: 0.84rem; }
+    .av-pole-sub   { font-size: 0.65rem; }
+  }
+`;
 
 const HeroSlider = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -95,6 +312,8 @@ const HeroSlider = () => {
       aria-label="Diaporama Altitude-Vision"
       aria-roledescription="carousel"
     >
+      <style>{HERO_CSS}</style>
+
       {/* ── Slides ── */}
       <AnimatePresence initial={false} custom={direction} mode="wait">
         <motion.div
@@ -109,19 +328,12 @@ const HeroSlider = () => {
           aria-roledescription="diapositive"
           aria-label={`${currentIndex + 1} sur ${slides.length} : ${current.pole}`}
         >
-          {/* ✅ <img> avec dimensions explicites + fetchpriority
-              AVANT : backgroundImage CSS → navigateur ne connaît pas les dimensions
-                      → layout shift + image non préchargeable → LCP élevé
-              APRÈS : <img width height> → espace réservé → CLS = 0
-                      fetchpriority="high" sur slide 0 → préchargé en priorité → LCP ↓ */}
           <motion.div
             style={{ position: 'absolute', inset: 0 }}
             initial={{ scale: 1.08 }}
             animate={{ scale: 1.02 }}
             transition={{ duration: SLIDE_DURATION / 1000, ease: 'linear' }}
           >
-            {/* ✅ srcset responsive : mobile charge ~480px au lieu de 1600px
-                Économie : ~105 Ko sur mobile 4G */}
             <img
               src={current.image}
               srcSet={`${current.image.replace('w=1600', 'w=480')} 480w,
@@ -134,232 +346,139 @@ const HeroSlider = () => {
               fetchpriority={currentIndex === 0 ? 'high' : 'low'}
               loading={currentIndex === 0 ? 'eager' : 'lazy'}
               decoding={currentIndex === 0 ? 'sync' : 'async'}
-              style={{
-                position:       'absolute',
-                inset:          0,
-                width:          '100%',
-                height:         '100%',
-                objectFit:      'cover',
-                objectPosition: 'center',
-              }}
+              style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center' }}
             />
           </motion.div>
 
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(105deg, rgba(5,8,12,0.88) 0%, rgba(5,8,12,0.52) 55%, rgba(5,8,12,0.22) 100%)' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(5,8,12,0.8) 0%, transparent 50%)' }} />
+          {/* Dégradés superposés — plus dense sur mobile */}
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(105deg, rgba(5,8,12,0.92) 0%, rgba(5,8,12,0.58) 55%, rgba(5,8,12,0.28) 100%)' }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(5,8,12,0.85) 0%, rgba(5,8,12,0.1) 60%)' }} />
+          {/* Accent vertical */}
           <motion.div style={{
-            position: 'absolute', top: 0, left: 0,
-            width: '2px', height: '100%',
-            background: `linear-gradient(to bottom, transparent, ${current.accent}, transparent)`,
-          }} initial={{ scaleY: 0, originY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 1.2, delay: 0.2 }} />
+            position:'absolute', top:0, left:0, width:'2px', height:'100%',
+            background:`linear-gradient(to bottom, transparent, ${current.accent}, transparent)`,
+          }} initial={{ scaleY:0, originY:0 }} animate={{ scaleY:1 }} transition={{ duration:1.2, delay:0.2 }} />
         </motion.div>
       </AnimatePresence>
 
       {/* ── Contenu texte ── */}
-      <div style={{
-        position: 'absolute', inset: 0, zIndex: 10,
-        display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        padding: 'clamp(80px, 10vw, 100px) clamp(20px, 5vw, 64px) clamp(130px, 18vw, 160px)',
-      }}>
-        <AnimatePresence mode="wait">
-          <div key={currentIndex}>
-            <motion.div custom={0.1} variants={textV} initial="hidden" animate="visible"
-              style={{ marginBottom: 'clamp(12px, 2vw, 20px)' }}>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: '8px',
-                padding: '5px 14px', borderRadius: '40px',
-                border: '1px solid rgba(255,255,255,0.12)',
-                backdropFilter: 'blur(8px)',
-                background: `${current.accent}22`,
-                fontSize: 'clamp(0.58rem, 1.2vw, 0.65rem)',
-                fontWeight: 400, letterSpacing: '0.28em',
-                textTransform: 'uppercase', color: 'rgba(255,255,255,0.9)',
-              }}>
-                {/* ✅ animation composée : transform+opacity uniquement → pas de layout shift */}
-                <span style={{
-                  width: '5px', height: '5px', borderRadius: '50%',
-                  background: current.accent,
-                  animation: 'avPulse 2s ease-in-out infinite',
-                }} />
-                {current.pole}
-              </span>
-            </motion.div>
+      <div className="av-hero-content">
+        <div className="av-hero-text-zone">
+          <AnimatePresence mode="wait">
+            <div key={currentIndex}>
 
-            <motion.h1 custom={0.25} variants={textV} initial="hidden" animate="visible"
-              style={{
-                fontFamily: "'Cormorant Garamond', serif",
-                fontSize: 'clamp(1.8rem, 4.5vw, 3.8rem)',
-                fontWeight: 300, lineHeight: 1.0,
-                letterSpacing: '-0.02em', color: '#fff',
-                marginBottom: 'clamp(12px, 2vw, 20px)',
-                maxWidth: '700px', whiteSpace: 'pre-line',
-              }}>
-              {current.title}
-            </motion.h1>
+              {/* Pill */}
+              <motion.div custom={0.1} variants={textV} initial="hidden" animate="visible">
+                <span className="av-pole-pill" style={{ background:`${current.accent}28` }}>
+                  <span style={{ width:'5px', height:'5px', borderRadius:'50%', background:current.accent, animation:'avPulse 2s ease-in-out infinite' }} />
+                  {current.pole}
+                </span>
+              </motion.div>
 
-            <motion.div custom={0.38} variants={textV} initial="hidden" animate="visible"
-              style={{ marginBottom: 'clamp(12px, 2vw, 20px)' }}>
-              <div style={{ height: '1px', width: '50px', background: `linear-gradient(to right, ${current.accent}, transparent)` }} />
-            </motion.div>
+              {/* Titre */}
+              <motion.h1 custom={0.25} variants={textV} initial="hidden" animate="visible"
+                className="av-hero-title">
+                {current.title}
+              </motion.h1>
 
-            <motion.p custom={0.45} variants={textV} initial="hidden" animate="visible"
-              style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 'clamp(0.82rem, 2vw, 1.05rem)',
-                fontWeight: 300, color: 'rgba(255,255,255,0.62)',
-                maxWidth: '460px', lineHeight: 1.75,
-                marginBottom: 'clamp(24px, 4vw, 40px)',
-              }}>
-              {current.subtitle}
-            </motion.p>
+              {/* Séparateur */}
+              <motion.div custom={0.38} variants={textV} initial="hidden" animate="visible"
+                style={{ marginBottom:'16px' }}>
+                <div style={{ height:'1px', width:'50px', background:`linear-gradient(to right, ${current.accent}, transparent)` }} />
+              </motion.div>
 
-            <motion.div custom={0.55} variants={textV} initial="hidden" animate="visible"
-              style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <Link to={current.cta.route} style={{
-                display: 'inline-flex', alignItems: 'center', gap: '8px',
-                padding: 'clamp(10px, 2vw, 13px) clamp(18px, 3vw, 28px)',
-                borderRadius: '40px', background: current.accent,
-                color: '#0A0C0F', fontFamily: "'DM Sans', sans-serif",
-                fontSize: 'clamp(0.68rem, 1.5vw, 0.78rem)',
-                fontWeight: 500, letterSpacing: '0.08em',
-                textTransform: 'uppercase', transition: '0.25s',
-                boxShadow: `0 8px 32px ${current.accent}50`,
-              }}>
-                {current.cta.label} →
-              </Link>
-              <Link to="/contact" style={{
-                display: 'inline-flex', alignItems: 'center', gap: '8px',
-                padding: 'clamp(10px, 2vw, 12px) clamp(18px, 3vw, 28px)',
-                borderRadius: '40px', background: 'transparent',
-                border: '1px solid rgba(255,255,255,0.2)',
-                backdropFilter: 'blur(8px)', color: 'rgba(255,255,255,0.8)',
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 'clamp(0.68rem, 1.5vw, 0.78rem)',
-                fontWeight: 300, letterSpacing: '0.08em',
-                textTransform: 'uppercase', transition: '0.25s',
-              }}>
-                Nous contacter
-              </Link>
-            </motion.div>
-          </div>
-        </AnimatePresence>
+              {/* Sous-titre */}
+              <motion.p custom={0.45} variants={textV} initial="hidden" animate="visible"
+                className="av-hero-subtitle">
+                {current.subtitle}
+              </motion.p>
+
+              {/* CTAs */}
+              <motion.div custom={0.55} variants={textV} initial="hidden" animate="visible"
+                className="av-hero-cta-group">
+                <Link to={current.cta.route}
+                  className="av-hero-cta-primary"
+                  style={{ background:current.accent, boxShadow:`0 8px 32px ${current.accent}55` }}>
+                  {current.cta.label} →
+                </Link>
+                <Link to="/contact" className="av-hero-cta-secondary">
+                  Nous contacter
+                </Link>
+              </motion.div>
+
+            </div>
+          </AnimatePresence>
+        </div>
       </div>
 
-      {/* ── Flèches nav ── */}
-      {[
-        { fn: prev, side: 'left',  label: 'Précédente' },
-        { fn: next, side: 'right', label: 'Suivante'   },
-      ].map(({ fn, side, label }) => (
-        <button key={side} onClick={fn} aria-label={`Slide ${label}`} style={{
-          position: 'absolute', [side]: 'clamp(8px, 2vw, 20px)', top: '50%',
-          transform: 'translateY(-50%)', zIndex: 20,
-          padding: '10px', borderRadius: '50%',
-          background: 'rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          color: 'rgba(255,255,255,0.7)', display: 'flex', transition: '0.2s',
-          minWidth: '44px', minHeight: '44px',
-          alignItems: 'center', justifyContent: 'center',
-        }}>
-          {side === 'left' ? <ChevronLeft size={18} aria-hidden="true" /> : <ChevronRight size={18} aria-hidden="true" />}
-        </button>
-      ))}
+      {/* ── Flèches ── */}
+      <button onClick={prev} aria-label="Slide Précédente" className="av-arrow av-arrow-left">
+        <ChevronLeft size={20} aria-hidden="true" />
+      </button>
+      <button onClick={next} aria-label="Slide Suivante" className="av-arrow av-arrow-right">
+        <ChevronRight size={20} aria-hidden="true" />
+      </button>
 
       {/* ── Compteur ── */}
-      <div style={{
-        position: 'absolute', top: '20px', right: 'clamp(16px, 3vw, 24px)', zIndex: 20,
-        fontFamily: "'DM Sans', sans-serif", fontSize: '0.62rem',
-        letterSpacing: '0.22em', color: 'rgba(255,255,255,0.22)',
-        userSelect: 'none', pointerEvents: 'none',
-      }} aria-hidden="true">
-        {String(currentIndex + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
+      <div className="av-counter" aria-hidden="true">
+        {String(currentIndex + 1).padStart(2,'0')} / {String(slides.length).padStart(2,'0')}
       </div>
 
-      {/* ── Indicateurs verticaux — centrés pour ne pas toucher le bandeau pôles ── */}
-      <div style={{
-        position: 'absolute',
-        top: '50%', transform: 'translateY(-50%)',
-        right: 'clamp(12px, 2vw, 20px)', zIndex: 20,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
-      }}>
-        <div style={{ width: '1px', height: '48px', background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-          {/* ✅ height% → propriété composée via transform: scaleY serait encore mieux
-              mais height% est acceptable ici car c'est un élément de 1px de large */}
-          <motion.div style={{ width: '100%', background: current.accent, height: `${progress}%` }} />
+      {/* ── Indicateurs verticaux ── */}
+      <div className="av-dots-col">
+        <div style={{ width:'1px', height:'48px', background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
+          <motion.div style={{ width:'100%', background:current.accent, height:`${progress}%` }} />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }} role="tablist" aria-label="Diapositives">
+        <div style={{ display:'flex', flexDirection:'column', gap:'7px' }} role="tablist" aria-label="Diapositives">
           {slides.map((_, i) => (
-            <button key={i} onClick={() => goTo(i)} aria-label={`Slide ${i + 1}`}
+            <button key={i} onClick={() => goTo(i)} aria-label={`Slide ${i+1}`}
               role="tab" aria-selected={i === currentIndex}
               style={{
-                border: 'none', cursor: 'pointer', padding: 0, borderRadius: '50%',
-                transition: 'transform 0.3s, background 0.3s, box-shadow 0.3s',
+                border:'none', cursor:'pointer', padding:0, borderRadius:'50%',
+                transition:'0.3s',
                 width: i === currentIndex ? '7px' : '5px',
                 height: i === currentIndex ? '7px' : '5px',
                 background: i === currentIndex ? current.accent : 'rgba(255,255,255,0.25)',
                 boxShadow: i === currentIndex ? `0 0 8px ${current.accent}` : 'none',
-                minWidth: '20px', minHeight: '20px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }} >
+                minWidth:'20px', minHeight:'20px',
+                display:'flex', alignItems:'center', justifyContent:'center',
+              }}>
               <span style={{
                 width: i === currentIndex ? '7px' : '5px',
                 height: i === currentIndex ? '7px' : '5px',
-                borderRadius: '50%',
+                borderRadius:'50%',
                 background: i === currentIndex ? current.accent : 'rgba(255,255,255,0.25)',
-                display: 'block',
+                display:'block',
               }} />
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── Bandeau pôles bas ── */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20 }}>
-        <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)' }} />
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-          background: 'rgba(5,8,12,0.6)', backdropFilter: 'blur(20px)',
-        }}>
+      {/* ── Bandeau pôles ── */}
+      <div className="av-poles-band">
+        <div style={{ height:'1px', background:'rgba(255,255,255,0.06)' }} />
+        <div className="av-poles-grid">
           {poles.map((pole, i) => {
-            const Icon     = pole.icon;
+            const Icon = pole.icon;
             const isActive = slides[currentIndex].pole === pole.label;
             return (
-              <Link key={i} to={pole.route} style={{
-                display: 'flex', alignItems: 'center',
-                gap: 'clamp(8px, 2vw, 14px)',
-                padding: 'clamp(12px, 2.5vw, 18px) clamp(10px, 2vw, 28px)',
-                borderRight: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                position: 'relative', overflow: 'hidden', transition: '0.3s',
-              }}>
+              <Link key={i} to={pole.route} className="av-pole-item">
                 <div style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, height: '1px',
-                  background: pole.color, opacity: isActive ? 1 : 0, transition: '0.3s',
+                  position:'absolute', top:0, left:0, right:0, height:'2px',
+                  background:pole.color, opacity: isActive ? 1 : 0, transition:'0.3s',
                 }} />
-                <div style={{
-                  padding: 'clamp(6px, 1.5vw, 8px)', borderRadius: '10px', flexShrink: 0,
-                  background: isActive ? `${pole.color}22` : 'rgba(255,255,255,0.05)', transition: '0.3s',
-                  display: 'flex',
+                <div className="av-pole-icon" style={{
+                  background: isActive ? `${pole.color}28` : 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${isActive ? pole.color+'44' : 'rgba(255,255,255,0.07)'}`,
                 }}>
                   <Icon size={15} style={{ color: isActive ? pole.color : 'rgba(255,255,255,0.4)' }} aria-hidden="true" />
                 </div>
-                <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}
-                  className="hidden sm:block">
-                  <p style={{
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontSize: 'clamp(0.72rem, 1.8vw, 0.84rem)',
-                    fontWeight: isActive ? 400 : 300,
-                    color: isActive ? '#fff' : 'rgba(255,255,255,0.5)',
-                    transition: '0.3s', whiteSpace: 'nowrap',
-                  }}>
+                <div style={{ minWidth:0, display:'flex', flexDirection:'column' }}>
+                  <p className="av-pole-label" style={{ color: isActive ? '#fff' : 'rgba(255,255,255,0.5)', fontWeight: isActive ? 500 : 300 }}>
                     {pole.label}
                   </p>
-                  <p style={{
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontSize: 'clamp(0.58rem, 1.2vw, 0.65rem)',
-                    letterSpacing: '0.1em',
-                    color: isActive ? pole.color : 'rgba(255,255,255,0.28)',
-                    transition: '0.3s', whiteSpace: 'nowrap',
-                  }}>
+                  <p className="av-pole-sub" style={{ color: isActive ? pole.color : 'rgba(255,255,255,0.28)' }}>
                     {pole.sub}
                   </p>
                 </div>
@@ -368,15 +487,6 @@ const HeroSlider = () => {
           })}
         </div>
       </div>
-
-      {/* ✅ Animation composée : transform + opacity uniquement
-          avPulse utilisait scale() — déjà correct, pas de recalcul layout */}
-      <style>{`
-        @keyframes avPulse {
-          0%,100% { opacity: 1;  transform: scale(1);   }
-          50%      { opacity: .6; transform: scale(1.3); }
-        }
-      `}</style>
     </div>
   );
 };
