@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -147,22 +148,7 @@ const PAGE_CSS = `
   }
 
   /* ══ SEARCH PANEL ══ */
-  .ai-search-panel {
-    /* Ancré par rapport au header — s'ouvre vers le haut */
-    position: absolute;
-    bottom: 195px;
-    left: 50%; transform: translateX(-50%);
-    width: min(92vw, 560px);
-    background: rgba(8,10,14,0.97);
-    backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
-    border: 1px solid rgba(255,255,255,0.11);
-    border-radius: 14px; padding: 18px;
-    box-shadow: 0 -4px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04);
-    z-index: 50;
-  }
-  @media (min-width: 640px) {
-    .ai-search-panel { bottom: 130px; }
-  }
+  /* .ai-search-panel : styles inline via portal fixed — voir composant SearchPanel */
   .ai-panel-label {
     display: block; font-size: 0.56rem; font-weight: 600;
     letter-spacing: 0.15em; text-transform: uppercase;
@@ -388,21 +374,46 @@ const PropertySkeleton = () => (
     </div>
 );
 
-/* ─── Panneau recherche ─── */
-const SearchPanel = ({ onClose, onSearch }) => {
+/* ─── Panneau recherche — monté via portal dans <body>, position fixed ─── */
+const SearchPanel = ({ onClose, onSearch, anchorRef }) => {
     const [typeBien,    setTypeBien]    = useState('Tous');
     const [transaction, setTransaction] = useState('vente');
     const [budgetIdx,   setBudgetIdx]   = useState(0);
+    const [pos, setPos] = React.useState({ bottom: 0, left: 0, width: 0 });
+
+    React.useLayoutEffect(() => {
+        if (!anchorRef?.current) return;
+        const rect = anchorRef.current.getBoundingClientRect();
+        const panelW = Math.min(window.innerWidth * 0.92, 560);
+        const centreX = rect.left + rect.width / 2;
+        const leftX = Math.max(8, Math.min(centreX - panelW / 2, window.innerWidth - panelW - 8));
+        // bottom = distance depuis le bas du viewport jusqu'au dessus de l'ancre + 8px gap
+        const bottomFromViewport = window.innerHeight - rect.top + 8;
+        setPos({ bottom: bottomFromViewport, left: leftX, width: panelW });
+    }, [anchorRef]);
 
     const handleSubmit = () => { onSearch({ typeBien, transaction, budgetIdx }); onClose(); };
 
-    return (
+    const panel = (
         <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6, scale: 0.98 }}
+            exit={{ opacity: 0, y: 4, scale: 0.98 }}
             transition={{ duration: 0.20, ease: [0.22, 1, 0.36, 1] }}
-            className="ai-search-panel">
+            style={{
+                position: 'fixed',
+                bottom: pos.bottom,
+                left: pos.left,
+                width: pos.width,
+                background: 'rgba(8,10,14,0.97)',
+                backdropFilter: 'blur(28px)',
+                WebkitBackdropFilter: 'blur(28px)',
+                border: '1px solid rgba(255,255,255,0.11)',
+                borderRadius: '14px',
+                padding: '18px',
+                boxShadow: '0 -8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)',
+                zIndex: 9999,
+            }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
                 <span style={{ fontFamily:"'Outfit',sans-serif", fontSize:'0.64rem', fontWeight:600, letterSpacing:'0.14em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)' }}>
                     Rechercher un bien
@@ -417,8 +428,8 @@ const SearchPanel = ({ onClose, onSearch }) => {
             </div>
             <div className="ai-panel-filters">
                 {[
-                    { label:'Transaction', value:transaction, setter:setTransaction,              options:TRANSACTIONS.map(t=>({v:t.value,l:t.label})) },
-                    { label:'Type de bien', value:typeBien,   setter:setTypeBien,                 options:TYPES_BIENS.map(t=>({v:t,l:t})) },
+                    { label:'Transaction', value:transaction, setter:setTransaction,               options:TRANSACTIONS.map(t=>({v:t.value,l:t.label})) },
+                    { label:'Type de bien', value:typeBien,   setter:setTypeBien,                  options:TYPES_BIENS.map(t=>({v:t,l:t})) },
                     { label:'Budget',       value:budgetIdx,  setter:(v)=>setBudgetIdx(Number(v)), options:BUDGETS.map((b,i)=>({v:i,l:b.label})) },
                 ].map(({ label, value, setter, options }) => (
                     <div key={label} style={{ position:'relative' }}>
@@ -438,6 +449,8 @@ const SearchPanel = ({ onClose, onSearch }) => {
             </button>
         </motion.div>
     );
+
+    return createPortal(panel, document.body);
 };
 
 /* ─────────────────────────────────────────────────────────────
@@ -452,6 +465,7 @@ const AltimmoPage = () => {
     const [loading,        setLoading]        = useState(true);
     const [reviewsLoading, setReviewsLoading] = useState(true);
     const [searchOpen,     setSearchOpen]     = useState(false);
+    const pillRef = useRef(null); // ref sur le pill pour positionner le panel
 
     const handleSearch = ({ typeBien, transaction, budgetIdx }) => {
         const params = new URLSearchParams();
@@ -498,9 +512,7 @@ const AltimmoPage = () => {
 
             {/* ══ HERO ════════════════════════════════════════════════ */}
             <header style={{
-                position:'relative', color:'#fff',
-                /* overflow:hidden masqué pour laisser le SearchPanel visible */
-                overflow: searchOpen ? 'visible' : 'hidden',
+                position:'relative', color:'#fff', overflow:'hidden',
                 height:'100svh', minHeight:'620px', maxHeight:'860px',
             }}>
                 <HeroSliderAlt />
@@ -508,7 +520,7 @@ const AltimmoPage = () => {
                 {/* ── SearchPanel : ancré directement sur le header, s'ouvre vers le haut ── */}
                 <AnimatePresence>
                     {searchOpen && (
-                        <SearchPanel onClose={() => setSearchOpen(false)} onSearch={handleSearch} />
+                        <SearchPanel onClose={() => setSearchOpen(false)} onSearch={handleSearch} anchorRef={pillRef} />
                     )}
                 </AnimatePresence>
 
@@ -516,6 +528,7 @@ const AltimmoPage = () => {
                 <div className="ai-hero-actions">
                     {/* Pill recherche — principal et compact */}
                     <motion.button
+                        ref={pillRef}
                         onClick={() => setSearchOpen(!searchOpen)}
                         initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
                         transition={{ delay:0.5, duration:0.45 }}
