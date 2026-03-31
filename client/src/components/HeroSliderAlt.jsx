@@ -8,7 +8,7 @@ const slides = [
         url:         'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1175&auto=format&fit=crop',
         urlMd:       'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=800&auto=format&fit=crop',
         urlSm:       'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=480&auto=format&fit=crop',
-        width:       1175, height: 783,
+        width: 1175, height: 783,
         alt:         'Maison familiale à Brazzaville — Altimmo',
         eyebrow:     'Altimmo · Vente',
         headline:    'Chaque famille mérite\nsa maison de rêve.',
@@ -25,7 +25,7 @@ const slides = [
         url:         'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=1460&auto=format&fit=crop',
         urlMd:       'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=800&auto=format&fit=crop',
         urlSm:       'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=480&auto=format&fit=crop',
-        width:       1460, height: 973,
+        width: 1460, height: 973,
         alt:         'Investissement immobilier sécurisé au Congo',
         eyebrow:     'Altimmo · Conseil',
         headline:    'Investir à Brazzaville\nen toute sérénité.',
@@ -42,14 +42,14 @@ const slides = [
         url:         'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1470&auto=format&fit=crop',
         urlMd:       'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=800&auto=format&fit=crop',
         urlSm:       'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=480&auto=format&fit=crop',
-        width:       1470, height: 980,
+        width: 1470, height: 980,
         alt:         'Villa de luxe Brazzaville — Altimmo prestige',
         eyebrow:     'Altimmo · Prestige',
-        headline:    'L\'élégance,\nà votre portée.',
-        body:        'Des villas d\'exception aux appartements modernes — nous sélectionnons les biens les plus exclusifs de Brazzaville pour une clientèle exigeante.',
+        headline:    "L'élégance,\nà votre portée.",
+        body:        "Des villas d'exception aux appartements modernes — nous sélectionnons les biens les plus exclusifs de Brazzaville pour une clientèle exigeante.",
         quote:       '"Une sélection impeccable, un service d\'une rare qualité."',
-        cta:         { label: 'Voir l\'exclusif', to: '/altimmo/annonces' },
-        stat:        { value: '5 ans', label: 'd\'expertise locale' },
+        cta:         { label: "Voir l'exclusif", to: '/altimmo/annonces' },
+        stat:        { value: '5 ans', label: "d'expertise locale" },
         accent:      '#C8872A',
         accentLight: '#E8B86D',
         grad1: 'linear-gradient(108deg, rgba(18,10,2,0.92) 0%, rgba(12,6,0,0.58) 52%, rgba(12,6,0,0.1) 100%)',
@@ -58,6 +58,161 @@ const slides = [
 ];
 
 const SLIDE_DURATION = 7000;
+
+/* ─── CSS mobile-first ─── */
+const SLIDER_CSS = `
+  @keyframes altPulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:.5; transform:scale(1.5); }
+  }
+
+  /* ── Contenu texte ── */
+  .ash-content {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; justify-content: center;
+    /* padding-bottom : laisse place aux pills de recherche (72px) + atouts (52px) */
+    padding: 90px 24px 150px;
+  }
+  @media (min-width: 640px) {
+    .ash-content { padding: 100px 48px 175px; }
+  }
+  @media (min-width: 1024px) {
+    .ash-content { padding: 100px 80px 185px; }
+  }
+
+  /* ── Eyebrow pill ── */
+  .ash-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 5px 14px 5px 7px; border-radius: 40px;
+    backdrop-filter: blur(10px);
+    margin-bottom: clamp(14px, 2vw, 18px);
+  }
+  .ash-eyebrow-text {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(0.62rem, 1.5vw, 0.62rem);  /* lisible mobile */
+    font-weight: 500; letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  /* ── Titre ── */
+  .ash-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(2.4rem, 7vw, 4rem);         /* ↑ mobile : 2.4rem */
+    font-weight: 600; line-height: 1.06;
+    letter-spacing: -0.02em; color: #F5F2EE;
+    margin-bottom: clamp(8px, 1vw, 10px);
+    white-space: pre-line;
+  }
+
+  /* ── Corps ── */
+  .ash-body {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(0.9rem, 2vw, 0.92rem);      /* ↑ mobile : 0.9rem */
+    font-weight: 300; line-height: 1.72;
+    color: rgba(245,242,238,0.62);
+    margin-bottom: clamp(10px, 1.5vw, 16px);
+  }
+
+  /* ── Citation ── */
+  .ash-quote {
+    padding: 9px 14px; border-radius: 0 6px 6px 0;
+    margin-bottom: clamp(16px, 2.5vw, 24px);
+  }
+  .ash-quote-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(0.84rem, 1.5vw, 0.86rem);   /* ↑ mobile */
+    font-style: italic; font-weight: 400;
+    color: rgba(245,242,238,0.48); line-height: 1.5;
+  }
+
+  /* ── CTA row ── */
+  .ash-cta-row {
+    display: flex; align-items: center;
+    gap: clamp(10px, 2vw, 16px); flex-wrap: wrap;
+  }
+  .ash-cta-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    border-radius: 40px; color: #fff;
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(0.76rem, 1.5vw, 0.74rem);   /* ↑ mobile */
+    font-weight: 600; letter-spacing: 0.07em;
+    text-transform: uppercase; text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+    /* Padding tactile généreux */
+    padding: clamp(11px, 1.8vw, 12px) clamp(18px, 2.8vw, 24px);
+  }
+  .ash-cta-btn:hover { transform: translateY(-2px); }
+
+  /* ── Stat ── */
+  .ash-stat-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(1.3rem, 2.5vw, 1.4rem);     /* ↑ mobile */
+    font-weight: 600; line-height: 1; margin-bottom: 2px;
+  }
+  .ash-stat-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(0.6rem, 1vw, 0.6rem);
+    font-weight: 300; letter-spacing: 0.1em;
+    color: rgba(245,242,238,0.32);
+    text-transform: uppercase; white-space: nowrap;
+  }
+
+  /* ── Flèches ── */
+  .ash-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    z-index: 20; border-radius: 50%;
+    background: rgba(245,242,238,0.07);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(245,242,238,0.1);
+    color: rgba(245,242,238,0.55);
+    display: flex; align-items: center; justifyContent: center;
+    cursor: pointer; transition: 0.2s;
+    /* ↑ cible tactile 48px */
+    width: 48px; height: 48px;
+  }
+  @media (min-width: 768px) {
+    .ash-arrow { width: 40px; height: 40px; }
+  }
+  .ash-arrow-left  { left: clamp(12px, 2vw, 20px); }
+  .ash-arrow-right { right: clamp(12px, 2vw, 20px); }
+
+  /* ── Indicateurs ── */
+  .ash-indicators {
+    position: absolute;
+    right: 16px;
+    top: 50%; transform: translateY(-50%);
+    z-index: 20;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 10px;
+  }
+  @media (min-width: 768px) {
+    .ash-indicators { right: 18px; }
+  }
+  /* Masquer sur très petits écrans */
+  @media (max-width: 360px) {
+    .ash-indicators { display: none; }
+  }
+
+  .ash-counter {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(0.6rem, 1vw, 0.56rem);
+    letter-spacing: 0.16em;
+    color: rgba(245,242,238,0.25);
+    user-select: none; writing-mode: vertical-rl;
+  }
+
+  .ash-dot-btn {
+    padding: 0; border: none; cursor: pointer;
+    width: 28px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent;
+  }
+  .ash-dot-inner {
+    display: block; height: 4px; border-radius: 2px;
+    transition: all 0.4s ease;
+  }
+`;
 
 const imgV = {
     enter:  (d) => ({ x: d > 0 ? '100%' : '-100%', opacity: 0 }),
@@ -106,19 +261,21 @@ const HeroSliderAlt = () => {
     return (
         <div className="absolute inset-0 overflow-hidden"
             role="region" aria-label="Diaporama Altimmo" aria-roledescription="carousel">
+            <style>{SLIDER_CSS}</style>
 
-            {/* ── IMAGE ─────────────────────────────────────────────── */}
+            {/* ── IMAGE ─── */}
             <AnimatePresence initial={false} custom={dir} mode="wait">
-                <motion.div key={"img-" + idx} custom={dir} variants={imgV}
+                <motion.div key={'img-' + idx} custom={dir} variants={imgV}
                     initial="enter" animate="center" exit="exit"
                     className="absolute inset-0"
                     role="group" aria-roledescription="diapositive"
-                    aria-label={(idx + 1) + " sur " + slides.length + " : " + s.eyebrow}>
+                    aria-label={`${idx + 1} sur ${slides.length} : ${s.eyebrow}`}>
                     <motion.div className="absolute inset-0"
                         initial={{ scale: 1.08 }} animate={{ scale: 1.02 }}
                         transition={{ duration: SLIDE_DURATION / 1000, ease: 'linear' }}>
-                        <img src={s.url}
-                            srcSet={s.urlSm + " 480w, " + s.urlMd + " 800w, " + s.url + " 1175w"}
+                        <img
+                            src={s.url}
+                            srcSet={`${s.urlSm} 480w, ${s.urlMd} 800w, ${s.url} 1175w`}
                             sizes="(max-width: 640px) 480px, (max-width: 1024px) 800px, 1175px"
                             alt={s.alt} width={s.width} height={s.height}
                             fetchpriority={idx === 0 ? 'high' : 'low'}
@@ -129,44 +286,32 @@ const HeroSliderAlt = () => {
                     </motion.div>
                     <div style={{ position: 'absolute', inset: 0, background: s.grad1 }} />
                     <div style={{ position: 'absolute', inset: 0, background: s.grad2 }} />
-                    <motion.div initial={{ scaleY: 0 }} animate={{ scaleY: 1 }}
+                    <motion.div
+                        initial={{ scaleY: 0 }} animate={{ scaleY: 1 }}
                         transition={{ duration: 1.1, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                        style={{ position: 'absolute', top: 0, left: 0, width: '2px', height: '100%',
-                            background: "linear-gradient(to bottom, transparent 8%, " + s.accent + " 35%, " + s.accent + " 65%, transparent 92%)",
-                            transformOrigin: 'top' }} />
+                        style={{
+                            position: 'absolute', top: 0, left: 0, width: '2px', height: '100%',
+                            background: `linear-gradient(to bottom, transparent 8%, ${s.accent} 35%, ${s.accent} 65%, transparent 92%)`,
+                            transformOrigin: 'top',
+                        }} />
                 </motion.div>
             </AnimatePresence>
 
-            {/* ── CONTENU ───────────────────────────────────────────── */}
-            <div style={{
-                position: 'absolute', inset: 0, zIndex: 10,
-                display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                // padding-bottom généreux : laisse la place aux pills de recherche
-                // de AltimmoPage (bottom: 72px) + bande atouts (52px)
-                padding: 'clamp(80px,11vw,100px) clamp(24px,6vw,80px) clamp(150px,22vw,185px)',
-            }}>
+            {/* ── CONTENU ─── */}
+            <div className="ash-content">
                 <AnimatePresence mode="wait">
-                    <div key={"text-" + idx} style={{ maxWidth: '520px' }}>
+                    <div key={'text-' + idx} style={{ maxWidth: '540px' }}>
 
                         {/* Eyebrow */}
-                        <motion.div variants={stagger(0.08)} initial="hidden" animate="visible" exit="exit"
-                            style={{ marginBottom: 'clamp(12px,1.8vw,18px)' }}>
-                            <span style={{
-                                display: 'inline-flex', alignItems: 'center', gap: '8px',
-                                padding: '4px 12px 4px 6px', borderRadius: '40px',
-                                border: "1px solid " + s.accent + "40",
-                                background: s.accent + "12", backdropFilter: 'blur(10px)',
-                            }}>
+                        <motion.div variants={stagger(0.08)} initial="hidden" animate="visible" exit="exit">
+                            <span className="ash-eyebrow"
+                                style={{ border: `1px solid ${s.accent}40`, background: `${s.accent}12` }}>
                                 <span style={{
                                     width: '5px', height: '5px', borderRadius: '50%',
-                                    background: s.accent, boxShadow: "0 0 6px " + s.accent,
-                                    animation: 'altPulse 2.2s ease-in-out infinite',
+                                    background: s.accent, boxShadow: `0 0 6px ${s.accent}`,
+                                    animation: 'altPulse 2.2s ease-in-out infinite', flexShrink: 0,
                                 }} />
-                                <span style={{
-                                    fontFamily: "'Outfit', sans-serif",
-                                    fontSize: 'clamp(0.55rem,1vw,0.62rem)', fontWeight: 500,
-                                    letterSpacing: '0.2em', textTransform: 'uppercase', color: s.accentLight,
-                                }}>
+                                <span className="ash-eyebrow-text" style={{ color: s.accentLight }}>
                                     {s.eyebrow}
                                 </span>
                             </span>
@@ -174,14 +319,7 @@ const HeroSliderAlt = () => {
 
                         {/* Titre */}
                         <motion.h1 variants={stagger(0.18)} initial="hidden" animate="visible" exit="exit"
-                            style={{
-                                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                fontSize: 'clamp(1.9rem,4.8vw,4rem)',
-                                fontWeight: 600, lineHeight: 1.06,
-                                letterSpacing: '-0.02em', color: '#F5F2EE',
-                                marginBottom: 'clamp(6px,1vw,10px)',
-                                whiteSpace: 'pre-line',
-                            }}>
+                            className="ash-title">
                             {s.headline}
                         </motion.h1>
 
@@ -192,85 +330,40 @@ const HeroSliderAlt = () => {
                             transition={{ duration: 0.5, delay: 0.32, ease: [0.22, 1, 0.36, 1] }}
                             style={{
                                 height: '1.5px', borderRadius: '2px',
-                                background: "linear-gradient(to right, " + s.accent + ", transparent)",
-                                marginBottom: 'clamp(10px,1.6vw,16px)',
+                                background: `linear-gradient(to right, ${s.accent}, transparent)`,
+                                marginBottom: 'clamp(10px, 1.6vw, 16px)',
                             }}
                         />
 
                         {/* Corps */}
                         <motion.p variants={stagger(0.28)} initial="hidden" animate="visible" exit="exit"
-                            style={{
-                                fontFamily: "'Outfit', sans-serif",
-                                fontSize: 'clamp(0.8rem,1.3vw,0.92rem)',
-                                fontWeight: 300, lineHeight: 1.72,
-                                color: 'rgba(245,242,238,0.6)',
-                                marginBottom: 'clamp(10px,1.5vw,16px)',
-                            }}>
+                            className="ash-body">
                             {s.body}
                         </motion.p>
 
                         {/* Citation */}
                         <motion.blockquote variants={stagger(0.36)} initial="hidden" animate="visible" exit="exit"
-                            style={{
-                                padding: '8px 12px',
-                                borderLeft: "2px solid " + s.accent + "55",
-                                background: s.accent + "07",
-                                borderRadius: '0 6px 6px 0',
-                                marginBottom: 'clamp(14px,2.2vw,24px)',
-                            }}>
-                            <span style={{
-                                fontFamily: "'Cormorant Garamond', serif",
-                                fontSize: 'clamp(0.76rem,1.2vw,0.86rem)',
-                                fontStyle: 'italic', fontWeight: 400,
-                                color: 'rgba(245,242,238,0.45)', lineHeight: 1.5,
-                            }}>
-                                {s.quote}
-                            </span>
+                            className="ash-quote"
+                            style={{ borderLeft: `2px solid ${s.accent}55`, background: `${s.accent}07` }}>
+                            <span className="ash-quote-text">{s.quote}</span>
                         </motion.blockquote>
 
                         {/* CTA + Stat */}
                         <motion.div variants={stagger(0.44)} initial="hidden" animate="visible" exit="exit"
-                            style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                            <Link to={s.cta.to}
+                            className="ash-cta-row">
+                            <Link to={s.cta.to} className="ash-cta-btn"
                                 style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: '7px',
-                                    padding: 'clamp(9px,1.5vw,12px) clamp(16px,2.5vw,24px)',
-                                    borderRadius: '40px',
-                                    background: "linear-gradient(135deg, " + s.accent + ", " + s.accent + "CC)",
-                                    color: '#fff',
-                                    fontFamily: "'Outfit', sans-serif",
-                                    fontSize: 'clamp(0.65rem,1.1vw,0.74rem)',
-                                    fontWeight: 600, letterSpacing: '0.07em',
-                                    textTransform: 'uppercase', textDecoration: 'none',
-                                    boxShadow: "0 5px 20px " + s.accent + "40",
-                                    transition: 'transform 0.2s, box-shadow 0.2s',
-                                    whiteSpace: 'nowrap',
-                                }}
-                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = "0 10px 28px " + s.accent + "55"; }}
-                                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = "0 5px 20px " + s.accent + "40"; }}>
+                                    background: `linear-gradient(135deg, ${s.accent}, ${s.accent}CC)`,
+                                    boxShadow: `0 5px 20px ${s.accent}40`,
+                                }}>
                                 {s.cta.label}
-                                <ArrowRight size={12} aria-hidden="true" />
+                                <ArrowRight size={13} aria-hidden="true" />
                             </Link>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{ width: '1px', height: '28px', background: 'rgba(245,242,238,0.1)' }} />
                                 <div>
-                                    <p style={{
-                                        fontFamily: "'Cormorant Garamond', serif",
-                                        fontSize: 'clamp(1.1rem,1.8vw,1.4rem)',
-                                        fontWeight: 600, color: s.accentLight,
-                                        lineHeight: 1, marginBottom: '1px',
-                                    }}>
-                                        {s.stat.value}
-                                    </p>
-                                    <p style={{
-                                        fontFamily: "'Outfit', sans-serif",
-                                        fontSize: 'clamp(0.54rem,0.9vw,0.6rem)',
-                                        fontWeight: 300, letterSpacing: '0.1em',
-                                        color: 'rgba(245,242,238,0.32)',
-                                        textTransform: 'uppercase', whiteSpace: 'nowrap',
-                                    }}>
-                                        {s.stat.label}
-                                    </p>
+                                    <p className="ash-stat-value" style={{ color: s.accentLight }}>{s.stat.value}</p>
+                                    <p className="ash-stat-label">{s.stat.label}</p>
                                 </div>
                             </div>
                         </motion.div>
@@ -278,85 +371,58 @@ const HeroSliderAlt = () => {
                 </AnimatePresence>
             </div>
 
-            {/* ── FLÈCHES ───────────────────────────────────────────── */}
+            {/* ── FLÈCHES ─── */}
             {[
                 { fn: prev, side: 'left',  Icon: ChevronLeft,  label: 'Image précédente' },
                 { fn: next, side: 'right', Icon: ChevronRight, label: 'Image suivante'   },
             ].map(({ fn, side, Icon, label }) => (
                 <button key={side} onClick={fn} aria-label={label}
-                    style={{
-                        position: 'absolute', [side]: 'clamp(12px,2vw,20px)',
-                        top: '50%', transform: 'translateY(-50%)',
-                        zIndex: 20, width: '40px', height: '40px',
-                        borderRadius: '50%',
-                        background: 'rgba(245,242,238,0.07)',
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(245,242,238,0.1)',
-                        color: 'rgba(245,242,238,0.55)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', transition: '0.2s',
+                    className={`ash-arrow ash-arrow-${side}`}
+                    onMouseEnter={e => {
+                        e.currentTarget.style.background = `${s.accent}25`;
+                        e.currentTarget.style.borderColor = `${s.accent}45`;
+                        e.currentTarget.style.color = '#fff';
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = s.accent + "25"; e.currentTarget.style.borderColor = s.accent + "45"; e.currentTarget.style.color = '#fff'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,242,238,0.07)'; e.currentTarget.style.borderColor = 'rgba(245,242,238,0.1)'; e.currentTarget.style.color = 'rgba(245,242,238,0.55)'; }}>
-                    <Icon size={16} aria-hidden="true" />
+                    onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(245,242,238,0.07)';
+                        e.currentTarget.style.borderColor = 'rgba(245,242,238,0.1)';
+                        e.currentTarget.style.color = 'rgba(245,242,238,0.55)';
+                    }}>
+                    <Icon size={18} aria-hidden="true" />
                 </button>
             ))}
 
-            {/* ── INDICATEURS — centrés verticalement, pas en bas ──── */}
-            {/* Centré à mid-hauteur pour ne pas interférer avec les pills
-                de recherche flottants (bottom: 72px) de AltimmoPage     */}
-            <div style={{
-                position: 'absolute', right: '18px',
-                top: '50%', transform: 'translateY(-50%)',
-                zIndex: 20, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: '10px',
-            }}>
-                <div style={{
-                    width: '1px', height: '44px',
-                    background: 'rgba(245,242,238,0.1)', overflow: 'hidden',
-                }}
-                    role="progressbar"
-                    aria-valuenow={Math.round(progress)}
-                    aria-valuemin={0} aria-valuemax={100}
-                    aria-label="Progression">
-                    <div style={{ width: '100%', height: progress + '%', background: s.accent }} />
+            {/* ── INDICATEURS ─── */}
+            <div className="ash-indicators">
+                {/* Barre de progression */}
+                <div style={{ width: '1px', height: '44px', background: 'rgba(245,242,238,0.1)', overflow: 'hidden' }}
+                    role="progressbar" aria-valuenow={Math.round(progress)}
+                    aria-valuemin={0} aria-valuemax={100} aria-label="Progression">
+                    <div style={{ width: '100%', height: `${progress}%`, background: s.accent }} />
                 </div>
 
+                {/* Dots */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}
                     role="tablist" aria-label="Diapositives">
                     {slides.map((sl, i) => (
                         <button key={i} onClick={() => goTo(i)}
                             role="tab" aria-selected={i === idx}
-                            aria-label={"Aller à : " + sl.eyebrow}
-                            style={{
-                                padding: 0, border: 'none', cursor: 'pointer',
-                                width: '28px', height: '24px',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                background: 'transparent',
-                            }}>
-                            <span style={{
-                                display: 'block',
+                            aria-label={`Aller à : ${sl.eyebrow}`}
+                            className="ash-dot-btn">
+                            <span className="ash-dot-inner" style={{
                                 width: i === idx ? '16px' : '4px',
-                                height: '4px', borderRadius: '2px',
                                 background: i === idx ? s.accent : 'rgba(245,242,238,0.2)',
-                                boxShadow: i === idx ? "0 0 5px " + s.accent + "80" : 'none',
-                                transition: 'all 0.4s ease',
+                                boxShadow: i === idx ? `0 0 5px ${s.accent}80` : 'none',
                             }} />
                         </button>
                     ))}
                 </div>
 
-                <p style={{
-                    fontFamily: "'Outfit', sans-serif",
-                    fontSize: '0.56rem', letterSpacing: '0.16em',
-                    color: 'rgba(245,242,238,0.25)', userSelect: 'none',
-                    writingMode: 'vertical-rl',
-                }} aria-hidden="true">
+                {/* Compteur */}
+                <p className="ash-counter" aria-hidden="true">
                     {String(idx + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
                 </p>
             </div>
-
-            <style>{`@keyframes altPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.5)} }`}</style>
         </div>
     );
 };
