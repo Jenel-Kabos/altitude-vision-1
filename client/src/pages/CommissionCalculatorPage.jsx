@@ -74,7 +74,8 @@ const PAGE_CSS = `
   ════════════════════════════════════ */
   .cp-hero {
     position:relative; overflow:hidden;
-    height:clamp(480px,65vh,680px);
+    /* min-height au lieu de height fixe : le contenu dicte la hauteur */
+    min-height:clamp(520px,72vh,760px);
     display:flex; flex-direction:column; justify-content:flex-end;
   }
   .cp-hero-img {
@@ -114,7 +115,12 @@ const PAGE_CSS = `
   .cp-hero-inner {
     position:relative; z-index:2;
     max-width:1200px; margin:0 auto;
-    padding:0 clamp(20px,5vw,48px) clamp(40px,6vw,64px);
+    /* padding-top : compense la navbar fixe (~70px) + respiration */
+    padding:clamp(80px,12vw,120px) clamp(20px,5vw,48px) clamp(40px,6vw,64px);
+  }
+  /* Sur petits écrans : réduire le padding-top (navbar moins haute) */
+  @media(max-width:640px){
+    .cp-hero-inner { padding-top:clamp(48px,8vw,72px); }
   }
   .cp-hero-eyebrow {
     display:inline-flex; align-items:center; gap:9px;
