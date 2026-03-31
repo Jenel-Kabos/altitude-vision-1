@@ -93,21 +93,25 @@ const PAGE_CSS = `
 
   /* ══════════════════════════════════════════════════════════
      HERO ACTIONS ZONE
-     
-     Architecture : 2 lignes compactes
-     L1 : pill recherche (centré, discret)
-     L2 : 2 liens texte fins (pas des boutons pleins)
-     
-     Hauteur totale visée : ~68px mobile
+
+     Calcul des hauteurs bande atouts :
+     - Mobile (< 640px)  : 2 lignes × ~48px = ~96px
+     - Desktop (≥ 640px) : 1 ligne  × ~44px = ~44px
+
+     On ajoute 12px d'espacement au-dessus de la bande.
   ══════════════════════════════════════════════════════════ */
   .ai-hero-actions {
     position: absolute;
-    /* Juste au-dessus de la bande atouts (~48px) */
-    bottom: 52px;
+    /* Mobile : au-dessus des 2 rangées d'atouts (96px) + 12px gap */
+    bottom: 108px;
     left: 0; right: 0; z-index: 20;
     display: flex; flex-direction: column;
     align-items: center; gap: 8px;
     padding: 0 16px;
+  }
+  @media (min-width: 640px) {
+    /* Desktop : 1 seule rangée d'atouts (~44px) + 12px gap */
+    .ai-hero-actions { bottom: 56px; }
   }
 
   /* Pill recherche — compact, élégant */

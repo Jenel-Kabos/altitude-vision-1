@@ -70,19 +70,21 @@ const SLIDER_CSS = `
     padding-top: clamp(68px, 13vw, 96px);
     padding-left: clamp(20px, 5vw, 80px);
     padding-right: clamp(58px, 9vw, 120px);
-    padding-bottom: clamp(200px, 28vw, 210px);
+    /* Mobile : atouts (96px) + actions (pill ~36px + liens ~22px + gaps ~28px) = ~182px + marge 20px */
+    padding-bottom: 202px;
     overflow: hidden;
   }
   @media (min-width: 640px) {
     .ash-content {
       justify-content: center;
       padding-top: clamp(80px, 10vw, 100px);
-      padding-bottom: clamp(185px, 22vw, 205px);
+      /* Desktop : atouts (44px) + actions (~68px) + marge */
+      padding-bottom: 132px;
       padding-left: clamp(40px, 6vw, 80px);
     }
   }
   @media (min-width: 1024px) {
-    .ash-content { padding-bottom: 185px; padding-left: 80px; padding-right: 140px; }
+    .ash-content { padding-bottom: 120px; padding-left: 80px; padding-right: 140px; }
   }
 
   /* Bloc texte — protégé des flèches */
@@ -216,11 +218,13 @@ const SLIDER_CSS = `
   .ash-indicators {
     position: absolute; right: 12px; z-index: 20;
     display: flex; flex-direction: column; align-items: center; gap: 8px;
-    /* Mobile : ancré au-dessus de la zone actions */
-    bottom: calc(200px + 16px);
+    /* Mobile : ancrés au centre de la zone image (au-dessus de la zone actions) */
+    top: 50%; transform: translateY(-50%);
+    /* Décalé vers le haut pour ne pas tomber dans la zone actions */
+    margin-top: -60px;
   }
   @media (min-width: 640px) {
-    .ash-indicators { bottom: auto; top: 50%; transform: translateY(-50%); right: 16px; }
+    .ash-indicators { margin-top: 0; right: 16px; }
   }
   @media (max-width: 380px) { .ash-indicators { display: none; } }
 
