@@ -148,14 +148,20 @@ const PAGE_CSS = `
 
   /* ══ SEARCH PANEL ══ */
   .ai-search-panel {
+    /* Ancré par rapport au header — s'ouvre vers le haut */
     position: absolute;
-    bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
-    width: min(92vw, 640px);
-    background: rgba(8,10,14,0.94);
-    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 12px; padding: 16px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.55); z-index: 30;
+    bottom: 195px;
+    left: 50%; transform: translateX(-50%);
+    width: min(92vw, 560px);
+    background: rgba(8,10,14,0.97);
+    backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
+    border: 1px solid rgba(255,255,255,0.11);
+    border-radius: 14px; padding: 18px;
+    box-shadow: 0 -4px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04);
+    z-index: 50;
+  }
+  @media (min-width: 640px) {
+    .ai-search-panel { bottom: 130px; }
   }
   .ai-panel-label {
     display: block; font-size: 0.56rem; font-weight: 600;
@@ -492,63 +498,62 @@ const AltimmoPage = () => {
 
             {/* ══ HERO ════════════════════════════════════════════════ */}
             <header style={{
-                position:'relative', color:'#fff', overflow:'hidden',
+                position:'relative', color:'#fff',
+                /* overflow:hidden masqué pour laisser le SearchPanel visible */
+                overflow: searchOpen ? 'visible' : 'hidden',
                 height:'100svh', minHeight:'620px', maxHeight:'860px',
             }}>
                 <HeroSliderAlt />
 
+                {/* ── SearchPanel : ancré directement sur le header, s'ouvre vers le haut ── */}
+                <AnimatePresence>
+                    {searchOpen && (
+                        <SearchPanel onClose={() => setSearchOpen(false)} onSearch={handleSearch} />
+                    )}
+                </AnimatePresence>
+
                 {/* ── Zone actions : pill recherche + liens fins ── */}
                 <div className="ai-hero-actions">
-                    <div style={{ position:'relative', display:'flex', flexDirection:'column', alignItems:'center', gap:'8px', width:'100%' }}>
+                    {/* Pill recherche — principal et compact */}
+                    <motion.button
+                        onClick={() => setSearchOpen(!searchOpen)}
+                        initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
+                        transition={{ delay:0.5, duration:0.45 }}
+                        className="ai-search-pill"
+                        style={{
+                            background: searchOpen
+                                ? `linear-gradient(135deg, ${BLUE}, ${BLUE_DARK})`
+                                : 'rgba(8,10,14,0.60)',
+                            backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)',
+                            border: searchOpen ? `1px solid ${BLUE}55` : '1px solid rgba(255,255,255,0.15)',
+                            boxShadow: searchOpen ? `0 4px 20px ${BLUE}40` : '0 2px 14px rgba(0,0,0,0.28)',
+                        }}
+                        aria-label="Rechercher un bien immobilier"
+                        aria-expanded={searchOpen}>
+                        <Search size={13} aria-hidden="true" />
+                        Rechercher un bien
+                        <ChevronDown size={11} style={{
+                            opacity:0.55,
+                            transform: searchOpen ? 'rotate(180deg)' : 'rotate(0)',
+                            transition:'transform 0.22s',
+                        }} />
+                    </motion.button>
 
-                        <AnimatePresence>
-                            {searchOpen && (
-                                <SearchPanel onClose={() => setSearchOpen(false)} onSearch={handleSearch} />
-                            )}
-                        </AnimatePresence>
-
-                        {/* Pill recherche — principal et compact */}
-                        <motion.button
-                            onClick={() => setSearchOpen(!searchOpen)}
-                            initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
-                            transition={{ delay:0.5, duration:0.45 }}
-                            className="ai-search-pill"
-                            style={{
-                                background: searchOpen
-                                    ? `linear-gradient(135deg, ${BLUE}, ${BLUE_DARK})`
-                                    : 'rgba(8,10,14,0.60)',
-                                backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)',
-                                border: searchOpen ? `1px solid ${BLUE}55` : '1px solid rgba(255,255,255,0.15)',
-                                boxShadow: searchOpen ? `0 4px 20px ${BLUE}40` : '0 2px 14px rgba(0,0,0,0.28)',
-                            }}
-                            aria-label="Rechercher un bien immobilier"
-                            aria-expanded={searchOpen}>
-                            <Search size={13} aria-hidden="true" />
-                            Rechercher un bien
-                            <ChevronDown size={11} style={{
-                                opacity:0.55,
-                                transform: searchOpen ? 'rotate(180deg)' : 'rotate(0)',
-                                transition:'transform 0.22s',
-                            }} />
-                        </motion.button>
-
-                        {/* Liens secondaires — discrets, pas des boutons pleins */}
-                        <motion.div
-                            initial={{ opacity:0 }} animate={{ opacity:1 }}
-                            transition={{ delay:0.62, duration:0.4 }}
-                            className="ai-hero-links">
-                            <Link to="/altimmo/annonces" className="ai-hero-link">
-                                <Sparkles size={11} aria-hidden="true" />
-                                Toutes les annonces
-                            </Link>
-                            <div className="ai-hero-link-sep" />
-                            <a href="#contact-altimmo" onClick={handleScrollToContact} className="ai-hero-link">
-                                <Handshake size={11} aria-hidden="true" />
-                                Nous contacter
-                            </a>
-                        </motion.div>
-
-                    </div>
+                    {/* Liens secondaires — discrets */}
+                    <motion.div
+                        initial={{ opacity:0 }} animate={{ opacity:1 }}
+                        transition={{ delay:0.62, duration:0.4 }}
+                        className="ai-hero-links">
+                        <Link to="/altimmo/annonces" className="ai-hero-link">
+                            <Sparkles size={11} aria-hidden="true" />
+                            Toutes les annonces
+                        </Link>
+                        <div className="ai-hero-link-sep" />
+                        <a href="#contact-altimmo" onClick={handleScrollToContact} className="ai-hero-link">
+                            <Handshake size={11} aria-hidden="true" />
+                            Nous contacter
+                        </a>
+                    </motion.div>
                 </div>
 
                 {/* ── Bande atouts — compacte ── */}
