@@ -295,7 +295,7 @@ const CtaCommission = () => {
           <p className="cta-body">
             Vous connaissez quelqu'un qui veut vendre ou louer un bien ?
             Référez-le-nous et <strong>touchez 30% de notre commission</strong>
-            sur chaque transaction conclue. Sans contrainte, sans engagement.
+             sur chaque transaction conclue. Sans contrainte, sans engagement.
           </p>
 
           {/* Stats */}
