@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 
 import HeroSliderMila  from '../components/HeroSliderMila';
-import MilaContact     from '../components/MilaContact';
 import ReviewCard      from '../components/ReviewCard';
 import { getAllEvents }          from '../services/eventService';
 import { createQuoteRequest }   from '../services/quoteService';
@@ -664,7 +663,6 @@ const MilaEventsPage = () => {
                 </div>
             </section>
 
-            <MilaContact />
         </div>
     );
 };

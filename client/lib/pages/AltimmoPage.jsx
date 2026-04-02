@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 
 import HeroSliderAlt   from '../components/HeroSliderAlt';
-import AltimmoContact  from '../components/AltimmoContact';
 import PropertyCard    from '../components/PropertyCard';
 import ReviewCard      from '../components/ReviewCard';
 import CtaCommission   from '../components/CtaCommission';
@@ -787,7 +786,6 @@ const AltimmoPage = () => {
                 <div className="ai-container"><CtaCommission /></div>
             </section>
 
-            <AltimmoContact />
         </div>
     );
 };
