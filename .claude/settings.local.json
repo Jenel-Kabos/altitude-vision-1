@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(xargs sed:*)",
+      "Bash(npm run:*)",
+      "Bash(sed -i 's|from '\\\\''../../../AppProviders'\\\\''|from '\\\\''../../AppProviders'\\\\''|g' 'altcom/[[...slug]]/page.jsx' 'altimmo/[[...slug]]/page.jsx' avis/nouveau/page.jsx 'dashboard/[[...slug]]/page.jsx' 'mes-biens/[[...slug]]/page.jsx' 'mila-events/[[...slug]]/page.jsx' 'reset-password/[token]/page.jsx' 'verify-email/[token]/page.jsx')",
+      "Bash(sed -i 's|from '\\\\''../../../../AppProviders'\\\\''|from '\\\\''../../../AppProviders'\\\\''|g' 'mila-events/event/[eventId]/page.jsx')",
+      "Bash(sed -i 's|from '\\\\''../../src/pages/MilaEventsAnnonces'\\\\''|from '\\\\''../../../src/pages/MilaEventsAnnonces'\\\\''|g' mila-events/annonces/page.jsx)",
+      "Bash(sed -i 's|from '\\\\''../../src/pages/CreateProjectPage'\\\\''|from '\\\\''../../../src/pages/CreateProjectPage'\\\\''|g' mila-events/creer-projet/page.jsx)",
+      "Bash(sed -i 's|from '\\\\''../../../../../src/App'\\\\''|from '\\\\''../../../../src/App'\\\\''|g' 'mila-events/event/[eventId]/page.jsx')",
+      "Bash(grep -v \"^$\")",
+      "Bash(curl -s http://localhost:3001/altimmo -o /dev/null -w \"%{http_code}\")",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash([ -d \"$dir/[[...slug]]\" ])",
+      "Bash(mv '__TRACKED_VAR__/[[...slug]]' '__TRACKED_VAR__/[...slug]')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/altimmo)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/altimmo/annonces)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/altcom)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/mila-events)",
+      "Bash(curl -s -o /dev/null -w \"/altimmo: %{http_code}\\\\n\" http://localhost:3001/altimmo)",
+      "Bash(curl -s -o /dev/null -w \"/altimmo/annonces: %{http_code}\\\\n\" http://localhost:3001/altimmo/annonces)",
+      "Bash(curl -s -o /dev/null -w \"/altcom: %{http_code}\\\\n\" http://localhost:3001/altcom)",
+      "Bash(curl -s -o /dev/null -w \"/mila-events: %{http_code}\\\\n\" http://localhost:3001/mila-events)",
+      "Bash(curl -s -o /dev/null -w \"/login: %{http_code}\\\\n\" http://localhost:3001/login)",
+      "Bash(curl -s -o /dev/null -w \"/altimmo/property/test-id: %{http_code}\\\\n\" http://localhost:3001/altimmo/property/test-id)",
+      "Bash(curl -s -o /dev/null -w \"/altcom/portfolio/test-id: %{http_code}\\\\n\" http://localhost:3001/altcom/portfolio/test-id)",
+      "Bash(curl -s -o /dev/null -w \"/altimmo/services/location-gestion: %{http_code}\\\\n\" http://localhost:3001/altimmo/services/location-gestion)",
+      "Bash(curl -s -o /dev/null -w \"/altimmo/services/conseil-investissement: %{http_code}\\\\n\" http://localhost:3001/altimmo/services/conseil-investissement)",
+      "Bash(curl -s -o /dev/null -w \"/dashboard: %{http_code}\\\\n\" http://localhost:3001/dashboard)",
+      "Bash(grep -E \"/\\(layout|page\\).jsx$\")",
+      "Bash(grep -l \"useRouter\\\\|usePathname\" /c/Users/thiba/Documents/Projet-gemini/altitude-vision/client/lib/components/layout/*.jsx)",
+      "Bash(find /c/Users/thiba/Documents/Projet-gemini/altitude-vision/client/app -name \"page.jsx\" -type f -exec grep -l \"export const metadata\" {} \\\\;)",
+      "Bash(grep -h \"import SEOHead\" /c/Users/thiba/Documents/Projet-gemini/altitude-vision/client/lib/pages/*.jsx /c/Users/thiba/Documents/Projet-gemini/altitude-vision/client/lib/pages/**/*.jsx)",
+      "Bash(grep -l \"useNavigate\\\\|<Link to=\" /c/Users/thiba/Documents/Projet-gemini/altitude-vision/client/lib/pages/**/*.jsx /c/Users/thiba/Documents/Projet-gemini/altitude-vision/client/lib/pages/*.jsx)"
+    ]
+  }
+}
