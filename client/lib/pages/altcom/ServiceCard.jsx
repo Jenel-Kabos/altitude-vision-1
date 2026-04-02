@@ -16,18 +16,32 @@ const ServiceCard = ({ service, onQuote, index }) => {
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.5, delay: index * 0.1 }}
             whileHover={{ y: -6 }}
-            className="group relative bg-white rounded-3xl p-7 border flex flex-col h-full transition-all duration-500 hover:shadow-xl overflow-hidden"
+            className="group relative bg-white rounded-3xl border flex flex-col h-full transition-all duration-500 hover:shadow-xl overflow-hidden"
             style={{ borderColor: `${service.color}20` }}
         >
-            <div className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            <div className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10"
                 style={{ backgroundColor: service.color }} />
+
+            {/* Image illustrative */}
+            {service.images?.[0] && (
+                <div className="relative h-44 overflow-hidden">
+                    <img
+                        src={service.images[0]}
+                        alt={service.title}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0"
+                        style={{ background: `linear-gradient(to bottom, transparent 40%, rgba(255,255,255,0.95) 100%)` }} />
+                    <div className="absolute top-4 left-4 w-10 h-10 rounded-xl flex items-center justify-center"
+                        style={{ backgroundColor: `${service.color}E0`, boxShadow: `0 4px 12px ${service.color}50` }}>
+                        <Icon className="w-5 h-5 text-white" />
+                    </div>
+                </div>
+            )}
+
+            <div className="p-7 flex flex-col flex-1">
             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
                 style={{ background: `radial-gradient(circle at 30% 50%,${service.color}08,transparent 70%)` }} />
-
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110 relative z-10"
-                style={{ backgroundColor: `${service.color}15`, border: `1px solid ${service.color}25` }}>
-                <Icon className="w-6 h-6" style={{ color: service.color }} />
-            </div>
 
             <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full mb-3 relative z-10"
                 style={{ backgroundColor: `${service.color}12`, color: service.color, fontFamily: "'Outfit',sans-serif" }}>
@@ -57,6 +71,7 @@ const ServiceCard = ({ service, onQuote, index }) => {
                     Détails du service
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                 </Link>
+            </div>
             </div>
         </motion.div>
     );
