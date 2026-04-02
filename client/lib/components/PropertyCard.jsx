@@ -18,16 +18,9 @@ import { Calendar, ImageOff } from 'lucide-react';
 import LikeButton from './likes/LikeButton';
 
 // ─── Backend URL ────────────────────────────────────────────
-const getBackendUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL.replace('/api', '');
-  if (
-    window.location.hostname === 'altitudevision.agency' ||
-    window.location.hostname === 'www.altitudevision.agency' ||
-    window.location.hostname === 'altitudevision.netlify.app'
-  ) return 'https://altitude-vision.onrender.com';
-  return 'http://localhost:5000';
-};
-const BACKEND_URL = getBackendUrl();
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL
+  ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '')
+  : 'https://altitude-vision.onrender.com';
 
 // ✅ CORRECTION IMAGES 101 Ko — optimisation URL Cloudinary
 // Injecte f_auto (WebP), q_auto (compression), w_N (redimensionnement)
