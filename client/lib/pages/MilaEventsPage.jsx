@@ -152,7 +152,7 @@ const QuoteModal = ({ serviceTitle, onClose, onFormSubmit }) => {
     const [formData, setFormData] = useState({
         name: '', email: '', phone: '', service: serviceTitle,
         eventType: 'Autre', date: '', guests: '', budget: '',
-        description: '', source: 'Mila Events',
+        description: '', source: 'MilaEvents',
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const set = field => e => setFormData(p => ({ ...p, [field]: e.target.value }));

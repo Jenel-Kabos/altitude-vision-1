@@ -13,3 +13,6 @@ client/.env
 # Fichiers système
 .DS_Store
 npm-debug.log
+
+# Claude Code
+.claude/
