@@ -16,7 +16,7 @@ const slides = [
         headline:    'Votre marque mérite\nd\'être entendue.',
         body:        'Nous bâtissons des stratégies de communication sur-mesure qui amplifient votre voix et propulsent votre visibilité au Congo et au-delà.',
         quote:       '"Altcom a transformé notre présence digitale en véritable atout commercial."',
-        cta:         { label: 'Démarrer un projet', to: '/altcom' },
+        cta:         { label: 'Démarrer un projet', to: '/altcom', action: 'openProject' },
         stat:        { value: '80+', label: 'projets réalisés' },
         accent:      '#C8872A',
         accentLight: '#E8B86D',
@@ -73,7 +73,7 @@ const stagger = (delay) => ({
     exit:    { opacity: 0, y: -8, transition: { duration: 0.2 } },
 });
 
-const HeroSliderAltcom = () => {
+const HeroSliderAltcom = ({ onStartProject }) => {
     const [idx, setIdx]           = useState(0);
     const [dir, setDir]           = useState(1);
     const [progress, setProgress] = useState(0);
@@ -236,26 +236,49 @@ const HeroSliderAltcom = () => {
                         {/* CTA + Stat — sur une ligne */}
                         <motion.div variants={stagger(0.44)} initial="hidden" animate="visible" exit="exit"
                             style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                            <Link href={s.cta.to}
-                                style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: '7px',
-                                    padding: 'clamp(9px,1.5vw,12px) clamp(16px,2.5vw,24px)',
-                                    borderRadius: '40px',
-                                    background: "linear-gradient(135deg, " + s.accent + ", " + s.accent + "CC)",
-                                    color: '#0A0800',
-                                    fontFamily: "'Outfit', sans-serif",
-                                    fontSize: 'clamp(0.65rem,1.1vw,0.74rem)',
-                                    fontWeight: 600, letterSpacing: '0.07em',
-                                    textTransform: 'uppercase', textDecoration: 'none',
-                                    boxShadow: "0 5px 20px " + s.accent + "40",
-                                    transition: 'transform 0.2s, box-shadow 0.2s',
-                                    whiteSpace: 'nowrap',
-                                }}
-                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = "0 10px 28px " + s.accent + "55"; }}
-                                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = "0 5px 20px " + s.accent + "40"; }}>
-                                {s.cta.label}
-                                <ArrowRight size={12} aria-hidden="true" />
-                            </Link>
+                            {s.cta.action === 'openProject' && onStartProject ? (
+                                <button onClick={onStartProject}
+                                    style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: '7px',
+                                        padding: 'clamp(9px,1.5vw,12px) clamp(16px,2.5vw,24px)',
+                                        borderRadius: '40px',
+                                        background: "linear-gradient(135deg, " + s.accent + ", " + s.accent + "CC)",
+                                        color: '#0A0800', border: 'none', cursor: 'pointer',
+                                        fontFamily: "'Outfit', sans-serif",
+                                        fontSize: 'clamp(0.65rem,1.1vw,0.74rem)',
+                                        fontWeight: 600, letterSpacing: '0.07em',
+                                        textTransform: 'uppercase',
+                                        boxShadow: "0 5px 20px " + s.accent + "40",
+                                        transition: 'transform 0.2s, box-shadow 0.2s',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = "0 10px 28px " + s.accent + "55"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = "0 5px 20px " + s.accent + "40"; }}>
+                                    {s.cta.label}
+                                    <ArrowRight size={12} aria-hidden="true" />
+                                </button>
+                            ) : (
+                                <Link href={s.cta.to}
+                                    style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: '7px',
+                                        padding: 'clamp(9px,1.5vw,12px) clamp(16px,2.5vw,24px)',
+                                        borderRadius: '40px',
+                                        background: "linear-gradient(135deg, " + s.accent + ", " + s.accent + "CC)",
+                                        color: '#0A0800',
+                                        fontFamily: "'Outfit', sans-serif",
+                                        fontSize: 'clamp(0.65rem,1.1vw,0.74rem)',
+                                        fontWeight: 600, letterSpacing: '0.07em',
+                                        textTransform: 'uppercase', textDecoration: 'none',
+                                        boxShadow: "0 5px 20px " + s.accent + "40",
+                                        transition: 'transform 0.2s, box-shadow 0.2s',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = "0 10px 28px " + s.accent + "55"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = "0 5px 20px " + s.accent + "40"; }}>
+                                    {s.cta.label}
+                                    <ArrowRight size={12} aria-hidden="true" />
+                                </Link>
+                            )}
                             {/* Stat inline */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{ width: '1px', height: '28px', background: 'rgba(251,246,238,0.1)' }} />

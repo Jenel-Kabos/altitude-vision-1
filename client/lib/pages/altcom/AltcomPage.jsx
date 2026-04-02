@@ -185,14 +185,12 @@ const AltcomPage = () => {
                 )}
             </AnimatePresence>
 
-            <AnimatePresence>
-                {showProject && (
-                    <AltcomProjectFormModal
-                        onClose={() => setShowProject(false)}
-                        onFormSubmit={handleProjectSubmit}
-                    />
-                )}
-            </AnimatePresence>
+            {showProject && (
+                <AltcomProjectFormModal
+                    onClose={() => setShowProject(false)}
+                    onFormSubmit={handleProjectSubmit}
+                />
+            )}
 
             {/* ══ HERO ═════════════════════════════════════════════════
                 Le HeroSliderAltcom gère tout le contenu narratif.
@@ -205,7 +203,7 @@ const AltcomPage = () => {
                 style={{ height: 'calc(100vh - 0px)', minHeight: '640px', maxHeight: '860px' }}>
 
                 {/* Slider narratif — contient tout le texte */}
-                <HeroSliderAltcom />
+                <HeroSliderAltcom onStartProject={() => setShowProject(true)} />
 
                 {/* ── Bande atouts bas du hero ─────────────────────── */}
                 <div className="absolute bottom-0 left-0 right-0" style={{ zIndex: 10 }}>
