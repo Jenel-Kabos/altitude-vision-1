@@ -166,7 +166,7 @@ const ActualitesPage = () => {
                                     <div className="absolute top-4 left-4">
                                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-white"
                                             style={{ backgroundColor: SITE_ARTICLES[0].categoryColor }}>
-                                            <SITE_ARTICLES[0].categoryIcon className="w-3 h-3" />
+                                            {React.createElement(SITE_ARTICLES[0].categoryIcon, { className: "w-3 h-3" })}
                                             {SITE_ARTICLES[0].category}
                                         </span>
                                     </div>
