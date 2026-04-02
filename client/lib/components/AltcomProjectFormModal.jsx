@@ -68,7 +68,8 @@ const AltcomProjectFormModal = ({ onClose, onFormSubmit }) => {
     setIsSubmitting(true);
 
     try {
-      await onFormSubmit(formData);
+      const { projectCategory, ...dataToSend } = formData;
+      await onFormSubmit(dataToSend);
       onClose();
     } catch (error) {
       console.error("Erreur lors de la création du projet:", error);
