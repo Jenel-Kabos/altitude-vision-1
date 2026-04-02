@@ -553,42 +553,48 @@ const HomePage = () => {
             </FadeIn>
 
             <FadeIn x={20} delay={0.1}>
-              <div style={{ display:'flex', flexDirection:'column', gap:'2px' }}>
-                {poles.map((pole, i) => {
-                  const Icon = pole.icon;
-                  return (
-                    <FadeIn key={pole.id} delay={0.18 + i * 0.09} x={12}>
-                      <div className="hp-mini-card"
-                        onMouseEnter={e => {
-                          e.currentTarget.style.background = pole.colorLight;
-                          const acc = e.currentTarget.querySelector('.hp-acc');
-                          if (acc) acc.style.opacity = '1';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.background = 'transparent';
-                          const acc = e.currentTarget.querySelector('.hp-acc');
-                          if (acc) acc.style.opacity = '0';
-                        }}>
-                        <div className="hp-acc" style={{
-                          position:'absolute', left:0, top:0, bottom:0,
-                          width:'2px', background:pole.color, opacity:0, transition:'0.3s',
-                        }} />
-                        <div className="hp-mini-icon" style={{
-                          background:pole.colorLight, border:`1px solid ${pole.colorBorder}`,
-                        }}>
-                          <Icon size={14} style={{ color:pole.color }} />
-                        </div>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <p className="hp-mini-name">{pole.name}</p>
-                          <p className="hp-mini-sub">{pole.tag}</p>
-                        </div>
-                        <Link href={pole.pageroute} className="hp-mini-cta" style={{ color:pole.color }}>
-                          Voir <ArrowRight size={11} />
-                        </Link>
-                      </div>
-                    </FadeIn>
-                  );
-                })}
+              <div style={{ position:'relative', borderRadius:'20px', overflow:'hidden' }}>
+                <img
+                  src="https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1200&auto=format&fit=crop"
+                  alt="Équipe Altitude-Vision en réunion"
+                  width={600}
+                  height={420}
+                  style={{
+                    width:'100%', height:'clamp(280px,35vw,420px)',
+                    objectFit:'cover', display:'block',
+                    borderRadius:'20px',
+                  }}
+                />
+                {/* Overlay dégradé bas */}
+                <div style={{
+                  position:'absolute', inset:0,
+                  background:'linear-gradient(to top, rgba(10,12,15,0.65) 0%, transparent 55%)',
+                  borderRadius:'20px',
+                }} />
+                {/* Badge flottant */}
+                <div style={{
+                  position:'absolute', bottom:'20px', left:'20px', right:'20px',
+                  display:'flex', alignItems:'center', gap:'12px',
+                  background:'rgba(10,12,15,0.72)', backdropFilter:'blur(12px)',
+                  border:'1px solid rgba(200,135,42,0.25)',
+                  borderRadius:'14px', padding:'12px 16px',
+                }}>
+                  <div style={{
+                    width:'36px', height:'36px', borderRadius:'10px', flexShrink:0,
+                    background:'linear-gradient(135deg, #A0671A, #C8872A)',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}>
+                    <Briefcase size={16} style={{ color:'#fff' }} />
+                  </div>
+                  <div>
+                    <p style={{ color:'#E8E4DC', fontWeight:500, fontSize:'0.85rem', lineHeight:1.2 }}>
+                      Agence multidisciplinaire
+                    </p>
+                    <p style={{ color:'rgba(232,228,220,0.45)', fontSize:'0.72rem' }}>
+                      Immobilier · Événementiel · Communication
+                    </p>
+                  </div>
+                </div>
               </div>
             </FadeIn>
 
