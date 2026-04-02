@@ -343,7 +343,7 @@ const Header = () => {
                     </div>
 
                     {PROFILE_LINKS.map(({ to, Icon, label, color }) => (
-                      <Link key={to} to={to} onClick={() => setProfile(false)}
+                      <Link key={to} href={to} onClick={() => setProfile(false)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: '12px',
                           padding: '12px 20px', color: 'rgba(232,228,220,0.55)',
@@ -508,7 +508,7 @@ const Header = () => {
                   gap: '6px', marginBottom: '8px',
                 }}>
                   {PROFILE_LINKS.map(({ to, Icon, label, color }) => (
-                    <Link key={to} to={to} style={{
+                    <Link key={to} href={to} style={{
                       display: 'flex', alignItems: 'center', gap: '10px',
                       padding: '11px 14px', borderRadius: '12px',
                       background: 'rgba(232,228,220,0.03)',
