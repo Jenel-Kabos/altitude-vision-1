@@ -48,7 +48,7 @@ const RegisterPage = () => {
             auth.user.role === 'Admin'        ? '/admin'     :
             auth.user.role === 'Proprietaire' ? '/mes-biens' : '/'
         );
-    }, [navigate, auth.user]);
+    }, [router, auth.user]);
 
     const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
