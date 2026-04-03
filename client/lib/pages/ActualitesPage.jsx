@@ -7,6 +7,7 @@ import {
     RefreshCw, Clock, Tag, ArrowRight, BookOpen,
     Building2, CalendarCheck, Briefcase, ChevronRight,
 } from "lucide-react";
+import { ARTICLES as SITE_ARTICLES_RAW } from "@/lib/data/articlesData";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://altitude-vision.onrender.com/api";
 
@@ -16,57 +17,14 @@ const GOLD      = '#C8872A';
 const GOLD_DARK = '#A0671A';
 const RED       = '#D42B2B';
 
-// ─── Articles éditoriaux du site ────────────────────────────
-const SITE_ARTICLES = [
-    {
-        id: 'a1',
-        category: 'Immobilier',
-        categoryColor: BLUE,
-        categoryIcon: Building2,
-        title: 'Le marché immobilier à Brazzaville en 2025 : tendances et opportunités',
-        excerpt: 'Le secteur immobilier congolais connaît une dynamique nouvelle. Entre demande croissante de résidences haut de gamme et essor des quartiers émergents, Altimmo vous décrypte les tendances clés pour bien investir cette année.',
-        date: '2025-03-15',
-        readTime: '5 min',
-        image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=800&auto=format&fit=crop',
-        href: '/altimmo',
-    },
-    {
-        id: 'a2',
-        category: 'Événementiel',
-        categoryColor: RED,
-        categoryIcon: CalendarCheck,
-        title: 'Mila Events : 5 tendances événementielles qui redéfinissent le luxe à Brazzaville',
-        excerpt: 'Des mariages intimistes aux galas d\'entreprise, l\'événementiel haut de gamme se réinvente. Découvrez comment Mila Events intègre scénographie immersive, traiteur premium et expériences sur-mesure pour chaque occasion.',
-        date: '2025-02-28',
-        readTime: '4 min',
-        image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?q=80&w=800&auto=format&fit=crop',
-        href: '/mila-events',
-    },
-    {
-        id: 'a3',
-        category: 'Communication',
-        categoryColor: GOLD,
-        categoryIcon: Briefcase,
-        title: 'Altcom lance ses nouvelles offres de communication digitale pour les PME congolaises',
-        excerpt: 'Face à l\'essor des réseaux sociaux en République du Congo, Altcom déploie des packages adaptés aux PME locales : gestion des réseaux sociaux, création de contenus visuels et campagnes publicitaires ciblées.',
-        date: '2025-02-10',
-        readTime: '3 min',
-        image: 'https://images.unsplash.com/photo-1611926653458-09294b3142bf?q=80&w=800&auto=format&fit=crop',
-        href: '/altcom',
-    },
-    {
-        id: 'a4',
-        category: 'Altitude-Vision',
-        categoryColor: BLUE,
-        categoryIcon: BookOpen,
-        title: 'Altitude-Vision : une agence multidisciplinaire au service de votre ambition',
-        excerpt: 'Trois pôles d\'expertise — immobilier, événementiel, communication — qui travaillent en synergie pour vous offrir une approche 360°. Découvrez comment notre modèle unique crée de la valeur pour nos clients.',
-        date: '2025-01-20',
-        readTime: '6 min',
-        image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=800&auto=format&fit=crop',
-        href: '/contact',
-    },
-];
+const ICON_MAP = { Building2, CalendarCheck, Briefcase, BookOpen };
+
+// Adapter pour inclure icon React et href vers l'article
+const SITE_ARTICLES = SITE_ARTICLES_RAW.map(a => ({
+    ...a,
+    categoryIcon: ICON_MAP[a.categoryIconName] || BookOpen,
+    href: `/actualites/${a.slug}`,
+}));
 
 // ─── Skeleton ────────────────────────────────────────────────
 const FbSkeleton = () => (
