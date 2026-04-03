@@ -123,7 +123,7 @@ const AltcomServicePage = () => {
                     {/* Breadcrumb */}
                     <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
                         className="flex items-center gap-2 text-sm mb-10" style={{ color: 'rgba(232,228,220,0.4)' }}>
-                        <button onClick={() => navigate('/altcom')}
+                        <button onClick={() => router.push('/altcom')}
                             className="flex items-center gap-1.5 hover:text-white/80 transition-colors">
                             <ArrowLeft className="w-3.5 h-3.5" /> Altcom
                         </button>
@@ -165,7 +165,7 @@ const AltcomServicePage = () => {
                                     style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})`, boxShadow: `0 4px 20px ${GOLD}50` }}>
                                     <Send className="w-4 h-4" /> Demander un devis
                                 </button>
-                                <button onClick={() => navigate('/altcom')}
+                                <button onClick={() => router.push('/altcom')}
                                     className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white/70 text-sm border border-white/15 hover:bg-white/10 transition-all">
                                     <ArrowLeft className="w-4 h-4" /> Tous les services
                                 </button>
@@ -400,7 +400,7 @@ const AltcomServicePage = () => {
                                 <motion.button key={s._id}
                                     initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
                                     viewport={{ once: true }} transition={{ delay: i * 0.08 }}
-                                    onClick={() => navigate(s.route)}
+                                    onClick={() => router.push(s.route)}
                                     className="group text-left rounded-3xl overflow-hidden border bg-white hover:shadow-xl transition-all duration-300"
                                     style={{ borderColor: `${s.color}15` }}>
                                     {/* Image miniature */}
