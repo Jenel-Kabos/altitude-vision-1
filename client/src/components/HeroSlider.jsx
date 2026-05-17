@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Building2, Calendar, Briefcase } from 'lucide-react';
 
 const slides = [
@@ -396,12 +396,12 @@ const HeroSlider = () => {
               {/* CTAs */}
               <motion.div custom={0.55} variants={textV} initial="hidden" animate="visible"
                 className="av-hero-cta-group">
-                <Link to={current.cta.route}
+                <Link href={current.cta.route}
                   className="av-hero-cta-primary"
                   style={{ background:current.accent, boxShadow:`0 8px 32px ${current.accent}55` }}>
                   {current.cta.label} →
                 </Link>
-                <Link to="/contact" className="av-hero-cta-secondary">
+                <Link href="/contact" className="av-hero-cta-secondary">
                   Nous contacter
                 </Link>
               </motion.div>
@@ -463,7 +463,7 @@ const HeroSlider = () => {
             const Icon = pole.icon;
             const isActive = slides[currentIndex].pole === pole.label;
             return (
-              <Link key={i} to={pole.route} className="av-pole-item">
+              <Link key={i} href={pole.route} className="av-pole-item">
                 <div style={{
                   position:'absolute', top:0, left:0, right:0, height:'2px',
                   background:pole.color, opacity: isActive ? 1 : 0, transition:'0.3s',

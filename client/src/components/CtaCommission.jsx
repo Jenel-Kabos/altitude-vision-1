@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
 // ─── Design tokens (cohérents avec la charte Altimmo) ──────────
@@ -326,12 +326,12 @@ const CtaCommission = () => {
             <span className="cta-guarantee-text">Programme actif</span>
           </div>
 
-          <Link to="/trouve-ta-commission" className="cta-btn-link">
+          <Link href="/trouve-ta-commission" className="cta-btn-link">
             Estimer mes gains
             <ArrowRight size={13} className="cta-btn-icon" aria-hidden="true" />
           </Link>
 
-          <Link to="/altimmo#contact" className="cta-sub-link">
+          <Link href="/altimmo#contact" className="cta-sub-link">
             En savoir plus →
           </Link>
 

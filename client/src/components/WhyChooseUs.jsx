@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import {
     ShieldCheck,
     Zap,
@@ -210,7 +210,7 @@ const WhyChooseUs = () => {
 
                             {/* CTA */}
                             <Link
-                                to="/contact"
+                                href="/contact"
                                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white text-sm transition-all duration-300 hover:scale-105 hover:shadow-xl group"
                                 style={{
                                     background:  'linear-gradient(135deg, #C8872A, #E5A84B)',

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Quote, Loader2, MessageSquarePlus, Star, ChevronLeft, ChevronRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 import { getAllTestimonials } from "../services/reviewService";
 import { useAuth } from "../context/AuthContext";
 
@@ -121,7 +121,7 @@ const Testimonials = () => {
     const timerRef                        = useRef(null);
 
     const { user } = useAuth();
-    const navigate = useNavigate();
+    const router = useRouter();
 
     // ── Chargement ──────────────────────────
     useEffect(() => {
@@ -160,10 +160,13 @@ const Testimonials = () => {
     const prev = () => { setPage(p => (p - 1 + totalPages) % totalPages); resetTimer(); };
     const next = () => { setPage(p => (p + 1) % totalPages); resetTimer(); };
 
-    const handleLeaveReview = () =>
-        navigate(user ? '/avis/nouveau' : '/login', {
-            state: user ? undefined : { from: '/avis/nouveau' },
-        });
+    const handleLeaveReview = () => {
+        if (user) {
+            router.push('/avis/nouveau');
+        } else {
+            router.push('/login?from=/avis/nouveau');
+        }
+    };
 
     // ── États ───────────────────────────────
     if (isLoading) return (

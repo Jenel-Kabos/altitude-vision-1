@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { ArrowRight, ExternalLink, Loader2, Newspaper } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://altitude-vision.onrender.com/api";
@@ -129,7 +129,7 @@ const FacebookFeed = () => {
               className="text-center mt-10"
             >
               <Link
-                to="/actualites"
+                href="/actualites"
                 className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3.5 rounded-full transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
               >
                 Voir toutes les actualités
