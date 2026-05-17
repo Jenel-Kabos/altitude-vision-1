@@ -1,35 +1,24 @@
 # netlify.toml
 
 # ═══════════════════════════════════════════════════════════════
-# BUILD
+# BUILD — Next.js 15 (App Router)
 # ═══════════════════════════════════════════════════════════════
 [build]
-  # Netlify entre dans le dossier client avant de builder
   base    = "client"
   command = "npm run build"
-  # Dossier de sortie Vite (relatif au dossier client)
-  publish = "dist"
+  publish = ".next"
+
+# Plugin Netlify pour Next.js (SSR, ISR, App Router)
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 # ═══════════════════════════════════════════════════════════════
-# SPA REDIRECT — évite les 404 au refresh ou accès direct à une URL
-# ═══════════════════════════════════════════════════════════════
-[[redirects]]
-  from   = "/*"
-  to     = "/index.html"
-  status = 200
-
-# ═══════════════════════════════════════════════════════════════
-# CACHE HEADERS — correction PageSpeed "Utiliser des durées de
-# mise en cache efficaces" (économie estimée : 34 Ko)
-#
-# Principe : les assets Vite ont un hash dans leur nom
-# (ex: index-Dj3k8aQ.js) — si le fichier change, le nom change.
-# On peut donc les mettre en cache 1 an sans risque.
+# CACHE HEADERS
+# Les assets Next.js ont un hash dans leur nom — cache 1 an sans risque
 # ═══════════════════════════════════════════════════════════════
 
-# JS/CSS compilés par Vite (avec hash — cache 1 an)
 [[headers]]
-  for = "/assets/*"
+  for = "/_next/static/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
@@ -59,13 +48,6 @@
   for = "/favicon.ico"
   [headers.values]
     Cache-Control = "public, max-age=604800"
-
-# HTML — pas de cache pour que les mises à jour soient
-# visibles immédiatement après chaque déploiement
-[[headers]]
-  for = "/*.html"
-  [headers.values]
-    Cache-Control = "no-cache"
 
 # ═══════════════════════════════════════════════════════════════
 # SÉCURITÉ — headers de base recommandés

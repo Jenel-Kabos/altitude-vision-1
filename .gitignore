@@ -6,8 +6,13 @@ server/uploads/
 # Fichiers et dossiers du frontend (client)
 client/node_modules/
 client/build/
+client/dist/
+client/.next/
 client/.env
 
 # Fichiers système
 .DS_Store
 npm-debug.log
+
+# Claude Code
+.claude/
