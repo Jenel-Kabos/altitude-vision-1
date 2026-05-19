@@ -1,5 +1,3 @@
-"use client";
-
 'use client';
 
 import React from 'react';
@@ -11,41 +9,25 @@ import LikeButton from './likes/LikeButton';
 // 🔧 CORRECTION: Utilisation correcte de BACKEND_URL
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
 
-console.log('🔧 [PortfolioCard] BACKEND_URL:', BACKEND_URL);
-
 // 🔧 FONCTION UTILITAIRE POUR CONSTRUIRE L'URL DE L'IMAGE
 const getImageUrl = (imagePath) => {
   if (!imagePath) {
-    console.warn('⚠️ [PortfolioCard] Pas de chemin d\'image fourni');
     return 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop';
   }
 
-  console.log('📸 [PortfolioCard] Chemin image reçu:', imagePath);
-  
-  // Si l'image commence par http:// ou https://, c'est déjà une URL complète
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    console.log('✅ [PortfolioCard] URL complète détectée:', imagePath);
     return imagePath;
   }
-  
-  // Si l'image commence par /uploads
+
   if (imagePath.startsWith('/uploads')) {
-    const finalUrl = `${BACKEND_URL}${imagePath}`;
-    console.log('✅ [PortfolioCard] URL construite (uploads):', finalUrl);
-    return finalUrl;
+    return `${BACKEND_URL}${imagePath}`;
   }
-  
-  // Si l'image ne commence pas par /
+
   if (!imagePath.startsWith('/')) {
-    const finalUrl = `${BACKEND_URL}/${imagePath}`;
-    console.log('✅ [PortfolioCard] URL construite (relatif):', finalUrl);
-    return finalUrl;
+    return `${BACKEND_URL}/${imagePath}`;
   }
-  
-  // Par défaut
-  const finalUrl = `${BACKEND_URL}${imagePath}`;
-  console.log('✅ [PortfolioCard] URL construite (défaut):', finalUrl);
-  return finalUrl;
+
+  return `${BACKEND_URL}${imagePath}`;
 };
 
 /**
@@ -102,12 +84,8 @@ const PortfolioCard = ({ item }) => {
           alt={item.title}
           className="w-full h-full object-cover"
           onError={(e) => {
-            console.error('❌ [PortfolioCard] Erreur chargement image:', imageUrl);
-            e.target.onerror = null; 
+            e.target.onerror = null;
             e.target.src = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop';
-          }}
-          onLoad={() => {
-            console.log('✅ [PortfolioCard] Image chargée avec succès:', imageUrl);
           }}
         />
         

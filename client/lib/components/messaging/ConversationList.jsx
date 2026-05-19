@@ -1,3 +1,5 @@
+'use client';
+
 // src/components/messaging/ConversationList.jsx
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';

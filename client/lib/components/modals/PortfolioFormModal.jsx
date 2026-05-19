@@ -103,8 +103,6 @@ const PortfolioFormModal = ({ item, onClose, onSuccess }) => {
       images: validUrls 
     }));
     
-    // Debug log
-    console.log('📸 Images après modification:', validUrls);
   };
 
   const addImageUrlField = () => {
@@ -171,8 +169,6 @@ const PortfolioFormModal = ({ item, onClose, onSuccess }) => {
         pole: 'Altcom',
         images: formData.images.filter((url) => url && url.trim()),
       };
-
-      console.log('📤 Données envoyées au backend:', dataToSubmit);
 
       if (isEditMode) {
         await updatePortfolioItem(item._id, dataToSubmit);
@@ -394,12 +390,8 @@ const PortfolioFormModal = ({ item, onClose, onSuccess }) => {
                           alt={`Aperçu ${index + 1}`}
                           className="w-full h-32 object-cover rounded-lg border-2 border-purple-300 shadow-md"
                           onError={(e) => {
-                            console.error(`❌ Erreur de chargement de l'image ${index + 1}:`, img);
                             e.target.src = 'https://via.placeholder.com/200x150/9333EA/FFFFFF?text=Image+Invalide';
-                            e.target.onerror = null; // Éviter une boucle infinie
-                          }}
-                          onLoad={() => {
-                            console.log(`✅ Image ${index + 1} chargée avec succès:`, img);
+                            e.target.onerror = null;
                           }}
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded-lg flex items-center justify-center">

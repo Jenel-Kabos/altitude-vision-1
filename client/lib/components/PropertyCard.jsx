@@ -1,7 +1,6 @@
-"use client";
+'use client';
 
 // src/components/PropertyCard.jsx
-'use client';
 
 import React, { useState } from 'react';
 import Link from 'next/link';

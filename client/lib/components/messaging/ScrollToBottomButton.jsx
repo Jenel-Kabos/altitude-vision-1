@@ -1,3 +1,5 @@
+'use client';
+
 // src/components/messaging/ScrollToBottomButton.jsx
 // Créez ce fichier dans votre dossier messaging
 import React from 'react';

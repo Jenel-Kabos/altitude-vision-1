@@ -4,7 +4,7 @@ import AltcomPortfolioDetailPage from "@/lib/pages/altcom/AltcomPortfolioDetailP
 export async function generateMetadata({ params }) {
   const { portfolioId } = await params;
   try {
-    const res = await fetch(`https://altitude-vision.onrender.com/api/portfolio/${portfolioId}`, { next: { revalidate: 60 } });
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/portfolio/${portfolioId}`, { next: { revalidate: 60 } });
     if (!res.ok) return buildMetadata({ title: 'Projet Portfolio', url: `/altcom/portfolio/${portfolioId}` });
     const item = await res.json();
     return buildMetadata({

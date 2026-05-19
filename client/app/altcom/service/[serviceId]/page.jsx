@@ -4,7 +4,7 @@ import AltcomServiceDetailPage from "@/lib/pages/altcom/AltcomServiceDetailPage"
 export async function generateMetadata({ params }) {
   const { serviceId } = await params;
   try {
-    const res = await fetch(`https://altitude-vision.onrender.com/api/services/${serviceId}`, { next: { revalidate: 3600 } });
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/services/${serviceId}`, { next: { revalidate: 3600 } });
     if (!res.ok) return buildMetadata({ title: 'Service Altcom', url: `/altcom/service/${serviceId}` });
     const service = await res.json();
     return buildMetadata({

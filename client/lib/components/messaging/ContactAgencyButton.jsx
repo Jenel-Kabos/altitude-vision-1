@@ -1,5 +1,3 @@
-"use client";
-
 'use client';
 
 // src/components/messaging/ContactAgencyButton.jsx
@@ -63,8 +61,6 @@ const ContactAgencyButton = ({ propertyId = null, eventId = null, adminId = null
         propertyId,
         eventId
       );
-
-      console.log('✅ Conversation créée:', conversation);
 
       setShowModal(false);
       router.push('/messages');

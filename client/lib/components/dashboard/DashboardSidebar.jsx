@@ -1,5 +1,3 @@
-"use client";
-
 'use client';
 
 import React from "react";
@@ -64,7 +62,6 @@ const DashboardSidebar = () => {
             <Building2 className="w-5 h-5" />
             <span>Biens Immobiliers</span>
           </Link>
-        </div>
 
         {/* Bloc Mila Events */}
         <div className="pt-4 mt-4 border-t border-blue-700">

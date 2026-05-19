@@ -4,7 +4,7 @@ import PropertyDetailPage from "@/lib/pages/PropertyDetailPage";
 export async function generateMetadata({ params }) {
   const { propertyId } = await params;
   try {
-    const res = await fetch(`https://altitude-vision.onrender.com/api/properties/${propertyId}`, { next: { revalidate: 60 } });
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/properties/${propertyId}`, { next: { revalidate: 60 } });
     if (!res.ok) return buildMetadata({ title: 'Bien immobilier', url: `/altimmo/property/${propertyId}` });
     const property = await res.json();
     return buildMetadata({
