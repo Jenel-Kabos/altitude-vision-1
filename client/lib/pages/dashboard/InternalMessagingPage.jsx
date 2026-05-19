@@ -58,13 +58,13 @@ const InternalMessagingPage = () => {
       try {
         const users = await getAllUsers();
         // Exclure l'utilisateur courant de la liste des destinataires
-        setAllUsers((users || []).filter(u => u._id !== user._id));
+        setAllUsers((users || []).filter(u => u._id !== user?._id));
       } catch (err) {
         console.error('Erreur chargement utilisateurs:', err);
       }
     };
-    loadUsers();
-  }, [user._id]);
+    if (user?._id) loadUsers();
+  }, [user?._id]);
 
   useEffect(() => {
     fetchMessages();

@@ -1,5 +1,5 @@
 import { buildMetadata } from '@/lib/seo';
-import MyPropertiesPage from "@/lib/pages/dashboard/MyPropertiesPage";
+import MyPropertiesPage from "./ClientPage";
 
 export const metadata = buildMetadata({ title: 'Mes biens', noIndex: true });
 

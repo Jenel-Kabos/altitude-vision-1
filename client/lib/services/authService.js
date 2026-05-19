@@ -57,7 +57,7 @@ export const logout = () => {
 /**
  * Vérifie la session
  */
-export const isAuthenticated = () => !!localStorage.getItem('token');
+export const isAuthenticated = () => typeof window !== 'undefined' && !!localStorage.getItem('token');
 
 /**
  * Récupère les infos utilisateur

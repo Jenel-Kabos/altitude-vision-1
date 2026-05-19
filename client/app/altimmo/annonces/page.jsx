@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { buildMetadata } from '@/lib/seo';
 import AltimmoAnnonces from "@/lib/pages/AltimmoAnnonces";
 
@@ -8,5 +9,9 @@ export const metadata = buildMetadata({
 });
 
 export default function Page() {
-  return <AltimmoAnnonces />;
+  return (
+    <Suspense>
+      <AltimmoAnnonces />
+    </Suspense>
+  );
 }

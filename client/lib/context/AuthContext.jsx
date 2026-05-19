@@ -2,7 +2,17 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 
-const AuthContext = createContext();
+const DEFAULT_AUTH = {
+    user: null,
+    loading: true,
+    isInitialized: false,
+    isAuthenticated: false,
+    login: () => {},
+    logout: () => {},
+    updateUser: () => {},
+};
+
+const AuthContext = createContext(undefined);
 
 export const AuthProvider = ({ children }) => {
     const [user,          setUser]          = useState(null);
@@ -111,20 +121,18 @@ console.log('🔄 photo dans updatedData:', updatedData.photo);
         updateUser,
     }), [user, loading, isInitialized, login, logout, updateUser]);
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-                    <p className="text-gray-600">Initialisation...</p>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <AuthContext.Provider value={value}>
-            {children}
+            {loading ? (
+                <div className="flex items-center justify-center min-h-screen bg-gray-50">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+                        <p className="text-gray-600">Initialisation...</p>
+                    </div>
+                </div>
+            ) : (
+                children
+            )}
         </AuthContext.Provider>
     );
 };
@@ -132,6 +140,9 @@ console.log('🔄 photo dans updatedData:', updatedData.photo);
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (context === undefined) {
+        if (typeof window === 'undefined') {
+            return DEFAULT_AUTH;
+        }
         throw new Error("useAuth doit être utilisé à l'intérieur d'un AuthProvider");
     }
     return context;
