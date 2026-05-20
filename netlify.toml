@@ -5,7 +5,7 @@
 # ═══════════════════════════════════════════════════════════════
 [build]
   base    = "client"
-  command = "npm run build"
+  command = "npm run build:next"
   publish = ".next"
 
 # Plugin Netlify pour Next.js (SSR, ISR, App Router)
