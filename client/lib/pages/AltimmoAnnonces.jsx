@@ -214,7 +214,7 @@ const AltimmoAnnonces = () => {
                 }}>
                 <div className="absolute top-0 left-0 right-0 h-px"
                     style={{ background: `linear-gradient(to right, transparent, ${BLUE}60, transparent)` }} />
-                <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
+                <div className="container mx-auto px-4 sm:px-6 max-w-7xl relative z-10">
                     <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
                         <p className="text-xs font-bold uppercase tracking-widest mb-4 text-white/60">Altimmo</p>
                         <h1 className="text-white mb-4 max-w-4xl"
@@ -245,7 +245,7 @@ const AltimmoAnnonces = () => {
             </div>
 
             {/* ── Contenu ──────────────────────────────── */}
-            <div className="container mx-auto px-4 sm:px-6 max-w-6xl py-12">
+            <div className="container mx-auto px-4 sm:px-6 max-w-7xl py-12">
 
                 {/* Barre recherche */}
                 <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 mb-8">
@@ -298,7 +298,7 @@ const AltimmoAnnonces = () => {
                             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
                                 <div className="pt-5 mt-5 border-t border-gray-100">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
 
                                         {/* ✅ Transaction — labels clairs, valeurs BDD */}
                                         <div>
@@ -431,7 +431,7 @@ const AltimmoAnnonces = () => {
 
                 {/* Résultats */}
                 {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
                         {[1,2,3,4,5,6].map(i => <PropertySkeleton key={i} />)}
                     </div>
                 ) : currentProperties.length === 0 ? (
@@ -462,7 +462,7 @@ const AltimmoAnnonces = () => {
                                 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
                                 className={viewMode === 'grid'
-                                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'
+                                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5'
                                     : 'flex flex-col gap-4'}>
                                 {currentProperties.map((property, i) => (
                                     <motion.div key={property._id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}

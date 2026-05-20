@@ -301,7 +301,7 @@ const MilaEventsAnnonces = () => {
                 <div className="absolute top-0 left-0 right-0 h-px"
                     style={{ background: `linear-gradient(to right, transparent, ${MILA_RED}60, transparent)` }} />
 
-                <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
+                <div className="container mx-auto px-4 sm:px-6 max-w-7xl relative z-10">
                     <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.7 }}>
 
@@ -344,7 +344,7 @@ const MilaEventsAnnonces = () => {
             </div>
 
             {/* ── Contenu ──────────────────────────── */}
-            <div className="container mx-auto px-4 sm:px-6 max-w-6xl py-12">
+            <div className="container mx-auto px-4 sm:px-6 max-w-7xl py-12">
 
                 {/* Barre recherche + filtres */}
                 <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 mb-8">
@@ -482,7 +482,7 @@ const MilaEventsAnnonces = () => {
 
                 {/* Grille / liste */}
                 {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
                         {[1,2,3,4,5,6].map(i => <CardSkeleton key={i} />)}
                     </div>
                 ) : currentEvents.length === 0 ? (
@@ -516,7 +516,7 @@ const MilaEventsAnnonces = () => {
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.3 }}
                                 className={viewMode === 'grid'
-                                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5'
+                                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5'
                                     : 'flex flex-col gap-4'}
                             >
                                 {currentEvents.map((event, i) =>

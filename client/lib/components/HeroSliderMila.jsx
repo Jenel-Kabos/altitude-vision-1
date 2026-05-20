@@ -171,7 +171,7 @@ const HeroSliderMila = () => {
                                 }} />
                                 <span style={{
                                     fontFamily: "'Outfit', sans-serif",
-                                    fontSize: 'clamp(0.55rem,1vw,0.62rem)', fontWeight: 500,
+                                    fontSize: 'clamp(0.65rem,0.9vw,0.85rem)', fontWeight: 500,
                                     letterSpacing: '0.2em', textTransform: 'uppercase', color: s.accentLight,
                                 }}>
                                     {s.eyebrow}

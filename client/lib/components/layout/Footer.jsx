@@ -47,10 +47,14 @@ const FOOTER_CSS = `
   .av-footer-grid {
     display: grid;
     grid-template-columns: 1.5fr 1fr 1fr 1fr;
-    gap: clamp(32px, 5vw, 60px);
-    padding: clamp(56px,8vw,80px) var(--px) clamp(40px,6vw,56px);
-    max-width: 1200px;
+    gap: clamp(32px, 5vw, 80px);
+    padding: clamp(56px,8vw,140px) var(--px) clamp(40px,6vw,80px);
+    max-width: 1400px;
     margin: 0 auto;
+  }
+  @media (min-width: 1920px) {
+    .av-footer-grid { max-width: 1600px; gap: 100px; }
+    .av-footer-bottom { max-width: 1600px; }
   }
   @media (max-width: 900px) {
     .av-footer-grid { grid-template-columns: 1fr 1fr; }
@@ -67,7 +71,7 @@ const FOOTER_CSS = `
     flex-wrap: wrap;
     gap: 8px;
     padding: 18px var(--px);
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
   }
 
@@ -81,7 +85,7 @@ const FOOTER_CSS = `
     gap: 8px;
     min-height: 44px;
     font-family: 'DM Sans', sans-serif;
-    font-size: clamp(0.78rem, 1.8vw, 0.85rem);
+    font-size: clamp(0.78rem, 1.1vw, 1rem);
     font-weight: 400;
     color: rgba(232,228,220,0.72);
     transition: color 0.2s;
@@ -105,7 +109,7 @@ const ColTitle = ({ children, id }) => (
     aria-level="3"
     style={{
       fontFamily: "'DM Sans', sans-serif",
-      fontSize: 'clamp(0.58rem, 1.3vw, 0.62rem)',
+      fontSize: 'clamp(0.58rem, 0.9vw, 0.85rem)',
       letterSpacing: '0.28em',
       textTransform: 'uppercase',
       // ✅ CORRECTION CONTRASTE
@@ -140,7 +144,7 @@ const Footer = () => (
           <span style={{
             display: 'block',
             fontFamily: "'Cormorant Garamond', serif",
-            fontSize: 'clamp(1.1rem, 3vw, 1.35rem)',
+            fontSize: 'clamp(1.1rem, 1.8vw, 1.6rem)',
             fontWeight: 600,
             color: '#E8E4DC',
             letterSpacing: '0.02em',
@@ -163,12 +167,11 @@ const Footer = () => (
 
         <p style={{
           fontFamily: "'DM Sans', sans-serif",
-          fontSize: 'clamp(0.78rem, 1.8vw, 0.82rem)',
-          // ✅ CORRECTION CONTRASTE : 0.36 → 0.65 (ratio ~3.8:1 ✅)
+          fontSize: 'clamp(0.78rem, 1.1vw, 1rem)',
           color: 'rgba(232,228,220,0.65)',
           lineHeight: 1.8,
           fontWeight: 300,
-          maxWidth: '280px',
+          maxWidth: '340px',
           marginBottom: '24px',
         }}>
           Agence multidisciplinaire au service de vos ambitions. Immobilier, événementiel et communication réunis en une seule vision.
@@ -184,8 +187,8 @@ const Footer = () => (
               rel="noopener noreferrer"
               aria-label={`Suivre Altitude-Vision sur ${label}`}
               style={{
-                width: '44px',
-                height: '44px',
+                width: 'clamp(36px, 3vw, 48px)',
+                height: 'clamp(36px, 3vw, 48px)',
                 borderRadius: '10px',
                 border: '1px solid rgba(232,228,220,0.08)',
                 display: 'flex',
@@ -273,7 +276,7 @@ const Footer = () => (
                       style={{
                         display: 'block',
                         fontFamily: "'DM Sans', sans-serif",
-                        fontSize: 'clamp(0.75rem, 1.8vw, 0.82rem)',
+                        fontSize: 'clamp(0.75rem, 1.1vw, 1rem)',
                         // ✅ CORRECTION CONTRASTE : 0.42 → 0.72 (ratio ~4.6:1 ✅)
                         color: 'rgba(232,228,220,0.72)',
                         fontWeight: 400,
@@ -293,7 +296,7 @@ const Footer = () => (
                       key={j}
                       style={{
                         fontFamily: "'DM Sans', sans-serif",
-                        fontSize: 'clamp(0.75rem, 1.8vw, 0.82rem)',
+                        fontSize: 'clamp(0.75rem, 1.1vw, 1rem)',
                         // ✅ CORRECTION CONTRASTE : 0.36 → 0.62 (ratio ~3.7:1 ✅)
                         color: 'rgba(232,228,220,0.62)',
                         fontWeight: 300,
@@ -319,7 +322,7 @@ const Footer = () => (
     <div className="av-footer-bottom">
       <p style={{
         fontFamily: "'DM Sans', sans-serif",
-        fontSize: 'clamp(0.68rem, 1.5vw, 0.72rem)',
+        fontSize: 'clamp(0.68rem, 1.1vw, 0.85rem)',
         // ✅ 0.2 → 0.45 pour passer le seuil 3:1 sur texte small
         color: 'rgba(232,228,220,0.45)',
         fontWeight: 300,
@@ -329,7 +332,7 @@ const Footer = () => (
       </p>
       <p style={{
         fontFamily: "'DM Sans', sans-serif",
-        fontSize: 'clamp(0.68rem, 1.5vw, 0.72rem)',
+        fontSize: 'clamp(0.68rem, 1.1vw, 0.85rem)',
         color: 'rgba(232,228,220,0.45)',
         fontWeight: 300,
         display: 'flex',

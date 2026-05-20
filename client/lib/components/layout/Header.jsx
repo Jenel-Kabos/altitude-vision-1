@@ -61,14 +61,15 @@ const useUnreadCount = (pathname) => {
 };
 
 const useBreakpoint = () => {
-  const [bp, setBp] = useState('lg');
+  const [bp, setBp] = useState('xl');
   useEffect(() => {
     const update = () => {
       const w = window.innerWidth;
-      if (w < 480)       setBp('xs');
-      else if (w < 768)  setBp('sm');
-      else if (w < 1024) setBp('md');
-      else               setBp('lg');
+      if (w < 480)        setBp('xs');
+      else if (w < 768)   setBp('sm');
+      else if (w < 1024)  setBp('md');
+      else if (w < 1440)  setBp('lg');
+      else                setBp('xl');
     };
     update();
     window.addEventListener('resize', update);
@@ -115,13 +116,14 @@ const Header = () => {
   const profileRef                = useRef(null);
   const bp                        = useBreakpoint();
 
-  const isDesktop = bp === 'lg';
+  const isXL      = bp === 'xl';
+  const isDesktop = bp === 'lg' || bp === 'xl';
   const isTablet  = bp === 'md';
   const isMobile  = bp === 'xs' || bp === 'sm';
 
-  const headerHeight   = isMobile ? '60px' : isTablet ? '66px' : '72px';
-  const headerHeightPx = isMobile ? 60 : isTablet ? 66 : 72;
-  const headerPadding  = isMobile ? '0 16px' : isTablet ? '0 28px' : '0 48px';
+  const headerHeight   = isMobile ? '60px' : isTablet ? '66px' : isXL ? '80px' : '72px';
+  const headerHeightPx = isMobile ? 60 : isTablet ? 66 : isXL ? 80 : 72;
+  const headerPadding  = isMobile ? '0 16px' : isTablet ? '0 28px' : isXL ? '0 80px' : '0 48px';
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
@@ -171,7 +173,7 @@ const Header = () => {
         <Link href="/" style={{ textDecoration: 'none', flexShrink: 0 }}>
           <span style={{
             display: 'block', fontFamily: "'Cormorant Garamond', serif",
-            fontSize: isMobile ? '1.1rem' : isTablet ? '1.2rem' : '1.3rem',
+            fontSize: isMobile ? '1.1rem' : isTablet ? '1.2rem' : isXL ? '1.6rem' : '1.3rem',
             fontWeight: 600, color: '#E8E4DC', letterSpacing: '0.02em', lineHeight: 1.2,
           }}>
             Altitude<span style={{ color: '#C8872A' }}>-</span>Vision
@@ -189,12 +191,12 @@ const Header = () => {
 
         {/* NAV DESKTOP */}
         {isDesktop && (
-          <nav style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
+          <nav style={{ display: 'flex', alignItems: 'center', gap: isXL ? '40px' : '28px' }}>
             {NAV_LINKS.map(({ to, label }) => {
               const active = isNavLinkActive(pathname, to);
               return (
                 <Link key={to} href={to} style={{
-                  fontFamily: "'DM Sans', sans-serif", fontSize: '0.78rem',
+                  fontFamily: "'DM Sans', sans-serif", fontSize: isXL ? '0.9rem' : '0.78rem',
                   fontWeight: 400, letterSpacing: '0.08em', textTransform: 'uppercase',
                   color: active ? '#E8E4DC' : 'rgba(232,228,220,0.45)',
                   textDecoration: 'none', transition: 'color 0.2s',
@@ -371,22 +373,24 @@ const Header = () => {
             <>
               <Link href="/login" style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
-                padding: isTablet ? '8px 14px' : '9px 20px', borderRadius: '40px',
+                padding: isTablet ? '8px 14px' : isXL ? '11px 24px' : '9px 20px', borderRadius: '40px',
                 border: '1px solid rgba(232,228,220,0.12)', color: 'rgba(232,228,220,0.6)',
-                fontSize: isTablet ? '0.7rem' : '0.75rem', fontWeight: 400,
+                fontSize: isTablet ? '0.7rem' : isXL ? '0.88rem' : '0.75rem', fontWeight: 400,
                 letterSpacing: '0.06em', textTransform: 'uppercase', textDecoration: 'none', whiteSpace: 'nowrap',
+                minHeight: '44px',
               }}>
-                <LogIn size={13} />
+                <LogIn size={isXL ? 15 : 13} />
                 {!isTablet && 'Connexion'}
               </Link>
               <Link href="/register" style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
-                padding: isTablet ? '8px 14px' : '9px 20px', borderRadius: '40px',
+                padding: isTablet ? '8px 14px' : isXL ? '11px 24px' : '9px 20px', borderRadius: '40px',
                 background: '#C8872A', color: '#0A0C0F',
-                fontSize: isTablet ? '0.7rem' : '0.75rem', fontWeight: 500,
+                fontSize: isTablet ? '0.7rem' : isXL ? '0.88rem' : '0.75rem', fontWeight: 500,
                 letterSpacing: '0.06em', textTransform: 'uppercase', textDecoration: 'none', whiteSpace: 'nowrap',
+                minHeight: '44px',
               }}>
-                <UserPlus size={13} />
+                <UserPlus size={isXL ? 15 : 13} />
                 {!isTablet && "S'inscrire"}
               </Link>
             </>

@@ -205,7 +205,7 @@ const Testimonials = () => {
                     style={{ background: 'linear-gradient(to right, transparent, rgba(46,123,181,0.2), transparent)' }} />
             </div>
 
-            <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
+            <div className="container mx-auto px-4 sm:px-6 max-w-7xl relative z-10">
 
                 {/* ── En-tête ─────────────────────────── */}
                 <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-10">

@@ -40,6 +40,9 @@
 @media (min-width: 1920px) {
   :root { --px: 120px; --py: 160px; }
 }
+@media (min-width: 2560px) {
+  :root { --px: 160px; --py: 180px; }
+}
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

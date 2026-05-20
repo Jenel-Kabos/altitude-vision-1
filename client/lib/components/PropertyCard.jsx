@@ -80,7 +80,7 @@ const CARD_STYLES = `
   /* Image zone */
   .pcard-img-wrap {
     position: relative;
-    height: 260px;
+    height: clamp(200px, 20vw, 340px);
     overflow: hidden;
     background: var(--cream-dark);
   }
@@ -126,7 +126,7 @@ const CARD_STYLES = `
     position: absolute;
     top: 16px; right: 16px;
     font-family: 'Jost', sans-serif;
-    font-size: 10px;
+    font-size: clamp(0.55rem, 0.9vw, 0.7rem);
     font-weight: 500;
     letter-spacing: 0.15em;
     text-transform: uppercase;
@@ -144,7 +144,7 @@ const CARD_STYLES = `
     position: absolute;
     bottom: 18px; left: 20px;
     font-family: 'Cormorant Garamond', serif;
-    font-size: 22px;
+    font-size: clamp(1.2rem, 1.8vw, 1.8rem);
     font-weight: 500;
     color: #fff;
     letter-spacing: 0.01em;
@@ -173,7 +173,7 @@ const CARD_STYLES = `
 
   /* Body */
   .pcard-body {
-    padding: 22px 24px 20px;
+    padding: clamp(16px, 2vw, 32px);
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -183,7 +183,7 @@ const CARD_STYLES = `
 
   .pcard-type {
     font-family: 'Jost', sans-serif;
-    font-size: 10px;
+    font-size: clamp(0.55rem, 0.9vw, 0.7rem);
     font-weight: 500;
     letter-spacing: 0.2em;
     text-transform: uppercase;
@@ -194,7 +194,7 @@ const CARD_STYLES = `
 
   .pcard-title {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 20px;
+    font-size: clamp(1rem, 1.5vw, 1.5rem);
     font-weight: 500;
     color: var(--ink);
     line-height: 1.25;
@@ -211,7 +211,7 @@ const CARD_STYLES = `
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 12px;
+    font-size: clamp(0.68rem, 1vw, 0.85rem);
     color: var(--ink-soft);
     letter-spacing: 0.03em;
     margin-bottom: 16px;
@@ -226,7 +226,7 @@ const CARD_STYLES = `
   }
 
   .pcard-desc {
-    font-size: 13px;
+    font-size: clamp(0.75rem, 1.1vw, 0.9rem);
     line-height: 1.65;
     color: var(--ink-mid);
     display: -webkit-box;
@@ -248,7 +248,7 @@ const CARD_STYLES = `
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
+    font-size: clamp(0.68rem, 1vw, 0.85rem);
     color: var(--ink-soft);
   }
   .pcard-stat-icon {
@@ -272,7 +272,7 @@ const CARD_STYLES = `
   }
   .pcard-tag {
     font-family: 'Jost', sans-serif;
-    font-size: 10px;
+    font-size: clamp(0.55rem, 0.9vw, 0.7rem);
     letter-spacing: 0.1em;
     text-transform: uppercase;
     padding: 4px 10px;
@@ -299,7 +299,7 @@ const CARD_STYLES = `
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 11px;
+    font-size: clamp(0.62rem, 0.9vw, 0.78rem);
     color: var(--ink-soft);
     letter-spacing: 0.05em;
   }
@@ -309,7 +309,7 @@ const CARD_STYLES = `
      sans changer l'apparence visuelle du texte */
   .pcard-cta {
     font-family: 'Jost', sans-serif;
-    font-size: 10px;
+    font-size: clamp(0.58rem, 0.9vw, 0.75rem);
     font-weight: 600;
     letter-spacing: 0.18em;
     text-transform: uppercase;

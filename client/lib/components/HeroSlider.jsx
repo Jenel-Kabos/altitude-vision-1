@@ -99,7 +99,7 @@ const HERO_CSS = `
     padding: 6px 16px; border-radius: 40px;
     border: 1px solid rgba(255,255,255,0.14);
     backdrop-filter: blur(10px);
-    font-size: 0.68rem;          /* mobile : lisible */
+    font-size: clamp(0.65rem, 0.9vw, 0.85rem);
     font-weight: 400; letter-spacing: 0.26em;
     text-transform: uppercase; color: rgba(255,255,255,0.92);
     margin-bottom: 18px;

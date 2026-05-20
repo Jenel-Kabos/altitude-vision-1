@@ -117,7 +117,7 @@ const SLIDER_CSS = `
   }
   .ash-eyebrow-text {
     font-family: 'Outfit', sans-serif;
-    font-size: 0.58rem; font-weight: 600;
+    font-size: clamp(0.58rem, 0.9vw, 0.85rem); font-weight: 600;
     letter-spacing: 0.22em; text-transform: uppercase;
   }
 

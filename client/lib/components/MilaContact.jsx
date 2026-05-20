@@ -87,7 +87,7 @@ const MilaContact = () => {
             <div className="absolute -left-32 top-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-[140px] opacity-[0.04] pointer-events-none"
                 style={{ background: MILA_RED }} />
 
-            <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
+            <div className="container mx-auto px-4 sm:px-6 max-w-7xl relative z-10">
 
                 {/* En-tête */}
                 <motion.div className="mb-14"

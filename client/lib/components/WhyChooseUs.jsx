@@ -147,7 +147,7 @@ const WhyChooseUs = () => {
                 }}
             />
 
-            <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
+            <div className="container mx-auto px-4 sm:px-6 max-w-7xl">
 
                 {/* ── Layout asymétrique ────────────────── */}
                 <div className="lg:grid lg:grid-cols-[1fr_2fr] lg:gap-16 lg:items-start">
@@ -227,7 +227,7 @@ const WhyChooseUs = () => {
                     </div>
 
                     {/* ── Colonne droite — Grille des cards ── */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-2 gap-4 2xl:gap-6">
                         {REASONS.map((reason, index) => (
                             <ReasonCard key={index} reason={reason} />
                         ))}

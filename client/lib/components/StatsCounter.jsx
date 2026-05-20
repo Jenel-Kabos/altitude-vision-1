@@ -200,7 +200,7 @@ const StatsCounter = () => {
             <div className="absolute top-0 left-0 right-0 h-px"
                 style={{ background: 'linear-gradient(to right, transparent, rgba(200,135,42,0.4), transparent)' }} />
 
-            <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
+            <div className="container mx-auto px-4 sm:px-6 max-w-7xl relative z-10">
 
                 {/* ── En-tête ─────────────────────────── */}
                 <motion.div

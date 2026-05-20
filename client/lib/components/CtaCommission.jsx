@@ -49,6 +49,11 @@ const CTA_CSS = `
   /* ── Conteneur global ── */
   .cta-outer {
     font-family: 'Jost', sans-serif;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (min-width: 1920px) {
+    .cta-outer { max-width: 1600px; }
   }
 
   /* ── Bloc principal ── */

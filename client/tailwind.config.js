@@ -7,6 +7,9 @@ export default {
   ],
   theme: {
     extend: {
+      screens: {
+        '3xl': '1920px',
+      },
       colors: {
         secondary: "#f59e0b",
         gold: "#C8872A",
