@@ -57,7 +57,7 @@ const CTA_CSS = `
     background: ${INK};
     border-radius: 2px;
     overflow: hidden;
-    padding: clamp(28px, 5.5vw, 56px) clamp(20px, 5vw, 56px);
+    padding: clamp(28px, 5.5vw, 100px) clamp(20px, 5vw, 120px);
     display: grid;
     grid-template-columns: 1fr auto;
     gap: clamp(24px, 4vw, 56px);
@@ -103,7 +103,7 @@ const CTA_CSS = `
     right: clamp(12px, 3vw, 40px);
     top: 50%; transform: translateY(-50%);
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(72px, 13vw, 156px);
+    font-size: clamp(72px, 13vw, 240px);
     font-weight: 700;
     color: rgba(200,135,42,0.055);
     line-height: 1; user-select: none; pointer-events: none;
@@ -131,7 +131,7 @@ const CTA_CSS = `
 
   .cta-title {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(1.75rem, 4.5vw, 3rem);
+    font-size: clamp(1.75rem, 4.5vw, 4.5rem);
     font-weight: 600; line-height: 1.08;
     color: #F5F2EE; letter-spacing: -0.01em;
     margin-bottom: clamp(8px, 1.8vw, 14px);
@@ -145,10 +145,10 @@ const CTA_CSS = `
   }
 
   .cta-body {
-    font-size: clamp(0.82rem, 1.8vw, 0.92rem);
+    font-size: clamp(0.82rem, 1.8vw, 1.1rem);
     font-weight: 300; line-height: 1.75;
     color: rgba(245,242,238,0.52);
-    max-width: 520px;
+    max-width: 640px;
   }
   .cta-body strong {
     font-weight: 500;

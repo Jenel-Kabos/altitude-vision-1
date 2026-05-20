@@ -66,7 +66,7 @@ const TestimonialCard = ({ t, index }) => {
                 className="text-gray-600 leading-relaxed flex-1 relative z-10"
                 style={{
                     fontFamily: "'Cormorant Garamond', Georgia, serif",
-                    fontSize:   'clamp(1rem, 1.3vw, 1.08rem)',
+                    fontSize:   'clamp(1rem, 1.3vw, 1.2rem)',
                     fontStyle:  'italic',
                 }}
             >
@@ -226,7 +226,7 @@ const Testimonials = () => {
                             className="text-gray-900"
                             style={{
                                 fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                fontSize:   'clamp(1.8rem, 3.5vw, 2.8rem)',
+                                fontSize:   'clamp(1.8rem, 3.5vw, 4.5rem)',
                                 fontWeight: 700,
                                 lineHeight: 1.1,
                             }}

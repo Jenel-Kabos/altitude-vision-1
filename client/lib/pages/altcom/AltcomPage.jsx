@@ -227,7 +227,7 @@ const AltcomPage = () => {
                             viewport={{ once: true }} transition={{ duration: 0.7 }} className="mb-12 lg:mb-0">
                             <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD }}>Notre approche</p>
                             <h2 className="text-gray-900 mb-5"
-                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3.2rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Qui Sommes-Nous ?
                             </h2>
                             <div className="h-0.5 w-16 rounded-full mb-6" style={{ background: `linear-gradient(to right, ${GOLD}, ${BLUE})` }} />
@@ -290,7 +290,7 @@ const AltcomPage = () => {
                         viewport={{ once: true }} transition={{ duration: 0.6 }}>
                         <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GOLD }}>Nos Expertises</p>
                         <h2 className="text-gray-900 mb-3"
-                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                             Nos Services
                         </h2>
                         <p className="text-gray-500 text-sm max-w-xl mx-auto">
@@ -310,7 +310,7 @@ const AltcomPage = () => {
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: GOLD }}>Portfolio</p>
                             <h2 className="text-gray-900"
-                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Nos Réalisations
                             </h2>
                         </motion.div>
@@ -362,7 +362,7 @@ const AltcomPage = () => {
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: GOLD }}>Témoignages</p>
                             <h2 className="text-gray-900"
-                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Ils Nous Font Confiance
                             </h2>
                         </motion.div>
@@ -431,7 +431,7 @@ const AltcomPage = () => {
                         </div>
                         <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD_LIGHT }}>Propulsez votre marque</p>
                         <h2 className="text-white mb-5"
-                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                             Prêt à Propulser Votre Marque ?
                         </h2>
                         <p className="text-white/60 mb-10 max-w-2xl mx-auto leading-relaxed"

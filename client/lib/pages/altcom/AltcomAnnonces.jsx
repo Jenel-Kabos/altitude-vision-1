@@ -342,10 +342,10 @@ const AltcomAnnonces = () => {
                         <p className="text-xs font-bold uppercase tracking-widest mb-4 text-white/60">
                             Altcom
                         </p>
-                        <h1 className="text-white mb-4 max-w-3xl"
+                        <h1 className="text-white mb-4 max-w-4xl"
                             style={{
                                 fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                fontSize:   'clamp(2.2rem, 5vw, 4rem)',
+                                fontSize:   'clamp(2.2rem, 5vw, 4.5rem)',
                                 fontWeight: 700, lineHeight: 1.1,
                             }}>
                             Portfolio & Réalisations

@@ -23,7 +23,10 @@ export default {
         full:    "9999px",
       },
       fontSize: {
-        section: ["clamp(1.5rem, 4vw, 2.5rem)", { lineHeight: "1.2" }],
+        section:    ["clamp(1.5rem, 4vw, 4.5rem)", { lineHeight: "1.2" }],
+        "section-h3": ["clamp(1.4rem, 3vw, 2.5rem)", { lineHeight: "1.25" }],
+        hero:       ["clamp(2.6rem, 8vw, 7rem)",   { lineHeight: "1.0" }],
+        body:       ["clamp(1rem, 1.5vw, 1.2rem)",  { lineHeight: "1.6" }],
       },
     },
   },

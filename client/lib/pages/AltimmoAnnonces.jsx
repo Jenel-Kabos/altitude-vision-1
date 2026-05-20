@@ -217,8 +217,8 @@ const AltimmoAnnonces = () => {
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
                     <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
                         <p className="text-xs font-bold uppercase tracking-widest mb-4 text-white/60">Altimmo</p>
-                        <h1 className="text-white mb-4 max-w-3xl"
-                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2.2rem, 5vw, 4rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                        <h1 className="text-white mb-4 max-w-4xl"
+                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2.2rem, 5vw, 4.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                             Nos Biens Immobiliers
                         </h1>
                         <div className="h-0.5 w-16 rounded-full mb-4" style={{ background: `linear-gradient(to right, ${BLUE}, ${GOLD})` }} />

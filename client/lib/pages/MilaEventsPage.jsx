@@ -408,7 +408,7 @@ const MilaEventsPage = () => {
                             viewport={{ once: true }} transition={{ duration: 0.7 }} className="mb-12 lg:mb-0">
                             <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: RED }}>Notre Philosophie</p>
                             <h2 className="text-gray-900 mb-5"
-                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3.2rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Chaque Événement,
                                 <span className="block" style={{ color: RED }}>Une Signature</span>
                             </h2>
@@ -468,7 +468,7 @@ const MilaEventsPage = () => {
                     <motion.div className="text-center mb-12" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                         <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: RED }}>Nos Engagements</p>
                         <h2 className="text-gray-900 mb-3"
-                            style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                             Nos Services Exclusifs
                         </h2>
                         <p className="text-gray-500 text-sm max-w-xl mx-auto">De l'intime au grandiose, nos prestations couvrent tous vos besoins</p>
@@ -513,7 +513,7 @@ const MilaEventsPage = () => {
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: RED }}>Notre Portfolio</p>
                             <h2 className="text-gray-900"
-                                style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                                style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Nos Réalisations
                             </h2>
                         </motion.div>
@@ -579,7 +579,7 @@ const MilaEventsPage = () => {
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: RED }}>Témoignages</p>
                             <h2 className="text-gray-900"
-                                style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                                style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                                 Ce Que Disent Nos Clients
                             </h2>
                         </motion.div>
@@ -640,7 +640,7 @@ const MilaEventsPage = () => {
                     <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                         <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: RED_SOFT }}>Commençons</p>
                         <h2 className="text-white mb-5"
-                            style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(2rem, 4vw, 3.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
                             Prêt à créer votre événement de rêve ?
                         </h2>
                         <p className="text-white/60 mb-10 max-w-2xl mx-auto leading-relaxed">

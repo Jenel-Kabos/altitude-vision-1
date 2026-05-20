@@ -101,7 +101,7 @@ const AltimmoContact = () => {
                     <h2 className="text-gray-900"
                         style={{
                             fontFamily: "'Cormorant Garamond', Georgia, serif",
-                            fontSize:   'clamp(2rem, 4vw, 3rem)',
+                            fontSize:   'clamp(2rem, 4vw, 4.5rem)',
                             fontWeight: 700,
                             lineHeight: 1.1,
                         }}>

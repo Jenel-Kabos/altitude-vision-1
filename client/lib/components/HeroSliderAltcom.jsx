@@ -148,10 +148,10 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                 display: 'flex', flexDirection: 'column', justifyContent: 'flex-start',
                 // padding-top : header fixe 72px + marge 20px = 92px minimum
                 // padding-bottom : bande atouts 52px + marge = suffisant
-                padding: 'clamp(110px,14vw,140px) clamp(24px,6vw,80px) clamp(140px,20vw,175px)',
+                padding: 'clamp(110px,14vw,160px) clamp(24px,6vw,120px) clamp(140px,20vw,200px)',
             }}>
                 <AnimatePresence mode="wait">
-                    <div key={"text-" + idx} style={{ maxWidth: '520px' }}>
+                    <div key={"text-" + idx} style={{ maxWidth: '680px' }}>
 
                         {/* Eyebrow — compact, sans "Altcom ·" redondant */}
                         <motion.div variants={stagger(0.08)} initial="hidden" animate="visible" exit="exit"
@@ -181,7 +181,7 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                         <motion.h1 variants={stagger(0.18)} initial="hidden" animate="visible" exit="exit"
                             style={{
                                 fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                fontSize: 'clamp(1.9rem,4.8vw,4rem)',
+                                fontSize: 'clamp(1.9rem,4.8vw,7rem)',
                                 fontWeight: 600, lineHeight: 1.06,
                                 letterSpacing: '-0.02em', color: '#FBF6EE',
                                 marginBottom: 'clamp(6px,1vw,10px)',
@@ -206,7 +206,7 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                         <motion.p variants={stagger(0.28)} initial="hidden" animate="visible" exit="exit"
                             style={{
                                 fontFamily: "'Outfit', sans-serif",
-                                fontSize: 'clamp(0.8rem,1.3vw,0.92rem)',
+                                fontSize: 'clamp(0.8rem,1.3vw,1.2rem)',
                                 fontWeight: 300, lineHeight: 1.72,
                                 color: 'rgba(251,246,238,0.6)',
                                 marginBottom: 'clamp(10px,1.5vw,16px)',

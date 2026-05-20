@@ -72,7 +72,7 @@ const LOCAL_BUSINESS_SCHEMA = JSON.stringify({
 const GLOBAL_CSS = `
   :root {
     --px: 16px;
-    --py: clamp(40px, 7.5vw, 88px);
+    --py: clamp(40px, 7.5vw, 140px);
     --gold: #C8872A;
     --blue: #2E7BB5;
     --red:  #D42B2B;
@@ -86,6 +86,8 @@ const GLOBAL_CSS = `
   @media (min-width: 768px)  { :root { --px: 40px; } }
   @media (min-width: 1024px) { :root { --px: 56px; } }
   @media (min-width: 1200px) { :root { --px: 64px; } }
+  @media (min-width: 1440px) { :root { --px: 80px; --py: 140px; } }
+  @media (min-width: 1920px) { :root { --px: 120px; --py: 160px; } }
 
   *, *::before, *::after { box-sizing: border-box; }
 
@@ -97,7 +99,7 @@ const GLOBAL_CSS = `
   }
 
   .hp-section    { padding: var(--py) var(--px); width: 100%; }
-  .hp-container  { max-width: 1200px; margin: 0 auto; width: 100%; }
+  .hp-container  { max-width: 1400px; margin: 0 auto; width: 100%; }
 
   .hp-eyebrow {
     display: flex; align-items: center; gap: 10px;
@@ -110,7 +112,7 @@ const GLOBAL_CSS = `
 
   .hp-h2 {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(1.6rem, 5.5vw, 3.4rem);
+    font-size: clamp(1.6rem, 5.5vw, 4.5rem);
     font-weight: 300; line-height: 1.12;
     letter-spacing: -0.01em; color: var(--text);
     word-break: break-word;
@@ -162,7 +164,7 @@ const GLOBAL_CSS = `
 
   .hp-stat-num {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(2rem, 6.5vw, 3.8rem);
+    font-size: clamp(2rem, 6.5vw, 5rem);
     font-weight: 300; line-height: 1; letter-spacing: -0.02em;
     margin-bottom: clamp(4px, 1vw, 8px);
   }
@@ -178,7 +180,7 @@ const GLOBAL_CSS = `
   @media (min-width: 768px) { .hp-poles-grid { grid-template-columns: repeat(3, 1fr); } }
 
   .hp-pole-card {
-    padding: clamp(22px, 4.5vw, 52px) clamp(18px, 3.5vw, 44px);
+    padding: clamp(22px, 4.5vw, 80px) clamp(18px, 3.5vw, 64px);
     border-bottom: 1px solid var(--border);
     position: relative; overflow: hidden; transition: background 0.4s;
   }

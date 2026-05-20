@@ -69,9 +69,9 @@ const SLIDER_CSS = `
     position: absolute; inset: 0; z-index: 10;
     display: flex; flex-direction: column;
     justify-content: flex-start;
-    padding-top: clamp(68px, 13vw, 96px);
+    padding-top: clamp(68px, 13vw, 120px);
     padding-left: clamp(20px, 5vw, 80px);
-    padding-right: clamp(58px, 9vw, 120px);
+    padding-right: clamp(58px, 9vw, 160px);
     /* Mobile : atouts (96px) + actions (pill ~36px + liens ~22px + gaps ~28px) = ~182px + marge 20px */
     padding-bottom: 202px;
     overflow: hidden;
@@ -88,11 +88,17 @@ const SLIDER_CSS = `
   @media (min-width: 1024px) {
     .ash-content { padding-bottom: 120px; padding-left: 80px; padding-right: 140px; }
   }
+  @media (min-width: 1440px) {
+    .ash-content { padding-left: 120px; padding-right: 200px; }
+  }
+  @media (min-width: 1920px) {
+    .ash-content { padding-left: 160px; padding-right: 240px; }
+  }
 
   /* Bloc texte — protégé des flèches */
   .ash-text-block {
     width: 100%;
-    max-width: 480px;
+    max-width: 640px;
   }
   @media (max-width: 639px) {
     .ash-text-block { max-width: calc(100vw - 72px); }
@@ -118,7 +124,7 @@ const SLIDER_CSS = `
   /* ══ TITRE — compact mobile, grand desktop ══ */
   .ash-title {
     font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: clamp(1.95rem, 5.5vw, 3.6rem);
+    font-size: clamp(1.95rem, 5.5vw, 7rem);
     font-weight: 600; line-height: 1.06;
     letter-spacing: -0.02em; color: #F5F2EE;
     margin-bottom: clamp(6px, 1.2vw, 10px);
@@ -176,8 +182,12 @@ const SLIDER_CSS = `
     text-decoration: none;
     transition: transform 0.2s, box-shadow 0.2s;
     white-space: nowrap; flex-shrink: 0;
+    min-height: 40px;
   }
   .ash-cta-btn:hover { transform: translateY(-2px); }
+  @media (min-width: 1440px) {
+    .ash-cta-btn { font-size: 0.82rem; padding: 12px 24px; min-height: 48px; }
+  }
 
   /* Stat inline */
   .ash-stat-sep { width:1px; height:24px; background:rgba(245,242,238,0.12); flex-shrink:0; }

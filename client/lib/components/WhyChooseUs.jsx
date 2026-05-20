@@ -173,7 +173,7 @@ const WhyChooseUs = () => {
                                 className="text-gray-900 mb-6"
                                 style={{
                                     fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                    fontSize:   'clamp(2.2rem, 4vw, 3.5rem)',
+                                    fontSize:   'clamp(2.2rem, 4vw, 4.5rem)',
                                     fontWeight: 700,
                                     lineHeight: 1.1,
                                     letterSpacing: '-0.01em',

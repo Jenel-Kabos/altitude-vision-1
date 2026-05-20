@@ -69,13 +69,15 @@ const ATOUTS = [
 const PAGE_CSS = `
   .ai-page {
     --blue: #2E7BB5; --blue-dark: #1A5A8A; --gold: #C8872A;
-    --px: 20px; --py: clamp(52px, 9vw, 88px);
+    --px: 20px; --py: clamp(52px, 9vw, 140px);
     font-family: 'Outfit', sans-serif;
   }
   @media (min-width: 640px)  { .ai-page { --px: 36px; } }
   @media (min-width: 1024px) { .ai-page { --px: 48px; } }
+  @media (min-width: 1440px) { .ai-page { --px: 80px; --py: 140px; } }
+  @media (min-width: 1920px) { .ai-page { --px: 120px; --py: 160px; } }
 
-  .ai-container { max-width: 1152px; margin: 0 auto; padding: 0 var(--px); }
+  .ai-container { max-width: 1400px; margin: 0 auto; padding: 0 var(--px); }
 
   /* ══ EYEBROW ══ */
   .ai-eyebrow {
@@ -87,7 +89,7 @@ const PAGE_CSS = `
   /* ══ H2 ══ */
   .ai-h2 {
     font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: clamp(2rem, 5.5vw, 3.2rem);
+    font-size: clamp(2rem, 5.5vw, 4.5rem);
     font-weight: 700; line-height: 1.08; color: #111827;
   }
   .ai-h2--light { color: #fff; }
@@ -210,7 +212,7 @@ const PAGE_CSS = `
 
   .ai-about-h2 {
     font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: clamp(2rem, 5.5vw, 3.2rem);
+    font-size: clamp(2rem, 5.5vw, 4.5rem);
     font-weight: 700; line-height: 1.08; color: #111827; margin-bottom: 18px;
   }
   .ai-about-body {
@@ -228,7 +230,7 @@ const PAGE_CSS = `
   }
   .ai-stat-num {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(2rem, 6vw, 2.6rem);
+    font-size: clamp(2rem, 6vw, 4.5rem);
     font-weight: 700; line-height: 1; margin-bottom: 4px;
   }
   .ai-stat-label { font-size: 0.68rem; color: #6B7280; font-weight: 500; }
@@ -273,7 +275,7 @@ const PAGE_CSS = `
   }
   .ai-properties-h2 {
     font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: clamp(1.85rem, 4.5vw, 2.6rem);
+    font-size: clamp(1.85rem, 4.5vw, 4.5rem);
     font-weight: 700; line-height: 1.1; color: #111827;
   }
   .ai-properties-link {
@@ -304,7 +306,7 @@ const PAGE_CSS = `
   @media (min-width: 1024px) { .ai-estimation-grid { grid-template-columns: 2fr 3fr; } }
   .ai-estimation-h2 {
     font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: clamp(1.85rem, 4.5vw, 2.6rem);
+    font-size: clamp(1.85rem, 4.5vw, 4.5rem);
     font-weight: 700; line-height: 1.1; color: #fff; margin-bottom: 14px;
   }
   .ai-estimation-body {
@@ -326,7 +328,7 @@ const PAGE_CSS = `
   }
   .ai-reviews-h2 {
     font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: clamp(1.85rem, 4.5vw, 2.6rem);
+    font-size: clamp(1.85rem, 4.5vw, 4.5rem);
     font-weight: 700; line-height: 1.1; color: #111827;
   }
   .ai-review-btn {

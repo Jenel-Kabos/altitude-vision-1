@@ -150,10 +150,10 @@ const HeroSliderMila = () => {
             <div style={{
                 position: 'absolute', inset: 0, zIndex: 10,
                 display: 'flex', flexDirection: 'column', justifyContent: 'flex-start',
-                padding: 'clamp(110px,14vw,140px) clamp(24px,6vw,80px) clamp(160px,22vw,200px)',
+                padding: 'clamp(110px,14vw,160px) clamp(24px,6vw,120px) clamp(160px,22vw,220px)',
             }}>
                 <AnimatePresence mode="wait">
-                    <div key={"text-" + idx} style={{ maxWidth: '520px' }}>
+                    <div key={"text-" + idx} style={{ maxWidth: '680px' }}>
 
                         {/* Eyebrow */}
                         <motion.div variants={stagger(0.08)} initial="hidden" animate="visible" exit="exit"
@@ -183,7 +183,7 @@ const HeroSliderMila = () => {
                         <motion.h1 variants={stagger(0.18)} initial="hidden" animate="visible" exit="exit"
                             style={{
                                 fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                fontSize: 'clamp(1.9rem,4.8vw,4rem)',
+                                fontSize: 'clamp(1.9rem,4.8vw,7rem)',
                                 fontWeight: 600, lineHeight: 1.06,
                                 letterSpacing: '-0.02em', color: '#FDF8F5',
                                 marginBottom: 'clamp(6px,1vw,10px)',
@@ -208,7 +208,7 @@ const HeroSliderMila = () => {
                         <motion.p variants={stagger(0.28)} initial="hidden" animate="visible" exit="exit"
                             style={{
                                 fontFamily: "'Outfit', sans-serif",
-                                fontSize: 'clamp(0.8rem,1.3vw,0.92rem)',
+                                fontSize: 'clamp(0.8rem,1.3vw,1.2rem)',
                                 fontWeight: 300, lineHeight: 1.72,
                                 color: 'rgba(253,248,245,0.6)',
                                 marginBottom: 'clamp(10px,1.5vw,16px)',

@@ -113,7 +113,7 @@ const StatCard = ({ stat, started, index }) => {
                     className="leading-none"
                     style={{
                         fontFamily: "'Cormorant Garamond', Georgia, serif",
-                        fontSize:   'clamp(3rem, 5vw, 4.5rem)',
+                        fontSize:   'clamp(3rem, 5vw, 6rem)',
                         fontWeight: 700,
                         color:      stat.color,
                         lineHeight: 1,
@@ -125,7 +125,7 @@ const StatCard = ({ stat, started, index }) => {
                     className="pb-1"
                     style={{
                         fontFamily: "'Outfit', sans-serif",
-                        fontSize:   'clamp(1.2rem, 2vw, 1.8rem)',
+                        fontSize:   'clamp(1.2rem, 2vw, 2.5rem)',
                         fontWeight: 600,
                         color:      stat.color,
                         opacity:    0.8,
@@ -140,7 +140,7 @@ const StatCard = ({ stat, started, index }) => {
                 className="font-bold text-white mb-1"
                 style={{
                     fontFamily: "'Outfit', sans-serif",
-                    fontSize:   'clamp(0.95rem, 1.5vw, 1.1rem)',
+                    fontSize:   'clamp(0.95rem, 1.5vw, 1.2rem)',
                 }}
             >
                 {stat.label}
@@ -220,7 +220,7 @@ const StatsCounter = () => {
                         className="text-white"
                         style={{
                             fontFamily: "'Cormorant Garamond', Georgia, serif",
-                            fontSize:   'clamp(2rem, 4vw, 3rem)',
+                            fontSize:   'clamp(2rem, 4vw, 4.5rem)',
                             fontWeight: 600,
                             lineHeight: 1.2,
                         }}

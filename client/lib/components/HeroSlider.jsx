@@ -82,6 +82,16 @@ const HERO_CSS = `
       height: 100%;
     }
   }
+  @media (min-width: 1440px) {
+    .av-hero-text-zone {
+      padding: 120px 120px 200px;
+    }
+  }
+  @media (min-width: 1920px) {
+    .av-hero-text-zone {
+      padding: 140px 160px 220px;
+    }
+  }
 
   /* ── Pill pôle ── */
   .av-pole-pill {
@@ -101,19 +111,19 @@ const HERO_CSS = `
   /* ── Titre hero ── */
   .av-hero-title {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(2.6rem, 8vw, 4.2rem);   /* ↑ mobile : 2.6rem au lieu de 1.8rem */
+    font-size: clamp(2.6rem, 8vw, 7rem);
     font-weight: 300; line-height: 1.0;
     letter-spacing: -0.02em; color: #fff;
     margin-bottom: 16px;
-    max-width: 700px; white-space: pre-line;
+    max-width: 900px; white-space: pre-line;
   }
 
   /* ── Sous-titre hero ── */
   .av-hero-subtitle {
     font-family: 'DM Sans', sans-serif;
-    font-size: clamp(0.95rem, 2.5vw, 1.05rem);  /* ↑ mobile : 0.95rem */
+    font-size: clamp(0.95rem, 2.5vw, 1.5rem);
     font-weight: 300; color: rgba(255,255,255,0.65);
-    max-width: 480px; line-height: 1.75;
+    max-width: 600px; line-height: 1.75;
     margin-bottom: 32px;
   }
 
@@ -130,6 +140,9 @@ const HERO_CSS = `
   @media (min-width: 768px) {
     .av-hero-cta-primary { font-size: 0.78rem; padding: 13px 28px; }
   }
+  @media (min-width: 1440px) {
+    .av-hero-cta-primary { font-size: 0.9rem; padding: 15px 36px; min-height: 48px; }
+  }
 
   .av-hero-cta-secondary {
     display: inline-flex; align-items: center; gap: 8px;
@@ -144,6 +157,9 @@ const HERO_CSS = `
   }
   @media (min-width: 768px) {
     .av-hero-cta-secondary { font-size: 0.78rem; padding: 12px 28px; }
+  }
+  @media (min-width: 1440px) {
+    .av-hero-cta-secondary { font-size: 0.9rem; padding: 14px 36px; min-height: 48px; }
   }
 
   /* Wrap boutons mobile = colonne, desktop = ligne */
