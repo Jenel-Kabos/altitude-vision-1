@@ -10,8 +10,14 @@ Allow: /mila-events
 Allow: /altcom
 Allow: /contact
 Allow: /actualites
-Allow: /properties/
-Allow: /register
+Allow: /altimmo/annonces
+Allow: /altimmo/property/
+Allow: /mila-events/annonces
+Allow: /mila-events/event/
+Allow: /altcom/annonces
+Allow: /altcom/portfolio/
+Allow: /contact
+Allow: /actualites
 
 # Bloquer le dashboard et les pages privées
 Disallow: /dashboard/
@@ -19,9 +25,11 @@ Disallow: /dashboard
 Disallow: /admin/
 Disallow: /api/
 Disallow: /login
-Disallow: /account
+Disallow: /register
+Disallow: /mon-compte
 Disallow: /profile
-Disallow: /favorites
+Disallow: /favoris
+Disallow: /mes-biens
 
 # Bloquer les paramètres de recherche inutiles
 Disallow: /*?page=
