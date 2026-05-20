@@ -545,7 +545,7 @@ const MilaEventsPage = () => {
                         </div>
                     )}
                     {loading ? (
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' }}>
                             {[1,2,3,4,5,6].map(i => <EventSkeleton key={i} />)}
                         </div>
                     ) : currentEvents.length === 0 ? (
@@ -556,7 +556,7 @@ const MilaEventsPage = () => {
                         </div>
                     ) : (
                         <>
-                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' }}>
                                 {currentEvents.map((e, i) => <EventCard key={e._id} event={e} index={i} />)}
                             </div>
                             <Pagination

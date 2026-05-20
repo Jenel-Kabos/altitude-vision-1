@@ -297,7 +297,7 @@ const AltcomPage = () => {
                             Des solutions sur mesure pour amplifier votre message et engager votre audience
                         </p>
                     </motion.div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' }}>
                         {SERVICES.map((s, i) => <ServiceCard key={s._id} service={s} onQuote={openQuote} index={i} />)}
                     </div>
                 </div>
@@ -322,12 +322,12 @@ const AltcomPage = () => {
                     </div>
 
                     {loading ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' }}>
                             {[1,2,3].map(i => <PortfolioSkeleton key={i} />)}
                         </div>
                     ) : currentPortfolio.length > 0 ? (
                         <>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' }}>
                                 {currentPortfolio.map((item, i) => (
                                     <motion.div key={item._id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
                                         viewport={{ once: true, amount: 0.1 }} transition={{ duration: 0.4, delay: i * 0.05 }}>

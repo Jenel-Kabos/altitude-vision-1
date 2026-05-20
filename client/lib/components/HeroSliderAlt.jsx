@@ -124,7 +124,7 @@ const SLIDER_CSS = `
   /* ══ TITRE — compact mobile, grand desktop ══ */
   .ash-title {
     font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: clamp(1.95rem, 5.5vw, 7rem);
+    font-size: clamp(2rem, 5.5vw, 8rem);
     font-weight: 600; line-height: 1.06;
     letter-spacing: -0.02em; color: #F5F2EE;
     margin-bottom: clamp(6px, 1.2vw, 10px);
@@ -174,19 +174,19 @@ const SLIDER_CSS = `
   }
   .ash-cta-btn {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 9px 18px;
+    padding: 10px 20px;
     border-radius: 5px;
     color: #fff; font-family: 'Outfit', sans-serif;
-    font-size: 0.70rem; font-weight: 600;
+    font-size: 0.72rem; font-weight: 600;
     letter-spacing: 0.10em; text-transform: uppercase;
     text-decoration: none;
     transition: transform 0.2s, box-shadow 0.2s;
     white-space: nowrap; flex-shrink: 0;
-    min-height: 40px;
+    min-height: 44px;
   }
   .ash-cta-btn:hover { transform: translateY(-2px); }
   @media (min-width: 1440px) {
-    .ash-cta-btn { font-size: 0.82rem; padding: 12px 24px; min-height: 48px; }
+    .ash-cta-btn { font-size: 0.88rem; padding: 14px 28px; min-height: 52px; }
   }
 
   /* Stat inline */

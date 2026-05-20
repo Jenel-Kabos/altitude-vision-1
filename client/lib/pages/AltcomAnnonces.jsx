@@ -325,11 +325,8 @@ const AltcomAnnonces = () => {
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className={
-                viewMode === 'grid'
-                  ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-                  : 'space-y-6'
-              }
+              className={viewMode === 'list' ? 'space-y-6' : undefined}
+              style={viewMode === 'grid' ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' } : undefined}
             >
               {currentPortfolio.map((item) => (
                 <motion.div key={item._id} variants={itemVariants}>

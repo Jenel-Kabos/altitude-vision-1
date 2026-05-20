@@ -431,7 +431,7 @@ const AltimmoAnnonces = () => {
 
                 {/* Résultats */}
                 {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' }}>
                         {[1,2,3,4,5,6].map(i => <PropertySkeleton key={i} />)}
                     </div>
                 ) : currentProperties.length === 0 ? (
@@ -461,9 +461,8 @@ const AltimmoAnnonces = () => {
                             <motion.div key={`${viewMode}-${currentPage}`}
                                 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
-                                className={viewMode === 'grid'
-                                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5'
-                                    : 'flex flex-col gap-4'}>
+                                className={viewMode === 'list' ? 'flex flex-col gap-4' : undefined}
+                                style={viewMode === 'grid' ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' } : undefined}>
                                 {currentProperties.map((property, i) => (
                                     <motion.div key={property._id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.3, delay: i * 0.04 }}>

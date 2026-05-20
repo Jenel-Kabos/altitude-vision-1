@@ -111,7 +111,7 @@ const HERO_CSS = `
   /* ── Titre hero ── */
   .av-hero-title {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(2.6rem, 8vw, 7rem);
+    font-size: clamp(2.6rem, 7vw, 8rem);
     font-weight: 300; line-height: 1.0;
     letter-spacing: -0.02em; color: #fff;
     margin-bottom: 16px;
@@ -141,7 +141,7 @@ const HERO_CSS = `
     .av-hero-cta-primary { font-size: 0.78rem; padding: 13px 28px; }
   }
   @media (min-width: 1440px) {
-    .av-hero-cta-primary { font-size: 0.9rem; padding: 15px 36px; min-height: 48px; }
+    .av-hero-cta-primary { font-size: 0.9rem; padding: 15px 36px; min-height: 52px; }
   }
 
   .av-hero-cta-secondary {
@@ -159,7 +159,7 @@ const HERO_CSS = `
     .av-hero-cta-secondary { font-size: 0.78rem; padding: 12px 28px; }
   }
   @media (min-width: 1440px) {
-    .av-hero-cta-secondary { font-size: 0.9rem; padding: 14px 36px; min-height: 48px; }
+    .av-hero-cta-secondary { font-size: 0.9rem; padding: 14px 36px; min-height: 52px; }
   }
 
   /* Wrap boutons mobile = colonne, desktop = ligne */

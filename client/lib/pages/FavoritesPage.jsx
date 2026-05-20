@@ -128,7 +128,7 @@ const FavoritesPage = () => {
                   <Home className="text-green-600" />
                   Altimmo ({favorites.properties.length})
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' }}>
                   {favorites.properties.map((property) => (
                     <PropertyCard key={property._id} property={property} />
                   ))}
@@ -143,7 +143,7 @@ const FavoritesPage = () => {
                   <Calendar className="text-purple-600" />
                   MilaEvents ({favorites.events.length})
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' }}>
                   {favorites.events.map((event) => (
                     <EventCard key={event._id} event={event} />
                   ))}
@@ -158,7 +158,7 @@ const FavoritesPage = () => {
                   <Briefcase className="text-orange-600" />
                   Altcom ({favorites.services.length})
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' }}>
                   {/* Ajouter ServiceCard quand vous créerez le pôle Altcom */}
                   <p className="text-gray-500">Composant ServiceCard à créer</p>
                 </div>

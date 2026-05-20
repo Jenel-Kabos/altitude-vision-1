@@ -181,7 +181,7 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                         <motion.h1 variants={stagger(0.18)} initial="hidden" animate="visible" exit="exit"
                             style={{
                                 fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                fontSize: 'clamp(1.9rem,4.8vw,7rem)',
+                                fontSize: 'clamp(2rem,5.5vw,8rem)',
                                 fontWeight: 600, lineHeight: 1.06,
                                 letterSpacing: '-0.02em', color: '#FBF6EE',
                                 marginBottom: 'clamp(6px,1vw,10px)',
@@ -240,12 +240,12 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                                 <button onClick={onStartProject}
                                     style={{
                                         display: 'inline-flex', alignItems: 'center', gap: '7px',
-                                        padding: 'clamp(9px,1.5vw,12px) clamp(16px,2.5vw,24px)',
+                                        padding: 'clamp(10px,1.5vw,14px) clamp(18px,2.5vw,28px)',
                                         borderRadius: '40px',
                                         background: "linear-gradient(135deg, " + s.accent + ", " + s.accent + "CC)",
                                         color: '#0A0800', border: 'none', cursor: 'pointer',
                                         fontFamily: "'Outfit', sans-serif",
-                                        fontSize: 'clamp(0.65rem,1.1vw,0.74rem)',
+                                        fontSize: 'clamp(0.68rem,1.1vw,0.82rem)',
                                         fontWeight: 600, letterSpacing: '0.07em',
                                         textTransform: 'uppercase',
                                         boxShadow: "0 5px 20px " + s.accent + "40",
@@ -261,12 +261,12 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                                 <Link href={s.cta.to}
                                     style={{
                                         display: 'inline-flex', alignItems: 'center', gap: '7px',
-                                        padding: 'clamp(9px,1.5vw,12px) clamp(16px,2.5vw,24px)',
+                                        padding: 'clamp(10px,1.5vw,14px) clamp(18px,2.5vw,28px)',
                                         borderRadius: '40px',
                                         background: "linear-gradient(135deg, " + s.accent + ", " + s.accent + "CC)",
                                         color: '#0A0800',
                                         fontFamily: "'Outfit', sans-serif",
-                                        fontSize: 'clamp(0.65rem,1.1vw,0.74rem)',
+                                        fontSize: 'clamp(0.68rem,1.1vw,0.82rem)',
                                         fontWeight: 600, letterSpacing: '0.07em',
                                         textTransform: 'uppercase', textDecoration: 'none',
                                         boxShadow: "0 5px 20px " + s.accent + "40",

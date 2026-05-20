@@ -31,17 +31,17 @@
   --radius-pill: 40px;
   --transition:  0.3s cubic-bezier(0.4,0,0.2,1);
   --px: clamp(16px, 5vw, 80px);
-  --py: clamp(60px, 8vw, 140px);
+  --py: clamp(60px, 7vw, 120px);
 }
 
 @media (min-width: 1440px) {
-  :root { --px: 80px; --py: 140px; }
+  :root { --px: 80px; --py: 120px; }
 }
 @media (min-width: 1920px) {
-  :root { --px: 120px; --py: 160px; }
+  :root { --px: 120px; --py: 140px; }
 }
 @media (min-width: 2560px) {
-  :root { --px: 160px; --py: 180px; }
+  :root { --px: 160px; --py: 160px; }
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
