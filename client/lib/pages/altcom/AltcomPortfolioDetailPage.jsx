@@ -21,6 +21,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { getPortfolioItem } from '../../services/portfolioService';
+import Breadcrumb from '../../components/Breadcrumb';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
 
@@ -167,8 +168,13 @@ const AltcomPortfolioDetailPage = () => {
               className="flex items-center text-gray-600 hover:text-blue-600 transition-colors"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />
-              Retour aux réalisations
+              Retour
             </button>
+            <Breadcrumb items={[
+              { label: 'Altcom',     href: '/altcom' },
+              { label: 'Portfolio',  href: '/altcom/annonces' },
+              { label: item?.title ?? 'Réalisation' },
+            ]} />
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsLiked(!isLiked)}

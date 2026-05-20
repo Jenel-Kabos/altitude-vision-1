@@ -1,17 +1,16 @@
-"use client";
-
 import React, { useEffect, useState } from 'react';
+import { Helmet }         from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
-import Link from 'next/link';
+import { Link }           from 'react-router-dom';
 import { ArrowRight, Building2, Calendar, Briefcase, MapPin, Phone, Mail } from 'lucide-react';
 
-import HeroSlider    from '../components/HeroSlider';
-import HomeSlider    from '../components/HomeSlider';
-import CtaCommission from '../components/CtaCommission';
-import Testimonials  from '../components/Testimonials';
-import FacebookFeed  from '../components/FacebookFeed';
-import StatsCounter  from '../components/StatsCounter';
-import WhyChooseUs   from '../components/WhyChooseUs';
+import HeroSlider        from '../components/HeroSlider';
+import HomeSlider        from '../components/HomeSlider';
+import CtaCommission     from '../components/CtaCommission';
+import Testimonials      from '../components/Testimonials';
+import FacebookFeed      from '../components/FacebookFeed';
+import StatsCounter      from '../components/StatsCounter';
+import WhyChooseUs       from '../components/WhyChooseUs';
 
 import { getLatestPropertiesByPoles } from '../services/propertyService';
 import { getAllEvents }                from '../services/eventService';
@@ -47,31 +46,30 @@ const poles = [
   },
 ];
 
+/* ─── SEO : données structurées LocalBusiness (Schema.org) ─── */
+const LOCAL_BUSINESS_SCHEMA = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'LocalBusiness',
+  name: 'Altitude Vision',
+  url: 'https://altitudevision.agency',
+  logo: 'https://altitudevision.agency/logo.png',
+  telephone: '+242068002151',
+  email: 'contact@altitudevision.agency',
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: 'Brazzaville',
+    addressLocality: 'Brazzaville',
+    addressCountry: 'CG',
+  },
+  description:
+    'Agence multidisciplinaire à Brazzaville — Immobilier (Altimmo), Événementiel (Mila Events) et Communication (Altcom).',
+  sameAs: [],
+});
+
 /* ═══════════════════════════════════════════════════════════════
    CSS — Mobile-first strict, de 320px à 1440px+
-
-   Règles plancher (320px = iPhone SE, valeur critique) :
-   · --px : 16px  → jamais de contenu collé au bord
-   · font-size corps  : 0.875rem (14px) minimum
-   · font-size eyebrow: 0.60rem  (9.6px) minimum lisible
-   · h2 : 1.6rem (25.6px) minimum — lisible et impactant
-   · stats chiffres : 2rem (32px) minimum
-   · padding sections : 40px minimum en vertical
-   · overflow-x:hidden sur root → pas de scroll horizontal
-   · word-break:break-word sur textes → pas de débordement
-
-   Breakpoints :
-   375px  iPhone standard    → --px monte à 20px
-   480px  grand mobile       → tabs en ligne
-   640px  petite tablette    → --px 32px
-   768px  tablette portrait  → stats 4 cols, pôles 3 cols
-   900px  tablette paysage   → about 2 cols
-   1024px laptop             → --px 56px
-   1200px desktop            → --px 64px
 ═══════════════════════════════════════════════════════════════ */
 const GLOBAL_CSS = `
-
-  /* ─── Variables ─── */
   :root {
     --px: 16px;
     --py: clamp(40px, 7.5vw, 88px);
@@ -91,7 +89,6 @@ const GLOBAL_CSS = `
 
   *, *::before, *::after { box-sizing: border-box; }
 
-  /* ─── Root ─── */
   .hp-root {
     min-height: 100vh;
     background: var(--bg);
@@ -99,11 +96,9 @@ const GLOBAL_CSS = `
     overflow-x: hidden;
   }
 
-  /* ─── Section / container ─── */
-  .hp-section { padding: var(--py) var(--px); width: 100%; }
-  .hp-container { max-width: 1200px; margin: 0 auto; width: 100%; }
+  .hp-section    { padding: var(--py) var(--px); width: 100%; }
+  .hp-container  { max-width: 1200px; margin: 0 auto; width: 100%; }
 
-  /* ─── Eyebrow ─── */
   .hp-eyebrow {
     display: flex; align-items: center; gap: 10px;
     font-size: clamp(0.60rem, 1.6vw, 0.68rem);
@@ -113,7 +108,6 @@ const GLOBAL_CSS = `
   }
   .hp-eyebrow-line { width: 18px; height: 1px; background: var(--gold); flex-shrink: 0; }
 
-  /* ─── H2 — plancher 1.6rem sur 320px ─── */
   .hp-h2 {
     font-family: 'Cormorant Garamond', serif;
     font-size: clamp(1.6rem, 5.5vw, 3.4rem);
@@ -122,7 +116,6 @@ const GLOBAL_CSS = `
     word-break: break-word;
   }
 
-  /* ─── Ticker ─── */
   @keyframes hp-tick {
     from { transform: translateX(0); }
     to   { transform: translateX(-50%); }
@@ -145,7 +138,6 @@ const GLOBAL_CSS = `
     flex-shrink: 0; display: inline-flex; align-items: center; gap: 12px;
   }
 
-  /* ─── Stats grid — 2×2 mobile → 1×4 desktop ─── */
   .hp-stats-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -160,12 +152,12 @@ const GLOBAL_CSS = `
     border-bottom: 1px solid var(--border);
   }
   @media (max-width: 767px) {
-    .hp-stat-item:nth-child(2n) { border-right: none; }
+    .hp-stat-item:nth-child(2n)        { border-right: none; }
     .hp-stat-item:nth-last-child(-n+2) { border-bottom: none; }
   }
   @media (min-width: 768px) {
-    .hp-stat-item { border-bottom: none; }
-    .hp-stat-item:last-child { border-right: none; }
+    .hp-stat-item               { border-bottom: none; }
+    .hp-stat-item:last-child    { border-right: none; }
   }
 
   .hp-stat-num {
@@ -179,7 +171,6 @@ const GLOBAL_CSS = `
     letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 400;
   }
 
-  /* ─── Pôles grid — 1 col mobile → 3 cols ≥768px ─── */
   .hp-poles-grid {
     display: grid; grid-template-columns: 1fr;
     border: 1px solid var(--border); overflow: hidden;
@@ -193,8 +184,8 @@ const GLOBAL_CSS = `
   }
   .hp-pole-card:last-child { border-bottom: none; }
   @media (min-width: 768px) {
-    .hp-pole-card { border-bottom: none; border-right: 1px solid var(--border); }
-    .hp-pole-card:last-child { border-right: none; }
+    .hp-pole-card              { border-bottom: none; border-right: 1px solid var(--border); }
+    .hp-pole-card:last-child   { border-right: none; }
   }
   .hp-pole-card:hover { background: var(--pole-bg, rgba(232,228,220,0.04)); }
   .hp-pole-card:hover .hp-pole-accent { opacity: 1 !important; }
@@ -225,8 +216,8 @@ const GLOBAL_CSS = `
     font-size: clamp(0.60rem, 1.3vw, 0.68rem); letter-spacing: 0.22em;
     text-transform: uppercase; font-weight: 400; margin-bottom: clamp(10px, 2vw, 16px);
   }
-  .hp-pole-sep { height: 1px; background: var(--border); margin-bottom: clamp(10px, 2vw, 16px); }
-  .hp-pole-desc {
+  .hp-pole-sep   { height: 1px; background: var(--border); margin-bottom: clamp(10px, 2vw, 16px); }
+  .hp-pole-desc  {
     font-size: clamp(0.82rem, 1.8vw, 0.86rem); color: rgba(232,228,220,0.42);
     line-height: 1.72; font-weight: 300; margin-bottom: clamp(14px, 2.5vw, 26px);
     word-break: break-word;
@@ -238,7 +229,6 @@ const GLOBAL_CSS = `
     opacity: 0; transform: translateY(8px); transition: 0.3s;
   }
 
-  /* ─── Séparateur ─── */
   .hp-divider {
     height: 1px; margin: 0 var(--px);
     background: linear-gradient(to right,
@@ -246,7 +236,6 @@ const GLOBAL_CSS = `
     );
   }
 
-  /* ─── About grid — 1 col mobile → 2 cols ≥900px ─── */
   .hp-about-grid {
     display: grid; grid-template-columns: 1fr;
     gap: clamp(32px, 6vw, 80px); align-items: start;
@@ -259,7 +248,6 @@ const GLOBAL_CSS = `
   .hp-contact-row {
     display: flex; align-items: center; gap: 10px;
     font-size: clamp(0.78rem, 1.8vw, 0.82rem); color: rgba(232,228,220,0.4); font-weight: 300;
-    /* email peut être long sur 320px */
     overflow-wrap: break-word; word-break: break-all;
   }
 
@@ -286,7 +274,6 @@ const GLOBAL_CSS = `
     text-transform: uppercase; font-weight: 400; flex-shrink: 0; white-space: nowrap;
   }
 
-  /* ─── Bouton primaire ─── */
   .hp-btn-primary {
     display: inline-flex; align-items: center; gap: 7px;
     padding: clamp(11px, 2vw, 14px) clamp(20px, 3.5vw, 28px);
@@ -295,19 +282,16 @@ const GLOBAL_CSS = `
     font-size: clamp(0.70rem, 1.6vw, 0.75rem); font-weight: 600;
     letter-spacing: 0.08em; text-transform: uppercase;
     transition: 0.22s; text-decoration: none; white-space: nowrap;
-    /* Cible tactile WCAG min 44px */
     min-height: 44px;
   }
   .hp-btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
 
-  /* ─── Tabs annonces ─── */
   .hp-tabs {
     display: flex; flex-wrap: wrap; gap: 8px;
     margin-bottom: clamp(22px, 4vw, 36px);
   }
-  /* < 480px : boutons empilés pleine largeur */
   @media (max-width: 479px) {
-    .hp-tabs { flex-direction: column; }
+    .hp-tabs    { flex-direction: column; }
     .hp-tab-btn { width: 100%; justify-content: center; }
   }
 
@@ -318,7 +302,7 @@ const GLOBAL_CSS = `
     font-size: clamp(0.70rem, 1.8vw, 0.78rem); font-weight: 400;
     letter-spacing: 0.06em; text-transform: uppercase;
     padding: clamp(10px, 1.8vw, 12px) clamp(14px, 2.8vw, 22px);
-    min-height: 44px; /* cible tactile */
+    min-height: 44px;
   }
 
   .hp-annonces-head {
@@ -336,7 +320,6 @@ const GLOBAL_CSS = `
     text-transform: uppercase; font-weight: 400; transition: 0.2s; white-space: nowrap; flex-shrink: 0;
   }
 
-  /* ─── Empty state ─── */
   .hp-empty {
     text-align: center; padding: clamp(32px, 7vw, 72px) clamp(16px, 4vw, 40px); border-radius: 16px;
   }
@@ -370,8 +353,8 @@ const Eyebrow = ({ children }) => (
 );
 
 const PageSkeleton = () => (
-  <div style={{ minHeight:'100vh', background:'#0A0C0F' }}>
-    <div style={{ height:'100vh', background:'linear-gradient(160deg,#0D1520,#080B0E)' }} />
+  <div style={{ minHeight: '100vh', background: '#0A0C0F' }}>
+    <div style={{ height: '100vh', background: 'linear-gradient(160deg,#0D1520,#080B0E)' }} />
   </div>
 );
 
@@ -389,7 +372,7 @@ const Ticker = () => {
         {[...items, ...items].map((item, i) => (
           <span key={i} className="hp-ticker-item">
             {item}
-            <span style={{ width:'4px', height:'4px', borderRadius:'50%', background:'rgba(10,12,15,0.32)', flexShrink:0 }} />
+            <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'rgba(10,12,15,0.32)', flexShrink: 0 }} />
           </span>
         ))}
       </div>
@@ -445,251 +428,299 @@ const HomePage = () => {
   if (isLoading) return <PageSkeleton />;
 
   return (
-    <div className="hp-root">
+    <>
+      {/* ══ SEO ══ */}
+      <Helmet>
+        <title>Altitude Vision — Immobilier, Événements & Communication à Brazzaville</title>
+        <meta
+          name="description"
+          content="Agence multidisciplinaire à Brazzaville. Trouvez votre bien immobilier avec Altimmo, organisez vos événements avec Mila Events, et boostez votre communication avec Altcom."
+        />
+        <meta name="robots"        content="index, follow" />
+        <link rel="canonical"      href="https://altitudevision.agency/" />
 
-      {/* ══ HERO ══ */}
-      <header style={{ position:'relative', height:'100svh', minHeight:'560px', overflow:'hidden' }}>
-        <HeroSlider />
-      </header>
+        {/* Open Graph */}
+        <meta property="og:type"        content="website" />
+        <meta property="og:url"         content="https://altitudevision.agency/" />
+        <meta property="og:title"       content="Altitude Vision — Immobilier, Événements & Communication à Brazzaville" />
+        <meta property="og:description" content="Agence multidisciplinaire à Brazzaville. Immobilier, événementiel haut de gamme et stratégie de communication." />
+        <meta property="og:image"       content="https://altitudevision.agency/og-default.jpg" />
+        <meta property="og:locale"      content="fr_CG" />
+        <meta property="og:site_name"   content="Altitude Vision" />
 
-      {/* ══ TICKER ══ */}
-      <Ticker />
+        {/* Twitter Card */}
+        <meta name="twitter:card"        content="summary_large_image" />
+        <meta name="twitter:title"       content="Altitude Vision — Brazzaville" />
+        <meta name="twitter:description" content="Immobilier, événementiel et communication à Brazzaville." />
+        <meta name="twitter:image"       content="https://altitudevision.agency/og-default.jpg" />
 
-      {/* ══ STATS ══ */}
-      <div className="hp-stats-grid">
-        {[
-          { num:'3',    label:"Pôles d'expertise",    color:'#C8872A' },
-          { num:'150+', label:'Biens immobiliers',    color:'#2E7BB5' },
-          { num:'80+',  label:'Événements organisés', color:'#D42B2B' },
-          { num:'∞',    label:'Possibilités',         color:'#C8872A' },
-        ].map((stat, i) => (
-          <FadeIn key={i} delay={i * 0.07} y={14}>
-            <div className="hp-stat-item">
-              <div className="hp-stat-num" style={{ color:stat.color }}>{stat.num}</div>
-              <div className="hp-stat-label">{stat.label}</div>
-            </div>
-          </FadeIn>
-        ))}
-      </div>
+        {/* Schema.org LocalBusiness */}
+        <script type="application/ld+json">{LOCAL_BUSINESS_SCHEMA}</script>
+      </Helmet>
 
-      {/* ══ PÔLES ══ */}
-      <section className="hp-section">
-        <div className="hp-container">
-          <FadeIn>
-            <div style={{ marginBottom:'clamp(28px,5vw,64px)' }}>
-              <Eyebrow>Notre Expertise</Eyebrow>
-              <h2 className="hp-h2">
-                Trois pôles,{' '}
-                <em style={{ fontStyle:'italic', color:'#C8872A' }}>une seule vision</em>
-              </h2>
-            </div>
-          </FadeIn>
+      <div className="hp-root">
 
-          <div className="hp-poles-grid">
-            {poles.map((pole, i) => {
-              const Icon = pole.icon;
-              return (
-                <FadeIn key={pole.id} delay={i * 0.09} y={26}>
-                  <div className="hp-pole-card" style={{ '--pole-bg': pole.colorLight }}>
-                    <div className="hp-pole-accent" style={{
-                      position:'absolute', top:0, left:0, right:0, height:'2px',
-                      background:pole.color, opacity:0, transition:'0.3s',
-                    }} />
-                    <span className="hp-pole-num">{pole.num}</span>
-                    <div className="hp-pole-icon-wrap" style={{
-                      background:pole.colorLight, border:`1px solid ${pole.colorBorder}`,
-                    }}>
-                      <Icon size={17} style={{ color:pole.color }} />
+        {/* ══ HERO ══ */}
+        <header style={{ position: 'relative', height: '100svh', minHeight: '560px', overflow: 'hidden' }}>
+          <HeroSlider />
+        </header>
+
+        {/* ══ TICKER ══ */}
+        <Ticker />
+
+        {/* ══ STATS ══ */}
+        <div className="hp-stats-grid">
+          {[
+            { num: '3',    label: "Pôles d'expertise",    color: '#C8872A' },
+            { num: '150+', label: 'Biens immobiliers',    color: '#2E7BB5' },
+            { num: '80+',  label: 'Événements organisés', color: '#D42B2B' },
+            { num: '5+',   label: 'Années d\'expérience', color: '#C8872A' },
+          ].map((stat, i) => (
+            <FadeIn key={i} delay={i * 0.07} y={14}>
+              <div className="hp-stat-item">
+                <div className="hp-stat-num" style={{ color: stat.color }}>{stat.num}</div>
+                <div className="hp-stat-label">{stat.label}</div>
+              </div>
+            </FadeIn>
+          ))}
+        </div>
+
+        {/* ══ PÔLES ══ */}
+        <section className="hp-section" aria-labelledby="poles-heading">
+          <div className="hp-container">
+            <FadeIn>
+              <div style={{ marginBottom: 'clamp(28px,5vw,64px)' }}>
+                <Eyebrow>Notre Expertise</Eyebrow>
+                <h2 id="poles-heading" className="hp-h2">
+                  Trois pôles,{' '}
+                  <em style={{ fontStyle: 'italic', color: '#C8872A' }}>une seule vision</em>
+                </h2>
+              </div>
+            </FadeIn>
+
+            <div className="hp-poles-grid">
+              {poles.map((pole, i) => {
+                const Icon = pole.icon;
+                return (
+                  <FadeIn key={pole.id} delay={i * 0.09} y={26}>
+                    <div className="hp-pole-card" style={{ '--pole-bg': pole.colorLight }}>
+                      <div className="hp-pole-accent" style={{
+                        position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
+                        background: pole.color, opacity: 0, transition: '0.3s',
+                      }} />
+                      <span className="hp-pole-num">{pole.num}</span>
+                      <div className="hp-pole-icon-wrap" style={{
+                        background: pole.colorLight, border: `1px solid ${pole.colorBorder}`,
+                      }}>
+                        <Icon size={17} style={{ color: pole.color }} aria-hidden="true" />
+                      </div>
+                      <h3 className="hp-pole-name">{pole.name}</h3>
+                      <p className="hp-pole-tag" style={{ color: pole.color }}>{pole.tag}</p>
+                      <div className="hp-pole-sep" />
+                      <p className="hp-pole-desc">{pole.description}</p>
+                      <Link href={pole.pageroute} className="hp-pole-link" style={{ color: pole.color }}>
+                        Découvrir <ArrowRight size={12} />
+                      </Link>
                     </div>
-                    <h3 className="hp-pole-name">{pole.name}</h3>
-                    <p className="hp-pole-tag" style={{ color:pole.color }}>{pole.tag}</p>
-                    <div className="hp-pole-sep" />
-                    <p className="hp-pole-desc">{pole.description}</p>
-                    <Link href={pole.pageroute} className="hp-pole-link" style={{ color:pole.color }}>
-                      Découvrir <ArrowRight size={12} />
-                    </Link>
-                  </div>
-                </FadeIn>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <div className="hp-divider" />
-
-      {/* ══ À PROPOS ══ */}
-      <section className="hp-section">
-        <div className="hp-container">
-          <div className="hp-about-grid">
-
-            <FadeIn x={-20}>
-              <Eyebrow>À propos</Eyebrow>
-              <h2 className="hp-h2" style={{ marginBottom:'clamp(14px,2.5vw,20px)' }}>
-                Qui sommes-<em style={{ fontStyle:'italic', color:'#C8872A' }}>nous ?</em>
-              </h2>
-              <p className="hp-about-p" style={{ color:'rgba(232,228,220,0.5)', marginBottom:'12px' }}>
-                <span style={{ color:'#E8E4DC', fontWeight:400 }}>Altitude-Vision</span>{' '}
-                est une agence multidisciplinaire basée à Brazzaville. Nos trois pôles travaillent en synergie pour vous offrir visibilité et résultats concrets.
-              </p>
-              <p className="hp-about-p" style={{ color:'rgba(232,228,220,0.34)', marginBottom:'clamp(20px,4vw,32px)' }}>
-                Immobilier de prestige, événementiel haut de gamme ou stratégie de communication — une seule agence suffit.
-              </p>
-              <div style={{ display:'flex', flexDirection:'column', gap:'10px', marginBottom:'clamp(22px,4vw,34px)' }}>
-                {[
-                  { icon:MapPin, text:'Brazzaville, République du Congo' },
-                  { icon:Phone,  text:'+242 06 800 21 51' },
-                  { icon:Mail,   text:'contact@altitudevision.agency' },
-                ].map(({ icon:Icon, text }, i) => (
-                  <div key={i} className="hp-contact-row">
-                    <Icon size={12} style={{ color:'#C8872A', flexShrink:0 }} />
-                    {text}
-                  </div>
-                ))}
-              </div>
-              <Link href="/contact" className="hp-btn-primary">
-                Nous contacter <ArrowRight size={12} />
-              </Link>
-            </FadeIn>
-
-            <FadeIn x={20} delay={0.1}>
-              <div style={{ position:'relative', borderRadius:'20px', overflow:'hidden' }}>
-                <img
-                  src="https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1200&auto=format&fit=crop"
-                  alt="Équipe Altitude-Vision en réunion"
-                  width={600}
-                  height={420}
-                  style={{
-                    width:'100%', height:'clamp(280px,35vw,420px)',
-                    objectFit:'cover', display:'block',
-                    borderRadius:'20px',
-                  }}
-                />
-                {/* Overlay dégradé bas */}
-                <div style={{
-                  position:'absolute', inset:0,
-                  background:'linear-gradient(to top, rgba(10,12,15,0.65) 0%, transparent 55%)',
-                  borderRadius:'20px',
-                }} />
-                {/* Badge flottant */}
-                <div style={{
-                  position:'absolute', bottom:'20px', left:'20px', right:'20px',
-                  display:'flex', alignItems:'center', gap:'12px',
-                  background:'rgba(10,12,15,0.72)', backdropFilter:'blur(12px)',
-                  border:'1px solid rgba(200,135,42,0.25)',
-                  borderRadius:'14px', padding:'12px 16px',
-                }}>
-                  <div style={{
-                    width:'36px', height:'36px', borderRadius:'10px', flexShrink:0,
-                    background:'linear-gradient(135deg, #A0671A, #C8872A)',
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                  }}>
-                    <Briefcase size={16} style={{ color:'#fff' }} />
-                  </div>
-                  <div>
-                    <p style={{ color:'#E8E4DC', fontWeight:500, fontSize:'0.85rem', lineHeight:1.2 }}>
-                      Agence multidisciplinaire
-                    </p>
-                    <p style={{ color:'rgba(232,228,220,0.45)', fontSize:'0.72rem' }}>
-                      Immobilier · Événementiel · Communication
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </FadeIn>
-
-          </div>
-        </div>
-      </section>
-
-      <StatsCounter />
-
-      {/* ══ ANNONCES ══ */}
-      <section className="hp-section" style={{ background:'linear-gradient(to bottom,rgba(17,20,24,0.5),transparent)' }}>
-        <div className="hp-container">
-          <FadeIn>
-            <div style={{ marginBottom:'clamp(22px,4vw,48px)' }}>
-              <Eyebrow>Notre Sélection</Eyebrow>
-              <h2 className="hp-h2">
-                Nos Dernières{' '}
-                <em style={{ fontStyle:'italic', color:'#C8872A' }}>Annonces</em>
-              </h2>
+                  </FadeIn>
+                );
+              })}
             </div>
-          </FadeIn>
-
-          <div className="hp-tabs">
-            {poles.map(pole => {
-              const Icon     = pole.icon;
-              const isActive = activePole === pole.id;
-              return (
-                <motion.button key={pole.id}
-                  onClick={() => setActivePole(pole.id)}
-                  whileTap={{ scale: 0.96 }}
-                  className="hp-tab-btn"
-                  style={{
-                    border:     isActive ? 'none' : `1px solid ${pole.colorBorder}`,
-                    background: isActive ? pole.gradient : 'transparent',
-                    color:      isActive ? '#fff' : pole.color,
-                    boxShadow:  isActive ? `0 4px 20px ${pole.color}28` : 'none',
-                  }}
-                  aria-pressed={isActive}>
-                  <Icon size={13} aria-hidden="true" /> {pole.name}
-                </motion.button>
-              );
-            })}
           </div>
+        </section>
 
-          <AnimatePresence mode="wait">
-            <motion.div key={activePole}
-              initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-              exit={{ opacity:0, y:-8 }} transition={{ duration:0.28 }}>
+        <div className="hp-divider" />
 
-              <div className="hp-annonces-head">
-                <div className="hp-annonces-head-left">
-                  <div style={{ width:'2px', height:'20px', borderRadius:'1px', background:activePoleData?.color, flexShrink:0 }} />
-                  <h3 className="hp-annonces-title">{activePoleData?.name}</h3>
+        {/* ══ À PROPOS ══ */}
+        <section className="hp-section" aria-labelledby="about-heading">
+          <div className="hp-container">
+            <div className="hp-about-grid">
+
+              <FadeIn x={-20}>
+                <Eyebrow>À propos</Eyebrow>
+                <h2 id="about-heading" className="hp-h2" style={{ marginBottom: 'clamp(14px,2.5vw,20px)' }}>
+                  Qui sommes-<em style={{ fontStyle: 'italic', color: '#C8872A' }}>nous ?</em>
+                </h2>
+                <p className="hp-about-p" style={{ color: 'rgba(232,228,220,0.5)', marginBottom: '12px' }}>
+                  <span style={{ color: '#E8E4DC', fontWeight: 400 }}>Altitude-Vision</span>{' '}
+                  est une agence multidisciplinaire basée à Brazzaville. Nos trois pôles travaillent en synergie pour vous offrir visibilité et résultats concrets.
+                </p>
+                <p className="hp-about-p" style={{ color: 'rgba(232,228,220,0.34)', marginBottom: 'clamp(20px,4vw,32px)' }}>
+                  Immobilier de prestige, événementiel haut de gamme ou stratégie de communication — une seule agence suffit.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: 'clamp(22px,4vw,34px)' }}>
+                  {[
+                    { icon: MapPin, text: 'Brazzaville, République du Congo' },
+                    { icon: Phone,  text: '+242 06 800 21 51', href: 'tel:+242068002151' },
+                    { icon: Mail,   text: 'contact@altitudevision.agency', href: 'mailto:contact@altitudevision.agency' },
+                  ].map(({ icon: Icon, text, href }, i) => (
+                    <div key={i} className="hp-contact-row">
+                      <Icon size={12} style={{ color: '#C8872A', flexShrink: 0 }} aria-hidden="true" />
+                      {href
+                        ? <a href={href} style={{ color: 'inherit', textDecoration: 'none' }}>{text}</a>
+                        : text
+                      }
+                    </div>
+                  ))}
                 </div>
-                <Link href={activePoleData?.route} className="hp-see-all" style={{ color:activePoleData?.color }}>
-                  Voir tout <ArrowRight size={12} />
+                <Link to="/contact" className="hp-btn-primary">
+                  Nous contacter <ArrowRight size={12} />
                 </Link>
-              </div>
+              </FadeIn>
 
-              {activePoleItems.length > 0 ? (
-                <HomeSlider
-                  properties={activePoleItems}
-                  isEvent={activePole === 'MilaEvents'}
-                  isPortfolio={activePole === 'Altcom'}
-                />
-              ) : (
-                <div className="hp-empty" style={{
-                  border:`1px dashed ${activePoleData?.colorBorder}`,
-                  background:activePoleData?.colorLight,
-                }}>
-                  <div className="hp-empty-icon" style={{ background:activePoleData?.gradient }}>
-                    {activePoleData && <activePoleData.icon size={20} color="#fff" aria-hidden="true" />}
+              <FadeIn x={20} delay={0.1}>
+                <div style={{ position: 'relative', borderRadius: '20px', overflow: 'hidden' }}>
+                  {/*
+                    ⚠️  REMPLACER cette image Unsplash par une vraie photo de votre équipe.
+                    Cela renforcera la confiance et l'authenticité pour vos prospects.
+                  */}
+                  <img
+                    src="https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1200&auto=format&fit=crop"
+                    alt="L'équipe Altitude Vision en réunion à Brazzaville"
+                    width={600}
+                    height={420}
+                    loading="lazy"
+                    style={{
+                      width: '100%', height: 'clamp(280px,35vw,420px)',
+                      objectFit: 'cover', display: 'block',
+                      borderRadius: '20px',
+                    }}
+                  />
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(to top, rgba(10,12,15,0.65) 0%, transparent 55%)',
+                    borderRadius: '20px',
+                  }} />
+                  <div style={{
+                    position: 'absolute', bottom: '20px', left: '20px', right: '20px',
+                    display: 'flex', alignItems: 'center', gap: '12px',
+                    background: 'rgba(10,12,15,0.72)', backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(200,135,42,0.25)',
+                    borderRadius: '14px', padding: '12px 16px',
+                  }}>
+                    <div style={{
+                      width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
+                      background: 'linear-gradient(135deg, #A0671A, #C8872A)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Briefcase size={16} style={{ color: '#fff' }} aria-hidden="true" />
+                    </div>
+                    <div>
+                      <p style={{ color: '#E8E4DC', fontWeight: 500, fontSize: '0.85rem', lineHeight: 1.2 }}>
+                        Agence multidisciplinaire
+                      </p>
+                      <p style={{ color: 'rgba(232,228,220,0.45)', fontSize: '0.72rem' }}>
+                        Immobilier · Événementiel · Communication
+                      </p>
+                    </div>
                   </div>
-                  <p className="hp-empty-title">Aucune annonce disponible</p>
-                  <p className="hp-empty-sub">
-                    Les nouvelles annonces pour {activePoleData?.name} arrivent bientôt
-                  </p>
                 </div>
-              )}
+              </FadeIn>
 
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </section>
+            </div>
+          </div>
+        </section>
 
-      <WhyChooseUs />
-      <FacebookFeed />
-      <Testimonials />
+        <StatsCounter />
 
-      <section className="hp-section">
-        <div className="hp-container">
-          <CtaCommission />
-        </div>
-      </section>
-    </div>
+        {/* ══ ANNONCES ══ */}
+        <section
+          className="hp-section"
+          aria-labelledby="annonces-heading"
+          style={{ background: 'linear-gradient(to bottom,rgba(17,20,24,0.5),transparent)' }}
+        >
+          <div className="hp-container">
+            <FadeIn>
+              <div style={{ marginBottom: 'clamp(22px,4vw,48px)' }}>
+                <Eyebrow>Notre Sélection</Eyebrow>
+                <h2 id="annonces-heading" className="hp-h2">
+                  Nos Dernières{' '}
+                  <em style={{ fontStyle: 'italic', color: '#C8872A' }}>Annonces</em>
+                </h2>
+              </div>
+            </FadeIn>
+
+            <div className="hp-tabs" role="tablist" aria-label="Filtrer les annonces par pôle">
+              {poles.map(pole => {
+                const Icon     = pole.icon;
+                const isActive = activePole === pole.id;
+                return (
+                  <motion.button
+                    key={pole.id}
+                    onClick={() => setActivePole(pole.id)}
+                    whileTap={{ scale: 0.96 }}
+                    className="hp-tab-btn"
+                    role="tab"
+                    aria-selected={isActive}
+                    style={{
+                      border:     isActive ? 'none' : `1px solid ${pole.colorBorder}`,
+                      background: isActive ? pole.gradient : 'transparent',
+                      color:      isActive ? '#fff' : pole.color,
+                      boxShadow:  isActive ? `0 4px 20px ${pole.color}28` : 'none',
+                    }}
+                  >
+                    <Icon size={13} aria-hidden="true" /> {pole.name}
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activePole}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.28 }}
+                role="tabpanel"
+              >
+                <div className="hp-annonces-head">
+                  <div className="hp-annonces-head-left">
+                    <div style={{ width: '2px', height: '20px', borderRadius: '1px', background: activePoleData?.color, flexShrink: 0 }} />
+                    <h3 className="hp-annonces-title">{activePoleData?.name}</h3>
+                  </div>
+                  <Link to={activePoleData?.route} className="hp-see-all" style={{ color: activePoleData?.color }}>
+                    Voir tout <ArrowRight size={12} />
+                  </Link>
+                </div>
+
+                {activePoleItems.length > 0 ? (
+                  <HomeSlider
+                    properties={activePoleItems}
+                    isEvent={activePole === 'MilaEvents'}
+                    isPortfolio={activePole === 'Altcom'}
+                  />
+                ) : (
+                  <div className="hp-empty" style={{
+                    border: `1px dashed ${activePoleData?.colorBorder}`,
+                    background: activePoleData?.colorLight,
+                  }}>
+                    <div className="hp-empty-icon" style={{ background: activePoleData?.gradient }}>
+                      {activePoleData && <activePoleData.icon size={20} color="#fff" aria-hidden="true" />}
+                    </div>
+                    <p className="hp-empty-title">Aucune annonce disponible</p>
+                    <p className="hp-empty-sub">
+                      Les nouvelles annonces pour {activePoleData?.name} arrivent bientôt
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </section>
+
+        <WhyChooseUs />
+        <FacebookFeed />
+        <Testimonials />
+
+        <section className="hp-section">
+          <div className="hp-container">
+            <CtaCommission />
+          </div>
+        </section>
+
+      </div>
+    </>
   );
 };
 

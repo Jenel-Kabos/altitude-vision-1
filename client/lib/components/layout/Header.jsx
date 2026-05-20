@@ -215,8 +215,8 @@ const Header = () => {
 
         {/* NAV TABLETTE */}
         {isTablet && (
-          <nav style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-            {NAV_LINKS.slice(0, 4).map(({ to, label }) => {
+          <nav style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+            {NAV_LINKS.map(({ to, label }) => {
               const active = isNavLinkActive(pathname, to);
               return (
                 <Link key={to} href={to} style={{

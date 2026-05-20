@@ -10,6 +10,7 @@ import {
   Phone, Clock, Scale, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import CommentList from '../components/comments/CommentList';
+import Breadcrumb from '../components/Breadcrumb';
 
 // ─── Design tokens ─────────────────────────────────────────────
 const BLUE      = '#2E7BB5';
@@ -635,11 +636,11 @@ const PropertyDetailPage = () => {
       {/* ── Nav ── */}
       <div className="pdp-nav">
         <div className="pdp-nav-inner">
-          <Link href="/altimmo/annonces" className="pdp-nav-back">
-            <ArrowLeft size={12} /> Annonces
-          </Link>
-          <span className="pdp-nav-sep">—</span>
-          <span className="pdp-nav-title">{property.title}</span>
+          <Breadcrumb items={[
+            { label: 'Altimmo',   href: '/altimmo' },
+            { label: 'Annonces',  href: '/altimmo/annonces' },
+            { label: property.title },
+          ]} />
         </div>
       </div>
 

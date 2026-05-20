@@ -17,6 +17,14 @@ export default {
         display: ["Cormorant Garamond", "Georgia", "serif"],
         body: ["DM Sans", "-apple-system", "sans-serif"],
       },
+      borderRadius: {
+        DEFAULT: "8px",
+        lg:      "16px",
+        full:    "9999px",
+      },
+      fontSize: {
+        section: ["clamp(1.5rem, 4vw, 2.5rem)", { lineHeight: "1.2" }],
+      },
     },
   },
   plugins: [],

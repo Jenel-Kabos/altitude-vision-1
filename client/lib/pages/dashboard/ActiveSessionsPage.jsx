@@ -3,8 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { ShieldCheck, User, Trash2, Globe, Clock, Mail } from 'lucide-react';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import toast from 'react-hot-toast';
 
 // ✅ URL de l'API (Prod ou Dev)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api';

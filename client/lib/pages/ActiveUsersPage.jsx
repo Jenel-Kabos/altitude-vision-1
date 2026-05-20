@@ -3,7 +3,7 @@
 // src/pages/ActiveUsersPage.jsx (NOUVEAU FICHIER)
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { ToastContainer, toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { RotateCcw, Ban } from 'lucide-react'; 
 
 const BASE_API_URL = 'https://altitude-vision.onrender.com/api/admin/owners'; 
@@ -86,7 +86,6 @@ const ActiveUsersPage = () => {
 
     return (
         <div className="p-6 bg-white rounded-lg shadow">
-            <ToastContainer />
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-800">Sessions Actives ({activeUsers.length})</h1>
                 <button

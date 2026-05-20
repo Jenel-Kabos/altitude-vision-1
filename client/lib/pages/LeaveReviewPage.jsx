@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Star, Send, Loader2, ArrowLeft, Building2, Calendar, Briefcase } from 'lucide-react';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { createReview } from '../services/reviewService';
 import { useAuth } from '../context/AuthContext';
 

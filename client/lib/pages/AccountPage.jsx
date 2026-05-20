@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from '../context/AuthContext';
 import { updateMe, updateMyPassword } from "../services/userService";
-import { Toaster, toast } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     User, Mail, Lock, Save, AlertTriangle,
@@ -365,11 +365,6 @@ console.log('🔍 res.user.photo:', res.user?.photo);
 
     return (
         <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
-            <Toaster position="top-right" toastOptions={{
-                style: { fontFamily: "'Outfit', sans-serif", borderRadius: '16px', fontSize: '14px' },
-                success: { iconTheme: { primary: BLUE, secondary: '#fff' } },
-            }} />
-
             {/* ── Hero ─────────────────────────────────────── */}
             <div className="relative py-16 text-white overflow-hidden"
                 style={{ background: `linear-gradient(135deg, #0D1117 0%, #0e1e30 60%, #0D1117 100%)` }}>

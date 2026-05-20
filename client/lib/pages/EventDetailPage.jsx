@@ -12,6 +12,7 @@ import { getEventById } from '../services/eventService';
 import { getFirstValidImage } from '../utils/imageUtils';
 // Importation du nouveau composant CommentList
 import CommentList from '../components/comments/CommentList';
+import Breadcrumb from '../components/Breadcrumb';
 
 const EventDetailPage = () => {
   const { eventId } = useParams();
@@ -146,16 +147,21 @@ const EventDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Bouton retour */}
+      {/* Breadcrumb + retour */}
       <div className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
           <button
             onClick={() => router.push('/mila-events')}
             className="flex items-center text-gray-600 hover:text-blue-600 transition font-semibold"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Retour aux événements
+            Retour
           </button>
+          <Breadcrumb items={[
+            { label: 'Mila Events',  href: '/mila-events' },
+            { label: 'Événements',   href: '/mila-events/annonces' },
+            { label: event?.title ?? 'Événement' },
+          ]} />
         </div>
       </div>
 

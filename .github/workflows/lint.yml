@@ -1,0 +1,60 @@
+name: Lint & Format Check
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+        directory: [server, client]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: '${{ matrix.directory }}/package-lock.json'
+
+      - name: Install dependencies (${{ matrix.directory }})
+        run: |
+          cd ${{ matrix.directory }}
+          npm install
+
+      - name: Run ESLint (${{ matrix.directory }})
+        run: |
+          cd ${{ matrix.directory }}
+          npm run lint
+
+      - name: Check format with Prettier (${{ matrix.directory }})
+        run: |
+          cd ${{ matrix.directory }}
+          npx prettier --check "**/*.{js,jsx,json,css,md}"
+
+  type-check:
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Comment if TypeScript needed
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '💡 **Tip**: Consider adding TypeScript for better type safety!'
+            })

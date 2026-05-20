@@ -20,7 +20,7 @@
   --dark2:       #111418;
   --dark3:       #181C22;
   --text:        #E8E4DC;
-  --muted:       rgba(232,228,220,0.45);
+  --muted:       rgba(232,228,220,0.55);
   --faint:       rgba(232,228,220,0.2);
   --border:      rgba(232,228,220,0.07);
   --font-display:'Cormorant Garamond', Georgia, serif;
@@ -45,7 +45,7 @@ html {
 body {
   font-family: var(--font-body);
   font-size: 16px;
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1.6;
   color: var(--text);
   background: var(--dark);
@@ -119,6 +119,19 @@ img { max-width: 100%; display: block; }
 }
 
 .animate-pulse-slow { animation: pulse-slow 6s ease-in-out infinite; }
+
+/* ================================================================
+   ACCESSIBILITÉ — REDUCED MOTION
+   ================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* ================================================================
    LEAFLET
