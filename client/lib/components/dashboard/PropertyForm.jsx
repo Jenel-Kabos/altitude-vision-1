@@ -16,7 +16,7 @@ L.Icon.Default.mergeOptions({
 // ✅ Préfixe les URLs relatives avec l'URL du backend.
 // file.path retourne "uploads/events/photo.jpg" (sans slash ni domaine),
 // ce qui n'est pas une URL valide pour <img src="...">.
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api';
 
 const getImageUrl = (url) => {
   if (!url) return null;

@@ -18,7 +18,7 @@ const GOLD  = '#C8872A';
 const BLUE  = '#2E7BB5';
 const RED   = '#D42B2B';
 const ITEMS_PER_PAGE = 10;
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api').replace('/api', '');
 
 const getImageUrl = (imagePath) => {
   if (!imagePath) return 'https://placehold.co/80x80/C8872A/FFFFFF?text=Altcom';

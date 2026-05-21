@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { getPortfolioItem } from '../services/portfolioService';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
+const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api').replace('/api', '');
 
 // 🔧 FONCTION UTILITAIRE POUR CONSTRUIRE L'URL DE L'IMAGE CORRECTEMENT
 const getImageUrl = (imagePath) => {

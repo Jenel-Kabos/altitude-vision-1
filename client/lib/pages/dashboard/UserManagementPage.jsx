@@ -7,7 +7,7 @@ const UserManagementPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null); // pour suppression
-  const API_URL = 'http://localhost:5000/api/admin/owners';
+  const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api'}/admin/owners`;
 
 
   // Récupération des utilisateurs

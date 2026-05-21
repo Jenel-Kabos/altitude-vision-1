@@ -18,7 +18,7 @@ const AdminProjectEditPage = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const backendUrl = import.meta.env.VITE_API_URL.replace('/api', '') || 'http://localhost:5000';
+  const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api').replace('/api', '');
 
   useEffect(() => {
     const fetchProject = async () => {

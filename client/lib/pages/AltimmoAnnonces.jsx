@@ -325,11 +325,11 @@ const AltimmoAnnonces = () => {
 
                                         {/* ✅ Type de bien */}
                                         <div>
-                                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
+                                            <label htmlFor="filter-type" className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}>
                                                 Type de bien
                                             </label>
-                                            <select value={selType} onChange={e => setSelType(e.target.value)}
+                                            <select id="filter-type" value={selType} onChange={e => setSelType(e.target.value)}
                                                 className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none transition-all"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}
                                                 onFocus={inputFocus} onBlur={inputBlur}>
@@ -339,11 +339,11 @@ const AltimmoAnnonces = () => {
 
                                         {/* ✅ Disponibilité — enum BDD */}
                                         <div>
-                                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
+                                            <label htmlFor="filter-avail" className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}>
                                                 Disponibilité
                                             </label>
-                                            <select value={selAvail} onChange={e => setSelAvail(e.target.value)}
+                                            <select id="filter-avail" value={selAvail} onChange={e => setSelAvail(e.target.value)}
                                                 className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none transition-all"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}
                                                 onFocus={inputFocus} onBlur={inputBlur}>
@@ -353,11 +353,11 @@ const AltimmoAnnonces = () => {
 
                                         {/* Tri */}
                                         <div>
-                                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
+                                            <label htmlFor="filter-sort" className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}>
                                                 Trier par
                                             </label>
-                                            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+                                            <select id="filter-sort" value={sortBy} onChange={e => setSortBy(e.target.value)}
                                                 className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none transition-all"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}
                                                 onFocus={inputFocus} onBlur={inputBlur}>

@@ -19,7 +19,7 @@ const GOLD = '#C8872A';
 // ✅ Préfixe les URLs relatives avec l'URL du backend.
 // Le controller sauvegarde les chemins sous la forme "/uploads/events/photo.jpg"
 // (chemin relatif au serveur), pas une URL absolue — il faut donc ajouter le domaine.
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api';
 
 const getImageUrl = (url) => {
   if (!url) return null;

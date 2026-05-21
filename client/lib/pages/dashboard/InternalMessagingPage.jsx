@@ -32,7 +32,7 @@ import {
 import { getAllUsers } from '../../services/userService';
 import { useAuth } from '../../context/AuthContext';
 
-const UPLOAD_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+const UPLOAD_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api').replace('/api', '');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 5;
 
