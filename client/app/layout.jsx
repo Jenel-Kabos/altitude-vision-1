@@ -1,8 +1,24 @@
 import "./globals.css";
+import { Cormorant_Garamond, DM_Sans } from 'next/font/google';
 import AppProviders from "./AppProviders";
 import ClientLayout from "./ClientLayout";
 import JsonLd from "@/lib/components/JsonLd";
 import { buildMetadata, SITE_URL } from "@/lib/seo";
+
+const cormorant = Cormorant_Garamond({
+  subsets: ['latin'],
+  weight: ['300', '400', '600', '700'],
+  style: ['normal', 'italic'],
+  variable: '--font-cormorant',
+  display: 'swap',
+});
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '500'],
+  variable: '--font-dm-sans',
+  display: 'swap',
+});
 
 export const metadata = {
   ...buildMetadata({
@@ -61,7 +77,7 @@ const LOCAL_BUSINESS_SCHEMA = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="fr">
+    <html lang="fr" className={`${cormorant.variable} ${dmSans.variable}`}>
       <body>
         <JsonLd schemas={[LOCAL_BUSINESS_SCHEMA]} />
         <AppProviders>
