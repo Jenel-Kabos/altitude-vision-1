@@ -13,7 +13,7 @@ export default function ClientLayout({ children }) {
   return (
     <>
       {!noHeaderFooter && <Header />}
-      {children}
+      <main id="main-content">{children}</main>
       {!noHeaderFooter && <Footer />}
     </>
   );

@@ -122,7 +122,7 @@ const HERO_CSS = `
   .av-hero-subtitle {
     font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.95rem, 2.5vw, 1.5rem);
-    font-weight: 300; color: rgba(255,255,255,0.65);
+    font-weight: 300; color: rgba(255,255,255,0.85);
     max-width: 600px; line-height: 1.75;
     margin-bottom: 32px;
   }

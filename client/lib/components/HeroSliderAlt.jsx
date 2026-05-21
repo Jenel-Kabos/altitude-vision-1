@@ -142,7 +142,7 @@ const SLIDER_CSS = `
     font-family: 'Outfit', sans-serif;
     font-size: clamp(0.80rem, 1.5vw, 0.88rem);
     font-weight: 300; line-height: 1.65;
-    color: rgba(245,242,238,0.58);
+    color: rgba(245,242,238,0.78);
     margin-bottom: clamp(8px, 1.4vw, 14px);
     display: -webkit-box;
     -webkit-line-clamp: 2;

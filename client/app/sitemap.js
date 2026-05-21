@@ -4,7 +4,13 @@ const API = process.env.NEXT_PUBLIC_API_URL;
 
 async function fetchIds(path, selector) {
   try {
-    const res = await fetch(`${API}${path}`, { next: { revalidate: 3600 } });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`${API}${path}`, {
+      next:   { revalidate: 3600 },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
     if (!res.ok) return [];
     const json = await res.json();
     return selector(json) || [];

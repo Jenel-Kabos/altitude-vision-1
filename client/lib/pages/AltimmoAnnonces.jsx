@@ -51,12 +51,12 @@ const Pagination = ({ totalPages, currentPage, onPageChange }) => {
     if (totalPages <= 1) return null;
     return (
         <div className="flex justify-center items-center gap-2 mt-12">
-            <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}
+            <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} aria-label="Page précédente"
                 className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center disabled:opacity-30 hover:bg-gray-50 transition-all">
                 <ChevronLeft className="w-4 h-4 text-gray-500" />
             </button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                <button key={p} onClick={() => onPageChange(p)}
+                <button key={p} onClick={() => onPageChange(p)} aria-label={`Page ${p}`} aria-current={p === currentPage ? 'page' : undefined}
                     className="min-w-[36px] h-9 px-3 rounded-full font-semibold text-sm transition-all"
                     style={{
                         background: p === currentPage ? `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` : 'white',
@@ -68,7 +68,7 @@ const Pagination = ({ totalPages, currentPage, onPageChange }) => {
                     {p}
                 </button>
             ))}
-            <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}
+            <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} aria-label="Page suivante"
                 className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center disabled:opacity-30 hover:bg-gray-50 transition-all">
                 <ChevronRight className="w-4 h-4 text-gray-500" />
             </button>
@@ -253,12 +253,13 @@ const AltimmoAnnonces = () => {
                         <div className="relative flex-1">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <input type="text" placeholder="Rechercher un bien, une ville, un quartier..."
+                                aria-label="Rechercher un bien, une ville, un quartier"
                                 value={searchTerm} onChange={e => setSearch(e.target.value)}
                                 className="w-full pl-11 pr-10 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none focus:bg-white transition-all placeholder-gray-400"
                                 style={{ fontFamily: "'Outfit', sans-serif" }}
                                 onFocus={inputFocus} onBlur={inputBlur} />
                             {searchTerm && (
-                                <button onClick={() => setSearch('')}
+                                <button onClick={() => setSearch('')} aria-label="Effacer la recherche"
                                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 transition-colors">
                                     <X className="w-3.5 h-3.5 text-gray-400" />
                                 </button>
@@ -281,8 +282,8 @@ const AltimmoAnnonces = () => {
                                 )}
                             </button>
                             <div className="flex bg-gray-100 rounded-2xl p-1 gap-1">
-                                {[{ mode: 'grid', Icon: Grid3x3 }, { mode: 'list', Icon: List }].map(({ mode, Icon }) => (
-                                    <button key={mode} onClick={() => setViewMode(mode)}
+                                {[{ mode: 'grid', Icon: Grid3x3, label: 'Vue grille' }, { mode: 'list', Icon: List, label: 'Vue liste' }].map(({ mode, Icon, label }) => (
+                                    <button key={mode} onClick={() => setViewMode(mode)} aria-label={label} aria-pressed={viewMode === mode}
                                         className="p-2 rounded-xl transition-all"
                                         style={{ background: viewMode === mode ? 'white' : 'transparent', boxShadow: viewMode === mode ? '0 1px 4px rgba(0,0,0,0.1)' : 'none' }}>
                                         <Icon className="w-4 h-4 text-gray-600" />
@@ -376,14 +377,14 @@ const AltimmoAnnonces = () => {
                                                 Fourchette de prix (FCFA)
                                             </label>
                                             <div className="flex gap-3 items-center">
-                                                <input type="number" placeholder="Prix min"
+                                                <input type="number" placeholder="Prix min" aria-label="Prix minimum (FCFA)"
                                                     value={priceRange.min}
                                                     onChange={e => setPriceRange(p => ({ ...p, min: e.target.value }))}
                                                     className="flex-1 px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm focus:outline-none transition-all"
                                                     style={{ fontFamily: "'Outfit', sans-serif" }}
                                                     onFocus={inputFocus} onBlur={inputBlur} />
-                                                <span className="text-gray-400 font-bold">—</span>
-                                                <input type="number" placeholder="Prix max"
+                                                <span className="text-gray-400 font-bold" aria-hidden="true">—</span>
+                                                <input type="number" placeholder="Prix max" aria-label="Prix maximum (FCFA)"
                                                     value={priceRange.max}
                                                     onChange={e => setPriceRange(p => ({ ...p, max: e.target.value }))}
                                                     className="flex-1 px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm focus:outline-none transition-all"
