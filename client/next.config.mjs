@@ -14,7 +14,7 @@ const CSP = [
   "img-src 'self' data: blob: https://images.unsplash.com https://altitude-vision.onrender.com https://res.cloudinary.com https://graph.facebook.com https://*.fbcdn.net https://platform-lookaside.fbsbx.com https://ui-avatars.com https://placehold.co https://illustrations.popsy.co",
   // API calls + Facebook feed data
   "connect-src 'self' https://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com",
-  "frame-src 'none'",
+  "frame-src https://www.google.com https://maps.google.com https://maps.googleapis.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
