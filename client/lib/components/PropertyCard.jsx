@@ -44,10 +44,8 @@ const STATUS_LABEL = { vente: 'Vente', location: 'Location' };
 
 // ─── Styles injectés une seule fois ─────────────────────────
 const CARD_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap');
-
   .pcard-root {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     --gold: #C8872A;
     --gold-light: #E8B86D;
     --gold-pale: rgba(200,135,42,0.08);
@@ -125,7 +123,7 @@ const CARD_STYLES = `
   .pcard-badge {
     position: absolute;
     top: 16px; right: 16px;
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.55rem, 0.9vw, 0.7rem);
     font-weight: 500;
     letter-spacing: 0.15em;
@@ -143,7 +141,7 @@ const CARD_STYLES = `
   .pcard-price {
     position: absolute;
     bottom: 18px; left: 20px;
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-cormorant), serif;
     font-size: clamp(1.2rem, 1.8vw, 1.8rem);
     font-weight: 500;
     color: #fff;
@@ -151,7 +149,7 @@ const CARD_STYLES = `
     text-shadow: 0 1px 8px rgba(0,0,0,0.4);
   }
   .pcard-price span {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: 11px;
     font-weight: 400;
     letter-spacing: 0.12em;
@@ -182,7 +180,7 @@ const CARD_STYLES = `
   }
 
   .pcard-type {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.55rem, 0.9vw, 0.7rem);
     font-weight: 500;
     letter-spacing: 0.2em;
@@ -193,7 +191,7 @@ const CARD_STYLES = `
   }
 
   .pcard-title {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-cormorant), serif;
     font-size: clamp(1rem, 1.5vw, 1.5rem);
     font-weight: 500;
     color: var(--ink);
@@ -271,7 +269,7 @@ const CARD_STYLES = `
     margin-bottom: 16px;
   }
   .pcard-tag {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.55rem, 0.9vw, 0.7rem);
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -308,7 +306,7 @@ const CARD_STYLES = `
   /* ✅ CORRECTION ZONE TACTILE : padding-block assure 44px de hauteur cliquable
      sans changer l'apparence visuelle du texte */
   .pcard-cta {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.58rem, 0.9vw, 0.75rem);
     font-weight: 600;
     letter-spacing: 0.18em;
@@ -381,7 +379,7 @@ const CARD_STYLES = `
     flex: 1;
   }
   .pcard-list-price {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-cormorant), serif;
     font-size: 28px;
     font-weight: 500;
     color: var(--ink);
@@ -389,7 +387,7 @@ const CARD_STYLES = `
     margin-bottom: 4px;
   }
   .pcard-list-price span {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: 12px;
     color: var(--ink-soft); /* ✅ fixed via --ink-soft var */
     letter-spacing: 0.1em;

@@ -122,9 +122,8 @@ const MessagesPage = () => {
     });
 
     return (
-        <div style={{ minHeight: '100vh', background: C.bg, fontFamily: "'DM Sans', sans-serif", paddingTop: '72px' }}>
+        <div style={{ minHeight: '100vh', background: C.bg, fontFamily: "var(--font-dm-sans), sans-serif", paddingTop: '72px' }}>
             <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Cormorant+Garamond:wght@500;600;700&display=swap');
                 * { box-sizing: border-box; }
                 ::-webkit-scrollbar { width: 4px; }
                 ::-webkit-scrollbar-track { background: transparent; }
@@ -139,7 +138,7 @@ const MessagesPage = () => {
                 <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
                     style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                        <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1.6rem,3vw,2.2rem)', fontWeight: 700, color: C.text, margin: 0, lineHeight: 1.1 }}>
+                        <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 'clamp(1.6rem,3vw,2.2rem)', fontWeight: 700, color: C.text, margin: 0, lineHeight: 1.1 }}>
                             Messagerie
                         </h1>
                         <p style={{ fontSize: '0.78rem', color: C.textMuted, margin: '4px 0 0', fontWeight: 300 }}>
@@ -199,7 +198,7 @@ const MessagesPage = () => {
                                         width: '100%', padding: '10px 14px 10px 36px',
                                         background: C.surfaceHi, border: `1px solid ${C.border}`,
                                         borderRadius: 14, color: C.text, fontSize: '0.82rem',
-                                        fontFamily: "'DM Sans', sans-serif",
+                                        fontFamily: "var(--font-dm-sans), sans-serif",
                                         transition: 'border-color 0.2s',
                                     }}
                                     onFocus={e => e.target.style.borderColor = `${C.gold}50`}
@@ -343,7 +342,7 @@ const MessagesPage = () => {
                                 <div style={{ width: 80, height: 80, borderRadius: 24, background: `${C.gold}10`, border: `1px solid ${C.gold}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
                                     <MessageCircle size={36} style={{ color: C.gold, opacity: 0.6 }} />
                                 </div>
-                                <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.5rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
+                                <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: '1.5rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
                                     Vos conversations
                                 </h3>
                                 <p style={{ color: C.textMuted, fontSize: '0.85rem', maxWidth: 280, lineHeight: 1.6, margin: '0 0 28px', fontWeight: 300 }}>
@@ -420,7 +419,7 @@ const NewConversationModal = ({ onClose, onCreated }) => {
                 {/* Header modal */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 24px 16px' }}>
                     <div>
-                        <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.5rem', fontWeight: 700, color: C.text, margin: 0 }}>
+                        <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: '1.5rem', fontWeight: 700, color: C.text, margin: 0 }}>
                             Nouveau message
                         </h3>
                         <p style={{ fontSize: '0.75rem', color: C.textMuted, margin: '4px 0 0', fontWeight: 300 }}>
@@ -454,7 +453,7 @@ const NewConversationModal = ({ onClose, onCreated }) => {
                                 width: '100%', padding: '14px 16px',
                                 background: C.surfaceHi, border: `1px solid ${error ? '#EF4444' : C.border}`,
                                 borderRadius: 16, color: C.text, fontSize: '0.88rem',
-                                fontFamily: "'DM Sans', sans-serif", resize: 'none',
+                                fontFamily: "var(--font-dm-sans), sans-serif", resize: 'none',
                                 lineHeight: 1.6, transition: 'border-color 0.2s',
                             }}
                             onFocus={e => e.target.style.borderColor = `${C.gold}50`}
@@ -472,13 +471,13 @@ const NewConversationModal = ({ onClose, onCreated }) => {
                     {/* Boutons */}
                     <div style={{ display: 'flex', gap: 10, padding: '16px 24px 24px' }}>
                         <button type="button" onClick={onClose}
-                            style={{ flex: 1, padding: '12px', borderRadius: 14, background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                            style={{ flex: 1, padding: '12px', borderRadius: 14, background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', fontFamily: "var(--font-dm-sans), sans-serif" }}>
                             Annuler
                         </button>
                         <motion.button type="submit" disabled={loading || !message.trim()}
                             whileHover={{ scale: (loading || !message.trim()) ? 1 : 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 14, background: (loading || !message.trim()) ? C.surfaceHi : `linear-gradient(135deg,${C.gold},${C.goldLight})`, border: 'none', color: (loading || !message.trim()) ? C.textFaint : '#0A0C0F', fontSize: '0.85rem', fontWeight: 600, cursor: (loading || !message.trim()) ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s', boxShadow: (loading || !message.trim()) ? 'none' : `0 4px 16px ${C.gold}30` }}>
+                            style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 14, background: (loading || !message.trim()) ? C.surfaceHi : `linear-gradient(135deg,${C.gold},${C.goldLight})`, border: 'none', color: (loading || !message.trim()) ? C.textFaint : '#0A0C0F', fontSize: '0.85rem', fontWeight: 600, cursor: (loading || !message.trim()) ? 'not-allowed' : 'pointer', fontFamily: "var(--font-dm-sans), sans-serif", transition: 'all 0.2s', boxShadow: (loading || !message.trim()) ? 'none' : `0 4px 16px ${C.gold}30` }}>
                             {loading
                                 ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Envoi...</>
                                 : <><Send size={16} /> Envoyer</>

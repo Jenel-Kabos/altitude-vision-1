@@ -59,11 +59,9 @@ const priceFormatter = new Intl.NumberFormat('fr-CG', {
    - Typographie : minimum 14px corps, 28px+ titres sur mobile
 ═══════════════════════════════════════════════════════════════ */
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&family=Jost:wght@300;400;500;600&display=swap');
-
   /* ── Reset & Root ── */
   .pdp-root {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     background: ${CREAM};
     min-height: 100vh;
     color: ${INK};
@@ -85,7 +83,7 @@ const STYLES = `
   }
   .pdp-nav-back {
     display: inline-flex; align-items: center; gap: 5px;
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.62rem, 1.5vw, 0.68rem);
     font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase;
     color: ${INK_SOFT}; text-decoration: none; transition: color 0.2s;
@@ -94,7 +92,7 @@ const STYLES = `
   .pdp-nav-back:hover { color: ${GOLD}; }
   .pdp-nav-sep { color: rgba(200,135,42,0.3); font-size: 12px; flex-shrink: 0; }
   .pdp-nav-title {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.62rem, 1.5vw, 0.68rem);
     color: ${INK_SOFT};
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -115,13 +113,13 @@ const STYLES = `
     margin-bottom: clamp(16px, 3vw, 24px);
   }
   .pdp-eyebrow {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.58rem, 1.3vw, 0.62rem);
     font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase;
     color: ${GOLD}; margin-bottom: 8px;
   }
   .pdp-h1 {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-cormorant), serif;
     font-size: clamp(1.9rem, 5vw, 3.2rem);
     font-weight: 600; line-height: 1.08; color: ${INK};
     max-width: 680px;
@@ -166,7 +164,7 @@ const STYLES = `
     padding: clamp(3px, 0.6vw, 5px) clamp(8px, 1.5vw, 12px);
     border-radius: 1px;
     background: rgba(26,22,18,0.65); backdrop-filter: blur(8px);
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.58rem, 1.2vw, 0.62rem);
     font-weight: 500; letter-spacing: 0.14em; color: rgba(255,255,255,0.85);
   }
@@ -174,7 +172,7 @@ const STYLES = `
     position: absolute; top: clamp(8px, 1.5vw, 12px); right: clamp(8px, 1.5vw, 12px);
     padding: clamp(3px, 0.5vw, 4px) clamp(8px, 1.5vw, 10px); border-radius: 1px;
     background: rgba(26,22,18,0.55); backdrop-filter: blur(6px);
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.52rem, 1vw, 0.56rem); font-weight: 600; letter-spacing: 0.18em;
     color: rgba(255,255,255,0.7); pointer-events: none;
   }
@@ -186,7 +184,7 @@ const STYLES = `
     border: 1px solid rgba(200,135,42,0.38);
   }
   .pdp-img-price-value {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-cormorant), serif;
     font-size: clamp(1.1rem, 3vw, 1.5rem);
     font-weight: 600; color: #fff; line-height: 1;
   }
@@ -258,7 +256,7 @@ const STYLES = `
   }
   .pdp-card:last-child { margin-bottom: 0; }
   .pdp-card-title {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.60rem, 1.3vw, 0.68rem);
     font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase;
     color: ${GOLD}; margin-bottom: clamp(14px, 3vw, 20px);
@@ -297,7 +295,7 @@ const STYLES = `
     border-radius: 1px; flex-shrink: 0;
   }
   .pdp-stat-val {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-cormorant), serif;
     font-size: clamp(1.1rem, 3vw, 1.4rem);
     font-weight: 600; color: ${INK}; line-height: 1;
   }
@@ -308,7 +306,7 @@ const STYLES = `
 
   /* ── DESCRIPTION ── */
   .pdp-desc {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.88rem, 2vw, 0.95rem);
     line-height: 1.82; color: ${INK_MID}; white-space: pre-wrap;
   }
@@ -326,7 +324,7 @@ const STYLES = `
     color: ${INK_SOFT}; flex-shrink: 0;
   }
   .pdp-row-value {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-cormorant), serif;
     font-size: clamp(1rem, 2.5vw, 1.05rem); font-weight: 500;
     color: ${INK}; text-align: right;
   }
@@ -357,13 +355,13 @@ const STYLES = `
     border-bottom: 1px solid rgba(200,135,42,0.2);
   }
   .pdp-sidebar-price-label {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.52rem, 1.1vw, 0.56rem); font-weight: 600;
     letter-spacing: 0.25em; text-transform: uppercase;
     color: rgba(200,135,42,0.6); margin-bottom: 8px;
   }
   .pdp-sidebar-price-value {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-cormorant), serif;
     font-size: clamp(1.6rem, 4vw, 2.2rem);
     font-weight: 600; color: #fff; line-height: 1;
   }
@@ -371,7 +369,7 @@ const STYLES = `
     display: flex; gap: 8px; margin-top: clamp(10px, 2vw, 16px); flex-wrap: wrap;
   }
   .pdp-sidebar-badge {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.58rem, 1.1vw, 0.62rem); font-weight: 500;
     letter-spacing: 0.14em; text-transform: uppercase;
     padding: clamp(3px, 0.6vw, 4px) clamp(8px, 1.5vw, 10px);
@@ -382,12 +380,12 @@ const STYLES = `
     padding: clamp(18px, 4vw, 28px);
   }
   .pdp-sidebar-intro {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: var(--font-cormorant), serif;
     font-size: clamp(1.05rem, 2.5vw, 1.25rem); font-weight: 500;
     color: #fff; margin-bottom: 5px;
   }
   .pdp-sidebar-sub {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.76rem, 1.6vw, 0.78rem); line-height: 1.65;
     color: rgba(255,255,255,0.42); margin-bottom: clamp(16px, 3vw, 22px);
   }
@@ -397,7 +395,7 @@ const STYLES = `
     display: flex; align-items: center; justify-content: center; gap: 10px;
     width: 100%; padding: clamp(13px, 2.5vw, 16px);
     background: linear-gradient(135deg, #166534, #16A34A); color: #fff;
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.76rem, 1.6vw, 0.82rem); font-weight: 600; letter-spacing: 0.06em;
     border: none; cursor: pointer; border-radius: 1px;
     transition: opacity 0.2s, transform 0.15s; text-decoration: none; margin-bottom: 10px;
@@ -409,7 +407,7 @@ const STYLES = `
     display: flex; align-items: center; justify-content: center; gap: 8px;
     width: 100%; padding: clamp(11px, 2.2vw, 14px);
     background: transparent; color: rgba(200,135,42,0.9);
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.76rem, 1.6vw, 0.82rem); font-weight: 500; letter-spacing: 0.08em;
     border: 1px solid rgba(200,135,42,0.3); cursor: pointer; border-radius: 1px;
     transition: border-color 0.2s, color 0.2s; text-decoration: none;
@@ -432,7 +430,7 @@ const STYLES = `
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .pdp-reassurance-text {
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.74rem, 1.5vw, 0.78rem); line-height: 1.6;
     color: rgba(255,255,255,0.36);
   }
@@ -442,7 +440,7 @@ const STYLES = `
     display: inline-flex; align-items: center; gap: 5px;
     padding: clamp(4px, 0.8vw, 5px) clamp(10px, 2vw, 12px);
     border: 1px solid rgba(200,135,42,0.3); color: ${GOLD};
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.58rem, 1.1vw, 0.62rem); font-weight: 600;
     letter-spacing: 0.18em; text-transform: uppercase;
     border-radius: 1px; background: ${GOLD_PALE};
@@ -484,7 +482,7 @@ const STYLES = `
   .pdp-lightbox-close:hover { background: rgba(200,135,42,0.25); }
   .pdp-lightbox-counter {
     position: fixed; bottom: clamp(14px, 3vw, 24px); left: 50%; transform: translateX(-50%);
-    font-family: 'Jost', sans-serif;
+    font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.60rem, 1.2vw, 0.68rem); font-weight: 500; letter-spacing: 0.2em;
     color: rgba(255,255,255,0.42);
   }

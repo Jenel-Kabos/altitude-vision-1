@@ -34,7 +34,7 @@ const Toast = ({ msg, type, onDone }) => {
         background: type === 'success'
           ? 'linear-gradient(135deg, #166534, #16A34A)'
           : `linear-gradient(135deg, #991B1B, ${RED})`,
-        fontFamily: "'Outfit', sans-serif",
+        fontFamily: "var(--font-dm-sans), sans-serif",
         backdropFilter: 'blur(12px)',
       }}>
       {type === 'success' ? <CheckCircle size={18} /> : <AlertTriangle size={18} />}
@@ -47,7 +47,7 @@ const Toast = ({ msg, type, onDone }) => {
 const Field = ({ label, icon: Icon, accent = BLUE, children }) => (
   <div className="space-y-1.5">
     <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
-      style={{ color: accent, fontFamily: "'Outfit', sans-serif" }}>
+      style={{ color: accent, fontFamily: "var(--font-dm-sans), sans-serif" }}>
       <Icon size={12} />
       {label} <span style={{ color: RED }}>*</span>
     </label>
@@ -73,9 +73,9 @@ const InfoCard = ({ icon: Icon, label, value, href, color, delay }) => (
     </div>
     <div className="min-w-0 flex-1">
       <p className="text-xs font-semibold uppercase tracking-widest mb-0.5"
-        style={{ color: `${color}80`, fontFamily: "'Outfit', sans-serif" }}>{label}</p>
+        style={{ color: `${color}80`, fontFamily: "var(--font-dm-sans), sans-serif" }}>{label}</p>
       <p className="text-sm font-medium text-white truncate"
-        style={{ fontFamily: "'Outfit', sans-serif" }}>{value}</p>
+        style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}>{value}</p>
     </div>
     <ArrowUpRight size={14} className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
       style={{ color }} />
@@ -97,7 +97,7 @@ const ContactPage = () => {
   };
 
   const inputStyle = (field) => ({
-    fontFamily: "'Outfit', sans-serif",
+    fontFamily: "var(--font-dm-sans), sans-serif",
     background: '#161B22',
     border: `1px solid ${focused === field ? BLUE : 'rgba(255,255,255,0.08)'}`,
     boxShadow: focused === field ? `0 0 0 3px ${BLUE}25` : 'none',
@@ -126,9 +126,8 @@ const ContactPage = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: '#0D1117', fontFamily: "'Outfit', sans-serif" }}>
+    <div className="min-h-screen" style={{ background: '#0D1117', fontFamily: "var(--font-dm-sans), sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
         ::placeholder { color: rgba(148,163,184,0.5); }
         textarea { resize: vertical; }
         .map-wrapper iframe { display: block; }
@@ -166,7 +165,7 @@ const ContactPage = () => {
           <motion.h1
             initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
             className="text-5xl sm:text-6xl font-bold text-white mb-5 leading-tight"
-            style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+            style={{ fontFamily: "var(--font-cormorant), serif" }}>
             Parlons de{' '}
             <span style={{
               background: `linear-gradient(135deg, ${GOLD}, ${BLUE})`,
@@ -210,7 +209,7 @@ const ContactPage = () => {
                 <Send size={16} style={{ color: BLUE }} />
               </div>
               <h2 className="text-xl font-bold text-white"
-                style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+                style={{ fontFamily: "var(--font-cormorant), serif" }}>
                 Envoyez-nous un message
               </h2>
             </div>
@@ -255,7 +254,7 @@ const ContactPage = () => {
               style={{
                 background: `linear-gradient(135deg, #1A5A8A, ${BLUE})`,
                 boxShadow: `0 6px 24px ${BLUE}35`,
-                fontFamily: "'Outfit', sans-serif",
+                fontFamily: "var(--font-dm-sans), sans-serif",
               }}>
               {status === 'sending' ? (
                 <><Loader2 size={17} className="animate-spin" /> Envoi en cours…</>
@@ -281,7 +280,7 @@ const ContactPage = () => {
                   <Phone size={16} style={{ color: GOLD }} />
                 </div>
                 <h2 className="text-xl font-bold text-white"
-                  style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+                  style={{ fontFamily: "var(--font-cormorant), serif" }}>
                   Nos Coordonnées
                 </h2>
               </div>
@@ -318,7 +317,7 @@ const ContactPage = () => {
                   background: '#0D1117EE',
                   border: `1px solid ${GOLD}40`,
                   color: GOLD,
-                  fontFamily: "'Outfit', sans-serif",
+                  fontFamily: "var(--font-dm-sans), sans-serif",
                   backdropFilter: 'blur(8px)',
                 }}>
                 <MapPin size={12} style={{ color: GOLD }} />
@@ -331,7 +330,7 @@ const ContactPage = () => {
                 style={{
                   background: `linear-gradient(135deg, #1A5A8A, ${BLUE})`,
                   boxShadow: `0 4px 16px ${BLUE}40`,
-                  fontFamily: "'Outfit', sans-serif",
+                  fontFamily: "var(--font-dm-sans), sans-serif",
                 }}>
                 <Navigation size={13} />
                 Itinéraire
@@ -368,8 +367,8 @@ const ContactPage = () => {
               style={{ background: `${color}08`, border: `1px solid ${color}20` }}>
               <span className="text-2xl">{icon}</span>
               <div>
-                <p className="text-sm font-bold" style={{ color, fontFamily: "'Outfit', sans-serif" }}>{pole}</p>
-                <p className="text-xs text-gray-500" style={{ fontFamily: "'Outfit', sans-serif" }}>{desc}</p>
+                <p className="text-sm font-bold" style={{ color, fontFamily: "var(--font-dm-sans), sans-serif" }}>{pole}</p>
+                <p className="text-xs text-gray-500" style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}>{desc}</p>
               </div>
             </div>
           ))}

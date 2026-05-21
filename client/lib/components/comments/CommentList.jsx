@@ -287,8 +287,9 @@ const CommentList = ({ targetType, targetId }) => {
               <button
                 className="cl-page-btn"
                 onClick={() => setPage(p => p - 1)}
-                disabled={page === 1}>
-                ‹
+                disabled={page === 1}
+                aria-label="Page précédente">
+                <span aria-hidden="true">‹</span>
               </button>
 
               {Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -312,8 +313,9 @@ const CommentList = ({ targetType, targetId }) => {
               <button
                 className="cl-page-btn"
                 onClick={() => setPage(p => p + 1)}
-                disabled={page === totalPages}>
-                ›
+                disabled={page === totalPages}
+                aria-label="Page suivante">
+                <span aria-hidden="true">›</span>
               </button>
             </div>
           )}

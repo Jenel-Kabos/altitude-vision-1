@@ -64,11 +64,12 @@ const ContactModal = ({ intention, onClose, serviceTitle = null }) => {
       <div className="bg-white p-8 rounded-xl shadow-2xl max-w-lg w-full relative transform transition-all duration-300 scale-100">
         
         {/* Bouton de Fermeture */}
-        <button 
-          onClick={onClose} 
+        <button
+          onClick={onClose}
+          aria-label="Fermer"
           className="absolute top-4 right-4 text-gray-500 hover:text-red-500 transition duration-200"
         >
-          <FaTimes className="text-2xl" />
+          <FaTimes className="text-2xl" aria-hidden="true" />
         </button>
         
         <div className="text-center mb-6">
