@@ -60,6 +60,7 @@ const EventCardGrid = ({ event, index }) => {
             {/* Image */}
             <div className="relative h-52 overflow-hidden">
                 <img src={img} alt={event.name || event.title}
+                    loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     onError={e => { e.target.src = 'https://placehold.co/600x400/D42B2B/FFFFFF?text=Mila+Events'; }} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
@@ -135,6 +136,7 @@ const EventCardList = ({ event, index }) => {
             {/* Image */}
             <div className="relative sm:w-56 h-48 sm:h-auto flex-shrink-0 overflow-hidden">
                 <img src={img} alt={event.name || event.title}
+                    loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black/40 to-transparent" />
                 <span className="absolute top-3 left-3 text-white text-xs font-bold px-3 py-1.5 rounded-full"

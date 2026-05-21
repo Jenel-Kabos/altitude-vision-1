@@ -68,6 +68,7 @@ const EventCard = ({ event, index }) => {
         >
             <div className="relative h-52 overflow-hidden">
                 <img src={d.imageUrl} alt={d.title}
+                    loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     onError={e => { e.target.src = 'https://placehold.co/600x400/D42B2B/FFFFFF?text=Mila+Events'; }} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />

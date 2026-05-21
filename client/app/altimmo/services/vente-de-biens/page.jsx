@@ -1,12 +1,39 @@
-import { buildMetadata } from '@/lib/seo';
+import { buildMetadata, SITE_URL } from '@/lib/seo';
 import VenteDeBiensPage from "@/lib/pages/services/VenteDeBiensPage";
+import JsonLd from "@/lib/components/JsonLd";
 
 export const metadata = buildMetadata({
-  title: "Vente de Biens Immobiliers — Altimmo",
-  description: "Confiez la vente de votre bien à Altimmo, votre expert immobilier à Brazzaville.",
+  title: "Vente de Biens Immobiliers — Altimmo Brazzaville",
+  description: "Confiez la vente de votre bien à Altimmo, votre expert immobilier à Brazzaville. Accompagnement complet, estimation gratuite.",
   url: "/altimmo/services/vente-de-biens",
 });
 
+const SCHEMAS = [
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Accueil",  item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Altimmo",  item: `${SITE_URL}/altimmo` },
+      { "@type": "ListItem", position: 3, name: "Vente de Biens", item: `${SITE_URL}/altimmo/services/vente-de-biens` },
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    name: "Vente de Biens Immobiliers — Altimmo",
+    description: "Service de vente immobilière à Brazzaville : estimation, mise en marché, négociation et suivi juridique.",
+    provider: { "@type": "RealEstateAgent", name: "Altimmo — Altitude-Vision", url: `${SITE_URL}/altimmo` },
+    areaServed: { "@type": "City", name: "Brazzaville" },
+    url: `${SITE_URL}/altimmo/services/vente-de-biens`,
+  },
+];
+
 export default function Page() {
-  return <VenteDeBiensPage />;
+  return (
+    <>
+      <JsonLd schemas={SCHEMAS} />
+      <VenteDeBiensPage />
+    </>
+  );
 }

@@ -52,7 +52,11 @@ const LOCAL_BUSINESS_SCHEMA = {
       { "@type": "Offer", itemOffered: { "@type": "Service", name: "Mila Events — Organisation d'événements" } },
     ],
   },
-  sameAs: [],
+  sameAs: [
+    "https://www.facebook.com/profile.php?id=61558493665509",
+    "https://www.instagram.com/immoaltitudevision/",
+    "https://wa.me/242068002151",
+  ],
 };
 
 export default function RootLayout({ children }) {

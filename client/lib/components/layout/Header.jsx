@@ -30,16 +30,13 @@ const PROFILE_LINKS = [
 const isNavLinkActive = (pathname, to) =>
   to === '/' ? pathname === '/' : pathname.startsWith(to);
 
-const useUnreadCount = (pathname) => {
+const useUnreadCount = (pathname, isAuthenticated) => {
   const [count, setCount]   = useState(0);
   const isOnMessagesPage    = pathname === '/messages';
 
   useEffect(() => {
-    // ✅ Si l'utilisateur est sur la page messages, badge = 0 immédiatement
-    if (isOnMessagesPage) {
-      setCount(0);
-      return;
-    }
+    if (!isAuthenticated) { setCount(0); return; }
+    if (isOnMessagesPage) { setCount(0); return; }
 
     const load = async () => {
       try {
@@ -50,12 +47,10 @@ const useUnreadCount = (pathname) => {
       }
     };
 
-    load(); // charge immédiatement
-
-    // ✅ Poll toutes les 10s (au lieu de 30s) pour une meilleure réactivité
-    const id = setInterval(load, 10000);
+    load();
+    const id = setInterval(load, 30000);
     return () => clearInterval(id);
-  }, [isOnMessagesPage]);
+  }, [isAuthenticated, isOnMessagesPage]);
 
   return count;
 };
@@ -112,7 +107,7 @@ const Header = () => {
   const [profileOpen, setProfile] = useState(false);
   const pathname                  = usePathname();
   const router                    = useRouter();
-  const unreadCount               = useUnreadCount(pathname);
+  const unreadCount               = useUnreadCount(pathname, !!user);
   const profileRef                = useRef(null);
   const bp                        = useBreakpoint();
 

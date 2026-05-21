@@ -199,7 +199,7 @@ const SLIDER_CSS = `
   .ash-stat-label {
     font-family: 'Outfit', sans-serif; font-size: 0.52rem;
     font-weight: 400; letter-spacing: 0.10em;
-    color: rgba(245,242,238,0.28); text-transform: uppercase; white-space: nowrap;
+    color: rgba(245,242,238,0.55); text-transform: uppercase; white-space: nowrap;
   }
 
   /* ══ FLÈCHES — discrètes, bien positionnées ══ */

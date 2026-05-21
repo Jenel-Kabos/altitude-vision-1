@@ -73,6 +73,7 @@ const PortfolioCardGrid = ({ item }) => {
             {/* Image */}
             <div className="relative h-52 overflow-hidden">
                 <img src={imageUrl} alt={item.title}
+                    loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     onError={e => { e.target.onerror = null; e.target.src = `https://placehold.co/600x400/C8872A/FFFFFF?text=Altcom`; }} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
@@ -148,6 +149,7 @@ const PortfolioCardList = ({ item }) => {
             {/* Image */}
             <div className="relative sm:w-56 h-44 sm:h-auto flex-shrink-0 overflow-hidden">
                 <img src={imageUrl} alt={item.title}
+                    loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     onError={e => { e.target.onerror = null; e.target.src = `https://placehold.co/600x400/C8872A/FFFFFF?text=Altcom`; }} />
                 <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black/30 to-transparent" />

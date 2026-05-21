@@ -118,6 +118,7 @@ const ActualitesPage = () => {
                                 onClick={() => setActiveArticle(SITE_ARTICLES[0])}>
                                 <div className="relative h-64 overflow-hidden">
                                     <img src={SITE_ARTICLES[0].image} alt={SITE_ARTICLES[0].title}
+                                        loading="lazy"
                                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                                     <div className="absolute inset-0"
                                         style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%)' }} />
@@ -166,6 +167,7 @@ const ActualitesPage = () => {
                                             style={{ borderColor: 'rgba(0,0,0,0.07)' }}>
                                             <div className="relative h-36 overflow-hidden">
                                                 <img src={article.image} alt={article.title}
+                                                    loading="lazy"
                                                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                                                 <div className="absolute inset-0"
                                                     style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 60%)' }} />
@@ -239,6 +241,7 @@ const ActualitesPage = () => {
                                                 {post.image && (
                                                     <div className="h-40 overflow-hidden">
                                                         <img src={post.image} alt="Publication Facebook"
+                                                            loading="lazy"
                                                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                                                     </div>
                                                 )}

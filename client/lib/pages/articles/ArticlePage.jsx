@@ -92,6 +92,7 @@ const RelatedCard = ({ article }) => {
             className="group flex gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors duration-200">
             <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
                 <img src={article.image} alt={article.title}
+                    loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
             </div>
             <div className="min-w-0">
@@ -164,6 +165,7 @@ const ArticlePage = ({ slug }) => {
                 {/* Image de fond avec parallaxe douce */}
                 <div className="absolute inset-0">
                     <img src={article.image} alt={article.title}
+                        loading="eager" fetchPriority="high"
                         className="w-full h-full object-cover"
                         style={{ transform: 'scale(1.05)' }} />
                     <div className="absolute inset-0"
