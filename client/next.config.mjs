@@ -4,16 +4,21 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 const CSP = [
   "default-src 'self'",
-  // Next.js hydration + Framer Motion require unsafe-inline; unsafe-eval for dev HMR
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  // Next.js hydration + Framer Motion require unsafe-inline; unsafe-eval for dev HMR; blob: for Web Workers / PDF libs
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
   // Framer Motion and Tailwind write inline styles at runtime
   "style-src 'self' 'unsafe-inline'",
   // Fonts are self-hosted via next/font — no external font CDN needed
   "font-src 'self'",
   // Images: local, Unsplash (hero), Cloudinary (uploads), Render (legacy), Facebook (feed)
   "img-src 'self' data: blob: https://images.unsplash.com https://altitude-vision.onrender.com https://res.cloudinary.com https://graph.facebook.com https://*.fbcdn.net https://platform-lookaside.fbsbx.com https://ui-avatars.com https://placehold.co https://illustrations.popsy.co",
-  // API calls + Facebook feed data
-  "connect-src 'self' https://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com",
+  // API calls + Facebook feed data; blob: for fetch() responses used by workers/libs
+  "connect-src 'self' blob: https://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com",
+  // Web Workers (e.g. PDF.js, comlink) require blob: worker source
+  "worker-src 'self' blob:",
+  // child-src covers blob: workers in older browsers that don't support worker-src
+  "child-src 'self' blob:",
+  // Google Maps embed on /contact
   "frame-src https://www.google.com https://maps.google.com https://maps.googleapis.com",
   "object-src 'none'",
   "base-uri 'self'",
