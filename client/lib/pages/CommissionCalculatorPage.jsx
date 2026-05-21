@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated } from '../services/authService';
@@ -663,12 +664,11 @@ const CommissionCalculatorPage = () => {
       <motion.section className="cp-hero"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7 }}>
 
-        <img
+        <Image fill priority
           className="cp-hero-img"
           src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1973&auto=format&fit=crop"
           alt="Immobilier Brazzaville"
-          fetchPriority="high"
-          loading="eager"
+          sizes="100vw"
         />
         <div className="cp-hero-grad" />
         <div className="cp-hero-dots" />
@@ -842,11 +842,11 @@ const CommissionCalculatorPage = () => {
 
             {/* Image */}
             <div className="cp-cta-img-wrap">
-              <img
+              <Image fill
                 className="cp-cta-img"
                 src="https://images.unsplash.com/photo-1582407947304-fd86f028f716?q=80&w=1296&auto=format&fit=crop"
                 alt="Partenariat Altimmo"
-                loading="lazy"
+                sizes="(max-width: 768px) 100vw, 50vw"
               />
               <div className="cp-cta-img-overlay" />
               <div className="cp-cta-img-badge">
@@ -918,11 +918,11 @@ const CommissionCalculatorPage = () => {
             <motion.div className="cp-example-card"
               initial={{ opacity:0, y:20 }} whileInView={{ opacity:1, y:0 }}
               viewport={{ once:true }} transition={{ duration:.55 }}>
-              <img
+              <Image width={800} height={200}
                 className="cp-example-img"
                 src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=800&auto=format&fit=crop"
                 alt="Villa à vendre Brazzaville"
-                loading="lazy"
+                sizes="(max-width: 768px) 100vw, 50vw"
               />
               <div className="cp-example-body">
                 <span className="cp-example-badge cp-example-badge--vente">
@@ -948,11 +948,11 @@ const CommissionCalculatorPage = () => {
             <motion.div className="cp-example-card"
               initial={{ opacity:0, y:20 }} whileInView={{ opacity:1, y:0 }}
               viewport={{ once:true }} transition={{ duration:.55, delay:.1 }}>
-              <img
+              <Image width={800} height={200}
                 className="cp-example-img"
                 src="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=800&auto=format&fit=crop"
                 alt="Appartement à louer Brazzaville"
-                loading="lazy"
+                sizes="(max-width: 768px) 100vw, 50vw"
               />
               <div className="cp-example-body">
                 <span className="cp-example-badge cp-example-badge--location">

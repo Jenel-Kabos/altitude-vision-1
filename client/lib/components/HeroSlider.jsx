@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Building2, Calendar, Briefcase } from 'lucide-react';
@@ -352,19 +353,10 @@ const HeroSlider = () => {
             animate={{ scale: 1.02 }}
             transition={{ duration: SLIDE_DURATION / 1000, ease: 'linear' }}
           >
-            <img
-              src={current.image}
-              srcSet={`${current.image.replace('w=1600', 'w=480')} 480w,
-                       ${current.image.replace('w=1600', 'w=800')} 800w,
-                       ${current.image} 1600w`}
+            <Image src={current.image} alt={current.title.replace('\n', ' ')} fill
+              priority={currentIndex === 0}
               sizes="(max-width: 640px) 480px, (max-width: 1024px) 800px, 1600px"
-              alt={current.title.replace('\n', ' ')}
-              width={current.imgWidth}
-              height={current.imgHeight}
-              fetchPriority={currentIndex === 0 ? 'high' : 'low'}
-              loading={currentIndex === 0 ? 'eager' : 'lazy'}
-              decoding={currentIndex === 0 ? 'sync' : 'async'}
-              style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center' }}
+              className="object-cover object-center"
             />
           </motion.div>
 

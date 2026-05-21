@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Trash2, Paperclip, CheckCheck, AlertTriangle } from 'lucide-react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Tokens alignés sur MessagesPage ──────────────────────────
@@ -35,8 +36,7 @@ const MiniAvatar = ({ name, photo }) => {
             overflow: 'hidden', border: `1.5px solid ${C.border}`,
         }}>
             {photo && !err
-                ? <img src={photo} alt={name} onError={() => setErr(true)}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ? <Image src={photo} alt={name} fill unoptimized onError={() => setErr(true)} className="object-cover" />
                 : (name || '?')[0].toUpperCase()
             }
         </div>

@@ -1,6 +1,7 @@
 "use client";
 // src/pages/altcom/ServiceCard.jsx
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Send, ArrowRight } from 'lucide-react';
@@ -25,10 +26,9 @@ const ServiceCard = ({ service, onQuote, index }) => {
             {/* Image illustrative */}
             {service.images?.[0] && (
                 <div className="relative h-44 overflow-hidden">
-                    <img
-                        src={service.images[0]}
-                        alt={service.title}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    <Image src={service.images[0]} alt={service.title} fill
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                        className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                     <div className="absolute inset-0"
                         style={{ background: `linear-gradient(to bottom, transparent 40%, rgba(255,255,255,0.95) 100%)` }} />

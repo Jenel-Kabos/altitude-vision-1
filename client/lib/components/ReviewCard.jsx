@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { FaStar } from 'react-icons/fa';
 import { Quote, Calendar, ShieldCheck, MessageSquare } from 'lucide-react';
@@ -138,11 +139,9 @@ const ReviewCard = ({ review }) => {
         <div className="flex items-center gap-3 mb-2">
           {/* Avatar ou Initiale */}
           {authorPhoto ? (
-            <img
-              src={authorPhoto}
-              alt={authorName}
-              loading="lazy"
-              className="w-10 h-10 rounded-full object-cover border-2 border-blue-500"
+            <Image src={authorPhoto} alt={authorName}
+              width={40} height={40} unoptimized
+              className="rounded-full object-cover border-2 border-blue-500"
             />
           ) : (
             <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getPoleGradient(pole)} flex items-center justify-center text-white font-bold text-sm`}>

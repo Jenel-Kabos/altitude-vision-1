@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
 import toast from '@/lib/utils/toast';
+import Image from 'next/image';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api';
 const getImageUrl = (url) => {
@@ -165,13 +166,10 @@ const PropertyModerationPage = () => {
             return (
               <div key={property._id} onClick={() => setSelectedProperty(property)}
                 className="border rounded-lg shadow-md p-4 flex flex-col cursor-pointer hover:shadow-xl transition-all bg-white">
-                <div className="relative mb-3">
-                  <img
-                    src={getImageUrl(property.images?.[0]) || '/placeholder.png'}
-                    alt={property.title}
-                    className="w-full h-48 object-cover rounded"
-                    onError={e => { e.target.src = '/placeholder.png'; }}
-                  />
+                <div className="relative mb-3 h-48">
+                  <Image src={getImageUrl(property.images?.[0]) || '/placeholder.png'} alt={property.title} fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    className="object-cover rounded" />
                   <span className={`absolute top-2 left-2 px-3 py-1 rounded-full text-xs font-bold text-white ${pole.bg}`}>
                     {property.pole}
                   </span>
@@ -267,8 +265,8 @@ const PropertyModerationPage = () => {
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Propriétaire</p>
                 <div className="flex items-center gap-3">
                   {selectedProperty.owner.photo ? (
-                    <img src={selectedProperty.owner.photo} alt={selectedProperty.owner.name}
-                      className="w-10 h-10 rounded-full object-cover" />
+                    <Image src={selectedProperty.owner.photo} alt={selectedProperty.owner.name}
+                      width={40} height={40} unoptimized className="rounded-full object-cover" />
                   ) : (
                     <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
                       {selectedProperty.owner.name?.charAt(0).toUpperCase()}
@@ -290,12 +288,12 @@ const PropertyModerationPage = () => {
               {selectedProperty.images?.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {selectedProperty.images.map((img, idx) => (
-                    <img key={idx}
-                      src={getImageUrl(img)}
-                      alt={`${selectedProperty.title} ${idx + 1}`}
-                      className="w-full h-36 object-cover rounded-lg shadow hover:shadow-xl transition"
-                      onError={e => { e.target.src = '/placeholder.png'; }}
-                    />
+                    <div key={idx} className="relative h-36">
+                      <Image src={getImageUrl(img)} fill
+                        alt={`${selectedProperty.title} ${idx + 1}`}
+                        sizes="(max-width: 768px) 50vw, 33vw"
+                        className="object-cover rounded-lg shadow hover:shadow-xl transition" />
+                    </div>
                   ))}
                 </div>
               ) : (

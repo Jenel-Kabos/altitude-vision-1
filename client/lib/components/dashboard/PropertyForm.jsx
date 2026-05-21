@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useMemo, useEffect } from "react";
+import Image from 'next/image';
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -382,11 +383,8 @@ const PropertyForm = ({
             <div className="flex flex-wrap gap-3">
               {existingImages.map((img, i) => (
                 <div key={i} className="relative w-24 h-24">
-                  <img
-                    src={getImageUrl(img)}
-                    alt={`Image existante ${i}`}
-                    className="object-cover w-full h-full rounded border-2 border-gray-300"
-                  />
+                  <Image src={getImageUrl(img)} alt={`Image existante ${i}`} fill
+                    className="object-cover rounded border-2 border-gray-300" sizes="96px" />
                   <button
                     type="button"
                     onClick={() => handleRemoveExistingImage(img)}
@@ -435,11 +433,8 @@ const PropertyForm = ({
             <div className="flex flex-wrap gap-3">
               {previewUrls.map((url, i) => (
                 <div key={i} className="relative w-24 h-24">
-                  <img
-                    src={url}
-                    alt={`Nouvelle image ${i}`}
-                    className="object-cover w-full h-full rounded border-2 border-green-300"
-                  />
+                  <Image src={url} alt={`Nouvelle image ${i}`} fill unoptimized
+                    className="object-cover rounded border-2 border-green-300" sizes="96px" />
                   <button
                     type="button"
                     onClick={() => handleRemoveNewImage(i)}

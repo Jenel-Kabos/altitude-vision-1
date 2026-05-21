@@ -8,6 +8,7 @@ import {
     Building2, CalendarCheck, Briefcase, ChevronRight,
 } from "lucide-react";
 import { ARTICLES as SITE_ARTICLES_RAW } from "@/lib/data/articlesData";
+import Image from 'next/image';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://altitude-vision.onrender.com/api";
 
@@ -117,9 +118,10 @@ const ActualitesPage = () => {
                                 style={{ borderColor: 'rgba(0,0,0,0.07)' }}
                                 onClick={() => setActiveArticle(SITE_ARTICLES[0])}>
                                 <div className="relative h-64 overflow-hidden">
-                                    <img src={SITE_ARTICLES[0].image} alt={SITE_ARTICLES[0].title}
-                                        loading="lazy"
-                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                                    <Image src={SITE_ARTICLES[0].image} alt={SITE_ARTICLES[0].title}
+                                        fill
+                                        sizes="(max-width: 768px) 100vw, 50vw"
+                                        className="object-cover transition-transform duration-700 group-hover:scale-105" />
                                     <div className="absolute inset-0"
                                         style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%)' }} />
                                     <div className="absolute top-4 left-4">
@@ -166,9 +168,10 @@ const ActualitesPage = () => {
                                             className="bg-white rounded-2xl border overflow-hidden group hover:shadow-md transition-all duration-300"
                                             style={{ borderColor: 'rgba(0,0,0,0.07)' }}>
                                             <div className="relative h-36 overflow-hidden">
-                                                <img src={article.image} alt={article.title}
-                                                    loading="lazy"
-                                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                                                <Image src={article.image} alt={article.title}
+                                                    fill
+                                                    sizes="(max-width: 768px) 100vw, 33vw"
+                                                    className="object-cover transition-transform duration-700 group-hover:scale-105" />
                                                 <div className="absolute inset-0"
                                                     style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 60%)' }} />
                                                 <div className="absolute top-2.5 left-2.5">
@@ -239,10 +242,11 @@ const ActualitesPage = () => {
                                                 style={{ borderColor: 'rgba(0,0,0,0.07)' }}>
 
                                                 {post.image && (
-                                                    <div className="h-40 overflow-hidden">
-                                                        <img src={post.image} alt="Publication Facebook"
-                                                            loading="lazy"
-                                                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                                                    <div className="relative h-40 overflow-hidden">
+                                                        <Image src={post.image} alt="Publication Facebook"
+                                                            fill unoptimized
+                                                            sizes="(max-width: 768px) 100vw, 25vw"
+                                                            className="object-cover transition-transform duration-700 group-hover:scale-105" />
                                                     </div>
                                                 )}
 

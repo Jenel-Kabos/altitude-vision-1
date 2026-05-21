@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { X, Save, Loader2, Plus, Trash2, DollarSign, FileText, Tag } from 'lucide-react';
 import { createService, updateService } from '../../services/serviceService';
@@ -225,14 +226,10 @@ const ServiceFormModal = ({ service, onClose, onSuccess }) => {
             {formData.imageUrl && (
               <div className="mt-3">
                 <p className="text-sm text-gray-600 mb-2">Aperçu :</p>
-                <img
-                  src={formData.imageUrl}
-                  alt="Aperçu"
-                  className="w-full h-48 object-cover rounded-lg"
-                  onError={(e) => {
-                    e.target.src = 'https://via.placeholder.com/400x200?text=Image+Invalide';
-                  }}
-                />
+                <div className="relative w-full h-48">
+                  <Image src={formData.imageUrl} alt="Aperçu" fill unoptimized
+                    className="object-cover rounded-lg" sizes="100vw" />
+                </div>
               </div>
             )}
           </div>

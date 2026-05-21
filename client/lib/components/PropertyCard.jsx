@@ -3,6 +3,7 @@
 // src/components/PropertyCard.jsx
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -472,12 +473,10 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
           {/* Image */}
           <div className="pcard-list-img">
             {!imageError && imgUrl ? (
-              <img
-                src={imgUrl}
-                alt={property.title}
-                className="pcard-img"
+              <Image src={imgUrl} alt={property.title} fill
+                sizes="(max-width: 768px) 100vw, 360px"
+                className="object-cover"
                 onError={() => setImageError(true)}
-                style={{ position:'absolute', inset:0, height:'100%' }}
               />
             ) : <ImagePlaceholder />}
             <div className="pcard-scrim" />
@@ -569,9 +568,8 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
         {/* Image */}
         <div className="pcard-img-wrap">
           {!imageError && imgUrl ? (
-            <img
-              src={imgUrl}
-              alt={property.title}
+            <Image src={imgUrl} alt={property.title} fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
               className="pcard-img"
               onError={() => setImageError(true)}
             />

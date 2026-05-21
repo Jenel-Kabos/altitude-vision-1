@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
+import Image from 'next/image';
 import { motion, AnimatePresence } from "framer-motion";
 import { Quote, Loader2, MessageSquarePlus, Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -78,18 +79,15 @@ const TestimonialCard = ({ t, index }) => {
 
             {/* Auteur */}
             <div className="flex items-center gap-3 relative z-10">
-                <img
+                <Image
                     src={
                         t.author?.photo ||
                         `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=f1f5f9&color=64748b&size=80`
                     }
                     alt={t.author?.name || 'Client'}
-                    className="w-9 h-9 rounded-full object-cover border-2 flex-shrink-0"
+                    width={36} height={36} unoptimized
+                    className="rounded-full object-cover border-2 flex-shrink-0"
                     style={{ borderColor: pc.dot }}
-                    onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=f1f5f9&color=64748b&size=80`;
-                    }}
                 />
                 <div className="min-w-0 flex-1">
                     <p

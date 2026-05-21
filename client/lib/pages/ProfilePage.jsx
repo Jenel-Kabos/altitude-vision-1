@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 import { User, Mail, Phone, Shield, ArrowLeft, Settings } from 'lucide-react';
@@ -69,7 +70,7 @@ const ProfilePage = () => {
 
                         {/* Avatar */}
                         <div className="relative inline-block mb-5">
-                            <div className="w-24 h-24 rounded-2xl overflow-hidden flex items-center justify-center mx-auto"
+                            <div className="relative w-24 h-24 rounded-2xl overflow-hidden flex items-center justify-center mx-auto"
                                 style={{
                                     background: user?.photo
                                         ? 'transparent'
@@ -77,8 +78,8 @@ const ProfilePage = () => {
                                     boxShadow: `0 0 0 3px rgba(46,123,181,0.2), 0 8px 32px rgba(0,0,0,0.5)`,
                                 }}>
                                 {user?.photo
-                                    ? <img src={user.photo} alt={user.name}
-                                        className="w-full h-full object-cover" />
+                                    ? <Image src={user.photo} alt={user.name}
+                                        fill unoptimized className="object-cover" />
                                     : <User className="w-11 h-11 text-white opacity-80" />
                                 }
                             </div>

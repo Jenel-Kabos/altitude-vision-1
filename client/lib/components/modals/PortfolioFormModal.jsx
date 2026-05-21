@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import {
   X,
@@ -386,15 +387,12 @@ const PortfolioFormModal = ({ item, onClose, onSuccess }) => {
                     .filter(url => url && url.trim())
                     .map((img, index) => (
                       <div key={index} className="relative group">
-                        <img
-                          src={img}
-                          alt={`Aperçu ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg border-2 border-purple-300 shadow-md"
-                          onError={(e) => {
-                            e.target.src = 'https://via.placeholder.com/200x150/9333EA/FFFFFF?text=Image+Invalide';
-                            e.target.onerror = null;
-                          }}
-                        />
+                        <div className="relative w-full h-32">
+                          <Image src={img} alt={`Aperçu ${index + 1}`} fill unoptimized
+                            className="object-cover rounded-lg border-2 border-purple-300 shadow-md"
+                            sizes="33vw"
+                          />
+                        </div>
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded-lg flex items-center justify-center">
                           <span className="text-white text-xs font-semibold opacity-0 group-hover:opacity-100">
                             Image {index + 1}

@@ -8,6 +8,7 @@ import {
   ArrowLeft, ArrowRight, Building2, MapPin, Maximize2, Bed, Bath, Sparkles, Send
 } from "lucide-react";
 import PropertyForm from "../../components/dashboard/PropertyForm";
+import Image from 'next/image';
 
 const PROPERTIES_PER_PAGE = 8;
 
@@ -195,15 +196,18 @@ const ManagePropertiesPage = () => {
     );
   };
 
+  const ALTIMMO_FALLBACK = 'https://placehold.co/600x400/3B82F6/FFFFFF?text=Altimmo';
+
   // ── PropertyCard ───────────────────────────────────────────
   const PropertyCard = ({ property }) => {
-    const firstImage = property.images?.[0] || 'https://placehold.co/600x400/3B82F6/FFFFFF?text=Altimmo';
+    const [imgSrc, setImgSrc] = useState(property.images?.[0] || ALTIMMO_FALLBACK);
     return (
       <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 group animate-slideUp">
         <div className="relative h-48 overflow-hidden">
-          <img src={firstImage} alt={property.title}
-            className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
-            onError={(e) => { e.target.src = 'https://placehold.co/600x400/3B82F6/FFFFFF?text=Altimmo'; }} />
+          <Image src={imgSrc} alt={property.title} fill
+            sizes="(max-width: 768px) 100vw, 33vw"
+            className="object-cover group-hover:scale-110 transition duration-300"
+            onError={() => setImgSrc(ALTIMMO_FALLBACK)} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           <span className="absolute top-2 left-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">{property.type || 'Bien'}</span>
           <span className="absolute top-2 right-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">{property.status || 'Vente'}</span>

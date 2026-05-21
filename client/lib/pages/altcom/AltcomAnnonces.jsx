@@ -8,6 +8,7 @@ import {
     Tag, X, SlidersHorizontal, Briefcase, ArrowRight,
 } from 'lucide-react';
 import { getAllPortfolioItems } from '../../services/portfolioService';
+import Image from 'next/image';
 
 // ─────────────────────────────────────────────────────────────
 // Constantes
@@ -59,9 +60,10 @@ const CardSkeleton = () => (
 // ─────────────────────────────────────────────────────────────
 // Card portfolio — vue grille
 // ─────────────────────────────────────────────────────────────
+const ALTCOM_FALLBACK = 'https://placehold.co/600x400/C8872A/FFFFFF?text=Altcom';
 const PortfolioCardGrid = ({ item }) => {
     const router = useRouter();
-    const imageUrl = getImageUrl(item.images?.[0]);
+    const [imgSrc, setImgSrc] = useState(getImageUrl(item.images?.[0]) || ALTCOM_FALLBACK);
 
     return (
         <motion.div
@@ -72,10 +74,11 @@ const PortfolioCardGrid = ({ item }) => {
         >
             {/* Image */}
             <div className="relative h-52 overflow-hidden">
-                <img src={imageUrl} alt={item.title}
-                    loading="lazy"
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    onError={e => { e.target.onerror = null; e.target.src = `https://placehold.co/600x400/C8872A/FFFFFF?text=Altcom`; }} />
+                <Image src={imgSrc} alt={item.title}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    onError={() => setImgSrc(ALTCOM_FALLBACK)} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
 
                 {/* Rating badge */}
@@ -137,7 +140,7 @@ const PortfolioCardGrid = ({ item }) => {
 // ─────────────────────────────────────────────────────────────
 const PortfolioCardList = ({ item }) => {
     const router = useRouter();
-    const imageUrl = getImageUrl(item.images?.[0]);
+    const [imgSrc, setImgSrc] = useState(getImageUrl(item.images?.[0]) || ALTCOM_FALLBACK);
 
     return (
         <motion.div
@@ -147,11 +150,12 @@ const PortfolioCardList = ({ item }) => {
             style={{ borderColor: 'rgba(0,0,0,0.06)' }}
         >
             {/* Image */}
-            <div className="relative sm:w-56 h-44 sm:h-auto flex-shrink-0 overflow-hidden">
-                <img src={imageUrl} alt={item.title}
-                    loading="lazy"
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    onError={e => { e.target.onerror = null; e.target.src = `https://placehold.co/600x400/C8872A/FFFFFF?text=Altcom`; }} />
+            <div className="relative sm:w-56 h-44 sm:min-h-full flex-shrink-0 overflow-hidden">
+                <Image src={imgSrc} alt={item.title}
+                    fill
+                    sizes="(max-width: 640px) 100vw, 224px"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    onError={() => setImgSrc(ALTCOM_FALLBACK)} />
                 <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black/30 to-transparent" />
             </div>
 

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { getAllEvents, getEventById, uploadEventImages, uploadEventVideos } from '../../services/eventService';
 import api from '../../services/api';
+import Image from 'next/image';
 
 const EVENTS_PER_PAGE = 8;
 
@@ -128,8 +129,11 @@ const ManageEventsPage = () => {
     );
   };
 
+  const MILA_FALLBACK = 'https://placehold.co/600x400/818CF8/FFFFFF?text=Mila+Events';
+
   // ── EventCard ──────────────────────────────────────────────
   const EventCard = ({ event }) => {
+    const [imgSrc, setImgSrc] = useState(event.images?.[0] || MILA_FALLBACK);
     const formattedDate = event.date
       ? new Date(event.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })
       : 'Date non définie';
@@ -138,10 +142,10 @@ const ManageEventsPage = () => {
     return (
       <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 group animate-slideUp">
         <div className="relative h-48 overflow-hidden">
-          <img src={event.images?.[0] || 'https://placehold.co/600x400/818CF8/FFFFFF?text=Mila+Events'}
-            alt={event.name}
-            className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
-            onError={(e) => { e.target.src = 'https://placehold.co/600x400/818CF8/FFFFFF?text=Mila+Events'; }} />
+          <Image src={imgSrc} alt={event.name} fill
+            sizes="(max-width: 768px) 100vw, 33vw"
+            className="object-cover group-hover:scale-110 transition duration-300"
+            onError={() => setImgSrc(MILA_FALLBACK)} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           <span className="absolute top-2 left-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
             {event.category || 'Événement'}
@@ -543,7 +547,10 @@ const EventModal = ({ mode, event, onClose, onSubmit }) => {
                 <div className="grid grid-cols-3 gap-3">
                   {formData.images.map((img, i) => (
                     <div key={i} className="relative group">
-                      <img src={img} alt={`Preview ${i + 1}`} className="w-full h-24 object-cover rounded-lg border-2 border-gray-200 group-hover:border-indigo-400 transition-all" />
+                      <div className="relative w-full h-24">
+                        <Image src={img} alt={`Preview ${i + 1}`} fill
+                          className="object-cover rounded-lg border-2 border-gray-200 group-hover:border-indigo-400 transition-all" sizes="33vw" unoptimized />
+                      </div>
                       <button type="button" onClick={() => handleRemoveImage(i)} disabled={isUploadingImage || isSubmitting}
                         className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition hover:bg-red-600">
                         <X className="w-4 h-4" />

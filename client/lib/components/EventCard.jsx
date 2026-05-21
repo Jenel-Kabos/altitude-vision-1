@@ -1,12 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Calendar, MapPin, Users, ArrowRight, Video } from 'lucide-react';
 import LikeButton from './likes/LikeButton';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || '';
+
+const EVENT_FALLBACK = 'https://images.unsplash.com/photo-1540555700478-4be29ab4cb3d?q=80&w=600&h=400&fit=crop';
 
 const EventCard = ({ event, index = 0 }) => {
     const router = useRouter();
@@ -23,15 +26,13 @@ const EventCard = ({ event, index = 0 }) => {
     };
 
     const imagePath = event.images && event.images.length > 0 ? event.images[0] : null;
+    const resolvedUrl = !imagePath
+        ? EVENT_FALLBACK
+        : imagePath.startsWith('http')
+            ? imagePath
+            : `${BACKEND_URL}/${imagePath.replace(/^\//, '')}`;
 
-    let imageUrl;
-    if (!imagePath) {
-        imageUrl = 'https://images.unsplash.com/photo-1540555700478-4be29ab4cb3d?q=80&w=600&h=400&fit=crop';
-    } else if (imagePath.startsWith('http')) {
-        imageUrl = imagePath;
-    } else {
-        imageUrl = `${BACKEND_URL}/${imagePath.replace(/^\//, '')}`;
-    }
+    const [imageUrl, setImageUrl] = useState(resolvedUrl);
 
     const formattedDate = displayEvent.date
         ? new Date(displayEvent.date).toLocaleDateString('fr-FR', {
@@ -77,14 +78,10 @@ const EventCard = ({ event, index = 0 }) => {
             >
                 {/* Image */}
                 <div className="relative h-56 overflow-hidden">
-                    <img
-                        src={imageUrl}
-                        alt={displayEvent.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                        onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = 'https://images.unsplash.com/photo-1540555700478-4be29ab4cb3d?q=80&w=600&h=400&fit=crop';
-                        }}
+                    <Image src={imageUrl} alt={displayEvent.title} fill
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                        className="object-cover group-hover:scale-110 transition-transform duration-700"
+                        onError={() => setImageUrl(EVENT_FALLBACK)}
                     />
 
                     {/* Overlay dégradé */}

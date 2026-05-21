@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from 'next/image';
 import { useAuth } from '../context/AuthContext';
 import { updateMe, updateMyPassword } from "../services/userService";
 import toast from "react-hot-toast";
@@ -149,13 +150,13 @@ const AvatarUpload = ({ user, preview, onFileChange, onRemove, uploading }) => {
     return (
         <div className="flex flex-col items-center gap-3">
             <div className="relative group" style={{ width: 96, height: 96 }}>
-                <div className="w-24 h-24 rounded-2xl overflow-hidden flex items-center justify-center"
+                <div className="relative w-24 h-24 rounded-2xl overflow-hidden flex items-center justify-center"
                     style={{
                         background: hasPhoto ? 'transparent' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
                         boxShadow:  `0 0 0 3px rgba(46,123,181,0.15)`,
                     }}>
                     {hasPhoto
-                        ? <img src={preview || user.photo} alt="Photo de profil" className="w-full h-full object-cover" />
+                        ? <Image src={preview || user.photo} alt="Photo de profil" fill unoptimized className="object-cover" />
                         : <User className="w-10 h-10 text-white opacity-80" />
                     }
                 </div>
@@ -383,14 +384,14 @@ console.log('🔍 res.user.photo:', res.user?.photo);
                         initial={{ scale: 0.9, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ duration: 0.25 }}
-                        className="w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center mx-auto mb-4"
+                        className="relative w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center mx-auto mb-4"
                         style={{
                             background: heroPhoto ? 'transparent' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
                             boxShadow:  `0 0 0 3px rgba(46,123,181,0.2), 0 8px 32px rgba(0,0,0,0.4)`,
                         }}
                     >
                         {heroPhoto
-                            ? <img src={heroPhoto} alt="Avatar" className="w-full h-full object-cover" />
+                            ? <Image src={heroPhoto} alt="Avatar" fill unoptimized className="object-cover" />
                             : <User className="w-9 h-9 text-white" />
                         }
                     </motion.div>

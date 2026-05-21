@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import Image from 'next/image';
 
 const slides = [
     {
@@ -118,14 +119,10 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                     <motion.div className="absolute inset-0"
                         initial={{ scale: 1.08 }} animate={{ scale: 1.02 }}
                         transition={{ duration: SLIDE_DURATION / 1000, ease: 'linear' }}>
-                        <img src={s.url}
-                            srcSet={s.urlSm + " 480w, " + s.urlMd + " 800w, " + s.url + " 1470w"}
+                        <Image src={s.url} alt={s.alt} fill
+                            priority={idx === 0}
                             sizes="(max-width: 640px) 480px, (max-width: 1024px) 800px, 1470px"
-                            alt={s.alt} width={s.width} height={s.height}
-                            fetchPriority={idx === 0 ? 'high' : 'low'}
-                            loading={idx === 0 ? 'eager' : 'lazy'}
-                            decoding={idx === 0 ? 'sync' : 'async'}
-                            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+                            className="object-cover object-center"
                         />
                     </motion.div>
                     {/* Dégradés plus intenses pour lisibilité du texte */}

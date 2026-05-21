@@ -2,6 +2,7 @@
 
 // src/components/messaging/ConversationList.jsx
 import React from 'react';
+import Image from 'next/image';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MessageCircle } from 'lucide-react';
@@ -50,11 +51,9 @@ const ConversationList = ({ conversations, selectedConversationId, onSelectConve
             <div className="flex items-start gap-3">
               {/* Avatar */}
               {otherParticipant?.avatar ? (
-                <img
-                  src={otherParticipant.avatar}
-                  alt={otherParticipant.name}
-                  className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                />
+                <Image src={otherParticipant.avatar} alt={otherParticipant.name}
+                  width={48} height={48} unoptimized
+                  className="rounded-full object-cover flex-shrink-0" />
               ) : (
                 <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold flex-shrink-0">
                   {otherParticipant?.name?.[0]?.toUpperCase() || '?'}

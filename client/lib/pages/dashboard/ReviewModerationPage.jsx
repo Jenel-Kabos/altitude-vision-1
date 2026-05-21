@@ -7,6 +7,7 @@ import {
   Loader2, AlertCircle, X, Calendar, User, CheckCircle, Search,
 } from 'lucide-react';
 import api from '../../services/api';
+import Image from 'next/image';
 
 const BLUE = '#2E7BB5';
 const RED  = '#D42B2B';
@@ -75,9 +76,8 @@ const Stars = ({ rating, size = 14 }) => (
 const Avatar = ({ user, size = 40 }) => {
   const letter = user?.name?.charAt(0).toUpperCase() || 'U';
   return user?.photo
-    ? <img src={user.photo} alt={user.name}
-        className="rounded-full object-cover flex-shrink-0"
-        style={{ width:size, height:size }} />
+    ? <Image src={user.photo} alt={user.name} width={size} height={size}
+        unoptimized className="rounded-full object-cover flex-shrink-0" />
     : <div className="rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold"
         style={{ width:size, height:size, background:`linear-gradient(135deg, ${BLUE}, ${GOLD})`,
           fontSize: size * 0.38, fontFamily:"'Outfit', sans-serif" }}>

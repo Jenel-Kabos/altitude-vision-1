@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -53,6 +54,7 @@ const AltcomPortfolioDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [mainImgError, setMainImgError] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
 
   useEffect(() => {
@@ -210,18 +212,12 @@ const AltcomPortfolioDetailPage = () => {
               transition={{ duration: 0.5 }}
               className="relative h-[60vh] md:h-[70vh] rounded-2xl overflow-hidden"
             >
-              <img
-                src={currentImage}
-                alt={portfolio.title}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  console.error('❌ Erreur chargement image principale:', currentImage);
-                  e.target.src = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&auto=format&fit=crop';
-                  e.target.onerror = null;
-                }}
-                onLoad={() => {
-                  console.log('✅ Image principale chargée:', currentImage);
-                }}
+              <Image
+                src={mainImgError ? 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&auto=format&fit=crop' : currentImage}
+                alt={portfolio.title} fill priority
+                sizes="100vw"
+                className="object-cover"
+                onError={() => setMainImgError(true)}
               />
               
               {/* Overlay gradient */}
@@ -296,18 +292,9 @@ const AltcomPortfolioDetailPage = () => {
                         : 'opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <img
-                      src={thumbnailUrl}
-                      alt={`${portfolio.title} - ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        console.error(`❌ Erreur miniature ${index + 1}:`, thumbnailUrl);
-                        e.target.src = 'https://via.placeholder.com/150?text=Image';
-                        e.target.onerror = null;
-                      }}
-                      onLoad={() => {
-                        console.log(`✅ Miniature ${index + 1} chargée:`, thumbnailUrl);
-                      }}
+                    <Image src={thumbnailUrl} alt={`${portfolio.title} - ${index + 1}`} fill
+                      sizes="(max-width: 768px) 25vw, 10vw"
+                      className="object-cover"
                     />
                   </motion.button>
                 );

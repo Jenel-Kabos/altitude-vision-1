@@ -13,6 +13,7 @@ import { getAllPortfolioItems, deletePortfolioItem } from '../../services/portfo
 import api from '../../services/api';
 import ServiceFormModal from '../../components/modals/ServiceFormModal';
 import PortfolioFormModal from '../../components/modals/PortfolioFormModal';
+import Image from 'next/image';
 
 const GOLD  = '#C8872A';
 const BLUE  = '#2E7BB5';
@@ -143,9 +144,10 @@ const PortfolioTable = ({ data, onEdit, onDelete, onView }) => (
         {data.map((item) => (
           <tr key={item._id} className="border-b hover:bg-gray-50 transition">
             <td className="px-6 py-4">
-              <img src={getImageUrl(item.images?.[0])} alt={item.title}
-                className="w-16 h-16 object-cover rounded-lg"
-                onError={(e) => { e.target.src = 'https://placehold.co/80x80/C8872A/FFFFFF?text=Img'; }} />
+              <div className="relative w-16 h-16">
+                <Image src={getImageUrl(item.images?.[0]) || 'https://placehold.co/80x80/C8872A/FFFFFF?text=Img'} alt={item.title} fill
+                  className="object-cover rounded-lg" sizes="64px" />
+              </div>
             </td>
             <td className="px-6 py-4 font-semibold text-gray-800">{item.title}</td>
             <td className="px-6 py-4 text-gray-600">{item.category}</td>
@@ -276,7 +278,13 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => (
 );
 
 // ─── PortfolioViewModal ──────────────────────────────────────
-const PortfolioViewModal = ({ item, onClose }) => (
+const ALTCOM_MODAL_FALLBACK = 'https://placehold.co/800x400/C8872A/FFFFFF?text=Image+Indisponible';
+
+const PortfolioViewModal = ({ item, onClose }) => {
+  const [modalImgSrc, setModalImgSrc] = useState(
+    item.images?.length > 0 ? getImageUrl(item.images[0]) : ALTCOM_MODAL_FALLBACK
+  );
+  return (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
     <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
@@ -286,10 +294,11 @@ const PortfolioViewModal = ({ item, onClose }) => (
         <X size={24} />
       </button>
       {item.images?.length > 0 && (
-        <div className="relative">
-          <img src={getImageUrl(item.images[0])} alt={item.title}
-            className="w-full h-96 object-cover rounded-t-2xl"
-            onError={(e) => { e.target.src = 'https://placehold.co/800x400/C8872A/FFFFFF?text=Image+Indisponible'; }} />
+        <div className="relative h-96">
+          <Image src={modalImgSrc} alt={item.title} fill
+            sizes="(max-width: 1024px) 100vw, 896px"
+            className="object-cover rounded-t-2xl"
+            onError={() => setModalImgSrc(ALTCOM_MODAL_FALLBACK)} />
           <div className="absolute bottom-4 left-4 bg-black/70 text-white px-4 py-2 rounded-lg text-sm">
             {item.images.length} image{item.images.length > 1 ? 's' : ''}
           </div>
@@ -353,7 +362,8 @@ const PortfolioViewModal = ({ item, onClose }) => (
       </div>
     </motion.div>
   </div>
-);
+  );
+};
 
 // ─── ProjectDetailModal ──────────────────────────────────────
 const ProjectDetailModal = ({ project, onClose }) => (

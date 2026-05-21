@@ -2,6 +2,7 @@
 
 // --- src/pages/Profile/ProfilePage.jsx ---
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { updateMe, updateMyPassword } from './userService';
 import { getCurrentUser, saveUser } from './authService';
 import { FaUserCircle, FaLock, FaSave, FaUpload, FaPhone } from 'react-icons/fa';
@@ -131,9 +132,9 @@ const ProfilePage = () => {
       <form onSubmit={handleProfileUpdate} className="mb-10">
         {/* Photo de profil */}
         <div className="mb-4 flex flex-col items-center">
-          <div className="w-24 h-24 rounded-full overflow-hidden mb-2">
+          <div className="relative w-24 h-24 rounded-full overflow-hidden mb-2">
             {photoPreview ? (
-              <img src={photoPreview} alt="Aperçu photo" className="w-full h-full object-cover" />
+              <Image src={photoPreview} alt="Aperçu photo" fill unoptimized className="object-cover" />
             ) : (
               <FaUserCircle className="w-full h-full text-gray-300" />
             )}

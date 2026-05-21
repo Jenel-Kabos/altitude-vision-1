@@ -1,8 +1,11 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const MotionImage = motion.create(Image);
 import { getPropertyById } from '../services/propertyService';
 import {
   ArrowLeft, MapPin, Tag, Check, Bed, Bath,
@@ -541,8 +544,10 @@ const PropertyDetailPage = () => {
   const [property,  setProperty]  = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState('');
-  const [mainIdx,   setMainIdx]   = useState(0);
-  const [lightbox,  setLightbox]  = useState(false);
+  const [mainIdx,       setMainIdx]       = useState(0);
+  const [lightbox,      setLightbox]      = useState(false);
+  const [mainImgError,  setMainImgError]  = useState(false);
+  const [lbImgError,    setLbImgError]    = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -574,6 +579,9 @@ const PropertyDetailPage = () => {
       window.removeEventListener('keydown', onKey);
     };
   }, [lightbox, property]);
+
+  useEffect(() => { setMainImgError(false); }, [mainIdx]);
+  useEffect(() => { setLbImgError(false); },  [lightbox]);
 
   if (loading) return (
     <div className="pdp-root">
@@ -675,14 +683,15 @@ const PropertyDetailPage = () => {
             <div className="pdp-gallery-wrap">
               <div className="pdp-main-img-wrap">
                 <AnimatePresence mode="wait">
-                  <motion.img
+                  <MotionImage
                     key={mainIdx}
-                    src={mainImage}
+                    src={mainImgError ? PLACEHOLDER : mainImage}
                     alt="Vue principale"
+                    fill sizes="(max-width: 768px) 100vw, 60vw"
                     className="pdp-main-img"
                     initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
                     transition={{ duration:0.3 }}
-                    onError={e=>{ e.target.src=PLACEHOLDER; }}
+                    onError={() => setMainImgError(true)}
                     onClick={() => setLightbox(mainIdx)}
                   />
                 </AnimatePresence>
@@ -717,13 +726,12 @@ const PropertyDetailPage = () => {
               {images.length > 1 && (
                 <div className="pdp-strip">
                   {images.map((img, i) => (
-                    <img
-                      key={i}
+                    <Image key={i}
                       src={optimizeCloudinaryUrl(buildImageUrl(img), 200)}
                       alt={`Vue ${i + 1}`}
+                      width={120} height={72}
                       className={`pdp-thumb${i === mainIdx ? ' active' : ''}`}
                       onClick={() => setMainIdx(i)}
-                      onError={e=>{ e.target.src=PLACEHOLDER; }}
                     />
                   ))}
                 </div>
@@ -896,17 +904,18 @@ const PropertyDetailPage = () => {
             onClick={() => setLightbox(false)}
             className="pdp-lightbox">
 
-            <motion.img
+            <MotionImage
               key={lightbox}
-              src={optimizeCloudinaryUrl(buildImageUrl(images[lightbox]), 1600)}
+              src={lbImgError ? PLACEHOLDER : optimizeCloudinaryUrl(buildImageUrl(images[lightbox]), 1600)}
               alt={`Photo ${lightbox + 1}`}
+              width={1600} height={900} unoptimized
               className="pdp-lightbox-img"
               initial={{ opacity:0, scale:0.94 }}
               animate={{ opacity:1, scale:1 }}
               exit={{ opacity:0, scale:0.96 }}
               transition={{ duration:0.28, ease:[0.22,1,0.36,1] }}
               onClick={e => e.stopPropagation()}
-              onError={e=>{ e.target.src=PLACEHOLDER; }}
+              onError={() => setLbImgError(true)}
             />
 
             <button onClick={() => setLightbox(false)} className="pdp-lightbox-close">×</button>
@@ -928,13 +937,12 @@ const PropertyDetailPage = () => {
 
                 <div className="pdp-lightbox-strip" onClick={e => e.stopPropagation()}>
                   {images.map((img, i) => (
-                    <img
-                      key={i}
+                    <Image key={i}
                       src={optimizeCloudinaryUrl(buildImageUrl(img), 200)}
                       alt={`Miniature ${i + 1}`}
+                      width={56} height={38}
                       className="pdp-lightbox-thumb"
                       onClick={() => setLightbox(i)}
-                      onError={e=>{ e.target.src=PLACEHOLDER; }}
                       style={{
                         outline: i === lightbox ? `2px solid ${GOLD}` : '2px solid transparent',
                         outlineOffset: 1,

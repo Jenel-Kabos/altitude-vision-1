@@ -19,6 +19,7 @@ import { getMilaEventsReviews } from '../services/reviewService';
 import { getFirstValidImage }   from '../utils/imageUtils';
 import { useAuth }              from '../context/AuthContext';
 import toast from '@/lib/utils/toast';
+import Image from 'next/image';
 
 const EVENTS_PER_PAGE = 6;
 const EVENT_TYPES = ['Tous', 'Mariage', 'Anniversaire', 'Gala', 'Conférence', 'Lancement'];
@@ -41,6 +42,7 @@ const ATOUTS = [
 ];
 
 // ─── EventCard ────────────────────────────────────────────────
+const MILA_FALLBACK = 'https://placehold.co/600x400/D42B2B/FFFFFF?text=Mila+Events';
 const EventCard = ({ event, index }) => {
     const router = useRouter();
     const d = {
@@ -54,6 +56,7 @@ const EventCard = ({ event, index }) => {
         guests:      event.guests,
         videos:      event.videos || [],
     };
+    const [imgSrc, setImgSrc] = useState(d.imageUrl);
     const formattedDate = d.date
         ? new Date(d.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })
         : 'Date non définie';
@@ -68,10 +71,11 @@ const EventCard = ({ event, index }) => {
             onClick={() => router.push(`/mila-events/event/${d._id}`)}
         >
             <div className="relative h-52 overflow-hidden">
-                <img src={d.imageUrl} alt={d.title}
-                    loading="lazy"
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                    onError={e => { e.target.src = 'https://placehold.co/600x400/D42B2B/FFFFFF?text=Mila+Events'; }} />
+                <Image src={imgSrc} alt={d.title}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                    className="object-cover group-hover:scale-110 transition-transform duration-700"
+                    onError={() => setImgSrc(MILA_FALLBACK)} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                 <div className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: RED }} />
                 <div className="absolute top-3 left-3 right-3 flex justify-between items-start">

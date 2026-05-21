@@ -1,7 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../services/api';
 import Spinner from '../../components/layout/Spinner';
+import Image from 'next/image';
 
 const AdminProjectCreatePage = () => {
   const [formData, setFormData] = useState({ title: '', client: '', service: '', description: '' });
@@ -96,7 +97,9 @@ const AdminProjectCreatePage = () => {
               <p className="text-sm font-medium text-gray-700">Aperçus :</p>
               <div className="mt-2 grid grid-cols-3 md:grid-cols-5 gap-4">
                 {imagePreviews.map((preview, index) => (
-                  <img key={index} src={preview} alt={`Aperçu ${index + 1}`} className="w-full h-24 object-cover rounded-md"/>
+                  <div key={index} className="relative w-full h-24">
+                    <Image src={preview} alt={`Aperçu ${index + 1}`} fill unoptimized className="object-cover rounded-md" sizes="20vw" />
+                  </div>
                 ))}
               </div>
             </div>

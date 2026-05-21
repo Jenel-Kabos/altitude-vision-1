@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { getPropertyById, updateProperty } from '../../services/propertyService';
 import LoadingSpinner from '../../components/UI/LoadingSpinner.jsx';
+import Image from 'next/image';
 
 const EditPropertyPage = () => {
   const params = useParams();
@@ -240,7 +241,7 @@ const EditPropertyPage = () => {
               <div className="flex flex-wrap gap-3">
                 {existingImages.map((img, i) => (
                   <div key={i} className="relative w-24 h-24">
-                    <img src={img} alt={`Image ${i}`} className="object-cover w-full h-full rounded" />
+                    <Image src={img} alt={`Image ${i}`} fill className="object-cover rounded" sizes="96px" />
                     <button 
                       type="button" 
                       onClick={() => setExistingImages(existingImages.filter((_, idx) => idx !== i))}

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -78,12 +79,11 @@ const UserAvatar = ({ user, size = 26 }) => {
   const hasPhoto = user?.photo && !imgError;
 
   return hasPhoto ? (
-    <img
-      src={user.photo}
-      alt={user.name || 'Avatar'}
+    <Image src={user.photo} alt={user.name || 'Avatar'}
+      width={size} height={size} unoptimized
       onError={() => setImgError(true)}
       style={{
-        width: size, height: size, borderRadius: '50%',
+        borderRadius: '50%',
         objectFit: 'cover', flexShrink: 0,
         border: '1.5px solid rgba(200,135,42,0.4)',
       }}

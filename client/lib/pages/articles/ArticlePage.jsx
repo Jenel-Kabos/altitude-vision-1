@@ -7,6 +7,7 @@ import {
     Building2, CalendarCheck, Briefcase, BookOpen, ChevronRight,
 } from 'lucide-react';
 import { getArticleBySlug, getOtherArticles } from '@/lib/data/articlesData';
+import Image from 'next/image';
 
 const ICON_MAP = { Building2, CalendarCheck, Briefcase, BookOpen };
 
@@ -90,10 +91,11 @@ const RelatedCard = ({ article }) => {
     return (
         <Link href={`/actualites/${article.slug}`}
             className="group flex gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors duration-200">
-            <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
-                <img src={article.image} alt={article.title}
-                    loading="lazy"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+            <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
+                <Image src={article.image} alt={article.title}
+                    fill
+                    sizes="64px"
+                    className="object-cover transition-transform duration-500 group-hover:scale-110" />
             </div>
             <div className="min-w-0">
                 <span className="inline-flex items-center gap-1 text-xs font-bold mb-1"
@@ -164,9 +166,10 @@ const ArticlePage = ({ slug }) => {
             <section className="relative min-h-[72vh] flex items-end overflow-hidden">
                 {/* Image de fond avec parallaxe douce */}
                 <div className="absolute inset-0">
-                    <img src={article.image} alt={article.title}
-                        loading="eager" fetchPriority="high"
-                        className="w-full h-full object-cover"
+                    <Image src={article.image} alt={article.title}
+                        fill priority
+                        sizes="100vw"
+                        className="object-cover"
                         style={{ transform: 'scale(1.05)' }} />
                     <div className="absolute inset-0"
                         style={{ background: 'linear-gradient(to top, rgba(5,10,20,0.92) 0%, rgba(5,10,20,0.55) 50%, rgba(5,10,20,0.2) 100%)' }} />

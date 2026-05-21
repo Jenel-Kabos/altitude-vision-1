@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../../services/api';
 import Spinner from '../../components/layout/Spinner';
 import { FaTrash } from 'react-icons/fa';
+import Image from 'next/image';
 
 const AdminProjectEditPage = () => {
   const { id: projectId } = useParams();
@@ -126,7 +127,9 @@ const AdminProjectEditPage = () => {
               <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
                 {existingImages.map((imageUrl, index) => (
                   <div key={index} className="relative group">
-                    <img src={`${backendUrl}${imageUrl}`} alt={`Projet existant ${index + 1}`} className="w-full h-24 object-cover rounded-md"/>
+                    <div className="relative w-full h-24">
+                      <Image src={`${backendUrl}${imageUrl}`} alt={`Projet existant ${index + 1}`} fill className="object-cover rounded-md" sizes="20vw" />
+                    </div>
                     <button type="button" onClick={() => handleDeleteExistingImage(imageUrl)} className="absolute top-1 right-1 bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                       <FaTrash size={12} />
                     </button>
@@ -146,7 +149,9 @@ const AdminProjectEditPage = () => {
               <p className="text-sm font-medium text-gray-700">Nouveaux aperçus :</p>
               <div className="mt-2 grid grid-cols-3 md:grid-cols-5 gap-4">
                 {newImagePreviews.map((preview, index) => (
-                  <img key={index} src={preview} alt={`Aperçu ${index + 1}`} className="w-full h-24 object-cover rounded-md"/>
+                  <div key={index} className="relative w-full h-24">
+                    <Image src={preview} alt={`Aperçu ${index + 1}`} fill unoptimized className="object-cover rounded-md" sizes="20vw" />
+                  </div>
                 ))}
               </div>
             </div>

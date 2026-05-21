@@ -12,6 +12,7 @@ import {
 import QuoteModal from './QuoteModal';
 import { createQuoteRequest }           from '../../services/quoteService';
 import { SERVICES, GOLD, GOLD_DARK, GOLD_LIGHT, BLUE } from './altcomData';
+import Image from 'next/image';
 
 // Mapping slug → service
 const SLUG_MAP = {
@@ -29,10 +30,10 @@ const ServiceImage = ({ src, alt, className = '' }) => {
             {!loaded && (
                 <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200" />
             )}
-            <img
-                src={src} alt={alt} loading="lazy"
+            <Image src={src} alt={alt} fill
+                sizes="(max-width: 768px) 100vw, 50vw"
                 onLoad={() => setLoaded(true)}
-                className={`w-full h-full object-cover transition-all duration-700 ${loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`}
+                className={`object-cover transition-all duration-700 ${loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`}
             />
         </div>
     );
@@ -103,8 +104,8 @@ const AltcomServicePage = () => {
                 {/* Image hero en arrière-plan avec overlay */}
                 {service.images[0] && (
                     <div className="absolute inset-0">
-                        <img src={service.images[0]} alt={service.title}
-                            className="w-full h-full object-cover opacity-20" />
+                        <Image src={service.images[0]} alt={service.title}
+                            fill sizes="100vw" className="object-cover opacity-20" />
                         <div className="absolute inset-0"
                             style={{ background: 'linear-gradient(135deg,rgba(13,17,23,0.95) 40%,rgba(14,30,48,0.85) 100%)' }} />
                     </div>
@@ -405,9 +406,10 @@ const AltcomServicePage = () => {
                                     style={{ borderColor: `${s.color}15` }}>
                                     {/* Image miniature */}
                                     {s.images?.[0] && (
-                                        <div className="h-36 overflow-hidden">
-                                            <img src={s.images[0]} alt={s.title}
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                        <div className="relative h-36 overflow-hidden">
+                                            <Image src={s.images[0]} alt={s.title}
+                                                fill sizes="(max-width: 768px) 100vw, 25vw"
+                                                className="object-cover group-hover:scale-105 transition-transform duration-500" />
                                         </div>
                                     )}
                                     <div className="p-5">

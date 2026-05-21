@@ -1,5 +1,6 @@
 // src/pages/ModerationPage.jsx
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import axios from 'axios';
 import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
 import toast from '@/lib/utils/toast';
@@ -185,12 +186,10 @@ const ModerationPage = () => {
               className="border rounded-lg shadow-md p-4 flex flex-col cursor-pointer hover:shadow-xl transition-all duration-300 bg-white"
               onClick={() => setSelectedProperty(property)}
             >
-              <div className="relative mb-3">
-                <img
-                  src={property.images?.[0] || '/placeholder.png'}
-                  alt={property.title}
-                  className="w-full h-48 object-cover rounded"
-                />
+              <div className="relative mb-3 h-48">
+                <Image src={property.images?.[0] || '/placeholder.png'} alt={property.title} fill
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  className="object-cover rounded" />
                 <span className={`absolute top-2 left-2 px-3 py-1 rounded-full text-xs font-bold text-white ${
                   property.pole === 'Altimmo' ? 'bg-green-500' :
                   property.pole === 'MilaEvents' ? 'bg-purple-500' :
@@ -272,12 +271,11 @@ const ModerationPage = () => {
               <h3 className="font-bold text-lg mb-3">Images ({selectedProperty.images?.length || 0})</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {selectedProperty.images?.map((img, idx) => (
-                  <img
-                    key={idx}
-                    src={img}
-                    alt={`${selectedProperty.title} ${idx + 1}`}
-                    className="w-full h-32 object-cover rounded-lg shadow hover:shadow-xl transition"
-                  />
+                  <div key={idx} className="relative h-32">
+                    <Image src={img} alt={`${selectedProperty.title} ${idx + 1}`} fill
+                      sizes="(max-width: 768px) 50vw, 33vw"
+                      className="object-cover rounded-lg shadow hover:shadow-xl transition" />
+                  </div>
                 ))}
               </div>
             </div>

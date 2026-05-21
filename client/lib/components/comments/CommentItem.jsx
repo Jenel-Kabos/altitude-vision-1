@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Edit2, Trash2, Check, X } from 'lucide-react';
+import Image from 'next/image';
 import { useAuth } from '../../context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -47,7 +48,7 @@ const ITEM_CSS = `
   /* Avatar */
   .ci-avatar-img {
     width: clamp(34px, 5vw, 40px); height: clamp(34px, 5vw, 40px);
-    border-radius: 50%; object-fit: cover; flex-shrink: 0;
+    border-radius: 50%; overflow: hidden; position: relative; flex-shrink: 0;
     box-shadow: 0 0 0 2px rgba(200,135,42,0.2);
   }
   .ci-avatar-letter {
@@ -229,7 +230,7 @@ const CommentItem = ({ comment, onEdit, onDelete }) => {
 
       {/* Avatar */}
       {authorAvatar
-        ? <img src={authorAvatar} alt={authorName} className="ci-avatar-img" />
+        ? <span className="ci-avatar-img"><Image src={authorAvatar} alt={authorName} fill unoptimized className="object-cover" /></span>
         : <div className="ci-avatar-letter"
             style={{ background: author
               ? `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`

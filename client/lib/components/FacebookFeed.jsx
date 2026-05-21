@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Image from 'next/image';
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, ExternalLink, Loader2, Newspaper } from "lucide-react";
@@ -83,11 +84,10 @@ const FacebookFeed = () => {
                 >
                   {/* Image */}
                   {post.image && (
-                    <div className="h-48 overflow-hidden">
-                      <img
-                        src={post.image}
-                        alt={post.message?.substring(0, 80) || 'Publication Facebook'}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    <div className="relative h-48 overflow-hidden">
+                      <Image src={post.image} alt={post.message?.substring(0, 80) || 'Publication Facebook'} fill
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                        className="object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     </div>
                   )}

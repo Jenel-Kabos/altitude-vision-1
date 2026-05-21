@@ -5,6 +5,7 @@ import api from '../../services/api';
 import Spinner from '../../components/layout/Spinner';
 import toast from '@/lib/utils/toast';
 import confirm from '@/lib/utils/confirm';
+import Image from 'next/image';
 
 const AdminProjectList = () => {
   const [projects, setProjects] = useState([]);
@@ -70,7 +71,9 @@ const AdminProjectList = () => {
             {projects.map((project) => (
               <tr key={project._id}>
                 <td className="px-6 py-4 whitespace-nowrap">
-                    <img src={`${backendUrl}${project.imageUrl}`} alt={project.title} className="w-16 h-10 object-cover rounded"/>
+                    <div className="relative w-16 h-10">
+                      <Image src={`${backendUrl}${project.imageUrl}`} alt={project.title} fill className="object-cover rounded" sizes="64px" />
+                    </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{project.title}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.category}</td>

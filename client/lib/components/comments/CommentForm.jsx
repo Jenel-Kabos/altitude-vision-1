@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Send, Lock } from 'lucide-react';
+import Image from 'next/image';
 import { useAuth } from '../../context/AuthContext';
 
 // ─── Design tokens (cohérents avec PropertyDetailPage) ─────────
@@ -68,7 +69,7 @@ const FORM_CSS = `
   /* Avatar */
   .cf-avatar {
     width: clamp(34px, 5vw, 40px); height: clamp(34px, 5vw, 40px);
-    border-radius: 50%; object-fit: cover;
+    border-radius: 50%; overflow: hidden; position: relative;
     flex-shrink: 0;
     box-shadow: 0 0 0 2px rgba(200,135,42,0.22);
   }
@@ -218,7 +219,7 @@ const CommentForm = ({ onSubmit, isSubmitting = false }) => {
         <div className="cf-inner">
           {/* Avatar */}
           {user.avatar
-            ? <img src={user.avatar} alt={user.name} className="cf-avatar" />
+            ? <span className="cf-avatar"><Image src={user.avatar} alt={user.name} fill unoptimized className="object-cover" /></span>
             : <div className="cf-avatar-letter">{user.name?.[0]?.toUpperCase() || 'U'}</div>
           }
 

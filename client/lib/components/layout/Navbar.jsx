@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import logo from '../../assets/logo.png'; // Assurez-vous que ce chemin est correct
+import Image from 'next/image';
+import logo from '../../assets/logo.png';
 
 const Navbar = () => {
   const { userInfo, logout } = useAuth();
@@ -29,7 +30,7 @@ const Navbar = () => {
           {/* Logo */}
           <div className="flex-shrink-0">
             <NavLink to="/" onClick={() => setMobileMenuOpen(false)}>
-              <img className="h-14 w-auto" src={logo} alt="Altitude-Vision" />
+              <Image src={logo} alt="Altitude-Vision" height={56} className="w-auto" />
             </NavLink>
           </div>
 

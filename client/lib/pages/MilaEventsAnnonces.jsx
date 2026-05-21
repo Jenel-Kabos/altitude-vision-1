@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { getAllEvents }       from '../services/eventService';
 import { getFirstValidImage } from '../utils/imageUtils';
+import Image from 'next/image';
 
 // ─────────────────────────────────────────────────────────────
 // Constantes
@@ -42,9 +43,10 @@ const CardSkeleton = () => (
 // ─────────────────────────────────────────────────────────────
 // Card événement — vue grille
 // ─────────────────────────────────────────────────────────────
+const MILA_FALLBACK = 'https://placehold.co/600x400/D42B2B/FFFFFF?text=Mila+Events';
 const EventCardGrid = ({ event, index }) => {
     const router = useRouter();
-    const img = getFirstValidImage(event.images, 'https://placehold.co/600x400/D42B2B/FFFFFF?text=Mila+Events');
+    const [imgSrc, setImgSrc] = useState(getFirstValidImage(event.images, MILA_FALLBACK));
     const date = event.date ? new Date(event.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Date non définie';
 
     return (
@@ -59,10 +61,11 @@ const EventCardGrid = ({ event, index }) => {
         >
             {/* Image */}
             <div className="relative h-52 overflow-hidden">
-                <img src={img} alt={event.name || event.title}
-                    loading="lazy"
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    onError={e => { e.target.src = 'https://placehold.co/600x400/D42B2B/FFFFFF?text=Mila+Events'; }} />
+                <Image src={imgSrc} alt={event.name || event.title}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    onError={() => setImgSrc(MILA_FALLBACK)} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
                 {/* Badges */}
@@ -121,7 +124,7 @@ const EventCardGrid = ({ event, index }) => {
 // ─────────────────────────────────────────────────────────────
 const EventCardList = ({ event, index }) => {
     const router = useRouter();
-    const img = getFirstValidImage(event.images, 'https://placehold.co/600x400/D42B2B/FFFFFF?text=Mila+Events');
+    const [imgSrc, setImgSrc] = useState(getFirstValidImage(event.images, MILA_FALLBACK));
     const date = event.date ? new Date(event.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Date non définie';
 
     return (
@@ -134,10 +137,12 @@ const EventCardList = ({ event, index }) => {
             style={{ borderColor: 'rgba(0,0,0,0.06)' }}
         >
             {/* Image */}
-            <div className="relative sm:w-56 h-48 sm:h-auto flex-shrink-0 overflow-hidden">
-                <img src={img} alt={event.name || event.title}
-                    loading="lazy"
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+            <div className="relative sm:w-56 h-48 sm:min-h-full flex-shrink-0 overflow-hidden">
+                <Image src={imgSrc} alt={event.name || event.title}
+                    fill
+                    sizes="(max-width: 640px) 100vw, 224px"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    onError={() => setImgSrc(MILA_FALLBACK)} />
                 <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black/40 to-transparent" />
                 <span className="absolute top-3 left-3 text-white text-xs font-bold px-3 py-1.5 rounded-full"
                     style={{ background: `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})`, fontFamily: "'Outfit', sans-serif" }}>

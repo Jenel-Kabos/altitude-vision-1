@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import {
@@ -25,8 +26,10 @@ const Img = ({ src, alt, className = '' }) => {
     return (
         <div className={`relative overflow-hidden bg-gray-100 ${className}`}>
             {!loaded && <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200" />}
-            <img src={src} alt={alt} loading="lazy" onLoad={() => setLoaded(true)}
-                className={`w-full h-full object-cover transition-all duration-700 ${loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`} />
+            <Image src={src} alt={alt} fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                onLoad={() => setLoaded(true)}
+                className={`object-cover transition-all duration-700 ${loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`} />
         </div>
     );
 };

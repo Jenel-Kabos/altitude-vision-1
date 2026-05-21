@@ -12,6 +12,7 @@ import {
   deleteProperty, getPropertyById,
 } from "../../services/propertyService";
 import PropertyForm from "../../components/dashboard/PropertyForm";
+import Image from 'next/image';
 
 const BLUE = '#2E7BB5';
 const GOLD = '#C8872A';
@@ -151,20 +152,20 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
 // ─────────────────────────────────────────────────────────────
 // Carte bien (liste)
 // ─────────────────────────────────────────────────────────────
+const ALTIMMO_FALLBACK = 'https://placehold.co/600x400/2E7BB5/FFFFFF?text=Altimmo';
+
 const PropertyCard = ({ property, onEdit, onDelete }) => {
-  // ✅ Correction : préfixer l'URL avec le domaine du backend.
-  // Sans ça, "/uploads/events/photo.jpg" est interprété comme une URL
-  // relative au frontend (ex: altitudevision.agency/uploads/...) au lieu
-  // du backend (ex: api.altitudevision.agency/uploads/...).
-  const img = getImageUrl(property.images?.[0])
-    || 'https://placehold.co/600x400/2E7BB5/FFFFFF?text=Altimmo';
+  const [imgSrc, setImgSrc] = useState(
+    getImageUrl(property.images?.[0]) || ALTIMMO_FALLBACK
+  );
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all group">
       <div className="relative h-44 overflow-hidden">
-        <img src={img} alt={property.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          onError={e => { e.target.src='https://placehold.co/600x400/2E7BB5/FFFFFF?text=Altimmo'; }} />
+        <Image src={imgSrc} alt={property.title} fill
+          sizes="(max-width: 768px) 100vw, 33vw"
+          className="object-cover group-hover:scale-105 transition-transform duration-500"
+          onError={() => setImgSrc(ALTIMMO_FALLBACK)} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
         <span className="absolute top-3 left-3 text-white text-xs font-semibold px-2.5 py-1 rounded-full"
           style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})`, fontFamily:"'Outfit', sans-serif" }}>

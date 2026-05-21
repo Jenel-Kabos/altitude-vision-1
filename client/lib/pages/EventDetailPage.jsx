@@ -1,6 +1,7 @@
 "use client";
 // src/pages/EventDetailPage.jsx
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -22,6 +23,7 @@ const EventDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const [mainImgError, setMainImgError] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [activeMediaTab, setActiveMediaTab] = useState('images');
 
@@ -211,13 +213,12 @@ const EventDetailPage = () => {
               className="relative h-96 lg:h-[500px] rounded-2xl overflow-hidden shadow-2xl group"
             >
               {activeMediaTab === 'images' ? (
-                <img
-                  src={currentImage}
-                  alt={event.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.src = 'https://placehold.co/800x600/60A5FA/FFFFFF?text=Mila+Events';
-                  }}
+                <Image
+                  src={mainImgError ? 'https://placehold.co/800x600/60A5FA/FFFFFF?text=Mila+Events' : currentImage}
+                  alt={event.name} fill priority
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
+                  onError={() => setMainImgError(true)}
                 />
               ) : (
                 <div className="w-full h-full bg-black flex items-center justify-center">
@@ -295,13 +296,9 @@ const EventDetailPage = () => {
                         : 'opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <img
-                      src={img}
-                      alt={`${event.name} ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.src = 'https://placehold.co/200x150/60A5FA/FFFFFF?text=Image';
-                      }}
+                    <Image src={img} alt={`${event.name} ${index + 1}`} fill
+                      sizes="(max-width: 768px) 25vw, 10vw"
+                      className="object-cover"
                     />
                   </button>
                 ))}

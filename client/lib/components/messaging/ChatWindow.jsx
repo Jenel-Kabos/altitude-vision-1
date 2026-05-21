@@ -2,6 +2,7 @@
 
 // src/components/messaging/ChatWindow.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { ArrowLeft, MoreVertical, Archive, RefreshCw, MessageCircle } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
@@ -149,11 +150,9 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
           </button>
 
           {otherParticipant?.avatar ? (
-            <img
-              src={otherParticipant.avatar}
-              alt={otherParticipant.name}
-              className="w-10 h-10 rounded-full object-cover"
-            />
+            <Image src={otherParticipant.avatar} alt={otherParticipant.name}
+              width={40} height={40} unoptimized
+              className="rounded-full object-cover" />
           ) : (
             <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
               {otherParticipant?.name?.[0]?.toUpperCase() || '?'}

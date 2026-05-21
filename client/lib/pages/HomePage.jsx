@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { Helmet }         from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link }           from 'react-router-dom';
@@ -571,22 +572,16 @@ const HomePage = () => {
               </FadeIn>
 
               <FadeIn x={20} delay={0.1}>
-                <div style={{ position: 'relative', borderRadius: '20px', overflow: 'hidden' }}>
+                <div style={{ position: 'relative', borderRadius: '20px', overflow: 'hidden', height: 'clamp(280px,35vw,420px)' }}>
                   {/*
                     ⚠️  REMPLACER cette image Unsplash par une vraie photo de votre équipe.
                     Cela renforcera la confiance et l'authenticité pour vos prospects.
                   */}
-                  <img
+                  <Image
                     src="https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1200&auto=format&fit=crop"
                     alt="L'équipe Altitude Vision en réunion à Brazzaville"
-                    width={600}
-                    height={420}
-                    loading="lazy"
-                    style={{
-                      width: '100%', height: 'clamp(280px,35vw,420px)',
-                      objectFit: 'cover', display: 'block',
-                      borderRadius: '20px',
-                    }}
+                    fill sizes="(max-width: 768px) 100vw, 600px"
+                    className="object-cover"
                   />
                   <div style={{
                     position: 'absolute', inset: 0,

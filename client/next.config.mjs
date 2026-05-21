@@ -11,7 +11,7 @@ const CSP = [
   // Fonts are self-hosted via next/font — no external font CDN needed
   "font-src 'self'",
   // Images: local, Unsplash (hero), Cloudinary (uploads), Render (legacy), Facebook (feed)
-  "img-src 'self' data: blob: https://images.unsplash.com https://altitude-vision.onrender.com https://res.cloudinary.com https://graph.facebook.com",
+  "img-src 'self' data: blob: https://images.unsplash.com https://altitude-vision.onrender.com https://res.cloudinary.com https://graph.facebook.com https://*.fbcdn.net https://platform-lookaside.fbsbx.com https://ui-avatars.com https://placehold.co https://illustrations.popsy.co",
   // API calls + Facebook feed data
   "connect-src 'self' https://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com",
   "frame-src 'none'",
@@ -36,6 +36,18 @@ const SECURITY_HEADERS = [
 const nextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: __dirname,
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'altitude-vision.onrender.com' },
+      { protocol: 'https', hostname: 'graph.facebook.com' },
+      { protocol: 'https', hostname: '**.googleusercontent.com' },
+      { protocol: 'https', hostname: '**.fbcdn.net' },
+      { protocol: 'https', hostname: 'platform-lookaside.fbsbx.com' },
+      { protocol: 'https', hostname: 'illustrations.popsy.co' },
+    ],
+  },
   webpack: (config) => {
     config.resolve.alias['@'] = path.resolve(__dirname);
     return config;

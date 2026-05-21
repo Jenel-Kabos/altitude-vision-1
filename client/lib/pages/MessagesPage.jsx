@@ -12,6 +12,7 @@ import ConversationList from '../components/messaging/ConversationList';
 import ChatWindow       from '../components/messaging/ChatWindow';
 import { getUserConversations, createOrGetConversation } from '../services/conversationService';
 import { useAuth } from '../context/AuthContext';
+import Image from 'next/image';
 
 // ── Design tokens ──────────────────────────────────────────────
 const C = {
@@ -42,8 +43,7 @@ const Avatar = ({ name = 'U', photo, size = 40, online = false }) => {
                 border: `2px solid ${C.border}`,
             }}>
                 {photo && !imgErr
-                    ? <img src={photo} alt={name} onError={() => setImgErr(true)}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ? <Image src={photo} alt={name} fill unoptimized onError={() => setImgErr(true)} className="object-cover" />
                     : (name || 'U')[0].toUpperCase()
                 }
             </div>

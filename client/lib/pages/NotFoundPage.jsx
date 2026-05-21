@@ -4,6 +4,9 @@ import React from "react";
 import Link from "next/link";
 import { ArrowLeft, Building2, Calendar, Briefcase } from "lucide-react";
 import { motion } from "framer-motion";
+import Image from 'next/image';
+
+const MotionImage = motion.create(Image);
 
 const NotFoundPage = () => {
 
@@ -61,10 +64,11 @@ const NotFoundPage = () => {
       }}>
 
         {/* --- Illustration flottante --- */}
-        <motion.img
+        <MotionImage
           src="https://illustrations.popsy.co/gray/error-404.svg"
           alt="Page non trouvée"
-          style={{ width: "clamp(180px, 40vw, 320px)", marginBottom: "clamp(24px, 4vw, 40px)", opacity: 0.9 }}
+          width={320} height={320} unoptimized
+          style={{ width: "clamp(180px, 40vw, 320px)", height: "auto", marginBottom: "clamp(24px, 4vw, 40px)", opacity: 0.9 }}
           variants={floatVariant}
           animate="animate"
         />

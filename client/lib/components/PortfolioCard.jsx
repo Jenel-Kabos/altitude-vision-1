@@ -1,8 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
+
+const MotionImage = motion.create(Image);
 import { Star, Calendar, User, Tag, ExternalLink } from 'lucide-react';
 import LikeButton from './likes/LikeButton';
 
@@ -34,11 +37,12 @@ const getImageUrl = (imagePath) => {
  * Composant de carte pour afficher un projet du portfolio Altcom
  * @param {Object} item - L'objet portfolio contenant _id, title, images, description, client, category, etc.
  */
+const PORTFOLIO_FALLBACK = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop';
+
 const PortfolioCard = ({ item }) => {
   const router = useRouter();
-
-  // Construire l'URL de l'image (prend la première image ou utilise un fallback)
-  const imageUrl = getImageUrl(item.images?.[0]);
+  const [imgError, setImgError] = useState(false);
+  const imageUrl = imgError ? PORTFOLIO_FALLBACK : getImageUrl(item.images?.[0]);
 
   // Formater la date du projet
   const formatDate = (date) => {
@@ -77,16 +81,14 @@ const PortfolioCard = ({ item }) => {
       >
       {/* Image */}
       <div className="relative h-56 overflow-hidden">
-        <motion.img
+        <MotionImage
           whileHover={{ scale: 1.1 }}
           transition={{ duration: 0.6 }}
           src={imageUrl}
           alt={item.title}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop';
-          }}
+          fill sizes="(max-width: 768px) 100vw, 33vw"
+          className="object-cover"
+          onError={() => setImgError(true)}
         />
         
         {/* Overlay avec catégorie et CTA */}
