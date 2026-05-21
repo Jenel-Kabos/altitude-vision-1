@@ -246,13 +246,14 @@ const QuoteResponseModal = ({ quote, onClose, onSubmit }) => {
             <label className="block text-gray-700 font-semibold mb-2">Objet de l'email</label>
             <input type="text" value={responseData.subject}
               onChange={(e) => setResponseData({ ...responseData, subject: e.target.value })} required
+              aria-label="Objet de l'email"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-gray-700 font-semibold mb-2">Montant du Devis (FCFA) <span className="text-red-500">*</span></label>
             <input type="number" value={responseData.quotedAmount}
               onChange={(e) => setResponseData({ ...responseData, quotedAmount: e.target.value })} required
-              min="0" placeholder="Ex: 5000000"
+              min="0" placeholder="Ex: 5000000" aria-label="Montant du devis en FCFA"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
@@ -397,7 +398,7 @@ const ManageQuotesPage = () => {
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input type="text" placeholder="Rechercher par nom, email, service…" value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)} aria-label="Rechercher un devis"
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
           <div className="flex items-center gap-2">

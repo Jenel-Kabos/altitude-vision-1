@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Loader2, Upload, Calendar, DollarSign, Target, Briefcase, Users, FileText, Check } from 'lucide-react';
+import toast from '@/lib/utils/toast';
 
 const AltcomProjectFormModal = ({ onClose, onFormSubmit }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -61,7 +62,7 @@ const AltcomProjectFormModal = ({ onClose, onFormSubmit }) => {
   const handleSubmit = async () => {
     // Validation
     if (!formData.projectName || !formData.contactName || !formData.email || !formData.detailedDescription) {
-      alert('Veuillez remplir tous les champs obligatoires.');
+      toast.warning('Veuillez remplir tous les champs obligatoires.');
       return;
     }
 
@@ -73,7 +74,7 @@ const AltcomProjectFormModal = ({ onClose, onFormSubmit }) => {
       onClose();
     } catch (error) {
       console.error("Erreur lors de la création du projet:", error);
-      alert(error.message || "Erreur lors de l'envoi. Veuillez réessayer.");
+      toast.error(error.message || "Erreur lors de l'envoi. Veuillez réessayer.");
     } finally {
       setIsSubmitting(false);
     }

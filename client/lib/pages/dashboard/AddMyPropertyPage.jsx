@@ -81,17 +81,17 @@ const AddMyPropertyPage = () => {
     <div className="dashboard-form max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-2xl font-semibold mb-6">Ajouter ma Propriété</h2>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <input name="title" placeholder="Titre" value={property.title} onChange={handleChange} required className="input-field" />
-        <textarea name="description" placeholder="Description" value={property.description} onChange={handleChange} required className="input-field" />
-        <input name="price" type="number" placeholder="Prix" value={property.price} onChange={handleChange} required className="input-field" />
-        <input name="address" placeholder="Adresse" value={property.address} onChange={handleChange} required className="input-field" />
-        <input name="city" placeholder="Ville" value={property.city} onChange={handleChange} required className="input-field" />
-        <input name="type" placeholder="Type (Maison, Villa, Studio…)" value={property.type} onChange={handleChange} required className="input-field" />
-        <input name="bedrooms" type="number" placeholder="Chambres" value={property.bedrooms} onChange={handleChange} required className="input-field" />
-        <input name="bathrooms" type="number" placeholder="Salles de bain" value={property.bathrooms} onChange={handleChange} required className="input-field" />
-        <input name="area" type="number" placeholder="Surface (m²)" value={property.area} onChange={handleChange} required className="input-field" />
+        <input name="title" placeholder="Titre" value={property.title} onChange={handleChange} required aria-label="Titre de la propriété" className="input-field" />
+        <textarea name="description" placeholder="Description" value={property.description} onChange={handleChange} required aria-label="Description" className="input-field" />
+        <input name="price" type="number" placeholder="Prix" value={property.price} onChange={handleChange} required aria-label="Prix" className="input-field" />
+        <input name="address" placeholder="Adresse" value={property.address} onChange={handleChange} required aria-label="Adresse" className="input-field" />
+        <input name="city" placeholder="Ville" value={property.city} onChange={handleChange} required aria-label="Ville" className="input-field" />
+        <input name="type" placeholder="Type (Maison, Villa, Studio…)" value={property.type} onChange={handleChange} required aria-label="Type de bien" className="input-field" />
+        <input name="bedrooms" type="number" placeholder="Chambres" value={property.bedrooms} onChange={handleChange} required aria-label="Nombre de chambres" className="input-field" />
+        <input name="bathrooms" type="number" placeholder="Salles de bain" value={property.bathrooms} onChange={handleChange} required aria-label="Nombre de salles de bain" className="input-field" />
+        <input name="area" type="number" placeholder="Surface (m²)" value={property.area} onChange={handleChange} required aria-label="Surface en m²" className="input-field" />
 
-        <input type="file" onChange={handleImageChange} required />
+        <input type="file" onChange={handleImageChange} required aria-label="Photo de la propriété" />
 
         <button
           type="submit"

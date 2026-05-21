@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { FaTimes, FaEnvelopeOpenText, FaPaperPlane } from 'react-icons/fa';
+import toast from '@/lib/utils/toast';
 
 /**
  * Composant Modal générique pour toutes les demandes de contact (Devis, Partenariat, Infos).
@@ -45,7 +46,7 @@ const ContactModal = ({ intention, onClose, serviceTitle = null }) => {
       confirmationMessage = `✅ Votre message pour la catégorie "${intention}" a bien été reçu. Merci de nous avoir contactés !`;
     }
     
-    alert(confirmationMessage);
+    toast.success(confirmationMessage);
     onClose(); 
   };
   

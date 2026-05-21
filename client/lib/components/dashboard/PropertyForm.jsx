@@ -131,6 +131,7 @@ const PropertyForm = ({
           value={formData.title}
           onChange={handleChange}
           placeholder="Ex: Appartement moderne à Moungali"
+          aria-label="Titre du bien"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
           required
         />
@@ -143,6 +144,7 @@ const PropertyForm = ({
           value={formData.description}
           onChange={handleChange}
           placeholder="Décrivez le bien en détail..."
+          aria-label="Description du bien"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
           rows={5}
           required

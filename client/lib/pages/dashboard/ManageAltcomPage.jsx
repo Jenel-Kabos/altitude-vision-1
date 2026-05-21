@@ -581,7 +581,7 @@ const ManageAltcomPage = () => {
           <div className="relative flex-1 w-full">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="text" placeholder="Rechercher…" value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)} aria-label="Rechercher un projet Altcom"
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none transition-all"
               style={{ fontFamily: "'Outfit', sans-serif" }}
               onFocus={e => { e.target.style.borderColor = GOLD; e.target.style.boxShadow = `0 0 0 3px ${GOLD}20`; }}

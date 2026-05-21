@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
+import toast from '@/lib/utils/toast';
 
 const ModerationPage = () => {
   const [properties, setProperties] = useState([]);
@@ -75,10 +76,10 @@ const ModerationPage = () => {
       setSelectedProperty(null);
       
       // Afficher un message de succès
-      alert(`Annonce ${action === 'validate' ? 'validée' : 'rejetée'} avec succès !`);
+      toast.success(`Annonce ${action === 'validate' ? 'validée' : 'rejetée'} avec succès !`);
     } catch (err) {
       console.error('❌ [ModerationPage] Erreur modération:', err);
-      alert(err.response?.data?.message || err.message);
+      toast.error(err.response?.data?.message || err.message);
     }
   };
 

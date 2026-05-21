@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import confirm from '@/lib/utils/confirm';
 import { RotateCcw, Ban } from 'lucide-react'; 
 
 const BASE_API_URL = 'https://altitude-vision.onrender.com/api/admin/owners'; 
@@ -42,9 +43,7 @@ const ActiveUsersPage = () => {
     };
 
     const handleBan = async (userId, userName) => {
-        if (!window.confirm(`Êtes-vous sûr de vouloir BANNIR et déconnecter ${userName} ? Cette action invalide immédiatement tous ses tokens.`)) {
-            return;
-        }
+        if (!await confirm(`Êtes-vous sûr de vouloir BANNIR ${userName} ? Cette action invalide immédiatement tous ses tokens.`, { title: 'Bannir l\'utilisateur', danger: true })) return;
 
         try {
             const token = localStorage.getItem('token');

@@ -244,6 +244,7 @@ const AdminPropertyList = () => {
               placeholder="Titre, propriétaire, ville…"
               value={search}
               onChange={e => setSearch(e.target.value)}
+              aria-label="Rechercher un bien immobilier"
               className="w-full pl-10 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none transition-all"
               style={{ fontFamily: "'Outfit', sans-serif" }}
               onFocus={e => { e.target.style.borderColor = BLUE; e.target.style.boxShadow = `0 0 0 3px ${BLUE}18`; }}

@@ -8,7 +8,8 @@ import { MessageSquare, Layout, TrendingUp, Zap, Loader2 as IconSpinner, X, Chev
 // 🔌 IMPORTATION DES SERVICES API (Simulés pour Altcom)
 // Remplacer ces imports par vos vrais services Altcom
 import useAltcomData from "../hooks/useAltcomData"; // Hook personnalisé de votre code initial
-import { createQuoteRequest } from '../services/quoteService'; // Service réutilisé de MilaEvents
+import { createQuoteRequest } from '../services/quoteService';
+import toast from '@/lib/utils/toast';
 
 // 🎨 IMPORTATION DES COMPOSANTS/UTILITAIRES
 // Assurez-vous que ces composants existent et sont correctement importés
@@ -172,7 +173,7 @@ const QuoteRequestModal = ({ serviceTitle, onClose, onFormSubmit }) => {
     
     // Validation minimale adaptée à Altcom
     if (!formData.name || !formData.email || !formData.description || !formData.projectType) {
-      alert('Veuillez remplir tous les champs obligatoires.');
+      toast.warning('Veuillez remplir tous les champs obligatoires.');
       return;
     }
 
@@ -183,7 +184,7 @@ const QuoteRequestModal = ({ serviceTitle, onClose, onFormSubmit }) => {
       onClose();
     } catch (error) {
       console.error("Erreur lors de la soumission du devis Altcom:", error);
-      alert(error.message || "Erreur lors de l'envoi du devis. Veuillez réessayer.");
+      toast.error(error.message || "Erreur lors de l'envoi du devis. Veuillez réessayer.");
     } finally {
       setIsSubmitting(false);
     }

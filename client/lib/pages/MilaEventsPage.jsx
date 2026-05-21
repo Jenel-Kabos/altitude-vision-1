@@ -18,6 +18,7 @@ import { createQuoteRequest }   from '../services/quoteService';
 import { getMilaEventsReviews } from '../services/reviewService';
 import { getFirstValidImage }   from '../utils/imageUtils';
 import { useAuth }              from '../context/AuthContext';
+import toast from '@/lib/utils/toast';
 
 const EVENTS_PER_PAGE = 6;
 const EVENT_TYPES = ['Tous', 'Mariage', 'Anniversaire', 'Gala', 'Conférence', 'Lancement'];
@@ -162,12 +163,12 @@ const QuoteModal = ({ serviceTitle, onClose, onFormSubmit }) => {
     const handleSubmit = async e => {
         e.preventDefault();
         if (!formData.name || !formData.email || !formData.description || !formData.date || !formData.guests) {
-            alert('Veuillez remplir tous les champs obligatoires.');
+            toast.warning('Veuillez remplir tous les champs obligatoires.');
             return;
         }
         setIsSubmitting(true);
         try { await onFormSubmit(formData); onClose(); }
-        catch (err) { alert(err.message || "Erreur."); }
+        catch (err) { toast.error(err.message || "Erreur."); }
         finally { setIsSubmitting(false); }
     };
 

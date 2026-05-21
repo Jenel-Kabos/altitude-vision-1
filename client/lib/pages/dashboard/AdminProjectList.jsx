@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '../../services/api';
 import Spinner from '../../components/layout/Spinner';
+import toast from '@/lib/utils/toast';
+import confirm from '@/lib/utils/confirm';
 
 const AdminProjectList = () => {
   const [projects, setProjects] = useState([]);
@@ -29,14 +31,13 @@ const AdminProjectList = () => {
   }, [fetchProjects]);
 
   const deleteHandler = async (id) => {
-    if (window.confirm('Voulez-vous vraiment supprimer ce projet ?')) {
-      try {
-        await api.delete(`/projects/${id}`);
-        fetchProjects();
-      } catch (err) {
-        alert('La suppression du projet a échoué.');
-        console.error(err);
-      }
+    if (!await confirm('Voulez-vous vraiment supprimer ce projet ?', { title: 'Supprimer le projet', danger: true })) return;
+    try {
+      await api.delete(`/projects/${id}`);
+      fetchProjects();
+    } catch (err) {
+      toast.error('La suppression du projet a échoué.');
+      console.error(err);
     }
   };
 

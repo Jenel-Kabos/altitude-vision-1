@@ -169,7 +169,7 @@ const ManageEmailsPage = () => {
         <div className="relative flex-1 w-full md:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input type="text" placeholder="Rechercher un email…" value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => setSearchTerm(e.target.value)} aria-label="Rechercher un email"
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
         </div>
         <button onClick={handleAdd}
@@ -346,20 +346,20 @@ const EmailModal = ({ mode, email, onClose, onSubmit, showPassword, setShowPassw
               <label className="block text-gray-700 font-semibold mb-2">Adresse Email <span className="text-red-500">*</span></label>
               <div className="flex">
                 <input type="text" name="email" value={formData.email} onChange={handleChange} required
-                  disabled={mode === 'edit'} placeholder="contact"
+                  disabled={mode === 'edit'} placeholder="contact" aria-label="Adresse email"
                   className="flex-1 p-3 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" />
                 <span className="bg-gray-200 px-4 py-3 border border-l-0 border-gray-300 rounded-r-lg text-gray-700 text-sm">@altitudevision.agency</span>
               </div>
             </div>
             <div>
               <label className="block text-gray-700 font-semibold mb-2">Nom d'affichage <span className="text-red-500">*</span></label>
-              <input type="text" name="displayName" value={formData.displayName} onChange={handleChange} required placeholder="Ex: Service Contact" className={inputCls} />
+              <input type="text" name="displayName" value={formData.displayName} onChange={handleChange} required placeholder="Ex: Service Contact" aria-label="Nom d'affichage" className={inputCls} />
             </div>
           </div>
 
           <div>
             <label className="block text-gray-700 font-semibold mb-2">Type d'email</label>
-            <select name="emailType" value={formData.emailType} onChange={handleChange} className={inputCls}>
+            <select name="emailType" value={formData.emailType} onChange={handleChange} aria-label="Type d'email" className={inputCls}>
               {['Contact Général','Devis & Commercial','Support Technique','Administration','Marketing','Événementiel','Immobilier','Personnel','Autre'].map(t => (
                 <option key={t} value={t}>{t}</option>
               ))}
@@ -369,7 +369,7 @@ const EmailModal = ({ mode, email, onClose, onSubmit, showPassword, setShowPassw
           <div>
             <label className="block text-gray-700 font-semibold mb-2">Description</label>
             <textarea name="description" value={formData.description} onChange={handleChange} rows="3"
-              placeholder="Description de l'usage de cet email…" className={inputCls} />
+              placeholder="Description de l'usage de cet email…" aria-label="Description" className={inputCls} />
           </div>
 
           {mode === 'add' && (
@@ -377,7 +377,7 @@ const EmailModal = ({ mode, email, onClose, onSubmit, showPassword, setShowPassw
               <label className="block text-gray-700 font-semibold mb-2">Mot de passe (optionnel)</label>
               <div className="relative">
                 <input type={showPassword ? 'text' : 'password'} name="password" value={formData.password}
-                  onChange={handleChange} placeholder="••••••••" className={`${inputCls} pr-12`} />
+                  onChange={handleChange} placeholder="••••••••" aria-label="Mot de passe" className={`${inputCls} pr-12`} />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}

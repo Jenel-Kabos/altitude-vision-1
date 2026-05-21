@@ -17,6 +17,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { createPortfolioItem, updatePortfolioItem } from '../../services/portfolioService';
+import toast from '@/lib/utils/toast';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
 
@@ -180,7 +181,7 @@ const PortfolioFormModal = ({ item, onClose, onSuccess }) => {
     } catch (error) {
       console.error('❌ Erreur lors de la sauvegarde:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Erreur lors de la sauvegarde du projet';
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

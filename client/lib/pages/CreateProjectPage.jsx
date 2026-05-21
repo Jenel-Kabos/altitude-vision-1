@@ -25,6 +25,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { createQuoteRequest } from '../services/quoteService';
+import toast from '@/lib/utils/toast';
 
 const CreateProjectPage = () => {
   const router = useRouter();
@@ -137,7 +138,7 @@ const CreateProjectPage = () => {
       setCurrentStep(prev => Math.min(prev + 1, 9));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      alert('Veuillez remplir tous les champs obligatoires');
+      toast.warning('Veuillez remplir tous les champs obligatoires');
     }
   };
 

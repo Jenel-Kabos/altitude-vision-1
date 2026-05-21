@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { getPortfolioItem } from '../../services/portfolioService';
 import Breadcrumb from '../../components/Breadcrumb';
+import toast from '../../utils/toast';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://altitude-vision.onrender.com';
 
@@ -104,7 +105,7 @@ const AltcomPortfolioDetailPage = () => {
       }
     } else {
       navigator.clipboard.writeText(window.location.href);
-      alert('Lien copié dans le presse-papiers !');
+      toast.success('Lien copié dans le presse-papiers !');
     }
   };
 

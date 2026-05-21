@@ -2,13 +2,14 @@
 
 // client/src/components/modals/AltcomQuoteRequestModal.jsx
 import React, { useState } from "react";
+import toast from '@/lib/utils/toast';
 
 const AltcomQuoteRequestModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null; // Ne rien afficher si modal fermée
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    alert("Demande de devis envoyée !");
+    toast.success("Demande de devis envoyée !");
     onClose(); // Fermer la modal après soumission
   };
 

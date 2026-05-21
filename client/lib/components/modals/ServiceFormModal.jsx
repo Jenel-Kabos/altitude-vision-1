@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Save, Loader2, Plus, Trash2, DollarSign, FileText, Tag } from 'lucide-react';
 import { createService, updateService } from '../../services/serviceService';
+import toast from '@/lib/utils/toast';
 
 const ServiceFormModal = ({ service, onClose, onSuccess }) => {
   const isEditMode = !!service;
@@ -50,7 +51,7 @@ const ServiceFormModal = ({ service, onClose, onSuccess }) => {
 
   const handleAddOption = () => {
     if (!newOption.name || !newOption.price) {
-      alert('Veuillez remplir le nom et le prix de l\'option');
+      toast.warning("Veuillez remplir le nom et le prix de l'option");
       return;
     }
 
@@ -112,7 +113,7 @@ const ServiceFormModal = ({ service, onClose, onSuccess }) => {
       onSuccess();
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      alert(error.response?.data?.message || 'Erreur lors de la sauvegarde du service');
+      toast.error(error.response?.data?.message || 'Erreur lors de la sauvegarde du service');
     } finally {
       setIsSubmitting(false);
     }

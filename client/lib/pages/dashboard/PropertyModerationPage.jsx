@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
+import toast from '@/lib/utils/toast';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api';
 const getImageUrl = (url) => {
@@ -73,9 +74,9 @@ const PropertyModerationPage = () => {
         }));
       }
       setSelectedProperty(null);
-      alert(`Annonce ${action === 'validate' ? 'validée' : 'rejetée'} avec succès !`);
+      toast.success(`Annonce ${action === 'validate' ? 'validée' : 'rejetée'} avec succès !`);
     } catch (err) {
-      alert(err.response?.data?.message || "Une erreur est survenue.");
+      toast.error(err.response?.data?.message || "Une erreur est survenue.");
     }
   };
 

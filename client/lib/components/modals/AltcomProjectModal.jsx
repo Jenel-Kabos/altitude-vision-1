@@ -2,13 +2,14 @@
 
 // client/src/components/modals/AltcomProjectModal.jsx
 import React, { useState } from "react";
+import toast from '@/lib/utils/toast';
 
 const AltcomProjectModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    alert("Projet enregistré !");
+    toast.success("Projet enregistré !");
     onClose();
   };
 

@@ -85,7 +85,7 @@ const AdminEventCreatePage = () => {
             <label className="block text-gray-700 font-bold mb-2">Images</label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
               <FaUpload className="mx-auto text-4xl text-gray-400 mb-2" />
-              <input type="file" multiple onChange={handleFileChange} className="file-input-style" />
+              <input type="file" multiple onChange={handleFileChange} aria-label="Images de l'événement" className="file-input-style" />
               <p className="text-xs text-gray-500 mt-2">PNG, JPG, GIF (jusqu'à 5)</p>
             </div>
           </div>

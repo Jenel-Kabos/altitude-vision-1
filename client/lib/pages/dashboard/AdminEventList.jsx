@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FaPlus, FaPencilAlt, FaTrash } from 'react-icons/fa';
 import api from '../../services/api';
 import Spinner from '../../components/layout/Spinner';
+import confirm from '@/lib/utils/confirm';
 
 const AdminEventList = () => {
   const [events, setEvents] = useState([]);
@@ -28,14 +29,13 @@ const AdminEventList = () => {
   }, [fetchEvents]);
 
   const handleDelete = async (id) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet événement ?')) {
-      try {
-        await api.delete(`/events/${id}`);
-        fetchEvents(); // Recharger la liste après suppression
-      } catch (err) {
-        setError('La suppression a échoué.');
-        console.error(err);
-      }
+    if (!await confirm('Êtes-vous sûr de vouloir supprimer cet événement ?', { title: 'Supprimer l\'événement', danger: true })) return;
+    try {
+      await api.delete(`/events/${id}`);
+      fetchEvents();
+    } catch (err) {
+      setError('La suppression a échoué.');
+      console.error(err);
     }
   };
 

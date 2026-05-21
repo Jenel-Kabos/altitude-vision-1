@@ -1,6 +1,7 @@
 // src/pages/UserManagementPage.jsx
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import toast from '@/lib/utils/toast';
 
 const UserManagementPage = () => {
   const [users, setUsers] = useState([]);
@@ -65,7 +66,7 @@ const UserManagementPage = () => {
       }
       setSelectedUser(null);
     } catch (err) {
-      alert(err.response?.data?.message || err.message);
+      toast.error(err.response?.data?.message || err.message);
     }
   };
 

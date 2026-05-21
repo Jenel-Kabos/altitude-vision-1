@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { getEventById } from '../services/eventService';
 import { getFirstValidImage } from '../utils/imageUtils';
+import toast from '@/lib/utils/toast';
 // Importation du nouveau composant CommentList
 import CommentList from '../components/comments/CommentList';
 import Breadcrumb from '../components/Breadcrumb';
@@ -62,7 +63,7 @@ const EventDetailPage = () => {
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href);
-    alert('Lien copié dans le presse-papier !');
+    toast.success('Lien copié dans le presse-papier !');
     setShowShareMenu(false);
   };
 

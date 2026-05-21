@@ -11,6 +11,8 @@ import { getMessages, sendMessage, deleteConversationMessage } from '../../servi
 import { markConversationAsRead, archiveConversation } from '../../services/conversationService';
 import { useAuth } from '../../context/AuthContext';
 import { useSmartScroll } from '../../hooks/useSmartScroll';
+import toast from '@/lib/utils/toast';
+import confirm from '@/lib/utils/confirm';
 
 const ChatWindow = ({ conversation, onBack, onArchive }) => {
   const { user } = useAuth();
@@ -95,7 +97,7 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
       await fetchMessages(conversationId, true);
     } catch (error) {
       console.error("Erreur lors de l'envoi:", error);
-      alert("Erreur lors de l'envoi du message");
+      toast.error("Erreur lors de l'envoi du message");
     } finally {
       setSending(false);
     }
@@ -114,19 +116,19 @@ const ChatWindow = ({ conversation, onBack, onArchive }) => {
       );
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
-      alert('Erreur lors de la suppression du message');
+      toast.error('Erreur lors de la suppression du message');
     }
   };
 
   const handleArchive = async () => {
-    if (!confirm('Archiver cette conversation ?')) return;
+    if (!await confirm('Archiver cette conversation ?')) return;
 
     try {
       await archiveConversation(conversationId);
       onArchive();
     } catch (error) {
       console.error("Erreur lors de l'archivage:", error);
-      alert("Erreur lors de l'archivage");
+      toast.error("Erreur lors de l'archivage");
     }
   };
 

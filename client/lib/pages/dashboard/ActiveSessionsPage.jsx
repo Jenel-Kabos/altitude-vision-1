@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { ShieldCheck, User, Trash2, Globe, Clock, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
+import confirm from '@/lib/utils/confirm';
 
 // ✅ URL de l'API (Prod ou Dev)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api';
@@ -45,7 +46,7 @@ const ActiveSessionsPage = () => {
 
   // 🚫 Révoquer (Forcer la déconnexion)
   const handleRevokeSession = async (userId, userName) => {
-    if (!window.confirm(`Voulez-vous vraiment déconnecter de force ${userName} ?`)) return;
+    if (!await confirm(`Voulez-vous vraiment déconnecter de force ${userName} ?`, { title: 'Déconnecter la session', danger: true })) return;
 
     try {
       const token = localStorage.getItem('token');

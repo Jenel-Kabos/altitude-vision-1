@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
+import confirm from '@/lib/utils/confirm';
 
 const GOLD      = '#C8872A';
 const GOLD_PALE = 'rgba(200,135,42,0.08)';
@@ -212,7 +213,7 @@ const CommentItem = ({ comment, onEdit, onDelete }) => {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Supprimer ce commentaire ?')) return;
+    if (!await confirm('Supprimer ce commentaire ?', { title: 'Supprimer', danger: true })) return;
     setIsDeleting(true);
     try { await onDelete(comment._id); }
     catch { setIsDeleting(false); }

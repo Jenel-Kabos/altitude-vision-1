@@ -6,6 +6,7 @@ import { MessageCircle, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { createOrGetConversation } from '../../services/conversationService';
+import toast from '@/lib/utils/toast';
 
 /**
  * Bouton pour contacter l'agence depuis une annonce
@@ -33,7 +34,7 @@ const ContactAgencyButton = ({ propertyId = null, eventId = null, adminId = null
 
   const handleClick = () => {
     if (!user) {
-      alert('Vous devez être connecté pour contacter l\'agence');
+      toast.warning("Vous devez être connecté pour contacter l'agence");
       router.push('/login');
       return;
     }
@@ -44,7 +45,7 @@ const ContactAgencyButton = ({ propertyId = null, eventId = null, adminId = null
 
   const handleSendMessage = async () => {
     if (!message.trim()) {
-      alert('Veuillez écrire un message');
+      toast.warning('Veuillez écrire un message');
       return;
     }
 
@@ -66,7 +67,7 @@ const ContactAgencyButton = ({ propertyId = null, eventId = null, adminId = null
       router.push('/messages');
     } catch (error) {
       console.error('❌ Erreur:', error);
-      alert('Erreur lors de l\'envoi du message. Veuillez réessayer.');
+      toast.error("Erreur lors de l'envoi du message. Veuillez réessayer.");
     } finally {
       setIsLoading(false);
     }

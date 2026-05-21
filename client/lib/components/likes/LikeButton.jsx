@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { Heart } from 'lucide-react';
 import { toggleLike, getLikeStatus } from '../../services/likeService';
 import { useAuth } from '../../context/AuthContext';
+import toast from '@/lib/utils/toast';
 
 /**
  * Bouton Like/Unlike avec animation
@@ -52,7 +53,7 @@ const LikeButton = ({ targetType, targetId, size = 'md', showCount = true }) => 
     e.stopPropagation();
 
     if (!user) {
-      alert('Vous devez être connecté pour liker');
+      toast.warning('Vous devez être connecté pour liker');
       return;
     }
 
@@ -69,7 +70,7 @@ const LikeButton = ({ targetType, targetId, size = 'md', showCount = true }) => 
       setTimeout(() => setIsAnimating(false), 300);
     } catch (error) {
       console.error('Erreur lors du like:', error);
-      alert('Erreur lors du like. Veuillez réessayer.');
+      toast.error('Erreur lors du like. Veuillez réessayer.');
     } finally {
       setIsLoading(false);
     }

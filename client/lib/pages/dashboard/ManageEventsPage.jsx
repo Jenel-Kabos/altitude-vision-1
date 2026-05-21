@@ -234,7 +234,7 @@ const ManageEventsPage = () => {
             <div className="relative flex-1 w-full md:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input type="text" placeholder="Rechercher un événement…" value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)} aria-label="Rechercher un événement"
                 className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all" />
             </div>
             <button onClick={handleAdd}
@@ -463,20 +463,20 @@ const EventModal = ({ mode, event, onClose, onSubmit }) => {
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Nom de l'Événement <span className="text-red-500">*</span></label>
-                <input type="text" name="name" value={formData.name} onChange={handleChange} required className={inputCls} />
+                <input type="text" name="name" value={formData.name} onChange={handleChange} required aria-label="Nom de l'événement" className={inputCls} />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Description <span className="text-red-500">*</span></label>
-                <textarea name="description" value={formData.description} onChange={handleChange} required rows="4" className={inputCls} />
+                <textarea name="description" value={formData.description} onChange={handleChange} required rows="4" aria-label="Description" className={inputCls} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Date <span className="text-red-500">*</span></label>
-                  <input type="date" name="date" value={formData.date} onChange={handleChange} required className={inputCls} />
+                  <input type="date" name="date" value={formData.date} onChange={handleChange} required aria-label="Date de l'événement" className={inputCls} />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Catégorie</label>
-                  <select name="category" value={formData.category} onChange={handleChange} className={inputCls}>
+                  <select name="category" value={formData.category} onChange={handleChange} aria-label="Catégorie" className={inputCls}>
                     {['Événement','Mariage','Gala','Conférence','Anniversaire','Lancement'].map(c => (
                       <option key={c} value={c}>{c}</option>
                     ))}
@@ -484,12 +484,12 @@ const EventModal = ({ mode, event, onClose, onSubmit }) => {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2"><Users className="w-4 h-4 text-purple-600" />Invités</label>
-                  <input type="number" name="guests" value={formData.guests} onChange={handleChange} min="1" placeholder="Ex: 150" className={inputCls} />
+                  <input type="number" name="guests" value={formData.guests} onChange={handleChange} min="1" placeholder="Ex: 150" aria-label="Nombre d'invités" className={inputCls} />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Lieu <span className="text-red-500">*</span></label>
-                <input type="text" name="location" value={formData.location} onChange={handleChange} required placeholder="Ex: Hôtel Radisson Blu, Brazzaville" className={inputCls} />
+                <input type="text" name="location" value={formData.location} onChange={handleChange} required placeholder="Ex: Hôtel Radisson Blu, Brazzaville" aria-label="Lieu de l'événement" className={inputCls} />
               </div>
             </div>
           )}
@@ -533,7 +533,7 @@ const EventModal = ({ mode, event, onClose, onSubmit }) => {
                 </div>
                 <div className="flex gap-2 mb-4">
                   <input type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)}
-                    placeholder="Ou coller une URL d'image" className={`flex-1 ${inputCls}`}
+                    placeholder="Ou coller une URL d'image" aria-label="URL d'image" className={`flex-1 ${inputCls}`}
                     disabled={isUploadingImage || isSubmitting} />
                   <button type="button" onClick={handleAddUrlImage} disabled={isUploadingImage || isSubmitting}
                     className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:scale-105 transition shadow-md disabled:bg-gray-400">
@@ -575,7 +575,7 @@ const EventModal = ({ mode, event, onClose, onSubmit }) => {
                 </div>
                 <div className="flex gap-2 mb-4">
                   <input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="Ou coller une URL (YouTube, Vimeo…)" className={`flex-1 ${inputCls}`}
+                    placeholder="Ou coller une URL (YouTube, Vimeo…)" aria-label="URL de vidéo" className={`flex-1 ${inputCls}`}
                     disabled={isUploadingVideo || isSubmitting || formData.videos.length >= 3} />
                   <button type="button" onClick={handleAddUrlVideo}
                     disabled={isUploadingVideo || isSubmitting || formData.videos.length >= 3}

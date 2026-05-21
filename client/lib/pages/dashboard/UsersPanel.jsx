@@ -276,6 +276,7 @@ const UsersPanel = () => {
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
           placeholder="Rechercher nom, email…"
+          aria-label="Rechercher un utilisateur"
           className="w-full pl-8 pr-4 py-2 text-sm rounded-xl border outline-none transition-all"
           style={{
             fontFamily:"'Outfit', sans-serif",

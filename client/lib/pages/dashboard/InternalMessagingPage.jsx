@@ -31,6 +31,8 @@ import {
 } from '../../services/messageService';
 import { getAllUsers } from '../../services/userService';
 import { useAuth } from '../../context/AuthContext';
+import toast from '@/lib/utils/toast';
+import confirmDialog from '@/lib/utils/confirm';
 
 const UPLOAD_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api').replace('/api', '');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -142,7 +144,7 @@ const InternalMessagingPage = () => {
 
   const handleDelete = async (messageId) => {
     if (activeView === 'trash') {
-      if (!window.confirm('⚠️ Supprimer DÉFINITIVEMENT ce message ? Cette action est irréversible.')) return;
+      if (!await confirmDialog('Supprimer DÉFINITIVEMENT ce message ? Cette action est irréversible.', { title: 'Suppression définitive', danger: true })) return;
       try {
         await permanentlyDelete(messageId);
         showNotification('Message supprimé définitivement');
@@ -152,7 +154,7 @@ const InternalMessagingPage = () => {
         showNotification('Erreur lors de la suppression définitive', 'error');
       }
     } else if (activeView === 'drafts') {
-      if (!window.confirm('Supprimer ce brouillon ?')) return;
+      if (!await confirmDialog('Supprimer ce brouillon ?', { title: 'Supprimer le brouillon', danger: true })) return;
       try {
         await deleteDraft(messageId);
         showNotification('Brouillon supprimé');
@@ -162,7 +164,7 @@ const InternalMessagingPage = () => {
         showNotification('Erreur lors de la suppression du brouillon', 'error');
       }
     } else {
-      if (!window.confirm('Déplacer ce message vers la corbeille ?')) return;
+      if (!await confirmDialog('Déplacer ce message vers la corbeille ?', { title: 'Mettre à la corbeille' })) return;
       try {
         await moveToTrash(messageId);
         showNotification('Message déplacé vers la corbeille');
@@ -186,7 +188,7 @@ const InternalMessagingPage = () => {
   };
 
   const handleEmptyTrash = async () => {
-    if (!window.confirm('⚠️ Vider la corbeille ? Tous les messages seront DÉFINITIVEMENT supprimés.')) return;
+    if (!await confirmDialog('Vider la corbeille ? Tous les messages seront DÉFINITIVEMENT supprimés.', { title: 'Vider la corbeille', danger: true })) return;
     try {
       await emptyTrash();
       showNotification('Corbeille vidée avec succès');
@@ -321,6 +323,7 @@ const InternalMessagingPage = () => {
               placeholder="Rechercher..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              aria-label="Rechercher une conversation"
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -727,12 +730,12 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
         }
       } else {
         if (!formData.recipient) {
-          alert('Veuillez sélectionner un destinataire.');
+          toast.warning('Veuillez sélectionner un destinataire.');
           return;
         }
       }
       if (!formData.content.trim() && formData.attachments.length === 0) {
-        alert('Veuillez écrire un message ou joindre au moins un fichier.');
+        toast.warning('Veuillez écrire un message ou joindre au moins un fichier.');
         return;
       }
     }
@@ -824,6 +827,7 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
                     value={formData.externalEmail}
                     onChange={handleChange}
                     placeholder="destinataire@gmail.com"
+                    aria-label="Email du destinataire externe"
                     className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                       emailError ? 'border-red-400 focus:ring-red-400' : 'border-gray-300'
                     }`}
@@ -865,6 +869,7 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
                     onChange={(e) => { setSearchUser(e.target.value); setShowDropdown(true); }}
                     onFocus={() => setShowDropdown(true)}
                     placeholder="Rechercher un collaborateur..."
+                    aria-label="Rechercher un collaborateur"
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -908,6 +913,7 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
               value={formData.subject}
               onChange={handleChange}
               placeholder="Objet du message"
+              aria-label="Sujet du message"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -923,6 +929,7 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
               onChange={handleChange}
               rows="6"
               placeholder="Écrivez votre message..."
+              aria-label="Contenu du message"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
             />
           </div>
@@ -938,6 +945,7 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
               ref={fileInputRef}
               onChange={handleFileChange}
               multiple
+              aria-label="Pièces jointes"
               className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
             />
             {fileErrors.map((err, i) => (
@@ -967,6 +975,7 @@ const ComposeModal = ({ onClose, onSend, editingDraft, allUsers }) => {
               name="priority"
               value={formData.priority}
               onChange={handleChange}
+              aria-label="Priorité du message"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="Basse">Basse</option>

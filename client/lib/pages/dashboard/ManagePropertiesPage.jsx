@@ -290,7 +290,7 @@ const ManagePropertiesPage = () => {
             <div className="relative flex-1 w-full md:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input type="text" placeholder="Rechercher un bien…" value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)} aria-label="Rechercher un bien immobilier"
                 className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
             </div>
             <button onClick={() => setShowAddModal(true)}

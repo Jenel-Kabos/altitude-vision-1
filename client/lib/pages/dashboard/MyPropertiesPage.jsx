@@ -9,6 +9,7 @@ import {
   deleteProperty
 } from "../../services/propertyService";
 import PropertyForm from "../../components/dashboard/PropertyForm";
+import confirm from '@/lib/utils/confirm';
 
 const MyPropertiesPage = () => {
   const [properties, setProperties] = useState([]);
@@ -60,7 +61,7 @@ const MyPropertiesPage = () => {
   }, []);
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Voulez-vous vraiment supprimer ce bien ?")) return;
+    if (!await confirm("Voulez-vous vraiment supprimer ce bien ?", { title: 'Supprimer le bien', danger: true })) return;
     try {
       await deleteProperty(id);
       toast.success("Bien supprimé !");

@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, X, Send, Loader2 } from 'lucide-react';
 import { GOLD, GOLD_DARK, PROJECT_TYPES, BUDGETS } from './altcomData';
+import toast from '@/lib/utils/toast';
 
 const inputCls  = "w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm transition-all focus:outline-none focus:bg-white placeholder-gray-400";
 const focusGold = e => { e.target.style.borderColor = GOLD; e.target.style.boxShadow = `0 0 0 3px ${GOLD}15`; };
@@ -22,12 +23,12 @@ const QuoteModal = ({ serviceTitle, onClose, onSubmit }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!form.name || !form.email || !form.description || !form.projectType) {
-            alert('Veuillez remplir tous les champs obligatoires.');
+            toast.warning('Veuillez remplir tous les champs obligatoires.');
             return;
         }
         setLoading(true);
         try { await onSubmit(form); onClose(); }
-        catch (err) { alert(err.message || "Erreur lors de l'envoi."); }
+        catch (err) { toast.error(err.message || "Erreur lors de l'envoi."); }
         finally { setLoading(false); }
     };
 

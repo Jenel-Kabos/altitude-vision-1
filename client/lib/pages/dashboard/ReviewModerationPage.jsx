@@ -478,6 +478,7 @@ const ReviewModerationPage = () => {
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
             placeholder="Rechercher auteur, commentaire…"
+            aria-label="Rechercher un avis"
             className="pl-8 pr-4 py-2 text-sm rounded-xl border outline-none transition-all w-64"
             style={{
               fontFamily:"'Outfit', sans-serif",
