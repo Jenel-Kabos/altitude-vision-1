@@ -150,7 +150,7 @@ const PortfolioCardList = ({ item }) => {
             style={{ borderColor: 'rgba(0,0,0,0.06)' }}
         >
             {/* Image */}
-            <div className="relative sm:w-56 h-44 sm:min-h-full flex-shrink-0 overflow-hidden">
+            <div className="relative sm:w-56 h-44 flex-shrink-0 overflow-hidden">
                 <Image src={imgSrc} alt={item.title}
                     fill
                     sizes="(max-width: 640px) 100vw, 224px"

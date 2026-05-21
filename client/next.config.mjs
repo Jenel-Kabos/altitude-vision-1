@@ -46,6 +46,8 @@ const nextConfig = {
       { protocol: 'https', hostname: '**.fbcdn.net' },
       { protocol: 'https', hostname: 'platform-lookaside.fbsbx.com' },
       { protocol: 'https', hostname: 'illustrations.popsy.co' },
+      { protocol: 'https', hostname: 'placehold.co' },
+      { protocol: 'https', hostname: 'ui-avatars.com' },
     ],
   },
   webpack: (config) => {
