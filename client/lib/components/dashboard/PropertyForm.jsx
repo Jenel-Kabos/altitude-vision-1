@@ -159,6 +159,7 @@ const PropertyForm = ({
           value={formData.price}
           onChange={handleChange}
           placeholder="Ex: 150000"
+          aria-label="Prix en FCFA"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
           required
         />
@@ -171,6 +172,7 @@ const PropertyForm = ({
             name="pole"
             value={formData.pole}
             onChange={handleChange}
+            aria-label="Pôle"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             required
           >
@@ -186,6 +188,7 @@ const PropertyForm = ({
             name="status"
             value={formData.status}
             onChange={handleChange}
+            aria-label="Statut"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
           >
             <option value="vente">Vendre</option>
@@ -200,6 +203,7 @@ const PropertyForm = ({
           name="availability"
           value={formData.availability}
           onChange={handleChange}
+          aria-label="Disponibilité"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
         >
           <option>Disponible</option>
@@ -215,6 +219,7 @@ const PropertyForm = ({
           value={formData.type}
           onChange={handleChange}
           placeholder="Ex: Appartement, Villa, Studio"
+          aria-label="Type de bien"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
         />
       </div>
@@ -231,6 +236,7 @@ const PropertyForm = ({
               value={formData.address.district}
               onChange={handleAddressChange}
               placeholder="Ex: Moungali"
+              aria-label="Quartier"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
               required
             />
@@ -243,6 +249,7 @@ const PropertyForm = ({
               value={formData.address.street}
               onChange={handleAddressChange}
               placeholder="Ex: Avenue de la Paix"
+              aria-label="Rue"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
@@ -254,6 +261,7 @@ const PropertyForm = ({
               value={formData.address.city}
               onChange={handleAddressChange}
               placeholder="Brazzaville"
+              aria-label="Ville"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
@@ -273,6 +281,7 @@ const PropertyForm = ({
               value={formData.surface}
               onChange={handleChange}
               placeholder="Ex: 62"
+              aria-label="Surface en m²"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
@@ -285,6 +294,7 @@ const PropertyForm = ({
               value={formData.bedrooms}
               onChange={handleChange}
               placeholder="Ex: 3"
+              aria-label="Nombre de chambres"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
@@ -297,6 +307,7 @@ const PropertyForm = ({
               value={formData.bathrooms}
               onChange={handleChange}
               placeholder="Ex: 2"
+              aria-label="Nombre de salles de bain"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
@@ -311,6 +322,7 @@ const PropertyForm = ({
               value={formData.livingRooms}
               onChange={handleChange}
               placeholder="Ex: 1"
+              aria-label="Nombre de salons"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
@@ -323,6 +335,7 @@ const PropertyForm = ({
               value={formData.kitchens}
               onChange={handleChange}
               placeholder="Ex: 1"
+              aria-label="Nombre de cuisines"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>
@@ -333,6 +346,7 @@ const PropertyForm = ({
               name="constructionType"
               value={formData.constructionType}
               onChange={handleChange}
+              aria-label="Type de construction"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             >
               <option value="Béton armé">Béton armé</option>
@@ -351,6 +365,7 @@ const PropertyForm = ({
           value={formData.amenities}
           onChange={handleChange}
           placeholder="Ex: Climatisation, Parking, Wifi (séparés par des virgules)"
+          aria-label="Équipements"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
         />
         <p className="text-xs text-gray-500 mt-1">Séparez les équipements par des virgules</p>
@@ -465,6 +480,7 @@ const PropertyForm = ({
               type="number"
               value={formData.latitude}
               readOnly
+              aria-label="Latitude"
               className="w-full px-2 py-1 text-sm border rounded bg-gray-50 text-gray-900"
             />
           </div>
@@ -474,6 +490,7 @@ const PropertyForm = ({
               type="number"
               value={formData.longitude}
               readOnly
+              aria-label="Longitude"
               className="w-full px-2 py-1 text-sm border rounded bg-gray-50 text-gray-900"
             />
           </div>
