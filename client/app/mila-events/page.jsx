@@ -4,9 +4,8 @@ import JsonLd from "@/lib/components/JsonLd";
 
 export const metadata = buildMetadata({
   title:       "Mila Events — Organisation d'Événements à Brazzaville, Congo",
-  description: "Mila Events by Altitude-Vision : organisation de mariages, galas, conférences et anniversaires à Brazzaville. Devis gratuit, réponse sous 24h.",
+  description: "80+ événements réussis à Brazzaville. Mariages, galas, conférences — du premier appel au dernier applaudissement, nous gérons chaque détail pour vous.",
   url:         "/mila-events",
-  image:       "/og-mila.jpg",
 });
 
 const SCHEMAS = [

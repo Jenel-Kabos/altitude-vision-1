@@ -4,9 +4,8 @@ import JsonLd from "@/lib/components/JsonLd";
 
 export const metadata = buildMetadata({
   title:       "Altimmo — Achat, Vente & Location Immobilière à Brazzaville",
-  description: "Altimmo by Altitude-Vision : trouvez des appartements, maisons et villas à vendre ou à louer à Brazzaville, Congo.",
+  description: "200 familles logées à Brazzaville. Biens vérifiés, prix transparents — achetez, louez ou investissez avec des experts qui connaissent chaque quartier.",
   url:         "/altimmo",
-  image:       "/og-altimmo.jpg",
 });
 
 const SCHEMAS = [

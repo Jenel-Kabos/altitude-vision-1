@@ -3,7 +3,6 @@
 export {
   SITE_NAME,
   SITE_URL,
-  DEFAULT_IMG,
   DEFAULT_DESC,
   buildTitle,
   buildMetadata,

@@ -4,9 +4,8 @@ import JsonLd from "@/lib/components/JsonLd";
 
 export const metadata = buildMetadata({
   title:       "Altcom — Agence de Communication & Branding à Brazzaville",
-  description: "Altcom by Altitude-Vision : stratégie digitale, création de marque, campagnes publicitaires et production audiovisuelle à Brazzaville, Congo.",
+  description: "80 entreprises congolaises accompagnées. Branding, digital, stratégie — une seule agence pour construire votre image et multiplier vos clients à Brazzaville.",
   url:         "/altcom",
-  image:       "/og-altcom.jpg",
 });
 
 const SCHEMAS = [
