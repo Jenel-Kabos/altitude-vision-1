@@ -32,12 +32,10 @@ const EventDetailPage = () => {
       try {
         setLoading(true);
         setError(null);
-        console.log('📡 [EventDetail] Chargement de l\'événement:', eventId);
         
         const data = await getEventById(eventId);
         setEvent(data);
         
-        console.log('✅ [EventDetail] Événement chargé:', data);
       } catch (err) {
         console.error('❌ [EventDetail] Erreur:', err);
         setError('Impossible de charger les détails de l\'événement');

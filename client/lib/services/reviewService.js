@@ -6,39 +6,32 @@ import api from './api';
  * ============================================================
  */
 const extractReviewsFromResponse = (response, context = '') => {
-  console.log(`📦 [reviewService] ${context} - Réponse brute:`, response.data);
 
   let reviews = [];
 
   // Format 1: response.data = [...]
   if (Array.isArray(response.data)) {
-    console.log(`✅ [reviewService] ${context} - Format: Array direct`);
     reviews = response.data;
   }
   // Format 2: response.data.data = [...]
   else if (response.data.data && Array.isArray(response.data.data)) {
-    console.log(`✅ [reviewService] ${context} - Format: response.data.data (Array)`);
     reviews = response.data.data;
   }
   // Format 3: response.data.data.reviews = [...]
   else if (response.data.data && response.data.data.reviews && Array.isArray(response.data.data.reviews)) {
-    console.log(`✅ [reviewService] ${context} - Format: response.data.data.reviews`);
     reviews = response.data.data.reviews;
   }
   // Format 4: response.data.reviews = [...]
   else if (response.data.reviews && Array.isArray(response.data.reviews)) {
-    console.log(`✅ [reviewService] ${context} - Format: response.data.reviews`);
     reviews = response.data.reviews;
   }
   // Format 5: Recherche intelligente
   else if (response.data && typeof response.data === 'object') {
     console.warn(`⚠️ [reviewService] ${context} - Format non standard, recherche automatique...`);
     const arrays = Object.entries(response.data).filter(([key, value]) => Array.isArray(value));
-    console.log(`🔍 [reviewService] ${context} - Tableaux trouvés:`, arrays.map(([k, v]) => `${k} (${v.length})`));
     
     if (arrays.length > 0) {
       const [key, value] = arrays[0];
-      console.log(`✅ [reviewService] ${context} - Utilisation du tableau: ${key}`);
       reviews = value;
     }
   }
@@ -49,7 +42,6 @@ const extractReviewsFromResponse = (response, context = '') => {
     return [];
   }
 
-  console.log(`✅ [reviewService] ${context} - ${reviews.length} avis récupéré(s)`);
   return reviews;
 };
 
@@ -66,7 +58,6 @@ const extractReviewsFromResponse = (response, context = '') => {
  */
 export const getAllReviews = async (params = {}) => {
   try {
-    console.log('🔍 [reviewService] getAllReviews appelé avec params:', params);
     
     const queryString = new URLSearchParams(params).toString();
     const response = await api.get(`/reviews?${queryString}`);
@@ -91,7 +82,6 @@ export const getAllReviews = async (params = {}) => {
  */
 export const getReviewsByPole = async (pole, limit = 10) => {
   try {
-    console.log(`🔍 [reviewService] getReviewsByPole appelé pour ${pole} avec limit:`, limit);
     
     const response = await api.get(`/reviews?pole=${pole}&limit=${limit}&sort=-createdAt`);
     
@@ -109,7 +99,6 @@ export const getReviewsByPole = async (pole, limit = 10) => {
  * @returns {Promise<Array>} - Tableau d'avis Altimmo
  */
 export const getAltimmoReviews = async (limit = 6) => {
-  console.log('🔍 [reviewService] getAltimmoReviews appelé');
   return getReviewsByPole('Altimmo', limit);
 };
 
@@ -119,7 +108,6 @@ export const getAltimmoReviews = async (limit = 6) => {
  * @returns {Promise<Array>} - Tableau d'avis MilaEvents
  */
 export const getMilaEventsReviews = async (limit = 6) => {
-  console.log('🔍 [reviewService] getMilaEventsReviews appelé');
   return getReviewsByPole('MilaEvents', limit);
 };
 
@@ -129,7 +117,6 @@ export const getMilaEventsReviews = async (limit = 6) => {
  * @returns {Promise<Array>} - Tableau d'avis Altcom
  */
 export const getAltcomReviews = async (limit = 6) => {
-  console.log('🔍 [reviewService] getAltcomReviews appelé');
   return getReviewsByPole('Altcom', limit);
 };
 
@@ -140,7 +127,6 @@ export const getAltcomReviews = async (limit = 6) => {
  */
 export const getAllTestimonials = async (limit = 10) => {
   try {
-    console.log('🔍 [reviewService] getAllTestimonials appelé avec limit:', limit);
     
     const response = await api.get(`/reviews?limit=${limit}&sort=-createdAt`);
     
@@ -169,11 +155,9 @@ export const getAllTestimonials = async (limit = 10) => {
  */
 export const createReview = async (reviewData) => {
   try {
-    console.log('🔍 [reviewService] createReview appelé avec:', reviewData);
     
     const response = await api.post('/reviews', reviewData);
     
-    console.log('✅ [reviewService] Avis créé avec succès:', response.data);
     
     // ✅ Extraction robuste
     if (response.data.data && response.data.data.review) {
@@ -200,11 +184,9 @@ export const createReview = async (reviewData) => {
  */
 export const updateReview = async (reviewId, updateData) => {
   try {
-    console.log('🔍 [reviewService] updateReview appelé pour:', reviewId);
     
     const response = await api.patch(`/reviews/${reviewId}`, updateData);
     
-    console.log('✅ [reviewService] Avis mis à jour:', response.data);
     
     // ✅ Extraction robuste
     if (response.data.data && response.data.data.review) {
@@ -230,11 +212,9 @@ export const updateReview = async (reviewId, updateData) => {
  */
 export const deleteReview = async (reviewId) => {
   try {
-    console.log('🔍 [reviewService] deleteReview appelé pour:', reviewId);
     
     await api.delete(`/reviews/${reviewId}`);
     
-    console.log('✅ [reviewService] Avis supprimé avec succès');
   } catch (error) {
     console.error('❌ [reviewService] Erreur deleteReview:', error);
     console.error('❌ Détails:', error.response?.data);
@@ -256,14 +236,11 @@ export const deleteReview = async (reviewId) => {
  */
 export const addAdminResponse = async (reviewId, responseText) => {
   try {
-    console.log('🔍 [reviewService] addAdminResponse appelé pour:', reviewId);
-    console.log('📝 Texte de la réponse:', responseText);
     
     const response = await api.patch(`/reviews/${reviewId}/admin-response`, {
       responseText,
     });
     
-    console.log('✅ [reviewService] Réponse admin ajoutée:', response.data);
     
     // ✅ Extraction robuste
     if (response.data.data && response.data.data.review) {
@@ -289,11 +266,9 @@ export const addAdminResponse = async (reviewId, responseText) => {
  */
 export const deleteAdminResponse = async (reviewId) => {
   try {
-    console.log('🔍 [reviewService] deleteAdminResponse appelé pour:', reviewId);
     
     const response = await api.delete(`/reviews/${reviewId}/admin-response`);
     
-    console.log('✅ [reviewService] Réponse admin supprimée:', response.data);
     
     // ✅ Extraction robuste
     if (response.data.data && response.data.data.review) {

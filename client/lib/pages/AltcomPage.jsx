@@ -409,12 +409,10 @@ const AltcomPage = () => {
   
   const handleFormSubmit = async (formData) => {
     try {
-      console.log("📤 [AltcomPage] Envoi du devis:", formData);
       
       // Simuler l'appel API si createQuoteRequest n'est pas implémenté
       // const response = await createQuoteRequest(formData); 
       
-      console.log("✅ [AltcomPage] Devis simulé envoyé avec succès.");
       
       setShowNotification({
         visible: true,

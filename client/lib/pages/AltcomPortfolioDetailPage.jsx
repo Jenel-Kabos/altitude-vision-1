@@ -66,8 +66,6 @@ const AltcomPortfolioDetailPage = () => {
       const data = await getPortfolioItem(portfolioId);
       
       if (data) {
-        console.log('📦 Portfolio chargé:', data);
-        console.log('🖼️ Images:', data.images);
         setPortfolio(data);
       } else {
         setError('Projet non trouvé');
@@ -101,7 +99,6 @@ const AltcomPortfolioDetailPage = () => {
           url: window.location.href,
         });
       } catch (err) {
-        console.log('Partage annulé');
       }
     } else {
       navigator.clipboard.writeText(window.location.href);
@@ -152,7 +149,6 @@ const AltcomPortfolioDetailPage = () => {
     ? getImageUrl(portfolio.images[currentImageIndex])
     : 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&auto=format&fit=crop';
 
-  console.log('🖼️ Image actuelle affichée:', currentImage);
 
   return (
     <div className="bg-gray-50 min-h-screen">

@@ -20,7 +20,6 @@ export const getTotalUnreadCount = async () => {
         try {
             const internalResponse = await api.get('/internal-mails/count/unread');
             internalMailsUnread = internalResponse.data.data.unreadCount || 0;
-            console.log('📧 Emails internes non lus:', internalMailsUnread);
         } catch (error) {
             // Ignorer les erreurs 401 (non authentifié) - normal si pas connecté
             if (error.response?.status !== 401) {
@@ -33,7 +32,6 @@ export const getTotalUnreadCount = async () => {
         try {
             const conversationResponse = await api.get('/conversations/count/unread');
             conversationsUnread = conversationResponse.data.data.unreadCount || 0;
-            console.log('💬 Conversations non lues:', conversationsUnread);
         } catch (error) {
             // Ignorer les erreurs 401 (non authentifié) - normal si pas connecté
             if (error.response?.status !== 401) {
@@ -42,7 +40,6 @@ export const getTotalUnreadCount = async () => {
         }
 
         const total = internalMailsUnread + conversationsUnread;
-        console.log('📊 Total messages non lus:', total);
         
         return total;
     } catch (error) {
@@ -65,7 +62,6 @@ export const getInternalMailsUnreadCount = async () => {
 
         const response = await api.get('/internal-mails/count/unread');
         const count = response.data.data.unreadCount || 0;
-        console.log('📧 Emails internes non lus:', count);
         return count;
     } catch (error) {
         if (error.response?.status === 401) {
@@ -91,7 +87,6 @@ export const getConversationsUnreadCount = async () => {
 
         const response = await api.get('/conversations/count/unread');
         const count = response.data.data.unreadCount || 0;
-        console.log('💬 Conversations non lues:', count);
         return count;
     } catch (error) {
         if (error.response?.status === 401) {

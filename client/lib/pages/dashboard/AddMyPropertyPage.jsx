@@ -54,7 +54,6 @@ const AddMyPropertyPage = () => {
       setLoading(true);
       const newProperty = await createProperty(formData); // Utilise l'API centralisée
       toast.success("✅ Votre bien a été ajouté avec succès !");
-      console.log("Bien créé :", newProperty);
 
       // Réinitialisation du formulaire
       setProperty({

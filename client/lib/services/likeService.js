@@ -8,11 +8,9 @@ import api from './api';
  */
 export const toggleLike = async (targetType, targetId) => {
   try {
-    console.log(`💖 [likeService] Toggle like: ${targetType} ${targetId}`);
     
     const response = await api.post('/likes', { targetType, targetId });
     
-    console.log(`✅ [likeService] Like toggled:`, response.data.data);
     return response.data.data;
   } catch (error) {
     console.error('❌ [likeService] Erreur toggle like:', error);
@@ -41,12 +39,10 @@ export const getLikeStatus = async (targetType, targetId) => {
  */
 export const getMyFavorites = async (type = null) => {
   try {
-    console.log(`⭐ [likeService] Get favorites, type: ${type || 'Tous'}`);
     
     const url = type ? `/likes/my-favorites?type=${type}` : '/likes/my-favorites';
     const response = await api.get(url);
     
-    console.log(`✅ [likeService] Favoris récupérés:`, response.data.results);
     return response.data.data.favorites;
   } catch (error) {
     console.error('❌ [likeService] Erreur get favorites:', error);

@@ -35,7 +35,6 @@ const ContactModal = ({ intention, onClose, serviceTitle = null }) => {
     e.preventDefault();
     
     // --- SIMULATION D'ENVOI AU BACKEND ---
-    console.log("Données à envoyer au backend (simulées) :", formData);
     
     // Ici, vous feriez un appel API (ex: fetch, axios) à votre endpoint de contact.
     

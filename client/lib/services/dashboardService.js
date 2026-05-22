@@ -21,12 +21,10 @@ export const getDashboardStats = async () => {
       },
     });
 
-    console.log("📊 [dashboardService] Réponse complète:", response.data);
 
     // ✅ CORRECTION : Accès correct à response.data.data.stats
     const stats = response.data?.data?.stats || { Altimmo: 0, MilaEvents: 0, Altcom: 0 };
     
-    console.log("📊 [dashboardService] Stats extraites:", stats);
     
     return stats;
   } catch (error) {

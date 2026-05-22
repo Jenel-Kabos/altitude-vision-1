@@ -28,16 +28,11 @@ export const AuthProvider = ({ children }) => {
                 const storedUser  = localStorage.getItem('user');
                 const storedToken = localStorage.getItem('token');
 
-                console.log("🔍 Vérification de la session existante...");
-                console.log("   Token présent:", !!storedToken);
-                console.log("   User présent:",  !!storedUser);
 
                 if (storedUser && storedToken) {
                     const parsedUser = JSON.parse(storedUser);
                     setUser(parsedUser);
-                    console.log("✅ Session restaurée:", parsedUser.email);
                 } else {
-                    console.log("ℹ️ Aucune session existante");
                 }
             } catch (error) {
                 console.error("❌ Erreur restauration session:", error);
@@ -47,7 +42,6 @@ export const AuthProvider = ({ children }) => {
                 if (isMounted) {
                     setLoading(false);
                     setIsInitialized(true);
-                    console.log("✅ AuthContext initialisé");
                 }
             }
         };
@@ -59,7 +53,6 @@ export const AuthProvider = ({ children }) => {
     // ── Login (connexion initiale ou après changement de mot de passe) ──
     // 🔧 Ne doit PAS être appelé après updateMe — utiliser updateUser à la place
     const login = useCallback((userData, token) => {
-        console.log("🔓 Connexion en cours...", userData?.email);
 
         if (!token) {
             console.error("❌ Token manquant lors de la connexion");
@@ -74,25 +67,19 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('token', token);
         setUser(userData);
 
-        console.log("✅ Connexion réussie");
     }, []);
 
     // ── Logout ────────────────────────────────────────────────
     const logout = useCallback(() => {
-        console.log("🚪 Déconnexion...");
         localStorage.removeItem('user');
         localStorage.removeItem('token');
         setUser(null);
-        console.log("✅ Session nettoyée");
     }, []);
 
     // ── updateUser : merge partiel des données ────────────────
     // 🔧 À utiliser après updateMe pour ne pas perdre les champs existants
     //    (notamment photo, phone, etc.)
     const updateUser = useCallback((updatedData) => {
-        console.log("🔄 Mise à jour utilisateur:", Object.keys(updatedData).join(', '));
-        console.log('🔄 updatedData reçu:', updatedData);
-console.log('🔄 photo dans updatedData:', updatedData.photo);
 
         setUser(prev => {
             // 🔧 Merge : on garde tout l'ancien user et on écrase seulement
@@ -106,7 +93,6 @@ console.log('🔄 photo dans updatedData:', updatedData.photo);
             }
 
             localStorage.setItem('user', JSON.stringify(merged));
-            console.log("✅ User mis à jour — photo:", merged.photo ?? 'aucune');
             return merged;
         });
     }, []);

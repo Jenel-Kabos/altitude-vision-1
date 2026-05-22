@@ -36,7 +36,6 @@ const useAltcomData = () => {
 				setLoading(true);
 				setError(null);
 
-				console.log('📡 [useAltcomData] Chargement des données Altcom...');
 
 				// Lancer les 3 requêtes en parallèle avec Promise.allSettled
 				// pour gérer les échecs individuels sans bloquer les autres
@@ -62,7 +61,6 @@ const useAltcomData = () => {
 				// === TRAITEMENT DES SERVICES ===
 				if (servicesResult.status === 'fulfilled') {
 					setServices(servicesResult.value || []);
-					console.log(`✅ [useAltcomData] ${servicesResult.value?.length || 0} services chargés`);
 				} else {
 					console.warn('⚠️ [useAltcomData] Impossible de charger les services:', servicesResult.reason);
 					setServices([]);
@@ -72,7 +70,6 @@ const useAltcomData = () => {
 				if (portfolioResult.status === 'fulfilled') {
 					// Le portfolio est chargé complet ici. AltcomPage le limitera à 6.
 					setPortfolio(portfolioResult.value || []);
-					console.log(`✅ [useAltcomData] ${portfolioResult.value?.length || 0} projets portfolio chargés`);
 				} else {
 					console.warn('⚠️ [useAltcomData] Impossible de charger le portfolio:', portfolioResult.reason);
 					setPortfolio([]);
@@ -89,7 +86,6 @@ const useAltcomData = () => {
 					});
 					
 					setReviews(altcomReviews);
-					console.log(`✅ [useAltcomData] ${altcomReviews.length} avis Altcom chargés (sur ${allReviews.length} total)`);
 				} else {
 					console.warn('⚠️ [useAltcomData] Impossible de charger les reviews:', reviewsResult.reason);
 					setReviews([]);
@@ -112,7 +108,6 @@ const useAltcomData = () => {
 				setError(err.message || "Une erreur inconnue est survenue lors du chargement des données Altcom.");
 			} finally {
 				setLoading(false);
-				console.log('🏁 [useAltcomData] Chargement terminé');
 			}
 		};
 

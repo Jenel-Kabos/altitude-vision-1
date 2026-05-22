@@ -40,7 +40,6 @@ const ModerationPage = () => {
       };
       setStats(newStats);
       
-      console.log('✅ [ModerationPage] Propriétés chargées:', newStats);
     } catch (err) {
       console.error('❌ [ModerationPage] Erreur:', err);
       setError(err.response?.data?.message || err.message);

@@ -9,7 +9,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onre
  */
 export const sendContactMessage = async (messageData) => {
   try {
-    console.log('🚀 [contactService] Envoi du message au backend:', messageData);
     
     const response = await axios.post(`${API_URL}/contact`, messageData, {
       headers: {
@@ -17,7 +16,6 @@ export const sendContactMessage = async (messageData) => {
       },
     });
     
-    console.log('✅ [contactService] Réponse du serveur:', response.data);
     return response.data;
     
   } catch (error) {

@@ -6,7 +6,6 @@ export const getAllTestimonials = async () => {
     const response = await api.get('/reviews');
 
     // 🔍 DEBUG : Regarde dans la console du navigateur ce qui s'affiche ici
-    console.log("📦 Structure API Reviews reçue :", response.data);
 
     let reviewsData = [];
 

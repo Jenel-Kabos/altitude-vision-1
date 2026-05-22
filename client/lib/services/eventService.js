@@ -21,7 +21,6 @@ const fallbackEvents = [
 export const getAllEvents = async () => {
   try {
     const response = await api.get('/events?sort=-date');
-    console.log("✅ [eventService] Événements chargés:", response.data.data.events.length);
     return response.data.data.events;
   } catch (error) {
     console.error("❌ [eventService] Erreur lors du chargement des événements:", error);
@@ -36,7 +35,6 @@ export const getAllEvents = async () => {
 export const getEventById = async (eventId) => {
   try {
     const response = await api.get(`/events/${eventId}`);
-    console.log(`✅ [eventService] Événement ${eventId} chargé`);
     return response.data.data.event;
   } catch (error) {
     console.error(`❌ [eventService] Erreur lors du chargement de l'événement ${eventId}:`, error);
@@ -49,7 +47,6 @@ export const getEventById = async (eventId) => {
  */
 export const uploadEventImages = async (files) => {
   try {
-    console.log("📤 [eventService] Upload de", files.length, "image(s)");
     
     const formData = new FormData();
     Array.from(files).forEach((file) => {
@@ -62,7 +59,6 @@ export const uploadEventImages = async (files) => {
       },
     });
 
-    console.log("✅ [eventService] Images uploadées:", response.data.data.images);
     return response.data.data.images;
   } catch (error) {
     console.error("❌ [eventService] Erreur lors de l'upload des images:", error);
@@ -84,7 +80,6 @@ export const uploadEventImages = async (files) => {
  */
 export const uploadEventVideos = async (files) => {
   try {
-    console.log("📤 [eventService] Upload de", files.length, "vidéo(s)");
     
     // Vérifier la limite de 3 vidéos
     if (files.length > 3) {
@@ -112,7 +107,6 @@ export const uploadEventVideos = async (files) => {
       timeout: 300000, // 5 minutes
     });
 
-    console.log("✅ [eventService] Vidéos uploadées:", response.data.data.videos);
     return response.data.data.videos;
   } catch (error) {
     console.error("❌ [eventService] Erreur lors de l'upload des vidéos:", error);
@@ -138,9 +132,7 @@ export const uploadEventVideos = async (files) => {
  */
 export const createEvent = async (eventData) => {
   try {
-    console.log("📤 [eventService] Création d'un nouvel événement:", eventData);
     const response = await api.post('/events', eventData);
-    console.log("✅ [eventService] Événement créé avec succès:", response.data);
     return response.data.data.event;
   } catch (error) {
     console.error("❌ [eventService] Erreur lors de la création de l'événement:", error);
@@ -165,9 +157,7 @@ export const createEvent = async (eventData) => {
  */
 export const updateEvent = async (eventId, eventData) => {
   try {
-    console.log(`📤 [eventService] Mise à jour de l'événement ${eventId}:`, eventData);
     const response = await api.put(`/events/${eventId}`, eventData);
-    console.log("✅ [eventService] Événement mis à jour avec succès");
     return response.data.data.event;
   } catch (error) {
     console.error(`❌ [eventService] Erreur lors de la mise à jour de l'événement ${eventId}:`, error);
@@ -196,9 +186,7 @@ export const updateEvent = async (eventId, eventData) => {
  */
 export const deleteEvent = async (eventId) => {
   try {
-    console.log(`🗑️ [eventService] Suppression de l'événement ${eventId}`);
     await api.delete(`/events/${eventId}`);
-    console.log("✅ [eventService] Événement supprimé avec succès");
   } catch (error) {
     console.error(`❌ [eventService] Erreur lors de la suppression de l'événement ${eventId}:`, error);
     
@@ -220,7 +208,6 @@ export const deleteEvent = async (eventId) => {
 export const getEventsPaginated = async (page = 1, limit = 10) => {
   try {
     const response = await api.get(`/events?page=${page}&limit=${limit}&sort=-date`);
-    console.log(`✅ [eventService] Page ${page} chargée (${limit} événements/page)`);
     return {
       events: response.data.data.events,
       pagination: response.data.pagination || {
@@ -255,7 +242,6 @@ export const searchEvents = async (filters = {}) => {
     if (filters.endDate) params.append('endDate', filters.endDate);
     
     const response = await api.get(`/events?${params.toString()}&sort=-date`);
-    console.log("✅ [eventService] Recherche effectuée:", response.data.data.events.length, "résultats");
     return response.data.data.events;
   } catch (error) {
     console.error("❌ [eventService] Erreur lors de la recherche:", error);

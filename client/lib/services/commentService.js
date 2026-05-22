@@ -9,11 +9,9 @@ import api from './api';
  */
 export const createComment = async (targetType, targetId, content) => {
   try {
-    console.log(`💬 [commentService] Create comment: ${targetType} ${targetId}`);
     
     const response = await api.post('/comments', { targetType, targetId, content });
     
-    console.log(`✅ [commentService] Comment created:`, response.data.data.comment);
     return response.data.data.comment;
   } catch (error) {
     console.error('❌ [commentService] Erreur create comment:', error);
@@ -30,11 +28,9 @@ export const createComment = async (targetType, targetId, content) => {
  */
 export const getComments = async (targetType, targetId, page = 1, limit = 20) => {
   try {
-    console.log(`📖 [commentService] Get comments: ${targetType} ${targetId}, page ${page}`);
     
     const response = await api.get(`/comments?targetType=${targetType}&targetId=${targetId}&page=${page}&limit=${limit}`);
     
-    console.log(`✅ [commentService] ${response.data.results} commentaire(s) récupéré(s)`);
     return {
       comments: response.data.data.comments,
       totalComments: response.data.totalComments
@@ -52,11 +48,9 @@ export const getComments = async (targetType, targetId, page = 1, limit = 20) =>
  */
 export const updateComment = async (commentId, content) => {
   try {
-    console.log(`✏️ [commentService] Update comment: ${commentId}`);
     
     const response = await api.put(`/comments/${commentId}`, { content });
     
-    console.log(`✅ [commentService] Comment updated`);
     return response.data.data.comment;
   } catch (error) {
     console.error('❌ [commentService] Erreur update comment:', error);
@@ -70,11 +64,9 @@ export const updateComment = async (commentId, content) => {
  */
 export const deleteComment = async (commentId) => {
   try {
-    console.log(`🗑️ [commentService] Delete comment: ${commentId}`);
     
     await api.delete(`/comments/${commentId}`);
     
-    console.log(`✅ [commentService] Comment deleted`);
   } catch (error) {
     console.error('❌ [commentService] Erreur delete comment:', error);
     throw error;

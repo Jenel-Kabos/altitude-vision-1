@@ -18,12 +18,10 @@ export const getAllProperties = async (options = {}) => {
     if (sort) query += `sort=${encodeURIComponent(sort)}&`;
     if (query.endsWith('&') || query.endsWith('?')) query = query.slice(0, -1);
 
-    console.log(`📡 [propertyService] getAllProperties - Requête: /properties${query}`);
     
     const response = await api.get(`/properties${query === '?' ? '' : query}`);
     const properties = response.data?.data?.properties || [];
     
-    console.log(`✅ [propertyService] getAllProperties - ${properties.length} propriété(s) récupérée(s)`);
     
     return properties;
   } catch (error) {
@@ -39,12 +37,10 @@ export const getAllProperties = async (options = {}) => {
  */
 export const getPropertyById = async (propertyId) => {
   try {
-    console.log(`📡 [propertyService] getPropertyById - ID: ${propertyId}`);
     
     const response = await api.get(`/properties/${propertyId}`);
     const property = response.data?.data?.property || response.data?.data?.properties || null;
     
-    console.log(`✅ [propertyService] getPropertyById - Propriété récupérée:`, property?.title || 'Non trouvée');
     
     return property;
   } catch (error) {
@@ -60,12 +56,10 @@ export const getPropertyById = async (propertyId) => {
  */
 export const addProperty = async (propertyData) => {
   try {
-    console.log(`📡 [propertyService] addProperty - Création d'une nouvelle propriété`);
     
     const response = await api.post('/properties', propertyData, { headers: apiFormHeaders() });
     const property = response.data?.data?.property;
     
-    console.log(`✅ [propertyService] addProperty - Propriété créée:`, property?.title);
     
     return property;
   } catch (error) {
@@ -85,12 +79,10 @@ export const createProperty = addProperty;
  */
 export const updateProperty = async (propertyId, propertyData) => {
   try {
-    console.log(`📡 [propertyService] updateProperty - ID: ${propertyId}`);
     
     const response = await api.put(`/properties/${propertyId}`, propertyData, { headers: apiFormHeaders() });
     const property = response.data?.data?.property;
     
-    console.log(`✅ [propertyService] updateProperty - Propriété mise à jour:`, property?.title);
     
     return property;
   } catch (error) {
@@ -106,11 +98,9 @@ export const updateProperty = async (propertyId, propertyData) => {
  */
 export const deleteProperty = async (propertyId) => {
   try {
-    console.log(`📡 [propertyService] deleteProperty - ID: ${propertyId}`);
     
     await api.delete(`/properties/${propertyId}`);
     
-    console.log(`✅ [propertyService] deleteProperty - Propriété supprimée avec succès`);
   } catch (error) {
     console.error(`❌ [propertyService] Erreur lors de la suppression de la propriété ${propertyId} :`, error.response?.data || error.message);
     throw error;
@@ -123,12 +113,10 @@ export const deleteProperty = async (propertyId) => {
  */
 export const getMyProperties = async () => {
   try {
-    console.log(`📡 [propertyService] getMyProperties - Récupération des propriétés de l'utilisateur`);
     
     const response = await api.get('/properties/my-properties');
     const properties = response.data?.data?.properties || [];
     
-    console.log(`✅ [propertyService] getMyProperties - ${properties.length} propriété(s) récupérée(s)`);
     
     return properties;
   } catch (error) {
@@ -144,7 +132,6 @@ export const getMyProperties = async () => {
  * @returns {Promise<Array>} - Tableau de propriétés
  */
 export const getLatestPropertiesByPole = async (pole, limit = 5) => {
-  console.log(`📡 [propertyService] getLatestPropertiesByPole appelé pour: ${pole}, limite: ${limit}`);
   
   // Validation du pôle
   if (!pole || typeof pole !== 'string' || pole.trim().length === 0) {
@@ -163,19 +150,6 @@ export const getLatestPropertiesByPole = async (pole, limit = 5) => {
     
     const properties = response.data?.data?.properties || [];
     
-    console.log(`✅ [propertyService] ${pole}: ${properties.length} annonce(s) récupérée(s)`);
-    
-    // Afficher les titres des propriétés récupérées pour le debug
-    if (properties.length > 0) {
-      console.log(`   → Propriétés récupérées:`, properties.map(p => ({
-        id: p._id,
-        title: p.title,
-        pole: p.pole,
-        createdAt: p.createdAt
-      })));
-    } else {
-      console.log(`   ℹ️ Aucune propriété trouvée pour ${pole}`);
-    }
     
     return properties;
     
@@ -196,7 +170,6 @@ export const getLatestPropertiesByPole = async (pole, limit = 5) => {
  * @returns {Promise<Object>} - Objet avec les propriétés groupées par pôle { "Altimmo": [...], "MilaEvents": [...], ... }
  */
 export const getLatestPropertiesByPoles = async (poles = [], limit = 5) => {
-  console.log("🚀 [propertyService] getLatestPropertiesByPoles appelé avec:", { poles, limit });
   
   try {
     const results = {};
@@ -205,7 +178,6 @@ export const getLatestPropertiesByPoles = async (poles = [], limit = 5) => {
     // Filtrer les pôles valides
     const validPoles = poleList.filter(pole => pole && typeof pole === 'string' && pole.trim().length > 0);
     
-    console.log("📋 [propertyService] Pôles valides à traiter:", validPoles);
 
     if (validPoles.length === 0) {
       console.warn("⚠️ [propertyService] Aucun pôle valide trouvé");
@@ -213,27 +185,17 @@ export const getLatestPropertiesByPoles = async (poles = [], limit = 5) => {
     }
 
     // Lance tous les appels en parallèle pour de meilleures performances
-    console.log("⏳ [propertyService] Lancement des requêtes parallèles...");
     
     const propertiesPromises = validPoles.map((pole) => {
-      console.log(`   🔄 Requête pour: ${pole}`);
       return getLatestPropertiesByPole(pole, limit);
     });
     
     const allProperties = await Promise.all(propertiesPromises);
     
-    console.log("📦 [propertyService] Toutes les requêtes terminées");
 
     // Mappe les résultats dans l'objet { Pole: [annonces] }
     validPoles.forEach((pole, index) => {
       results[pole] = allProperties[index];
-      console.log(`   ✨ ${pole}: ${allProperties[index].length} annonce(s) ajoutée(s) aux résultats`);
-    });
-    
-    console.log("🎉 [propertyService] Résultats finaux:", {
-      nombreDePoles: Object.keys(results).length,
-      résumé: Object.entries(results).map(([pole, props]) => `${pole}: ${props.length}`).join(', '),
-      totalAnnonces: Object.values(results).reduce((acc, props) => acc + props.length, 0)
     });
     
     return results;

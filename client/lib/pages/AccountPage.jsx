@@ -292,9 +292,6 @@ const AccountPage = () => {
             }
 
             const res = await updateMe(payload);
-            console.log('🔍 res complet:', res);
-console.log('🔍 res.user:', res.user);
-console.log('🔍 res.user.photo:', res.user?.photo);
 
             if (res.success && res.user) {
                 // 🔧 updateUser (merge) au lieu de login (remplacement complet)

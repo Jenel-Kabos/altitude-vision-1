@@ -10,7 +10,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onre
  */
 export const createAltcomProject = async (projectData) => {
   try {
-    console.log('🚀 [altcomService] Envoi du projet au backend:', projectData);
     
     const response = await axios.post(`${API_URL}/altcom/projects`, projectData, {
       headers: {
@@ -18,7 +17,6 @@ export const createAltcomProject = async (projectData) => {
       },
     });
     
-    console.log('✅ [altcomService] Réponse du serveur:', response.data);
     return response.data;
     
   } catch (error) {
@@ -48,7 +46,6 @@ export const createAltcomProject = async (projectData) => {
  */
 export const createAltcomQuote = async (quoteData) => {
   try {
-    console.log('🚀 [altcomService] Envoi du devis au backend:', quoteData);
     
     const response = await axios.post(`${API_URL}/altcom/quotes`, quoteData, {
       headers: {
@@ -56,7 +53,6 @@ export const createAltcomQuote = async (quoteData) => {
       },
     });
     
-    console.log('✅ [altcomService] Réponse du serveur:', response.data);
     return response.data;
     
   } catch (error) {

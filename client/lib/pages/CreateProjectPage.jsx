@@ -243,7 +243,6 @@ Budget: ${formData.budget} FCFA
         },
       };
 
-      console.log('📤 [CreateProject] Envoi du projet complet:', quoteData);
 
       await createQuoteRequest(quoteData);
       

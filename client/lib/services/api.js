@@ -2,7 +2,6 @@ import axios from "axios";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://altitude-vision.onrender.com/api";
 
-console.log("🔧 API Base URL configurée:", BASE_URL);
 
 // Instance Axios principale
 const api = axios.create({
@@ -21,7 +20,6 @@ api.interceptors.request.use(
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log("🔑 Token ajouté à la requête:", config.method.toUpperCase(), config.url);
     } else {
       console.warn("⚠️ Aucun token trouvé pour:", config.method.toUpperCase(), config.url);
     }
@@ -29,24 +27,18 @@ api.interceptors.request.use(
     // Gérer FormData correctement
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
-      console.log("📤 Requête FormData envoyée:", config.method.toUpperCase(), config.url);
       
       // Log du contenu du FormData pour debug
       if (config.data) {
-        console.log("📦 Contenu du FormData:");
         let fileCount = 0;
         for (let pair of config.data.entries()) {
           if (pair[1] instanceof File) {
             fileCount++;
-            console.log(`   ${pair[0]}: [File: ${pair[1].name}, ${(pair[1].size / 1024).toFixed(2)} KB]`);
           } else {
-            console.log(`   ${pair[0]}: ${pair[1]}`);
           }
         }
-        console.log(`📸 Total de fichiers dans FormData: ${fileCount}`);
       }
     } else {
-      console.log("📤 Requête JSON envoyée:", config.method.toUpperCase(), config.url);
     }
 
     return config;
@@ -60,7 +52,6 @@ api.interceptors.request.use(
 // ⭐ CORRECTION CRITIQUE : Intercepteur de réponse avec gestion 401
 api.interceptors.response.use(
   (response) => {
-    console.log("✅ Réponse reçue:", response.status, response.config.url);
     return response;
   },
   (error) => {
@@ -86,7 +77,6 @@ api.interceptors.response.use(
           
           // Rediriger vers la page de connexion si on n'y est pas déjà
           if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
-            console.log("🔄 Redirection vers /login...");
             window.location.href = '/login';
           }
         }

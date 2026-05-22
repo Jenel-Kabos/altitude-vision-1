@@ -8,11 +8,9 @@ import api from './api';
  */
 export const createQuoteRequest = async (quoteData) => {
   try {
-    console.log("📤 [quoteService] Envoi de la demande de devis:", quoteData);
     
     const response = await api.post('/quotes', quoteData);
     
-    console.log("✅ [quoteService] Devis créé avec succès:", response.data);
     
     return response.data;
   } catch (error) {
@@ -45,7 +43,6 @@ export const createQuoteRequest = async (quoteData) => {
 export const getAllQuotes = async () => {
   try {
     const response = await api.get('/quotes');
-    console.log("✅ [quoteService] Devis chargés:", response.data.data.quotes.length);
     return response.data.data.quotes;
   } catch (error) {
     console.error("❌ [quoteService] Erreur lors de la récupération des devis:", error);
@@ -137,7 +134,6 @@ export const getAllQuotes = async () => {
 export const getQuoteById = async (quoteId) => {
   try {
     const response = await api.get(`/quotes/${quoteId}`);
-    console.log(`✅ [quoteService] Devis ${quoteId} chargé`);
     return response.data.data.quote;
   } catch (error) {
     console.error(`❌ [quoteService] Erreur lors de la récupération du devis ${quoteId}:`, error);
@@ -153,9 +149,7 @@ export const getQuoteById = async (quoteId) => {
  */
 export const updateQuoteStatus = async (quoteId, status) => {
   try {
-    console.log(`📤 [quoteService] Mise à jour du statut du devis ${quoteId} vers ${status}`);
     const response = await api.patch(`/quotes/${quoteId}`, { status });
-    console.log("✅ [quoteService] Statut mis à jour avec succès");
     return response.data.data.quote;
   } catch (error) {
     console.error(`❌ [quoteService] Erreur lors de la mise à jour du devis ${quoteId}:`, error);
@@ -173,9 +167,7 @@ export const updateQuoteStatus = async (quoteId, status) => {
  */
 export const sendQuoteResponse = async (quoteId, responseData) => {
   try {
-    console.log(`📤 [quoteService] Envoi de la réponse pour le devis ${quoteId}`);
     const response = await api.post(`/quotes/${quoteId}/respond`, responseData);
-    console.log("✅ [quoteService] Réponse envoyée avec succès");
     return response.data;
   } catch (error) {
     console.error(`❌ [quoteService] Erreur lors de l'envoi de la réponse:`, error);
@@ -190,9 +182,7 @@ export const sendQuoteResponse = async (quoteId, responseData) => {
  */
 export const deleteQuote = async (quoteId) => {
   try {
-    console.log(`🗑️ [quoteService] Suppression du devis ${quoteId}`);
     await api.delete(`/quotes/${quoteId}`);
-    console.log("✅ [quoteService] Devis supprimé avec succès");
   } catch (error) {
     console.error(`❌ [quoteService] Erreur lors de la suppression du devis ${quoteId}:`, error);
     throw error;
