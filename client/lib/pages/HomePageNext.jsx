@@ -458,10 +458,10 @@ const HomePage = () => {
       {/* ══ STATS ══ */}
       <div className="hp-stats-grid">
         {[
-          { num:'3',    label:"Pôles d'expertise",    color:'#C8872A' },
-          { num:'150+', label:'Biens immobiliers',    color:'#2E7BB5' },
-          { num:'80+',  label:'Événements organisés', color:'#D42B2B' },
-          { num:'∞',    label:'Possibilités',         color:'#C8872A' },
+          { num:'150+', label:'Biens sélectionnés',      color:'#2E7BB5' },
+          { num:'80+',  label:'Événements livrés',        color:'#D42B2B' },
+          { num:'80+',  label:'Entreprises accompagnées', color:'#C8872A' },
+          { num:'5+',   label:'Années au Congo',          color:'#C8872A' },
         ].map((stat, i) => (
           <FadeIn key={i} delay={i * 0.07} y={14}>
             <div className="hp-stat-item">
@@ -530,10 +530,10 @@ const HomePage = () => {
               </h2>
               <p className="hp-about-p" style={{ color:'rgba(232,228,220,0.5)', marginBottom:'12px' }}>
                 <span style={{ color:'#E8E4DC', fontWeight:400 }}>Altitude-Vision</span>{' '}
-                est une agence multidisciplinaire basée à Brazzaville. Nos trois pôles travaillent en synergie pour vous offrir visibilité et résultats concrets.
+                est la seule agence à Brazzaville qui réunit l'immobilier, l'événementiel et la communication sous un même toit.
               </p>
               <p className="hp-about-p" style={{ color:'rgba(232,228,220,0.34)', marginBottom:'clamp(20px,4vw,32px)' }}>
-                Immobilier de prestige, événementiel haut de gamme ou stratégie de communication — une seule agence suffit.
+                200+ familles logées, 80+ événements réussis, 80+ marques accompagnées — ce sont nos preuves. Confiez-nous un projet : nous livrons.
               </p>
               <div style={{ display:'flex', flexDirection:'column', gap:'10px', marginBottom:'clamp(22px,4vw,34px)' }}>
                 {[
