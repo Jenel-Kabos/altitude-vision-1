@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
@@ -266,7 +266,9 @@ const injectCtaStyles = () => {
 };
 
 const CtaCommission = () => {
-  injectCtaStyles();
+  useEffect(() => {
+    injectCtaStyles();
+  }, []);
 
   return (
     <div className="cta-outer">

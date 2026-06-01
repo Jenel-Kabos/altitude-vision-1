@@ -97,6 +97,12 @@ export const AuthProvider = ({ children }) => {
         });
     }, []);
 
+    // Prevents hydration mismatch: Next.js RSC renders the layout in the HTML,
+    // but loading=true would render a spinner client-side — causing a fatal mismatch.
+    // The mounted flag defers the spinner until after hydration completes.
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
+
     const value = useMemo(() => ({
         user,
         loading,
@@ -109,7 +115,7 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {loading ? (
+            {mounted && loading ? (
                 <div className="flex items-center justify-center min-h-screen bg-gray-50">
                     <div className="text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />

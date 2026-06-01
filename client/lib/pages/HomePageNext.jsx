@@ -412,11 +412,13 @@ const FadeIn = ({ children, delay = 0, x = 0, y = 20 }) => (
    PAGE
 ═══════════════════════════════════════════════════════════════ */
 const HomePage = () => {
-  injectHpStyles();
-
   const [latestProperties, setLatestProperties] = useState({});
   const [isLoading,  setIsLoading]  = useState(true);
   const [activePole, setActivePole] = useState(poles[0].id);
+
+  useEffect(() => {
+    injectHpStyles();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {

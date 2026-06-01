@@ -21,6 +21,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata = {
+  metadataBase: new URL(SITE_URL),
   ...buildMetadata({
     title: "Immobilier, Événements & Communication à Brazzaville",
     description: "Altitude-Vision — Trouvez votre bien immobilier, organisez vos événements et boostez votre communication à Brazzaville, Congo.",
