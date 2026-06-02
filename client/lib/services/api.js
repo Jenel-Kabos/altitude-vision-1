@@ -20,8 +20,6 @@ api.interceptors.request.use(
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    } else {
-      console.warn("⚠️ Aucun token trouvé pour:", config.method.toUpperCase(), config.url);
     }
 
     // Gérer FormData correctement
