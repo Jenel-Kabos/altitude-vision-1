@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FiLogIn, FiMail, FiLock, FiAlertTriangle } from 'react-icons/fi';
-import { useAuth } from '../context/AuthContext.jsx';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api.js';
 
 const LoginPage = () => {
