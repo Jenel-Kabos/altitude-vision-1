@@ -419,8 +419,10 @@ const PropertyForm = ({
           </label>
           <p className="text-xs text-gray-500 mt-1">
             {formData.images.length === 0
-              ? "Veuillez ajouter au moins une image"
-              : `${formData.images.length} image(s) sélectionnée(s)`}
+              ? existingImages.length > 0
+                ? "Ajouter d'autres images (optionnel)"
+                : "Veuillez ajouter au moins une image"
+              : `${formData.images.length} nouvelle(s) image(s) sélectionnée(s)`}
           </p>
         </div>
 
@@ -495,13 +497,13 @@ const PropertyForm = ({
       {/* Bouton Submit */}
       <button
         type="submit"
-        disabled={loading || formData.images.length === 0}
+        disabled={loading || (formData.images.length === 0 && existingImages.length === 0)}
         className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold transition-colors"
       >
         {loading ? "Sauvegarde en cours..." : "Enregistrer le bien"}
       </button>
 
-      {formData.images.length === 0 && (
+      {formData.images.length === 0 && existingImages.length === 0 && (
         <p className="text-sm text-red-600 text-center -mt-2">
           ⚠️ Veuillez ajouter au moins une image avant de soumettre
         </p>

@@ -10,10 +10,10 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   // Fonts are self-hosted via next/font — no external font CDN needed
   "font-src 'self'",
-  // Images: local, Unsplash (hero), Cloudinary (uploads), Render (legacy), Facebook (feed)
-  "img-src 'self' data: blob: https://images.unsplash.com https://altitude-vision.onrender.com https://res.cloudinary.com https://graph.facebook.com https://*.fbcdn.net https://platform-lookaside.fbsbx.com https://ui-avatars.com https://placehold.co https://illustrations.popsy.co https://*.googleusercontent.com",
-  // API calls + Facebook feed data; blob: for fetch() responses; GA endpoints
-  "connect-src 'self' blob: https://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com",
+  // Images: local, Unsplash (hero), Cloudinary (uploads), Render (legacy), Facebook (feed), Leaflet tiles + marker icons
+  "img-src 'self' data: blob: https://images.unsplash.com https://altitude-vision.onrender.com https://res.cloudinary.com https://graph.facebook.com https://*.fbcdn.net https://platform-lookaside.fbsbx.com https://ui-avatars.com https://placehold.co https://illustrations.popsy.co https://*.googleusercontent.com https://*.tile.openstreetmap.org https://*.tile.openstreetmap.fr https://*.basemaps.cartocdn.com https://unpkg.com",
+  // API calls + Facebook feed data; blob: for fetch() responses; GA endpoints; Leaflet tile/geocoding requests
+  "connect-src 'self' blob: https://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://*.tile.openstreetmap.org https://nominatim.openstreetmap.org",
   // Web Workers (e.g. PDF.js, comlink) require blob: worker source
   "worker-src 'self' blob:",
   // child-src covers blob: workers in older browsers that don't support worker-src
