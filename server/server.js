@@ -132,12 +132,13 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const allowedOrigins = [
   "https://altitudevision.agency",
   "https://www.altitudevision.agency",
+  "https://altitude-vision-1.vercel.app",
   "https://altitudevision.netlify.app",
   "https://altitude-vision-frontend.onrender.com",
   "http://localhost:5173",
   "http://localhost:3000",
   "http://localhost:5174",
-  process.env.FRONTEND_URL 
+  process.env.FRONTEND_URL
 ].filter(Boolean);
 
 console.log('🌍 [CORS] Origines autorisées:', allowedOrigins);
