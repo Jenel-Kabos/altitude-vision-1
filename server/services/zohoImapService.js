@@ -20,14 +20,23 @@ const pollZohoInbox = async () => {
     const stats = { imported: 0, skipped: 0, errors: 0 };
 
     const client = new ImapFlow({
-        host:   'imap.zoho.com',
-        port:   993,
-        secure: true,
+        host:              'imap.zoho.com',
+        port:              993,
+        secure:            true,
         auth: {
             user: process.env.ZOHO_FROM_EMAIL,
             pass: process.env.ZOHO_IMAP_PASSWORD,
         },
-        logger: false,
+        logger:            false,
+        connectionTimeout: 15000,  // 15 s max pour établir la connexion
+        socketTimeout:     30000,  // 30 s max d'inactivité socket
+    });
+
+    // ImapFlow émet les erreurs réseau (ETIMEOUT, ECONNRESET…) via l'événement
+    // 'error' de l'EventEmitter. Sans listener, Node.js traite ça comme une
+    // exception non gérée et crashe le processus.
+    client.on('error', (err) => {
+        console.error('❌ [IMAP] Erreur socket (absorbée):', err.message);
     });
 
     try {
@@ -120,8 +129,13 @@ const pollZohoInbox = async () => {
         return stats;
 
     } catch (error) {
-        console.error('❌ [IMAP] Erreur connexion:', error.message);
-        try { await client.logout(); } catch {}
+        const isNetworkErr = ['ETIMEOUT', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'].includes(error.code);
+        if (isNetworkErr) {
+            console.warn(`⚠️ [IMAP] Timeout/réseau (${error.code}) — polling ignoré, serveur intact`);
+        } else {
+            console.error('❌ [IMAP] Erreur connexion:', error.message);
+        }
+        try { client.close(); } catch {}
         return { ...stats, errors: stats.errors + 1 };
     }
 };
