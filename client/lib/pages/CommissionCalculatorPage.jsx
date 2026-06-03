@@ -617,6 +617,9 @@ const CommissionCalculatorPage = () => {
   const router = useRouter();
   const isLoggedIn = isAuthenticated();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [type,  setType]  = useState('vente');
   const [price, setPrice] = useState(SLIDER_CONFIG.vente.default);
   const cfg = SLIDER_CONFIG[type];
@@ -649,7 +652,7 @@ const CommissionCalculatorPage = () => {
 
   return (
     <div className="cp-root">
-      <style>{PAGE_CSS}</style>
+      {mounted && <style>{PAGE_CSS}</style>}
 
       {/* ══ HERO ═══════════════════════════════════════════════ */}
       <motion.section className="cp-hero"

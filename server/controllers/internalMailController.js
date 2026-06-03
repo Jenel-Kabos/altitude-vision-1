@@ -2,7 +2,7 @@
 const asyncHandler = require('express-async-handler');
 const InternalMail = require('../models/InternalMail');
 const User = require('../models/User');
-const { sendEmailViaZoho } = require('../services/zohoMailService'); // ← adaptez le chemin
+const { sendEmailViaZoho } = require('../services/emailService');
 
 // ═══════════════════════════════════════════════════════════════
 // MISE À JOUR DU SCHÉMA MONGOOSE REQUISE

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
@@ -257,9 +257,12 @@ const CTA_CSS = `
 `;
 
 const CtaCommission = () => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   return (
     <div className="cta-outer">
-      <style>{CTA_CSS}</style>
+      {mounted && <style>{CTA_CSS}</style>}
       <div className="cta-wrap">
 
         {/* ── Fond décoratif ── */}
