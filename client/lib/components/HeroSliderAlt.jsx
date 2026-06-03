@@ -141,7 +141,7 @@ const SLIDER_CSS = `
   /* ══ CORPS — 2 lignes max mobile ══ */
   .ash-body {
     font-family: 'Outfit', sans-serif;
-    font-size: clamp(0.80rem, 1.5vw, 0.88rem);
+    font-size: clamp(0.80rem, 1.5vw, 1.4rem);
     font-weight: 300; line-height: 1.65;
     color: rgba(245,242,238,0.78);
     margin-bottom: clamp(8px, 1.4vw, 14px);
@@ -187,7 +187,7 @@ const SLIDER_CSS = `
   }
   .ash-cta-btn:hover { transform: translateY(-2px); }
   @media (min-width: 1440px) {
-    .ash-cta-btn { font-size: 0.88rem; padding: 14px 28px; min-height: 52px; }
+    .ash-cta-btn { font-size: 1rem; padding: 14px 28px; min-height: 52px; }
   }
 
   /* Stat inline */

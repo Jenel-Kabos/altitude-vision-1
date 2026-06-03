@@ -150,7 +150,7 @@ const CTA_CSS = `
   }
 
   .cta-body {
-    font-size: clamp(0.82rem, 1.8vw, 1.1rem);
+    font-size: clamp(0.82rem, 1.8vw, 1.3rem);
     font-weight: 300; line-height: 1.75;
     color: rgba(245,242,238,0.52);
     max-width: 640px;
@@ -169,7 +169,7 @@ const CTA_CSS = `
   .cta-stat { display: flex; flex-direction: column; gap: 2px; }
   .cta-stat-val {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(1.25rem, 2.8vw, 1.65rem);
+    font-size: clamp(1.25rem, 2.8vw, 3.5rem);
     font-weight: 600; color: ${GOLD}; line-height: 1;
   }
   .cta-stat-lbl {
@@ -218,7 +218,7 @@ const CTA_CSS = `
     background: ${GOLD};
     color: ${INK};
     font-family: 'Jost', sans-serif;
-    font-size: clamp(0.68rem, 1.4vw, 0.75rem);
+    font-size: clamp(0.68rem, 1.4vw, 1rem);
     font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase;
     text-decoration: none; border-radius: 1px;
     position: relative; overflow: hidden; white-space: nowrap;
