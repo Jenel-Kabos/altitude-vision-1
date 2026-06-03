@@ -136,7 +136,7 @@ const CTA_CSS = `
 
   .cta-title {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(1.75rem, 4.5vw, 4.5rem);
+    font-size: clamp(1.75rem, 4.5vw, 6rem);
     font-weight: 600; line-height: 1.08;
     color: #F5F2EE; letter-spacing: -0.01em;
     margin-bottom: clamp(8px, 1.8vw, 14px);
@@ -162,23 +162,23 @@ const CTA_CSS = `
 
   /* ── Stats inline ── */
   .cta-stats {
-    display: flex; gap: 18px; flex-wrap: wrap;
+    display: flex; gap: clamp(18px, 3vw, 40px); flex-wrap: wrap;
     align-items: baseline;
     margin-top: clamp(14px, 2.5vw, 22px);
   }
   .cta-stat { display: flex; flex-direction: column; gap: 2px; }
   .cta-stat-val {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(1.25rem, 2.8vw, 3rem);
+    font-size: clamp(1.25rem, 3.5vw, 5rem);
     font-weight: 600; color: ${GOLD}; line-height: 1;
   }
   .cta-stat-lbl {
-    font-size: clamp(0.56rem, 1.1vw, 0.60rem);
+    font-size: clamp(0.56rem, 1.1vw, 0.85rem);
     font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase;
     color: rgba(245,242,238,0.28);
   }
   .cta-stat-sep {
-    width: 1px; height: 32px;
+    width: 1px; height: clamp(32px, 4vw, 56px);
     background: rgba(200,135,42,0.2);
     align-self: center;
   }
@@ -267,7 +267,9 @@ const injectCtaStyles = () => {
 
 const CtaCommission = () => {
   useEffect(() => {
+    _ctaStylesInjected = false;
     injectCtaStyles();
+    return () => { _ctaStylesInjected = false; };
   }, []);
 
   return (
