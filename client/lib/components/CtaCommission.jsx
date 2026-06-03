@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
@@ -256,24 +256,10 @@ const CTA_CSS = `
   .cta-sub-link:hover { color: ${GOLD}; }
 `;
 
-let _ctaStylesInjected = false;
-const injectCtaStyles = () => {
-  if (_ctaStylesInjected || typeof document === 'undefined') return;
-  const s = document.createElement('style');
-  s.textContent = CTA_CSS;
-  document.head.appendChild(s);
-  _ctaStylesInjected = true;
-};
-
 const CtaCommission = () => {
-  useEffect(() => {
-    _ctaStylesInjected = false;
-    injectCtaStyles();
-    return () => { _ctaStylesInjected = false; };
-  }, []);
-
   return (
     <div className="cta-outer">
+      <style>{CTA_CSS}</style>
       <div className="cta-wrap">
 
         {/* ── Fond décoratif ── */}
