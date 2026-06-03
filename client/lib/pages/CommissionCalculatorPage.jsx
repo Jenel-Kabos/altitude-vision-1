@@ -138,7 +138,7 @@ const PAGE_CSS = `
   }
   .cp-hero-h1 {
     font-family:var(--font-cormorant),serif;
-    font-size:clamp(2.2rem,5.5vw,4rem);
+    font-size:clamp(2.2rem,5.5vw,6rem);
     font-weight:600; line-height:1.06; color:#F5F2EE;
     letter-spacing:-.02em;
     margin-bottom:clamp(12px,2vw,18px);
@@ -158,7 +158,7 @@ const PAGE_CSS = `
   /* Stats hero */
   .cp-hero-stats {
     display:flex; gap:clamp(14px,3vw,28px); flex-wrap:wrap;
-    align-items:center;
+    align-items:baseline;
     margin-top:clamp(20px,3.5vw,32px);
     padding-top:clamp(16px,3vw,24px);
     border-top:1px solid rgba(200,135,42,.18);
@@ -166,10 +166,10 @@ const PAGE_CSS = `
   .cp-hstat { display:flex; flex-direction:column; gap:2px; }
   .cp-hstat-val {
     font-family:var(--font-cormorant),serif;
-    font-size:clamp(1.5rem,3vw,2rem); font-weight:600; color:${GOLD}; line-height:1;
+    font-size:clamp(1.5rem,3.5vw,5rem); font-weight:600; color:${GOLD}; line-height:1;
   }
   .cp-hstat-lbl {
-    font-size:clamp(.56rem,1.1vw,.60rem); font-weight:400;
+    font-size:clamp(.56rem,1.1vw,0.85rem); font-weight:400;
     letter-spacing:.12em; text-transform:uppercase; color:rgba(245,242,238,.3);
   }
   .cp-hstat-sep { width:1px; height:36px; background:rgba(200,135,42,.18); align-self:center; }
@@ -584,15 +584,6 @@ const PAGE_CSS = `
   }
 `;
 
-let _cpInjected = false;
-const injectStyles = () => {
-  if (_cpInjected || typeof document === 'undefined') return;
-  const s = document.createElement('style');
-  s.textContent = PAGE_CSS;
-  document.head.appendChild(s);
-  _cpInjected = true;
-};
-
 /* ─── Hook compteur animé ─────────────────────────────────── */
 const useAnimatedValue = (target) => {
   const [display, setDisplay] = useState(target);
@@ -623,7 +614,6 @@ const SLIDER_CONFIG = {
    PAGE
 ═══════════════════════════════════════════════════════════════ */
 const CommissionCalculatorPage = () => {
-  injectStyles();
   const router = useRouter();
   const isLoggedIn = isAuthenticated();
 
@@ -659,6 +649,7 @@ const CommissionCalculatorPage = () => {
 
   return (
     <div className="cp-root">
+      <style>{PAGE_CSS}</style>
 
       {/* ══ HERO ═══════════════════════════════════════════════ */}
       <motion.section className="cp-hero"
