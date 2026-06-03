@@ -64,7 +64,7 @@ const CTA_CSS = `
     overflow: hidden;
     padding: clamp(28px, 5.5vw, 100px) clamp(20px, 5vw, 120px);
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1.5fr auto;
     gap: clamp(24px, 4vw, 56px);
     align-items: center;
     animation: cta-enter 0.65s cubic-bezier(0.22,1,0.36,1) both;
@@ -153,7 +153,7 @@ const CTA_CSS = `
     font-size: clamp(0.82rem, 1.8vw, 1.3rem);
     font-weight: 300; line-height: 1.75;
     color: rgba(245,242,238,0.52);
-    max-width: 640px;
+    max-width: 100%;
   }
   .cta-body strong {
     font-weight: 500;
@@ -163,13 +163,13 @@ const CTA_CSS = `
   /* ── Stats inline ── */
   .cta-stats {
     display: flex; gap: 18px; flex-wrap: wrap;
-    align-items: center;
+    align-items: baseline;
     margin-top: clamp(14px, 2.5vw, 22px);
   }
   .cta-stat { display: flex; flex-direction: column; gap: 2px; }
   .cta-stat-val {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(1.25rem, 2.8vw, 3.5rem);
+    font-size: clamp(1.25rem, 2.8vw, 3rem);
     font-weight: 600; color: ${GOLD}; line-height: 1;
   }
   .cta-stat-lbl {
