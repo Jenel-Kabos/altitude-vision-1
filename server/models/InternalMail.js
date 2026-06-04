@@ -26,7 +26,7 @@ const internalMailSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: function () {
-      return !this.isDraft;
+      return !this.isDraft && !this.isExternalMail;
     },
   },
 
