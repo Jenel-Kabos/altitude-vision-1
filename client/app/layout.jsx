@@ -32,6 +32,9 @@ export const metadata = {
     shortcut: "/favicon.ico",
     apple: "/logo.png",
   },
+  verification: {
+    google: 'F4D7sKQm2QQaHzm8XU6CPY4hj2q00o1kY2ZlvKktsIs',
+  },
 };
 
 const LOCAL_BUSINESS_SCHEMA = {
