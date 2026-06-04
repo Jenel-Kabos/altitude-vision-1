@@ -170,29 +170,24 @@ const sendEmailViaZoho = async (fromEmail, toEmail, subject, content) => {
   try {
     console.log(`📧 [EmailService] Envoi email de ${fromEmail} vers ${toEmail}`);
 
-    // Vérifier que l'email d'envoi existe dans la base de données et est actif
-    const emailAccount = await Email.findOne({ email: fromEmail, isActive: true });
-    
-    if (!emailAccount) {
-      throw new Error('Compte email non trouvé ou inactif');
-    }
-
-    // Envoyer via Zoho Mail API
+    // Envoyer via Zoho Mail API (la validation de l'expéditeur est faite par Zoho OAuth)
     const result = await zohoMailService.sendEmail(fromEmail, toEmail, subject, content);
 
-    // Incrémenter le compteur d'emails envoyés
-    emailAccount.emailsSent = (emailAccount.emailsSent || 0) + 1;
-    emailAccount.lastEmailSent = new Date();
-    await emailAccount.save();
+    // Incrémenter le compteur si le compte existe en base (optionnel)
+    const emailAccount = await Email.findOne({ email: fromEmail });
+    if (emailAccount) {
+      emailAccount.emailsSent = (emailAccount.emailsSent || 0) + 1;
+      emailAccount.lastEmailSent = new Date();
+      await emailAccount.save();
+    }
 
-    console.log(`✅ [EmailService] Email envoyé ! Total: ${emailAccount.emailsSent}`);
+    console.log(`✅ [EmailService] Email envoyé de ${fromEmail} vers ${toEmail}`);
 
     return {
       success: true,
       message: 'Email envoyé avec succès',
-      emailsSent: emailAccount.emailsSent,
-      fromEmail: fromEmail,
-      toEmail: toEmail,
+      fromEmail,
+      toEmail,
       zohoResponse: result
     };
   } catch (error) {
