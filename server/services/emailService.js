@@ -170,18 +170,23 @@ const sendEmailViaZoho = async (fromEmail, toEmail, subject, content) => {
   try {
     console.log(`📧 [EmailService] Envoi email de ${fromEmail} vers ${toEmail}`);
 
+    // Récupérer le compte pour le nom affiché (optionnel — pas bloquant)
+    const emailAccount = await Email.findOne({ email: fromEmail });
+    const fromAddress = emailAccount?.displayName
+      ? `${emailAccount.displayName} <${fromEmail}>`
+      : fromEmail;
+
     // Envoyer via Zoho Mail API (la validation de l'expéditeur est faite par Zoho OAuth)
-    const result = await zohoMailService.sendEmail(fromEmail, toEmail, subject, content);
+    const result = await zohoMailService.sendEmail(fromAddress, toEmail, subject, content);
 
     // Incrémenter le compteur si le compte existe en base (optionnel)
-    const emailAccount = await Email.findOne({ email: fromEmail });
     if (emailAccount) {
       emailAccount.emailsSent = (emailAccount.emailsSent || 0) + 1;
       emailAccount.lastEmailSent = new Date();
       await emailAccount.save();
     }
 
-    console.log(`✅ [EmailService] Email envoyé de ${fromEmail} vers ${toEmail}`);
+    console.log(`✅ [EmailService] Email envoyé de ${fromAddress} vers ${toEmail}`);
 
     return {
       success: true,
