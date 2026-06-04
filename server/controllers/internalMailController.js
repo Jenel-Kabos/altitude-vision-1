@@ -56,7 +56,6 @@ exports.sendInternalMail = asyncHandler(async (req, res) => {
     const emailContent = `${content}\n\n---\nMessage envoyé depuis Altitude Vision\nPar : ${senderUser.name}`;
 
     // Envoi via Zoho
-    console.log('🔍 fromEmail utilisé:', fromEmail);
     await sendEmailViaZoho(fromEmail, receiverEmail, subject || 'Sans objet', emailContent);
 
     // Sauvegarder une trace dans "Messages envoyés"
