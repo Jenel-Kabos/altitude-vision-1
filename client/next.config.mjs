@@ -12,6 +12,8 @@ const CSP = [
   "font-src 'self'",
   // Images: local, Unsplash (hero), Cloudinary (uploads), Render (legacy), Facebook (feed), Leaflet tiles + marker icons
   "img-src 'self' data: blob: https://images.unsplash.com https://altitude-vision.onrender.com https://res.cloudinary.com https://graph.facebook.com https://*.fbcdn.net https://platform-lookaside.fbsbx.com https://ui-avatars.com https://placehold.co https://illustrations.popsy.co https://*.googleusercontent.com https://*.tile.openstreetmap.org https://*.tile.openstreetmap.fr https://*.basemaps.cartocdn.com https://unpkg.com",
+  // Videos: Cloudinary hosted videos + blob: for local object URLs
+  "media-src 'self' https://res.cloudinary.com https://*.cloudinary.com blob:",
   // API calls + Facebook feed data; blob: for fetch() responses; GA endpoints; Leaflet tile/geocoding requests
   "connect-src 'self' blob: https://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://*.tile.openstreetmap.org https://nominatim.openstreetmap.org",
   // Web Workers (e.g. PDF.js, comlink) require blob: worker source
