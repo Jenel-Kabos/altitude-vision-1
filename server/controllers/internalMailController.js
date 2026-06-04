@@ -45,7 +45,7 @@ exports.sendInternalMail = asyncHandler(async (req, res) => {
 
     // Récupérer l'expéditeur connecté
     const senderUser = await User.findById(req.user.id).select('name email zohoEmail');
-    const fromEmail  = senderUser.zohoEmail || senderUser.email;
+    const fromEmail  = process.env.ZOHO_FROM_EMAIL || 'contact@altitudevision.agency';
 
     if (!fromEmail) {
       res.status(400);
