@@ -20,15 +20,17 @@ cloudinary.config({
 // ✅ limits.files ajouté : sans cette limite, un attaquant peut envoyer
 //    des centaines de fichiers dans une seule requête → saturation mémoire (DoS).
 //    fileSize seul ne protège pas contre les attaques multi-fichiers.
+const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+const ALLOWED_VIDEO_MIMES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024,  // 10 Mo par fichier
+    fileSize: 100 * 1024 * 1024, // 100 Mo — couvre images et vidéos
     files:    15,                  // max 15 fichiers par requête (galerie immobilière)
   },
   fileFilter: (req, file, cb) => {
-    // ✅ Liste blanche stricte avec includes() — pas de regex laxiste
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    const allowed = [...ALLOWED_IMAGE_MIMES, ...ALLOWED_VIDEO_MIMES];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
