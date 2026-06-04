@@ -2,6 +2,7 @@
 
 // src/pages/dashboard/InternalMessagingPage.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mail, Send, Inbox, SendHorizontal, Star, Trash2, Search, X, Loader2,
@@ -583,9 +584,10 @@ const MessageDetail = ({ message, onToggleStar, onDelete, onRestore, uploadBaseU
 
       <div className="flex-1 overflow-y-auto p-6 bg-white">
         <div className="max-w-3xl">
-          <p className="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap">
-            {message.content}
-          </p>
+          <div
+            className="text-gray-700 text-lg leading-relaxed prose prose-sm max-w-none"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(message.content) }}
+          />
 
           {message.attachments?.length > 0 && (
             <div className="mt-8 pt-6 border-t border-gray-200">
