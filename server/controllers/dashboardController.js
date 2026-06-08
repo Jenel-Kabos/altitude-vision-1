@@ -2,34 +2,121 @@
 const User          = require('../models/User');
 const Property      = require('../models/Property');
 const Event         = require('../models/Event');
-const PortfolioItem = require('../models/portfolioItemModel'); // ← import au top niveau
+const PortfolioItem = require('../models/portfolioItemModel');
+const AltcomProject = require('../models/AltcomProject');
+const Review        = require('../models/Review');
 
 /**
- * @DESC   Obtenir les statistiques du Dashboard
+ * @DESC   Statistiques enrichies du Dashboard
  * @ROUTE  GET /api/dashboard/stats
  * @ACCESS Private (Admin, Collaborateur)
  */
 exports.getDashboardStats = async (req, res) => {
   try {
-    const [usersCount, propertiesCount, eventsCount, ownersCount, portfolioCount] = await Promise.all([
+    const now        = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [
+      // Comptages globaux
+      usersCount,
+      propertiesTotal,
+      eventsTotal,
+      ownersCount,
+      portfolioCount,
+      // Altimmo KPIs
+      propertiesActives,
+      propertiesPending,
+      propertiesThisMonth,
+      // Mila Events KPIs
+      eventsUpcoming,
+      eventsPublished,
+      // Altcom KPIs
+      altcomEnCours,
+      altcomReviews,
+      // Activité récente
+      recentProperties,
+      recentEvents,
+      recentProjects,
+    ] = await Promise.all([
       User.countDocuments(),
       Property.countDocuments(),
       Event.countDocuments(),
       User.countDocuments({ role: 'Proprietaire' }),
       PortfolioItem.countDocuments({ isPublished: true }),
+      // Altimmo
+      Property.countDocuments({ statusAdmin: 'Validée' }),
+      Property.countDocuments({ statusAdmin: 'En attente' }),
+      Property.countDocuments({ createdAt: { $gte: monthStart } }),
+      // Events
+      Event.countDocuments({ date: { $gte: now }, status: 'Publié' }),
+      Event.countDocuments({ status: 'Publié' }),
+      // Altcom
+      AltcomProject.countDocuments({ status: { $in: ['En cours', 'Accepté'] } }),
+      Review.countDocuments(),
+      // Activité récente (4 items par pôle)
+      Property.find()
+        .sort({ createdAt: -1 }).limit(4)
+        .select('title statusAdmin status createdAt price'),
+      Event.find()
+        .sort({ createdAt: -1 }).limit(4)
+        .select('name status date createdAt'),
+      AltcomProject.find()
+        .sort({ createdAt: -1 }).limit(4)
+        .select('projectName companyName status createdAt'),
     ]);
 
-    const statsData = {
-      Altimmo:    propertiesCount,
-      MilaEvents: eventsCount,
-      Altcom:     portfolioCount,
-      Users:      usersCount,
-      Owners:     ownersCount,
-    };
+    // Score de performance global (0–100)
+    const validationRate  = propertiesTotal > 0 ? Math.round((propertiesActives / propertiesTotal) * 100) : 0;
+    const eventsScore     = Math.min(eventsUpcoming * 12, 100);
+    const portfolioScore  = Math.min(portfolioCount * 8, 100);
+    const reviewScore     = Math.min(altcomReviews * 5, 100);
+    const globalScore     = Math.round((validationRate * 0.35) + (eventsScore * 0.25) + (portfolioScore * 0.25) + (reviewScore * 0.15));
 
     res.status(200).json({
       status: 'success',
-      data: { stats: statsData },
+      data: {
+        // Rétrocompatibilité — les composants existants continuent de fonctionner
+        stats: {
+          Altimmo:    propertiesTotal,
+          MilaEvents: eventsTotal,
+          Altcom:     portfolioCount,
+          Users:      usersCount,
+          Owners:     ownersCount,
+        },
+        // KPIs détaillés par pôle
+        kpis: {
+          altimmo: {
+            actives:    propertiesActives,
+            pending:    propertiesPending,
+            leadsMonth: propertiesThisMonth,
+            total:      propertiesTotal,
+          },
+          milaEvents: {
+            upcoming:  eventsUpcoming,
+            published: eventsPublished,
+            total:     eventsTotal,
+          },
+          altcom: {
+            projetsEnCours: altcomEnCours,
+            servicesActifs: portfolioCount,
+            avisRecus:      altcomReviews,
+          },
+        },
+        // Activité récente (pour le widget)
+        activity: {
+          properties: recentProperties,
+          events:     recentEvents,
+          projects:   recentProjects,
+        },
+        // Indicateur de performance global
+        performance: {
+          globalScore,
+          validationRate,
+          eventsScore,
+          portfolioScore,
+          reviewScore,
+        },
+      },
     });
 
   } catch (error) {
