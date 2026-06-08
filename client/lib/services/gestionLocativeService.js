@@ -8,19 +8,36 @@ export const getProprietaires = async () => {
 };
 
 export const createProprietaire = async (data) => {
-  const fd = toFormData(data);
+  const fd = buildPropFD(data);
   const res = await api.post('/proprietaires', fd);
   return res.data.data.proprietaire;
 };
 
 export const updateProprietaire = async (id, data) => {
-  const fd = toFormData(data);
+  const fd = buildPropFD(data);
   const res = await api.put(`/proprietaires/${id}`, fd);
   return res.data.data.proprietaire;
 };
 
 export const deleteProprietaire = async (id) => {
   await api.delete(`/proprietaires/${id}`);
+};
+
+// ── Biens d'un propriétaire ───────────────────────────────────
+
+export const addBienPhotos = async (proprietaireId, bienIndex, files) => {
+  const fd = new FormData();
+  files.forEach(f => fd.append('photos', f));
+  const res = await api.post(`/proprietaires/${proprietaireId}/biens/${bienIndex}/photos`, fd);
+  return res.data.data;
+};
+
+export const deleteBienPhoto = async (proprietaireId, bienIndex, photoIndex) => {
+  await api.delete(`/proprietaires/${proprietaireId}/biens/${bienIndex}/photos/${photoIndex}`);
+};
+
+export const deleteBien = async (proprietaireId, bienIndex) => {
+  await api.delete(`/proprietaires/${proprietaireId}/biens/${bienIndex}`);
 };
 
 // ── Locataires ────────────────────────────────────────────────
@@ -85,12 +102,23 @@ export const deletePaiement = async (id) => {
   await api.delete(`/paiements/${id}`);
 };
 
-// ── Utilitaire ────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────
 
 const toFormData = (data) => {
   const fd = new FormData();
   Object.entries(data).forEach(([k, v]) => {
     if (v !== null && v !== undefined && v !== '') fd.append(k, v);
   });
+  return fd;
+};
+
+const buildPropFD = (data) => {
+  const { pieceIdentite, biensPropres, ...rest } = data;
+  const fd = new FormData();
+  Object.entries(rest).forEach(([k, v]) => {
+    if (v !== null && v !== undefined && v !== '') fd.append(k, v);
+  });
+  if (pieceIdentite instanceof File) fd.append('pieceIdentite', pieceIdentite);
+  if (biensPropres !== undefined) fd.append('biensPropres', JSON.stringify(biensPropres));
   return fd;
 };
