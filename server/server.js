@@ -253,6 +253,12 @@ const emailRoutes = require('./routes/emailRoutes');
 // ✅ NOUVEAU — Webhook Zoho (sans JWT)
 const webhookRoutes = require('./routes/webhookRoutes');
 
+// 🏘️ Gestion Locative
+const proprietaireRoutes = require('./routes/proprietaireRoutes');
+const locataireRoutes    = require('./routes/locataireRoutes');
+const contratRoutes      = require('./routes/contratRoutes');
+const paiementRoutes     = require('./routes/paiementRoutes');
+
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
 // ============================================================
@@ -265,6 +271,12 @@ app.use('/api/auth', require('./routes/authRoutes'));
 // 🏠 Pôle Altimmo
 app.use("/api/properties", propertyRoutes);
 app.use("/api/transactions", transactionRoutes);
+
+// 🏘️ Gestion Locative
+app.use('/api/proprietaires', proprietaireRoutes);
+app.use('/api/locataires',    locataireRoutes);
+app.use('/api/contrats',      contratRoutes);
+app.use('/api/paiements',     paiementRoutes);
 
 // 💼 Pôle Altcom
 app.use("/api/services", serviceRoutes);

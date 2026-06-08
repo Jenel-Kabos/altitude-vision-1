@@ -54,8 +54,9 @@ const DashboardHome = () => {
   const [activity, setActivity]     = useState(null);
   const [perf, setPerf]             = useState(null);
   const [quotesStats, setQuotesStats] = useState({ total: 0, nouveau: 0, enCours: 0, converti: 0 });
-  const [quotesRaw, setQuotesRaw]   = useState([]);
-  const [milaCount, setMilaCount]   = useState(0);
+  const [quotesRaw, setQuotesRaw]       = useState([]);
+  const [milaCount, setMilaCount]       = useState(0);
+  const [contratsActifs, setContrats]   = useState(0);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
   const [activeTab, setActiveTab]   = useState('overview');
@@ -77,6 +78,7 @@ const DashboardHome = () => {
         setStats(dsStats);
         setMilaCount(events.length > 0 ? events.length : (dsStats.MilaEvents || 0));
         setKpis(dashboardData.kpis   || null);
+        setContrats(dashboardData.contratsActifs || 0);
         setActivity(dashboardData.activity  || null);
         setPerf(dashboardData.performance   || null);
         const quotes = quotesData || [];
@@ -301,9 +303,10 @@ const DashboardHome = () => {
                   <PoleKpiCard
                     title="Altimmo" Icon={Building2} color={BLUE}
                     kpis={kpis ? [
-                      { label:'Biens actifs',    value: kpis.altimmo.actives,    icon: CheckCircle },
-                      { label:'En attente',       value: kpis.altimmo.pending,    icon: Clock       },
-                      { label:'Ajouts ce mois',   value: kpis.altimmo.leadsMonth, icon: TrendingUp  },
+                      { label:'Biens actifs',      value: kpis.altimmo.actives,    icon: CheckCircle },
+                      { label:'En attente',         value: kpis.altimmo.pending,    icon: Clock       },
+                      { label:'Ajouts ce mois',     value: kpis.altimmo.leadsMonth, icon: TrendingUp  },
+                      { label:'Contrats actifs',    value: contratsActifs,          icon: Home        },
                     ] : null}
                     fallback={stats.Altimmo}
                   />

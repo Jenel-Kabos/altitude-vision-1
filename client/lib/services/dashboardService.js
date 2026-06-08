@@ -14,11 +14,10 @@ export const getDashboardStats = async () => {
   const data = response.data?.data || {};
 
   return {
-    // Rétrocompatibilité
     stats:       data.stats       || { Altimmo: 0, MilaEvents: 0, Altcom: 0 },
-    // Nouveau
     kpis:        data.kpis        || null,
     activity:    data.activity    || null,
     performance: data.performance || null,
+    contratsActifs: data.kpis?.gestionLocative?.contratsActifs ?? 0,
   };
 };

@@ -5,6 +5,7 @@ const Event         = require('../models/Event');
 const PortfolioItem = require('../models/portfolioItemModel');
 const AltcomProject = require('../models/AltcomProject');
 const Review        = require('../models/Review');
+const Contrat       = require('../models/Contrat');
 
 /**
  * @DESC   Statistiques enrichies du Dashboard
@@ -33,6 +34,8 @@ exports.getDashboardStats = async (req, res) => {
       // Altcom KPIs
       altcomEnCours,
       altcomReviews,
+      // Gestion Locative
+      contratsActifs,
       // Activité récente
       recentProperties,
       recentEvents,
@@ -53,6 +56,8 @@ exports.getDashboardStats = async (req, res) => {
       // Altcom
       AltcomProject.countDocuments({ status: { $in: ['En cours', 'Accepté'] } }),
       Review.countDocuments(),
+      // Gestion locative
+      Contrat.countDocuments({ statut: 'actif' }),
       // Activité récente (4 items par pôle)
       Property.find()
         .sort({ createdAt: -1 }).limit(4)
@@ -100,6 +105,9 @@ exports.getDashboardStats = async (req, res) => {
             projetsEnCours: altcomEnCours,
             servicesActifs: portfolioCount,
             avisRecus:      altcomReviews,
+          },
+          gestionLocative: {
+            contratsActifs,
           },
         },
         // Activité récente (pour le widget)

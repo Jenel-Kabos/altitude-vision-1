@@ -1,12 +1,13 @@
 "use client";
 // src/pages/AdminDashboard.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Home, Calendar, Briefcase, LogOut, BarChart3, Globe, Users,
-  CheckCircle2, ShieldCheck, Mail, Menu, X, Star, Mountain,
+  CheckCircle2, ShieldCheck, Mail, Menu, X, Star, Mountain, Building,
 } from "lucide-react";
+import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const GOLD = '#C8872A';
@@ -20,7 +21,8 @@ const NAV_SECTIONS = [
     label: null,
     links: [
       { to: '/dashboard',             end: true, Icon: BarChart3,    label: 'Tableau de bord',   accent: BLUE },
-      { to: '/dashboard/properties',  end: false, Icon: Home,         label: 'Altimmo',           accent: BLUE },
+      { to: '/dashboard/properties',         end: false, Icon: Home,     label: 'Altimmo',          accent: BLUE },
+      { to: '/dashboard/gestion-locative',   end: false, Icon: Building, label: 'Gestion Locative', accent: BLUE, badge: 'contratsActifs' },
       { to: '/dashboard/events',      end: false, Icon: Calendar,     label: 'Mila Events',       accent: '#D42B2B' },
       { to: '/dashboard/altcom',      end: false, Icon: Briefcase,    label: 'Altcom',            accent: GOLD },
     ],
@@ -55,6 +57,13 @@ const AdminDashboard = ({ children }) => {
   const isActive = (to, end = false) => end ? pathname === to : pathname.startsWith(to);
   const { logout, user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [contratsActifs, setContratsActifs] = useState(0);
+
+  useEffect(() => {
+    api.get('/contrats?statut=actif')
+      .then(r => setContratsActifs(r.data?.results || 0))
+      .catch(() => {});
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -135,7 +144,7 @@ const AdminDashboard = ({ children }) => {
                     {section.label}
                   </p>
                 )}
-                {section.links.map(({ to, end, Icon, label, accent }) => (
+                {section.links.map(({ to, end, Icon, label, accent, badge }) => (
                   <Link key={to} href={to} onClick={close}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 ${
                       isActive(to, end)
@@ -145,7 +154,13 @@ const AdminDashboard = ({ children }) => {
                     style={{ fontFamily: "'Outfit', sans-serif" }}>
                     <Icon size={16} style={{ color: isActive(to, end) ? accent : undefined, flexShrink: 0 }} />
                     <span>{label}</span>
-                    {isActive(to, end) && (
+                    {badge === 'contratsActifs' && contratsActifs > 0 && (
+                      <span className="ml-auto text-xs font-bold px-1.5 py-0.5 rounded-full text-white"
+                        style={{ background: accent, fontSize: '0.65rem' }}>
+                        {contratsActifs}
+                      </span>
+                    )}
+                    {isActive(to, end) && !badge && (
                       <span className="ml-auto w-1 h-4 rounded-full flex-shrink-0"
                         style={{ backgroundColor: accent }} />
                     )}
