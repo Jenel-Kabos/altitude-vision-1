@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useAuth } from '../../context/AuthContext';
 import {
   Building, Users, Home, FileText, CreditCard,
   Plus, Pencil, Trash2, X, ChevronRight, Check,
@@ -217,17 +218,21 @@ const TH = ({ children }) => (
   <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide bg-gray-50">{children}</th>
 );
 
-const Actions = ({ onView, onEdit, onDelete }) => (
+const Actions = ({ onView, onEdit, onDelete, showEdit = true, showDelete = true }) => (
   <td className="px-4 py-3">
     <div className="flex items-center gap-1">
       {onView && (
         <button onClick={e => { e.stopPropagation(); onView(); }}
           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all"><Eye size={14}/></button>
       )}
-      <button onClick={e => { e.stopPropagation(); onEdit(); }}
-        className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-all"><Pencil size={14}/></button>
-      <button onClick={e => { e.stopPropagation(); onDelete(); }}
-        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
+      {showEdit && (
+        <button onClick={e => { e.stopPropagation(); onEdit(); }}
+          className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-all"><Pencil size={14}/></button>
+      )}
+      {showDelete && (
+        <button onClick={e => { e.stopPropagation(); onDelete(); }}
+          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
+      )}
     </div>
   </td>
 );
@@ -1168,6 +1173,7 @@ const TYPE_DOC_ICONS = {
 };
 
 const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
+  const { isAdmin } = useAuth();
   const [detailTab,      setDetailTab]      = useState('documents');
   const [docs,           setDocs]           = useState(contrat.documents || []);
   const [edls,           setEdls]           = useState(contrat.etatsDesLieux || []);
@@ -1268,32 +1274,40 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
         {/* ─── ONGLET DOCUMENTS ─── */}
         {detailTab === 'documents' && (
           <div className="space-y-5">
-            {/* Boutons de génération */}
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3" style={{fontFamily:FONT}}>
-                Générer un document
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { id:'bail',       label:'📄 Contrat de bail',   title:'Générer le contrat de bail' },
-                  { id:'preavis_loc',label:'📋 Préavis locataire', title:'Préavis initié par le locataire' },
-                  { id:'preavis_pro',label:'📋 Préavis bailleur',  title:'Préavis initié par le bailleur' },
-                ].map(btn => (
-                  <Btn key={btn.id} small outline color={BLUE}
-                    onClick={() => handleGenerate(btn.id)}
-                    loading={generating === btn.id}>
-                    {btn.label}
-                  </Btn>
-                ))}
-                {impayesMois.length > 0 && (
-                  <Btn small outline color={RED}
-                    onClick={() => setMedModal(impayesMois[0])}
-                    loading={generating === 'med'}>
-                    ⚠️ Mise en demeure
-                  </Btn>
-                )}
+            {/* Boutons de génération — Admin uniquement */}
+            {isAdmin ? (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3" style={{fontFamily:FONT}}>
+                  Générer un document
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id:'bail',       label:'📄 Contrat de bail',   title:'Générer le contrat de bail' },
+                    { id:'preavis_loc',label:'📋 Préavis locataire', title:'Préavis initié par le locataire' },
+                    { id:'preavis_pro',label:'📋 Préavis bailleur',  title:'Préavis initié par le bailleur' },
+                  ].map(btn => (
+                    <Btn key={btn.id} small outline color={BLUE}
+                      onClick={() => handleGenerate(btn.id)}
+                      loading={generating === btn.id}>
+                      {btn.label}
+                    </Btn>
+                  ))}
+                  {impayesMois.length > 0 && (
+                    <Btn small outline color={RED}
+                      onClick={() => setMedModal(impayesMois[0])}
+                      loading={generating === 'med'}>
+                      ⚠️ Mise en demeure
+                    </Btn>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
+                style={{ background:'#EFF6FF', border:'1px solid #BFDBFE', fontFamily:FONT }}>
+                <span>🔒</span>
+                <p className="text-blue-700">La génération et l'envoi de documents sont réservés aux administrateurs.</p>
+              </div>
+            )}
 
             {/* Liste documents générés */}
             {docs.length === 0
@@ -1320,9 +1334,11 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
                         <Btn small outline color={BLUE} onClick={() => window.open(doc.url, '_blank')}>
                           <Eye size={12}/> Voir
                         </Btn>
-                        <Btn small outline color={GREEN} onClick={() => openEmailModal(doc, i)}>
-                          <Send size={12}/> Envoyer
-                        </Btn>
+                        {isAdmin && (
+                          <Btn small outline color={GREEN} onClick={() => openEmailModal(doc, i)}>
+                            <Send size={12}/> Envoyer
+                          </Btn>
+                        )}
                         <a href={doc.url} download target="_blank" rel="noreferrer">
                           <Btn small outline color={GRAY}>
                             <Download size={12}/>
@@ -1335,8 +1351,8 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
               )
             }
 
-            {/* Quittances rapides */}
-            {payesMois.length > 0 && (
+            {/* Quittances rapides — Admin uniquement */}
+            {isAdmin && payesMois.length > 0 && (
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2" style={{fontFamily:FONT}}>
                   Quittances disponibles
@@ -1382,6 +1398,11 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
                             <Eye size={12}/> Voir le PDF
                           </Btn>
                         )}
+                        {!isAdmin && (
+                          <p className="text-xs mt-1" style={{ color: GRAY, fontFamily: FONT }}>
+                            🔒 Cet état des lieux a été enregistré. Seul un admin peut le modifier.
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <Btn small outline color={BLUE} onClick={() => {
@@ -1396,7 +1417,7 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
               })}
             </div>
 
-            {edls.length >= 2 && (
+            {isAdmin && edls.length >= 2 && (
               <Btn outline color={BLUE} onClick={async () => {
                 setGenerating('edl_compare');
                 try {
@@ -1498,9 +1519,15 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
             </Btn>
             <div className="flex gap-2 justify-end pt-2">
               <Btn outline color={GRAY} onClick={() => setEdlModal(null)}>Annuler</Btn>
-              <Btn color={BLUE} onClick={handleGenEDL} loading={generating==='edl'}>
-                <FileText size={14}/> Générer le PDF
-              </Btn>
+              {isAdmin ? (
+                <Btn color={BLUE} onClick={handleGenEDL} loading={generating==='edl'}>
+                  <FileText size={14}/> Générer le PDF
+                </Btn>
+              ) : (
+                <p className="text-xs self-center" style={{ color: GRAY, fontFamily: FONT }}>
+                  🔒 La génération du PDF est réservée aux administrateurs.
+                </p>
+              )}
             </div>
           </div>
         </Modal>
@@ -1527,6 +1554,15 @@ const ConfirmDelete = ({ label, onConfirm, onCancel }) => (
 // ═══════════════════════════════════════════════════════════════
 const GestionLocativePage = () => {
   const { toasts, push: toast } = useToast();
+  const { canAdd, isAdmin } = useAuth();
+
+  const checkPermission = (action) => {
+    if (!isAdmin && ['edit','delete','print','send','validate','pay'].includes(action)) {
+      toast('🔒 Action réservée aux administrateurs. Contactez votre admin.', 'error');
+      return false;
+    }
+    return true;
+  };
 
   const [contrats,      setContrats]      = useState([]);
   const [proprietaires, setProprietaires] = useState([]);
@@ -1854,9 +1890,11 @@ const GestionLocativePage = () => {
           {/* ─── CONTRATS ─── */}
           {tab === 'contrats' && (
             <div className="space-y-4">
-              <div className="flex justify-end">
-                <Btn onClick={() => { setEditContrat(null); setContratModal(true); }}><Plus size={15}/> Nouveau Contrat</Btn>
-              </div>
+              {canAdd && (
+                <div className="flex justify-end">
+                  <Btn onClick={() => { setEditContrat(null); setContratModal(true); }}><Plus size={15}/> Nouveau Contrat</Btn>
+                </div>
+              )}
               {contrats.length === 0
                 ? <p className="text-center text-gray-400 py-12 text-sm">Aucun contrat. Créez le premier.</p>
                 : (
@@ -1875,6 +1913,8 @@ const GestionLocativePage = () => {
                             <TD><StatutBadge statut={c.statut}/></TD>
                             <TD>{c.dateEntree?new Date(c.dateEntree).toLocaleDateString('fr-FR'):c.dateSignatureCompromis?new Date(c.dateSignatureCompromis).toLocaleDateString('fr-FR'):'—'}</TD>
                             <Actions
+                              showEdit={isAdmin}
+                              showDelete={isAdmin}
                               onView={() => setViewContrat(c)}
                               onEdit={() => {
                                 const init = {
@@ -1913,9 +1953,11 @@ const GestionLocativePage = () => {
           {/* ─── PROPRIÉTAIRES ─── */}
           {tab === 'proprietaires' && (
             <div className="space-y-4">
-              <div className="flex justify-end">
-                <Btn onClick={() => { setEditProp(null); setPropModal(true); }}><Plus size={15}/> Nouveau Propriétaire</Btn>
-              </div>
+              {canAdd && (
+                <div className="flex justify-end">
+                  <Btn onClick={() => { setEditProp(null); setPropModal(true); }}><Plus size={15}/> Nouveau Propriétaire</Btn>
+                </div>
+              )}
               {proprietaires.length === 0
                 ? <p className="text-center text-gray-400 py-12 text-sm">Aucun propriétaire enregistré.</p>
                 : (
@@ -1936,6 +1978,8 @@ const GestionLocativePage = () => {
                               </TD>
                               <TD>{p.ville||'—'}</TD>
                               <Actions
+                                showEdit={isAdmin}
+                                showDelete={isAdmin}
                                 onView={() => setViewProp(p)}
                                 onEdit={() => { setEditProp(p); setPropModal(true); }}
                                 onDelete={() => setDeleteTarget({id:p._id, label:`${p.prenom} ${p.nom}`, type:'proprietaire'})}
@@ -1953,9 +1997,11 @@ const GestionLocativePage = () => {
           {/* ─── LOCATAIRES ─── */}
           {tab === 'locataires' && (
             <div className="space-y-4">
-              <div className="flex justify-end">
-                <Btn onClick={() => { setEditLoc(null); setLocModal(true); }}><Plus size={15}/> Nouveau Locataire</Btn>
-              </div>
+              {canAdd && (
+                <div className="flex justify-end">
+                  <Btn onClick={() => { setEditLoc(null); setLocModal(true); }}><Plus size={15}/> Nouveau Locataire</Btn>
+                </div>
+              )}
               {locataires.length === 0
                 ? <p className="text-center text-gray-400 py-12 text-sm">Aucun locataire enregistré.</p>
                 : (
@@ -1975,6 +2021,8 @@ const GestionLocativePage = () => {
                                 ? <span className="text-xs font-semibold" style={{color:GREEN}}>✓ {contrat.adresseBien||'Actif'}</span>
                                 : <span className="text-xs text-gray-400">—</span>}</TD>
                               <Actions
+                                showEdit={isAdmin}
+                                showDelete={isAdmin}
                                 onEdit={() => { setEditLoc(l); setLocModal(true); }}
                                 onDelete={() => setDeleteTarget({id:l._id, label:`${l.prenom} ${l.nom}`, type:'locataire'})}
                               />
@@ -2009,9 +2057,11 @@ const GestionLocativePage = () => {
                     </Select>
                   </Field>
                 </div>
-                <Btn small outline color={GOLD} onClick={handleCalculerPenalites}>
-                  ⚠️ Calculer pénalités
-                </Btn>
+                {isAdmin && (
+                  <Btn small outline color={GOLD} onClick={handleCalculerPenalites}>
+                    ⚠️ Calculer pénalités
+                  </Btn>
+                )}
               </div>
 
               {!filterContrat
@@ -2060,10 +2110,17 @@ const GestionLocativePage = () => {
                                   <TD>{p.modePaiement||'—'}</TD>
                                   <td className="px-4 py-3">
                                     <div className="flex flex-col gap-1">
-                                      {p.statut!=='payé' && (
-                                        <Btn small onClick={() => handleOpenPayModal(p)} color={GREEN}><Check size={12}/> Payé</Btn>
+                                      {p.statut !== 'payé' && (
+                                        isAdmin ? (
+                                          <Btn small onClick={() => handleOpenPayModal(p)} color={GREEN}><Check size={12}/> Payé</Btn>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full"
+                                            style={{ background:'#F1F5F9', color:GRAY, fontFamily:FONT }}>
+                                            🔒 Admin requis
+                                          </span>
+                                        )
                                       )}
-                                      {p.statut==='payé' && (
+                                      {p.statut === 'payé' && isAdmin && (
                                         <Btn small outline color={BLUE} onClick={async () => {
                                           try {
                                             const doc = await generateQuittance(p._id);

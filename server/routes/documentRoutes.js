@@ -4,17 +4,14 @@ const authController = require('../controllers/authController');
 
 const router = express.Router();
 
-// --- Protect all routes in this file ---
-// Only Admins and Collaborators can access the document management system.
-router.use(authController.protect, authController.restrictTo('Admin', 'Collaborateur'));
+const protect   = [authController.protect, authController.restrictTo('Admin', 'Collaborateur')];
+const adminOnly = [authController.protect, authController.restrictTo('Admin')];
 
-router.route('/')
-    .get(documentController.getAllDocuments)
-    .post(documentController.createDocument);
+router.get('/',    protect,   documentController.getAllDocuments);
+router.post('/',   adminOnly, documentController.createDocument);
 
-router.route('/:id')
-    .get(documentController.getDocument)
-    .patch(documentController.updateDocument)
-    .delete(documentController.deleteDocument);
+router.get('/:id',    protect,   documentController.getDocument);
+router.patch('/:id',  adminOnly, documentController.updateDocument);
+router.delete('/:id', adminOnly, documentController.deleteDocument);
 
 module.exports = router;
