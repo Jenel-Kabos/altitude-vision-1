@@ -16,6 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getDashboardStats } from "../../services/dashboardService";
 import { getAllQuotes } from "../../services/quoteService";
 import { getAllEvents } from "../../services/eventService";
+import { getAlertesPaiements } from "../../services/gestionLocativeService";
 
 const BLUE  = '#2E7BB5';
 const GOLD  = '#C8872A';
@@ -57,6 +58,7 @@ const DashboardHome = () => {
   const [quotesRaw, setQuotesRaw]       = useState([]);
   const [milaCount, setMilaCount]       = useState(0);
   const [contratsActifs, setContrats]   = useState(0);
+  const [alertesGL, setAlertesGL]       = useState({ nbImpayes:0, nbPenalites:0, totalPenalites:0, bailsExpiration:0 });
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
   const [activeTab, setActiveTab]   = useState('overview');
@@ -68,10 +70,11 @@ const DashboardHome = () => {
       try {
         setLoading(true);
         setError(null);
-        const [dashboardData, quotesData, eventsData] = await Promise.all([
+        const [dashboardData, quotesData, eventsData, alertesData] = await Promise.all([
           getDashboardStats(),
           getAllQuotes(),
           getAllEvents(),
+          getAlertesPaiements().catch(() => null),
         ]);
         const dsStats = dashboardData.stats || { Altimmo: 0, MilaEvents: 0, Altcom: 0 };
         const events  = Array.isArray(eventsData) ? eventsData : [];
@@ -79,6 +82,7 @@ const DashboardHome = () => {
         setMilaCount(events.length > 0 ? events.length : (dsStats.MilaEvents || 0));
         setKpis(dashboardData.kpis   || null);
         setContrats(dashboardData.contratsActifs || 0);
+        if (alertesData) setAlertesGL(alertesData);
         setActivity(dashboardData.activity  || null);
         setPerf(dashboardData.performance   || null);
         const quotes = quotesData || [];
@@ -331,6 +335,55 @@ const DashboardHome = () => {
                     fallback={stats.Altcom}
                   />
                 </div>
+
+                {/* Widget Alertes Gestion Locative */}
+                {(alertesGL.nbImpayes > 0 || alertesGL.nbPenalites > 0 || alertesGL.bailsExpiration > 0) && (
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+                      <span className="text-base">🔔</span>
+                      <h3 className="font-bold text-gray-900 text-sm flex-1" style={{ fontFamily:FONT }}>
+                        Alertes Gestion Locative
+                      </h3>
+                      <span className="text-xs font-extrabold px-2.5 py-1 rounded-full"
+                        style={{ background:`${RED}15`, color:RED, fontFamily:FONT }}>
+                        {alertesGL.nbImpayes + (alertesGL.bailsExpiration > 0 ? 1 : 0)}
+                      </span>
+                    </div>
+                    <div className="divide-y divide-gray-50">
+                      {alertesGL.nbImpayes > 0 && (
+                        <div className="flex items-center gap-3 px-5 py-3">
+                          <span>❌</span>
+                          <span className="text-sm text-gray-700" style={{ fontFamily:FONT }}>
+                            <strong>{alertesGL.nbImpayes}</strong> loyer{alertesGL.nbImpayes > 1 ? 's' : ''} impayé{alertesGL.nbImpayes > 1 ? 's' : ''} (&gt; 5 jours)
+                          </span>
+                        </div>
+                      )}
+                      {alertesGL.nbPenalites > 0 && (
+                        <div className="flex items-center gap-3 px-5 py-3">
+                          <span>⚠️</span>
+                          <span className="text-sm text-gray-700" style={{ fontFamily:FONT }}>
+                            <strong>{alertesGL.nbPenalites}</strong> pénalité{alertesGL.nbPenalites > 1 ? 's' : ''} appliquée{alertesGL.nbPenalites > 1 ? 's' : ''} :{' '}
+                            <strong style={{ color:GOLD }}>{Number(alertesGL.totalPenalites).toLocaleString('fr-FR')} FCFA</strong>
+                          </span>
+                        </div>
+                      )}
+                      {alertesGL.bailsExpiration > 0 && (
+                        <div className="flex items-center gap-3 px-5 py-3">
+                          <span>📅</span>
+                          <span className="text-sm text-gray-700" style={{ fontFamily:FONT }}>
+                            <strong>{alertesGL.bailsExpiration}</strong> bail{alertesGL.bailsExpiration > 1 ? 's' : ''} expire{alertesGL.bailsExpiration > 1 ? 'nt' : ''} dans 30 jours
+                          </span>
+                        </div>
+                      )}
+                      <div className="px-5 py-3">
+                        <a href="/dashboard/gestion-locative"
+                          className="text-xs font-semibold hover:underline" style={{ color:BLUE, fontFamily:FONT }}>
+                          Voir les détails →
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Activité récente + Performance */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

@@ -102,6 +102,21 @@ export const deletePaiement = async (id) => {
   await api.delete(`/paiements/${id}`);
 };
 
+export const marquerPaiementPaye = async (id, data) => {
+  const res = await api.post(`/paiements/${id}/marquer-paye`, data);
+  return res.data.data.paiement;
+};
+
+export const calculerPenalites = async () => {
+  const res = await api.post('/paiements/calculer-penalites');
+  return res.data.data;
+};
+
+export const getAlertesPaiements = async () => {
+  const res = await api.get('/paiements/alertes');
+  return res.data.data;
+};
+
 // ── Helpers ───────────────────────────────────────────────────
 
 const toFormData = (data) => {

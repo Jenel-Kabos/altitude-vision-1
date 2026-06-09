@@ -10,7 +10,7 @@ import {
   getProprietaires, createProprietaire, updateProprietaire, deleteProprietaire,
   getLocataires,    createLocataire,    updateLocataire,    deleteLocataire,
   getContrats,      createContrat,      updateContrat,      deleteContrat,
-  getPaiements,     updatePaiement,
+  getPaiements,     updatePaiement,     marquerPaiementPaye, calculerPenalites,
   addBienPhotos,
 } from "../../services/gestionLocativeService";
 import { getAllProperties } from "../../services/propertyService";
@@ -1194,6 +1194,11 @@ const GestionLocativePage = () => {
   const [editLoc,      setEditLoc]      = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  const [payModal,    setPayModal]    = useState(false);
+  const [payTarget,   setPayTarget]   = useState(null);
+  const [payForm,     setPayForm]     = useState({ montantRecu:'', datePaiement:'', modePaiement:'espèces', reference:'', notes:'' });
+  const [payLoading,  setPayLoading]  = useState(false);
+
   const [filterContrat, setFilterContrat] = useState('');
   const [filterAnnee,   setFilterAnnee]   = useState(new Date().getFullYear());
 
@@ -1384,12 +1389,41 @@ const GestionLocativePage = () => {
   };
 
   // ── Paiements ───────────────────────────────────────────────
-  const handleMarkPaye = async (paiement) => {
+  const handleOpenPayModal = (paiement) => {
+    const montantSuggere = paiement.montantTotal || paiement.montant || '';
+    setPayTarget(paiement);
+    setPayForm({
+      montantRecu: montantSuggere,
+      datePaiement: new Date().toISOString().slice(0, 10),
+      modePaiement: 'espèces',
+      reference: '',
+      notes: '',
+    });
+    setPayModal(true);
+  };
+
+  const handleConfirmPaye = async () => {
+    if (!payTarget) return;
+    setPayLoading(true);
     try {
-      const up = await updatePaiement(paiement._id, { statut:'payé', datePaiement: new Date().toISOString() });
-      setPaiements(prev => prev.map(p => p._id===paiement._id ? up : p));
-      toast('Paiement marqué comme payé');
-    } catch { toast('Erreur', 'error'); }
+      const up = await marquerPaiementPaye(payTarget._id, payForm);
+      setPaiements(prev => prev.map(p => p._id === payTarget._id ? up : p));
+      toast('Paiement enregistré');
+      setPayModal(false);
+      setPayTarget(null);
+    } catch { toast('Erreur lors de l\'enregistrement', 'error'); }
+    finally { setPayLoading(false); }
+  };
+
+  const handleCalculerPenalites = async () => {
+    try {
+      const result = await calculerPenalites();
+      toast(`${result.penalites} pénalité(s) appliquée(s)`);
+      if (filterContrat) {
+        const data = await getPaiements(filterContrat, filterAnnee);
+        setPaiements(Array.isArray(data) ? data : []);
+      }
+    } catch { toast('Erreur calcul pénalités', 'error'); }
   };
 
   // ── Tabs ─────────────────────────────────────────────────────
@@ -1408,8 +1442,10 @@ const GestionLocativePage = () => {
 
   const contratsActifs    = contrats.filter(c => c.statut==='actif').length;
   const contratsEnAttente = contrats.filter(c => c.statut==='en_attente').length;
-  const totalAttendu  = paiements.reduce((s,p) => s+(p.montant||0), 0);
-  const totalEncaisse = paiements.filter(p => p.statut==='payé').reduce((s,p) => s+(p.montant||0), 0);
+  const totalAttendu   = paiements.reduce((s,p) => s+(p.montantTotal||p.montant||0), 0);
+  const totalEncaisse  = paiements.filter(p => p.statut==='payé').reduce((s,p) => s+(p.montantRecu||p.montant||0), 0);
+  const totalImpaye    = paiements.filter(p => p.statut!=='payé').reduce((s,p) => s+(p.montantTotal||p.montant||0), 0);
+  const totalPenalites = paiements.filter(p => p.penaliteAppliquee).reduce((s,p) => s+(p.penaliteMontant||0), 0);
 
   return (
     <div className="space-y-5" style={{fontFamily:FONT}}>
@@ -1599,22 +1635,27 @@ const GestionLocativePage = () => {
           {/* ─── PAIEMENTS ─── */}
           {tab === 'paiements' && (
             <div className="space-y-4">
-              <div className="flex flex-wrap gap-3 items-end">
-                <Field label="Contrat">
-                  <Select value={filterContrat} onChange={e=>setFilterContrat(e.target.value)} style={{minWidth:220}}>
-                    <option value="">— Sélectionner —</option>
-                    {contrats.filter(c=>c.type==='location').map(c=>(
-                      <option key={c._id} value={c._id}>
-                        {c.proprietaire?`${c.proprietaire.prenom} ${c.proprietaire.nom}`:''} — {c.adresseBien||c.bien?.title||c._id.slice(-6)}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Année">
-                  <Select value={filterAnnee} onChange={e=>setFilterAnnee(Number(e.target.value))} style={{width:110}}>
-                    {[2023,2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}
-                  </Select>
-                </Field>
+              <div className="flex flex-wrap gap-3 items-end justify-between">
+                <div className="flex flex-wrap gap-3 items-end">
+                  <Field label="Contrat">
+                    <Select value={filterContrat} onChange={e=>setFilterContrat(e.target.value)} style={{minWidth:220}}>
+                      <option value="">— Sélectionner —</option>
+                      {contrats.filter(c=>c.type==='location').map(c=>(
+                        <option key={c._id} value={c._id}>
+                          {c.proprietaire?`${c.proprietaire.prenom} ${c.proprietaire.nom}`:''} — {c.adresseBien||c.bien?.title||c._id.slice(-6)}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Année">
+                    <Select value={filterAnnee} onChange={e=>setFilterAnnee(Number(e.target.value))} style={{width:110}}>
+                      {[2023,2024,2025,2026,2027].map(y=><option key={y} value={y}>{y}</option>)}
+                    </Select>
+                  </Field>
+                </div>
+                <Btn small outline color={GOLD} onClick={handleCalculerPenalites}>
+                  ⚠️ Calculer pénalités
+                </Btn>
               </div>
 
               {!filterContrat
@@ -1625,29 +1666,70 @@ const GestionLocativePage = () => {
                     <>
                       <div className="overflow-x-auto rounded-xl border border-gray-100">
                         <table className="w-full text-left">
-                          <thead><tr>{['Mois','Montant','Statut','Date paiement','Mode','Action'].map(h=><TH key={h}>{h}</TH>)}</tr></thead>
+                          <thead><tr>{['Mois','Locataire','Montant','Statut','Date paiement','Mode','Action'].map(h=><TH key={h}>{h}</TH>)}</tr></thead>
                           <tbody>
-                            {paiements.map(p => (
-                              <TRow key={p._id}>
-                                <TD bold>{MOIS[(p.mois||1)-1]} {p.annee}</TD>
-                                <TD>{fmt(p.montant)}</TD>
-                                <TD><PaiementBadge statut={p.statut}/></TD>
-                                <TD>{p.datePaiement?new Date(p.datePaiement).toLocaleDateString('fr-FR'):'—'}</TD>
-                                <TD>{p.modePaiement||'—'}</TD>
-                                <td className="px-4 py-3">
-                                  {p.statut!=='payé' && (
-                                    <Btn small onClick={() => handleMarkPaye(p)} color={GREEN}><Check size={12}/> Payé</Btn>
-                                  )}
-                                </td>
-                              </TRow>
-                            ))}
+                            {paiements.map(p => {
+                              const contrat = contrats.find(c => c._id === (p.contrat?._id || p.contrat));
+                              const locataireNom = contrat?.locataire
+                                ? `${contrat.locataire.prenom} ${contrat.locataire.nom}`
+                                : '—';
+                              return (
+                                <TRow key={p._id}>
+                                  <TD bold>{MOIS[(p.mois||1)-1]} {p.annee}</TD>
+                                  <TD>{locataireNom}</TD>
+                                  <TD>
+                                    <div>
+                                      <span className="font-semibold">{fmt(p.montant)}</span>
+                                      {p.penaliteAppliquee && (
+                                        <>
+                                          <div className="text-xs font-semibold mt-0.5" style={{color:RED}}>
+                                            + ⚠️ {fmt(p.penaliteMontant)} pénalité
+                                          </div>
+                                          <div className="text-xs font-bold text-gray-700 border-t border-gray-100 pt-0.5 mt-0.5">
+                                            Total : {fmt(p.montantTotal)}
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  </TD>
+                                  <TD>
+                                    <div className="space-y-0.5">
+                                      <PaiementBadge statut={p.statut}/>
+                                      {(p.retardJours||0) > 0 && p.statut !== 'payé' && (
+                                        <p className="text-xs text-gray-400">{p.retardJours} jour(s)</p>
+                                      )}
+                                    </div>
+                                  </TD>
+                                  <TD>{p.datePaiement?new Date(p.datePaiement).toLocaleDateString('fr-FR'):'—'}</TD>
+                                  <TD>{p.modePaiement||'—'}</TD>
+                                  <td className="px-4 py-3">
+                                    {p.statut!=='payé' && (
+                                      <Btn small onClick={() => handleOpenPayModal(p)} color={GREEN}><Check size={12}/> Payé</Btn>
+                                    )}
+                                  </td>
+                                </TRow>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
-                      <div className="flex gap-6 justify-end pt-2 text-sm font-semibold">
-                        <span className="text-gray-500">Attendu : <strong style={{color:BLUE}}>{fmt(totalAttendu)}</strong></span>
-                        <span className="text-gray-500">Encaissé : <strong style={{color:GREEN}}>{fmt(totalEncaisse)}</strong></span>
-                        <span className="text-gray-500">Solde : <strong style={{color:totalAttendu-totalEncaisse>0?RED:GREEN}}>{fmt(totalAttendu-totalEncaisse)}</strong></span>
+
+                      {/* KPI Paiements */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                        {[
+                          { label:'Attendu ce mois',  value:totalAttendu,   color:BLUE  },
+                          { label:'Encaissé ce mois', value:totalEncaisse,  color:GREEN },
+                          { label:'Impayé ce mois',   value:totalImpaye,    color:RED   },
+                          { label:'Pénalités générées', value:totalPenalites, color:GOLD },
+                        ].map(({ label, value, color }) => (
+                          <div key={label} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+                            <p className="text-xs text-gray-400 mb-1" style={{fontFamily:FONT}}>{label}</p>
+                            <p className="text-base font-extrabold" style={{color, fontFamily:FONT}}>
+                              {Number(value).toLocaleString('fr-FR')}
+                            </p>
+                            <p className="text-xs text-gray-400">FCFA</p>
+                          </div>
+                        ))}
                       </div>
                     </>
                   )}
@@ -1710,6 +1792,84 @@ const GestionLocativePage = () => {
 
       {viewProp && (
         <PropDetailModal proprietaire={viewProp} onClose={() => setViewProp(null)}/>
+      )}
+
+      {payModal && payTarget && (
+        <Modal title="Enregistrer le paiement" onClose={() => { setPayModal(false); setPayTarget(null); }}>
+          <div className="space-y-4">
+            <p className="text-sm font-semibold text-gray-700" style={{fontFamily:FONT}}>
+              Loyer de : <span style={{color:BLUE}}>{MOIS[(payTarget.mois||1)-1]} {payTarget.annee}</span>
+            </p>
+
+            {/* Récapitulatif montants */}
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2 border border-gray-100">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Montant du loyer</span>
+                <span className="font-semibold text-gray-800">{fmt(payTarget.montant)}</span>
+              </div>
+              {payTarget.penaliteAppliquee && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span style={{color:RED}}>⚠️ Pénalité de retard (3% — {payTarget.retardJours} jours)</span>
+                    <span className="font-semibold" style={{color:RED}}>{fmt(payTarget.penaliteMontant)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm border-t border-gray-200 pt-2 mt-1">
+                    <span className="font-bold text-gray-800">Total dû</span>
+                    <span className="font-bold text-gray-800">{fmt(payTarget.montantTotal)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <Field label="Montant reçu *">
+              <Input
+                type="number"
+                value={payForm.montantRecu}
+                onChange={e => setPayForm(f => ({...f, montantRecu: e.target.value}))}
+                placeholder={payTarget.montantTotal || payTarget.montant}
+              />
+            </Field>
+            <Field label="Date de paiement *">
+              <Input
+                type="date"
+                value={payForm.datePaiement}
+                onChange={e => setPayForm(f => ({...f, datePaiement: e.target.value}))}
+              />
+            </Field>
+            <Field label="Mode de paiement *">
+              <Select value={payForm.modePaiement} onChange={e => setPayForm(f => ({...f, modePaiement: e.target.value}))}>
+                {['espèces','virement','chèque','mobile'].map(m => <option key={m} value={m}>{m}</option>)}
+              </Select>
+            </Field>
+            <Field label="Référence (reçu, N° virement…)">
+              <Input
+                value={payForm.reference}
+                onChange={e => setPayForm(f => ({...f, reference: e.target.value}))}
+                placeholder="ex : reçu N°123"
+              />
+            </Field>
+            <Field label="Notes">
+              <Textarea
+                value={payForm.notes}
+                onChange={e => setPayForm(f => ({...f, notes: e.target.value}))}
+              />
+            </Field>
+
+            {payTarget.penaliteAppliquee && payTarget.dateDebutRetard && (
+              <p className="text-xs text-gray-400 italic" style={{fontFamily:FONT}}>
+                ℹ️ Pénalité de retard de 3% appliquée automatiquement
+                le {new Date(payTarget.dateDebutRetard).toLocaleDateString('fr-FR')}
+              </p>
+            )}
+
+            <div className="flex gap-2 justify-end pt-2">
+              <Btn outline color={GRAY} onClick={() => { setPayModal(false); setPayTarget(null); }}>Annuler</Btn>
+              <Btn color={GREEN} onClick={handleConfirmPaye} loading={payLoading}>
+                <Check size={14}/> Enregistrer
+              </Btn>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {deleteTarget && (

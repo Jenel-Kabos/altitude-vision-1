@@ -88,6 +88,23 @@ cron.schedule('*/5 * * * *', async () => {
 
 console.log('⏰ [CRON] Polling IMAP Zoho activé (toutes les 5 minutes)');
 
+// ============================================================
+// 💸 CRON JOB — Pénalités de retard locatif (6h du matin)
+// ============================================================
+const { verifierPaiementsEnRetard } = require('./services/alerteService');
+
+cron.schedule('0 6 * * *', async () => {
+  console.log('⏰ [CRON] Vérification paiements en retard...');
+  try {
+    const result = await verifierPaiementsEnRetard();
+    console.log(`✅ [CRON] ${result.verifies} paiements vérifiés, ${result.penalites} pénalité(s) appliquée(s)`);
+  } catch (err) {
+    console.error('❌ [CRON] Erreur vérification paiements:', err.message);
+  }
+});
+
+console.log('⏰ [CRON] Vérification pénalités locatives activée (6h quotidien)');
+
 // ── Polling immédiat au démarrage (optionnel) ─────────────────
 mongoose.connection.once('open', async () => {
     // Attendre 10s que le serveur soit stabilisé avant le premier poll

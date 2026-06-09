@@ -15,8 +15,17 @@ const paiementSchema = new mongoose.Schema({
     type: String,
     enum: ['espèces', 'virement', 'chèque', 'mobile'],
   },
-  reference: { type: String, trim: true },
-  notes:     { type: String, trim: true },
+  reference:    { type: String, trim: true },
+  notes:        { type: String, trim: true },
+  montantRecu:  { type: Number },
+
+  // ── Retard & Pénalités ─────────────────────────────────────
+  jourEcheance:      { type: Number, default: 1 },
+  penaliteAppliquee: { type: Boolean, default: false },
+  penaliteMontant:   { type: Number, default: 0 },
+  montantTotal:      { type: Number },
+  dateDebutRetard:   { type: Date },
+  retardJours:       { type: Number, default: 0 },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Paiement', paiementSchema);
