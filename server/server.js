@@ -271,10 +271,11 @@ const emailRoutes = require('./routes/emailRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 
 // 🏘️ Gestion Locative
-const proprietaireRoutes = require('./routes/proprietaireRoutes');
-const locataireRoutes    = require('./routes/locataireRoutes');
-const contratRoutes      = require('./routes/contratRoutes');
-const paiementRoutes     = require('./routes/paiementRoutes');
+const proprietaireRoutes     = require('./routes/proprietaireRoutes');
+const locataireRoutes        = require('./routes/locataireRoutes');
+const contratRoutes          = require('./routes/contratRoutes');
+const paiementRoutes         = require('./routes/paiementRoutes');
+const gestionDocumentRoutes  = require('./routes/gestionDocumentRoutes');
 
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
@@ -290,10 +291,11 @@ app.use("/api/properties", propertyRoutes);
 app.use("/api/transactions", transactionRoutes);
 
 // 🏘️ Gestion Locative
-app.use('/api/proprietaires', proprietaireRoutes);
-app.use('/api/locataires',    locataireRoutes);
-app.use('/api/contrats',      contratRoutes);
-app.use('/api/paiements',     paiementRoutes);
+app.use('/api/proprietaires',    proprietaireRoutes);
+app.use('/api/locataires',       locataireRoutes);
+app.use('/api/contrats',         contratRoutes);
+app.use('/api/paiements',        paiementRoutes);
+app.use('/api/gestion-docs',     gestionDocumentRoutes);
 
 // 💼 Pôle Altcom
 app.use("/api/services", serviceRoutes);

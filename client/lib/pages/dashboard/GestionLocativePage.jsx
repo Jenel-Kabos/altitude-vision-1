@@ -5,6 +5,7 @@ import {
   Building, Users, Home, FileText, CreditCard,
   Plus, Pencil, Trash2, X, ChevronRight, Check,
   AlertCircle, Loader2, Eye, RefreshCw, Camera,
+  Download, Send, Receipt,
 } from "lucide-react";
 import {
   getProprietaires, createProprietaire, updateProprietaire, deleteProprietaire,
@@ -13,6 +14,10 @@ import {
   getPaiements,     updatePaiement,     marquerPaiementPaye, calculerPenalites,
   addBienPhotos,
 } from "../../services/gestionLocativeService";
+import {
+  getContratDocuments, generateBail, generateQuittance, generateMiseEnDemeure,
+  generatePreavis, generateEtatDesLieux, envoyerDocument,
+} from "../../services/documentService";
 import { getAllProperties } from "../../services/propertyService";
 
 // ── Palette ──────────────────────────────────────────────────
@@ -1156,6 +1161,354 @@ const PropDetailModal = ({ proprietaire: p, onClose }) => {
   );
 };
 
+// ── ContratDetailModal ────────────────────────────────────────
+const TYPE_DOC_ICONS = {
+  bail:'📄', quittance:'🧾', mise_en_demeure:'⚠️', preavis:'📋',
+  etat_entree:'🏠', etat_sortie:'🚪',
+};
+
+const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
+  const [detailTab,      setDetailTab]      = useState('documents');
+  const [docs,           setDocs]           = useState(contrat.documents || []);
+  const [edls,           setEdls]           = useState(contrat.etatsDesLieux || []);
+  const [generating,     setGenerating]     = useState('');
+  const [emailModal,     setEmailModal]     = useState(null);
+  const [emailForm,      setEmailForm]      = useState({ sujet:'', message:'', email:'' });
+  const [preavisModal,   setPreavisModal]   = useState(false);
+  const [medModal,       setMedModal]       = useState(null);
+  const [edlModal,       setEdlModal]       = useState(null);
+  const [edlPieces,      setEdlPieces]      = useState([{ nom:'', etat:'Bon', observations:'' }]);
+  const [sendingEmail,   setSendingEmail]   = useState(false);
+
+  const payesMois = paiements.filter(p => p.statut === 'payé');
+
+  const handleGenerate = async (action) => {
+    setGenerating(action);
+    try {
+      let doc;
+      if (action === 'bail')           doc = await generateBail(contrat._id);
+      else if (action === 'preavis_loc') doc = await generatePreavis(contrat._id, 'locataire');
+      else if (action === 'preavis_pro') doc = await generatePreavis(contrat._id, 'proprietaire');
+      if (doc) {
+        setDocs(prev => [...prev, doc]);
+        window.open(doc.url, '_blank');
+      }
+    } catch (e) { alert('Erreur : ' + e.message); }
+    finally { setGenerating(''); }
+  };
+
+  const handleGenMed = async (paiementId) => {
+    setGenerating('med');
+    try {
+      const doc = await generateMiseEnDemeure(paiementId);
+      setDocs(prev => [...prev, doc]);
+      window.open(doc.url, '_blank');
+      setMedModal(null);
+    } catch (e) { alert('Erreur : ' + e.message); }
+    finally { setGenerating(''); }
+  };
+
+  const handleGenEDL = async () => {
+    if (!edlModal) return;
+    const pieces = edlPieces.filter(p => p.nom.trim());
+    if (pieces.length === 0) return;
+    setGenerating('edl');
+    try {
+      const doc = await generateEtatDesLieux(contrat._id, edlModal, pieces);
+      setDocs(prev => [...prev, doc]);
+      setEdls(prev => [...prev, { type: edlModal, pieces }]);
+      setEdlModal(null);
+      window.open(doc.url, '_blank');
+    } catch (e) { alert('Erreur : ' + e.message); }
+    finally { setGenerating(''); }
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailModal) return;
+    setSendingEmail(true);
+    try {
+      await envoyerDocument(contrat._id, emailModal.index, emailForm);
+      setDocs(prev => prev.map((d, i) => i === emailModal.index ? { ...d, envoiEmail: true } : d));
+      setEmailModal(null);
+    } catch (e) { alert('Erreur envoi : ' + e.message); }
+    finally { setSendingEmail(false); }
+  };
+
+  const openEmailModal = (doc, index) => {
+    const locNom  = contrat.locataire ? `${contrat.locataire.prenom} ${contrat.locataire.nom}` : '';
+    const locEmail = contrat.locataire?.email || '';
+    setEmailForm({
+      email:   locEmail,
+      sujet:   `Document — ${doc.nom}`,
+      message: `Bonjour ${locNom},\n\nVeuillez trouver ci-dessous le lien pour accéder à votre document "${doc.nom}".\n\nCordialement,\nAltitude Vision — Altimmo`,
+    });
+    setEmailModal({ doc, index });
+  };
+
+  const impayesMois = paiements.filter(p => p.statut !== 'payé' && (p.retardJours || 0) >= 5);
+
+  return (
+    <Modal title={`Documents — ${contrat.adresseBien || 'Contrat'}`} onClose={onClose} wide>
+      <div className="space-y-4">
+        {/* Onglets */}
+        <div className="flex gap-0 border-b border-gray-100">
+          {[
+            { id:'documents', label:'📄 Documents' },
+            { id:'edl',       label:'🏠 État des lieux' },
+          ].map(({ id, label }) => (
+            <button key={id} onClick={() => setDetailTab(id)}
+              className={`px-4 py-2 text-sm font-semibold transition-all border-b-2 ${
+                detailTab === id ? 'text-blue-600 border-blue-500' : 'text-gray-400 border-transparent hover:text-gray-700'
+              }`} style={{fontFamily:FONT}}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ─── ONGLET DOCUMENTS ─── */}
+        {detailTab === 'documents' && (
+          <div className="space-y-5">
+            {/* Boutons de génération */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3" style={{fontFamily:FONT}}>
+                Générer un document
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id:'bail',       label:'📄 Contrat de bail',   title:'Générer le contrat de bail' },
+                  { id:'preavis_loc',label:'📋 Préavis locataire', title:'Préavis initié par le locataire' },
+                  { id:'preavis_pro',label:'📋 Préavis bailleur',  title:'Préavis initié par le bailleur' },
+                ].map(btn => (
+                  <Btn key={btn.id} small outline color={BLUE}
+                    onClick={() => handleGenerate(btn.id)}
+                    loading={generating === btn.id}>
+                    {btn.label}
+                  </Btn>
+                ))}
+                {impayesMois.length > 0 && (
+                  <Btn small outline color={RED}
+                    onClick={() => setMedModal(impayesMois[0])}
+                    loading={generating === 'med'}>
+                    ⚠️ Mise en demeure
+                  </Btn>
+                )}
+              </div>
+            </div>
+
+            {/* Liste documents générés */}
+            {docs.length === 0
+              ? <p className="text-sm text-gray-400 text-center py-6" style={{fontFamily:FONT}}>
+                  Aucun document généré pour ce contrat.
+                </p>
+              : (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400" style={{fontFamily:FONT}}>
+                    Documents générés
+                  </p>
+                  {docs.map((doc, i) => (
+                    <div key={i} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800" style={{fontFamily:FONT}}>
+                          {TYPE_DOC_ICONS[doc.type] || '📄'} {doc.nom}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5" style={{fontFamily:FONT}}>
+                          {doc.dateGeneration ? new Date(doc.dateGeneration).toLocaleDateString('fr-FR') : ''}
+                          {doc.envoiEmail && <span className="ml-2 text-green-500">✓ Envoyé</span>}
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Btn small outline color={BLUE} onClick={() => window.open(doc.url, '_blank')}>
+                          <Eye size={12}/> Voir
+                        </Btn>
+                        <Btn small outline color={GREEN} onClick={() => openEmailModal(doc, i)}>
+                          <Send size={12}/> Envoyer
+                        </Btn>
+                        <a href={doc.url} download target="_blank" rel="noreferrer">
+                          <Btn small outline color={GRAY}>
+                            <Download size={12}/>
+                          </Btn>
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            }
+
+            {/* Quittances rapides */}
+            {payesMois.length > 0 && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2" style={{fontFamily:FONT}}>
+                  Quittances disponibles
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {payesMois.map(p => (
+                    <Btn key={p._id} small outline color={GREEN}
+                      loading={generating === `q_${p._id}`}
+                      onClick={async () => {
+                        setGenerating(`q_${p._id}`);
+                        try {
+                          const doc = await generateQuittance(p._id);
+                          setDocs(prev => [...prev, doc]);
+                          window.open(doc.url, '_blank');
+                        } catch (e) { alert(e.message); }
+                        finally { setGenerating(''); }
+                      }}>
+                      🧾 {['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'][(p.mois||1)-1]} {p.annee}
+                    </Btn>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── ONGLET ÉTAT DES LIEUX ─── */}
+        {detailTab === 'edl' && (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              {['entree','sortie'].map(type => {
+                const existing = edls.find(e => e.type === type);
+                return (
+                  <div key={type} className="flex-1 bg-gray-50 rounded-xl border border-gray-100 p-4">
+                    <p className="text-sm font-bold text-gray-800 mb-1" style={{fontFamily:FONT}}>
+                      {type === 'entree' ? '🏠 État des lieux d\'entrée' : '🚪 État des lieux de sortie'}
+                    </p>
+                    {existing ? (
+                      <div className="space-y-2">
+                        <p className="text-xs text-gray-400">{existing.pieces?.length || 0} pièce(s) enregistrée(s)</p>
+                        {existing.documentUrl && (
+                          <Btn small outline color={BLUE} onClick={() => window.open(existing.documentUrl, '_blank')}>
+                            <Eye size={12}/> Voir le PDF
+                          </Btn>
+                        )}
+                      </div>
+                    ) : (
+                      <Btn small outline color={BLUE} onClick={() => {
+                        setEdlModal(type);
+                        setEdlPieces([{ nom:'Salon', etat:'Bon', observations:'' }, { nom:'Chambre 1', etat:'Bon', observations:'' }, { nom:'Salle de bain', etat:'Bon', observations:'' }]);
+                      }}>
+                        <Plus size={12}/> Créer
+                      </Btn>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {edls.length >= 2 && (
+              <Btn outline color={BLUE} onClick={async () => {
+                setGenerating('edl_compare');
+                try {
+                  const sortie = edls.find(e => e.type === 'sortie');
+                  const doc    = await generateEtatDesLieux(contrat._id, 'sortie', sortie?.pieces || []);
+                  setDocs(prev => [...prev, doc]);
+                  window.open(doc.url, '_blank');
+                } catch (e) { alert(e.message); }
+                finally { setGenerating(''); }
+              }} loading={generating === 'edl_compare'}>
+                📄 Générer le PDF comparatif (entrée vs sortie)
+              </Btn>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ─── Modal Mise en demeure ─── */}
+      {medModal && (
+        <Modal title="Générer une mise en demeure" onClose={() => setMedModal(null)}>
+          <p className="text-sm text-gray-600 mb-5" style={{fontFamily:FONT}}>
+            Générer une mise en demeure pour <strong>{contrat.locataire?.prenom} {contrat.locataire?.nom}</strong>{' '}
+            concernant le loyer impayé de{' '}
+            <strong>{['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'][(medModal.mois||1)-1]} {medModal.annee}</strong> ?
+          </p>
+          <div className="flex gap-2">
+            <Btn color={RED} onClick={() => handleGenMed(medModal._id)} loading={generating==='med'}>
+              Générer et envoyer
+            </Btn>
+            <Btn outline color={GRAY} onClick={() => setMedModal(null)}>Annuler</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* ─── Modal Email ─── */}
+      {emailModal && (
+        <Modal title="Envoyer le document par email" onClose={() => setEmailModal(null)}>
+          <div className="space-y-3">
+            <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-700" style={{fontFamily:FONT}}>
+              <p>Document : <strong>{emailModal.doc.nom}</strong></p>
+              <p className="text-xs mt-0.5">📎 Lien de téléchargement joint automatiquement</p>
+            </div>
+            <Field label="Destinataire (email)">
+              <Input value={emailForm.email} onChange={e => setEmailForm(f => ({...f, email:e.target.value}))} type="email"/>
+            </Field>
+            <Field label="Objet">
+              <Input value={emailForm.sujet} onChange={e => setEmailForm(f => ({...f, sujet:e.target.value}))}/>
+            </Field>
+            <Field label="Message">
+              <Textarea rows={5} value={emailForm.message} onChange={e => setEmailForm(f => ({...f, message:e.target.value}))}/>
+            </Field>
+            <div className="flex gap-2 justify-end">
+              <Btn outline color={GRAY} onClick={() => setEmailModal(null)}>Annuler</Btn>
+              <Btn color={GREEN} onClick={handleSendEmail} loading={sendingEmail}>
+                <Send size={14}/> Envoyer
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ─── Modal État des lieux ─── */}
+      {edlModal && (
+        <Modal title={`État des lieux d'${edlModal === 'entree' ? 'entrée' : 'sortie'}`}
+          onClose={() => setEdlModal(null)} wide>
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500" style={{fontFamily:FONT}}>
+              Renseignez l'état de chaque pièce.
+            </p>
+            {edlPieces.map((p, i) => (
+              <div key={i} className="flex gap-2 items-start">
+                <Input
+                  className="flex-1" placeholder="Nom de la pièce"
+                  value={p.nom}
+                  onChange={e => setEdlPieces(prev => prev.map((r,ri) => ri===i?{...r,nom:e.target.value}:r))}
+                />
+                <Select
+                  style={{width:130}}
+                  value={p.etat}
+                  onChange={e => setEdlPieces(prev => prev.map((r,ri) => ri===i?{...r,etat:e.target.value}:r))}>
+                  {['Neuf','Très bon','Bon','Moyen','Mauvais','Très mauvais'].map(et => (
+                    <option key={et} value={et}>{et}</option>
+                  ))}
+                </Select>
+                <Input
+                  className="flex-1" placeholder="Observations"
+                  value={p.observations}
+                  onChange={e => setEdlPieces(prev => prev.map((r,ri) => ri===i?{...r,observations:e.target.value}:r))}
+                />
+                <button onClick={() => setEdlPieces(prev => prev.filter((_,ri) => ri!==i))}
+                  className="p-1.5 text-gray-400 hover:text-red-500 transition-all mt-1">
+                  <X size={16}/>
+                </button>
+              </div>
+            ))}
+            <Btn small outline color={BLUE}
+              onClick={() => setEdlPieces(prev => [...prev, {nom:'',etat:'Bon',observations:''}])}>
+              <Plus size={13}/> Ajouter une pièce
+            </Btn>
+            <div className="flex gap-2 justify-end pt-2">
+              <Btn outline color={GRAY} onClick={() => setEdlModal(null)}>Annuler</Btn>
+              <Btn color={BLUE} onClick={handleGenEDL} loading={generating==='edl'}>
+                <FileText size={14}/> Générer le PDF
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </Modal>
+  );
+};
+
 // ── ConfirmDelete ─────────────────────────────────────────────
 const ConfirmDelete = ({ label, onConfirm, onCancel }) => (
   <Modal title="Confirmer la suppression" onClose={onCancel}>
@@ -1193,6 +1546,8 @@ const GestionLocativePage = () => {
   const [locModal,     setLocModal]     = useState(false);
   const [editLoc,      setEditLoc]      = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const [viewContrat, setViewContrat] = useState(null);
 
   const [payModal,    setPayModal]    = useState(false);
   const [payTarget,   setPayTarget]   = useState(null);
@@ -1520,6 +1875,7 @@ const GestionLocativePage = () => {
                             <TD><StatutBadge statut={c.statut}/></TD>
                             <TD>{c.dateEntree?new Date(c.dateEntree).toLocaleDateString('fr-FR'):c.dateSignatureCompromis?new Date(c.dateSignatureCompromis).toLocaleDateString('fr-FR'):'—'}</TD>
                             <Actions
+                              onView={() => setViewContrat(c)}
                               onEdit={() => {
                                 const init = {
                                   ...emptyContrat, type:c.type, bien:c.bien?._id||'',
@@ -1703,9 +2059,20 @@ const GestionLocativePage = () => {
                                   <TD>{p.datePaiement?new Date(p.datePaiement).toLocaleDateString('fr-FR'):'—'}</TD>
                                   <TD>{p.modePaiement||'—'}</TD>
                                   <td className="px-4 py-3">
-                                    {p.statut!=='payé' && (
-                                      <Btn small onClick={() => handleOpenPayModal(p)} color={GREEN}><Check size={12}/> Payé</Btn>
-                                    )}
+                                    <div className="flex flex-col gap-1">
+                                      {p.statut!=='payé' && (
+                                        <Btn small onClick={() => handleOpenPayModal(p)} color={GREEN}><Check size={12}/> Payé</Btn>
+                                      )}
+                                      {p.statut==='payé' && (
+                                        <Btn small outline color={BLUE} onClick={async () => {
+                                          try {
+                                            const doc = await generateQuittance(p._id);
+                                            toast('Quittance générée');
+                                            window.open(doc.url, '_blank');
+                                          } catch { toast('Erreur génération quittance', 'error'); }
+                                        }}><Receipt size={12}/> Quittance</Btn>
+                                      )}
+                                    </div>
                                   </td>
                                 </TRow>
                               );
@@ -1792,6 +2159,14 @@ const GestionLocativePage = () => {
 
       {viewProp && (
         <PropDetailModal proprietaire={viewProp} onClose={() => setViewProp(null)}/>
+      )}
+
+      {viewContrat && (
+        <ContratDetailModal
+          contrat={viewContrat}
+          paiements={filterContrat === viewContrat._id ? paiements : []}
+          onClose={() => setViewContrat(null)}
+        />
       )}
 
       {payModal && payTarget && (

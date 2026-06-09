@@ -1,10 +1,25 @@
 const mongoose = require('mongoose');
 
 const documentSchema = new mongoose.Schema({
-  nom:             { type: String },
-  url:             { type: String },
-  type:            { type: String },
-  dateGeneration:  { type: Date, default: Date.now },
+  nom:            { type: String },
+  url:            { type: String },
+  type:           { type: String },
+  dateGeneration: { type: Date, default: Date.now },
+  envoiEmail:     { type: Boolean, default: false },
+  dateEnvoi:      { type: Date },
+});
+
+const pieceEdlSchema = new mongoose.Schema({
+  nom:          { type: String, trim: true },
+  etat:         { type: String, enum: ['Neuf', 'Très bon', 'Bon', 'Moyen', 'Mauvais', 'Très mauvais'] },
+  observations: { type: String, trim: true },
+}, { _id: false });
+
+const etatDesLieuxSchema = new mongoose.Schema({
+  type:        { type: String, enum: ['entree', 'sortie'], required: true },
+  date:        { type: Date, default: Date.now },
+  pieces:      [pieceEdlSchema],
+  documentUrl: { type: String },
 }, { _id: false });
 
 const contratSchema = new mongoose.Schema({
@@ -23,8 +38,9 @@ const contratSchema = new mongoose.Schema({
   },
   adresseBien:  { type: String, trim: true },
   villeBien:    { type: String, trim: true },
-  documents:    [documentSchema],
-  notes:        { type: String, trim: true },
+  documents:      [documentSchema],
+  etatsDesLieux:  [etatDesLieuxSchema],
+  notes:          { type: String, trim: true },
 
   // ─── Location ──────────────────────────────────────────────
   locataire:          { type: mongoose.Schema.Types.ObjectId, ref: 'Locataire' },
