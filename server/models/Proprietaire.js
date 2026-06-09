@@ -93,8 +93,10 @@ const proprietaireSchema = new mongoose.Schema({
   telephone:      { type: String, required: [true, 'Le téléphone est requis'], trim: true },
   adresse:        { type: String, trim: true },
   ville:          { type: String, trim: true },
-  pieceIdentite:  { type: String },
-  notes:          { type: String, trim: true },
+  pieceIdentite:     { type: String },
+  pieceIdentiteType: { type: String }, // 'pdf', 'jpeg', 'png'
+  pieceIdentiteNom:  { type: String }, // nom original du fichier
+  notes:             { type: String, trim: true },
   biensPropres:   [bienSchema],
 }, { timestamps: true });
 

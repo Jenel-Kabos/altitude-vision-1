@@ -604,7 +604,11 @@ const BienCard = ({ bien, index, expanded, onToggle, onChange, onRemove }) => {
 };
 
 // ── ProprietaireForm ──────────────────────────────────────────
-const emptyProp = { nom:'', prenom:'', email:'', telephone:'', adresse:'', ville:'', notes:'', pieceIdentite:null };
+const emptyProp = {
+  nom:'', prenom:'', email:'', telephone:'', adresse:'', ville:'', notes:'',
+  pieceIdentite:null,
+  _pieceIdentiteUrl:'', _pieceIdentiteType:'', _pieceIdentiteNom:'',
+};
 
 const initBienFromDB = (b) => ({
   typeBien:          b.typeBien || '',
@@ -636,10 +640,13 @@ const initBienFromDB = (b) => ({
   _photos:           (b.photos||[]).map(url => ({ type:'existing', url })),
 });
 
+const PIECE_ALLOWED_MIMES = ['image/jpeg','image/jpg','image/png','application/pdf'];
+
 const ProprietaireForm = ({ init = emptyProp, initBiens = [], onSave, onCancel, loading }) => {
   const [f, setF]         = useState(init);
   const [biens, setBiens] = useState(initBiens.map(initBienFromDB));
-  const [expanded, setExpanded] = useState(new Set(initBiens.length > 0 ? [0] : []));
+  const [expanded, setExpanded]     = useState(new Set(initBiens.length > 0 ? [0] : []));
+  const [pieceError, setPieceError] = useState('');
 
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
 
@@ -679,9 +686,71 @@ const ProprietaireForm = ({ init = emptyProp, initBiens = [], onSave, onCancel, 
         <Field label="Ville"><Input value={f.ville} onChange={e=>set('ville',e.target.value)}/></Field>
       </div>
       <Field label="Pièce d'identité">
-        <input type="file" accept="image/*,application/pdf"
-          onChange={e=>set('pieceIdentite', e.target.files[0]||null)}
-          className="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 cursor-pointer"/>
+        {/* Affiche le document existant si aucun nouveau fichier sélectionné */}
+        {f._pieceIdentiteUrl && !f.pieceIdentite ? (
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+            {f._pieceIdentiteType === 'pdf' ? (
+              <>
+                <FileText size={28} className="text-red-400 flex-shrink-0"/>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-700 truncate" style={{fontFamily:FONT}}>
+                    {f._pieceIdentiteNom || 'Document PDF'}
+                  </p>
+                  <a href={f._pieceIdentiteUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-xs hover:underline flex items-center gap-1 mt-0.5" style={{color:BLUE}}>
+                    <Eye size={11}/> Voir le document
+                  </a>
+                </div>
+              </>
+            ) : (
+              <>
+                <img src={f._pieceIdentiteUrl} alt="Pièce d'identité"
+                  className="w-14 h-14 object-cover rounded-lg border border-gray-200 flex-shrink-0"/>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-700 truncate" style={{fontFamily:FONT}}>
+                    {f._pieceIdentiteNom || "Pièce d'identité"}
+                  </p>
+                  <a href={f._pieceIdentiteUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-xs hover:underline flex items-center gap-1 mt-0.5" style={{color:BLUE}}>
+                    <Eye size={11}/> Voir en grand
+                  </a>
+                </div>
+              </>
+            )}
+            <button type="button" onClick={() => { set('_pieceIdentiteUrl', ''); setPieceError(''); }}
+              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border hover:bg-gray-100 transition-colors flex-shrink-0"
+              style={{color:GRAY, borderColor:'#E2E8F0', fontFamily:FONT}}>
+              ✏️ Modifier
+            </button>
+          </div>
+        ) : (
+          <>
+            <input type="file"
+              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/jpg,image/png"
+              onChange={e => {
+                const file = e.target.files[0] || null;
+                setPieceError('');
+                if (file) {
+                  if (file.size > 5 * 1024 * 1024) {
+                    setPieceError('Fichier trop lourd. Maximum 5 MB.');
+                    e.target.value = '';
+                    return;
+                  }
+                  if (!PIECE_ALLOWED_MIMES.includes(file.type)) {
+                    setPieceError('Format non supporté. Utilisez PDF, JPEG ou PNG.');
+                    e.target.value = '';
+                    return;
+                  }
+                }
+                set('pieceIdentite', file);
+              }}
+              className="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 cursor-pointer"/>
+            {pieceError
+              ? <p className="text-xs text-red-500 mt-1" style={{fontFamily:FONT}}>{pieceError}</p>
+              : <p className="text-xs text-gray-400 mt-1" style={{fontFamily:FONT}}>Formats acceptés : PDF, JPEG, PNG (max 5 MB)</p>
+            }
+          </>
+        )}
       </Field>
       <Field label="Notes"><Textarea value={f.notes} onChange={e=>set('notes',e.target.value)}/></Field>
 
@@ -1609,7 +1678,11 @@ const GestionLocativePage = () => {
             init={editProp ? {
               nom:editProp.nom, prenom:editProp.prenom, email:editProp.email||'',
               telephone:editProp.telephone, adresse:editProp.adresse||'',
-              ville:editProp.ville||'', notes:editProp.notes||'', pieceIdentite:null,
+              ville:editProp.ville||'', notes:editProp.notes||'',
+              pieceIdentite:null,
+              _pieceIdentiteUrl:  editProp.pieceIdentite     || '',
+              _pieceIdentiteType: editProp.pieceIdentiteType || '',
+              _pieceIdentiteNom:  editProp.pieceIdentiteNom  || '',
             } : emptyProp}
             initBiens={editProp?.biensPropres||[]}
             onSave={handleSaveProp}

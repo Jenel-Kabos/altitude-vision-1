@@ -6,10 +6,19 @@ const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudin
 const uploadPiece = async (file) => {
   if (!file) return undefined;
   const result = await uploadToCloudinary(file.buffer, {
-    folder: 'altitude-vision/pieces-identite',
+    folder:        'altitude-vision/proprietaires/pieces-identite',
     resource_type: 'auto',
+    quality:       undefined, // ne pas compresser les documents PDF
+    fetch_format:  undefined,
+    width:         undefined,
+    crop:          undefined,
   });
-  return result.secure_url;
+  const ext = (file.originalname || '').split('.').pop().toLowerCase();
+  return {
+    url:  result.secure_url,
+    type: ext === 'pdf' ? 'pdf' : (['jpg','jpeg'].includes(ext) ? 'jpeg' : 'png'),
+    nom:  file.originalname || '',
+  };
 };
 
 const uploadBienPhotos = async (files = [], proprietaireId, bienIndex) => {
@@ -61,7 +70,12 @@ exports.getOne = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const data = { ...req.body };
-    if (req.file) data.pieceIdentite = await uploadPiece(req.file);
+    if (req.file) {
+      const piece = await uploadPiece(req.file);
+      data.pieceIdentite     = piece.url;
+      data.pieceIdentiteType = piece.type;
+      data.pieceIdentiteNom  = piece.nom;
+    }
     const biens = parseBiens(data.biensPropres);
     if (biens) data.biensPropres = biens;
     const p = await Proprietaire.create(data);
@@ -74,7 +88,12 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const data = { ...req.body };
-    if (req.file) data.pieceIdentite = await uploadPiece(req.file);
+    if (req.file) {
+      const piece = await uploadPiece(req.file);
+      data.pieceIdentite     = piece.url;
+      data.pieceIdentiteType = piece.type;
+      data.pieceIdentiteNom  = piece.nom;
+    }
     const biens = parseBiens(data.biensPropres);
     if (biens !== undefined) data.biensPropres = biens;
     const p = await Proprietaire.findByIdAndUpdate(req.params.id, data, {

@@ -113,7 +113,8 @@ const toFormData = (data) => {
 };
 
 const buildPropFD = (data) => {
-  const { pieceIdentite, biensPropres, ...rest } = data;
+  // _piece* sont des champs internes frontend — ne pas envoyer au backend
+  const { pieceIdentite, biensPropres, _pieceIdentiteUrl, _pieceIdentiteType, _pieceIdentiteNom, ...rest } = data;
   const fd = new FormData();
   Object.entries(rest).forEach(([k, v]) => {
     if (v !== null && v !== undefined && v !== '') fd.append(k, v);
