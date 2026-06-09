@@ -27,6 +27,68 @@ const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov
 const BIEN_TYPES = ['Appartement','Maison','Villa','Terrain','Bureau','Commerce','Entrepôt','Studio'];
 const BIEN_STATUTS_LOCATION = ['Disponible','Loué','En travaux','Réservé'];
 const BIEN_STATUTS_VENTE    = ['Disponible','Vendu','Réservé'];
+
+const emptyCommodites = {
+  eauCourante:false, eauChaude:false, electricite:false, groupeElectrogene:false, panneauxSolaires:false,
+  climatisation:false, brasseurAir:false,
+  cuisineEquipee:false, refrigerateur:false, cuisiniere:false,
+  gardien:false, videosurveillance:false, portailElectrique:false, interphone:false, alarme:false,
+  wifi:false, fibreOptique:false, cableTv:false,
+  parking:false, garage:false, jardin:false, piscine:false, terrasse:false, balcon:false,
+  ascenseur:false, cave:false, buanderie:false,
+  animauxAcceptes:false, fumeurAccepte:false,
+  autres:'',
+};
+
+const COMMODITES_GROUPS = [
+  { label:'💧 Eau & Énergie', items:[
+    { key:'eauCourante',       label:'Eau courante',       icon:'💧' },
+    { key:'eauChaude',         label:'Eau chaude',         icon:'🚿' },
+    { key:'electricite',       label:'Électricité',        icon:'⚡' },
+    { key:'groupeElectrogene', label:'Groupe électrogène', icon:'🔋' },
+    { key:'panneauxSolaires',  label:'Panneaux solaires',  icon:'☀️' },
+  ]},
+  { label:'❄️ Climatisation', items:[
+    { key:'climatisation', label:'Climatisation',  icon:'❄️' },
+    { key:'brasseurAir',   label:"Brasseur d'air", icon:'🌀' },
+  ]},
+  { label:'🍳 Cuisine', items:[
+    { key:'cuisineEquipee', label:'Cuisine équipée', icon:'🍳' },
+    { key:'refrigerateur',  label:'Réfrigérateur',   icon:'🧊' },
+    { key:'cuisiniere',     label:'Cuisinière',       icon:'🔥' },
+  ]},
+  { label:'🔒 Sécurité', items:[
+    { key:'gardien',           label:'Gardien',            icon:'🔒' },
+    { key:'videosurveillance', label:'Vidéosurveillance',  icon:'📹' },
+    { key:'portailElectrique', label:'Portail électrique', icon:'🚪' },
+    { key:'interphone',        label:'Interphone',         icon:'📞' },
+    { key:'alarme',            label:'Alarme',             icon:'🚨' },
+  ]},
+  { label:'📡 Connectivité', items:[
+    { key:'wifi',        label:'WiFi',        icon:'📡' },
+    { key:'fibreOptique',label:'Fibre optique',icon:'🌐' },
+    { key:'cableTv',     label:'Câble TV',    icon:'📺' },
+  ]},
+  { label:'🌿 Extérieur', items:[
+    { key:'parking',  label:'Parking',  icon:'🅿️' },
+    { key:'garage',   label:'Garage',   icon:'🚗' },
+    { key:'jardin',   label:'Jardin',   icon:'🌿' },
+    { key:'piscine',  label:'Piscine',  icon:'🏊' },
+    { key:'terrasse', label:'Terrasse', icon:'🌅' },
+    { key:'balcon',   label:'Balcon',   icon:'🏗️' },
+  ]},
+  { label:'🏠 Intérieur', items:[
+    { key:'ascenseur', label:'Ascenseur', icon:'🛗' },
+    { key:'cave',      label:'Cave',      icon:'📦' },
+    { key:'buanderie', label:'Buanderie', icon:'🧺' },
+  ]},
+  { label:'📋 Autres', items:[
+    { key:'animauxAcceptes', label:'Animaux acceptés', icon:'🐾' },
+    { key:'fumeurAccepte',   label:'Fumeur accepté',   icon:'🚬' },
+  ]},
+];
+
+const ALL_COMMODITE_ITEMS = COMMODITES_GROUPS.flatMap(g => g.items);
 const STATUT_COLORS = {
   Disponible: GREEN, Loué: BLUE, Vendu: GRAY, 'En travaux': GOLD, Réservé: '#EAB308',
 };
@@ -214,6 +276,65 @@ const PhotoGrid = ({ photos = [], onAdd, onRemove, onReorder }) => {
   );
 };
 
+// ── CommoditesSection ─────────────────────────────────────────
+const CommoditesSection = ({ commodites = {}, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const c = { ...emptyCommodites, ...commodites };
+  const setC = (k, v) => onChange({ ...c, [k]: v });
+
+  const countChecked = ALL_COMMODITE_ITEMS.filter(({ key }) => !!c[key]).length;
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <button type="button" onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-2.5" style={{fontFamily:FONT}}>
+          <span className="text-sm font-semibold text-gray-700">🏷️ Commodités</span>
+          {countChecked > 0 && !open
+            ? <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                style={{color:BLUE, background:`${BLUE}12`}}>
+                ✅ {countChecked} sélectionnée{countChecked > 1 ? 's' : ''}
+              </span>
+            : !open && <span className="text-xs text-gray-400">Ajouter</span>
+          }
+        </div>
+        <ChevronRight size={15} className={`text-gray-400 transition-transform duration-200 ${open?'rotate-90':''}`}/>
+      </button>
+
+      {open && (
+        <div className="border-t border-gray-100 px-4 py-4 space-y-4 bg-white">
+          {COMMODITES_GROUPS.map(({ label, items }) => (
+            <div key={label}>
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2" style={{fontFamily:FONT}}>
+                {label}
+              </p>
+              <div className="grid grid-cols-2 gap-1">
+                {items.map(({ key, label: lbl }) => (
+                  <label key={key}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors select-none"
+                    style={{ background: c[key] ? `${BLUE}0D` : 'transparent' }}>
+                    <input type="checkbox" checked={!!c[key]} onChange={e => setC(key, e.target.checked)}
+                      className="rounded cursor-pointer accent-blue-500 flex-shrink-0"/>
+                    <span className="text-xs text-gray-700" style={{fontFamily:FONT}}>{lbl}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2" style={{fontFamily:FONT}}>
+              Autres commodités
+            </p>
+            <Textarea value={c.autres || ''} onChange={e => setC('autres', e.target.value)}
+              placeholder="Ex: Générateur 5KVA, Citerne 10 000L..." rows={2}/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── BienCard (accordion) ──────────────────────────────────────
 const emptyBien = {
   typeBien: '',
@@ -222,6 +343,7 @@ const emptyBien = {
   // Location
   prixLoyer:'', charges:'', caution:'', meuble:false, disponibleDes:'',
   nombrePieces:'', nombreChambres:'', nombreSDB:'', etage:'',
+  commodites: { ...emptyCommodites },
   // Vente
   prixVente:'', prixNegociable:false, anneeConstruction:'', etatGeneral:'Bon état', titreFoncier:false,
   _photos:[],
@@ -389,6 +511,7 @@ const BienCard = ({ bien, index, expanded, onToggle, onChange, onRemove }) => {
 
               {/* CHAMPS LOCATION */}
               {bien.typeBien === 'location' && (
+                <>
                 <div className="space-y-3 p-3 rounded-xl border border-blue-100 bg-blue-50/30">
                   <SectionTitle>Conditions de location</SectionTitle>
                   <div className="grid grid-cols-2 gap-3">
@@ -422,6 +545,11 @@ const BienCard = ({ bien, index, expanded, onToggle, onChange, onRemove }) => {
                     </Select>
                   </Field>
                 </div>
+                <CommoditesSection
+                  commodites={bien.commodites || {}}
+                  onChange={c => onChange({ ...bien, commodites: c })}
+                />
+                </>
               )}
 
               {/* CHAMPS VENTE */}
@@ -498,6 +626,7 @@ const initBienFromDB = (b) => ({
   charges:           b.charges ?? '',
   caution:           b.caution ?? '',
   meuble:            b.meuble ?? false,
+  commodites:        b.commodites ? { ...emptyCommodites, ...b.commodites } : { ...emptyCommodites },
   // Vente
   prixVente:         b.prixVente ?? '',
   prixNegociable:    b.prixNegociable ?? false,
@@ -847,6 +976,19 @@ const PropDetailModal = ({ proprietaire: p, onClose }) => {
                     </div>
                     {b.prixLoyer > 0 && <p className="text-xs font-bold mt-1" style={{color:BLUE}}>🏠 {fmt(b.prixLoyer)}/mois</p>}
                     {b.prixVente > 0 && <p className="text-xs font-bold mt-1" style={{color:GREEN}}>💰 {fmt(b.prixVente)}</p>}
+                    {b.commodites && (() => {
+                      const first4 = ALL_COMMODITE_ITEMS.filter(({ key }) => b.commodites[key]).slice(0, 4);
+                      return first4.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {first4.map(({ key, icon, label }) => (
+                            <span key={key} title={label}
+                              className="text-xs px-1 py-0.5 rounded bg-blue-50 text-blue-500 font-medium">
+                              {icon}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 </button>
               );
@@ -909,6 +1051,34 @@ const PropDetailModal = ({ proprietaire: p, onClose }) => {
               {selectedBien.description && (
                 <p className="text-sm text-gray-600 p-3 bg-gray-50 rounded-xl">{selectedBien.description}</p>
               )}
+
+              {/* Commodités */}
+              {selectedBien.typeBien === 'location' && selectedBien.commodites && (() => {
+                const checked = ALL_COMMODITE_ITEMS.filter(({ key }) => selectedBien.commodites[key]);
+                const autres  = selectedBien.commodites.autres;
+                if (checked.length === 0 && !autres) return null;
+                return (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2" style={{fontFamily:FONT}}>
+                      Commodités ({checked.length})
+                    </p>
+                    {checked.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {checked.map(({ key, icon, label }) => (
+                          <span key={key}
+                            className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg font-medium"
+                            style={{background:`${BLUE}12`, color:BLUE, fontFamily:FONT}}>
+                            {icon} {label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {autres && (
+                      <p className="text-xs text-gray-500 italic p-2 bg-gray-50 rounded-lg">{autres}</p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1066,10 +1236,11 @@ const GestionLocativePage = () => {
           photos:         (b._photos||[]).filter(p => p.type==='existing').map(p => p.url),
         };
         if (b.typeBien === 'location') {
-          base.prixLoyer = b.prixLoyer ? Number(b.prixLoyer) : undefined;
-          base.charges   = b.charges   ? Number(b.charges)   : undefined;
-          base.caution   = b.caution   ? Number(b.caution)   : undefined;
-          base.meuble    = !!b.meuble;
+          base.prixLoyer  = b.prixLoyer ? Number(b.prixLoyer) : undefined;
+          base.charges    = b.charges   ? Number(b.charges)   : undefined;
+          base.caution    = b.caution   ? Number(b.caution)   : undefined;
+          base.meuble     = !!b.meuble;
+          base.commodites = b.commodites ? { ...b.commodites } : { ...emptyCommodites };
         } else {
           base.prixVente         = b.prixVente         ? Number(b.prixVente)         : undefined;
           base.prixNegociable    = !!b.prixNegociable;

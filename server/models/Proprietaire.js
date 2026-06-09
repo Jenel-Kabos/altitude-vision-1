@@ -42,6 +42,47 @@ const bienSchema = new mongoose.Schema({
     enum: ['Neuf','Très bon état','Bon état','À rénover'],
   },
   titreFoncier: { type: Boolean, default: false },
+  // Commodités (location)
+  commodites: {
+    // Eau & Énergie
+    eauCourante:       { type: Boolean, default: false },
+    eauChaude:         { type: Boolean, default: false },
+    electricite:       { type: Boolean, default: false },
+    groupeElectrogene: { type: Boolean, default: false },
+    panneauxSolaires:  { type: Boolean, default: false },
+    // Climatisation
+    climatisation:     { type: Boolean, default: false },
+    brasseurAir:       { type: Boolean, default: false },
+    // Cuisine
+    cuisineEquipee:    { type: Boolean, default: false },
+    refrigerateur:     { type: Boolean, default: false },
+    cuisiniere:        { type: Boolean, default: false },
+    // Sécurité
+    gardien:           { type: Boolean, default: false },
+    videosurveillance: { type: Boolean, default: false },
+    portailElectrique: { type: Boolean, default: false },
+    interphone:        { type: Boolean, default: false },
+    alarme:            { type: Boolean, default: false },
+    // Connectivité
+    wifi:              { type: Boolean, default: false },
+    fibreOptique:      { type: Boolean, default: false },
+    cableTv:           { type: Boolean, default: false },
+    // Extérieur
+    parking:           { type: Boolean, default: false },
+    garage:            { type: Boolean, default: false },
+    jardin:            { type: Boolean, default: false },
+    piscine:           { type: Boolean, default: false },
+    terrasse:          { type: Boolean, default: false },
+    balcon:            { type: Boolean, default: false },
+    // Intérieur
+    ascenseur:         { type: Boolean, default: false },
+    cave:              { type: Boolean, default: false },
+    buanderie:         { type: Boolean, default: false },
+    // Autres
+    animauxAcceptes:   { type: Boolean, default: false },
+    fumeurAccepte:     { type: Boolean, default: false },
+    autres:            { type: String,  default: '' },
+  },
   dateAjout:  { type: Date, default: Date.now },
 }, { _id: true });
 
