@@ -9,7 +9,7 @@ export const buildOrganization = () => ({
   '@type': 'Organization',
   name: 'Altitude-Vision',
   url: SITE_URL,
-  logo: `${SITE_URL}/logo.png`,
+  logo: `${SITE_URL}/images/Logo_Altitude1.png`,
   contactPoint: {
     '@type': 'ContactPoint',
     telephone: '+242-06-800-21-51',

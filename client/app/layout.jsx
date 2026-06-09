@@ -31,7 +31,7 @@ export const metadata = {
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
-    apple: "/logo.png",
+    apple: "/images/Logo_Altitude1.png",
   },
   verification: {
     google: 'F4D7sKQm2QQaHzm8XU6CPY4hj2q00o1kY2ZlvKktsIs',
@@ -44,7 +44,7 @@ const LOCAL_BUSINESS_SCHEMA = {
   name: "Altitude-Vision",
   description: "Agence Altitude-Vision — Immobilier, Événements et Communication à Brazzaville.",
   url: SITE_URL,
-  logo: `${SITE_URL}/logo.png`,
+  logo: `${SITE_URL}/images/Logo_Altitude1.png`,
   image: `${SITE_URL}/og-default.jpg`,
   telephone: "+242 05 330 16 75",
   email: "contact@altitudevision.agency",

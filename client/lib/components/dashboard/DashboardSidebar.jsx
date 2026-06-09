@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { 
   Home, 
@@ -35,14 +36,14 @@ const DashboardSidebar = () => {
     <aside className="w-64 bg-gradient-to-b from-blue-900 to-blue-800 text-white min-h-screen flex flex-col shadow-2xl">
       {/* Logo */}
       <div className="p-6 border-b border-blue-700">
-        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition">
-          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-            <span className="text-blue-900 font-bold text-xl">AV</span>
-          </div>
-          <div>
-            <h2 className="text-lg font-bold">Altitude Vision</h2>
-            <p className="text-xs text-blue-200">Administration</p>
-          </div>
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition">
+          <Image
+            src="/images/Logo_Altitude1.png"
+            alt="Altitude Vision"
+            width={120}
+            height={35}
+            style={{ objectFit: 'contain' }}
+          />
         </Link>
       </div>
 

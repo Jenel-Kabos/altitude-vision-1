@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { MapPin, Mail, Phone, ArrowUpRight } from 'lucide-react';
 import { FaFacebook, FaInstagram, FaWhatsapp } from 'react-icons/fa';
 
@@ -141,28 +142,13 @@ const Footer = () => (
       {/* ── Brand ── */}
       <div className="av-footer-brand">
         <Link href="/" style={{ textDecoration: 'none', display: 'block', marginBottom: '18px' }} aria-label="Accueil Altitude-Vision">
-          <span style={{
-            display: 'block',
-            fontFamily: "'Cormorant Garamond', serif",
-            fontSize: 'clamp(1.1rem, 1.8vw, 1.6rem)',
-            fontWeight: 600,
-            color: '#E8E4DC',
-            letterSpacing: '0.02em',
-            lineHeight: 1.2,
-          }}>
-            Altitude<span style={{ color: '#C8872A' }}>-</span>Vision
-          </span>
-          <span style={{
-            display: 'block',
-            fontFamily: "'DM Sans', sans-serif",
-            fontSize: '0.5rem',
-            letterSpacing: '0.35em',
-            // ✅ légèrement plus visible que 0.2 mais reste subtil
-            color: 'rgba(232,228,220,0.35)',
-            textTransform: 'uppercase',
-          }}>
-            Agency
-          </span>
+          <Image
+            src="/images/Logo_Altitude1.png"
+            alt="Altitude Vision"
+            width={160}
+            height={50}
+            style={{ objectFit: 'contain' }}
+          />
         </Link>
 
         <p style={{

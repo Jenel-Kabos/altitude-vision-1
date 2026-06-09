@@ -53,7 +53,7 @@ const LOCAL_BUSINESS_SCHEMA = JSON.stringify({
   '@type': 'LocalBusiness',
   name: 'Altitude Vision',
   url: 'https://altitudevision.agency',
-  logo: 'https://altitudevision.agency/logo.png',
+  logo: 'https://altitudevision.agency/images/Logo_Altitude1.png',
   telephone: '+242068002151',
   email: 'contact@altitudevision.agency',
   address: {

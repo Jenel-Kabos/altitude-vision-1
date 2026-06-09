@@ -48,7 +48,7 @@ export default function ArticleRoute({ params }) {
                 "@type": "Organization",
                 name: "Altitude-Vision",
                 url: SITE_URL,
-                logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
+                logo: { "@type": "ImageObject", url: `${SITE_URL}/images/Logo_Altitude1.png` },
             },
             url: `${SITE_URL}/actualites/${article.slug}`,
             keywords: article.tags?.join(', '),
