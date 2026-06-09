@@ -24,8 +24,9 @@ const GRAY   = '#94A3B8';
 const FONT   = "'Outfit', sans-serif";
 
 const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-const BIEN_TYPES = ['Appartement','Maison','Villa','Terrain','Bureau','Commerce','Entrepôt'];
-const BIEN_STATUTS = ['Disponible','Loué','Vendu','En travaux','Réservé'];
+const BIEN_TYPES = ['Appartement','Maison','Villa','Terrain','Bureau','Commerce','Entrepôt','Studio'];
+const BIEN_STATUTS_LOCATION = ['Disponible','Loué','En travaux','Réservé'];
+const BIEN_STATUTS_VENTE    = ['Disponible','Vendu','Réservé'];
 const STATUT_COLORS = {
   Disponible: GREEN, Loué: BLUE, Vendu: GRAY, 'En travaux': GOLD, Réservé: '#EAB308',
 };
@@ -215,14 +216,20 @@ const PhotoGrid = ({ photos = [], onAdd, onRemove, onReorder }) => {
 
 // ── BienCard (accordion) ──────────────────────────────────────
 const emptyBien = {
+  typeBien: '',
   titre:'', type:'Appartement', adresse:'', ville:'Brazzaville', quartier:'',
-  superficie:'', nombrePieces:'', nombreChambres:'', nombreSDB:'', etage:'',
-  description:'', statut:'Disponible', prixLoyer:'', prixVente:'', charges:'',
+  superficie:'', description:'', statut:'Disponible',
+  // Location
+  prixLoyer:'', charges:'', caution:'', meuble:false, disponibleDes:'',
+  nombrePieces:'', nombreChambres:'', nombreSDB:'', etage:'',
+  // Vente
+  prixVente:'', prixNegociable:false, anneeConstruction:'', etatGeneral:'Bon état', titreFoncier:false,
   _photos:[],
 };
 
 const BienCard = ({ bien, index, expanded, onToggle, onChange, onRemove }) => {
   const set = (k, v) => onChange({ ...bien, [k]: v });
+  const [confirmType, setConfirmType] = useState(null);
 
   const addPhotos = (files) => {
     const added = files.map(f => ({ type:'new', file:f, preview: URL.createObjectURL(f) }));
@@ -244,6 +251,34 @@ const BienCard = ({ bien, index, expanded, onToggle, onChange, onRemove }) => {
     onChange({ ...bien, _photos: next });
   };
 
+  const hasTypeSpecificData = (type) => {
+    if (type === 'location') return !!(bien.prixLoyer || bien.charges || bien.caution || bien.meuble || bien.disponibleDes);
+    return !!(bien.prixVente || bien.anneeConstruction || bien.titreFoncier || bien.prixNegociable);
+  };
+
+  const handleTypeChange = (newType) => {
+    if (!bien.typeBien || newType === bien.typeBien) {
+      onChange({ ...bien, typeBien: newType, statut: 'Disponible' });
+      return;
+    }
+    if (hasTypeSpecificData(bien.typeBien)) {
+      setConfirmType(newType);
+    } else {
+      applyType(newType);
+    }
+  };
+
+  const applyType = (type) => {
+    const cleared = type === 'location'
+      ? { prixVente:'', prixNegociable:false, anneeConstruction:'', etatGeneral:'Bon état', titreFoncier:false }
+      : { prixLoyer:'', charges:'', caution:'', meuble:false };
+    onChange({ ...bien, typeBien: type, statut: 'Disponible', ...cleared });
+    setConfirmType(null);
+  };
+
+  const typeColor = bien.typeBien === 'location' ? BLUE : bien.typeBien === 'vente' ? GREEN : GRAY;
+  const typeEmoji = bien.typeBien === 'location' ? '🏠' : bien.typeBien === 'vente' ? '💰' : '';
+  const typeLabel = bien.typeBien === 'location' ? 'Location' : bien.typeBien === 'vente' ? 'Vente' : 'Non défini';
   const statutColor = STATUT_COLORS[bien.statut] || GRAY;
 
   return (
@@ -252,17 +287,22 @@ const BienCard = ({ bien, index, expanded, onToggle, onChange, onRemove }) => {
       <button type="button" onClick={onToggle}
         className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-all text-left">
         <div className="flex items-center gap-2.5">
-          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: statutColor }}/>
+          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: bien.typeBien ? statutColor : GRAY }}/>
           <span className="font-semibold text-gray-800 text-sm" style={{fontFamily:FONT}}>
-            Bien {index+1}{bien.titre ? ` — ${bien.titre}` : ''}
-            {bien.type ? <span className="ml-2 font-normal text-gray-400 text-xs">({bien.type})</span> : ''}
+            Bien {index+1}
+            {bien.typeBien
+              ? <span className="ml-1.5 font-semibold" style={{color:typeColor}}> — {typeEmoji} {typeLabel}</span>
+              : <span className="ml-1.5 font-normal text-gray-400 text-xs">— type non défini</span>}
+            {bien.titre && <span className="ml-1.5 font-normal text-gray-400"> · {bien.titre}</span>}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-            style={{ color: statutColor, background:`${statutColor}15`, fontFamily:FONT }}>
-            {bien.statut}
-          </span>
+          {bien.typeBien && (
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ color: statutColor, background:`${statutColor}15`, fontFamily:FONT }}>
+              {bien.statut}
+            </span>
+          )}
           {(bien._photos||[]).length > 0 && (
             <span className="text-xs text-gray-400">{(bien._photos||[]).length} photo{(bien._photos||[]).length>1?'s':''}</span>
           )}
@@ -272,65 +312,157 @@ const BienCard = ({ bien, index, expanded, onToggle, onChange, onRemove }) => {
 
       {/* Body accordion */}
       {expanded && (
-        <div className="p-4 space-y-3 border-t border-gray-100">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Titre" required><Input value={bien.titre} onChange={e=>set('titre',e.target.value)} placeholder="Ex: Appartement Bacongo"/></Field>
-            <Field label="Type">
-              <Select value={bien.type} onChange={e=>set('type',e.target.value)}>
-                {BIEN_TYPES.map(t=><option key={t}>{t}</option>)}
-              </Select>
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Adresse" required><Input value={bien.adresse} onChange={e=>set('adresse',e.target.value)}/></Field>
-            <Field label="Ville" required><Input value={bien.ville} onChange={e=>set('ville',e.target.value)}/></Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Quartier"><Input value={bien.quartier} onChange={e=>set('quartier',e.target.value)}/></Field>
-            <Field label="Superficie (m²)"><Input type="number" min="0" value={bien.superficie} onChange={e=>set('superficie',e.target.value)}/></Field>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="Pièces"><Input type="number" min="0" value={bien.nombrePieces} onChange={e=>set('nombrePieces',e.target.value)}/></Field>
-            <Field label="Chambres"><Input type="number" min="0" value={bien.nombreChambres} onChange={e=>set('nombreChambres',e.target.value)}/></Field>
-            <Field label="SDB"><Input type="number" min="0" value={bien.nombreSDB} onChange={e=>set('nombreSDB',e.target.value)}/></Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Étage"><Input type="number" value={bien.etage} onChange={e=>set('etage',e.target.value)}/></Field>
-            <Field label="Statut">
-              <Select value={bien.statut} onChange={e=>set('statut',e.target.value)}>
-                {BIEN_STATUTS.map(s=><option key={s}>{s}</option>)}
-              </Select>
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Loyer/mois (FCFA)">
-              <Input type="number" min="0" value={bien.prixLoyer}
-                onChange={e=>set('prixLoyer',e.target.value)}
-                disabled={bien.statut==='Vendu'}
-                placeholder={bien.statut==='Vendu'?'Non applicable':''}/>
-            </Field>
-            <Field label="Prix vente (FCFA)">
-              <Input type="number" min="0" value={bien.prixVente}
-                onChange={e=>set('prixVente',e.target.value)}
-                disabled={bien.statut==='Loué'}
-                placeholder={bien.statut==='Loué'?'Non applicable':''}/>
-            </Field>
-          </div>
-          <Field label="Charges (FCFA)"><Input type="number" min="0" value={bien.charges} onChange={e=>set('charges',e.target.value)}/></Field>
-          <Field label="Description"><Textarea value={bien.description} onChange={e=>set('description',e.target.value)}/></Field>
+        <div className="p-4 space-y-4 border-t border-gray-100">
 
-          {/* Photos */}
+          {/* ÉTAPE 1 — Choix du type */}
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2" style={{fontFamily:FONT}}>
-              Photos du bien
+              Ce bien est destiné à :
             </p>
-            <PhotoGrid
-              photos={bien._photos||[]}
-              onAdd={addPhotos}
-              onRemove={removePhoto}
-              onReorder={reorderPhotos}
-            />
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { key:'location', emoji:'🏠', title:'LOCATION', desc:'Bail locatif · Loyer mensuel', color:BLUE },
+                { key:'vente',    emoji:'💰', title:'VENTE',    desc:'Transaction · Prix de vente', color:GREEN },
+              ].map(({ key, emoji, title, desc, color }) => (
+                <button key={key} type="button" onClick={() => handleTypeChange(key)}
+                  className="p-3 rounded-xl border-2 text-left transition-all"
+                  style={{
+                    borderColor: bien.typeBien===key ? color : '#E2E8F0',
+                    background:  bien.typeBien===key ? `${color}0D` : 'white',
+                    fontFamily:  FONT,
+                  }}>
+                  <p className="text-sm font-bold mb-0.5"
+                    style={{color: bien.typeBien===key ? color : '#64748B'}}>
+                    {emoji} {title}
+                  </p>
+                  <p className="text-xs text-gray-400">{desc}</p>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Confirmation de changement de type */}
+          {confirmType && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+              <p className="text-sm text-amber-800" style={{fontFamily:FONT}}>
+                Changer le type effacera les données spécifiques. Continuer ?
+              </p>
+              <div className="flex gap-2">
+                <Btn small onClick={() => applyType(confirmType)} color={GOLD}>Confirmer</Btn>
+                <Btn small onClick={() => setConfirmType(null)} outline color={GRAY}>Annuler</Btn>
+              </div>
+            </div>
+          )}
+
+          {/* Reste du formulaire — affiché uniquement si le type est choisi */}
+          {bien.typeBien && (
+            <>
+              {/* CHAMPS COMMUNS */}
+              <SectionTitle>Informations du bien</SectionTitle>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Titre" required>
+                  <Input value={bien.titre} onChange={e=>set('titre',e.target.value)} placeholder="Ex: Appartement Bacongo"/>
+                </Field>
+                <Field label="Type de bien">
+                  <Select value={bien.type} onChange={e=>set('type',e.target.value)}>
+                    {BIEN_TYPES.map(t=><option key={t}>{t}</option>)}
+                  </Select>
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Adresse" required><Input value={bien.adresse} onChange={e=>set('adresse',e.target.value)}/></Field>
+                <Field label="Ville" required><Input value={bien.ville} onChange={e=>set('ville',e.target.value)}/></Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Quartier"><Input value={bien.quartier} onChange={e=>set('quartier',e.target.value)}/></Field>
+                <Field label="Superficie (m²)"><Input type="number" min="0" value={bien.superficie} onChange={e=>set('superficie',e.target.value)}/></Field>
+              </div>
+              <Field label="Description"><Textarea value={bien.description} onChange={e=>set('description',e.target.value)}/></Field>
+
+              {/* Photos */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2" style={{fontFamily:FONT}}>
+                  Photos du bien
+                </p>
+                <PhotoGrid photos={bien._photos||[]} onAdd={addPhotos} onRemove={removePhoto} onReorder={reorderPhotos}/>
+              </div>
+
+              {/* CHAMPS LOCATION */}
+              {bien.typeBien === 'location' && (
+                <div className="space-y-3 p-3 rounded-xl border border-blue-100 bg-blue-50/30">
+                  <SectionTitle>Conditions de location</SectionTitle>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Loyer mensuel* (FCFA)">
+                      <Input type="number" min="0" value={bien.prixLoyer} onChange={e=>set('prixLoyer',e.target.value)}/>
+                    </Field>
+                    <Field label="Charges (FCFA/mois)">
+                      <Input type="number" min="0" value={bien.charges} onChange={e=>set('charges',e.target.value)}/>
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Caution (FCFA — recommandé : 2× loyer)">
+                      <Input type="number" min="0" value={bien.caution} onChange={e=>set('caution',e.target.value)}/>
+                    </Field>
+                    <Field label="Disponible dès">
+                      <Input type="date" value={bien.disponibleDes} onChange={e=>set('disponibleDes',e.target.value)}/>
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Field label="Nb de pièces"><Input type="number" min="0" value={bien.nombrePieces} onChange={e=>set('nombrePieces',e.target.value)}/></Field>
+                    <Field label="Nb de chambres"><Input type="number" min="0" value={bien.nombreChambres} onChange={e=>set('nombreChambres',e.target.value)}/></Field>
+                    <Field label="Nb de SDB"><Input type="number" min="0" value={bien.nombreSDB} onChange={e=>set('nombreSDB',e.target.value)}/></Field>
+                  </div>
+                  <Field label="Étage">
+                    <Input type="number" value={bien.etage} onChange={e=>set('etage',e.target.value)} style={{maxWidth:120}}/>
+                  </Field>
+                  <Toggle checked={!!bien.meuble} onChange={v=>set('meuble',v)} label="Meublé"/>
+                  <Field label="Statut">
+                    <Select value={bien.statut} onChange={e=>set('statut',e.target.value)}>
+                      {BIEN_STATUTS_LOCATION.map(s=><option key={s}>{s}</option>)}
+                    </Select>
+                  </Field>
+                </div>
+              )}
+
+              {/* CHAMPS VENTE */}
+              {bien.typeBien === 'vente' && (
+                <div className="space-y-3 p-3 rounded-xl border border-green-100 bg-green-50/30">
+                  <SectionTitle>Conditions de vente</SectionTitle>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Prix de vente* (FCFA)">
+                      <Input type="number" min="0" value={bien.prixVente} onChange={e=>set('prixVente',e.target.value)}/>
+                    </Field>
+                    <Field label="Disponible dès">
+                      <Input type="date" value={bien.disponibleDes} onChange={e=>set('disponibleDes',e.target.value)}/>
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Field label="Nb de pièces"><Input type="number" min="0" value={bien.nombrePieces} onChange={e=>set('nombrePieces',e.target.value)}/></Field>
+                    <Field label="Nb de chambres"><Input type="number" min="0" value={bien.nombreChambres} onChange={e=>set('nombreChambres',e.target.value)}/></Field>
+                    <Field label="Nb de SDB"><Input type="number" min="0" value={bien.nombreSDB} onChange={e=>set('nombreSDB',e.target.value)}/></Field>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Étage"><Input type="number" value={bien.etage} onChange={e=>set('etage',e.target.value)}/></Field>
+                    <Field label="Année de construction"><Input type="number" value={bien.anneeConstruction} onChange={e=>set('anneeConstruction',e.target.value)} placeholder="Ex: 2020"/></Field>
+                  </div>
+                  <Field label="État général">
+                    <Select value={bien.etatGeneral} onChange={e=>set('etatGeneral',e.target.value)}>
+                      {['Neuf','Très bon état','Bon état','À rénover'].map(s=><option key={s}>{s}</option>)}
+                    </Select>
+                  </Field>
+                  <div className="space-y-2.5 pt-1">
+                    <Toggle checked={!!bien.prixNegociable} onChange={v=>set('prixNegociable',v)} label="Prix négociable"/>
+                    <Toggle checked={!!bien.titreFoncier}   onChange={v=>set('titreFoncier',v)}   label="Titre foncier disponible"/>
+                  </div>
+                  <Field label="Statut">
+                    <Select value={bien.statut} onChange={e=>set('statut',e.target.value)}>
+                      {BIEN_STATUTS_VENTE.map(s=><option key={s}>{s}</option>)}
+                    </Select>
+                  </Field>
+                </div>
+              )}
+            </>
+          )}
 
           <button type="button" onClick={onRemove}
             className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-600 transition-colors pt-1"
@@ -347,22 +479,32 @@ const BienCard = ({ bien, index, expanded, onToggle, onChange, onRemove }) => {
 const emptyProp = { nom:'', prenom:'', email:'', telephone:'', adresse:'', ville:'', notes:'', pieceIdentite:null };
 
 const initBienFromDB = (b) => ({
-  titre:          b.titre || '',
-  type:           b.type || 'Appartement',
-  adresse:        b.adresse || '',
-  ville:          b.ville || 'Brazzaville',
-  quartier:       b.quartier || '',
-  superficie:     b.superficie ?? '',
-  nombrePieces:   b.nombrePieces ?? '',
-  nombreChambres: b.nombreChambres ?? '',
-  nombreSDB:      b.nombreSDB ?? '',
-  etage:          b.etage ?? '',
-  description:    b.description || '',
-  statut:         b.statut || 'Disponible',
-  prixLoyer:      b.prixLoyer ?? '',
-  prixVente:      b.prixVente ?? '',
-  charges:        b.charges ?? '',
-  _photos:        (b.photos||[]).map(url => ({ type:'existing', url })),
+  typeBien:          b.typeBien || '',
+  titre:             b.titre || '',
+  type:              b.type || 'Appartement',
+  adresse:           b.adresse || '',
+  ville:             b.ville || 'Brazzaville',
+  quartier:          b.quartier || '',
+  superficie:        b.superficie ?? '',
+  nombrePieces:      b.nombrePieces ?? '',
+  nombreChambres:    b.nombreChambres ?? '',
+  nombreSDB:         b.nombreSDB ?? '',
+  etage:             b.etage ?? '',
+  description:       b.description || '',
+  statut:            b.statut || 'Disponible',
+  disponibleDes:     b.disponibleDes ? new Date(b.disponibleDes).toISOString().slice(0,10) : '',
+  // Location
+  prixLoyer:         b.prixLoyer ?? '',
+  charges:           b.charges ?? '',
+  caution:           b.caution ?? '',
+  meuble:            b.meuble ?? false,
+  // Vente
+  prixVente:         b.prixVente ?? '',
+  prixNegociable:    b.prixNegociable ?? false,
+  anneeConstruction: b.anneeConstruction ?? '',
+  etatGeneral:       b.etatGeneral || 'Bon état',
+  titreFoncier:      b.titreFoncier ?? false,
+  _photos:           (b.photos||[]).map(url => ({ type:'existing', url })),
 });
 
 const ProprietaireForm = ({ init = emptyProp, initBiens = [], onSave, onCancel, loading }) => {
@@ -689,14 +831,22 @@ const PropDetailModal = ({ proprietaire: p, onClose }) => {
                       : <div className="w-full h-full flex items-center justify-center"><Building size={28} className="text-gray-300"/></div>}
                   </div>
                   <div className="p-2.5">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      {b.typeBien && (
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded-md"
+                          style={{color: b.typeBien==='location'?BLUE:GREEN, background: b.typeBien==='location'?`${BLUE}12`:`${GREEN}12`}}>
+                          {b.typeBien==='location'?'🏠 Location':'💰 Vente'}
+                        </span>
+                      )}
+                    </div>
                     <p className="font-semibold text-sm text-gray-800 truncate">{b.titre}</p>
                     <p className="text-xs text-gray-400 truncate">{b.quartier||b.ville}</p>
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <div className="w-1.5 h-1.5 rounded-full" style={{background:color}}/>
                       <span className="text-xs font-semibold" style={{color}}>{b.statut}</span>
                     </div>
-                    {b.prixLoyer > 0 && <p className="text-xs font-bold mt-1" style={{color:BLUE}}>{fmt(b.prixLoyer)}/mois</p>}
-                    {b.prixVente > 0 && <p className="text-xs font-bold mt-1" style={{color:GREEN}}>{fmt(b.prixVente)}</p>}
+                    {b.prixLoyer > 0 && <p className="text-xs font-bold mt-1" style={{color:BLUE}}>🏠 {fmt(b.prixLoyer)}/mois</p>}
+                    {b.prixVente > 0 && <p className="text-xs font-bold mt-1" style={{color:GREEN}}>💰 {fmt(b.prixVente)}</p>}
                   </div>
                 </button>
               );
@@ -731,6 +881,7 @@ const PropDetailModal = ({ proprietaire: p, onClose }) => {
               {/* Infos */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {[
+                  selectedBien.typeBien && ['Destination', selectedBien.typeBien==='location'?'🏠 Location':'💰 Vente'],
                   ['Type', selectedBien.type],
                   ['Statut', <span key="s" className="text-xs font-bold px-2 py-0.5 rounded-full" style={{color:STATUT_COLORS[selectedBien.statut]||GRAY,background:`${STATUT_COLORS[selectedBien.statut]||GRAY}15`}}>{selectedBien.statut}</span>],
                   ['Adresse', selectedBien.adresse],
@@ -739,9 +890,18 @@ const PropDetailModal = ({ proprietaire: p, onClose }) => {
                   selectedBien.nombrePieces && ['Pièces', selectedBien.nombrePieces],
                   selectedBien.nombreChambres && ['Chambres', selectedBien.nombreChambres],
                   selectedBien.nombreSDB && ['SDB', selectedBien.nombreSDB],
-                  selectedBien.prixLoyer > 0 && ['Loyer', <span key="l" className="font-bold" style={{color:BLUE}}>{fmt(selectedBien.prixLoyer)}/mois</span>],
-                  selectedBien.prixVente > 0 && ['Prix vente', <span key="v" className="font-bold" style={{color:GREEN}}>{fmt(selectedBien.prixVente)}</span>],
+                  // Location
+                  selectedBien.prixLoyer > 0 && ['Loyer/mois', <span key="l" className="font-bold" style={{color:BLUE}}>{fmt(selectedBien.prixLoyer)}</span>],
                   selectedBien.charges > 0 && ['Charges', fmt(selectedBien.charges)],
+                  selectedBien.caution > 0 && ['Caution', fmt(selectedBien.caution)],
+                  selectedBien.typeBien==='location' && ['Meublé', selectedBien.meuble ? 'Oui' : 'Non'],
+                  // Vente
+                  selectedBien.prixVente > 0 && ['Prix de vente', <span key="v" className="font-bold" style={{color:GREEN}}>{fmt(selectedBien.prixVente)}</span>],
+                  selectedBien.typeBien==='vente' && selectedBien.prixNegociable && ['Prix négociable', 'Oui'],
+                  selectedBien.anneeConstruction && ['Année construction', selectedBien.anneeConstruction],
+                  selectedBien.etatGeneral && ['État', selectedBien.etatGeneral],
+                  selectedBien.typeBien==='vente' && ['Titre foncier', selectedBien.titreFoncier ? 'Oui' : 'Non'],
+                  selectedBien.disponibleDes && ['Disponible dès', new Date(selectedBien.disponibleDes).toLocaleDateString('fr-FR')],
                 ].filter(Boolean).map(([k, v]) => (
                   <div key={k}><p className="text-xs text-gray-400 mb-0.5">{k}</p><p className="font-semibold">{v}</p></div>
                 ))}
@@ -881,24 +1041,44 @@ const GestionLocativePage = () => {
     if (!personal.nom || !personal.prenom || !personal.telephone)
       return toast('Nom, prénom et téléphone requis', 'error');
 
+    const bienSansType = biens.findIndex(b => !b.typeBien);
+    if (bienSansType >= 0)
+      return toast(`Bien ${bienSansType+1} : sélectionnez le type (location ou vente)`, 'error');
+
     setSaving(true);
     try {
-      // Séparer photos existantes (URL) et nouvelles (File)
-      const biensPropres = biens.map(b => ({
-        titre: b.titre, type: b.type, adresse: b.adresse, ville: b.ville,
-        quartier: b.quartier||undefined,
-        superficie:     b.superficie     ? Number(b.superficie)     : undefined,
-        nombrePieces:   b.nombrePieces   ? Number(b.nombrePieces)   : undefined,
-        nombreChambres: b.nombreChambres ? Number(b.nombreChambres) : undefined,
-        nombreSDB:      b.nombreSDB      ? Number(b.nombreSDB)      : undefined,
-        etage:          b.etage !== ''   ? Number(b.etage)          : undefined,
-        description: b.description||undefined,
-        statut: b.statut,
-        prixLoyer: b.prixLoyer ? Number(b.prixLoyer) : undefined,
-        prixVente: b.prixVente ? Number(b.prixVente) : undefined,
-        charges:   b.charges   ? Number(b.charges)   : undefined,
-        photos:    (b._photos||[]).filter(p => p.type==='existing').map(p => p.url),
-      }));
+      const biensPropres = biens.map(b => {
+        const base = {
+          typeBien:       b.typeBien,
+          titre:          b.titre,
+          type:           b.type,
+          adresse:        b.adresse,
+          ville:          b.ville,
+          quartier:       b.quartier       || undefined,
+          superficie:     b.superficie     ? Number(b.superficie)     : undefined,
+          nombrePieces:   b.nombrePieces   ? Number(b.nombrePieces)   : undefined,
+          nombreChambres: b.nombreChambres ? Number(b.nombreChambres) : undefined,
+          nombreSDB:      b.nombreSDB      ? Number(b.nombreSDB)      : undefined,
+          etage:          b.etage !== ''   ? Number(b.etage)          : undefined,
+          description:    b.description    || undefined,
+          statut:         b.statut,
+          disponibleDes:  b.disponibleDes  || undefined,
+          photos:         (b._photos||[]).filter(p => p.type==='existing').map(p => p.url),
+        };
+        if (b.typeBien === 'location') {
+          base.prixLoyer = b.prixLoyer ? Number(b.prixLoyer) : undefined;
+          base.charges   = b.charges   ? Number(b.charges)   : undefined;
+          base.caution   = b.caution   ? Number(b.caution)   : undefined;
+          base.meuble    = !!b.meuble;
+        } else {
+          base.prixVente         = b.prixVente         ? Number(b.prixVente)         : undefined;
+          base.prixNegociable    = !!b.prixNegociable;
+          base.anneeConstruction = b.anneeConstruction ? Number(b.anneeConstruction) : undefined;
+          base.etatGeneral       = b.etatGeneral       || undefined;
+          base.titreFoncier      = !!b.titreFoncier;
+        }
+        return base;
+      });
 
       let saved;
       if (editProp) {

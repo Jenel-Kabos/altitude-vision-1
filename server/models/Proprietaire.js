@@ -1,10 +1,15 @@
 const mongoose = require('mongoose');
 
 const bienSchema = new mongoose.Schema({
+  typeBien: {
+    type: String,
+    enum: ['location', 'vente'],
+    required: [true, 'Le type du bien est requis (location ou vente)'],
+  },
   titre:          { type: String, required: [true, 'Le titre du bien est requis'], trim: true },
   type: {
     type: String,
-    enum: ['Appartement','Maison','Villa','Terrain','Bureau','Commerce','Entrepôt'],
+    enum: ['Appartement','Maison','Villa','Terrain','Bureau','Commerce','Entrepôt','Studio'],
     default: 'Appartement',
   },
   adresse:        { type: String, required: [true, "L'adresse est requise"], trim: true },
@@ -16,15 +21,27 @@ const bienSchema = new mongoose.Schema({
   nombreSDB:      { type: Number, min: 0 },
   etage:          { type: Number },
   description:    { type: String, trim: true },
-  photos:         [{ type: String }], // URLs Cloudinary
+  photos:         [{ type: String }],
   statut: {
     type: String,
     enum: ['Disponible','Loué','Vendu','En travaux','Réservé'],
     default: 'Disponible',
   },
+  disponibleDes:  { type: Date },
+  // Champs location
   prixLoyer:  { type: Number, min: 0 },
-  prixVente:  { type: Number, min: 0 },
   charges:    { type: Number, min: 0 },
+  caution:    { type: Number, min: 0 },
+  meuble:     { type: Boolean, default: false },
+  // Champs vente
+  prixVente:         { type: Number, min: 0 },
+  prixNegociable:    { type: Boolean, default: false },
+  anneeConstruction: { type: Number },
+  etatGeneral: {
+    type: String,
+    enum: ['Neuf','Très bon état','Bon état','À rénover'],
+  },
+  titreFoncier: { type: Boolean, default: false },
   dateAjout:  { type: Date, default: Date.now },
 }, { _id: true });
 
