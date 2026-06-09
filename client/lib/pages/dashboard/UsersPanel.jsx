@@ -455,7 +455,13 @@ const UsersPanel = () => {
 
   useEffect(() => {
     let list = [...users];
-    if (filterTab !== 'all') list = list.filter(u => u.role === filterTab);
+    if (filterTab !== 'all') {
+      if (filterTab === 'User') {
+        list = list.filter(u => u.role === 'User' || u.role === 'Client');
+      } else {
+        list = list.filter(u => u.role === filterTab);
+      }
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(u =>
@@ -544,11 +550,12 @@ const UsersPanel = () => {
     total:         users.length,
     admins:        users.filter(u => u.role === 'Admin').length,
     collaborateurs:users.filter(u => u.role === 'Collaborateur').length,
-    users:         users.filter(u => u.role === 'User').length,
+    users:         users.filter(u => u.role === 'User' || u.role === 'Client').length,
   };
 
   const countByTab = (tab) => {
     if (tab === 'all') return users.length;
+    if (tab === 'User') return users.filter(u => u.role === 'User' || u.role === 'Client').length;
     return users.filter(u => u.role === tab).length;
   };
 
