@@ -17,6 +17,7 @@ import { getDashboardStats } from "../../services/dashboardService";
 import { getAllQuotes } from "../../services/quoteService";
 import { getAllEvents } from "../../services/eventService";
 import { getAlertesPaiements } from "../../services/gestionLocativeService";
+import { getAllUsers } from "../../services/userService";
 
 const BLUE  = '#2E7BB5';
 const GOLD  = '#C8872A';
@@ -59,6 +60,7 @@ const DashboardHome = () => {
   const [milaCount, setMilaCount]       = useState(0);
   const [contratsActifs, setContrats]   = useState(0);
   const [alertesGL, setAlertesGL]       = useState({ nbImpayes:0, nbPenalites:0, totalPenalites:0, bailsExpiration:0 });
+  const [teamStats, setTeamStats]       = useState({ admins:0, collaborateurs:0, utilisateurs:0 });
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
   const [activeTab, setActiveTab]   = useState('overview');
@@ -70,11 +72,12 @@ const DashboardHome = () => {
       try {
         setLoading(true);
         setError(null);
-        const [dashboardData, quotesData, eventsData, alertesData] = await Promise.all([
+        const [dashboardData, quotesData, eventsData, alertesData, usersData] = await Promise.all([
           getDashboardStats(),
           getAllQuotes(),
           getAllEvents(),
           getAlertesPaiements().catch(() => null),
+          getAllUsers().catch(() => []),
         ]);
         const dsStats = dashboardData.stats || { Altimmo: 0, MilaEvents: 0, Altcom: 0 };
         const events  = Array.isArray(eventsData) ? eventsData : [];
@@ -83,6 +86,13 @@ const DashboardHome = () => {
         setKpis(dashboardData.kpis   || null);
         setContrats(dashboardData.contratsActifs || 0);
         if (alertesData) setAlertesGL(alertesData);
+        if (Array.isArray(usersData) && usersData.length > 0) {
+          setTeamStats({
+            admins:        usersData.filter(u => u.role === 'Admin').length,
+            collaborateurs: usersData.filter(u => u.role === 'Collaborateur').length,
+            utilisateurs:  usersData.filter(u => !['Admin','Collaborateur'].includes(u.role)).length,
+          });
+        }
         setActivity(dashboardData.activity  || null);
         setPerf(dashboardData.performance   || null);
         const quotes = quotesData || [];
@@ -386,6 +396,42 @@ const DashboardHome = () => {
                         <a href="/dashboard/gestion-locative"
                           className="text-xs font-semibold hover:underline" style={{ color:BLUE, fontFamily:FONT }}>
                           Voir les détails →
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Widget Équipe — Admin uniquement */}
+                {user?.role === 'Admin' && (
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+                      <span className="text-base">👥</span>
+                      <h3 className="font-bold text-gray-900 text-sm flex-1" style={{ fontFamily:FONT }}>Équipe</h3>
+                    </div>
+                    <div className="divide-y divide-gray-50">
+                      <div className="flex items-center gap-3 px-5 py-3">
+                        <span>🔴</span>
+                        <span className="text-sm text-gray-700 flex-1" style={{ fontFamily:FONT }}>
+                          <strong>{teamStats.admins}</strong> Administrateur{teamStats.admins > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 px-5 py-3">
+                        <span>🟡</span>
+                        <span className="text-sm text-gray-700 flex-1" style={{ fontFamily:FONT }}>
+                          <strong>{teamStats.collaborateurs}</strong> Collaborateur{teamStats.collaborateurs > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 px-5 py-3">
+                        <span>⚪</span>
+                        <span className="text-sm text-gray-700 flex-1" style={{ fontFamily:FONT }}>
+                          <strong>{teamStats.utilisateurs}</strong> Utilisateur{teamStats.utilisateurs > 1 ? 's' : ''} inscrit{teamStats.utilisateurs > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="px-5 py-3">
+                        <a href="/dashboard/users"
+                          className="text-xs font-semibold hover:underline" style={{ color:BLUE, fontFamily:FONT }}>
+                          Gérer l'équipe →
                         </a>
                       </div>
                     </div>

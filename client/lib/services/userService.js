@@ -42,6 +42,29 @@ export const updateMe = async (data) => {
 };
 
 /**
+ * 🔹 Changer le rôle d'un utilisateur (Admin uniquement)
+ */
+export const updateUserRole = async (userId, role) => {
+  const response = await api.patch(`/users/${userId}/role`, { role });
+  return response.data?.data?.user;
+};
+
+/**
+ * 🔹 Créer un utilisateur depuis l'admin (Admin/Collaborateur uniquement)
+ */
+export const createUserByAdmin = async (data) => {
+  const response = await api.post('/users/create-by-admin', data);
+  return response.data?.data?.user;
+};
+
+/**
+ * 🔹 Supprimer un utilisateur (Admin uniquement)
+ */
+export const deleteAdminUser = async (userId) => {
+  await api.delete(`/users/${userId}`);
+};
+
+/**
  * 🔹 Met à jour le mot de passe de l'utilisateur connecté
  */
 export const updateMyPassword = async (data) => {

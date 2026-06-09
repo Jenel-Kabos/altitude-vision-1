@@ -39,10 +39,14 @@ router.use(authController.restrictTo('Admin'));
 router.get('/',        userController.getAllUsers);
 router.get('/owners',  userController.getAllOwners);
 
+// ✅ Création d'utilisateur par admin
+router.post('/create-by-admin', userController.createByAdmin);
+
 // ✅ Gestion admin + suspension / vérification KYC
 router.patch('/:id/verify',   userController.verifyOwner);
 router.patch('/:id/suspend',  userController.suspendUser);
 router.patch('/:id/activate', userController.activateUser);
+router.patch('/:id/role',     userController.updateUserRole);
 
 router
   .route('/:id')

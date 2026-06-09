@@ -102,6 +102,15 @@ const userSchema = new mongoose.Schema(
         passwordChangedAt:  Date,
         passwordResetToken: String,
         passwordResetExpires: Date,
+
+        // 🔹 Historique des changements de rôle
+        historiqueRoles: [{
+            ancienRole:  { type: String },
+            nouveauRole: { type: String },
+            changedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            date:        { type: Date, default: Date.now },
+            note:        { type: String },
+        }],
     },
     { timestamps: true }
 );
