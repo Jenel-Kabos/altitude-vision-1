@@ -425,7 +425,7 @@ const EventModal = ({ mode, event, onClose, onSubmit }) => {
   const isFirstStep = activeTab === 'basic';
   const isLastStep  = activeTab === 'media';
 
-  const inputCls = "w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm hover:border-gray-300";
+  const inputCls = "w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm text-gray-900 hover:border-gray-300";
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto animate-fadeIn">

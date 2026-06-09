@@ -219,7 +219,7 @@ const ContactPage = () => {
                 <input type="text" name="name" value={formData.name} onChange={handleChange}
                   placeholder="Jean Dupont"
                   onFocus={() => setFocused('name')} onBlur={() => setFocused(null)}
-                  className="w-full px-4 py-3 text-sm outline-none"
+                  className="w-full px-4 py-3 text-sm text-gray-900 outline-none"
                   style={inputStyle('name')} />
               </Field>
 
@@ -227,7 +227,7 @@ const ContactPage = () => {
                 <input type="email" name="email" value={formData.email} onChange={handleChange}
                   placeholder="jean@email.com"
                   onFocus={() => setFocused('email')} onBlur={() => setFocused(null)}
-                  className="w-full px-4 py-3 text-sm outline-none"
+                  className="w-full px-4 py-3 text-sm text-gray-900 outline-none"
                   style={inputStyle('email')} />
               </Field>
             </div>
@@ -236,7 +236,7 @@ const ContactPage = () => {
               <input type="text" name="subject" value={formData.subject} onChange={handleChange}
                 placeholder="Ex : Demande de devis pour un événement"
                 onFocus={() => setFocused('subject')} onBlur={() => setFocused(null)}
-                className="w-full px-4 py-3 text-sm outline-none"
+                className="w-full px-4 py-3 text-sm text-gray-900 outline-none"
                 style={inputStyle('subject')} />
             </Field>
 
@@ -245,7 +245,7 @@ const ContactPage = () => {
                 placeholder="Décrivez votre projet ou votre demande en détail…"
                 rows={6}
                 onFocus={() => setFocused('message')} onBlur={() => setFocused(null)}
-                className="w-full px-4 py-3 text-sm outline-none"
+                className="w-full px-4 py-3 text-sm text-gray-900 outline-none"
                 style={inputStyle('message')} />
             </Field>
 

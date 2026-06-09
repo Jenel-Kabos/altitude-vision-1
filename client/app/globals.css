@@ -157,3 +157,45 @@ img { max-width: 100%; display: block; }
    ================================================================ */
 
 .leaflet-container { height: 300px; width: 100%; }
+
+/* ================================================================
+   FORMULAIRES — LISIBILITÉ SUR FONDS CLAIRS
+   Le body utilise color: var(--text) (#E8E4DC) pour le thème sombre
+   du site public. Sur les pages dashboard et modals à fond blanc/gris,
+   ce texte clair devient quasi-invisible dans les champs de saisie.
+   Ces règles forcent un texte sombre pour tous les inputs, en
+   restaurant ensuite la couleur correcte pour les inputs dark-theme
+   (.input-style) grâce à la spécificité de sélecteur de classe.
+   ================================================================ */
+
+input,
+textarea,
+select {
+  color: #1a1a1a !important;
+}
+
+/* Restaurer la couleur claire pour les champs sur fond sombre */
+.input-style {
+  color: var(--text) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important;
+  opacity: 1;
+}
+
+.input-style::placeholder {
+  color: var(--faint) !important;
+}
+
+option {
+  color: #1a1a1a !important;
+  background-color: #ffffff;
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  color: #6b7280 !important;
+}

@@ -326,7 +326,7 @@ const EmailModal = ({ mode, email, onClose, onSubmit, showPassword, setShowPassw
     setIsSubmitting(false);
   };
 
-  const inputCls = "w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500";
+  const inputCls = "w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">

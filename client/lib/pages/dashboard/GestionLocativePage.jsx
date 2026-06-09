@@ -168,7 +168,7 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
-const inputCls = "w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent bg-gray-50 disabled:opacity-40";
+const inputCls = "w-full px-3 py-2 text-sm text-gray-900 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent bg-gray-50 disabled:opacity-40";
 const Input    = (props) => <input  {...props} className={`${inputCls} ${props.className||''}`} style={{fontFamily:FONT,...props.style}}/>;
 const Select   = (props) => <select {...props} className={`${inputCls} ${props.className||''}`} style={{fontFamily:FONT,...props.style}}/>;
 const Textarea = (props) => <textarea {...props} rows={3} className={`${inputCls} resize-none ${props.className||''}`} style={{fontFamily:FONT,...props.style}}/>;
