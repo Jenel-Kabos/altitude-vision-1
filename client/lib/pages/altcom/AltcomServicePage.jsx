@@ -98,7 +98,7 @@ const AltcomServicePage = () => {
             </AnimatePresence>
 
             {/* ══ HERO ══════════════════════════════════════ */}
-            <header className="relative overflow-hidden"
+            <header className="relative overflow-x-hidden"
                 style={{ background: 'linear-gradient(135deg,#0D1117 0%,#0e1e30 60%,#0D1117 100%)' }}>
 
                 {/* Image hero en arrière-plan avec overlay */}
@@ -120,7 +120,7 @@ const AltcomServicePage = () => {
                 <div className="absolute top-0 left-0 right-0 h-px"
                     style={{ background: `linear-gradient(to right,transparent,${service.color}60,transparent)` }} />
 
-                <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10 py-24 sm:py-32">
+                <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10 pt-24 pb-28 sm:pt-32 sm:pb-36">
                     {/* Breadcrumb */}
                     <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
                         className="flex items-center gap-2 text-sm mb-10" style={{ color: 'rgba(232,228,220,0.4)' }}>
@@ -254,7 +254,7 @@ const AltcomServicePage = () => {
             </section>
 
             {/* ══ NOTRE PROCESSUS ═══════════════════════════ */}
-            <section className="py-16 sm:py-20 overflow-hidden"
+            <section className="relative py-16 sm:py-20 overflow-x-hidden"
                 style={{ background: 'linear-gradient(135deg,#0D1117 0%,#0e1e30 60%,#0D1117 100%)' }}>
                 <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute top-1/3 right-0 w-64 h-64 rounded-full blur-[100px] opacity-8"
