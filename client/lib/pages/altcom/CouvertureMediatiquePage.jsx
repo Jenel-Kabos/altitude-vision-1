@@ -244,7 +244,7 @@ const CouvertureMediatiquePage = () => {
                         transition={{ delay: 0.1, duration: 0.7 }}
                         className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight"
                     >
-                        Couverture Médiatique Professionnelle
+                        Couverture Médiatique à Brazzaville
                     </motion.h1>
 
                     <motion.p
@@ -253,7 +253,7 @@ const CouvertureMediatiquePage = () => {
                         transition={{ delay: 0.3, duration: 0.7 }}
                         className="text-lg sm:text-xl font-light max-w-3xl text-white/90 leading-relaxed"
                     >
-                        Organisation et couverture complète de vos événements avec reportage photo/vidéo professionnel, live streaming et diffusion multicanal. Immortalisez vos moments importants avec une qualité exceptionnelle.
+                        Altcom, votre agence de couverture médiatique à Brazzaville et dans tout le Congo : organisation complète, reportage photo/vidéo professionnel, live streaming et diffusion multicanal pour immortaliser vos événements avec une qualité exceptionnelle.
                     </motion.p>
                 </div>
             </section>

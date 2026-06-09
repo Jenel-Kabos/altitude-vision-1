@@ -146,7 +146,7 @@ const AltcomServicePage = () => {
                                 transition={{ delay: 0.1, duration: 0.6 }}
                                 className="text-white mb-4"
                                 style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 'clamp(2.4rem,5vw,4.2rem)', fontWeight: 700, lineHeight: 1.1 }}>
-                                {service.title}
+                                {service.h1 || service.title}
                             </motion.h1>
 
                             <div className="h-0.5 w-14 rounded-full mb-5"
