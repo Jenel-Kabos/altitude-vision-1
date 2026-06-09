@@ -7,6 +7,7 @@ import {
   Loader2, AlertCircle, Search, Filter, X, ShieldCheck,
 } from 'lucide-react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const BLUE = '#2E7BB5';
 const GOLD = '#C8872A';
@@ -95,6 +96,7 @@ const FILTERS = [
 // MAIN
 // ─────────────────────────────────────────────────────────────
 const AdminPropertyList = () => {
+  const { canEdit, canDelete, canValidate } = useAuth();
   const [properties, setProperties]   = useState([]);
   const [filtered, setFiltered]       = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -369,7 +371,7 @@ const AdminPropertyList = () => {
               {/* Actions */}
               <div className="col-span-2 flex items-center justify-end gap-2">
                 {/* Approuver (si en attente) */}
-                {!property.isApproved && (
+                {canValidate && !property.isApproved && (
                   <button
                     onClick={() => setConfirm({ type: 'approve', id: property._id })}
                     className="p-2 rounded-xl transition-all hover:scale-105"
@@ -379,21 +381,25 @@ const AdminPropertyList = () => {
                   </button>
                 )}
                 {/* Modifier */}
-                <Link
-                  href={`/propriete/${property._id}/edit`}
-                  className="p-2 rounded-xl transition-all hover:scale-105"
-                  style={{ background: `${BLUE}12`, color: BLUE }}
-                  title="Modifier">
-                  <Edit2 size={14} />
-                </Link>
+                {canEdit && (
+                  <Link
+                    href={`/propriete/${property._id}/edit`}
+                    className="p-2 rounded-xl transition-all hover:scale-105"
+                    style={{ background: `${BLUE}12`, color: BLUE }}
+                    title="Modifier">
+                    <Edit2 size={14} />
+                  </Link>
+                )}
                 {/* Supprimer */}
-                <button
-                  onClick={() => setConfirm({ type: 'delete', id: property._id })}
-                  className="p-2 rounded-xl transition-all hover:scale-105"
-                  style={{ background: '#FEE2E2', color: '#DC2626' }}
-                  title="Supprimer">
-                  <Trash2 size={14} />
-                </button>
+                {canDelete && (
+                  <button
+                    onClick={() => setConfirm({ type: 'delete', id: property._id })}
+                    className="p-2 rounded-xl transition-all hover:scale-105"
+                    style={{ background: '#FEE2E2', color: '#DC2626' }}
+                    title="Supprimer">
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
             </div>
           ))}

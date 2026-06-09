@@ -164,6 +164,13 @@ const DashboardHome = () => {
   })();
 
   return (
+    <>
+      {user?.role === 'Collaborateur' && (
+        <div className="flex items-center gap-3 px-6 py-2.5 text-sm" style={{ background:'#EFF6FF', borderBottom:'1px solid #BFDBFE', fontFamily:FONT }}>
+          <span>👤</span>
+          <p className="text-blue-700">Vous êtes connecté en tant que <strong>Collaborateur</strong> — Vous pouvez ajouter du contenu mais pas le modifier ou le supprimer.</p>
+        </div>
+      )}
     <div className="flex h-[calc(100vh-64px)] md:h-screen overflow-hidden" style={{ background:'#F8FAFC' }}>
 
       {/* ── Menu latéral ──────────────────────────────────── */}
@@ -577,6 +584,7 @@ const DashboardHome = () => {
         </div>
       </main>
     </div>
+    </>
   );
 };
 

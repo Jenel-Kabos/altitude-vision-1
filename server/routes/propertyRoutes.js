@@ -66,8 +66,8 @@ router.get(
 router.post(
     '/', 
     authController.protect, 
-    authController.restrictTo('Admin', 'Proprietaire'), 
-    upload.array('images', 10), 
+    authController.restrictTo('Admin', 'Proprietaire', 'Collaborateur'),
+    upload.array('images', 10),
     propertyController.createProperty
 );
 

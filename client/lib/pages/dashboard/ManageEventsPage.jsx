@@ -8,12 +8,14 @@ import {
   Image as ImageIcon, Upload, Video, Users, Target, Lightbulb, Settings, TrendingUp, Film
 } from 'lucide-react';
 import { getAllEvents, getEventById, uploadEventImages, uploadEventVideos } from '../../services/eventService';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import Image from 'next/image';
 
 const EVENTS_PER_PAGE = 8;
 
 const ManageEventsPage = () => {
+  const { canEdit, canDelete } = useAuth();
   const [events, setEvents]             = useState([]);
   const [filteredEvents, setFiltered]   = useState([]);
   const [loading, setLoading]           = useState(true);
@@ -169,16 +171,20 @@ const ManageEventsPage = () => {
             <div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-red-500" /><span className="line-clamp-1">{event.location}</span></div>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => handleEdit(event._id)}
-              className="flex-1 p-2.5 text-indigo-600 hover:text-white bg-indigo-50 hover:bg-gradient-to-r hover:from-indigo-600 hover:to-purple-600 rounded-xl transition-all duration-200 hover:scale-110 hover:shadow-lg flex items-center justify-center"
-              title="Modifier">
-              <Edit className="w-5 h-5" />
-            </button>
-            <button onClick={() => handleDelete(event._id)}
-              className="flex-1 p-2.5 text-red-600 hover:text-white bg-red-50 hover:bg-gradient-to-r hover:from-red-600 hover:to-pink-600 rounded-xl transition-all duration-200 hover:scale-110 hover:shadow-lg flex items-center justify-center"
-              title="Supprimer">
-              <Trash2 className="w-5 h-5" />
-            </button>
+            {canEdit && (
+              <button onClick={() => handleEdit(event._id)}
+                className="flex-1 p-2.5 text-indigo-600 hover:text-white bg-indigo-50 hover:bg-gradient-to-r hover:from-indigo-600 hover:to-purple-600 rounded-xl transition-all duration-200 hover:scale-110 hover:shadow-lg flex items-center justify-center"
+                title="Modifier">
+                <Edit className="w-5 h-5" />
+              </button>
+            )}
+            {canDelete && (
+              <button onClick={() => handleDelete(event._id)}
+                className="flex-1 p-2.5 text-red-600 hover:text-white bg-red-50 hover:bg-gradient-to-r hover:from-red-600 hover:to-pink-600 rounded-xl transition-all duration-200 hover:scale-110 hover:shadow-lg flex items-center justify-center"
+                title="Supprimer">
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
       </div>

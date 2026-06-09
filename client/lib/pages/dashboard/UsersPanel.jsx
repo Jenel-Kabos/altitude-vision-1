@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, ShieldCheck, ShieldOff, UserX, RefreshCw,
@@ -121,6 +123,15 @@ const ACTION_META = {
 
 // ─── MAIN ────────────────────────────────────────────────────
 const UsersPanel = () => {
+  const { isAdmin } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isAdmin === false) {
+      setTimeout(() => router.push('/dashboard'), 1500);
+    }
+  }, [isAdmin, router]);
+
   const [users, setUsers]           = useState([]);
   const [filtered, setFiltered]     = useState([]);
   const [loading, setLoading]       = useState(true);

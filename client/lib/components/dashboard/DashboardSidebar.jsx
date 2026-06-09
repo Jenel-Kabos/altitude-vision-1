@@ -4,18 +4,19 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { 
-  Home, 
-  Building2, 
-  Calendar, 
+import {
+  Home,
+  Building2,
+  Calendar,
   Briefcase,
   FileText,
-  Users, 
-  Shield, 
+  Users,
+  Shield,
   LogOut,
   Mail,
   MessageSquare,
-  Monitor
+  Monitor,
+  Key,
 } from "lucide-react";
 import { useAuth } from '../../context/AuthContext';
 
@@ -106,13 +107,15 @@ const DashboardSidebar = () => {
             Communication
           </p>
           
-          <Link
-            href="/dashboard/emails"
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition font-medium ${activeClass('/dashboard/emails')}`}
-          >
-            <Mail className="w-5 h-5" />
-            <span>Emails Pro</span>
-          </Link>
+          {user?.role === 'Admin' && (
+            <Link
+              href="/dashboard/emails"
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition font-medium ${activeClass('/dashboard/emails')}`}
+            >
+              <Mail className="w-5 h-5" />
+              <span>Emails Pro</span>
+            </Link>
+          )}
 
           <Link
             href="/dashboard/messages"
@@ -124,12 +127,12 @@ const DashboardSidebar = () => {
         </div>
 
         {/* Section Administration */}
-        {(user?.role === "Admin" || user?.role === "Administrateur") && (
+        {user?.role === 'Admin' && (
           <div className="pt-4 mt-4 border-t border-blue-700">
             <p className="text-xs font-semibold text-blue-300 uppercase tracking-wider px-4 mb-2">
               Administration
             </p>
-            
+
             <Link
               href="/dashboard/moderation"
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition font-medium ${activeClass('/dashboard/moderation')}`}
@@ -152,6 +155,14 @@ const DashboardSidebar = () => {
             >
               <Monitor className="w-5 h-5" />
               <span>Sessions Actives</span>
+            </Link>
+
+            <Link
+              href="/dashboard/gestion-locative"
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition font-medium ${activeClass('/dashboard/gestion-locative')}`}
+            >
+              <Key className="w-5 h-5" />
+              <span>Gestion Locative</span>
             </Link>
           </div>
         )}

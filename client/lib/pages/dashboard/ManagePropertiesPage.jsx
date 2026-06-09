@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { getAllProperties, deleteProperty, updateProperty, addProperty } from "../../services/propertyService";
+import { useAuth } from '../../context/AuthContext';
 import {
   PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle,
   ArrowLeft, ArrowRight, Building2, MapPin, Maximize2, Bed, Bath, Sparkles, Send
@@ -13,6 +14,7 @@ import Image from 'next/image';
 const PROPERTIES_PER_PAGE = 8;
 
 const ManagePropertiesPage = () => {
+  const { canEdit, canDelete } = useAuth();
   const [properties, setProperties]         = useState([]);
   const [filteredProperties, setFiltered]   = useState([]);
   const [loading, setLoading]               = useState(false);
@@ -235,14 +237,18 @@ const ManagePropertiesPage = () => {
             </div>
           )}
           <div className="flex gap-2">
-            <button onClick={() => handleEdit(property)}
-              className="flex-1 p-2.5 text-blue-600 hover:text-white bg-blue-50 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center" title="Modifier">
-              <Edit className="w-5 h-5" />
-            </button>
-            <button onClick={() => handleDelete(property._id)}
-              className="flex-1 p-2.5 text-red-600 hover:text-white bg-red-50 hover:bg-gradient-to-r hover:from-red-600 hover:to-pink-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center" title="Supprimer">
-              <Trash2 className="w-5 h-5" />
-            </button>
+            {canEdit && (
+              <button onClick={() => handleEdit(property)}
+                className="flex-1 p-2.5 text-blue-600 hover:text-white bg-blue-50 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center" title="Modifier">
+                <Edit className="w-5 h-5" />
+              </button>
+            )}
+            {canDelete && (
+              <button onClick={() => handleDelete(property._id)}
+                className="flex-1 p-2.5 text-red-600 hover:text-white bg-red-50 hover:bg-gradient-to-r hover:from-red-600 hover:to-pink-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center" title="Supprimer">
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
       </div>

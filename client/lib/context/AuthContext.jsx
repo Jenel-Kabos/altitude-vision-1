@@ -10,6 +10,12 @@ const DEFAULT_AUTH = {
     login: () => {},
     logout: () => {},
     updateUser: () => {},
+    isAdmin:         false,
+    isCollaborateur: false,
+    canAdd:          false,
+    canEdit:         false,
+    canDelete:       false,
+    canValidate:     false,
 };
 
 const AuthContext = createContext(undefined);
@@ -111,6 +117,12 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         updateUser,
+        isAdmin:         user?.role === 'Admin',
+        isCollaborateur: user?.role === 'Collaborateur',
+        canAdd:          ['Admin', 'Collaborateur'].includes(user?.role),
+        canEdit:         user?.role === 'Admin',
+        canDelete:       user?.role === 'Admin',
+        canValidate:     user?.role === 'Admin',
     }), [user, loading, isInitialized, login, logout, updateUser]);
 
     return (
