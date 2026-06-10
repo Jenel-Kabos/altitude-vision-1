@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   Home, Calendar, Briefcase, LogOut, BarChart3, Globe, Users,
   CheckCircle2, ShieldCheck, Mail, Menu, X, Star, Mountain, Building,
+  ClipboardList, BarChart2,
 } from "lucide-react";
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -37,8 +38,10 @@ const NAV_SECTIONS = [
   {
     label: 'Administration',
     links: [
-      { to: '/dashboard/users',           end: false, Icon: Users,      label: 'Utilisateurs',      accent: '#0D9488' },
-      { to: '/dashboard/active-sessions', end: false, Icon: ShieldCheck, label: 'Sessions Actives', accent: '#DC2626' },
+      { to: '/dashboard/users',            end: false, Icon: Users,         label: 'Utilisateurs',      accent: '#0D9488' },
+      { to: '/dashboard/active-sessions',  end: false, Icon: ShieldCheck,   label: 'Sessions Actives',  accent: '#DC2626' },
+      { to: '/dashboard/historique',       end: false, Icon: ClipboardList, label: 'Historique',        accent: '#7C3AED' },
+      { to: '/dashboard/export-marketing', end: false, Icon: BarChart2,     label: 'Export Marketing',  accent: GOLD },
     ],
   },
   {
