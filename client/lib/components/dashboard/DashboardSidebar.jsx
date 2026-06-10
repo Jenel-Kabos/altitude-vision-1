@@ -18,6 +18,7 @@ import {
   Monitor,
   Key,
   ClipboardList,
+  BarChart2,
 } from "lucide-react";
 import { useAuth } from '../../context/AuthContext';
 
@@ -172,6 +173,14 @@ const DashboardSidebar = () => {
             >
               <ClipboardList className="w-5 h-5" />
               <span>Historique</span>
+            </Link>
+
+            <Link
+              href="/dashboard/export-marketing"
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition font-medium ${activeClass('/dashboard/export-marketing')}`}
+            >
+              <BarChart2 className="w-5 h-5" />
+              <span>Export Marketing</span>
             </Link>
           </div>
         )}

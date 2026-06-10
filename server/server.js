@@ -337,6 +337,9 @@ app.use('/api/facebook-posts', require('./routes/facebookPostsRoutes'));
 // 📋 Journal d'audit
 app.use('/api/action-logs', require('./routes/actionLogRoutes'));
 
+// 📊 Export Marketing
+app.use('/api/export', require('./routes/exportRoutes'));
+
 // ============================================================
 // 🔍 ROUTES DE TEST
 // ============================================================
