@@ -104,15 +104,95 @@ exports.signup = async (req, res) => {
 
         const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
 
-        // Email de confirmation contrat pour Propriétaire (fire & forget)
+        // PDF + email contrat pour Propriétaire (fire & forget)
         if (role === 'Proprietaire' && contratAccepte) {
+            const userId   = newUser._id;
+            const userName = newUser.name;
+            const userEmail = newUser.email;
+            const ref = `CONTRAT-${String(userId).slice(-8).toUpperCase()}-v1.0`;
             const dateStr = now.toLocaleDateString('fr-FR');
             const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-            sendEmail({
-                email:   newUser.email,
-                subject: '✅ Votre inscription est confirmée — Altitude Vision',
-                message: `Bonjour ${newUser.name},\n\nVotre inscription en tant que Propriétaire / Apporteur d'affaires sur Altitude Vision est confirmée.\n\nVotre contrat d'hébergement a été accepté le ${dateStr} à ${timeStr}.\nRéférence : CONTRAT-${newUser._id}-v1.0\n\nCONDITIONS DE RÉMUNÉRATION :\nPour chaque location conclue via notre plateforme :\n• Commission locataire (80% du loyer) versée à Altitude Vision\n• Votre part : 30% de cette commission\n\nExemple :\nLoyer 150 000 FCFA\n→ Votre gain : 36 000 FCFA\n\nVous pouvez maintenant publier vos biens sur altitudevision.agency/altimmo\n\nCordialement,\nAltitude Vision — Altimmo\ncontact@altitudevision.agency\n+242 06 800 21 51`,
-            }).catch(() => {});
+
+            (async () => {
+                try {
+                    const { generateContratHebergement } = require('../services/pdfService');
+                    const { sendEmailWithAttachment }    = require('../services/emailService');
+
+                    const pdfBuffer = await generateContratHebergement(newUser);
+
+                    // Upload vers Cloudinary
+                    const uploadResult = await uploadToCloudinary(pdfBuffer, {
+                        folder:        `altitude-vision/contrats/proprietaires/${userId}`,
+                        resource_type: 'raw',
+                        public_id:     `contrat-hebergement-${userId}`,
+                        format:        'pdf',
+                    });
+                    await User.findByIdAndUpdate(userId, { contratPdfUrl: uploadResult.secure_url });
+
+                    const attachment = {
+                        filename:    `Contrat-Hebergement-${userName.replace(/\s+/g, '-')}.pdf`,
+                        content:     pdfBuffer,
+                        contentType: 'application/pdf',
+                    };
+
+                    const htmlProprio = `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:linear-gradient(135deg,#C8872A,#2E7BB5);padding:30px;border-radius:12px 12px 0 0;text-align:center;">
+    <h1 style="color:white;margin:0;font-size:24px;">Altitude Vision — Altimmo</h1>
+    <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Contrat d'hébergement de bien immobilier</p>
+  </div>
+  <div style="background:#fff;padding:30px;border:1px solid #e5e7eb;border-radius:0 0 12px 12px;">
+    <h2 style="color:#1f2937;">Bonjour ${userName} 🏠</h2>
+    <p style="color:#6b7280;line-height:1.6;">
+      Votre inscription en tant que <strong>Propriétaire / Apporteur d'affaires</strong> sur Altitude Vision est confirmée.
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:20px 0;">
+      <p style="margin:0 0 8px;color:#374151;font-weight:bold;">Détails de votre contrat :</p>
+      <p style="margin:4px 0;color:#6b7280;">Référence : <strong style="color:#1f2937;">${ref}</strong></p>
+      <p style="margin:4px 0;color:#6b7280;">Signé le : <strong style="color:#1f2937;">${dateStr} à ${timeStr}</strong></p>
+      <p style="margin:4px 0;color:#6b7280;">Version : <strong style="color:#1f2937;">v1.0</strong></p>
+    </div>
+    <p style="color:#6b7280;line-height:1.6;">Votre contrat d'hébergement est joint à cet email en pièce jointe PDF.</p>
+    <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="color:#92400e;margin:0;line-height:1.8;font-size:14px;">
+        <strong>Conditions de rémunération :</strong><br>
+        • Commission locataire (80 % du premier loyer) versée à Altitude Vision<br>
+        • Votre part : 30 % de cette commission (soit ~24 % du loyer)<br>
+        • Exemple : loyer 150 000 FCFA → Votre gain : <strong>36 000 FCFA</strong>
+      </p>
+    </div>
+    <p style="color:#6b7280;line-height:1.6;">
+      Vous pouvez maintenant publier vos biens sur
+      <a href="https://altitudevision.agency/altimmo" style="color:#2563eb;">altitudevision.agency/altimmo</a>
+    </p>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+    <p style="color:#9ca3af;font-size:12px;">Cordialement,<br><strong>Altitude Vision — Altimmo</strong><br>contact@altitudevision.agency — +242 06 800 21 51</p>
+  </div>
+</div>`;
+
+                    const htmlAdmin = `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:#1e293b;padding:20px;border-radius:12px 12px 0 0;">
+    <h2 style="color:white;margin:0;font-size:18px;">🏠 Nouveau propriétaire inscrit</h2>
+  </div>
+  <div style="background:#fff;padding:24px;border:1px solid #e5e7eb;border-radius:0 0 12px 12px;">
+    <p style="margin:4px 0;color:#374151;"><strong>Nom :</strong> ${userName}</p>
+    <p style="margin:4px 0;color:#374151;"><strong>Email :</strong> ${userEmail}</p>
+    <p style="margin:4px 0;color:#374151;"><strong>Référence contrat :</strong> ${ref}</p>
+    <p style="margin:4px 0;color:#374151;"><strong>Signé le :</strong> ${dateStr} à ${timeStr}</p>
+    <p style="margin:12px 0 4px;color:#6b7280;font-size:13px;">Le contrat signé est joint en pièce jointe.</p>
+  </div>
+</div>`;
+
+                    const adminEmail = process.env.ZOHO_FROM_EMAIL || 'contact@altitudevision.agency';
+                    await sendEmailWithAttachment(userEmail,   '✅ Votre contrat d\'hébergement — Altitude Vision', htmlProprio, [attachment]);
+                    await sendEmailWithAttachment(adminEmail,  `🏠 Nouveau propriétaire : ${userName}`,             htmlAdmin,   [attachment]);
+
+                    console.log(`✅ [Auth] Contrat PDF envoyé à ${userEmail}`);
+                } catch (pdfErr) {
+                    console.error('❌ [Auth] Erreur génération/envoi contrat PDF:', pdfErr.message);
+                }
+            })();
         }
 
         try {

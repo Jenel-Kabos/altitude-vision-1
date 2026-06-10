@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, ShieldCheck, RefreshCw, Loader2, AlertCircle,
   Search, Plus, Pencil, Trash2, X, Check, Copy, Eye, EyeOff,
-  ChevronDown, Clock,
+  ChevronDown, Clock, FileText, Send,
 } from 'lucide-react';
 import { getAllUsers, updateUserRole, createUserByAdmin, deleteAdminUser } from '../../services/userService';
 import axios from 'axios';
@@ -336,12 +336,31 @@ const CreateUserModal = ({ onConfirm, onCancel, loading }) => {
 };
 
 // ── User Detail Modal ─────────────────────────────────────────
-const UserDetailModal = ({ user: target, onClose }) => {
+const UserDetailModal = ({ user: target, onClose, showToast }) => {
   const historique = target.historiqueRoles || [];
+  const [renvoyerLoading, setRenvoyerLoading] = React.useState(false);
+
+  const handleRenvoyerContrat = async () => {
+    setRenvoyerLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_URL}/users/${target._id}/renvoyer-contrat`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      showToast?.('Contrat renvoyé par email avec succès.');
+    } catch (err) {
+      showToast?.(err.response?.data?.message || 'Erreur lors du renvoi', 'error');
+    } finally {
+      setRenvoyerLoading(false);
+    }
+  };
+
+  const isProprietaire = target.role === 'Proprietaire';
+
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <motion.div initial={{ opacity:0, scale:0.93 }} animate={{ opacity:1, scale:1 }}
-        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[80vh] flex flex-col">
+        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <Avatar name={target.name} />
@@ -360,42 +379,122 @@ const UserDetailModal = ({ user: target, onClose }) => {
           <StatusBadge status={target.status} />
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3"
-            style={{ fontFamily:FONT }}>
-            Historique des accès
-          </p>
-          {historique.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6" style={{ fontFamily:FONT }}>
-              Aucun historique disponible.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {[...historique].reverse().map((h, i) => (
-                <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background:`${BLUE}15` }}>
-                    <Clock size={12} style={{ color:BLUE }}/>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-800" style={{ fontFamily:FONT }}>
-                      {h.note || `Rôle changé : ${h.ancienRole} → ${h.nouveauRole}`}
-                    </p>
-                    {h.changedBy?.name && (
-                      <p className="text-xs text-gray-400" style={{ fontFamily:FONT }}>
-                        par {h.changedBy.name}
-                      </p>
-                    )}
-                    {h.date && (
-                      <p className="text-xs text-gray-400" style={{ fontFamily:FONT }}>
-                        {new Date(h.date).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' })}
-                      </p>
-                    )}
-                  </div>
+        <div className="flex-1 overflow-y-auto space-y-5">
+          {/* ── Contrat d'hébergement (Propriétaire seulement) ── */}
+          {isProprietaire && target.contratAccepte && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3"
+                style={{ fontFamily:FONT }}>
+                Contrat d'hébergement
+              </p>
+              <div className="rounded-xl border border-gray-100 p-4 space-y-2 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500" style={{ fontFamily:FONT }}>Référence</span>
+                  <span className="text-xs font-mono text-gray-800 text-right">
+                    CONTRAT-{String(target._id).slice(-8).toUpperCase()}-v1.0
+                  </span>
                 </div>
-              ))}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500" style={{ fontFamily:FONT }}>Version</span>
+                  <span className="text-xs font-semibold text-gray-800">{target.contratVersion || 'v1.0'}</span>
+                </div>
+                {target.contratAccepteLe && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500" style={{ fontFamily:FONT }}>Accepté le</span>
+                    <span className="text-xs font-semibold text-gray-800">
+                      {new Date(target.contratAccepteLe).toLocaleDateString('fr-FR')}
+                    </span>
+                  </div>
+                )}
+                {target.ipInscription && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500" style={{ fontFamily:FONT }}>IP d'inscription</span>
+                    <span className="text-xs font-mono text-gray-500">{target.ipInscription}</span>
+                  </div>
+                )}
+
+                {/* Certifications */}
+                {target.certifications && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-400 mb-1.5" style={{ fontFamily:FONT }}>Certifications :</p>
+                    {[
+                      ['Informations vraies',      target.certifications.informationsVraies],
+                      ['Propriétaire légal',        target.certifications.estProprietaireLegal],
+                      ["Engagement d'honnêteté",    target.certifications.engagementHonnetete],
+                      ['Commission acceptée',       target.certifications.commissionAcceptee],
+                    ].map(([label, val]) => (
+                      <div key={label} className="flex items-center gap-1.5 py-0.5">
+                        <span style={{ color: val ? GREEN : RED, fontSize: 11, fontWeight: 700 }}>
+                          {val ? '✓' : '✗'}
+                        </span>
+                        <span className="text-xs text-gray-600" style={{ fontFamily:FONT }}>{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2 border-t border-gray-100 flex-wrap">
+                  {target.contratPdfUrl && (
+                    <a href={target.contratPdfUrl} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition hover:opacity-80"
+                      style={{ background:`${BLUE}15`, color:BLUE, fontFamily:FONT }}>
+                      <FileText size={12} />
+                      Voir le PDF
+                    </a>
+                  )}
+                  <button onClick={handleRenvoyerContrat} disabled={renvoyerLoading}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition hover:opacity-80 disabled:opacity-50"
+                    style={{ background:`${GOLD}18`, color:GOLD, fontFamily:FONT }}>
+                    {renvoyerLoading
+                      ? <Loader2 size={12} className="animate-spin" />
+                      : <Send size={12} />
+                    }
+                    Renvoyer par email
+                  </button>
+                </div>
+              </div>
             </div>
           )}
+
+          {/* ── Historique des accès ── */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3"
+              style={{ fontFamily:FONT }}>
+              Historique des accès
+            </p>
+            {historique.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6" style={{ fontFamily:FONT }}>
+                Aucun historique disponible.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {[...historique].reverse().map((h, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background:`${BLUE}15` }}>
+                      <Clock size={12} style={{ color:BLUE }}/>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-800" style={{ fontFamily:FONT }}>
+                        {h.note || `Rôle changé : ${h.ancienRole} → ${h.nouveauRole}`}
+                      </p>
+                      {h.changedBy?.name && (
+                        <p className="text-xs text-gray-400" style={{ fontFamily:FONT }}>
+                          par {h.changedBy.name}
+                        </p>
+                      )}
+                      {h.date && (
+                        <p className="text-xs text-gray-400" style={{ fontFamily:FONT }}>
+                          {new Date(h.date).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
     </div>
@@ -714,12 +813,21 @@ const UsersPanel = () => {
 
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                        {/* Voir historique */}
+                        {/* Voir historique / contrat */}
                         <button onClick={() => setDetailUser(u)}
                           className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-all"
                           title="Voir l'historique">
                           <Clock size={14} />
                         </button>
+
+                        {/* PDF Contrat pour Proprietaire */}
+                        {u.role === 'Proprietaire' && u.contratPdfUrl && (
+                          <a href={u.contratPdfUrl} target="_blank" rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-600 transition-all"
+                            title="Voir le contrat PDF">
+                            <FileText size={14} />
+                          </a>
+                        )}
 
                         {/* Modifier rôle */}
                         {!isSelf && (
@@ -816,6 +924,7 @@ const UsersPanel = () => {
         <UserDetailModal
           user={detailUser}
           onClose={() => setDetailUser(null)}
+          showToast={showToast}
         />
       )}
     </div>

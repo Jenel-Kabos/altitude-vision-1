@@ -1,7 +1,7 @@
 // server/controllers/userController.js
 const User       = require('../models/User');
 const sendEmail  = require('../utils/email');
-const { destroyFromCloudinary } = require('../config/cloudinary');
+const { destroyFromCloudinary, uploadToCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 
 // ── Email de notification de changement de rôle ──────────────
@@ -340,6 +340,73 @@ exports.updateUserRole = async (req, res) => {
     } catch (error) {
         console.error('Erreur updateUserRole:', error);
         res.status(500).json({ status: 'error', message: "Erreur lors du changement de rôle." });
+    }
+};
+
+// ======================================================
+// 📄 ADMIN : Renvoyer le contrat d'hébergement par email
+// ======================================================
+exports.renvoyerContrat = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
+        if (user.role !== 'Proprietaire') {
+            return res.status(400).json({ status: 'fail', message: "Seuls les propriétaires ont un contrat d'hébergement." });
+        }
+
+        const { generateContratHebergement } = require('../services/pdfService');
+        const { sendEmailWithAttachment }    = require('../services/emailService');
+
+        const pdfBuffer = await generateContratHebergement(user);
+
+        const uploadResult = await uploadToCloudinary(pdfBuffer, {
+            folder:        `altitude-vision/contrats/proprietaires/${user._id}`,
+            resource_type: 'raw',
+            public_id:     `contrat-hebergement-${user._id}-${Date.now()}`,
+            format:        'pdf',
+        });
+        await User.findByIdAndUpdate(user._id, { contratPdfUrl: uploadResult.secure_url });
+
+        const ref      = `CONTRAT-${String(user._id).slice(-8).toUpperCase()}-v1.0`;
+        const dateStr  = user.contratAccepteLe
+            ? new Date(user.contratAccepteLe).toLocaleDateString('fr-FR')
+            : new Date().toLocaleDateString('fr-FR');
+
+        const attachment = {
+            filename:    `Contrat-Hebergement-${user.name.replace(/\s+/g, '-')}.pdf`,
+            content:     pdfBuffer,
+            contentType: 'application/pdf',
+        };
+
+        const html = `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:linear-gradient(135deg,#C8872A,#2E7BB5);padding:30px;border-radius:12px 12px 0 0;text-align:center;">
+    <h1 style="color:white;margin:0;font-size:24px;">Altitude Vision — Altimmo</h1>
+    <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Contrat d'hébergement de bien immobilier</p>
+  </div>
+  <div style="background:#fff;padding:30px;border:1px solid #e5e7eb;border-radius:0 0 12px 12px;">
+    <h2 style="color:#1f2937;">Bonjour ${user.name} 🏠</h2>
+    <p style="color:#6b7280;line-height:1.6;">Suite à votre demande, voici votre contrat d'hébergement en pièce jointe.</p>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:20px 0;">
+      <p style="margin:0 0 8px;color:#374151;font-weight:bold;">Détails :</p>
+      <p style="margin:4px 0;color:#6b7280;">Référence : <strong style="color:#1f2937;">${ref}</strong></p>
+      <p style="margin:4px 0;color:#6b7280;">Signé le : <strong style="color:#1f2937;">${dateStr}</strong></p>
+    </div>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+    <p style="color:#9ca3af;font-size:12px;">Cordialement,<br><strong>Altitude Vision — Altimmo</strong><br>contact@altitudevision.agency</p>
+  </div>
+</div>`;
+
+        await sendEmailWithAttachment(user.email, '📋 Votre contrat d\'hébergement — Altitude Vision', html, [attachment]);
+
+        res.status(200).json({
+            status:  'success',
+            message: 'Contrat renvoyé avec succès.',
+            contratPdfUrl: uploadResult.secure_url,
+        });
+    } catch (error) {
+        console.error('❌ renvoyerContrat error:', error);
+        res.status(500).json({ status: 'error', message: error.message });
     }
 };
 

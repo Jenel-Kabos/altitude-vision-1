@@ -359,6 +359,28 @@ const getEmailByAddress = async (emailAddress) => {
   }
 };
 
+// Envoyer un email avec pièce(s) jointe(s) via Zoho SMTP (nodemailer)
+const sendEmailWithAttachment = async (toEmail, subject, htmlBody, attachments = []) => {
+  const nodemailer = require('nodemailer');
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.zoho.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.ZOHO_FROM_EMAIL,
+      pass: process.env.ZOHO_IMAP_PASSWORD,
+    },
+  });
+  await transporter.sendMail({
+    from: `"Altitude Vision" <${process.env.ZOHO_FROM_EMAIL}>`,
+    to: toEmail,
+    subject,
+    html: htmlBody,
+    attachments,
+  });
+  console.log(`✅ [EmailService] Email avec pièce jointe envoyé à ${toEmail}`);
+};
+
 module.exports = {
   getAllEmails,
   createEmail,
@@ -370,5 +392,6 @@ module.exports = {
   sendEmailViaZoho,
   syncWithZoho,
   sendNotificationEmail,
-  getEmailByAddress
+  getEmailByAddress,
+  sendEmailWithAttachment,
 };

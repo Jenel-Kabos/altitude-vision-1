@@ -517,10 +517,147 @@ const generateEtatDesLieux = async ({ contrat, proprietaire, locataire }, etatDe
   return pdfToBuffer(doc);
 };
 
+// ═════════════════════════════════════════════════════════════
+// 6. CONTRAT D'HÉBERGEMENT PROPRIÉTAIRE
+// ═════════════════════════════════════════════════════════════
+const generateContratHebergement = async (user) => {
+  const doc = newDoc();
+  const now = user.contratAccepteLe ? new Date(user.contratAccepteLe) : new Date();
+  const ref = `CONTRAT-${String(user._id).slice(-8).toUpperCase()}-v1.0`;
+
+  addHeader(
+    doc,
+    "CONTRAT D'HÉBERGEMENT DE BIEN IMMOBILIER",
+    `Référence : ${ref} | Signé le ${fmtDate(now)}`,
+  );
+
+  sectionTitle(doc, 'ENTRE LES SOUSSIGNÉS');
+
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(DARK).text("ALTITUDE VISION (L'AGENCE) :");
+  doc.moveDown(0.2);
+  infoLine(doc, 'Dénomination', 'Altitude Vision — Altimmo');
+  infoLine(doc, 'Siège social',  'Rue Mfoa n°24, Poto-Poto, Brazzaville, Congo');
+  infoLine(doc, 'Contact',       'contact@altitudevision.agency | +242 06 800 21 51');
+  doc.moveDown(0.8);
+
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(DARK).text('LE PROPRIÉTAIRE (LE MANDANT) :');
+  doc.moveDown(0.2);
+  infoLine(doc, 'Nom complet', user.name  || '—');
+  infoLine(doc, 'Email',       user.email || '—');
+  infoLine(doc, 'Téléphone',   user.phone || '—');
+  infoLine(doc, 'ID de compte', String(user._id));
+  doc.moveDown(1);
+
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(DARK)
+    .text('IL A ÉTÉ CONVENU CE QUI SUIT :');
+  doc.moveDown(0.6);
+
+  articleTitle(doc, 'Article 1 — OBJET DU CONTRAT');
+  articleBody(doc,
+    "Le présent contrat a pour objet de définir les conditions dans lesquelles le Mandant confie à " +
+    "Altitude Vision le mandat de gérer la mise en location de son (ses) bien(s) immobilier(s) via la " +
+    "plateforme altitudevision.agency/altimmo.",
+  );
+
+  articleTitle(doc, 'Article 2 — DURÉE DU CONTRAT');
+  articleBody(doc,
+    "Le présent contrat prend effet à la date d'acceptation en ligne par le Mandant et est conclu pour " +
+    "une durée indéterminée. Il peut être résilié par chacune des parties avec un préavis de 30 jours " +
+    "adressé par email.",
+  );
+
+  articleTitle(doc, "Article 3 — OBLIGATIONS DE L'AGENCE");
+  articleBody(doc,
+    "Altitude Vision s'engage à :\n" +
+    "• Publier les annonces du Mandant sur la plateforme Altimmo\n" +
+    "• Assurer la mise en relation avec les locataires potentiels\n" +
+    "• Percevoir la commission locataire et reverser la part du Mandant\n" +
+    "• Assurer le suivi des dossiers de location",
+  );
+
+  articleTitle(doc, 'Article 4 — OBLIGATIONS DU MANDANT');
+  articleBody(doc,
+    "Le Mandant s'engage à :\n" +
+    "• Fournir des informations exactes et conformes à la réalité concernant son(ses) bien(s)\n" +
+    "• Être le propriétaire légal ou avoir mandat du propriétaire légal\n" +
+    "• Informer l'Agence de tout changement affectant la disponibilité du bien\n" +
+    "• Ne pas contourner l'Agence en concluant directement avec un locataire présenté",
+  );
+
+  articleTitle(doc, 'Article 5 — CONDITIONS DE RÉMUNÉRATION');
+  articleBody(doc,
+    "Pour chaque location conclue via la plateforme :\n" +
+    "• L'Agence perçoit une commission équivalente à 80 % du premier loyer mensuel\n" +
+    "• Le Mandant reçoit 30 % de cette commission, soit 24 % du premier loyer\n" +
+    "• Exemple : pour un loyer de 150 000 FCFA → part Mandant = 36 000 FCFA",
+  );
+
+  articleTitle(doc, 'Article 6 — CONFIDENTIALITÉ');
+  articleBody(doc,
+    "Les parties s'engagent à préserver la confidentialité des informations échangées dans le cadre du " +
+    "présent contrat. Les données personnelles sont traitées conformément à la réglementation en vigueur.",
+  );
+
+  articleTitle(doc, 'Article 7 — RÉSOLUTION DES LITIGES');
+  articleBody(doc,
+    "En cas de litige, les parties s'engagent à rechercher une solution amiable. À défaut d'accord " +
+    "dans un délai de 30 jours, le différend sera soumis au tribunal compétent de Brazzaville, " +
+    "République du Congo.",
+  );
+
+  articleTitle(doc, 'Article 8 — DISPOSITIONS GÉNÉRALES');
+  articleBody(doc,
+    "Le présent contrat est régi par le droit congolais. Toute modification doit faire l'objet d'un " +
+    "avenant écrit signé par les deux parties. La nullité d'une clause n'entraîne pas la nullité " +
+    "du contrat dans son ensemble.",
+  );
+
+  sectionTitle(doc, 'ACCEPTATION NUMÉRIQUE');
+
+  doc.font('Helvetica').fontSize(10).fillColor(DARK)
+    .text(
+      `Le Mandant a accepté les termes du présent contrat le ${fmtDate(now)} ` +
+      `à ${now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} (heure locale).`,
+      { lineGap: 3 },
+    );
+  doc.moveDown(0.5);
+
+  if (user.ipInscription) infoLine(doc, 'Adresse IP de signature', user.ipInscription);
+  infoLine(doc, 'Référence contrat', ref);
+  infoLine(doc, 'Version', user.contratVersion || 'v1.0');
+
+  const certifLabels = [
+    'Les informations fournies sont exactes et conformes',
+    'Je suis le propriétaire légal ou mandaté pour agir',
+    "Je m'engage à agir avec honnêteté",
+    'Les conditions de rémunération sont acceptées',
+    "Le contrat d'hébergement est accepté dans son intégralité",
+  ];
+  doc.moveDown(0.5);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(DARK).text('Certifications acceptées :');
+  doc.moveDown(0.3);
+  certifLabels.forEach(line => {
+    doc.font('Helvetica').fontSize(10).fillColor('#16A34A').text(`  ✓ ${line}`);
+  });
+
+  addSignatureBlock(doc, [
+    { label: 'Le Mandant (signature numérique)', nom: user.name || '—' },
+    { label: "L'Agence",                         nom: 'Altitude Vision — Altimmo' },
+  ]);
+
+  doc.moveDown(0.5);
+  doc.font('Helvetica').fontSize(10).fillColor(DARK)
+    .text(`Fait à Brazzaville, le ${fmtDate(new Date())}`, { align: 'center' });
+
+  addFooter(doc);
+  return pdfToBuffer(doc);
+};
+
 module.exports = {
   generateContratBail,
   generateQuittanceLoyer,
   generateMiseEnDemeure,
   generatePreavis,
   generateEtatDesLieux,
+  generateContratHebergement,
 };

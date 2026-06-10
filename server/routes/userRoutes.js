@@ -43,10 +43,11 @@ router.get('/owners',  userController.getAllOwners);
 router.post('/create-by-admin', userController.createByAdmin);
 
 // ✅ Gestion admin + suspension / vérification KYC
-router.patch('/:id/verify',   userController.verifyOwner);
-router.patch('/:id/suspend',  userController.suspendUser);
-router.patch('/:id/activate', userController.activateUser);
-router.patch('/:id/role',     userController.updateUserRole);
+router.patch('/:id/verify',             userController.verifyOwner);
+router.patch('/:id/suspend',            userController.suspendUser);
+router.patch('/:id/activate',           userController.activateUser);
+router.patch('/:id/role',               userController.updateUserRole);
+router.post( '/:id/renvoyer-contrat',   userController.renvoyerContrat);
 
 router
   .route('/:id')

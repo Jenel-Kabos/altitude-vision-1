@@ -115,6 +115,7 @@ const userSchema = new mongoose.Schema(
             dateCertification:    { type: Date },
         },
         ipInscription: { type: String },
+        contratPdfUrl: { type: String },
 
         // 🔹 Historique des changements de rôle
         historiqueRoles: [{
