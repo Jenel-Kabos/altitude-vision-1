@@ -71,7 +71,7 @@ const Toast = ({ msg, type, onDone }) => {
   return (
     <motion.div initial={{ opacity:0, y:-40 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-40 }}
       className="fixed top-5 right-5 z-[200] px-5 py-3.5 rounded-xl shadow-xl text-white text-sm font-medium"
-      style={{ background: type === 'success' ? GREEN : RED, fontFamily: FONT }}>
+      style={{ background: type === 'success' ? GREEN : type === 'warning' ? GOLD : RED, fontFamily: FONT }}>
       {msg}
     </motion.div>
   );
@@ -518,9 +518,13 @@ const UsersPanel = () => {
     if (!editRole) return;
     setActionLoading(true);
     try {
-      const updated = await updateUserRole(editRole._id, newRole);
+      const { user: updated, emailSent } = await updateUserRole(editRole._id, newRole);
       setUsers(prev => prev.map(u => u._id === editRole._id ? { ...u, ...updated } : u));
-      showToast(`Rôle changé en ${newRole}.`);
+      if (emailSent) {
+        showToast(`✅ Rôle mis à jour. Un email a été envoyé à ${editRole.email}.`);
+      } else {
+        showToast(`✅ Rôle mis à jour mais l'email de notification n'a pas pu être envoyé.`, 'warning');
+      }
       setEditRole(null);
     } catch (err) {
       showToast(err.response?.data?.message || 'Erreur', 'error');

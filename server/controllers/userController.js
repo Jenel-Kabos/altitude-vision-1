@@ -3,6 +3,66 @@ const User       = require('../models/User');
 const sendEmail  = require('../utils/email');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 
+// ── Email de notification de changement de rôle ──────────────
+const ROLE_LABELS = {
+    Admin: 'Administrateur', Collaborateur: 'Collaborateur',
+    User: 'Utilisateur', Client: 'Client',
+    Proprietaire: 'Propriétaire', Prestataire: 'Prestataire',
+};
+
+const getRoleChangeEmailHTML = (nomComplet, ancienLabel, nouveauLabel, adminName, normalized) => `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+  <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:30px;border-radius:12px 12px 0 0;text-align:center;">
+    <h1 style="color:white;margin:0;font-size:24px;">Altitude Vision</h1>
+    <p style="color:#bfdbfe;margin:8px 0 0;font-size:14px;">Dashboard — Mise à jour de votre rôle</p>
+  </div>
+  <div style="background:#fff;padding:30px;border:1px solid #e5e7eb;border-radius:0 0 12px 12px;">
+    <h2 style="color:#1f2937;">Bonjour ${nomComplet} 👋</h2>
+    <p style="color:#6b7280;line-height:1.6;">Votre rôle sur le dashboard Altitude Vision a été modifié.</p>
+    <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
+      <tr style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:10px 0;color:#6b7280;width:40%;">Ancien rôle :</td>
+        <td style="padding:10px 0;color:#374151;">${ancienLabel}</td>
+      </tr>
+      <tr style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:10px 0;color:#6b7280;">Nouveau rôle :</td>
+        <td style="padding:10px 0;"><strong style="color:#1f2937;">${nouveauLabel}</strong></td>
+      </tr>
+      <tr style="border-bottom:1px solid #f3f4f6;">
+        <td style="padding:10px 0;color:#6b7280;">Modifié par :</td>
+        <td style="padding:10px 0;color:#374151;">${adminName}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 0;color:#6b7280;">Date :</td>
+        <td style="padding:10px 0;color:#374151;">${new Date().toLocaleDateString('fr-FR')}</td>
+      </tr>
+    </table>
+    ${normalized === 'Collaborateur' ? `
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="color:#1d4ed8;margin:0;line-height:1.6;">
+        En tant que <strong>Collaborateur</strong>, vous pouvez désormais vous connecter au dashboard et ajouter du contenu.<br><br>
+        🔗 <a href="https://altitudevision.agency/dashboard" style="color:#2563eb;">altitudevision.agency/dashboard</a>
+      </p>
+    </div>` : ''}
+    ${normalized === 'Admin' ? `
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="color:#991b1b;margin:0;line-height:1.6;">
+        En tant qu'<strong>Administrateur</strong>, vous avez maintenant accès complet au dashboard.<br><br>
+        🔗 <a href="https://altitudevision.agency/dashboard" style="color:#2563eb;">altitudevision.agency/dashboard</a>
+      </p>
+    </div>` : ''}
+    <p style="color:#6b7280;font-size:13px;line-height:1.6;">
+      Si vous n'êtes pas à l'origine de cette demande, contactez immédiatement l'administrateur.
+    </p>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+    <p style="color:#9ca3af;font-size:12px;">
+      Cordialement,<br>
+      <strong>Altitude Vision</strong><br>
+      contact@altitudevision.agency — +242 06 800 21 51
+    </p>
+  </div>
+</div>`;
+
 // ── Email de bienvenue ────────────────────────────────────────
 const getWelcomeEmailHTML = (prenom, roleLabel, email, password) => `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
@@ -212,14 +272,33 @@ exports.updateUserRole = async (req, res) => {
         if (!user) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
 
         const ancienRole = user.role;
-        user.historiqueRoles.push({ ancienRole, nouveauRole: normalized, changedBy: req.user._id });
+        user.historiqueRoles.push({ ancienRole, nouveauRole: normalized, changedBy: req.user._id, date: new Date() });
         user.role = normalized;
         await user.save({ validateBeforeSave: false });
 
         console.log(`✅ Admin ${req.user.name} a changé le rôle de ${user.name} en ${normalized}`);
 
+        // Envoi de l'email de notification — non bloquant
+        let emailSent = false;
+        try {
+            await sendEmail({
+                to:      user.email,
+                subject: 'Votre rôle a été mis à jour — Altitude Vision Dashboard',
+                html:    getRoleChangeEmailHTML(
+                    user.name || user.email,
+                    ROLE_LABELS[ancienRole]  || ancienRole,
+                    ROLE_LABELS[normalized]  || normalized,
+                    req.user.name || 'Admin',
+                    normalized
+                ),
+            });
+            emailSent = true;
+        } catch (emailErr) {
+            console.error('❌ Email de notification de rôle non envoyé:', emailErr.message);
+        }
+
         const updated = await User.findById(user._id).select('-password').populate('historiqueRoles.changedBy', 'name');
-        res.status(200).json({ status: 'success', data: { user: updated } });
+        res.status(200).json({ status: 'success', emailSent, data: { user: updated } });
     } catch (error) {
         console.error('Erreur updateUserRole:', error);
         res.status(500).json({ status: 'error', message: "Erreur lors du changement de rôle." });

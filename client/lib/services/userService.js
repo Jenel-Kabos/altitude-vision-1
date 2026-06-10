@@ -46,7 +46,10 @@ export const updateMe = async (data) => {
  */
 export const updateUserRole = async (userId, role) => {
   const response = await api.patch(`/users/${userId}/role`, { role });
-  return response.data?.data?.user;
+  return {
+    user:      response.data?.data?.user,
+    emailSent: response.data?.emailSent ?? false,
+  };
 };
 
 /**
