@@ -591,32 +591,57 @@ const MessageDetail = ({ message, onToggleStar, onDelete, onRestore, uploadBaseU
 
           {message.attachments?.length > 0 && (
             <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                 <Paperclip className="w-5 h-5" />
-                Pièces jointes ({message.attachments.length})
+                📎 Pièces jointes ({message.attachments.length})
               </h3>
-              <div className="space-y-2">
-                {message.attachments.map((attachment, index) => (
-                  <a
-                    key={index}
-                    href={attachment.url || `${uploadBaseUrl}/${attachment.filepath}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download={attachment.filename}
-                    className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition border"
-                  >
-                    <div className="flex items-center min-w-0 gap-2">
-                      <Paperclip className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                      <span className="text-blue-600 hover:underline truncate font-medium">
-                        {attachment.filename}
-                      </span>
+              <div className="space-y-3">
+                {message.attachments.map((att, index) => {
+                  const fileUrl  = att.url || (att.filepath ? `${uploadBaseUrl}/${att.filepath}` : null);
+                  const isImage  = att.mimetype?.startsWith('image/');
+                  return (
+                    <div key={index}
+                      className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200 hover:bg-gray-100 transition">
+                      {/* Miniature ou icône */}
+                      {isImage && fileUrl ? (
+                        <img
+                          src={fileUrl}
+                          alt={att.filename}
+                          className="w-16 h-16 object-cover rounded-lg flex-shrink-0 cursor-pointer hover:opacity-80 transition"
+                          onClick={() => window.open(fileUrl, '_blank')}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-blue-100">
+                          <Paperclip className="w-6 h-6 text-blue-500" />
+                        </div>
+                      )}
+                      {/* Infos + boutons */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-800 truncate">{att.filename}</p>
+                        <p className="text-sm text-gray-500 mt-0.5">{formatFileSize(att.size)}</p>
+                        {fileUrl && (
+                          <div className="flex gap-2 mt-2">
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition"
+                            >
+                              <Eye className="w-3.5 h-3.5" /> Voir
+                            </a>
+                            <a
+                              href={fileUrl}
+                              download={att.filename}
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition"
+                            >
+                              <Download className="w-3.5 h-3.5" /> Télécharger
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-500 flex-shrink-0">
-                      <span>{formatFileSize(attachment.size)}</span>
-                      <Download className="w-4 h-4" />
-                    </div>
-                  </a>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

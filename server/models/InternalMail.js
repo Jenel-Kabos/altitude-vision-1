@@ -60,7 +60,8 @@ const internalMailSchema = new mongoose.Schema({
   attachments: [
     {
       filename: { type: String, required: true },
-      filepath: { type: String, required: true },
+      url:      { type: String, default: null }, // Cloudinary URL (emails IMAP entrants)
+      filepath: { type: String, default: null }, // Chemin local (messages internes)
       mimetype: { type: String },
       size:     { type: Number },
     },

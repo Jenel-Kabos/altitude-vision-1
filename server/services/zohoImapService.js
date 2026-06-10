@@ -3,10 +3,11 @@
 // 📬 Service IMAP — Récupère les emails entrants depuis Zoho
 // Utilise imapflow (moderne, sans vulnérabilités connues)
 // ============================================================
-const { ImapFlow }     = require('imapflow');
-const { simpleParser } = require('mailparser');
-const InternalMail = require('../models/InternalMail');
-const User         = require('../models/User');
+const { ImapFlow }          = require('imapflow');
+const { simpleParser }      = require('mailparser');
+const InternalMail          = require('../models/InternalMail');
+const User                  = require('../models/User');
+const { uploadToCloudinary } = require('../config/cloudinary');
 
 // ── Fonction principale ───────────────────────────────────────
 const pollZohoInbox = async () => {
@@ -78,6 +79,34 @@ const pollZohoInbox = async () => {
                         continue;
                     }
 
+                    // 5b. Uploader les pièces jointes vers Cloudinary
+                    const attachmentDocs = [];
+                    for (const att of (parsed.attachments || [])) {
+                        if (!att.content || !att.filename) continue;
+                        try {
+                            const safeId = `${Date.now()}-${att.filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                            const result = await uploadToCloudinary(att.content, {
+                                resource_type: 'auto',
+                                folder:        'altitude-vision/email-attachments',
+                                public_id:     safeId,
+                                // Désactiver les transformations image sur les fichiers bruts
+                                quality:      undefined,
+                                fetch_format: undefined,
+                                width:        undefined,
+                                crop:         undefined,
+                            });
+                            attachmentDocs.push({
+                                filename: att.filename,
+                                url:      result.secure_url,
+                                mimetype: att.contentType || 'application/octet-stream',
+                                size:     att.size || att.content.length || 0,
+                            });
+                            console.log(`  📎 [IMAP] PJ uploadée: ${att.filename}`);
+                        } catch (attErr) {
+                            console.error(`  ⚠️ [IMAP] PJ non uploadée "${att.filename}":`, attErr.message);
+                        }
+                    }
+
                     // 6. Trouver le destinataire interne
                     let recipientUser = await User.findOne({ email: toAddress });
                     if (!recipientUser) {
@@ -106,6 +135,7 @@ const pollZohoInbox = async () => {
                         isExternalMail: true,
                         zohoMessageId:  messageId,
                         messageType:    'Email Externe',
+                        attachments:    attachmentDocs,
                     });
 
                     // 8. Marquer comme lu dans Zoho
