@@ -1,5 +1,6 @@
 // Import du modèle Event (correspond au fichier Event.js)
 const Event = require('../models/Event');
+const { logAction, buildAuteur } = require('../services/actionLogService');
 
 /**
  * @desc    Créer un nouvel événement
@@ -10,6 +11,15 @@ exports.createEvent = async (req, res) => {
     res.status(201).json({
       status: 'success',
       data: { event: newEvent },
+    });
+    logAction({
+      action: 'Événement créé',
+      description: `Événement "${newEvent.title}" ajouté`,
+      module: 'MilaEvents',
+      typeAction: 'CRÉATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(newEvent._id), type: 'Event', nom: newEvent.title },
+      req,
     });
   } catch (error) {
     res.status(400).json({ status: 'fail', message: error.message });
@@ -101,6 +111,15 @@ exports.updateEvent = async (req, res) => {
       status: 'success',
       data: { event },
     });
+    logAction({
+      action: 'Événement modifié',
+      description: `Événement "${event.title}" mis à jour`,
+      module: 'MilaEvents',
+      typeAction: 'MODIFICATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(event._id), type: 'Event', nom: event.title },
+      req,
+    });
   } catch (error) {
     res.status(400).json({ status: 'fail', message: error.message });
   }
@@ -121,6 +140,15 @@ exports.deleteEvent = async (req, res) => {
     res.status(204).json({
       status: 'success',
       data: null,
+    });
+    logAction({
+      action: 'Événement supprimé',
+      description: `Événement "${event.title}" supprimé`,
+      module: 'MilaEvents',
+      typeAction: 'SUPPRESSION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(event._id), type: 'Event', nom: event.title },
+      req,
     });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });

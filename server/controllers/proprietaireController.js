@@ -1,5 +1,6 @@
 const Proprietaire = require('../models/Proprietaire');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
+const { logAction, buildAuteur } = require('../services/actionLogService');
 
 // ── Upload helpers ─────────────────────────────────────────────
 
@@ -80,6 +81,15 @@ exports.create = async (req, res) => {
     if (biens) data.biensPropres = biens;
     const p = await Proprietaire.create(data);
     res.status(201).json({ status: 'success', data: { proprietaire: p } });
+    logAction({
+      action: 'Propriétaire ajouté',
+      description: `Propriétaire ${p.prenom || ''} ${p.nom || ''} enregistré`,
+      module: 'GestionLocative',
+      typeAction: 'CRÉATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(p._id), type: 'Proprietaire', nom: `${p.prenom || ''} ${p.nom || ''}`.trim() },
+      req,
+    });
   } catch (err) {
     res.status(400).json({ status: 'error', message: err.message });
   }
@@ -101,6 +111,15 @@ exports.update = async (req, res) => {
     });
     if (!p) return res.status(404).json({ status: 'error', message: 'Propriétaire introuvable' });
     res.json({ status: 'success', data: { proprietaire: p } });
+    logAction({
+      action: 'Propriétaire modifié',
+      description: `Propriétaire ${p.prenom || ''} ${p.nom || ''} mis à jour`,
+      module: 'GestionLocative',
+      typeAction: 'MODIFICATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(p._id), type: 'Proprietaire', nom: `${p.prenom || ''} ${p.nom || ''}`.trim() },
+      req,
+    });
   } catch (err) {
     res.status(400).json({ status: 'error', message: err.message });
   }
@@ -111,6 +130,15 @@ exports.delete = async (req, res) => {
     const p = await Proprietaire.findByIdAndDelete(req.params.id);
     if (!p) return res.status(404).json({ status: 'error', message: 'Propriétaire introuvable' });
     res.json({ status: 'success', message: 'Propriétaire supprimé' });
+    logAction({
+      action: 'Propriétaire supprimé',
+      description: `Propriétaire ${p.prenom || ''} ${p.nom || ''} supprimé`,
+      module: 'GestionLocative',
+      typeAction: 'SUPPRESSION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(p._id), type: 'Proprietaire', nom: `${p.prenom || ''} ${p.nom || ''}`.trim() },
+      req,
+    });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }

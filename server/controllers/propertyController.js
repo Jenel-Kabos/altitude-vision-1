@@ -4,6 +4,7 @@ const Property = require('../models/Property');
 const User = require('../models/User');
 const APIFeatures = require('../utils/apiFeatures');
 const { uploadToCloudinary } = require('../config/cloudinary');
+const { logAction, buildAuteur } = require('../services/actionLogService');
 
 // ============================================================
 // 🛠️ UTILITAIRES
@@ -135,6 +136,16 @@ const createProperty = asyncHandler(async (req, res, next) => {
   res.status(201).json({
     status: 'success',
     data: { property: newProperty },
+  });
+
+  logAction({
+    action: 'Bien immobilier ajouté',
+    description: `"${newProperty.title}" (${newProperty.type || ''}) ajouté dans Altimmo`,
+    module: 'Altimmo',
+    typeAction: 'CRÉATION',
+    auteur: buildAuteur(req.user),
+    cible: { id: String(newProperty._id), type: 'Property', nom: newProperty.title },
+    req,
   });
 });
 
@@ -287,6 +298,16 @@ const updateProperty = asyncHandler(async (req, res) => {
     status: 'success',
     data: { property: updatedProperty },
   });
+
+  logAction({
+    action: 'Bien immobilier modifié',
+    description: `Bien "${updatedProperty?.title}" mis à jour`,
+    module: 'Altimmo',
+    typeAction: 'MODIFICATION',
+    auteur: buildAuteur(req.user),
+    cible: { id: String(req.params.id), type: 'Property', nom: updatedProperty?.title },
+    req,
+  });
 });
 
 /**
@@ -320,6 +341,16 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
     message: `Propriété ${newStatusAdmin.toLowerCase()}.`,
     data: { property: updatedProperty },
   });
+
+  logAction({
+    action: action === 'validate' ? 'Bien validé' : 'Bien rejeté',
+    description: `Bien "${updatedProperty.title}" ${newStatusAdmin.toLowerCase()} par l'admin`,
+    module: 'Altimmo',
+    typeAction: action === 'validate' ? 'VALIDATION' : 'REJET',
+    auteur: buildAuteur(req.user),
+    cible: { id: String(id), type: 'Property', nom: updatedProperty.title },
+    req,
+  });
 });
 
 /**
@@ -333,6 +364,16 @@ const deleteProperty = asyncHandler(async (req, res) => {
     throw new Error('Propriété non trouvée.');
   }
   res.status(204).json({ status: 'success', data: null });
+
+  logAction({
+    action: 'Bien immobilier supprimé',
+    description: `Bien "${property.title}" supprimé`,
+    module: 'Altimmo',
+    typeAction: 'SUPPRESSION',
+    auteur: buildAuteur(req.user),
+    cible: { id: String(property._id), type: 'Property', nom: property.title },
+    req,
+  });
 });
 
 /**
@@ -346,6 +387,16 @@ const adminDeleteProperty = asyncHandler(async (req, res) => {
     throw new Error('Propriété non trouvée.');
   }
   res.status(204).json({ status: 'success', data: null });
+
+  logAction({
+    action: 'Bien supprimé (admin)',
+    description: `Bien "${property.title}" supprimé par un administrateur`,
+    module: 'Altimmo',
+    typeAction: 'SUPPRESSION',
+    auteur: buildAuteur(req.user),
+    cible: { id: String(property._id), type: 'Property', nom: property.title },
+    req,
+  });
 });
 
 // ============================================================

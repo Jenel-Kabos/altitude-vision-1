@@ -334,6 +334,9 @@ app.use('/api/sync', require('./routes/sync'));
 // 📘 Facebook Posts
 app.use('/api/facebook-posts', require('./routes/facebookPostsRoutes'));
 
+// 📋 Journal d'audit
+app.use('/api/action-logs', require('./routes/actionLogRoutes'));
+
 // ============================================================
 // 🔍 ROUTES DE TEST
 // ============================================================

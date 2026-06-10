@@ -1,5 +1,6 @@
 const Contrat  = require('../models/Contrat');
 const Paiement = require('../models/Paiement');
+const { logAction, buildAuteur } = require('../services/actionLogService');
 
 // Génère les paiements mensuels pour un bail location
 const generatePaiements = async (contratId, dateEntree, dateFinBail, montantLoyer) => {
@@ -72,6 +73,15 @@ exports.create = async (req, res) => {
     ]);
 
     res.status(201).json({ status: 'success', data: { contrat: populated } });
+    logAction({
+      action: 'Contrat créé',
+      description: `Contrat de ${c.type || 'location'} créé`,
+      module: 'GestionLocative',
+      typeAction: 'CRÉATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(c._id), type: 'Contrat', nom: `Contrat ${c.type || ''} #${c._id}` },
+      req,
+    });
   } catch (err) {
     res.status(400).json({ status: 'error', message: err.message });
   }
@@ -88,6 +98,15 @@ exports.update = async (req, res) => {
 
     if (!c) return res.status(404).json({ status: 'error', message: 'Contrat introuvable' });
     res.json({ status: 'success', data: { contrat: c } });
+    logAction({
+      action: 'Contrat modifié',
+      description: `Contrat #${c._id} mis à jour`,
+      module: 'GestionLocative',
+      typeAction: 'MODIFICATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(c._id), type: 'Contrat', nom: `Contrat ${c.type || ''} #${c._id}` },
+      req,
+    });
   } catch (err) {
     res.status(400).json({ status: 'error', message: err.message });
   }
@@ -100,6 +119,15 @@ exports.delete = async (req, res) => {
     // Supprimer les paiements associés
     await Paiement.deleteMany({ contrat: req.params.id });
     res.json({ status: 'success', message: 'Contrat et paiements supprimés' });
+    logAction({
+      action: 'Contrat supprimé',
+      description: `Contrat #${c._id} et ses paiements supprimés`,
+      module: 'GestionLocative',
+      typeAction: 'SUPPRESSION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(c._id), type: 'Contrat', nom: `Contrat ${c.type || ''} #${c._id}` },
+      req,
+    });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }

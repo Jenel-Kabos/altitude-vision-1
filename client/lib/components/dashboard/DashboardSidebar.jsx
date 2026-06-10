@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Monitor,
   Key,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth } from '../../context/AuthContext';
 
@@ -163,6 +164,14 @@ const DashboardSidebar = () => {
             >
               <Key className="w-5 h-5" />
               <span>Gestion Locative</span>
+            </Link>
+
+            <Link
+              href="/dashboard/historique"
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition font-medium ${activeClass('/dashboard/historique')}`}
+            >
+              <ClipboardList className="w-5 h-5" />
+              <span>Historique</span>
             </Link>
           </div>
         )}

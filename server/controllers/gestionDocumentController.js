@@ -3,6 +3,7 @@ const Paiement = require('../models/Paiement');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const zohoMailService        = require('../services/zohoMailService');
 const pdfService             = require('../services/pdfService');
+const { logAction, buildAuteur } = require('../services/actionLogService');
 
 const MOIS_FR = [
   'janvier','février','mars','avril','mai','juin',
@@ -69,6 +70,15 @@ exports.generateBail = async (req, res) => {
     const saved   = await saveDocToContrat(c._id, 'Contrat de bail', url, 'bail');
 
     res.json({ status:'success', data:{ document: saved } });
+    logAction({
+      action: 'Contrat de bail généré',
+      description: `PDF bail généré pour contrat #${c._id}`,
+      module: 'GestionLocative',
+      typeAction: 'GÉNÉRATION_PDF',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(c._id), type: 'Contrat', nom: 'Contrat de bail' },
+      req,
+    });
   } catch (err) {
     console.error('❌ [PDF] generateBail:', err.message);
     res.status(500).json({ status:'error', message: err.message });
@@ -99,6 +109,15 @@ exports.generateQuittance = async (req, res) => {
     const saved     = await saveDocToContrat(c._id, nom, url, 'quittance');
 
     res.json({ status:'success', data:{ document: saved } });
+    logAction({
+      action: 'Quittance de loyer générée',
+      description: `Quittance ${nom} générée`,
+      module: 'GestionLocative',
+      typeAction: 'GÉNÉRATION_PDF',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(c._id), type: 'Paiement', nom },
+      req,
+    });
   } catch (err) {
     console.error('❌ [PDF] generateQuittance:', err.message);
     res.status(500).json({ status:'error', message: err.message });
@@ -145,6 +164,15 @@ exports.generateMiseEnDemeure = async (req, res) => {
     }
 
     res.json({ status:'success', data:{ document: saved } });
+    logAction({
+      action: 'Mise en demeure générée',
+      description: `Mise en demeure loyer ${moisLabel} ${p.annee} générée`,
+      module: 'GestionLocative',
+      typeAction: 'GÉNÉRATION_PDF',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(c._id), type: 'Contrat', nom: `Mise en demeure ${moisLabel} ${p.annee}` },
+      req,
+    });
   } catch (err) {
     console.error('❌ [PDF] generateMiseEnDemeure:', err.message);
     res.status(500).json({ status:'error', message: err.message });
@@ -176,6 +204,15 @@ exports.generatePreavis = async (req, res) => {
     );
 
     res.json({ status:'success', data:{ document: saved } });
+    logAction({
+      action: 'Préavis généré',
+      description: `Préavis (${typeInitiateur}) généré pour contrat #${c._id}`,
+      module: 'GestionLocative',
+      typeAction: 'GÉNÉRATION_PDF',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(c._id), type: 'Contrat', nom: `Préavis — ${typeInitiateur}` },
+      req,
+    });
   } catch (err) {
     console.error('❌ [PDF] generatePreavis:', err.message);
     res.status(500).json({ status:'error', message: err.message });
@@ -222,6 +259,15 @@ exports.generateEtatDesLieux = async (req, res) => {
     );
 
     res.json({ status:'success', data:{ document: saved } });
+    logAction({
+      action: 'État des lieux généré',
+      description: `État des lieux d'${type === 'entree' ? 'entrée' : 'sortie'} généré`,
+      module: 'GestionLocative',
+      typeAction: 'GÉNÉRATION_PDF',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(c._id), type: 'Contrat', nom: `État des lieux d'${type === 'entree' ? 'entrée' : 'sortie'}` },
+      req,
+    });
   } catch (err) {
     console.error('❌ [PDF] generateEtatDesLieux:', err.message);
     res.status(500).json({ status:'error', message: err.message });
@@ -273,6 +319,15 @@ exports.envoyerDocument = async (req, res) => {
     });
 
     res.json({ status:'success', message:'Email envoyé avec succès' });
+    logAction({
+      action: 'Document envoyé par email',
+      description: `"${doc.nom}" envoyé à ${destinataire}`,
+      module: 'GestionLocative',
+      typeAction: 'ENVOI_EMAIL',
+      auteur: buildAuteur(req.user),
+      cible: { id: contratId, type: 'Contrat', nom: doc.nom },
+      req,
+    });
   } catch (err) {
     console.error('❌ [PDF] envoyerDocument:', err.message);
     res.status(500).json({ status:'error', message: err.message });

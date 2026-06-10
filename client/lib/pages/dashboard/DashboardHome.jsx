@@ -18,6 +18,7 @@ import { getAllQuotes } from "../../services/quoteService";
 import { getAllEvents } from "../../services/eventService";
 import { getAlertesPaiements } from "../../services/gestionLocativeService";
 import { getAllUsers } from "../../services/userService";
+import { getRecentActionLogs } from "../../services/actionLogService";
 
 const BLUE  = '#2E7BB5';
 const GOLD  = '#C8872A';
@@ -61,6 +62,7 @@ const DashboardHome = () => {
   const [contratsActifs, setContrats]   = useState(0);
   const [alertesGL, setAlertesGL]       = useState({ nbImpayes:0, nbPenalites:0, totalPenalites:0, bailsExpiration:0 });
   const [teamStats, setTeamStats]       = useState({ admins:0, collaborateurs:0, utilisateurs:0 });
+  const [recentLogs, setRecentLogs]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
   const [activeTab, setActiveTab]   = useState('overview');
@@ -72,12 +74,14 @@ const DashboardHome = () => {
       try {
         setLoading(true);
         setError(null);
-        const [dashboardData, quotesData, eventsData, alertesData, usersData] = await Promise.all([
+        const isAdmin = user?.role === 'Admin';
+        const [dashboardData, quotesData, eventsData, alertesData, usersData, logsData] = await Promise.all([
           getDashboardStats(),
           getAllQuotes(),
           getAllEvents(),
           getAlertesPaiements().catch(() => null),
           getAllUsers().catch(() => []),
+          isAdmin ? getRecentActionLogs(8).catch(() => []) : Promise.resolve([]),
         ]);
         const dsStats = dashboardData.stats || { Altimmo: 0, MilaEvents: 0, Altcom: 0 };
         const events  = Array.isArray(eventsData) ? eventsData : [];
@@ -95,6 +99,7 @@ const DashboardHome = () => {
         }
         setActivity(dashboardData.activity  || null);
         setPerf(dashboardData.performance   || null);
+        if (Array.isArray(logsData)) setRecentLogs(logsData);
         const quotes = quotesData || [];
         setQuotesRaw(quotes);
         setQuotesStats({
@@ -445,10 +450,42 @@ const DashboardHome = () => {
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                     <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
                       <Activity size={15} style={{ color:BLUE }} />
-                      <h3 className="font-bold text-gray-900 text-sm" style={{ fontFamily:FONT }}>Activité récente</h3>
+                      <h3 className="font-bold text-gray-900 text-sm flex-1" style={{ fontFamily:FONT }}>Activité récente</h3>
+                      {user?.role === 'Admin' && recentLogs.length > 0 && (
+                        <a href="/dashboard/historique" className="text-xs font-semibold hover:underline" style={{ color:BLUE, fontFamily:FONT }}>
+                          Voir tout →
+                        </a>
+                      )}
                     </div>
                     <div className="divide-y divide-gray-50">
-                      {recentItems.length === 0 ? (
+                      {user?.role === 'Admin' && recentLogs.length > 0 ? (
+                        recentLogs.map((log, i) => {
+                          const TYPE_COLORS_MAP = { CRÉATION:'#16A34A', MODIFICATION:'#2E7BB5', SUPPRESSION:'#D42B2B', VALIDATION:'#059669', REJET:'#DC2626', PAIEMENT:'#C8872A', 'GÉNÉRATION_PDF':'#7C3AED', ENVOI_EMAIL:'#EA580C', 'CHANGEMENT_RÔLE':'#D97706' };
+                          const TYPE_ICONS_MAP  = { CRÉATION:'➕', MODIFICATION:'✏️', SUPPRESSION:'🗑️', VALIDATION:'✅', REJET:'❌', PAIEMENT:'💰', 'GÉNÉRATION_PDF':'📄', ENVOI_EMAIL:'📧', 'CHANGEMENT_RÔLE':'🎭', CONNEXION:'🔓', DÉCONNEXION:'🔒' };
+                          const c = TYPE_COLORS_MAP[log.typeAction] || '#94A3B8';
+                          return (
+                            <div key={log._id || i} className="flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+                              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-sm mt-0.5"
+                                style={{ background:`${c}15` }}>
+                                {TYPE_ICONS_MAP[log.typeAction] || '•'}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-800 truncate" style={{ fontFamily:FONT }}>{log.action}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  {log.module && (
+                                    <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
+                                      style={{ color: c, background:`${c}15`, fontFamily:FONT }}>
+                                      {log.module}
+                                    </span>
+                                  )}
+                                  {log.auteur?.nom && <span className="text-xs text-gray-400 truncate" style={{ fontFamily:FONT }}>{log.auteur.nom}</span>}
+                                  <span className="text-xs text-gray-400 ml-auto shrink-0" style={{ fontFamily:FONT }}>{timeAgo(log.date)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : recentItems.length === 0 ? (
                         <p className="p-5 text-sm text-gray-400 text-center" style={{ fontFamily:FONT }}>Aucune activité récente</p>
                       ) : recentItems.map((item, i) => (
                         <div key={`${item.id}-${i}`} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">

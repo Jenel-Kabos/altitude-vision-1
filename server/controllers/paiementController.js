@@ -1,6 +1,7 @@
 const Paiement = require('../models/Paiement');
 const Contrat  = require('../models/Contrat');
 const { verifierPaiementsEnRetard } = require('../services/alerteService');
+const { logAction, buildAuteur } = require('../services/actionLogService');
 
 exports.getAll = async (req, res) => {
   try {
@@ -87,6 +88,16 @@ exports.marquerPaye = async (req, res) => {
     );
 
     res.json({ status: 'success', data: { paiement: updated } });
+    const moisLabel = updated.mois ? updated.mois + '/' + updated.annee : String(updated.annee || '');
+    logAction({
+      action: 'Paiement enregistré',
+      description: `Loyer ${moisLabel} marqué comme ${statut}`,
+      module: 'GestionLocative',
+      typeAction: 'PAIEMENT',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(updated._id), type: 'Paiement', nom: `Loyer ${moisLabel}` },
+      req,
+    });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }

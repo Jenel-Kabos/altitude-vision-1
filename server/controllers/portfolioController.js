@@ -1,4 +1,5 @@
 const PortfolioItem = require('../models/portfolioItemModel');
+const { logAction, buildAuteur } = require('../services/actionLogService');
 
 // --- GET ALL PORTFOLIO ITEMS ---
 // Can be filtered by pole and/or category
@@ -37,6 +38,15 @@ exports.createPortfolioItem = async (req, res) => {
       data: {
         item: newItem,
       },
+    });
+    logAction({
+      action: 'Portfolio ajouté',
+      description: `Projet portfolio "${newItem.title}" créé`,
+      module: 'Portfolio',
+      typeAction: 'CRÉATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(newItem._id), type: 'PortfolioItem', nom: newItem.title },
+      req,
     });
   } catch (error) {
     res.status(400).json({ status: 'fail', message: error.message });
@@ -78,6 +88,15 @@ exports.updatePortfolioItem = async (req, res) => {
         item,
       },
     });
+    logAction({
+      action: 'Portfolio modifié',
+      description: `Projet portfolio "${item.title}" mis à jour`,
+      module: 'Portfolio',
+      typeAction: 'MODIFICATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(item._id), type: 'PortfolioItem', nom: item.title },
+      req,
+    });
   } catch (error) {
     res.status(400).json({ status: 'fail', message: error.message });
   }
@@ -96,6 +115,15 @@ exports.deletePortfolioItem = async (req, res) => {
         res.status(204).json({
             status: 'success',
             data: null,
+        });
+        logAction({
+          action: 'Portfolio supprimé',
+          description: `Projet portfolio "${item.title}" supprimé`,
+          module: 'Portfolio',
+          typeAction: 'SUPPRESSION',
+          auteur: buildAuteur(req.user),
+          cible: { id: String(item._id), type: 'PortfolioItem', nom: item.title },
+          req,
         });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });

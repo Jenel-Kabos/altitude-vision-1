@@ -2,6 +2,7 @@
 const User       = require('../models/User');
 const sendEmail  = require('../utils/email');
 const { destroyFromCloudinary } = require('../config/cloudinary');
+const { logAction, buildAuteur } = require('../services/actionLogService');
 
 // ── Email de notification de changement de rôle ──────────────
 const ROLE_LABELS = {
@@ -196,6 +197,15 @@ exports.suspendUser = async (req, res, next) => {
 
         const updated = await User.findById(req.params.id).select('-password');
         res.status(200).json({ status: 'success', message: '⚠️ Compte suspendu avec succès.', data: { user: updated } });
+        logAction({
+          action: 'Compte suspendu',
+          description: `Compte de ${updated.name} suspendu`,
+          module: 'Utilisateurs',
+          typeAction: 'MODIFICATION',
+          auteur: buildAuteur(req.user),
+          cible: { id: String(updated._id), type: 'User', nom: updated.name },
+          req,
+        });
     } catch (error) {
         console.error('Erreur suspendUser:', error);
         next(error);
@@ -215,6 +225,15 @@ exports.activateUser = async (req, res, next) => {
 
         const updated = await User.findById(req.params.id).select('-password');
         res.status(200).json({ status: 'success', message: '✅ Compte réactivé avec succès.', data: { user: updated } });
+        logAction({
+          action: 'Compte réactivé',
+          description: `Compte de ${updated.name} réactivé`,
+          module: 'Utilisateurs',
+          typeAction: 'MODIFICATION',
+          auteur: buildAuteur(req.user),
+          cible: { id: String(updated._id), type: 'User', nom: updated.name },
+          req,
+        });
     } catch (error) {
         console.error('Erreur activateUser:', error);
         next(error);
@@ -246,6 +265,15 @@ exports.deleteUser = async (req, res) => {
         await destroyFromCloudinary(target.photo);
 
         res.status(204).send();
+        logAction({
+          action: 'Utilisateur supprimé',
+          description: `Compte de ${target.name} (${target.email}) supprimé`,
+          module: 'Utilisateurs',
+          typeAction: 'SUPPRESSION',
+          auteur: buildAuteur(req.user),
+          cible: { id: String(target._id), type: 'User', nom: target.name },
+          req,
+        });
     } catch (error) {
         console.error('Erreur deleteUser:', error);
         res.status(500).json({ status: 'error', message: "Erreur serveur lors de la suppression de l'utilisateur." });
@@ -299,6 +327,16 @@ exports.updateUserRole = async (req, res) => {
 
         const updated = await User.findById(user._id).select('-password').populate('historiqueRoles.changedBy', 'name');
         res.status(200).json({ status: 'success', emailSent, data: { user: updated } });
+        logAction({
+          action: 'Rôle utilisateur modifié',
+          description: `Rôle de ${user.name} changé de ${ancienRole} vers ${normalized}`,
+          module: 'Utilisateurs',
+          typeAction: 'CHANGEMENT_RÔLE',
+          auteur: buildAuteur(req.user),
+          cible: { id: String(user._id), type: 'User', nom: user.name },
+          metadata: { ancienneValeur: ancienRole, nouvelleValeur: normalized },
+          req,
+        });
     } catch (error) {
         console.error('Erreur updateUserRole:', error);
         res.status(500).json({ status: 'error', message: "Erreur lors du changement de rôle." });
@@ -356,6 +394,15 @@ exports.createByAdmin = async (req, res) => {
 
         const user = await User.findById(newUser._id).select('-password');
         res.status(201).json({ status: 'success', data: { user } });
+        logAction({
+          action: 'Utilisateur créé',
+          description: `Compte ${normalized} créé pour ${prenom} ${nom} (${email})`,
+          module: 'Utilisateurs',
+          typeAction: 'CRÉATION',
+          auteur: buildAuteur(req.user),
+          cible: { id: String(newUser._id), type: 'User', nom: `${prenom} ${nom}` },
+          req,
+        });
     } catch (error) {
         console.error('Erreur createByAdmin:', error);
         res.status(500).json({ status: 'error', message: "Erreur lors de la création du compte." });

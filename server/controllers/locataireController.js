@@ -1,5 +1,6 @@
 const Locataire = require('../models/Locataire');
 const { uploadToCloudinary } = require('../config/cloudinary');
+const { logAction, buildAuteur } = require('../services/actionLogService');
 
 const uploadPiece = async (file) => {
   if (!file) return undefined;
@@ -35,6 +36,15 @@ exports.create = async (req, res) => {
     if (req.file) data.pieceIdentite = await uploadPiece(req.file);
     const l = await Locataire.create(data);
     res.status(201).json({ status: 'success', data: { locataire: l } });
+    logAction({
+      action: 'Locataire ajouté',
+      description: `Locataire ${l.prenom || ''} ${l.nom || ''} enregistré`,
+      module: 'GestionLocative',
+      typeAction: 'CRÉATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(l._id), type: 'Locataire', nom: `${l.prenom || ''} ${l.nom || ''}`.trim() },
+      req,
+    });
   } catch (err) {
     res.status(400).json({ status: 'error', message: err.message });
   }
@@ -47,6 +57,15 @@ exports.update = async (req, res) => {
     const l = await Locataire.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true });
     if (!l) return res.status(404).json({ status: 'error', message: 'Locataire introuvable' });
     res.json({ status: 'success', data: { locataire: l } });
+    logAction({
+      action: 'Locataire modifié',
+      description: `Locataire ${l.prenom || ''} ${l.nom || ''} mis à jour`,
+      module: 'GestionLocative',
+      typeAction: 'MODIFICATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(l._id), type: 'Locataire', nom: `${l.prenom || ''} ${l.nom || ''}`.trim() },
+      req,
+    });
   } catch (err) {
     res.status(400).json({ status: 'error', message: err.message });
   }
@@ -57,6 +76,15 @@ exports.delete = async (req, res) => {
     const l = await Locataire.findByIdAndDelete(req.params.id);
     if (!l) return res.status(404).json({ status: 'error', message: 'Locataire introuvable' });
     res.json({ status: 'success', message: 'Locataire supprimé' });
+    logAction({
+      action: 'Locataire supprimé',
+      description: `Locataire ${l.prenom || ''} ${l.nom || ''} supprimé`,
+      module: 'GestionLocative',
+      typeAction: 'SUPPRESSION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(l._id), type: 'Locataire', nom: `${l.prenom || ''} ${l.nom || ''}`.trim() },
+      req,
+    });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
