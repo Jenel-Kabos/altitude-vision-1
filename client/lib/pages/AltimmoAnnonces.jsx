@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Home, Search, X, AlertCircle,
     ChevronLeft, ChevronRight, Grid3x3, List,
-    SlidersHorizontal, Building2, Tag,
+    SlidersHorizontal, Building2, Tag, AlertTriangle,
 } from 'lucide-react';
 import { getAllProperties } from '../services/propertyService';
 import PropertyCard          from '../components/PropertyCard';
@@ -468,6 +468,13 @@ const AltimmoAnnonces = () => {
                                     <motion.div key={property._id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.3, delay: i * 0.04 }}>
                                         <PropertyCard property={property} index={i} viewMode={viewMode} />
+                                        <div className="text-center pt-1.5">
+                                            <a href={`/signaler-un-litige?bien=${property._id}`}
+                                                className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-amber-500 transition-colors">
+                                                <AlertTriangle size={10} />
+                                                Signaler cette annonce
+                                            </a>
+                                        </div>
                                     </motion.div>
                                 ))}
                             </motion.div>

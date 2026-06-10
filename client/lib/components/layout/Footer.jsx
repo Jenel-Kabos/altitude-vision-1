@@ -16,9 +16,10 @@ const LINKS_POLES = [
 ];
 
 const LINKS_INFO = [
-  { to: '/contact',          label: 'Contact'          },
-  { to: '/actualites',       label: 'Actualités'       },
-  { to: '/mentions-legales', label: 'Mentions légales' },
+  { to: '/contact',              label: 'Contact'              },
+  { to: '/actualites',           label: 'Actualités'           },
+  { to: '/mentions-legales',     label: 'Mentions légales'     },
+  { to: '/signaler-un-litige',   label: 'Signaler un problème' },
 ];
 
 const SOCIALS = [

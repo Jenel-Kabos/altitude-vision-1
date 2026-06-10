@@ -40,10 +40,18 @@ const createSendToken = (user, statusCode, res) => {
 // ======================================================
 exports.signup = async (req, res) => {
     try {
-        const { name, email, password, passwordConfirm, role, phone } = req.body;
+        const { name, email, password, passwordConfirm, role, phone, contratAccepte, certifications } = req.body;
 
         if (!name || !email || !password) {
             return res.status(400).json({ status: 'fail', message: 'Champs manquants.' });
+        }
+
+        // Vérification contrat obligatoire pour Proprietaire
+        if (role === 'Proprietaire' && !contratAccepte) {
+            return res.status(400).json({
+                status:  'fail',
+                message: "Vous devez accepter le contrat d'hébergement pour vous inscrire en tant que Propriétaire.",
+            });
         }
 
         const existingUser = await User.findOne({ email });
@@ -62,7 +70,10 @@ exports.signup = async (req, res) => {
             photoUrl = result.secure_url;
         }
 
-        const newUser = await User.create({
+        const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || req.ip;
+        const now = new Date();
+
+        const userData = {
             name,
             email,
             password,
@@ -70,12 +81,39 @@ exports.signup = async (req, res) => {
             role:  role  || 'Client',
             phone: phone || '',
             photo: photoUrl || undefined,
-        });
+        };
+
+        if (role === 'Proprietaire' && contratAccepte) {
+            userData.contratAccepte   = true;
+            userData.contratAccepteLe = now;
+            userData.contratVersion   = 'v1.0';
+            userData.ipInscription    = ip;
+            userData.certifications   = {
+                informationsVraies:   true,
+                estProprietaireLegal: true,
+                engagementHonnetete:  true,
+                commissionAcceptee:   true,
+                dateCertification:    now,
+            };
+        }
+
+        const newUser = await User.create(userData);
 
         const verificationToken = newUser.createEmailVerificationToken();
         await newUser.save({ validateBeforeSave: false });
 
         const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+
+        // Email de confirmation contrat pour Propriétaire (fire & forget)
+        if (role === 'Proprietaire' && contratAccepte) {
+            const dateStr = now.toLocaleDateString('fr-FR');
+            const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            sendEmail({
+                email:   newUser.email,
+                subject: '✅ Votre inscription est confirmée — Altitude Vision',
+                message: `Bonjour ${newUser.name},\n\nVotre inscription en tant que Propriétaire / Apporteur d'affaires sur Altitude Vision est confirmée.\n\nVotre contrat d'hébergement a été accepté le ${dateStr} à ${timeStr}.\nRéférence : CONTRAT-${newUser._id}-v1.0\n\nCONDITIONS DE RÉMUNÉRATION :\nPour chaque location conclue via notre plateforme :\n• Commission locataire (80% du loyer) versée à Altitude Vision\n• Votre part : 30% de cette commission\n\nExemple :\nLoyer 150 000 FCFA\n→ Votre gain : 36 000 FCFA\n\nVous pouvez maintenant publier vos biens sur altitudevision.agency/altimmo\n\nCordialement,\nAltitude Vision — Altimmo\ncontact@altitudevision.agency\n+242 06 800 21 51`,
+            }).catch(() => {});
+        }
 
         try {
             await sendEmail({

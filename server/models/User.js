@@ -103,6 +103,19 @@ const userSchema = new mongoose.Schema(
         passwordResetToken: String,
         passwordResetExpires: Date,
 
+        // 🔹 Contrat d'hébergement (Propriétaire)
+        contratAccepte:    { type: Boolean, default: false },
+        contratAccepteLe:  { type: Date },
+        contratVersion:    { type: String, default: 'v1.0' },
+        certifications: {
+            informationsVraies:   { type: Boolean, default: false },
+            estProprietaireLegal: { type: Boolean, default: false },
+            engagementHonnetete:  { type: Boolean, default: false },
+            commissionAcceptee:   { type: Boolean, default: false },
+            dateCertification:    { type: Date },
+        },
+        ipInscription: { type: String },
+
         // 🔹 Historique des changements de rôle
         historiqueRoles: [{
             ancienRole:  { type: String },

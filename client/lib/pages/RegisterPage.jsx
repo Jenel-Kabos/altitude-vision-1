@@ -8,8 +8,9 @@ import api from "../services/api";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     UserPlus, User, Mail, Lock, Briefcase,
-    AlertTriangle, Eye, EyeOff, Loader2, CheckCircle,
+    AlertTriangle, Eye, EyeOff, Loader2, CheckCircle, FileText, Check,
 } from "lucide-react";
+import { contratHebergement } from "../data/contratHebergement";
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
@@ -33,6 +34,29 @@ const pwScore = p => {
 const PW_C = ['#E5E7EB','#EF4444','#F59E0B',BLUE,'#22C55E'];
 const PW_L = ['','Faible','Moyen','Bon','Fort'];
 
+const CERTIFICATIONS_LIST = [
+    {
+        key:   'contratAccepte',
+        label: "J'ai lu et j'accepte intégralement le contrat d'hébergement d'Altitude Vision",
+    },
+    {
+        key:   'informationsVraies',
+        label: 'Je certifie que toutes les informations fournies sont vraies, exactes et complètes',
+    },
+    {
+        key:   'estProprietaireLegal',
+        label: "Je certifie être le propriétaire légal ou l'apporteur d'affaires autorisé pour ces biens",
+    },
+    {
+        key:   'engagementHonnetete',
+        label: "Je m'engage à être honnête et transparent dans toutes mes interactions avec la plateforme et les clients",
+    },
+    {
+        key:   'commissionAcceptee',
+        label: "J'accepte les conditions de rémunération : je percevrai 30% de la commission reçue par Altitude Vision (soit 30% de 80% du loyer mensuel) pour chaque location conclue via la plateforme",
+    },
+];
+
 // ─────────────────────────────────────────────────────────────
 const RegisterPage = () => {
     const [form,        setForm]        = useState({ name:'', email:'', password:'', confirmPassword:'', role:'Client' });
@@ -40,8 +64,16 @@ const RegisterPage = () => {
     const [showConfirm, setShowConfirm] = useState(false);
     const [error,       setError]       = useState('');
     const [loading,     setLoading]     = useState(false);
+    const [certifications, setCertifications] = useState({
+        contratAccepte:       false,
+        informationsVraies:   false,
+        estProprietaireLegal: false,
+        engagementHonnetete:  false,
+        commissionAcceptee:   false,
+    });
+
     const router = useRouter();
-    const auth     = useAuth();
+    const auth   = useAuth();
 
     useEffect(() => {
         if (auth.user) router.push(
@@ -50,7 +82,11 @@ const RegisterPage = () => {
         );
     }, [router, auth.user]);
 
-    const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+    const set     = (k, v) => setForm(f => ({ ...f, [k]: v }));
+    const toggleC = k => setCertifications(c => ({ ...c, [k]: !c[k] }));
+
+    const isProprietaire = form.role === 'Proprietaire';
+    const toutAccepte    = isProprietaire ? Object.values(certifications).every(v => v === true) : true;
 
     const handleSubmit = async e => {
         e.preventDefault();
@@ -58,14 +94,26 @@ const RegisterPage = () => {
             return setError('Les mots de passe ne correspondent pas.');
         if (form.password.length < 8)
             return setError('Le mot de passe doit contenir au moins 8 caractères.');
+        if (isProprietaire && !toutAccepte)
+            return setError('Vous devez cocher toutes les cases pour vous inscrire en tant que Propriétaire.');
+
         setLoading(true); setError('');
         try {
             await api.post('/users/signup', {
-                name: form.name.trim(),
-                email: form.email.trim().toLowerCase(),
-                password: form.password,
+                name:            form.name.trim(),
+                email:           form.email.trim().toLowerCase(),
+                password:        form.password,
                 passwordConfirm: form.confirmPassword,
-                role: form.role,
+                role:            form.role,
+                ...(isProprietaire && {
+                    contratAccepte: true,
+                    certifications: {
+                        informationsVraies:   certifications.informationsVraies,
+                        estProprietaireLegal: certifications.estProprietaireLegal,
+                        engagementHonnetete:  certifications.engagementHonnetete,
+                        commissionAcceptee:   certifications.commissionAcceptee,
+                    },
+                }),
             });
             router.push(`/verify-email-pending?email=${encodeURIComponent(form.email.trim().toLowerCase())}`);
         } catch (err) {
@@ -91,7 +139,7 @@ const RegisterPage = () => {
             </div>
 
             <motion.div initial={{ opacity:0, y:24 }} animate={{ opacity:1, y:0 }}
-                transition={{ duration:0.5 }} className="w-full max-w-md relative z-10">
+                transition={{ duration:0.5 }} className="w-full max-w-lg relative z-10">
 
                 <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
 
@@ -217,18 +265,81 @@ const RegisterPage = () => {
                                 </div>
                             </div>
 
+                            {/* ── Section Contrat (Proprietaire uniquement) ────── */}
+                            <AnimatePresence>
+                            {isProprietaire && (
+                                <motion.div
+                                    initial={{ opacity:0, height:0 }}
+                                    animate={{ opacity:1, height:'auto' }}
+                                    exit={{ opacity:0, height:0 }}
+                                    transition={{ duration:0.3 }}
+                                    className="overflow-hidden">
+                                    <div className="rounded-2xl border border-gray-200 overflow-hidden">
+
+                                        {/* Header */}
+                                        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100"
+                                            style={{ background:`linear-gradient(135deg, ${BLUE_DARK}08, ${BLUE}06)` }}>
+                                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                                                style={{ background:`linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` }}>
+                                                <FileText className="w-3.5 h-3.5 text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-gray-800 uppercase tracking-wider">Contrat et certifications</p>
+                                                <p className="text-xs text-gray-400">Obligatoire pour les Propriétaires</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Contrat scrollable */}
+                                        <div className="overflow-y-auto bg-gray-50 p-4 text-xs text-gray-600 leading-relaxed whitespace-pre-wrap border-b border-gray-100"
+                                            style={{ maxHeight: '300px', fontFamily: 'monospace', fontSize: '0.7rem' }}>
+                                            {contratHebergement}
+                                        </div>
+
+                                        {/* Cases à cocher */}
+                                        <div className="p-4 space-y-3 bg-white">
+                                            {CERTIFICATIONS_LIST.map(({ key, label }) => (
+                                                <label key={key} className="flex items-start gap-3 cursor-pointer group">
+                                                    <div
+                                                        onClick={() => toggleC(key)}
+                                                        className="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all cursor-pointer"
+                                                        style={{
+                                                            borderColor:     certifications[key] ? BLUE : '#D1D5DB',
+                                                            backgroundColor: certifications[key] ? BLUE : 'transparent',
+                                                        }}>
+                                                        {certifications[key] && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                                    </div>
+                                                    <span
+                                                        className="text-xs text-gray-600 leading-relaxed select-none"
+                                                        onClick={() => toggleC(key)}>
+                                                        {label} <span className="text-red-400">*</span>
+                                                    </span>
+                                                </label>
+                                            ))}
+                                            <p className="text-xs text-gray-400 pt-1">* Tous les champs sont obligatoires</p>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                            </AnimatePresence>
+
                             {/* Submit */}
-                            <motion.button type="submit" disabled={loading}
-                                whileHover={{ scale: loading ? 1 : 1.02 }} whileTap={{ scale:0.98 }}
+                            <motion.button type="submit"
+                                disabled={loading || (isProprietaire && !toutAccepte)}
+                                whileHover={{ scale: (loading || (isProprietaire && !toutAccepte)) ? 1 : 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-white text-sm mt-2 transition-all"
                                 style={{
-                                    background: loading ? '#9CA3AF' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
-                                    boxShadow:  loading ? 'none' : `0 4px 20px ${BLUE}35`,
-                                    fontFamily: "'Outfit', sans-serif",
+                                    background:  (loading || (isProprietaire && !toutAccepte)) ? '#9CA3AF' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
+                                    boxShadow:   (loading || (isProprietaire && !toutAccepte)) ? 'none' : `0 4px 20px ${BLUE}35`,
+                                    fontFamily:  "'Outfit', sans-serif",
+                                    cursor:      (isProprietaire && !toutAccepte) ? 'not-allowed' : 'pointer',
+                                    opacity:     (isProprietaire && !toutAccepte) ? 0.6 : 1,
                                 }}>
                                 {loading
                                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Création en cours...</>
-                                    : <><UserPlus className="w-4 h-4" /> Créer mon compte</>}
+                                    : isProprietaire
+                                        ? <><UserPlus className="w-4 h-4" /> S'inscrire en tant que Propriétaire</>
+                                        : <><UserPlus className="w-4 h-4" /> Créer mon compte</>}
                             </motion.button>
                         </form>
 

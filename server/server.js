@@ -340,6 +340,9 @@ app.use('/api/action-logs', require('./routes/actionLogRoutes'));
 // 📊 Export Marketing
 app.use('/api/export', require('./routes/exportRoutes'));
 
+// ⚖️ Litiges
+app.use('/api/litiges', require('./routes/litigeRoutes'));
+
 // ============================================================
 // 🔍 ROUTES DE TEST
 // ============================================================
