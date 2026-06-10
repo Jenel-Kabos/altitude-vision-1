@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import api from "../services/api";
 
 const VerifyEmailPendingPage = () => {
-  const [searchParams] = useSearchParams();
+  const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
   const [resendStatus, setResendStatus] = useState(null); // null | 'loading' | 'success' | 'error'
 
