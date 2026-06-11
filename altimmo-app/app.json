@@ -43,7 +43,6 @@
       "expo-notifications",
       "expo-location",
       "expo-camera",
-      "expo-sharing",
       "expo-web-browser"
     ]
   }
