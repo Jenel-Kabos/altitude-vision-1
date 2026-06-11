@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createStackNavigator } from '@react-navigation/stack';
 
 import ListeAnnoncesScreen  from '../screens/Annonces/ListeAnnoncesScreen';
 import DetailAnnonceScreen  from '../screens/Annonces/DetailAnnonceScreen';
@@ -14,7 +14,7 @@ import VisitesScreen        from '../screens/Visites/VisitesScreen';
 import ProfilScreen         from '../screens/Profil/ProfilScreen';
 
 const Tab   = createBottomTabNavigator();
-const Stack = createNativeStackNavigator();
+const Stack = createStackNavigator();
 
 function AnnoncesStack() {
   return (
