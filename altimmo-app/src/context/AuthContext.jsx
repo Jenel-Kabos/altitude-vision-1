@@ -16,12 +16,19 @@ export const AuthProvider = ({ children }) => {
       const storedToken = await AsyncStorage.getItem('token');
       if (storedToken) {
         setToken(storedToken);
-        const res = await api.get('/users/me', {
-          headers: { Authorization: `Bearer ${storedToken}` },
-        });
-        setUser(res.data?.data?.user || res.data?.user || null);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 5000)
+        );
+        const response = await Promise.race([
+          api.get('/users/me', {
+            headers: { Authorization: `Bearer ${storedToken}` },
+          }),
+          timeoutPromise,
+        ]);
+        setUser(response.data?.data?.user || response.data?.user || null);
       }
-    } catch {
+    } catch (error) {
+      console.log('Auth load error:', error.message);
       await AsyncStorage.removeItem('token');
     } finally {
       setLoading(false);
