@@ -1,26 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>
-        Altimmo — App en cours...
-      </Text>
-    </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={{
+        flex: 1,
+        backgroundColor: '#0A0A0A',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <Text style={{
+          color: '#C8960C',
+          fontSize: 24,
+          fontWeight: 'bold',
+        }}>
+          Altimmo — App en cours...
+        </Text>
+      </View>
+    </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0A0A0A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  text: {
-    color: '#C8960C',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-});
