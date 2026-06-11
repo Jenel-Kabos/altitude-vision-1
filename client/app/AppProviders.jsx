@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
+import { SessionProvider } from "next-auth/react";
 import { AuthProvider } from "@/lib/context/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://altitude-vision.onrender.com/api";
@@ -15,10 +16,11 @@ function ServerWakeup() {
 
 export default function AppProviders({ children }) {
   return (
-    <AuthProvider>
-      <ServerWakeup />
-      {children}
-      <Toaster
+    <SessionProvider>
+      <AuthProvider>
+        <ServerWakeup />
+        {children}
+        <Toaster
         position="top-right"
         toastOptions={{
           style: {
@@ -32,6 +34,7 @@ export default function AppProviders({ children }) {
           error:   { iconTheme: { primary: '#D42B2B', secondary: '#0A0C0F' } },
         }}
       />
-    </AuthProvider>
+      </AuthProvider>
+    </SessionProvider>
   );
 }

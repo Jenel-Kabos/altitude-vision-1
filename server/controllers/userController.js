@@ -475,3 +475,58 @@ exports.createByAdmin = async (req, res) => {
         res.status(500).json({ status: 'error', message: "Erreur lors de la création du compte." });
     }
 };
+
+// ======================================================
+// COMPLETE PROFILE (Google OAuth — après inscription)
+// PATCH /api/users/complete-profile
+// ======================================================
+exports.completeProfile = async (req, res) => {
+    try {
+        const { prenom, nom, telephone, ville, role, certifications } = req.body;
+
+        if (!prenom || !nom || !telephone) {
+            return res.status(400).json({ status: 'fail', message: 'Prénom, nom et téléphone requis.' });
+        }
+
+        const allowedRoles = ['Client', 'Proprietaire', 'Prestataire'];
+        const newRole = allowedRoles.includes(role) ? role : 'Client';
+
+        if (newRole === 'Proprietaire' && (!certifications || !certifications.contratAccepte)) {
+            return res.status(400).json({
+                status: 'fail',
+                message: "Vous devez accepter le contrat d'hébergement.",
+            });
+        }
+
+        const now = new Date();
+        const updates = {
+            name:  `${prenom.trim()} ${nom.trim()}`,
+            phone: telephone.trim(),
+            role:  newRole,
+        };
+
+        if (newRole === 'Proprietaire' && certifications) {
+            const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
+            updates.contratAccepte   = true;
+            updates.contratAccepteLe = now;
+            updates.contratVersion   = 'v1.0';
+            updates.ipInscription    = ip;
+            updates.certifications   = {
+                informationsVraies:   !!certifications.informationsVraies,
+                estProprietaireLegal: !!certifications.estProprietaireLegal,
+                engagementHonnetete:  !!certifications.engagementHonnetete,
+                commissionAcceptee:   !!certifications.commissionAcceptee,
+                dateCertification:    now,
+            };
+        }
+
+        const updated = await User.findByIdAndUpdate(req.user._id, updates, {
+            new: true, runValidators: false, select: '-password',
+        });
+
+        res.status(200).json({ status: 'success', data: { user: updated } });
+    } catch (error) {
+        console.error('❌ Erreur completeProfile:', error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};

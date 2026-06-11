@@ -84,6 +84,11 @@ const userSchema = new mongoose.Schema(
         emailVerificationToken:   String,
         emailVerificationExpires: Date,
 
+        // 🔹 OAuth Google
+        googleId:     { type: String, sparse: true },
+        avatar:       { type: String },
+        authProvider: { type: String, enum: ['local', 'google', 'phone'], default: 'local' },
+
         // 🔹 Vérification Propriétaire (KYC Admin)
         isVerified: { type: Boolean, default: false },
 

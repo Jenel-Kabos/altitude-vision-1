@@ -14,17 +14,18 @@ const CSP = [
   "img-src 'self' data: blob: https://images.unsplash.com https://altitude-vision.onrender.com https://res.cloudinary.com https://graph.facebook.com https://*.fbcdn.net https://platform-lookaside.fbsbx.com https://ui-avatars.com https://placehold.co https://illustrations.popsy.co https://*.googleusercontent.com https://*.tile.openstreetmap.org https://*.tile.openstreetmap.fr https://*.basemaps.cartocdn.com https://unpkg.com",
   // Videos: Cloudinary hosted videos + blob: for local object URLs
   "media-src 'self' https://res.cloudinary.com https://*.cloudinary.com blob:",
-  // API calls + Facebook feed data; blob: for fetch() responses; GA endpoints; Leaflet tile/geocoding requests
-  "connect-src 'self' blob: https://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://*.tile.openstreetmap.org https://nominatim.openstreetmap.org",
+  // API calls + Facebook feed data; blob: for fetch() responses; GA endpoints; Leaflet tile/geocoding requests; NextAuth Google OAuth
+  "connect-src 'self' blob: https://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://*.tile.openstreetmap.org https://nominatim.openstreetmap.org https://accounts.google.com https://oauth2.googleapis.com",
   // Web Workers (e.g. PDF.js, comlink) require blob: worker source
   "worker-src 'self' blob:",
   // child-src covers blob: workers in older browsers that don't support worker-src
   "child-src 'self' blob:",
-  // Google Maps embed on /contact
-  "frame-src https://www.google.com https://maps.google.com https://maps.googleapis.com",
+  // Google Maps embed on /contact + Google OAuth popup (NextAuth)
+  "frame-src https://www.google.com https://maps.google.com https://maps.googleapis.com https://accounts.google.com",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  // NextAuth redirects to accounts.google.com during OAuth flow
+  "form-action 'self' https://accounts.google.com",
 ].join('; ');
 
 const SECURITY_HEADERS = [

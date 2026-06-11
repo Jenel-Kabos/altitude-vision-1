@@ -15,6 +15,10 @@ router.post('/resend-verification',  authController.resendVerificationEmail);
 // Connexion
 router.post('/login',                authController.login);
 
+// Google OAuth
+router.post('/google',               authController.googleAuth);
+router.post('/google-token',         authController.googleGetToken);
+
 // ✅ Mot de passe oublié → envoie l'email avec le lien
 router.post('/forgot-password',      authController.forgotPassword);
 

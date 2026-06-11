@@ -9,6 +9,7 @@ client/build/
 client/dist/
 client/.next/
 client/.env
+client/.env.local
 
 # Fichiers système
 .DS_Store

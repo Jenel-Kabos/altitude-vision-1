@@ -1,5 +1,6 @@
 // server/controllers/authController.js
 const crypto    = require('crypto');
+const bcrypt    = require('bcryptjs');
 const jwt       = require('jsonwebtoken');
 const { promisify } = require('util');
 const User      = require('../models/User');
@@ -588,7 +589,90 @@ exports.forgotPassword = async (req, res) => {
 };
 
 // ======================================================
-// 11. RÉINITIALISATION MOT DE PASSE
+// 11. GOOGLE AUTH
+// Route: POST /api/auth/google
+// ======================================================
+exports.googleAuth = async (req, res) => {
+    try {
+        const { email, name, googleId, avatar } = req.body;
+
+        if (!email || !googleId) {
+            return res.status(400).json({ status: 'fail', message: 'email et googleId requis.' });
+        }
+
+        let user = await User.findOne({ $or: [{ googleId }, { email }] });
+
+        if (user) {
+            if (!user.googleId) {
+                user.googleId      = googleId;
+                user.avatar        = avatar;
+                user.photo         = user.photo || avatar;
+                user.isVerified    = true;
+                user.isEmailVerified = true;
+                user.authProvider  = 'google';
+                await user.save({ validateBeforeSave: false });
+            }
+        } else {
+            const randomPwd = crypto.randomBytes(20).toString('hex');
+            user = await User.create({
+                name,
+                email,
+                googleId,
+                avatar,
+                photo:         avatar,
+                role:          'User',
+                isVerified:    true,
+                isEmailVerified: true,
+                authProvider:  'google',
+                password:        randomPwd,
+                passwordConfirm: randomPwd,
+            });
+        }
+
+        user.lastLoginAt = new Date();
+        await user.save({ validateBeforeSave: false });
+
+        createSendToken(user, 200, res);
+    } catch (error) {
+        console.error('❌ [Auth] Erreur googleAuth:', error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+// ======================================================
+// 12. GOOGLE GET TOKEN
+// Route: POST /api/auth/google-token
+// ======================================================
+exports.googleGetToken = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ status: 'fail', message: 'email requis.' });
+        }
+
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.status(404).json({ status: 'fail', message: 'Utilisateur non trouvé.' });
+        }
+
+        const token = signToken(user._id, user.tokenVersion);
+
+        res.status(200).json({
+            status: 'success',
+            token,
+            userId: user._id,
+            role:   user.role,
+        });
+    } catch (error) {
+        console.error('❌ [Auth] Erreur googleGetToken:', error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+// ======================================================
+// 13. RÉINITIALISATION MOT DE PASSE
 // Route: PATCH /api/auth/reset-password/:token
 // ======================================================
 exports.resetPassword = async (req, res) => {

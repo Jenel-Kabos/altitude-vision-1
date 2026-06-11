@@ -31,6 +31,9 @@ router.patch('/updateMe',         upload.single('photo'), authController.updateM
 // ✅ Mise à jour mot de passe (pas de fichier → pas de multer)
 router.patch('/updateMyPassword',                         authController.updateMyPassword);
 
+// ✅ Compléter le profil après connexion Google
+router.patch('/complete-profile',                         userController.completeProfile);
+
 /* =======================================
    👑 ROUTES ADMIN UNIQUEMENT
 ======================================= */

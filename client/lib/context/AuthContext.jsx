@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
 const DEFAULT_AUTH = {
     user: null,
@@ -102,6 +103,25 @@ export const AuthProvider = ({ children }) => {
             return merged;
         });
     }, []);
+
+    // ── Sync session Google → localStorage ───────────────────
+    const { data: session } = useSession();
+
+    useEffect(() => {
+        if (session?.accessToken && !user) {
+            const googleUser = {
+                _id:             session.user?.id,
+                name:            session.user?.name,
+                email:           session.user?.email,
+                role:            session.user?.role || 'User',
+                photo:           session.user?.image || null,
+                isEmailVerified: true,
+            };
+            localStorage.setItem('token', session.accessToken);
+            localStorage.setItem('user',  JSON.stringify(googleUser));
+            setUser(googleUser);
+        }
+    }, [session, user]);
 
     // Prevents hydration mismatch: Next.js RSC renders the layout in the HTML,
     // but loading=true would render a spinner client-side — causing a fatal mismatch.
