@@ -4,7 +4,7 @@
     "slug": "altimmo-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
