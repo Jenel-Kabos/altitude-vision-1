@@ -42,8 +42,7 @@
     "plugins": [
       "expo-notifications",
       "expo-location",
-      "expo-camera",
-      "expo-web-browser"
+      "expo-camera"
     ]
   }
 }
