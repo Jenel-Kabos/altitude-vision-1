@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Altimmo",
+    "slug": "altimmo-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0A"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.altitudevision.altimmo",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Pour afficher les biens près de vous",
+        "NSCameraUsageDescription": "Pour prendre des photos de vos biens",
+        "NSPhotoLibraryUsageDescription": "Pour sélectionner des photos"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0A0A"
+      },
+      "package": "com.altitudevision.altimmo",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-location",
+      "expo-camera",
+      "expo-sharing",
+      "expo-web-browser"
+    ]
+  }
+}
