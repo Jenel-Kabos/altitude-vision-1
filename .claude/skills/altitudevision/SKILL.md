@@ -11,7 +11,7 @@ Agence multidisciplinaire congolaise avec 3 pôles : Altimmo (immobilier), Mila 
 - Mobile : React Native + Expo SDK 52
 
 ## Chemins importants
-- Projet local : /Users/apple/Documents/Projet-gemini/altitude-vision-1/
+- Projet local : /Users/apple/Documents/GitHub/altitude-vision-1/
 - Frontend : client/
 - Backend : server/
 - App mobile : altimmo-app/
