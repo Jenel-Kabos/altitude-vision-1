@@ -8,13 +8,18 @@ import { useAuth } from '../../context/AuthContext';
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [erreur, setErreur] = useState('');
   const { login } = useAuth();
 
   const handleLogin = async () => {
     try {
+      setErreur('');
       await login(email, password);
     } catch (error) {
-      console.log('Login error:', error);
+      setErreur(
+        error.response?.data?.message ||
+        'Erreur de connexion. Vérifiez vos identifiants.'
+      );
     }
   };
 
@@ -48,6 +53,9 @@ export default function LoginScreen({ navigation }) {
           Se connecter
         </Text>
       </TouchableOpacity>
+      {erreur ? (
+        <Text style={styles.erreur}>{erreur}</Text>
+      ) : null}
       <TouchableOpacity
         onPress={() => navigation.navigate('Register')}
       >
@@ -95,6 +103,12 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  erreur: {
+    color: 'red',
+    marginTop: 10,
+    textAlign: 'center',
+    marginBottom: 10,
   },
   lien: {
     color: '#C8960C',
