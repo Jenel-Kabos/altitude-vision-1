@@ -8,18 +8,28 @@ import { useAuth } from '../../context/AuthContext';
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const [erreur, setErreur] = useState('');
   const { login } = useAuth();
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      setErreur('Email et mot de passe requis');
+      return;
+    }
+    setLoading(true);
+    setErreur('');
     try {
-      setErreur('');
       await login(email, password);
     } catch (error) {
+      console.log('Erreur complète:', JSON.stringify(error.response?.data));
       setErreur(
         error.response?.data?.message ||
-        'Erreur de connexion. Vérifiez vos identifiants.'
+        error.message ||
+        'Erreur de connexion'
       );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -46,15 +56,18 @@ export default function LoginScreen({ navigation }) {
         secureTextEntry
       />
       <TouchableOpacity
-        style={styles.bouton}
+        style={[styles.bouton, loading && { opacity: 0.7 }]}
         onPress={handleLogin}
+        disabled={loading}
       >
         <Text style={styles.boutonTexte}>
-          Se connecter
+          {loading ? 'Connexion...' : 'Se connecter'}
         </Text>
       </TouchableOpacity>
       {erreur ? (
-        <Text style={styles.erreur}>{erreur}</Text>
+        <Text style={{ color: '#ff4444', marginTop: 10, textAlign: 'center', fontSize: 14 }}>
+          {erreur}
+        </Text>
       ) : null}
       <TouchableOpacity
         onPress={() => navigation.navigate('Register')}
@@ -104,14 +117,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  erreur: {
-    color: 'red',
-    marginTop: 10,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
   lien: {
     color: '#C8960C',
     fontSize: 14,
+    marginTop: 10,
   },
 });
