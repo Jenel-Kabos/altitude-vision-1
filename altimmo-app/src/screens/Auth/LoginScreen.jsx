@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput,
-  TouchableOpacity, StyleSheet,
+  TouchableOpacity, StyleSheet, Alert,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 
@@ -13,21 +13,39 @@ export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
 
   const handleLogin = async () => {
+    Alert.alert(
+      'Debug',
+      `Email: ${email}\nPassword: ${password}\nAPI: https://altitude-vision.onrender.com/api`
+    );
+
     if (!email || !password) {
       setErreur('Email et mot de passe requis');
       return;
     }
+
     setLoading(true);
     setErreur('');
+
     try {
-      await login(email, password);
-    } catch (error) {
-      console.log('Erreur complète:', JSON.stringify(error.response?.data));
-      setErreur(
-        error.response?.data?.message ||
-        error.message ||
-        'Erreur de connexion'
+      const response = await fetch(
+        'https://altitude-vision.onrender.com/api/auth/login',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        }
       );
+      const data = await response.json();
+      Alert.alert('Réponse API', JSON.stringify(data));
+
+      if (data.token) {
+        await login(email, password);
+      } else {
+        setErreur(data.message || 'Identifiants incorrects');
+      }
+    } catch (error) {
+      Alert.alert('Erreur réseau', error.message);
+      setErreur(error.message);
     } finally {
       setLoading(false);
     }
