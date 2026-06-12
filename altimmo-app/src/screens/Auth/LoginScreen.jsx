@@ -13,11 +13,6 @@ export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
 
   const handleLogin = async () => {
-    Alert.alert(
-      'Debug',
-      `Email: ${email}\nPassword: ${password}\nAPI: https://altitude-vision.onrender.com/api`
-    );
-
     if (!email || !password) {
       setErreur('Email et mot de passe requis');
       return;
@@ -36,7 +31,6 @@ export default function LoginScreen({ navigation }) {
         }
       );
       const data = await response.json();
-      Alert.alert('Réponse API', JSON.stringify(data));
 
       if (data.token) {
         await login(email, password);
