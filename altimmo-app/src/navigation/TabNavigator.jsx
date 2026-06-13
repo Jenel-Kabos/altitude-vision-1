@@ -1,26 +1,28 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { View, Text } from 'react-native';
+import ListeAnnoncesScreen from '../screens/Annonces/ListeAnnoncesScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
-function HomeScreen() {
+function AnnoncesStack() {
   return (
-    <View style={{
-      flex: 1,
-      backgroundColor: '#0A0A0A',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}>
-      <Text style={{
-        color: '#C8960C',
-        fontSize: 24
-      }}>
-        🏠 Bienvenue sur Altimmo
-      </Text>
-    </View>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        cardStyle: {
+          backgroundColor: '#0A0A0A'
+        }
+      }}
+    >
+      <Stack.Screen
+        name="ListeAnnonces"
+        component={ListeAnnoncesScreen}
+      />
+    </Stack.Navigator>
   );
 }
 
@@ -32,14 +34,20 @@ export default function TabNavigator() {
         tabBarStyle: {
           backgroundColor: '#1A1A1A',
           borderTopColor: '#2A2A2A',
+          height: 65,
+          paddingBottom: 8
         },
         tabBarActiveTintColor: '#C8960C',
         tabBarInactiveTintColor: '#606060',
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600'
+        }
       }}
     >
       <Tab.Screen
-        name="Accueil"
-        component={HomeScreen}
+        name="Annonces"
+        component={AnnoncesStack}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons
