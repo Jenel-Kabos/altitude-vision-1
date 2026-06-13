@@ -3,45 +3,106 @@ import {
   View, Text, ScrollView, Image,
   TouchableOpacity, StyleSheet,
   FlatList, Dimensions, Linking,
-  Alert
+  Alert, TextInput, KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
 export default function DetailAnnonceScreen({ route, navigation }) {
   const { annonce } = route.params;
+  const { user } = useAuth();
+
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [commentaire, setCommentaire] = useState('');
+  const [envoi, setEnvoi] = useState(false);
+
+  console.log('Annonce data:', JSON.stringify({
+    transactionType: annonce.transactionType,
+    type: annonce.type,
+    typeTransaction: annonce.typeTransaction,
+    category: annonce.category
+  }));
 
   const photos = annonce.images || annonce.photos || [];
-
   const prix = annonce.price || annonce.loyer || 0;
 
   const isLocation =
     annonce.transactionType === 'location' ||
-    annonce.type === 'Location';
+    annonce.transactionType === 'Location' ||
+    annonce.transactionType === 'LOCATION' ||
+    annonce.type === 'location' ||
+    annonce.type === 'Location' ||
+    annonce.typeTransaction === 'location' ||
+    annonce.typeTransaction === 'Location' ||
+    annonce.category === 'location' ||
+    annonce.category === 'Location';
 
-  const appelerProprietaire = () => {
-    const tel = annonce.owner?.phone ||
-      annonce.proprietaire?.telephone ||
-      '+242068002151';
-    Linking.openURL(`tel:${tel}`);
+  const envoyerCommentaire = async () => {
+    if (!commentaire.trim()) return;
+    setEnvoi(true);
+    try {
+      await api.post(`/properties/${annonce._id}/reviews`, {
+        comment: commentaire,
+        rating: 5
+      });
+      Alert.alert('✅', 'Commentaire envoyé !');
+      setCommentaire('');
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible d\'envoyer le commentaire');
+    } finally {
+      setEnvoi(false);
+    }
   };
 
-  const whatsappProprietaire = () => {
-    const tel = (annonce.owner?.phone || '+242068002151')
-      .replace(/\s/g, '')
-      .replace('+', '');
-    const msg = encodeURIComponent(
-      `Bonjour, je suis intéressé par votre bien : ${annonce.title}`
+  const envoyerMessage = async () => {
+    try {
+      const photoUrl = photos[0] || '';
+      const lienBien = 'https://altitudevision.agency/altimmo';
+
+      await api.post('/internal-mails', {
+        to: 'contact@altitudevision.agency',
+        subject: `Intérêt pour : ${annonce.title}`,
+        content:
+          `Bonjour,\n\n` +
+          `Je suis intéressé(e) par :\n\n` +
+          `📍 ${annonce.title}\n` +
+          `💰 ${prix.toLocaleString('fr-FR')} FCFA${isLocation ? '/mois' : ''}\n` +
+          `📍 ${annonce.location?.city || 'Brazzaville'}\n\n` +
+          `🔗 Annonce : ${lienBien}\n` +
+          `📸 Photo : ${photoUrl}\n\n` +
+          `Envoyé par : ${user?.name || 'Utilisateur Altimmo'}`,
+        type: 'externe'
+      });
+
+      Alert.alert(
+        '✅ Message envoyé !',
+        'L\'équipe Altimmo vous contactera sous 24h.'
+      );
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible d\'envoyer le message');
+    }
+  };
+
+  const partagerWhatsapp = () => {
+    const lienBien = 'https://altitudevision.agency/altimmo';
+    const message = encodeURIComponent(
+      `🏠 *${annonce.title}*\n` +
+      `💰 ${prix.toLocaleString('fr-FR')} FCFA${isLocation ? '/mois' : ''}\n` +
+      `📍 ${annonce.location?.city || 'Brazzaville'}\n\n` +
+      `🔗 ${lienBien}\n\n` +
+      `Via Altimmo — Altitude Vision`
     );
-    Linking.openURL(`https://wa.me/${tel}?text=${msg}`);
+    Linking.openURL(`https://wa.me/?text=${message}`);
   };
 
   const demanderVisite = () => {
     Alert.alert(
       'Demander une visite',
-      `Voulez-vous demander une visite pour "${annonce.title}" ?`,
+      `Voulez-vous visiter :\n"${annonce.title}" ?`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -56,7 +117,10 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       {/* Header flottant */}
       <View style={styles.headerFlottant}>
         <TouchableOpacity
@@ -70,7 +134,10 @@ export default function DetailAnnonceScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Galerie photos */}
         {photos.length > 0 ? (
           <View>
@@ -94,7 +161,6 @@ export default function DetailAnnonceScreen({ route, navigation }) {
               )}
               keyExtractor={(_, i) => i.toString()}
             />
-            {/* Indicateur photos */}
             <View style={styles.indicateur}>
               <Text style={styles.indicateurTxt}>
                 {photoIndex + 1}/{photos.length}
@@ -208,6 +274,36 @@ export default function DetailAnnonceScreen({ route, navigation }) {
             </>
           )}
 
+          {/* Commentaire */}
+          <View style={styles.sep} />
+          <Text style={styles.sectionTitre}>
+            Laisser un commentaire
+          </Text>
+          <View style={styles.commentaireBox}>
+            <TextInput
+              style={styles.commentaireInput}
+              placeholder="Votre avis sur ce bien..."
+              placeholderTextColor="#666"
+              value={commentaire}
+              onChangeText={setCommentaire}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+            <TouchableOpacity
+              style={[
+                styles.btnEnvoyer,
+                envoi && { opacity: 0.6 }
+              ]}
+              onPress={envoyerCommentaire}
+              disabled={envoi}
+            >
+              <Text style={styles.btnEnvoyerTxt}>
+                {envoi ? 'Envoi...' : 'Envoyer'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Espace pour les boutons */}
           <View style={{ height: 100 }} />
         </View>
@@ -224,21 +320,21 @@ export default function DetailAnnonceScreen({ route, navigation }) {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.btnWhatsapp}
-          onPress={whatsappProprietaire}
+          style={styles.btnMessage}
+          onPress={envoyerMessage}
         >
-          <Ionicons name="logo-whatsapp" size={20} color="#FFF" />
-          <Text style={styles.btnWhatsappTxt}>WhatsApp</Text>
+          <Ionicons name="chatbubble" size={20} color="#FFF" />
+          <Text style={styles.btnMessageTxt}>Message</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.btnAppel}
-          onPress={appelerProprietaire}
+          style={styles.btnShare}
+          onPress={partagerWhatsapp}
         >
-          <Ionicons name="call" size={20} color="#FFF" />
+          <Ionicons name="logo-whatsapp" size={22} color="#FFF" />
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -378,6 +474,31 @@ const styles = StyleSheet.create({
     color: '#CCC',
     fontSize: 13
   },
+  commentaireBox: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    marginBottom: 8
+  },
+  commentaireInput: {
+    color: '#FFF',
+    fontSize: 14,
+    minHeight: 80,
+    marginBottom: 8
+  },
+  btnEnvoyer: {
+    backgroundColor: '#C8960C',
+    borderRadius: 8,
+    padding: 10,
+    alignItems: 'center'
+  },
+  btnEnvoyerTxt: {
+    color: '#000',
+    fontWeight: 'bold',
+    fontSize: 14
+  },
   actionsBar: {
     position: 'absolute',
     bottom: 0,
@@ -389,7 +510,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A0A0A',
     borderTopWidth: 1,
     borderTopColor: '#2A2A2A',
-    gap: 12
+    gap: 10
   },
   btnVisiter: {
     flex: 1,
@@ -404,25 +525,25 @@ const styles = StyleSheet.create({
   btnVisiterTxt: {
     color: '#000',
     fontWeight: 'bold',
-    fontSize: 16
+    fontSize: 15
   },
-  btnWhatsapp: {
+  btnMessage: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#25D366',
+    backgroundColor: '#1D4ED8',
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8
   },
-  btnWhatsappTxt: {
+  btnMessageTxt: {
     color: '#FFF',
     fontWeight: 'bold',
-    fontSize: 16
+    fontSize: 15
   },
-  btnAppel: {
-    backgroundColor: '#3B82F6',
+  btnShare: {
+    backgroundColor: '#25D366',
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',

@@ -58,54 +58,66 @@ export default function ListeAnnoncesScreen({ navigation }) {
     return matchRecherche && matchFiltre;
   });
 
-  const renderAnnonce = ({ item }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => navigation.navigate(
-        'DetailAnnonce', { annonce: item }
-      )}
-    >
-      <Image
-        source={{
-          uri: item.images?.[0] ||
-            item.photos?.[0] ||
-            'https://via.placeholder.com/300x200/1A1A1A/C8960C?text=Altimmo'
-        }}
-        style={styles.image}
-        resizeMode="cover"
-      />
-      <View style={styles.badge}>
-        <Text style={styles.badgeTexte}>
-          {item.transactionType === 'location'
-            ? 'LOCATION' : 'VENTE'}
-        </Text>
-      </View>
-      <View style={styles.cardContent}>
-        <Text style={styles.titre}
-          numberOfLines={2}>
-          {item.title}
-        </Text>
-        <View style={styles.localisation}>
-          <Ionicons
-            name="location"
-            size={14}
-            color="#C8960C"
-          />
-          <Text style={styles.ville}>
-            {item.location?.neighborhood ||
-             item.location?.city ||
-             'Brazzaville'}
+  const renderAnnonce = ({ item }) => {
+    const isLocation =
+      item.transactionType === 'location' ||
+      item.transactionType === 'Location' ||
+      item.transactionType === 'LOCATION' ||
+      item.type === 'location' ||
+      item.type === 'Location' ||
+      item.typeTransaction === 'location' ||
+      item.typeTransaction === 'Location';
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate(
+          'DetailAnnonce', { annonce: item }
+        )}
+      >
+        <Image
+          source={{
+            uri: item.images?.[0] ||
+              item.photos?.[0] ||
+              'https://via.placeholder.com/300x200/1A1A1A/C8960C?text=Altimmo'
+          }}
+          style={styles.image}
+          resizeMode="cover"
+        />
+        <View style={[
+          styles.badge,
+          { backgroundColor: isLocation ? '#3B82F6' : '#22C55E' }
+        ]}>
+          <Text style={styles.badgeTexte}>
+            {isLocation ? 'LOCATION' : 'VENTE'}
           </Text>
         </View>
-        <Text style={styles.prix}>
-          {item.price?.toLocaleString('fr-FR')}
-          {' '}FCFA
-          {item.transactionType === 'location'
-            ? '/mois' : ''}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.cardContent}>
+          <Text style={styles.titre}
+            numberOfLines={2}>
+            {item.title}
+          </Text>
+          <View style={styles.localisation}>
+            <Ionicons
+              name="location"
+              size={14}
+              color="#C8960C"
+            />
+            <Text style={styles.ville}>
+              {item.location?.neighborhood ||
+               item.location?.city ||
+               'Brazzaville'}
+            </Text>
+          </View>
+          <Text style={styles.prix}>
+            {item.price?.toLocaleString('fr-FR')}
+            {' '}FCFA
+            {isLocation ? '/mois' : ''}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
