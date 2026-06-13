@@ -6,6 +6,8 @@ import { View, Text, StyleSheet } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
 import ListeAnnoncesScreen from '../screens/Annonces/ListeAnnoncesScreen';
+import ConversationsScreen from '../screens/Messagerie/ConversationsScreen';
+import VisitesScreen from '../screens/Visites/VisitesScreen';
 import ProfilScreen from '../screens/Profil/ProfilScreen';
 
 const Tab = createBottomTabNavigator();
@@ -23,14 +25,6 @@ function StubScreen({ title, emoji }) {
 
 function PublierScreen() {
   return <StubScreen emoji="➕" title="Publier un bien" />;
-}
-
-function MessagesScreen() {
-  return <StubScreen emoji="💬" title="Messagerie" />;
-}
-
-function VisitesScreen() {
-  return <StubScreen emoji="📅" title="Visites" />;
 }
 
 function AnnoncesStack() {
@@ -92,7 +86,7 @@ export default function TabNavigator() {
       )}
       <Tab.Screen
         name="Messages"
-        component={MessagesScreen}
+        component={ConversationsScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles" size={size} color={color} />
