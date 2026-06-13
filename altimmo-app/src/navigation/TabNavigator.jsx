@@ -6,6 +6,7 @@ import { View, Text, StyleSheet } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
 import ListeAnnoncesScreen from '../screens/Annonces/ListeAnnoncesScreen';
+import DetailAnnonceScreen from '../screens/Annonces/DetailAnnonceScreen';
 import ConversationsScreen from '../screens/Messagerie/ConversationsScreen';
 import VisitesScreen from '../screens/Visites/VisitesScreen';
 import ProfilScreen from '../screens/Profil/ProfilScreen';
@@ -38,6 +39,10 @@ function AnnoncesStack() {
       <Stack.Screen
         name="ListeAnnonces"
         component={ListeAnnoncesScreen}
+      />
+      <Stack.Screen
+        name="DetailAnnonce"
+        component={DetailAnnonceScreen}
       />
     </Stack.Navigator>
   );

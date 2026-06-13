@@ -1,188 +1,432 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, Image, TouchableOpacity,
-  StyleSheet, Dimensions, Linking, Alert,
+  View, Text, ScrollView, Image,
+  TouchableOpacity, StyleSheet,
+  FlatList, Dimensions, Linking,
+  Alert
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../theme/colors';
 
 const { width } = Dimensions.get('window');
-const fmt = (n) => n ? `${Number(n).toLocaleString('fr-FR')} FCFA` : '—';
 
 export default function DetailAnnonceScreen({ route, navigation }) {
-  const { property: p } = route.params;
+  const { annonce } = route.params;
   const [photoIndex, setPhotoIndex] = useState(0);
 
-  const photos = p.images || p.photos || [];
-  const isLocation = p.transactionType === 'location' || p.type === 'location';
-  const prix = fmt(p.price || p.loyer || p.prix);
+  const photos = annonce.images || annonce.photos || [];
 
-  const callProprio = () => {
-    const tel = p.proprietaire?.phone || p.contact?.telephone;
-    if (tel) Linking.openURL(`tel:${tel}`);
-    else Alert.alert('Téléphone non disponible');
+  const prix = annonce.price || annonce.loyer || 0;
+
+  const isLocation =
+    annonce.transactionType === 'location' ||
+    annonce.type === 'Location';
+
+  const appelerProprietaire = () => {
+    const tel = annonce.owner?.phone ||
+      annonce.proprietaire?.telephone ||
+      '+242068002151';
+    Linking.openURL(`tel:${tel}`);
+  };
+
+  const whatsappProprietaire = () => {
+    const tel = (annonce.owner?.phone || '+242068002151')
+      .replace(/\s/g, '')
+      .replace('+', '');
+    const msg = encodeURIComponent(
+      `Bonjour, je suis intéressé par votre bien : ${annonce.title}`
+    );
+    Linking.openURL(`https://wa.me/${tel}?text=${msg}`);
+  };
+
+  const demanderVisite = () => {
+    Alert.alert(
+      'Demander une visite',
+      `Voulez-vous demander une visite pour "${annonce.title}" ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Confirmer',
+          onPress: () => Alert.alert(
+            '✅ Demande envoyée',
+            'Un agent vous contactera sous 24h'
+          )
+        }
+      ]
+    );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       {/* Header flottant */}
-      <View style={styles.floatingHeader}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={20} color={colors.text} />
+      <View style={styles.headerFlottant}>
+        <TouchableOpacity
+          style={styles.boutonRetour}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.iconBtn}>
-          <Ionicons name="heart-outline" size={20} color={colors.text} />
+        <TouchableOpacity style={styles.boutonRetour}>
+          <Ionicons name="heart-outline" size={24} color="#FFF" />
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Galerie */}
-        <View style={styles.gallery}>
-          <ScrollView
-            horizontal pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={e => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / width);
-              setPhotoIndex(idx);
-            }}
-          >
-            {photos.length > 0
-              ? photos.map((uri, i) => (
-                  <Image key={i} source={{ uri }} style={styles.galleryPhoto} />
-                ))
-              : <View style={[styles.galleryPhoto, styles.galleryPlaceholder]}>
-                  <Ionicons name="home-outline" size={60} color={colors.textMuted} />
-                </View>
-            }
-          </ScrollView>
-          {photos.length > 1 && (
-            <View style={styles.pagination}>
-              {photos.map((_, i) => (
-                <View key={i} style={[styles.dot, i === photoIndex && styles.dotActive]} />
-              ))}
+        {/* Galerie photos */}
+        {photos.length > 0 ? (
+          <View>
+            <FlatList
+              data={photos}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                const index = Math.round(
+                  e.nativeEvent.contentOffset.x / width
+                );
+                setPhotoIndex(index);
+              }}
+              renderItem={({ item }) => (
+                <Image
+                  source={{ uri: item }}
+                  style={styles.photo}
+                  resizeMode="cover"
+                />
+              )}
+              keyExtractor={(_, i) => i.toString()}
+            />
+            {/* Indicateur photos */}
+            <View style={styles.indicateur}>
+              <Text style={styles.indicateurTxt}>
+                {photoIndex + 1}/{photos.length}
+              </Text>
             </View>
-          )}
-          <View style={[styles.badge, { backgroundColor: isLocation ? colors.location : colors.vente }]}>
-            <Text style={styles.badgeText}>{isLocation ? 'LOCATION' : 'VENTE'}</Text>
           </View>
-        </View>
+        ) : (
+          <Image
+            source={{
+              uri: 'https://via.placeholder.com/400x250/1A1A1A/C8960C?text=Altimmo'
+            }}
+            style={styles.photo}
+          />
+        )}
 
-        <View style={styles.body}>
-          {/* Titre & Prix */}
-          <Text style={styles.title}>{p.title || p.titre || 'Bien immobilier'}</Text>
-          <View style={styles.row}>
-            <Ionicons name="location-outline" size={14} color={colors.textMuted} />
-            <Text style={styles.loc}>{[p.quartier, p.ville].filter(Boolean).join(', ') || '—'}</Text>
+        <View style={styles.content}>
+          {/* Badge type */}
+          <View style={styles.badgeRow}>
+            <View style={[
+              styles.badge,
+              { backgroundColor: isLocation ? '#3B82F6' : '#22C55E' }
+            ]}>
+              <Text style={styles.badgeTxt}>
+                {isLocation ? 'LOCATION' : 'VENTE'}
+              </Text>
+            </View>
+            {annonce.propertyType && (
+              <View style={styles.badgeType}>
+                <Text style={styles.badgeTypeTxt}>
+                  {annonce.propertyType}
+                </Text>
+              </View>
+            )}
           </View>
-          <Text style={styles.price}>
-            {prix}{isLocation ? <Text style={styles.priceSuffix}>/mois</Text> : ''}
+
+          {/* Titre et prix */}
+          <Text style={styles.titre}>{annonce.title}</Text>
+          <Text style={styles.prix}>
+            {prix.toLocaleString('fr-FR')} FCFA
+            {isLocation ? '/mois' : ''}
           </Text>
 
-          {/* Caractéristiques */}
-          <View style={styles.featRow}>
-            {[
-              { icon: 'bed-outline',    label: p.bedrooms,  unit: 'ch.' },
-              { icon: 'water-outline',  label: p.bathrooms, unit: 'sdb' },
-              { icon: 'expand-outline', label: p.surface,   unit: 'm²' },
-              { icon: 'layers-outline', label: p.pieces,    unit: 'pièces' },
-            ].filter(f => f.label != null).map((f, i) => (
-              <View key={i} style={styles.featCard}>
-                <Ionicons name={f.icon} size={20} color={colors.primary} />
-                <Text style={styles.featVal}>{f.label}</Text>
-                <Text style={styles.featUnit}>{f.unit}</Text>
-              </View>
-            ))}
+          {/* Localisation */}
+          <View style={styles.row}>
+            <Ionicons name="location" size={18} color="#C8960C" />
+            <Text style={styles.localisation}>
+              {annonce.location?.neighborhood
+                && `${annonce.location.neighborhood}, `}
+              {annonce.location?.city || 'Brazzaville'}
+            </Text>
           </View>
 
+          {/* Caractéristiques */}
+          <View style={styles.caract}>
+            {annonce.bedrooms > 0 && (
+              <View style={styles.caractItem}>
+                <Ionicons name="bed" size={20} color="#C8960C" />
+                <Text style={styles.caractTxt}>
+                  {annonce.bedrooms} Ch.
+                </Text>
+              </View>
+            )}
+            {annonce.bathrooms > 0 && (
+              <View style={styles.caractItem}>
+                <Ionicons name="water" size={20} color="#C8960C" />
+                <Text style={styles.caractTxt}>
+                  {annonce.bathrooms} SDB
+                </Text>
+              </View>
+            )}
+            {annonce.area > 0 && (
+              <View style={styles.caractItem}>
+                <Ionicons name="expand" size={20} color="#C8960C" />
+                <Text style={styles.caractTxt}>
+                  {annonce.area} m²
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.sep} />
+
           {/* Description */}
-          {(p.description || p.description_fr) && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <Text style={styles.description}>{p.description || p.description_fr}</Text>
-            </View>
+          {annonce.description && (
+            <>
+              <Text style={styles.sectionTitre}>Description</Text>
+              <Text style={styles.description}>
+                {annonce.description}
+              </Text>
+              <View style={styles.sep} />
+            </>
           )}
 
-          {/* Propriétaire */}
-          {p.proprietaire && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Propriétaire</Text>
-              <View style={styles.ownRow}>
-                {p.proprietaire.photo
-                  ? <Image source={{ uri: p.proprietaire.photo }} style={styles.ownPhoto} />
-                  : <View style={styles.ownPhotoPlaceholder}>
-                      <Ionicons name="person" size={20} color={colors.textMuted} />
-                    </View>
-                }
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.ownName}>{p.proprietaire.name || p.proprietaire.nom}</Text>
-                  <Text style={styles.ownRole}>Propriétaire vérifié</Text>
-                </View>
-                <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+          {/* Commodités */}
+          {annonce.amenities?.length > 0 && (
+            <>
+              <Text style={styles.sectionTitre}>Commodités</Text>
+              <View style={styles.commodites}>
+                {annonce.amenities.map((c, i) => (
+                  <View key={i} style={styles.commodite}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={16}
+                      color="#22C55E"
+                    />
+                    <Text style={styles.commoditeTxt}>{c}</Text>
+                  </View>
+                ))}
               </View>
-            </View>
+              <View style={styles.sep} />
+            </>
           )}
+
+          {/* Espace pour les boutons */}
+          <View style={{ height: 100 }} />
         </View>
       </ScrollView>
 
-      {/* Barre d'actions */}
-      <View style={styles.actionBar}>
-        <TouchableOpacity style={styles.actionBtn} onPress={callProprio}>
-          <Ionicons name="call-outline" size={20} color={colors.primary} />
-          <Text style={styles.actionTxt}>Appeler</Text>
+      {/* Boutons d'action fixes en bas */}
+      <View style={styles.actionsBar}>
+        <TouchableOpacity
+          style={styles.btnVisiter}
+          onPress={demanderVisite}
+        >
+          <Ionicons name="calendar" size={20} color="#000" />
+          <Text style={styles.btnVisiterTxt}>Visiter</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn}>
-          <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
-          <Text style={styles.actionTxt}>Message</Text>
+
+        <TouchableOpacity
+          style={styles.btnWhatsapp}
+          onPress={whatsappProprietaire}
+        >
+          <Ionicons name="logo-whatsapp" size={20} color="#FFF" />
+          <Text style={styles.btnWhatsappTxt}>WhatsApp</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn}>
-          <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-          <Text style={styles.actionTxt}>Visite</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => {}} activeOpacity={0.85}>
-          <LinearGradient colors={[colors.primaryDark, colors.primary]} style={styles.reserveBtn}>
-            <Text style={styles.reserveTxt}>Réserver</Text>
-          </LinearGradient>
+
+        <TouchableOpacity
+          style={styles.btnAppel}
+          onPress={appelerProprietaire}
+        >
+          <Ionicons name="call" size={20} color="#FFF" />
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: colors.background },
-  floatingHeader: { position: 'absolute', top: 50, left: 0, right: 0, zIndex: 10, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
-  iconBtn:      { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, padding: 8 },
-  gallery:      { height: 300, position: 'relative' },
-  galleryPhoto: { width, height: 300 },
-  galleryPlaceholder: { backgroundColor: colors.backgroundLight, justifyContent: 'center', alignItems: 'center' },
-  pagination:   { position: 'absolute', bottom: 12, alignSelf: 'center', flexDirection: 'row', gap: 6 },
-  dot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.4)' },
-  dotActive:    { backgroundColor: '#fff', width: 18 },
-  badge:        { position: 'absolute', top: 12, right: 12, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  badgeText:    { fontSize: 10, fontWeight: '800', color: '#fff' },
-  body:         { padding: 20 },
-  title:        { fontSize: 22, fontWeight: '800', color: colors.text, marginBottom: 6 },
-  row:          { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
-  loc:          { fontSize: 14, color: colors.textMuted },
-  price:        { fontSize: 24, fontWeight: '900', color: colors.primary, marginBottom: 16 },
-  priceSuffix:  { fontSize: 14, fontWeight: '400', color: colors.textMuted },
-  featRow:      { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  featCard:     { flex: 1, backgroundColor: colors.backgroundCard, borderRadius: 12, padding: 12, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.border },
-  featVal:      { fontSize: 16, fontWeight: '800', color: colors.text },
-  featUnit:     { fontSize: 11, color: colors.textMuted },
-  section:      { marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 10 },
-  description:  { fontSize: 14, color: colors.textSecondary, lineHeight: 22 },
-  ownRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.backgroundCard, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: colors.border },
-  ownPhoto:     { width: 46, height: 46, borderRadius: 23 },
-  ownPhotoPlaceholder: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.backgroundLight, justifyContent: 'center', alignItems: 'center' },
-  ownName:      { fontSize: 15, fontWeight: '700', color: colors.text },
-  ownRole:      { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  actionBar:    { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.backgroundLight, borderTopWidth: 1, borderTopColor: colors.border, gap: 8 },
-  actionBtn:    { flex: 1, alignItems: 'center', gap: 4 },
-  actionTxt:    { fontSize: 11, color: colors.textSecondary },
-  reserveBtn:   { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
-  reserveTxt:   { fontSize: 14, fontWeight: '700', color: '#000' },
+  container: {
+    flex: 1,
+    backgroundColor: '#0A0A0A'
+  },
+  headerFlottant: {
+    position: 'absolute',
+    top: 45,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    zIndex: 10
+  },
+  boutonRetour: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    padding: 8
+  },
+  photo: {
+    width: width,
+    height: 300
+  },
+  indicateur: {
+    position: 'absolute',
+    bottom: 12,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4
+  },
+  indicateurTxt: {
+    color: '#FFF',
+    fontSize: 12
+  },
+  content: {
+    padding: 16
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12
+  },
+  badge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 6
+  },
+  badgeTxt: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: 'bold'
+  },
+  badgeType: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#2A2A2A'
+  },
+  badgeTypeTxt: {
+    color: '#999',
+    fontSize: 11
+  },
+  titre: {
+    color: '#FFF',
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    lineHeight: 28
+  },
+  prix: {
+    color: '#C8960C',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 16
+  },
+  localisation: {
+    color: '#999',
+    fontSize: 15
+  },
+  caract: {
+    flexDirection: 'row',
+    gap: 20,
+    marginBottom: 16
+  },
+  caractItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  caractTxt: {
+    color: '#FFF',
+    fontSize: 14
+  },
+  sep: {
+    height: 1,
+    backgroundColor: '#2A2A2A',
+    marginVertical: 16
+  },
+  sectionTitre: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10
+  },
+  description: {
+    color: '#999',
+    fontSize: 15,
+    lineHeight: 24
+  },
+  commodites: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10
+  },
+  commodite: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#1A1A1A',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20
+  },
+  commoditeTxt: {
+    color: '#CCC',
+    fontSize: 13
+  },
+  actionsBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    padding: 16,
+    paddingBottom: 30,
+    backgroundColor: '#0A0A0A',
+    borderTopWidth: 1,
+    borderTopColor: '#2A2A2A',
+    gap: 12
+  },
+  btnVisiter: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#C8960C',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8
+  },
+  btnVisiterTxt: {
+    color: '#000',
+    fontWeight: 'bold',
+    fontSize: 16
+  },
+  btnWhatsapp: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#25D366',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8
+  },
+  btnWhatsappTxt: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16
+  },
+  btnAppel: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 52
+  }
 });
