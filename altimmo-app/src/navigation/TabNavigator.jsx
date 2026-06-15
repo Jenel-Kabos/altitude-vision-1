@@ -2,7 +2,6 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
 import ListeAnnoncesScreen from '../screens/Annonces/ListeAnnoncesScreen';
@@ -10,23 +9,10 @@ import DetailAnnonceScreen from '../screens/Annonces/DetailAnnonceScreen';
 import ConversationsScreen from '../screens/Messagerie/ConversationsScreen';
 import VisitesScreen from '../screens/Visites/VisitesScreen';
 import ProfilScreen from '../screens/Profil/ProfilScreen';
+import PublierBienScreen from '../screens/Publication/PublierBienScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
-
-function StubScreen({ title, emoji }) {
-  return (
-    <View style={stubStyles.container}>
-      <Text style={stubStyles.emoji}>{emoji}</Text>
-      <Text style={stubStyles.title}>{title}</Text>
-      <Text style={stubStyles.subtitle}>Bientôt disponible</Text>
-    </View>
-  );
-}
-
-function PublierScreen() {
-  return <StubScreen emoji="➕" title="Publier un bien" />;
-}
 
 function AnnoncesStack() {
   return (
@@ -81,7 +67,7 @@ export default function TabNavigator() {
       {canAdd && (
         <Tab.Screen
           name="Publier"
-          component={PublierScreen}
+          component={PublierBienScreen}
           options={{
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="add-circle" size={size} color={color} />
@@ -119,27 +105,3 @@ export default function TabNavigator() {
     </Tab.Navigator>
   );
 }
-
-const stubStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0A0A0A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24
-  },
-  emoji: {
-    fontSize: 56,
-    marginBottom: 16
-  },
-  title: {
-    color: '#C8960C',
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 8
-  },
-  subtitle: {
-    color: '#666',
-    fontSize: 14
-  }
-});
