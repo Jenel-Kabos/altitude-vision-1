@@ -1,199 +1,644 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform,
-  ScrollView, Alert, ActivityIndicator,
+  StyleSheet, SafeAreaView, KeyboardAvoidingView,
+  Platform, ScrollView, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
+import { colors, typography, spacing } from '../../theme';
+import Button from '../../components/ui/Button';
 
 const ROLES = [
-  { value: 'Client',       label: '👤 Client',       desc: 'Recherche de bien' },
-  { value: 'Proprietaire', label: '🏠 Propriétaire', desc: 'Publiez vos biens' },
+  {
+    value: 'Client',
+    icon: 'person-outline',
+    label: 'Client',
+    desc: 'Chercher et louer des biens',
+  },
+  {
+    value: 'Proprietaire',
+    icon: 'home-outline',
+    label: 'Propriétaire',
+    desc: 'Publier et gérer vos biens',
+  },
 ];
 
-const CERTIFICATIONS = [
-  { key: 'contratAccepte',       label: "J'accepte le contrat d'hébergement" },
-  { key: 'informationsVraies',   label: 'Informations vraies et exactes' },
-  { key: 'estProprietaireLegal', label: 'Je suis propriétaire légal ou apporteur' },
-  { key: 'engagementHonnetete',  label: "Je m'engage à l'honnêteté" },
-  { key: 'commissionAcceptee',   label: "J'accepte les conditions de rémunération" },
+const CERTS = [
+  { key: 'contratAccepte',       label: "J'accepte le contrat d'hébergement Altimmo" },
+  { key: 'informationsVraies',   label: 'Les informations que je fournis sont exactes' },
+  { key: 'estProprietaireLegal', label: 'Je suis le propriétaire légal des biens publiés' },
+  { key: 'engagementHonnetete',  label: "Je m'engage à agir honnêtement" },
+  { key: 'commissionAcceptee',   label: "J'accepte la commission d'Altimmo" },
 ];
+
+const STEP_LABELS = ['Infos', 'Profil', 'Engagements'];
 
 export default function RegisterScreen({ navigation }) {
   const { register } = useAuth();
-  const [role,     setRole]     = useState('Client');
-  const [form,     setForm]     = useState({ prenom:'', nom:'', email:'', telephone:'', password:'' });
+  const [step, setStep] = useState(1);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('Client');
   const [showPass, setShowPass] = useState(false);
-  const [loading,  setLoading]  = useState(false);
-  const [certs,    setCerts]    = useState({
-    contratAccepte: false, informationsVraies: false,
-    estProprietaireLegal: false, engagementHonnetete: false, commissionAcceptee: false,
+  const [focused, setFocused] = useState(null);
+  const [certs, setCerts] = useState({
+    contratAccepte: false,
+    informationsVraies: false,
+    estProprietaireLegal: false,
+    engagementHonnetete: false,
+    commissionAcceptee: false,
   });
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const toggleCert = (k) => setCerts(c => ({ ...c, [k]: !c[k] }));
+  const [loading, setLoading] = useState(false);
+  const [erreur, setErreur] = useState('');
 
   const isProprietaire = role === 'Proprietaire';
-  const toutAccepte    = isProprietaire ? Object.values(certs).every(Boolean) : true;
+  const allCertsChecked = Object.values(certs).every(Boolean);
+
+  const validateStep1 = () => {
+    if (!name.trim() || !email.trim() || !password) {
+      setErreur('Tous les champs sont requis');
+      return false;
+    }
+    if (password.length < 8) {
+      setErreur('Mot de passe trop court (8 caractères minimum)');
+      return false;
+    }
+    setErreur('');
+    return true;
+  };
+
+  const toggleCert = (key) => {
+    setCerts(c => ({ ...c, [key]: !c[key] }));
+  };
+
+  const goNext = () => {
+    if (validateStep1()) setStep(2);
+  };
+
+  const goBack = () => {
+    setErreur('');
+    setStep(s => Math.max(1, s - 1));
+  };
+
+  const handleStep2Next = () => {
+    setErreur('');
+    if (isProprietaire) {
+      setStep(3);
+    } else {
+      handleRegister();
+    }
+  };
 
   const handleRegister = async () => {
-    const { prenom, nom, email, telephone, password } = form;
-    if (!prenom || !nom || !email || !password) return Alert.alert('Erreur', 'Tous les champs sont requis.');
-    if (password.length < 8) return Alert.alert('Erreur', 'Mot de passe trop court (min 8 caractères).');
-    if (isProprietaire && !toutAccepte) return Alert.alert('Erreur', 'Cochez toutes les certifications.');
-
+    if (isProprietaire && !allCertsChecked) {
+      setErreur('Cochez tous les engagements');
+      return;
+    }
     setLoading(true);
+    setErreur('');
     try {
-      await register({
-        name:            `${prenom.trim()} ${nom.trim()}`,
-        email:           email.trim().toLowerCase(),
-        password,
-        passwordConfirm: password,
-        phone:           telephone.trim(),
-        role,
-        ...(isProprietaire && { contratAccepte: true, certifications: certs }),
-      });
-      Alert.alert('Inscription réussie', 'Vérifiez votre email pour activer votre compte.', [
-        { text: 'OK', onPress: () => navigation.navigate('Login') },
-      ]);
+      const payload = isProprietaire
+        ? {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            password,
+            passwordConfirm: password,
+            role,
+            ...certs,
+          }
+        : {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            password,
+            passwordConfirm: password,
+            role,
+          };
+      await register(payload);
+      Alert.alert(
+        'Inscription réussie',
+        'Vérifiez votre email pour activer votre compte.',
+        [{ text: 'OK', onPress: () => navigation.navigate('Login') }],
+      );
     } catch (err) {
-      Alert.alert('Erreur', err.response?.data?.message || "Erreur lors de l'inscription.");
+      setErreur(err.response?.data?.message || "Erreur lors de l'inscription.");
     } finally {
       setLoading(false);
     }
   };
 
+  // ─── Stepper renderers ────────────────────────────────────────
+
+  const renderDot = (n) => {
+    const isDisabled = n === 3 && role === 'Client';
+    const isCompleted = n < step && !isDisabled;
+    const isActive = n === step && !isDisabled;
+
+    if (isCompleted) {
+      return (
+        <View style={[styles.dot, styles.dotCompleted]}>
+          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+        </View>
+      );
+    }
+    if (isActive) {
+      return (
+        <View style={[styles.dot, styles.dotActive]}>
+          <Text style={styles.dotNumActive}>{n}</Text>
+        </View>
+      );
+    }
+    return (
+      <View style={[styles.dot, styles.dotFuture]}>
+        <Text style={styles.dotNumFuture}>{n}</Text>
+      </View>
+    );
+  };
+
+  const renderLabel = (n) => {
+    const isDisabled = n === 3 && role === 'Client';
+    if (isDisabled) return null;
+    const isActive = n === step;
+    return (
+      <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>
+        {STEP_LABELS[n - 1]}
+      </Text>
+    );
+  };
+
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={22} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Créer un compte</Text>
-        </View>
-
-        {/* Sélection rôle */}
-        <View style={styles.rolesRow}>
-          {ROLES.map(r => (
-            <TouchableOpacity
-              key={r.value}
-              style={[styles.roleCard, role === r.value && styles.roleCardActive]}
-              onPress={() => setRole(r.value)}
-            >
-              <Text style={styles.roleEmoji}>{r.label.split(' ')[0]}</Text>
-              <Text style={[styles.roleLabel, role === r.value && { color: colors.primary }]}>
-                {r.label.split(' ').slice(1).join(' ')}
-              </Text>
-              <Text style={styles.roleDesc}>{r.desc}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.form}>
-          {[
-            { key:'prenom',    placeholder:'Prénom', icon:'person-outline' },
-            { key:'nom',       placeholder:'Nom',    icon:'person-outline' },
-            { key:'email',     placeholder:'Email',  icon:'mail-outline',    keyboard:'email-address' },
-            { key:'telephone', placeholder:'Téléphone (+242...)', icon:'call-outline', keyboard:'phone-pad' },
-          ].map(field => (
-            <View key={field.key} style={styles.inputWrap}>
-              <Ionicons name={field.icon} size={18} color={colors.textMuted} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder={field.placeholder}
-                placeholderTextColor={colors.textMuted}
-                value={form[field.key]}
-                onChangeText={v => set(field.key, v)}
-                autoCapitalize={field.key === 'email' ? 'none' : 'words'}
-                keyboardType={field.keyboard || 'default'}
-              />
-            </View>
-          ))}
-
-          {/* Mot de passe */}
-          <View style={styles.inputWrap}>
-            <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Mot de passe (min 8 caractères)"
-              placeholderTextColor={colors.textMuted}
-              value={form.password}
-              onChangeText={v => set('password', v)}
-              secureTextEntry={!showPass}
-            />
-            <TouchableOpacity onPress={() => setShowPass(!showPass)} style={{ padding: 6 }}>
-              <Ionicons name={showPass ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.textMuted} />
-            </TouchableOpacity>
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Brand header */}
+          <View style={styles.header}>
+            <Text style={styles.brand}>ALTIMMO</Text>
+            <View style={styles.brandRule} />
+            <Text style={styles.subtitle}>
+              Votre partenaire immobilier
+            </Text>
           </View>
 
-          {/* Certifications propriétaire */}
-          {isProprietaire && (
-            <View style={styles.certsBox}>
-              <Text style={styles.certsTitle}>Certifications requises</Text>
-              {CERTIFICATIONS.map(c => (
-                <TouchableOpacity key={c.key} style={styles.certRow} onPress={() => toggleCert(c.key)}>
-                  <View style={[styles.checkbox, certs[c.key] && styles.checkboxActive]}>
-                    {certs[c.key] && <Ionicons name="checkmark" size={12} color="#000" />}
-                  </View>
-                  <Text style={styles.certLabel}>{c.label}</Text>
+          {/* Stepper */}
+          <View style={styles.stepperRow}>
+            <View style={styles.stepCol}>
+              {renderDot(1)}
+              {renderLabel(1)}
+            </View>
+            <View style={styles.barCol}>
+              <View style={[styles.bar, step > 1 && styles.barCompleted]} />
+            </View>
+            <View style={styles.stepCol}>
+              {renderDot(2)}
+              {renderLabel(2)}
+            </View>
+            <View style={styles.barCol}>
+              <View style={[styles.bar, step > 2 && styles.barCompleted]} />
+            </View>
+            <View style={styles.stepCol}>
+              {renderDot(3)}
+              {renderLabel(3)}
+            </View>
+          </View>
+
+          {/* Étape 1 — Infos */}
+          {step === 1 && (
+            <View style={styles.form}>
+              {/* Nom */}
+              <View style={[styles.inputWrap, focused === 'name' && styles.inputWrapFocused]}>
+                <Ionicons name="person-outline" size={18} color={colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Nom complet"
+                  placeholderTextColor={colors.textMuted}
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                  onFocus={() => setFocused('name')}
+                  onBlur={() => setFocused(null)}
+                />
+              </View>
+
+              {/* Email */}
+              <View style={[styles.inputWrap, focused === 'email' && styles.inputWrapFocused]}>
+                <Ionicons name="mail-outline" size={18} color={colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email"
+                  placeholderTextColor={colors.textMuted}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  onFocus={() => setFocused('email')}
+                  onBlur={() => setFocused(null)}
+                />
+              </View>
+
+              {/* Mot de passe */}
+              <View style={[styles.inputWrap, focused === 'password' && styles.inputWrapFocused]}>
+                <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Mot de passe (min 8 caractères)"
+                  placeholderTextColor={colors.textMuted}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPass}
+                  onFocus={() => setFocused('password')}
+                  onBlur={() => setFocused(null)}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPass(!showPass)}
+                  style={styles.eyeBtn}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name={showPass ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={colors.textMuted}
+                  />
                 </TouchableOpacity>
-              ))}
+              </View>
+
+              {erreur ? <Text style={styles.error}>{erreur}</Text> : null}
+
+              <Button
+                label="Suivant"
+                onPress={goNext}
+                fullWidth
+                variant="primary"
+                icon="arrow-forward"
+              />
             </View>
           )}
 
-          <TouchableOpacity
-            onPress={handleRegister}
-            disabled={loading || !toutAccepte}
-            activeOpacity={0.85}
-          >
-            <LinearGradient
-              colors={(!toutAccepte || loading) ? ['#555', '#555'] : [colors.primaryDark, colors.primary]}
-              style={styles.btnPrimary}
-            >
-              {loading
-                ? <ActivityIndicator color="#000" />
-                : <Text style={styles.btnPrimaryText}>S'inscrire</Text>
-              }
-            </LinearGradient>
-          </TouchableOpacity>
+          {/* Étape 2 — Profil */}
+          {step === 2 && (
+            <View style={styles.form}>
+              <Text style={styles.sectionTitle}>Quel est votre profil ?</Text>
 
-          <TouchableOpacity onPress={() => navigation.navigate('Login')} style={{ alignItems: 'center', marginTop: 16 }}>
-            <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
-              Déjà un compte ? <Text style={{ color: colors.primary, fontWeight: '700' }}>Se connecter</Text>
+              <View style={styles.rolesCol}>
+                {ROLES.map(r => {
+                  const selected = role === r.value;
+                  return (
+                    <TouchableOpacity
+                      key={r.value}
+                      style={[styles.roleCard, selected && styles.roleCardSelected]}
+                      onPress={() => setRole(r.value)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={[styles.roleIcon, selected && styles.roleIconSelected]}>
+                        <Ionicons
+                          name={r.icon}
+                          size={24}
+                          color={selected ? colors.primary : colors.textSecondary}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.roleLabel, selected && styles.roleLabelSelected]}>
+                          {r.label}
+                        </Text>
+                        <Text style={styles.roleDesc}>{r.desc}</Text>
+                      </View>
+                      {selected ? (
+                        <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {erreur ? <Text style={styles.error}>{erreur}</Text> : null}
+
+              <View style={styles.actionsRow}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label="Précédent"
+                    onPress={goBack}
+                    variant="outline"
+                    fullWidth
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label={isProprietaire ? 'Suivant' : "S'inscrire"}
+                    onPress={handleStep2Next}
+                    loading={!isProprietaire && loading}
+                    variant="primary"
+                    fullWidth
+                    icon={isProprietaire ? 'arrow-forward' : undefined}
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Étape 3 — Engagements (proprietaire uniquement) */}
+          {step === 3 && (
+            <View style={styles.form}>
+              <Text style={styles.sectionTitle}>Engagements propriétaire</Text>
+
+              <View style={styles.certsList}>
+                {CERTS.map(c => {
+                  const checked = certs[c.key];
+                  return (
+                    <TouchableOpacity
+                      key={c.key}
+                      style={styles.certRow}
+                      onPress={() => toggleCert(c.key)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                        {checked ? (
+                          <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                        ) : null}
+                      </View>
+                      <Text style={styles.certLabel}>{c.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {erreur ? <Text style={styles.error}>{erreur}</Text> : null}
+
+              <View style={styles.actionsRow}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label="Précédent"
+                    onPress={goBack}
+                    variant="outline"
+                    fullWidth
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label="S'inscrire"
+                    onPress={handleRegister}
+                    loading={loading}
+                    disabled={!allCertsChecked}
+                    variant="primary"
+                    fullWidth
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Lien vers Login */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Login')}
+            style={styles.linkWrap}
+          >
+            <Text style={styles.linkText}>
+              Déjà un compte ?{' '}
+              <Text style={styles.linkAccent}>Se connecter</Text>
             </Text>
           </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: colors.background },
-  scroll:      { flexGrow: 1, padding: 20 },
-  header:      { flexDirection: 'row', alignItems: 'center', marginTop: 50, marginBottom: 24, gap: 14 },
-  backBtn:     { padding: 4 },
-  title:       { fontSize: 22, fontWeight: '800', color: colors.text },
-  rolesRow:    { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  roleCard:    { flex: 1, backgroundColor: colors.backgroundCard, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
-  roleCardActive: { borderColor: colors.primary },
-  roleEmoji:   { fontSize: 22, marginBottom: 4 },
-  roleLabel:   { fontSize: 14, fontWeight: '700', color: colors.text },
-  roleDesc:    { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  form:        { backgroundColor: colors.backgroundCard, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: colors.border },
-  inputWrap:   { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.backgroundLight, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
-  inputIcon:   { marginRight: 10 },
-  input:       { flex: 1, color: colors.text, fontSize: 15, paddingVertical: 13 },
-  certsBox:    { backgroundColor: colors.backgroundLight, borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
-  certsTitle:  { fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 12 },
-  certRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-  checkbox:    { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center', marginTop: 1 },
-  checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  certLabel:   { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
-  btnPrimary:  { borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginBottom: 4 },
-  btnPrimaryText: { fontSize: 16, fontWeight: '700', color: '#000' },
+  safe: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  scroll: {
+    flexGrow: 1,
+    padding: spacing.xl,
+  },
+
+  // Brand
+  header: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  brand: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 2,
+  },
+  brandRule: {
+    width: 60,
+    height: 2,
+    backgroundColor: colors.primary,
+    marginVertical: spacing.md,
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+
+  // Stepper
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xl,
+  },
+  stepCol: {
+    width: 80,
+    alignItems: 'center',
+  },
+  barCol: {
+    flex: 1,
+    paddingTop: 15,
+  },
+  bar: {
+    height: 2,
+    backgroundColor: colors.border,
+  },
+  barCompleted: {
+    backgroundColor: colors.success,
+  },
+  dot: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  dotActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  dotCompleted: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
+  },
+  dotFuture: {
+    backgroundColor: colors.border,
+    borderColor: colors.border,
+  },
+  dotNumActive: {
+    ...typography.caption,
+    color: '#000',
+    fontWeight: '700',
+  },
+  dotNumFuture: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontWeight: '700',
+  },
+  stepLabel: {
+    ...typography.tiny,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  stepLabelActive: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+
+  // Form
+  form: {
+    marginBottom: spacing.xl,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  inputWrapFocused: {
+    borderColor: colors.primary,
+  },
+  inputIcon: {
+    marginRight: spacing.md,
+  },
+  input: {
+    flex: 1,
+    ...typography.body,
+    color: colors.text,
+    paddingVertical: spacing.lg,
+  },
+  eyeBtn: {
+    padding: spacing.sm,
+  },
+  error: {
+    ...typography.caption,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  sectionTitle: {
+    ...typography.h3,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+
+  // Role cards
+  rolesCol: {
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  roleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 16,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  roleCardSelected: {
+    borderColor: colors.primary,
+  },
+  roleIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.cardElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleIconSelected: {
+    backgroundColor: colors.primary + '22',
+  },
+  roleLabel: {
+    ...typography.h3,
+    color: colors.text,
+    marginBottom: 2,
+  },
+  roleLabelSelected: {
+    color: colors.primary,
+  },
+  roleDesc: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+
+  // Certs
+  certsList: {
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  certRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  certLabel: {
+    flex: 1,
+    ...typography.body,
+    color: colors.text,
+  },
+
+  // Actions
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+
+  // Login link
+  linkWrap: {
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  linkText: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  linkAccent: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
 });

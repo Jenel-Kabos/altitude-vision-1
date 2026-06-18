@@ -1,36 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Image, ScrollView, Alert, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import { colors } from '../../theme/colors';
+import { colors, typography, spacing } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
 const ROLE_COLOR = {
-  admin:         colors.admin,
-  collaborateur: colors.collaborateur,
-  proprietaire:  colors.proprietaire,
-  client:        colors.client,
-  user:          colors.client,
+  admin:         colors.error,
+  collaborateur: colors.warning,
+  proprietaire:  colors.success,
+  client:        colors.info,
+  user:          colors.info,
 };
 
-function MenuItem({ icon, label, value, onPress, danger, toggle, toggleVal, onToggle }) {
+const getInitials = (name) => {
+  if (!name || typeof name !== 'string') return '?';
+  const parts = name.trim().split(/\s+/);
+  const inits = parts
+    .slice(0, 2)
+    .map(p => p[0]?.toUpperCase() || '')
+    .join('');
+  return inits || '?';
+};
+
+function MenuRow({ icon, label, onPress, danger, toggle, toggleVal, onToggle }) {
   return (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress} disabled={!!toggle} activeOpacity={0.7}>
-      <View style={[styles.menuIcon, danger && { backgroundColor: `${colors.error}15` }]}>
-        <Ionicons name={icon} size={18} color={danger ? colors.error : colors.primary} />
-      </View>
-      <Text style={[styles.menuLabel, danger && { color: colors.error }]}>{label}</Text>
-      {value && <Text style={styles.menuValue}>{value}</Text>}
-      {toggle
-        ? <Switch value={toggleVal} onValueChange={onToggle} trackColor={{ true: colors.primary }} />
-        : <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-      }
+    <TouchableOpacity
+      style={[styles.menuRow, danger && styles.menuRowDanger]}
+      onPress={onPress}
+      disabled={!!toggle}
+      activeOpacity={0.7}
+    >
+      <Ionicons
+        name={icon}
+        size={24}
+        color={danger ? colors.error : colors.primary}
+      />
+      <Text style={[styles.menuLabel, danger && { color: colors.error }]}>
+        {label}
+      </Text>
+      {toggle ? (
+        <Switch
+          value={toggleVal}
+          onValueChange={onToggle}
+          trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor="#FFFFFF"
+        />
+      ) : (
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      )}
     </TouchableOpacity>
   );
 }
@@ -38,19 +61,39 @@ function MenuItem({ icon, label, value, onPress, danger, toggle, toggleVal, onTo
 export default function ProfilScreen({ navigation }) {
   const { user, logout, updateUser } = useAuth();
   const [notifs, setNotifs] = useState(true);
+  const [stats, setStats] = useState({ biens: 0, vues: 0 });
 
-  const roleColor = ROLE_COLOR[user?.role?.toLowerCase()] || colors.client;
+  const isProprietaire = user?.role?.toLowerCase() === 'proprietaire';
+  const roleColor = ROLE_COLOR[user?.role?.toLowerCase()] || colors.info;
   const roleLabel = user?.role || 'Utilisateur';
+
+  // Stats Proprietaire — best-effort fetch
+  useEffect(() => {
+    if (!isProprietaire) return;
+    (async () => {
+      try {
+        const res = await api.get('/properties/my-properties');
+        const biens = res.data?.data?.properties || res.data?.properties || [];
+        const vues = biens.reduce((s, b) => s + (b.views || b.viewCount || 0), 0);
+        setStats({ biens: biens.length, vues });
+      } catch {
+        setStats({ biens: 0, vues: 0 });
+      }
+    })();
+  }, [isProprietaire]);
 
   const pickAndUploadAvatar = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (perm.status !== 'granted') return Alert.alert('Permission requise');
+    if (perm.status !== 'granted') {
+      Alert.alert('Permission requise');
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
     if (result.canceled) return;
 
     const formData = new FormData();
     formData.append('photo', {
-      uri:  result.assets[0].uri,
+      uri: result.assets[0].uri,
       name: 'avatar.jpg',
       type: 'image/jpeg',
     });
@@ -72,91 +115,195 @@ export default function ProfilScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        {/* En-tête profil */}
-        <LinearGradient colors={[colors.backgroundLight, colors.background]} style={styles.profileHeader}>
-          <TouchableOpacity onPress={pickAndUploadAvatar} style={styles.avatarWrap}>
-            {user?.photo
-              ? <Image source={{ uri: user.photo }} style={styles.avatar} />
-              : <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarLetter}>{user?.name?.[0]?.toUpperCase() || '?'}</Text>
-                </View>
-            }
-            <View style={styles.editAvatarBtn}>
-              <Ionicons name="camera" size={14} color="#000" />
-            </View>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={pickAndUploadAvatar} activeOpacity={0.8}>
+            {user?.photo ? (
+              <Image source={{ uri: user.photo }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Text style={styles.avatarInitials}>{getInitials(user?.name)}</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           <Text style={styles.name}>{user?.name || 'Utilisateur'}</Text>
-          <Text style={styles.email}>{user?.email}</Text>
-          <View style={[styles.roleBadge, { backgroundColor: `${roleColor}20`, borderColor: roleColor }]}>
-            <Text style={[styles.roleLabel, { color: roleColor }]}>{roleLabel}</Text>
-          </View>
-        </LinearGradient>
 
-        {/* Menu */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mon compte</Text>
-          <View style={styles.menuCard}>
-            <MenuItem icon="person-outline"   label="Mes informations" onPress={() => {}} />
-            <MenuItem icon="heart-outline"    label="Mes favoris"      onPress={() => {}} />
-            <MenuItem icon="home-outline"     label="Mes annonces"     onPress={() => {}} />
-            <MenuItem icon="calendar-outline" label="Mes visites"      onPress={() => navigation.navigate('Visites')} />
-            {user?.role?.toLowerCase() === 'proprietaire' && (
-              <MenuItem icon="document-text-outline" label="Mon contrat PDF" onPress={() => {}} />
-            )}
+          <View style={[styles.roleBadge, { backgroundColor: roleColor }]}>
+            <Text style={styles.roleBadgeText}>{roleLabel}</Text>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Paramètres</Text>
-          <View style={styles.menuCard}>
-            <MenuItem
-              icon="notifications-outline"
-              label="Notifications"
-              toggle toggleVal={notifs} onToggle={setNotifs}
-            />
-            <MenuItem icon="shield-outline" label="Confidentialité" onPress={() => {}} />
+        {/* Stats Proprietaire */}
+        {isProprietaire && (
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{stats.biens}</Text>
+              <Text style={styles.statLabel}>Biens publiés</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{stats.vues}</Text>
+              <Text style={styles.statLabel}>Vues totales</Text>
+            </View>
           </View>
-        </View>
+        )}
 
-        <View style={styles.section}>
-          <View style={styles.menuCard}>
-            <MenuItem
-              icon="log-out-outline"
-              label="Se déconnecter"
-              danger
-              onPress={handleLogout}
-            />
-          </View>
-        </View>
+        {/* Compte */}
+        <Text style={styles.sectionTitle}>Compte</Text>
+        <MenuRow
+          icon="person-outline"
+          label="Modifier mon profil"
+          onPress={() => {}}
+        />
+        <MenuRow
+          icon="lock-closed-outline"
+          label="Changer le mot de passe"
+          onPress={() => {}}
+        />
 
-        <Text style={styles.version}>Altimmo v1.0.0 — Altitude Vision</Text>
+        {/* Préférences */}
+        <Text style={styles.sectionTitle}>Préférences</Text>
+        <MenuRow
+          icon="notifications-outline"
+          label="Notifications"
+          toggle
+          toggleVal={notifs}
+          onToggle={setNotifs}
+        />
+
+        {/* Support */}
+        <Text style={styles.sectionTitle}>Support</Text>
+        <MenuRow
+          icon="help-circle-outline"
+          label="Aide"
+          onPress={() => {}}
+        />
+        <MenuRow
+          icon="flag-outline"
+          label="Signaler un problème"
+          onPress={() => {}}
+        />
+
+        {/* Danger zone */}
+        <View style={styles.dangerZone}>
+          <MenuRow
+            icon="log-out-outline"
+            label="Se déconnecter"
+            danger
+            onPress={handleLogout}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: colors.background },
-  scroll:       { paddingBottom: 40 },
-  profileHeader:{ alignItems: 'center', paddingTop: 30, paddingBottom: 24, gap: 8 },
-  avatarWrap:   { position: 'relative', marginBottom: 4 },
-  avatar:       { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: colors.primary },
-  avatarPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
-  avatarLetter: { fontSize: 36, fontWeight: '900', color: '#000' },
-  editAvatarBtn:{ position: 'absolute', bottom: 2, right: 2, backgroundColor: colors.primary, borderRadius: 14, width: 26, height: 26, justifyContent: 'center', alignItems: 'center' },
-  name:         { fontSize: 22, fontWeight: '800', color: colors.text },
-  email:        { fontSize: 14, color: colors.textMuted },
-  roleBadge:    { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
-  roleLabel:    { fontSize: 12, fontWeight: '700' },
-  section:      { paddingHorizontal: 16, marginTop: 20 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 },
-  menuCard:     { backgroundColor: colors.backgroundCard, borderRadius: 16, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-  menuItem:     { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: colors.divider },
-  menuIcon:     { width: 34, height: 34, borderRadius: 10, backgroundColor: `${colors.primary}15`, justifyContent: 'center', alignItems: 'center' },
-  menuLabel:    { flex: 1, fontSize: 15, color: colors.text, fontWeight: '500' },
-  menuValue:    { fontSize: 13, color: colors.textMuted, marginRight: 6 },
-  version:      { textAlign: 'center', color: colors.textMuted, fontSize: 12, marginTop: 32 },
+  safe: { flex: 1, backgroundColor: colors.background },
+  scroll: { paddingBottom: spacing.xxl },
+
+  // Header
+  header: {
+    backgroundColor: colors.card,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  avatarFallback: {
+    backgroundColor: colors.cardElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    color: colors.primary,
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  name: {
+    ...typography.h2,
+    color: colors.text,
+    marginTop: spacing.md,
+  },
+  roleBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 100,
+  },
+  roleBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Stats
+  statsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: spacing.md,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  statValue: {
+    ...typography.h2,
+    color: colors.primary,
+  },
+  statLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+
+  // Section title
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    color: colors.textMuted,
+    letterSpacing: 0.8,
+    marginTop: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+
+  // Menu row
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  menuRowDanger: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  menuLabel: {
+    flex: 1,
+    ...typography.body,
+    color: colors.text,
+  },
+
+  // Danger zone
+  dangerZone: {
+    marginTop: spacing.xl,
+  },
 });

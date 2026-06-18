@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput,
-  TouchableOpacity, StyleSheet, Alert,
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, SafeAreaView, KeyboardAvoidingView,
+  Platform, ScrollView, Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { colors, typography, spacing } from '../../theme';
+import Button from '../../components/ui/Button';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [erreur, setErreur] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [focused, setFocused] = useState(null);
   const { login } = useAuth();
 
   const handleLogin = async () => {
@@ -46,92 +52,183 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.titre}>
-        🏠 Altimmo
-      </Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor="#666"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Mot de passe"
-        placeholderTextColor="#666"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      <TouchableOpacity
-        style={[styles.bouton, loading && { opacity: 0.7 }]}
-        onPress={handleLogin}
-        disabled={loading}
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Text style={styles.boutonTexte}>
-          {loading ? 'Connexion...' : 'Se connecter'}
-        </Text>
-      </TouchableOpacity>
-      {erreur ? (
-        <Text style={{ color: '#ff4444', marginTop: 10, textAlign: 'center', fontSize: 14 }}>
-          {erreur}
-        </Text>
-      ) : null}
-      <TouchableOpacity
-        onPress={() => navigation.navigate('Register')}
-      >
-        <Text style={styles.lien}>
-          Pas de compte ? S'inscrire
-        </Text>
-      </TouchableOpacity>
-    </View>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.header}>
+            <Text style={styles.brand}>ALTIMMO</Text>
+            <View style={styles.brandRule} />
+            <Text style={styles.subtitle}>
+              Votre partenaire immobilier
+            </Text>
+          </View>
+
+          <View style={styles.form}>
+            {/* Email */}
+            <View style={[
+              styles.inputWrap,
+              focused === 'email' && styles.inputWrapFocused,
+            ]}>
+              <Ionicons
+                name="mail-outline"
+                size={18}
+                color={colors.textMuted}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor={colors.textMuted}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                onFocus={() => setFocused('email')}
+                onBlur={() => setFocused(null)}
+              />
+            </View>
+
+            {/* Password */}
+            <View style={[
+              styles.inputWrap,
+              focused === 'password' && styles.inputWrapFocused,
+            ]}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={18}
+                color={colors.textMuted}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Mot de passe"
+                placeholderTextColor={colors.textMuted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPass}
+                onFocus={() => setFocused('password')}
+                onBlur={() => setFocused(null)}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPass(!showPass)}
+                style={styles.eyeBtn}
+                hitSlop={8}
+              >
+                <Ionicons
+                  name={showPass ? 'eye-off-outline' : 'eye-outline'}
+                  size={18}
+                  color={colors.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {erreur ? (
+              <Text style={styles.error}>{erreur}</Text>
+            ) : null}
+
+            <Button
+              label="Se connecter"
+              onPress={handleLogin}
+              loading={loading}
+              fullWidth
+              variant="primary"
+            />
+          </View>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Register')}
+            style={styles.linkWrap}
+          >
+            <Text style={styles.linkText}>
+              Pas encore de compte ?{' '}
+              <Text style={styles.linkAccent}>S'inscrire</Text>
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    backgroundColor: colors.background,
   },
-  titre: {
-    color: '#C8960C',
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: spacing.xxxl,
+  },
+  brand: {
     fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 40,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 2,
+  },
+  brandRule: {
+    width: 60,
+    height: 2,
+    backgroundColor: colors.primary,
+    marginVertical: spacing.md,
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  form: {
+    marginBottom: spacing.xl,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  inputWrapFocused: {
+    borderColor: colors.primary,
+  },
+  inputIcon: {
+    marginRight: spacing.md,
   },
   input: {
-    width: '100%',
-    backgroundColor: '#1A1A1A',
-    color: '#FFF',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#333',
+    flex: 1,
+    ...typography.body,
+    color: colors.text,
+    paddingVertical: spacing.lg,
   },
-  bouton: {
-    width: '100%',
-    backgroundColor: '#C8960C',
-    padding: 15,
-    borderRadius: 10,
+  eyeBtn: {
+    padding: spacing.sm,
+  },
+  error: {
+    ...typography.caption,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  linkWrap: {
     alignItems: 'center',
-    marginBottom: 20,
   },
-  boutonTexte: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize: 16,
+  linkText: {
+    ...typography.body,
+    color: colors.textSecondary,
   },
-  lien: {
-    color: '#C8960C',
-    fontSize: 14,
-    marginTop: 10,
+  linkAccent: {
+    color: colors.primary,
+    fontWeight: '600',
   },
 });

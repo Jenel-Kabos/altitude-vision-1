@@ -11,6 +11,9 @@ const { upload } = require('../config/cloudinary');
 // ✅ IMPORT 3 : Le contrôleur Property
 const propertyController = require('../controllers/propertyController');
 
+// ✅ IMPORT 4 : Contrôleur mobile (JSON pur, photos déjà uploadées)
+const { createPropertyMobile } = require('../controllers/propertyMobileController');
+
 // ============================================================
 // 1️⃣ ROUTES SPÉCIFIQUES (Doivent être EN PREMIER)
 // ============================================================
@@ -59,13 +62,24 @@ router.get(
 // ============================================================
 
 /**
+ * @route POST /api/properties/mobile
+ * @description Création depuis l'app mobile (JSON, photos déjà sur Cloudinary)
+ */
+router.post(
+    '/mobile',
+    authController.protect,
+    authController.restrictTo('Admin', 'Proprietaire', 'Collaborateur'),
+    createPropertyMobile
+);
+
+/**
  * @route POST /api/properties
  * @description Créer une propriété + Upload images
  * ✅ Correction du rôle : 'Admin' (et pas AdminOnly)
  */
 router.post(
-    '/', 
-    authController.protect, 
+    '/',
+    authController.protect,
     authController.restrictTo('Admin', 'Proprietaire', 'Collaborateur'),
     upload.array('images', 10),
     propertyController.createProperty

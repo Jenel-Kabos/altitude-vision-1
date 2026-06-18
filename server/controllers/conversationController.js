@@ -213,8 +213,12 @@ exports.createOrGetConversation = asyncHandler(async (req, res) => {
     if (!conversation) {
       conversation = await Conversation.create({
         participants: [req.user.id, targetUserId],
+        relatedProperty: req.body.relatedProperty || null,
       });
       await conversation.populate('participants', 'name email photo');
+    } else if (!conversation.relatedProperty && req.body.relatedProperty) {
+      conversation.relatedProperty = req.body.relatedProperty;
+      await conversation.save();
     }
 
     return res.status(200).json({

@@ -1,590 +1,1069 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Alert, ActivityIndicator, Image,
+  View, Text, TextInput, TouchableOpacity,
+  ScrollView, StyleSheet, Image, Alert,
+  ActivityIndicator, SafeAreaView, Animated,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { colors } from '../../theme/colors';
-import api from '../../services/api';
+import { colors, typography, spacing } from '../../theme';
+import Button from '../../components/ui/Button';
+import { uploadToCloudinary, creerAnnonce } from '../../services/annonceService';
 
-const STEPS = ['Type', 'Infos', 'Lieu', 'Équipements', 'Photos', 'Prix', 'Récap'];
-
-const TYPES_BIEN = ['Appartement', 'Maison', 'Villa', 'Studio', 'Terrain', 'Bureau', 'Commerce'];
-
-const TYPES_CONSTRUCTION = ['Béton', 'Brique', 'Bois', 'Mixte', 'Container'];
-
-const AMENITIES = [
-  { key: 'clim',       label: 'Climatisation',   icon: 'snow-outline' },
-  { key: 'eau',        label: 'Eau courante',    icon: 'water-outline' },
-  { key: 'elec',       label: 'Électricité',     icon: 'flash-outline' },
-  { key: 'parking',    label: 'Parking',         icon: 'car-outline' },
-  { key: 'securite',   label: 'Sécurité 24/7',   icon: 'shield-checkmark-outline' },
-  { key: 'piscine',    label: 'Piscine',         icon: 'water-outline' },
-  { key: 'jardin',     label: 'Jardin',          icon: 'leaf-outline' },
-  { key: 'wifi',       label: 'Internet/Wifi',   icon: 'wifi-outline' },
-  { key: 'meuble',     label: 'Meublé',          icon: 'bed-outline' },
-  { key: 'cuisine_eq', label: 'Cuisine équipée', icon: 'restaurant-outline' },
-  { key: 'balcon',     label: 'Balcon/Terrasse', icon: 'business-outline' },
-  { key: 'domestique', label: 'Domestique',      icon: 'people-outline' },
+const STEPS = [
+  { id: 1, label: 'Info' },
+  { id: 2, label: 'Type' },
+  { id: 3, label: 'Photos' },
+  { id: 4, label: 'Prix' },
+  { id: 5, label: 'Localisation' },
+  { id: 6, label: 'Commodités' },
+  { id: 7, label: 'Récap' },
 ];
 
-function StepIndicator({ step, total }) {
-  return (
-    <View style={styles.stepRow}>
-      {Array.from({ length: total }, (_, i) => (
-        <React.Fragment key={i}>
-          <View style={[styles.stepDot, i <= step && styles.stepDotActive]}>
-            {i < step
-              ? <Ionicons name="checkmark" size={10} color="#000" />
-              : <Text style={[styles.stepNum, i === step && { color: '#000' }]}>{i + 1}</Text>
-            }
-          </View>
-          {i < total - 1 && <View style={[styles.stepLine, i < step && styles.stepLineActive]} />}
-        </React.Fragment>
-      ))}
-    </View>
-  );
-}
+const STEP_TITLES = [
+  'Informations',
+  'Type de bien',
+  'Photos',
+  'Prix',
+  'Localisation',
+  'Caractéristiques',
+  'Récapitulatif',
+];
+
+const TYPES = [
+  { value: 'Appartement', icon: 'business-outline' },
+  { value: 'Villa',       icon: 'home-outline' },
+  { value: 'Terrain',     icon: 'leaf-outline' },
+  { value: 'Bureau',      icon: 'briefcase-outline' },
+  { value: 'Commerce',    icon: 'storefront-outline' },
+  { value: 'Studio',      icon: 'bed-outline' },
+];
+
+const TRANSACTIONS = [
+  { value: 'Vente',    icon: 'cash-outline',     desc: 'Mettre en vente' },
+  { value: 'Location', icon: 'calendar-outline', desc: 'Mettre en location' },
+];
+
+const PERIODS = ['Mensuel', 'Annuel'];
+
+const COMMODITES = [
+  { value: 'Parking',         icon: 'car-outline' },
+  { value: 'Piscine',         icon: 'water-outline' },
+  { value: 'Gardien',         icon: 'shield-outline' },
+  { value: 'Électricité',     icon: 'flash-outline' },
+  { value: 'Eau courante',    icon: 'water' },
+  { value: 'Climatisation',   icon: 'snow-outline' },
+  { value: 'Internet',        icon: 'wifi-outline' },
+  { value: 'Sécurité',        icon: 'lock-closed-outline' },
+];
+
+const initialForm = {
+  titre: '',
+  description: '',
+  type: '',
+  categorie: '',
+  period: 'Mensuel',
+  prix: '',
+  ville: '',
+  quartier: '',
+  rue: '',
+  surface: 0,
+  chambres: 0,
+  pieces: 0,
+  etage: 0,
+};
 
 export default function PublierBienScreen({ navigation }) {
-  const [step,    setStep]    = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [locating, setLocating] = useState(false);
-
-  const [form, setForm] = useState({
-    status: 'location',
-    type: 'Appartement',
-    constructionType: 'Béton',
-
-    title: '',
-    description: '',
-
-    surface: '',
-    bedrooms: '',
-    bathrooms: '',
-    livingRooms: '',
-    kitchens: '',
-
-    street: '',
-    district: '',
-    city: 'Brazzaville',
-    latitude: null,
-    longitude: null,
-
-    price: '',
-    negotiable: false,
-  });
-
-  const [amenities, setAmenities] = useState([]);
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState(initialForm);
   const [photos, setPhotos] = useState([]);
+  const [commodites, setCommodites] = useState([]);
+  const [coords, setCoords] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [focused, setFocused] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const toggleAmenity = (k) =>
-    setAmenities(prev => prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k]);
+  const scrollRef = useRef(null);
+  const progressAnim = useRef(new Animated.Value(1 / STEPS.length)).current;
 
-  const detectLocation = async () => {
-    setLocating(true);
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: step / STEPS.length,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [step]);
+
+  const setField = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const adjustNum = (k, delta) =>
+    setForm(f => ({ ...f, [k]: Math.max(0, (Number(f[k]) || 0) + delta) }));
+  const toggleCommodite = (v) =>
+    setCommodites(arr => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
+
+  // ─── Validation par étape ───────────────────────────────────
+  const validateStep = (n) => {
+    const e = {};
+    if (n === 1) {
+      if (!form.titre.trim()) e.titre = 'Titre requis';
+      if (!form.description.trim()) e.description = 'Description requise';
+    }
+    if (n === 2) {
+      if (!form.type) e.type = 'Choisissez un type de bien';
+      if (!form.categorie) e.categorie = 'Choisissez vente ou location';
+    }
+    if (n === 3) {
+      if (photos.length === 0) e.photos = 'Ajoutez au moins une photo';
+    }
+    if (n === 4) {
+      if (!form.prix || isNaN(Number(form.prix)) || Number(form.prix) <= 0) {
+        e.prix = 'Prix valide requis';
+      }
+    }
+    if (n === 5) {
+      if (!form.ville.trim()) e.ville = 'Ville requise';
+      if (!form.quartier.trim()) e.quartier = 'Quartier requis';
+    }
+    if (n === 6) {
+      if (!form.surface || form.surface <= 0) e.surface = 'Surface requise';
+    }
+    return e;
+  };
+
+  const goNext = () => {
+    const stepErrors = validateStep(step);
+    if (Object.keys(stepErrors).length) {
+      setErrors(stepErrors);
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      return;
+    }
+    setErrors({});
+    setStep(s => Math.min(STEPS.length, s + 1));
+  };
+
+  const goBack = () => {
+    setErrors({});
+    setStep(s => Math.max(1, s - 1));
+  };
+
+  // ─── Photos ─────────────────────────────────────────────────
+  const ajouterPhotos = async () => {
+    if (photos.length >= 10) return;
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') {
+      Alert.alert('Permission refusée', 'Accès à la galerie requis.');
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      quality: 0.8,
+      allowsMultipleSelection: true,
+      selectionLimit: 10 - photos.length,
+      mediaTypes: ['images'],
+    });
+    if (!res.canceled && res.assets?.length) {
+      const additions = res.assets.map(a => ({
+        uri: a.uri, uploading: false, url: null,
+      }));
+      setPhotos(prev => [...prev, ...additions]);
+    }
+  };
+
+  const supprimerPhoto = (idx) =>
+    setPhotos(prev => prev.filter((_, i) => i !== idx));
+
+  // ─── Géolocalisation ────────────────────────────────────────
+  const utiliserMaPosition = async () => {
+    setLocationLoading(true);
     try {
-      const { status: perm } = await Location.requestForegroundPermissionsAsync();
-      if (perm !== 'granted') {
-        Alert.alert('Permission refusée', 'Activez la localisation pour détecter votre position.');
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (perm.status !== 'granted') {
+        Alert.alert('Permission refusée', 'Activez la géolocalisation pour utiliser cette fonction.');
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      set('latitude',  loc.coords.latitude);
-      set('longitude', loc.coords.longitude);
-    } catch (e) {
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+      try {
+        const places = await Location.reverseGeocodeAsync(loc.coords);
+        if (places[0]) {
+          const p = places[0];
+          setForm(f => ({
+            ...f,
+            ville: f.ville || p.city || p.region || '',
+            quartier: f.quartier || p.district || p.subregion || '',
+            rue: f.rue || p.street || '',
+          }));
+        }
+      } catch {}
+    } catch {
       Alert.alert('Erreur', 'Impossible de récupérer votre position.');
     } finally {
-      setLocating(false);
+      setLocationLoading(false);
     }
   };
 
-  const pickImage = async (fromCamera = false) => {
-    const perm = fromCamera
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (perm.status !== 'granted') return Alert.alert('Permission requise');
-
-    const result = fromCamera
-      ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
-      : await ImagePicker.launchImageLibraryAsync({ allowsMultipleSelection: true, quality: 0.8 });
-
-    if (!result.canceled) {
-      const uris = result.assets.map(a => a.uri);
-      setPhotos(prev => [...prev, ...uris].slice(0, 10));
-    }
-  };
-
-  const removePhoto = (i) => setPhotos(prev => prev.filter((_, idx) => idx !== i));
-
-  const canNext = () => {
-    if (step === 1) return form.title.trim() && form.description.trim() && Number(form.surface) > 0;
-    if (step === 2) return form.district.trim() && form.city.trim() && form.latitude != null && form.longitude != null;
-    if (step === 4) return photos.length >= 3;
-    if (step === 5) return Number(form.price) > 0;
-    return true;
-  };
-
+  // ─── Publish ────────────────────────────────────────────────
   const handlePublish = async () => {
-    if (photos.length < 3) return Alert.alert('Photos requises', 'Ajoutez au moins 3 photos.');
-    if (form.latitude == null || form.longitude == null) {
-      return Alert.alert('Localisation requise', 'Détectez votre position avant de publier.');
-    }
-    if (!form.description.trim()) {
-      return Alert.alert('Description requise', 'Décrivez le bien avant de publier.');
-    }
-
-    setLoading(true);
+    setSubmitting(true);
     try {
-      const fd = new FormData();
-      fd.append('pole', 'Altimmo');
-      fd.append('title', form.title.trim());
-      fd.append('description', form.description.trim());
-      fd.append('status', form.status);
-      fd.append('type', form.type);
-      fd.append('constructionType', form.constructionType);
-      fd.append('price', String(Number(form.price)));
-      fd.append('surface', String(Number(form.surface)));
-      fd.append('bedrooms', String(Number(form.bedrooms) || 0));
-      fd.append('bathrooms', String(Number(form.bathrooms) || 0));
-      fd.append('livingRooms', String(Number(form.livingRooms) || 0));
-      fd.append('kitchens', String(Number(form.kitchens) || 0));
-      fd.append('latitude', String(form.latitude));
-      fd.append('longitude', String(form.longitude));
-      fd.append('address', JSON.stringify({
-        street:   form.street.trim(),
-        district: form.district.trim(),
-        city:     form.city.trim(),
-      }));
-      amenities.forEach(a => fd.append('amenities', a));
+      const working = [...photos];
+      for (let i = 0; i < working.length; i++) {
+        if (working[i].url) continue;
+        working[i] = { ...working[i], uploading: true };
+        setPhotos([...working]);
+        const url = await uploadToCloudinary(working[i].uri);
+        working[i] = { ...working[i], uploading: false, url };
+        setPhotos([...working]);
+      }
 
-      photos.forEach((uri, i) => {
-        fd.append('images', {
-          uri,
-          name: `photo_${i}.jpg`,
-          type: 'image/jpeg',
-        });
-      });
-
-      await api.post('/properties', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      await creerAnnonce({
+        titre: form.titre.trim(),
+        description: form.description.trim(),
+        prix: Number(form.prix),
+        superficie: form.surface || null,
+        chambres: form.chambres || null,
+        ville: form.ville.trim(),
+        quartier: form.quartier.trim(),
+        type: form.type,
+        categorie: form.categorie,
+        photos: working.map(p => p.url),
+        latitude: coords?.lat,
+        longitude: coords?.lng,
       });
 
       Alert.alert(
-        'Publié !',
-        'Votre bien sera visible sur Altimmo après validation par un administrateur.',
-        [{ text: 'OK', onPress: () => navigation.navigate('Annonces') }],
+        '✅ Publié !',
+        'Votre annonce est en ligne.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }],
       );
     } catch (err) {
-      const msg = err.response?.data?.message
-        || err.response?.data?.error
-        || 'Impossible de publier.';
-      Alert.alert('Erreur', msg);
+      Alert.alert('Erreur', err.message || 'Impossible de publier.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => step > 0 ? setStep(s => s - 1) : navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
+  // ─── Helpers de rendu ───────────────────────────────────────
+  const renderTextInput = (name, opts = {}) => (
+    <View style={styles.field}>
+      <TextInput
+        style={[
+          styles.input,
+          opts.multiline && styles.inputMultiline,
+          focused === name && styles.inputFocused,
+        ]}
+        placeholder={opts.placeholder}
+        placeholderTextColor={colors.textMuted}
+        value={form[name]}
+        onChangeText={(v) => setField(name, v)}
+        onFocus={() => setFocused(name)}
+        onBlur={() => setFocused(null)}
+        multiline={opts.multiline}
+        numberOfLines={opts.multiline ? 4 : 1}
+        keyboardType={opts.keyboardType || 'default'}
+        textAlignVertical={opts.multiline ? 'top' : 'center'}
+      />
+      {errors[name] ? <Text style={styles.errorText}>{errors[name]}</Text> : null}
+    </View>
+  );
+
+  const renderStepperField = (name, label, unit) => (
+    <View style={styles.numberField}>
+      <Text style={styles.fieldLabel}>{label}{unit ? ` (${unit})` : ''}</Text>
+      <View style={styles.numberRow}>
+        <TouchableOpacity
+          style={styles.stepBtn}
+          onPress={() => adjustNum(name, -1)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="remove" size={18} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Publier un bien</Text>
-        <Text style={styles.stepLabel}>{step + 1}/{STEPS.length}</Text>
+        <TextInput
+          style={styles.numberInput}
+          value={String(form[name])}
+          onChangeText={(v) => setField(name, Math.max(0, Number(v.replace(/[^0-9]/g, '')) || 0))}
+          keyboardType="numeric"
+        />
+        <TouchableOpacity
+          style={styles.stepBtn}
+          onPress={() => adjustNum(name, 1)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="add" size={18} color={colors.primary} />
+        </TouchableOpacity>
       </View>
+      {errors[name] ? <Text style={styles.errorText}>{errors[name]}</Text> : null}
+    </View>
+  );
 
-      <StepIndicator step={step} total={STEPS.length} />
-      <Text style={styles.currentStepName}>{STEPS[step]}</Text>
+  // ─── Step content ───────────────────────────────────────────
+  const renderStepContent = () => {
+    if (step === 1) {
+      return (
+        <View>
+          <Text style={styles.fieldLabel}>Titre du bien</Text>
+          {renderTextInput('titre', { placeholder: 'Ex : Appartement T3 vue mer' })}
+          <Text style={styles.fieldLabel}>Description</Text>
+          {renderTextInput('description', { placeholder: 'Décrivez votre bien…', multiline: true })}
+        </View>
+      );
+    }
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-
-        {/* 0 — Type */}
-        {step === 0 && (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Type de transaction</Text>
-            <View style={styles.typeRow}>
-              {['location', 'vente'].map(t => (
+    if (step === 2) {
+      return (
+        <View>
+          <Text style={styles.fieldLabel}>Type de bien</Text>
+          <View style={styles.grid2}>
+            {TYPES.map(t => {
+              const sel = form.type === t.value;
+              return (
                 <TouchableOpacity
-                  key={t}
-                  style={[styles.typeCard, form.status === t && styles.typeCardActive]}
-                  onPress={() => set('status', t)}
+                  key={t.value}
+                  style={[styles.typeCard, sel && styles.cardSelected]}
+                  onPress={() => setField('type', t.value)}
+                  activeOpacity={0.85}
                 >
                   <Ionicons
-                    name={t === 'location' ? 'key-outline' : 'cash-outline'}
+                    name={t.icon}
                     size={28}
-                    color={form.status === t ? colors.primary : colors.textMuted}
+                    color={sel ? colors.primary : colors.textSecondary}
                   />
-                  <Text style={[styles.typeLabel, form.status === t && { color: colors.primary }]}>
-                    {t === 'location' ? 'Location' : 'Vente'}
+                  <Text style={[styles.typeLabel, sel && { color: colors.primary }]}>
+                    {t.value}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.stepTitle}>Type de bien</Text>
-            <View style={styles.pillGrid}>
-              {TYPES_BIEN.map(t => (
-                <TouchableOpacity
-                  key={t}
-                  style={[styles.pill, form.type === t && styles.pillActive]}
-                  onPress={() => set('type', t)}
-                >
-                  <Text style={[styles.pillTxt, form.type === t && { color: '#000' }]}>{t}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              );
+            })}
           </View>
-        )}
+          {errors.type ? <Text style={styles.errorText}>{errors.type}</Text> : null}
 
-        {/* 1 — Infos */}
-        {step === 1 && (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Informations du bien</Text>
-
-            <Field label="Titre *" value={form.title} onChange={v => set('title', v)} placeholder="Ex: Villa 4 ch. avec piscine" />
-
-            <View style={styles.fieldWrap}>
-              <Text style={styles.fieldLabel}>Description *</Text>
-              <TextInput
-                style={[styles.fieldInput, { height: 110, textAlignVertical: 'top' }]}
-                placeholder="Décrivez le bien, son environnement, ses points forts..."
-                placeholderTextColor={colors.textMuted}
-                value={form.description}
-                onChangeText={v => set('description', v)}
-                multiline
-              />
-            </View>
-
-            <Field label="Superficie (m²) *" value={form.surface} onChange={v => set('surface', v)} placeholder="120" numeric />
-
-            <View style={styles.row2}>
-              <View style={{ flex: 1 }}>
-                <Field label="Chambres" value={form.bedrooms} onChange={v => set('bedrooms', v)} placeholder="3" numeric />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Field label="Salles de bain" value={form.bathrooms} onChange={v => set('bathrooms', v)} placeholder="2" numeric />
-              </View>
-            </View>
-
-            <View style={styles.row2}>
-              <View style={{ flex: 1 }}>
-                <Field label="Salons" value={form.livingRooms} onChange={v => set('livingRooms', v)} placeholder="1" numeric />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Field label="Cuisines" value={form.kitchens} onChange={v => set('kitchens', v)} placeholder="1" numeric />
-              </View>
-            </View>
-
-            <Text style={[styles.fieldLabel, { marginTop: 6 }]}>Type de construction</Text>
-            <View style={styles.pillGrid}>
-              {TYPES_CONSTRUCTION.map(t => (
+          <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Transaction</Text>
+          <View style={styles.grid2}>
+            {TRANSACTIONS.map(t => {
+              const sel = form.categorie === t.value;
+              return (
                 <TouchableOpacity
-                  key={t}
-                  style={[styles.pill, form.constructionType === t && styles.pillActive]}
-                  onPress={() => set('constructionType', t)}
+                  key={t.value}
+                  style={[styles.txCard, sel && styles.cardSelected]}
+                  onPress={() => setField('categorie', t.value)}
+                  activeOpacity={0.85}
                 >
-                  <Text style={[styles.pillTxt, form.constructionType === t && { color: '#000' }]}>{t}</Text>
+                  <Ionicons
+                    name={t.icon}
+                    size={28}
+                    color={sel ? colors.primary : colors.textSecondary}
+                  />
+                  <Text style={[styles.typeLabel, sel && { color: colors.primary }]}>
+                    {t.value}
+                  </Text>
+                  <Text style={styles.txDesc}>{t.desc}</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
+              );
+            })}
           </View>
-        )}
+          {errors.categorie ? <Text style={styles.errorText}>{errors.categorie}</Text> : null}
+        </View>
+      );
+    }
 
-        {/* 2 — Lieu */}
-        {step === 2 && (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Localisation</Text>
-
-            <Field label="Quartier *" value={form.district} onChange={v => set('district', v)} placeholder="Ex: Gombe, Poto-Poto..." />
-            <Field label="Ville *" value={form.city} onChange={v => set('city', v)} placeholder="Brazzaville" />
-            <Field label="Rue / Adresse" value={form.street} onChange={v => set('street', v)} placeholder="Rue, n°..." />
-
-            <View style={[styles.fieldWrap, { marginTop: 8 }]}>
-              <Text style={styles.fieldLabel}>Position GPS *</Text>
-              <TouchableOpacity style={styles.gpsBtn} onPress={detectLocation} disabled={locating}>
-                {locating ? (
-                  <ActivityIndicator color={colors.primary} />
-                ) : (
-                  <>
-                    <Ionicons name="locate-outline" size={20} color={colors.primary} />
-                    <Text style={styles.gpsBtnTxt}>
-                      {form.latitude != null ? 'Re-détecter ma position' : 'Détecter ma position'}
-                    </Text>
-                  </>
+    if (step === 3) {
+      const remaining = 10 - photos.length;
+      return (
+        <View>
+          <Text style={styles.fieldLabel}>Photos ({photos.length}/10)</Text>
+          <View style={styles.photoGrid}>
+            {photos.map((p, idx) => (
+              <View key={`${p.uri}-${idx}`} style={styles.photoCell}>
+                <Image source={{ uri: p.uri }} style={styles.photoImg} />
+                {p.uploading && (
+                  <View style={styles.photoOverlay}>
+                    <ActivityIndicator color="#FFFFFF" />
+                  </View>
                 )}
+                <TouchableOpacity
+                  style={styles.photoRemove}
+                  onPress={() => supprimerPhoto(idx)}
+                  hitSlop={8}
+                >
+                  <Ionicons name="close" size={14} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {remaining > 0 && (
+              <TouchableOpacity
+                style={styles.photoEmpty}
+                onPress={ajouterPhotos}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
               </TouchableOpacity>
+            )}
+          </View>
+          {errors.photos ? <Text style={styles.errorText}>{errors.photos}</Text> : null}
 
-              {form.latitude != null && (
-                <View style={styles.gpsBox}>
-                  <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-                  <Text style={styles.gpsTxt}>
-                    {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}
+          <View style={{ marginTop: spacing.lg }}>
+            <Button
+              label="Ajouter des photos"
+              variant="outline"
+              fullWidth
+              icon="image-outline"
+              onPress={ajouterPhotos}
+            />
+          </View>
+        </View>
+      );
+    }
+
+    if (step === 4) {
+      return (
+        <View>
+          <Text style={styles.fieldLabel}>Prix</Text>
+          <View style={styles.field}>
+            <View style={[
+              styles.priceWrap,
+              focused === 'prix' && styles.inputFocused,
+            ]}>
+              <TextInput
+                style={styles.priceInput}
+                placeholder="0"
+                placeholderTextColor={colors.textMuted}
+                value={form.prix}
+                onChangeText={(v) => setField('prix', v.replace(/[^0-9]/g, ''))}
+                onFocus={() => setFocused('prix')}
+                onBlur={() => setFocused(null)}
+                keyboardType="numeric"
+              />
+              <Text style={styles.priceSuffix}>FCFA</Text>
+            </View>
+            {errors.prix ? <Text style={styles.errorText}>{errors.prix}</Text> : null}
+          </View>
+
+          {form.categorie === 'Location' && (
+            <View style={{ marginTop: spacing.lg }}>
+              <Text style={styles.fieldLabel}>Période</Text>
+              <View style={styles.chipsRow}>
+                {PERIODS.map(p => {
+                  const sel = form.period === p;
+                  return (
+                    <TouchableOpacity
+                      key={p}
+                      style={[styles.chip, sel && styles.chipSelected]}
+                      onPress={() => setField('period', p)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.chipText, sel && styles.chipTextSelected]}>
+                        {p}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    if (step === 5) {
+      return (
+        <View>
+          <Text style={styles.fieldLabel}>Ville</Text>
+          {renderTextInput('ville', { placeholder: 'Ex : Pointe-Noire' })}
+          <Text style={styles.fieldLabel}>Quartier / District</Text>
+          {renderTextInput('quartier', { placeholder: 'Ex : Mpita' })}
+          <Text style={styles.fieldLabel}>Rue (optionnel)</Text>
+          {renderTextInput('rue', { placeholder: 'Ex : 24 Rue Mfoa' })}
+
+          <Button
+            label={locationLoading ? 'Récupération…' : 'Utiliser ma position'}
+            variant="outline"
+            fullWidth
+            icon="location-outline"
+            onPress={utiliserMaPosition}
+            loading={locationLoading}
+          />
+          {coords && (
+            <Text style={styles.coordsText}>
+              📍 {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+            </Text>
+          )}
+        </View>
+      );
+    }
+
+    if (step === 6) {
+      return (
+        <View>
+          {renderStepperField('surface', 'Surface', 'm²')}
+          {renderStepperField('chambres', 'Chambres')}
+          {renderStepperField('pieces', 'Pièces de vie')}
+          {renderStepperField('etage', 'Étage (optionnel)')}
+
+          <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Commodités</Text>
+          <View style={styles.commoditesGrid}>
+            {COMMODITES.map(c => {
+              const checked = commodites.includes(c.value);
+              return (
+                <TouchableOpacity
+                  key={c.value}
+                  style={styles.commoditeRow}
+                  onPress={() => toggleCommodite(c.value)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                    {checked && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                  </View>
+                  <Ionicons name={c.icon} size={16} color={colors.primary} />
+                  <Text style={styles.commoditeText}>{c.value}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      );
+    }
+
+    if (step === 7) {
+      const fmt = (n) => Number(n || 0).toLocaleString('fr-FR');
+      const isLocation = form.categorie === 'Location';
+      return (
+        <View style={styles.recapCard}>
+          {photos[0] && (
+            <Image
+              source={{ uri: photos[0].uri }}
+              style={styles.recapThumb}
+              resizeMode="cover"
+            />
+          )}
+
+          <Text style={styles.recapSectionTitle}>{form.titre || 'Sans titre'}</Text>
+          <Text style={styles.recapDesc} numberOfLines={4}>
+            {form.description || 'Pas de description'}
+          </Text>
+
+          <View style={styles.recapDivider} />
+
+          <Text style={styles.recapPrice}>
+            {fmt(form.prix)} FCFA{isLocation ? ` / ${form.period}` : ''}
+          </Text>
+
+          <View style={styles.recapDivider} />
+
+          <RecapRow label="Type" value={form.type} />
+          <RecapRow label="Transaction" value={form.categorie} />
+          <RecapRow label="Ville" value={form.ville} />
+          <RecapRow label="Quartier" value={form.quartier} />
+          {form.rue ? <RecapRow label="Rue" value={form.rue} /> : null}
+
+          <View style={styles.recapDivider} />
+
+          {form.surface > 0 && <RecapRow label="Surface" value={`${form.surface} m²`} />}
+          {form.chambres > 0 && <RecapRow label="Chambres" value={String(form.chambres)} />}
+          {form.pieces > 0 && <RecapRow label="Pièces" value={String(form.pieces)} />}
+          {form.etage > 0 && <RecapRow label="Étage" value={String(form.etage)} />}
+
+          {commodites.length > 0 && (
+            <>
+              <View style={styles.recapDivider} />
+              <RecapRow label="Commodités" value={commodites.join(', ')} />
+            </>
+          )}
+
+          <Text style={styles.recapWarn}>
+            Vérifiez vos informations avant de publier
+          </Text>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
+  // ─── Render principal ───────────────────────────────────────
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
+  const isLastStep = step === STEPS.length;
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="close-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {STEP_TITLES[step - 1]}
+          </Text>
+          <Text style={styles.headerStep}>{step}/{STEPS.length}</Text>
+        </View>
+
+        {/* Stepper horizontal */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.stepperContent}
+        >
+          {STEPS.map((s, idx) => {
+            const completed = step > s.id;
+            const active = step === s.id;
+            return (
+              <React.Fragment key={s.id}>
+                <View style={styles.stepCol}>
+                  <View style={[
+                    styles.stepCircle,
+                    completed && styles.stepCircleCompleted,
+                    active && styles.stepCircleActive,
+                    !completed && !active && styles.stepCircleFuture,
+                  ]}>
+                    {completed ? (
+                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    ) : (
+                      <Text style={active ? styles.stepNumActive : styles.stepNumFuture}>
+                        {s.id}
+                      </Text>
+                    )}
+                  </View>
+                  <Text
+                    style={[styles.stepLabel, active && styles.stepLabelActive]}
+                    numberOfLines={1}
+                  >
+                    {s.label}
                   </Text>
                 </View>
-              )}
-              <Text style={styles.hint}>Soyez sur place pour une localisation précise.</Text>
-            </View>
-          </View>
-        )}
+                {idx < STEPS.length - 1 && (
+                  <View style={[
+                    styles.connector,
+                    step > s.id && styles.connectorFilled,
+                  ]} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </ScrollView>
 
-        {/* 3 — Équipements */}
-        {step === 3 && (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Équipements et commodités</Text>
-            <Text style={styles.hint}>Sélectionnez tout ce que propose le bien.</Text>
+        {/* Progress bar */}
+        <View style={styles.progressTrack}>
+          <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
+        </View>
 
-            <View style={styles.amenitiesGrid}>
-              {AMENITIES.map(a => {
-                const active = amenities.includes(a.key);
-                return (
-                  <TouchableOpacity
-                    key={a.key}
-                    style={[styles.amenityCard, active && styles.amenityCardActive]}
-                    onPress={() => toggleAmenity(a.key)}
-                  >
-                    <Ionicons
-                      name={a.icon}
-                      size={20}
-                      color={active ? colors.primary : colors.textSecondary}
-                    />
-                    <Text style={[styles.amenityTxt, active && { color: colors.primary }]}>
-                      {a.label}
-                    </Text>
-                    {active && (
-                      <Ionicons name="checkmark-circle" size={16} color={colors.primary} style={{ marginLeft: 'auto' }} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        )}
+        {/* Step content */}
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.stepScroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {renderStepContent()}
+        </ScrollView>
 
-        {/* 4 — Photos */}
-        {step === 4 && (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Photos ({photos.length}/10 — min 3)</Text>
-            <View style={styles.photoBtns}>
-              <TouchableOpacity style={styles.photoBtn} onPress={() => pickImage(true)}>
-                <Ionicons name="camera-outline" size={22} color={colors.primary} />
-                <Text style={styles.photoBtnTxt}>Caméra</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.photoBtn} onPress={() => pickImage(false)}>
-                <Ionicons name="images-outline" size={22} color={colors.primary} />
-                <Text style={styles.photoBtnTxt}>Galerie</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.photoGrid}>
-              {photos.map((uri, i) => (
-                <View key={i} style={styles.photoThumb}>
-                  <Image source={{ uri }} style={styles.thumbImg} />
-                  <TouchableOpacity style={styles.thumbRemove} onPress={() => removePhoto(i)}>
-                    <Ionicons name="close-circle" size={22} color={colors.error} />
-                  </TouchableOpacity>
-                  {i === 0 && (
-                    <View style={styles.mainBadge}><Text style={styles.mainBadgeTxt}>Principale</Text></View>
-                  )}
-                </View>
-              ))}
-            </View>
-            {photos.length < 3 && (
-              <Text style={{ color: colors.warning, textAlign: 'center', marginTop: 8, fontSize: 13 }}>
-                Ajoutez encore {3 - photos.length} photo(s)
-              </Text>
-            )}
-          </View>
-        )}
-
-        {/* 5 — Prix */}
-        {step === 5 && (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>
-              {form.status === 'location' ? 'Loyer mensuel' : 'Prix de vente'}
-            </Text>
-
-            <Field
-              label={form.status === 'location' ? 'Loyer / mois (FCFA) *' : 'Prix (FCFA) *'}
-              value={form.price}
-              onChange={v => set('price', v)}
-              placeholder="0"
-              numeric
+        {/* Footer */}
+        <View style={styles.footer}>
+          <View style={{ flex: 1 }}>
+            <Button
+              label="Précédent"
+              variant="outline"
+              fullWidth
+              disabled={step === 1}
+              onPress={goBack}
             />
-
-            {form.price ? (
-              <Text style={styles.previewPrice}>
-                {Number(form.price).toLocaleString('fr-FR')} FCFA
-                {form.status === 'location' ? ' / mois' : ''}
-              </Text>
-            ) : null}
-
-            {form.status === 'vente' && (
-              <TouchableOpacity style={styles.toggleRow} onPress={() => set('negotiable', !form.negotiable)}>
-                <View style={[styles.toggle, form.negotiable && styles.toggleActive]}>
-                  <View style={[styles.toggleDot, form.negotiable && styles.toggleDotActive]} />
-                </View>
-                <Text style={styles.fieldLabel}>Prix négociable</Text>
-              </TouchableOpacity>
-            )}
           </View>
-        )}
-
-        {/* 6 — Récap */}
-        {step === 6 && (
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Récapitulatif</Text>
-
-            <Recap k="Transaction" v={form.status === 'location' ? 'Location' : 'Vente'} />
-            <Recap k="Type"        v={form.type} />
-            <Recap k="Titre"       v={form.title} />
-            <Recap k="Surface"     v={form.surface ? `${form.surface} m²` : '—'} />
-            <Recap k="Pièces"      v={`${form.bedrooms || 0} ch · ${form.bathrooms || 0} sdb`} />
-            <Recap k="Localisation" v={`${form.district}, ${form.city}`} />
-            <Recap k="GPS"         v={form.latitude != null ? `${form.latitude.toFixed(4)}, ${form.longitude.toFixed(4)}` : '—'} />
-            <Recap k="Équipements" v={amenities.length ? `${amenities.length} sélectionné(s)` : '—'} />
-            <Recap k="Photos"      v={`${photos.length} photo(s)`} />
-            <Recap
-              k="Prix"
-              v={form.price ? `${Number(form.price).toLocaleString('fr-FR')} FCFA${form.status === 'location' ? '/mois' : ''}` : '—'}
+          <View style={{ width: spacing.md }} />
+          <View style={{ flex: 2 }}>
+            <Button
+              label={isLastStep ? 'Publier' : 'Suivant'}
+              variant="primary"
+              fullWidth
+              loading={submitting}
+              onPress={isLastStep ? handlePublish : goNext}
+              icon={isLastStep ? undefined : 'arrow-forward'}
             />
-
-            <View style={styles.noticeBox}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.info} />
-              <Text style={styles.noticeTxt}>
-                Votre annonce sera publiée après validation par un administrateur.
-              </Text>
-            </View>
           </View>
-        )}
-      </ScrollView>
-
-      <View style={styles.footer}>
-        {step < STEPS.length - 1 ? (
-          <TouchableOpacity onPress={() => canNext() && setStep(s => s + 1)} disabled={!canNext()} activeOpacity={0.85}>
-            <LinearGradient
-              colors={canNext() ? [colors.primaryDark, colors.primary] : ['#555', '#555']}
-              style={styles.btnNext}
-            >
-              <Text style={styles.btnNextTxt}>Suivant</Text>
-              <Ionicons name="arrow-forward" size={18} color="#000" />
-            </LinearGradient>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity onPress={handlePublish} disabled={loading} activeOpacity={0.85}>
-            <LinearGradient colors={[colors.primaryDark, colors.primary]} style={styles.btnNext}>
-              {loading
-                ? <ActivityIndicator color="#000" />
-                : <><Text style={styles.btnNextTxt}>Publier le bien</Text><Ionicons name="checkmark" size={18} color="#000" /></>
-              }
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-function Field({ label, value, onChange, placeholder, numeric }) {
-  return (
-    <View style={styles.fieldWrap}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        style={styles.fieldInput}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
-        value={String(value ?? '')}
-        onChangeText={onChange}
-        keyboardType={numeric ? 'numeric' : 'default'}
-      />
-    </View>
-  );
-}
-
-function Recap({ k, v }) {
+function RecapRow({ label, value }) {
   return (
     <View style={styles.recapRow}>
-      <Text style={styles.recapKey}>{k}</Text>
-      <Text style={styles.recapVal} numberOfLines={2}>{v || '—'}</Text>
+      <Text style={styles.recapLabel}>{label}</Text>
+      <Text style={styles.recapValue} numberOfLines={2}>{value || '—'}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: colors.background },
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
-  headerTitle:  { fontSize: 18, fontWeight: '700', color: colors.text },
-  stepLabel:    { fontSize: 13, color: colors.textMuted },
+  safe: { flex: 1, backgroundColor: colors.background },
 
-  stepRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 6 },
-  stepDot:      { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.backgroundLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
-  stepDotActive:{ backgroundColor: colors.primary, borderColor: colors.primary },
-  stepNum:      { fontSize: 11, fontWeight: '700', color: colors.textMuted },
-  stepLine:     { flex: 1, height: 2, backgroundColor: colors.border, marginHorizontal: 2 },
-  stepLineActive:{ backgroundColor: colors.primary },
-  currentStepName: { textAlign: 'center', color: colors.primary, fontSize: 12, fontWeight: '700', marginBottom: 6, letterSpacing: 1 },
+  // ─── Header ───
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  closeBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: colors.card,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    ...typography.h3,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  headerStep: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    minWidth: 28,
+    textAlign: 'right',
+  },
 
-  scroll:       { padding: 16, paddingBottom: 32 },
-  stepContent:  { gap: 14 },
-  stepTitle:    { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 4 },
-  hint:         { fontSize: 12, color: colors.textMuted, marginTop: 4 },
+  // ─── Stepper ───
+  stepperContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  stepCol: {
+    alignItems: 'center',
+    width: 64,
+  },
+  stepCircle: {
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stepCircleCompleted: { backgroundColor: colors.success },
+  stepCircleActive:    { backgroundColor: colors.primary },
+  stepCircleFuture:    { backgroundColor: colors.card },
+  stepNumActive: { color: '#000', fontWeight: '700', fontSize: 13 },
+  stepNumFuture: { color: colors.textMuted, fontWeight: '700', fontSize: 13 },
+  stepLabel: {
+    fontSize: 10,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  stepLabelActive: { color: colors.primary, fontWeight: '600' },
+  connector: {
+    width: 24, height: 2,
+    backgroundColor: colors.border,
+    marginTop: 13,
+  },
+  connectorFilled: { backgroundColor: colors.success },
 
-  typeRow:      { flexDirection: 'row', gap: 12 },
-  typeCard:     { flex: 1, backgroundColor: colors.backgroundCard, borderRadius: 14, padding: 20, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: colors.border },
-  typeCardActive:{ borderColor: colors.primary },
-  typeLabel:    { fontSize: 15, fontWeight: '700', color: colors.textSecondary },
+  // ─── Progress bar ───
+  progressTrack: {
+    height: 3,
+    backgroundColor: colors.card,
+  },
+  progressFill: {
+    height: 3,
+    backgroundColor: colors.primary,
+  },
 
-  pillGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pill:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.backgroundCard, borderWidth: 1, borderColor: colors.border },
-  pillActive:   { backgroundColor: colors.primary, borderColor: colors.primary },
-  pillTxt:      { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  // ─── Step content ───
+  stepScroll: {
+    padding: spacing.lg,
+    paddingBottom: 100,
+  },
 
-  fieldWrap:    { gap: 6 },
-  fieldLabel:   { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  fieldInput:   { backgroundColor: colors.backgroundLight, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, color: colors.text, fontSize: 15, borderWidth: 1, borderColor: colors.border },
-  row2:         { flexDirection: 'row', gap: 12 },
+  // ─── Inputs ───
+  field: { marginBottom: spacing.md },
+  fieldLabel: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  input: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    color: colors.text,
+    fontSize: 15,
+  },
+  inputMultiline: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  inputFocused: { borderColor: colors.primary },
+  errorText: {
+    color: colors.error,
+    fontSize: 13,
+    marginTop: spacing.xs,
+  },
 
-  gpsBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.backgroundCard, borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: colors.primary },
-  gpsBtnTxt:    { fontSize: 14, fontWeight: '700', color: colors.primary },
-  gpsBox:       { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.backgroundLight, borderRadius: 10, padding: 12, marginTop: 8 },
-  gpsTxt:       { fontSize: 13, color: colors.text, fontWeight: '600' },
+  // ─── Step 2 : type cards ───
+  grid2: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  typeCard: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: spacing.md,
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  cardSelected: { borderColor: colors.primary },
+  typeLabel: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  txCard: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: spacing.md,
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  txDesc: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
 
-  amenitiesGrid:{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  amenityCard:  { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.backgroundCard, borderWidth: 1, borderColor: colors.border, minWidth: '48%' },
-  amenityCardActive: { borderColor: colors.primary, backgroundColor: colors.backgroundLight },
-  amenityTxt:   { fontSize: 13, fontWeight: '600', color: colors.textSecondary, flexShrink: 1 },
+  // ─── Step 3 : photos ───
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  photoCell: {
+    width: 100, height: 100,
+    borderRadius: 8,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  photoImg: {
+    width: 100, height: 100,
+    borderRadius: 8,
+  },
+  photoOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  photoRemove: {
+    position: 'absolute',
+    top: -6, right: -6,
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: colors.error,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  photoEmpty: {
+    width: 100, height: 100,
+    borderRadius: 8,
+    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    alignItems: 'center', justifyContent: 'center',
+  },
 
-  photoBtns:    { flexDirection: 'row', gap: 12 },
-  photoBtn:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.backgroundCard, borderRadius: 14, paddingVertical: 16, borderWidth: 1, borderColor: colors.primary },
-  photoBtnTxt:  { fontSize: 14, fontWeight: '600', color: colors.primary },
-  photoGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  photoThumb:   { width: 90, height: 90, position: 'relative' },
-  thumbImg:     { width: 90, height: 90, borderRadius: 10 },
-  thumbRemove:  { position: 'absolute', top: -6, right: -6, backgroundColor: '#000', borderRadius: 11 },
-  mainBadge:    { position: 'absolute', bottom: 4, left: 4, backgroundColor: colors.primary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  mainBadgeTxt: { fontSize: 9, fontWeight: '700', color: '#000' },
+  // ─── Step 4 : prix ───
+  priceWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  priceInput: {
+    flex: 1,
+    paddingVertical: 14,
+    color: colors.text,
+    fontSize: 15,
+  },
+  priceSuffix: {
+    color: colors.textMuted,
+    fontSize: 14,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  chip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: 100,
+    backgroundColor: colors.card,
+  },
+  chipSelected: { backgroundColor: colors.primary },
+  chipText: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  chipTextSelected: {
+    color: '#000',
+    fontWeight: '700',
+  },
 
-  previewPrice: { fontSize: 20, fontWeight: '800', color: colors.primary, textAlign: 'center', paddingVertical: 12 },
+  // ─── Step 5 : localisation ───
+  coordsText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
 
-  toggleRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
-  toggle:       { width: 46, height: 26, borderRadius: 13, backgroundColor: colors.backgroundLight, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', paddingHorizontal: 3 },
-  toggleActive: { backgroundColor: colors.primary },
-  toggleDot:    { width: 18, height: 18, borderRadius: 9, backgroundColor: colors.textMuted },
-  toggleDotActive: { backgroundColor: '#000', alignSelf: 'flex-end' },
+  // ─── Step 6 : stepper +/- ───
+  numberField: {
+    marginBottom: spacing.md,
+  },
+  numberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  stepBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.cardElevated,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  numberInput: {
+    flex: 1,
+    textAlign: 'center',
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '600',
+    padding: 0,
+  },
 
-  recapRow:     { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.divider, gap: 12 },
-  recapKey:     { fontSize: 14, color: colors.textMuted },
-  recapVal:     { fontSize: 14, fontWeight: '600', color: colors.text, flex: 1, textAlign: 'right' },
+  // ─── Commodités ───
+  commoditesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  commoditeRow: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 8,
+    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  commoditeText: {
+    ...typography.body,
+    color: colors.text,
+    flex: 1,
+  },
 
-  noticeBox:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.backgroundLight, borderRadius: 10, padding: 12, marginTop: 12 },
-  noticeTxt:    { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
+  // ─── Récap ───
+  recapCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: spacing.md,
+  },
+  recapThumb: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    marginBottom: spacing.md,
+  },
+  recapSectionTitle: {
+    ...typography.h3,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  recapDesc: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  recapPrice: {
+    ...typography.h2,
+    color: colors.primary,
+    fontWeight: '800',
+  },
+  recapRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: spacing.xs,
+    gap: spacing.md,
+  },
+  recapLabel: {
+    color: colors.textMuted,
+    fontSize: 13,
+  },
+  recapValue: {
+    color: colors.text,
+    fontSize: 13,
+    textAlign: 'right',
+    flex: 1,
+  },
+  recapDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.sm,
+  },
+  recapWarn: {
+    color: colors.warning,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: spacing.md,
+  },
 
-  footer:       { padding: 16, borderTopWidth: 1, borderTopColor: colors.border },
-  btnNext:      { borderRadius: 14, paddingVertical: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
-  btnNextTxt:   { fontSize: 16, fontWeight: '700', color: '#000' },
+  // ─── Footer ───
+  footer: {
+    flexDirection: 'row',
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
+  },
 });

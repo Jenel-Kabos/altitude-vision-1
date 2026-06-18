@@ -1,38 +1,71 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert,
+  ScrollView, Alert, SafeAreaView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
-import { colors } from '../../theme/colors';
+import { colors, typography, spacing } from '../../theme';
 import api from '../../services/api';
 
 const MODES = [
-  { id: 'mtn',    label: 'MTN Mobile Money',  icon: '📱', color: '#FFC107' },
-  { id: 'airtel', label: 'Airtel Money',       icon: '📱', color: '#EF4444' },
-  { id: 'card',   label: 'Carte bancaire',     icon: '💳', color: '#3B82F6' },
+  {
+    id: 'mtn',
+    label: 'MTN Mobile Money',
+    desc: 'Paiement via votre compte MTN',
+    icon: 'phone-portrait-outline',
+    bg: '#FFCC00',
+    iconColor: '#000000',
+    channel: 'MOBILE_MONEY',
+  },
+  {
+    id: 'airtel',
+    label: 'Airtel Money',
+    desc: 'Paiement via votre compte Airtel',
+    icon: 'phone-portrait-outline',
+    bg: '#EF4444',
+    iconColor: '#FFFFFF',
+    channel: 'MOBILE_MONEY',
+  },
+  {
+    id: 'card',
+    label: 'Carte bancaire',
+    desc: 'Visa / Mastercard',
+    icon: 'card-outline',
+    bg: colors.info,
+    iconColor: '#FFFFFF',
+    channel: 'CREDIT_CARD',
+  },
 ];
 
-const fmt = (n) => `${Number(n).toLocaleString('fr-FR')} FCFA`;
+const fmt = (n) => Number(n || 0).toLocaleString('fr-FR');
 
 export default function PaiementScreen({ route, navigation }) {
-  const { montant = 0, description = 'Paiement', bien = '' } = route.params || {};
+  const {
+    montant = 0,
+    description = 'Paiement',
+    bien = '',
+    type = '',
+    duree = '',
+  } = route.params || {};
+
   const [modeSelected, setMode] = useState(null);
-  const [loading, setLoading]   = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const initierPaiement = async () => {
-    if (!modeSelected) return Alert.alert('Mode requis', 'Choisissez un mode de paiement.');
+    if (!modeSelected) {
+      Alert.alert('Mode requis', 'Choisissez un mode de paiement.');
+      return;
+    }
     setLoading(true);
     try {
+      const mode = MODES.find(m => m.id === modeSelected);
       const transactionId = `AV-${Date.now()}`;
       const res = await api.post('/paiements/initier', {
         montant,
         description,
         transactionId,
-        channels: modeSelected === 'card' ? 'CREDIT_CARD' : 'MOBILE_MONEY',
+        channels: mode.channel,
         currency: 'XAF',
       });
       const paymentUrl = res.data?.paymentUrl;
@@ -40,7 +73,10 @@ export default function PaiementScreen({ route, navigation }) {
         await WebBrowser.openBrowserAsync(paymentUrl);
       }
     } catch (err) {
-      Alert.alert('Erreur', err.response?.data?.message || 'Impossible d\'initier le paiement.');
+      Alert.alert(
+        'Erreur',
+        err.response?.data?.message || "Impossible d'initier le paiement.",
+      );
     } finally {
       setLoading(false);
     }
@@ -48,90 +84,286 @@ export default function PaiementScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Paiement sécurisé</Text>
-        <View style={{ width: 30 }} />
-      </View>
-
-      {/* Résumé */}
-      <View style={styles.summaryCard}>
-        <Ionicons name="shield-checkmark-outline" size={32} color={colors.success} />
-        <Text style={styles.summaryLabel}>Montant à payer</Text>
-        <Text style={styles.summaryAmount}>{fmt(montant)}</Text>
-        {description ? <Text style={styles.summaryDesc}>{description}</Text> : null}
-        {bien ? <Text style={styles.summaryBien}>📍 {bien}</Text> : null}
-      </View>
-
-      {/* Modes de paiement */}
-      <Text style={styles.sectionTitle}>Choisir le mode de paiement</Text>
-      <View style={styles.modeList}>
-        {MODES.map(m => (
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Header back */}
+        <View style={styles.topRow}>
           <TouchableOpacity
-            key={m.id}
-            style={[styles.modeCard, modeSelected === m.id && styles.modeCardActive]}
-            onPress={() => setMode(m.id)}
-            activeOpacity={0.85}
+            onPress={() => navigation.goBack()}
+            style={styles.backBtn}
+            activeOpacity={0.8}
           >
-            <Text style={styles.modeIcon}>{m.icon}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.modeLabel}>{m.label}</Text>
-            </View>
-            <View style={[styles.radio, modeSelected === m.id && styles.radioActive]}>
-              {modeSelected === m.id && <View style={styles.radioDot} />}
-            </View>
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
           </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Bouton payer */}
-      <View style={styles.footer}>
-        <TouchableOpacity onPress={initierPaiement} disabled={!modeSelected || loading} activeOpacity={0.85}>
-          <LinearGradient
-            colors={(!modeSelected || loading) ? ['#555','#555'] : [colors.primaryDark, colors.primary]}
-            style={styles.payBtn}
-          >
-            {loading
-              ? <ActivityIndicator color="#000" />
-              : <>
-                  <Ionicons name="lock-closed" size={18} color="#000" />
-                  <Text style={styles.payBtnTxt}>Payer {fmt(montant)}</Text>
-                </>
-            }
-          </LinearGradient>
-        </TouchableOpacity>
-        <View style={styles.securityRow}>
-          <Ionicons name="lock-closed-outline" size={13} color={colors.textMuted} />
-          <Text style={styles.securityTxt}>Paiement sécurisé par CinetPay</Text>
         </View>
+
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Paiement</Text>
+          <Text style={styles.headerAmount}>{fmt(montant)} FCFA</Text>
+          {bien ? (
+            <Text style={styles.headerSubtitle} numberOfLines={1}>{bien}</Text>
+          ) : null}
+        </View>
+
+        {/* Méthodes de paiement */}
+        <Text style={styles.sectionTitle}>Mode de paiement</Text>
+        <View style={styles.methodsList}>
+          {MODES.map(m => {
+            const selected = modeSelected === m.id;
+            return (
+              <TouchableOpacity
+                key={m.id}
+                style={[styles.methodCard, selected && styles.methodCardSelected]}
+                onPress={() => setMode(m.id)}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.methodIcon, { backgroundColor: m.bg }]}>
+                  <Ionicons name={m.icon} size={22} color={m.iconColor} />
+                </View>
+                <View style={styles.methodInfo}>
+                  <Text style={styles.methodLabel}>{m.label}</Text>
+                  <Text style={styles.methodDesc}>{m.desc}</Text>
+                </View>
+                {selected ? (
+                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Récapitulatif */}
+        <Text style={styles.sectionTitle}>Récapitulatif</Text>
+        <View style={styles.summaryCard}>
+          {bien ? (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Bien</Text>
+              <Text style={styles.summaryValue} numberOfLines={1}>{bien}</Text>
+            </View>
+          ) : null}
+          {description ? (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Détail</Text>
+              <Text style={styles.summaryValue} numberOfLines={2}>{description}</Text>
+            </View>
+          ) : null}
+          {type ? (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Type</Text>
+              <Text style={styles.summaryValue}>{type}</Text>
+            </View>
+          ) : null}
+          {duree ? (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Durée</Text>
+              <Text style={styles.summaryValue}>{duree}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.divider} />
+
+          <View style={styles.summaryRow}>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalValue}>{fmt(montant)} FCFA</Text>
+          </View>
+        </View>
+
+        <View style={styles.securityRow}>
+          <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
+          <Text style={styles.securityText}>Paiement sécurisé par CinetPay</Text>
+        </View>
+      </ScrollView>
+
+      {/* CTA fixe */}
+      <View style={styles.ctaWrap}>
+        <TouchableOpacity
+          onPress={initierPaiement}
+          disabled={!modeSelected || loading}
+          activeOpacity={0.85}
+          style={[
+            styles.ctaBtn,
+            (!modeSelected || loading) && styles.ctaBtnDisabled,
+          ]}
+        >
+          <Text style={styles.ctaText}>
+            {loading ? 'Initialisation…' : 'Payer maintenant'}
+          </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: colors.background },
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
-  headerTitle:  { fontSize: 18, fontWeight: '700', color: colors.text },
-  summaryCard:  { backgroundColor: colors.backgroundCard, borderRadius: 20, margin: 16, padding: 24, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.border },
-  summaryLabel: { fontSize: 14, color: colors.textMuted, marginTop: 8 },
-  summaryAmount:{ fontSize: 32, fontWeight: '900', color: colors.primary },
-  summaryDesc:  { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
-  summaryBien:  { fontSize: 13, color: colors.textMuted },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.text, paddingHorizontal: 16, marginBottom: 10 },
-  modeList:     { paddingHorizontal: 16, gap: 10 },
-  modeCard:     { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.backgroundCard, borderRadius: 14, padding: 16, gap: 14, borderWidth: 1, borderColor: colors.border },
-  modeCardActive:{ borderColor: colors.primary },
-  modeIcon:     { fontSize: 22 },
-  modeLabel:    { fontSize: 15, fontWeight: '600', color: colors.text },
-  radio:        { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
-  radioActive:  { borderColor: colors.primary },
-  radioDot:     { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
-  footer:       { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border, gap: 12 },
-  payBtn:       { borderRadius: 16, paddingVertical: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
-  payBtnTxt:    { fontSize: 16, fontWeight: '800', color: '#000' },
-  securityRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  securityTxt:  { fontSize: 12, color: colors.textMuted },
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollContent: { paddingBottom: 120 },
+
+  topRow: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Header
+  header: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+  },
+  headerTitle: {
+    ...typography.h1,
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  headerAmount: {
+    ...typography.display,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  headerSubtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+
+  // Section
+  sectionTitle: {
+    ...typography.h3,
+    color: colors.text,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    marginTop: spacing.md,
+  },
+
+  // Méthodes
+  methodsList: {
+    paddingHorizontal: spacing.lg,
+  },
+  methodCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  methodCardSelected: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  methodIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  methodInfo: {
+    flex: 1,
+  },
+  methodLabel: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  methodDesc: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+
+  // Récap
+  summaryCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: spacing.md,
+    marginHorizontal: spacing.lg,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  summaryLabel: {
+    ...typography.body,
+    color: colors.textSecondary,
+    flexShrink: 0,
+  },
+  summaryValue: {
+    ...typography.body,
+    color: colors.text,
+    textAlign: 'right',
+    flex: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.sm,
+  },
+  totalLabel: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  totalValue: {
+    ...typography.h3,
+    color: colors.primary,
+    fontWeight: '800',
+  },
+
+  // Security
+  securityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.lg,
+  },
+  securityText: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+
+  // CTA
+  ctaWrap: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingBottom: spacing.lg,
+  },
+  ctaBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  ctaBtnDisabled: {
+    opacity: 0.5,
+  },
+  ctaText: {
+    color: '#000',
+    fontWeight: '700',
+    fontSize: 16,
+  },
 });

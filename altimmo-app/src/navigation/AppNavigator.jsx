@@ -1,9 +1,9 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { colors } from '../theme/colors';
+import { colors, typography } from '../theme';
 import AuthNavigator from './AuthNavigator';
 import TabNavigator from './TabNavigator';
 
@@ -14,10 +14,14 @@ export default function AppNavigator() {
 
   if (loading) {
     return (
-      <View style={{
-        flex: 1,
-        backgroundColor: '#0A0A0A',
-      }} />
+      <View style={styles.splash}>
+        <Text style={styles.logo}>Altimmo</Text>
+        <ActivityIndicator
+          size="large"
+          color={colors.primary}
+          style={styles.spinner}
+        />
+      </View>
     );
   }
 
@@ -27,7 +31,7 @@ export default function AppNavigator() {
         screenOptions={{
           headerShown: false,
           cardStyle: {
-            backgroundColor: '#0A0A0A',
+            backgroundColor: colors.background,
           },
         }}
       >
@@ -46,3 +50,20 @@ export default function AppNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  splash: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: {
+    ...typography.display,
+    color: colors.primary,
+    letterSpacing: 1,
+  },
+  spinner: {
+    marginTop: 24,
+  },
+});

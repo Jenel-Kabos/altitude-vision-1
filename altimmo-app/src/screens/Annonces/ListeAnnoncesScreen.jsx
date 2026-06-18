@@ -1,12 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  TouchableOpacity, Image,
-  ActivityIndicator, RefreshControl,
-  TextInput
+  TouchableOpacity, Image, TextInput,
+  ScrollView, RefreshControl, SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
+import { colors, typography, spacing } from '../../theme';
+import EmptyState from '../../components/ui/EmptyState';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import Button from '../../components/ui/Button';
+
+const FILTERS = [
+  { value: 'tous',        label: 'Tous' },
+  { value: 'vente',       label: 'Vente' },
+  { value: 'location',    label: 'Location' },
+  { value: 'appartement', label: 'Appartement' },
+  { value: 'maison',      label: 'Maison' },
+  { value: 'terrain',     label: 'Terrain' },
+];
+
+const PLACEHOLDER_IMG =
+  'https://via.placeholder.com/600x400/1A1A1A/C8960C?text=Altimmo';
+
+const formatPrice = (n) =>
+  Number(n || 0).toLocaleString('fr-FR');
 
 export default function ListeAnnoncesScreen({ navigation }) {
   const [annonces, setAnnonces] = useState([]);
@@ -36,9 +54,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
     }
   };
 
-  useEffect(() => {
-    chargerAnnonces();
-  }, []);
+  useEffect(() => { chargerAnnonces(); }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -46,74 +62,129 @@ export default function ListeAnnoncesScreen({ navigation }) {
   };
 
   const annoncesFiltrées = annonces.filter(a => {
-    const matchRecherche =
-      a.title?.toLowerCase()
-        .includes(recherche.toLowerCase()) ||
-      a.location?.city?.toLowerCase()
-        .includes(recherche.toLowerCase());
-    const matchFiltre =
-      filtre === 'tous' ||
-      a.transactionType === filtre ||
-      a.type === filtre;
+    const q = recherche.trim().toLowerCase();
+    const matchRecherche = !q
+      || a.title?.toLowerCase().includes(q)
+      || a.address?.city?.toLowerCase().includes(q)
+      || a.address?.district?.toLowerCase().includes(q)
+      || a.location?.city?.toLowerCase().includes(q);
+
+    const matchFiltre = filtre === 'tous'
+      || a.transactionType?.toLowerCase() === filtre
+      || a.type?.toLowerCase() === filtre
+      || a.typeTransaction?.toLowerCase() === filtre;
+
     return matchRecherche && matchFiltre;
   });
 
   const renderAnnonce = ({ item }) => {
     const isLocation =
-      item.transactionType === 'location' ||
-      item.transactionType === 'Location' ||
-      item.transactionType === 'LOCATION' ||
-      item.type === 'location' ||
-      item.type === 'Location' ||
-      item.typeTransaction === 'location' ||
-      item.typeTransaction === 'Location';
+      item.transactionType?.toLowerCase() === 'location' ||
+      item.type?.toLowerCase() === 'location' ||
+      item.typeTransaction?.toLowerCase() === 'location';
+
+    const district = item.address?.district || item.location?.neighborhood || '';
+    const city = item.address?.city || item.location?.city || 'Brazzaville';
+    const addressText = district ? `${district}, ${city}` : city;
+
+    const surface = item.surface || item.area;
+    const pieces = (item.bedrooms || 0) + (item.livingRooms || 0);
+
+    const ownerName = item.owner?.name || 'Propriétaire';
+    const ownerInitial = (ownerName[0] || '?').toUpperCase();
+    const ownerPhoto = item.owner?.photo;
 
     return (
       <TouchableOpacity
+        onPress={() => navigation.navigate('DetailAnnonce', { annonce: item })}
+        activeOpacity={0.85}
         style={styles.card}
-        onPress={() => navigation.navigate(
-          'DetailAnnonce', { annonce: item }
-        )}
       >
-        <Image
-          source={{
-            uri: item.images?.[0] ||
-              item.photos?.[0] ||
-              'https://via.placeholder.com/300x200/1A1A1A/C8960C?text=Altimmo'
-          }}
-          style={styles.image}
-          resizeMode="cover"
-        />
-        <View style={[
-          styles.badge,
-          { backgroundColor: isLocation ? '#3B82F6' : '#22C55E' }
-        ]}>
-          <Text style={styles.badgeTexte}>
-            {isLocation ? 'LOCATION' : 'VENTE'}
-          </Text>
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.titre}
-            numberOfLines={2}>
-            {item.title}
-          </Text>
-          <View style={styles.localisation}>
-            <Ionicons
-              name="location"
-              size={14}
-              color="#C8960C"
-            />
-            <Text style={styles.ville}>
-              {item.location?.neighborhood ||
-               item.location?.city ||
-               'Brazzaville'}
+        {/* Image area */}
+        <View style={styles.imageWrap}>
+          <Image
+            source={{ uri: item.images?.[0] || item.photos?.[0] || PLACEHOLDER_IMG }}
+            style={styles.image}
+            resizeMode="cover"
+          />
+          {/* Badge type */}
+          <View style={[
+            styles.badgeType,
+            { backgroundColor: isLocation ? colors.info : colors.success },
+          ]}>
+            <Text style={styles.badgeTypeText}>
+              {isLocation ? 'LOCATION' : 'VENTE'}
             </Text>
           </View>
-          <Text style={styles.prix}>
-            {item.price?.toLocaleString('fr-FR')}
-            {' '}FCFA
-            {isLocation ? '/mois' : ''}
+          {/* Badge prix */}
+          <View style={styles.badgePrice}>
+            <Text style={styles.badgePriceText}>
+              {formatPrice(item.price)} FCFA{isLocation ? '/mois' : ''}
+            </Text>
+          </View>
+        </View>
+
+        {/* Body */}
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {item.title}
           </Text>
+
+          {/* Adresse */}
+          <View style={styles.row}>
+            <Ionicons name="location" size={14} color={colors.primary} />
+            <Text style={styles.addressText} numberOfLines={1}>
+              {addressText}
+            </Text>
+          </View>
+
+          {/* Features */}
+          {(surface > 0 || item.bedrooms > 0 || pieces > 0) && (
+            <View style={styles.featuresRow}>
+              {surface > 0 && (
+                <View style={styles.feature}>
+                  <Ionicons name="resize-outline" size={14} color={colors.primary} />
+                  <Text style={styles.featureText}>{surface} m²</Text>
+                </View>
+              )}
+              {item.bedrooms > 0 && (
+                <View style={styles.feature}>
+                  <Ionicons name="bed-outline" size={14} color={colors.primary} />
+                  <Text style={styles.featureText}>{item.bedrooms} ch.</Text>
+                </View>
+              )}
+              {pieces > 0 && (
+                <View style={styles.feature}>
+                  <Ionicons name="grid-outline" size={14} color={colors.primary} />
+                  <Text style={styles.featureText}>{pieces} pièces</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          <View style={styles.separator} />
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <View style={styles.ownerInfo}>
+              {ownerPhoto ? (
+                <Image source={{ uri: ownerPhoto }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <Text style={styles.avatarInitial}>{ownerInitial}</Text>
+                </View>
+              )}
+              <Text style={styles.ownerName} numberOfLines={1}>
+                {ownerName}
+              </Text>
+            </View>
+            <Button
+              size="sm"
+              variant="outline"
+              label="Voir"
+              onPress={() => navigation.navigate('DetailAnnonce', { annonce: item })}
+            />
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -121,237 +192,291 @@ export default function ListeAnnoncesScreen({ navigation }) {
 
   if (loading) {
     return (
-      <View style={styles.centré}>
-        <ActivityIndicator
-          size={40}
-          color="#C8960C"
-        />
-        <Text style={styles.chargement}>
-          Chargement...
-        </Text>
-      </View>
+      <SafeAreaView style={styles.safe}>
+        <LoadingSpinner />
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitre}>
-          🏠 Annonces
-        </Text>
-        <Text style={styles.headerCount}>
-          {annoncesFiltrées.length} bien(s)
-        </Text>
-      </View>
-
-      {/* Recherche */}
-      <View style={styles.recherche}>
-        <Ionicons
-          name="search"
-          size={20}
-          color="#666"
-        />
-        <TextInput
-          style={styles.rechercheInput}
-          placeholder="Rechercher un bien..."
-          placeholderTextColor="#666"
-          value={recherche}
-          onChangeText={setRecherche}
-        />
-      </View>
-
-      {/* Filtres */}
-      <View style={styles.filtres}>
-        {['tous', 'location', 'vente'].map(f => (
-          <TouchableOpacity
-            key={f}
-            style={[
-              styles.filtreBtn,
-              filtre === f && styles.filtreBtnActif
-            ]}
-            onPress={() => setFiltre(f)}
-          >
-            <Text style={[
-              styles.filtreTxt,
-              filtre === f &&
-                styles.filtreTxtActif
-            ]}>
-              {f.charAt(0).toUpperCase() +
-               f.slice(1)}
+        <View style={styles.headerTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.titre}>Annonces</Text>
+            <Text style={styles.sousTitre}>
+              {annoncesFiltrées.length} bien{annoncesFiltrées.length !== 1 ? 's' : ''}
             </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Erreur */}
-      {erreur ? (
-        <View style={styles.centré}>
-          <Text style={{ color: '#ff4444' }}>
-            {erreur}
-          </Text>
-          <TouchableOpacity
-            onPress={chargerAnnonces}>
-            <Text style={{ color: '#C8960C' }}>
-              Réessayer
-            </Text>
-          </TouchableOpacity>
+          </View>
         </View>
+
+        {/* Search bar */}
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color={colors.primary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Rechercher un bien..."
+            placeholderTextColor={colors.textMuted}
+            value={recherche}
+            onChangeText={setRecherche}
+          />
+          {recherche ? (
+            <TouchableOpacity onPress={() => setRecherche('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* Filters */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersScroll}
+        >
+          {FILTERS.map(f => {
+            const active = filtre === f.value;
+            return (
+              <TouchableOpacity
+                key={f.value}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => setFiltre(f.value)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  {f.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* List */}
+      {erreur ? (
+        <EmptyState
+          icon="cloud-offline-outline"
+          title="Erreur de chargement"
+          subtitle={erreur}
+          actionLabel="Réessayer"
+          onAction={chargerAnnonces}
+        />
       ) : (
         <FlatList
           data={annoncesFiltrées}
           renderItem={renderAnnonce}
-          keyExtractor={item =>
-            item._id || item.id}
-          contentContainerStyle={
-            styles.liste
-          }
+          keyExtractor={item => item._id || item.id}
+          contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#C8960C"
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
           ListEmptyComponent={
-            <View style={styles.centré}>
-              <Text style={{ color: '#666' }}>
-                Aucune annonce trouvée
-              </Text>
-            </View>
+            <EmptyState
+              icon="home-outline"
+              title="Aucune annonce trouvée"
+              subtitle="Essayez un autre filtre ou revenez plus tard."
+            />
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: '#0A0A0A'
+    backgroundColor: colors.background,
   },
+
+  // ─── Header ───────────────────────────────────────────────
   header: {
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  headerTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: spacing.md,
+  },
+  titre: {
+    ...typography.h1,
+    color: colors.text,
+  },
+  sousTitre: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+
+  // ─── Search bar ───────────────────────────────────────────
+  searchBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    paddingTop: 50,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A'
-  },
-  headerTitre: {
-    color: '#C8960C',
-    fontSize: 24,
-    fontWeight: 'bold'
-  },
-  headerCount: {
-    color: '#666',
-    fontSize: 14
-  },
-  recherche: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1A1A1A',
-    margin: 12,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#2A2A2A'
-  },
-  rechercheInput: {
-    flex: 1,
-    color: '#FFF',
-    padding: 12,
-    fontSize: 14
-  },
-  filtres: {
-    flexDirection: 'row',
-    paddingHorizontal: 12,
-    gap: 8,
-    marginBottom: 8
-  },
-  filtreBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: '#2A2A2A'
-  },
-  filtreBtnActif: {
-    backgroundColor: '#C8960C',
-    borderColor: '#C8960C'
-  },
-  filtreTxt: {
-    color: '#666',
-    fontSize: 13
-  },
-  filtreTxtActif: {
-    color: '#000',
-    fontWeight: 'bold'
-  },
-  liste: {
-    padding: 12
-  },
-  card: {
-    backgroundColor: '#1A1A1A',
+    gap: spacing.sm,
+    backgroundColor: colors.card,
     borderRadius: 12,
-    marginBottom: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    marginBottom: spacing.md,
+  },
+  searchInput: {
+    flex: 1,
+    ...typography.body,
+    color: colors.text,
+    padding: 0,
+  },
+
+  // ─── Filter chips ─────────────────────────────────────────
+  filtersScroll: {
+    gap: spacing.sm,
+    paddingRight: spacing.lg,
+  },
+  chip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 100,
+    backgroundColor: colors.card,
+  },
+  chipActive: {
+    backgroundColor: colors.primary,
+  },
+  chipText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  chipTextActive: {
+    color: '#000000',
+    fontWeight: '700',
+  },
+
+  // ─── List ─────────────────────────────────────────────────
+  list: {
+    padding: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: spacing.lg,
+  },
+
+  // ─── Card ─────────────────────────────────────────────────
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#2A2A2A'
+    marginBottom: spacing.lg,
+  },
+  imageWrap: {
+    width: '100%',
+    height: 200,
+    position: 'relative',
   },
   image: {
     width: '100%',
-    height: 200
+    height: '100%',
   },
-  badge: {
+  badgeType: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: '#C8960C',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6
+    top: spacing.md,
+    left: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 8,
   },
-  badgeTexte: {
-    color: '#000',
-    fontSize: 11,
-    fontWeight: 'bold'
+  badgeTypeText: {
+    ...typography.tiny,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    letterSpacing: 0.8,
   },
-  cardContent: {
-    padding: 12
+  badgePrice: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    backgroundColor: '#0A0A0A80',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 8,
   },
-  titre: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 6
+  badgePriceText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '700',
   },
-  localisation: {
+  cardBody: {
+    padding: spacing.md,
+  },
+  cardTitle: {
+    ...typography.h3,
+    color: colors.text,
+    fontWeight: '600',
+    marginBottom: spacing.sm,
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 8
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  ville: {
-    color: '#999',
-    fontSize: 13
-  },
-  prix: {
-    color: '#C8960C',
-    fontSize: 18,
-    fontWeight: 'bold'
-  },
-  centré: {
+  addressText: {
+    ...typography.caption,
+    color: colors.textSecondary,
     flex: 1,
+  },
+  featuresRow: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  feature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  featureText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.sm,
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ownerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  avatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  avatarFallback: {
+    backgroundColor: colors.cardElevated,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20
   },
-  chargement: {
-    color: '#666',
-    marginTop: 10
-  }
+  avatarInitial: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  ownerName: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    flex: 1,
+  },
 });
