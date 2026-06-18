@@ -3,6 +3,7 @@
     "name": "Altimmo",
     "slug": "altimmo-app",
     "version": "1.0.0",
+    "scheme": "altimmo",
     "orientation": "portrait",
     "newArchEnabled": false,
     "icon": "./assets/icon.png",
@@ -37,7 +38,8 @@
     "plugins": [
       "expo-notifications",
       "expo-location",
-      "expo-camera"
+      "expo-camera",
+      "expo-font"
     ],
     "extra": {
       "eas": {

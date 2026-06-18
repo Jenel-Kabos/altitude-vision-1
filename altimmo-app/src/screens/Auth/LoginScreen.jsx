@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, KeyboardAvoidingView,
   Platform, ScrollView, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../../context/AuthContext';
-import { colors, typography, spacing } from '../../theme';
+import { colors, typography, spacing, fonts, fontSize } from '../../theme';
 import Button from '../../components/ui/Button';
+
+WebBrowser.maybeCompleteAuthSession();
+
+const ANDROID_CLIENT_ID =
+  '872164120879-o3j19vs2ro8l7pm93u3g1po8v10tgruv.apps.googleusercontent.com';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -16,7 +23,42 @@ export default function LoginScreen({ navigation }) {
   const [erreur, setErreur] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [focused, setFocused] = useState(null);
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId: ANDROID_CLIENT_ID,
+  });
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      handleGoogleLogin(authentication.accessToken);
+    }
+  }, [response]);
+
+  const handleGoogleLogin = async (accessToken) => {
+    try {
+      setLoading(true);
+      const userInfoRes = await fetch(
+        'https://www.googleapis.com/userinfo/v2/me',
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const userInfo = await userInfoRes.json();
+
+      await loginWithGoogle({
+        email:    userInfo.email,
+        name:     userInfo.name,
+        googleId: userInfo.id,
+        avatar:   userInfo.picture,
+      });
+      // Nav vers app principale : géré par AppNavigator qui switch sur user/token
+    } catch (err) {
+      console.log('Google login error:', err.message);
+      Alert.alert('Erreur', 'Connexion Google échouée. Réessayez.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -128,6 +170,20 @@ export default function LoginScreen({ navigation }) {
               </TouchableOpacity>
             </View>
 
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ForgotPassword')}
+              style={{ alignSelf: 'flex-end', marginBottom: spacing.md }}
+              hitSlop={8}
+            >
+              <Text style={{
+                fontFamily: fonts.body,
+                fontSize: fontSize.sm,
+                color: colors.gold,
+              }}>
+                Mot de passe oublié ?
+              </Text>
+            </TouchableOpacity>
+
             {erreur ? (
               <Text style={styles.error}>{erreur}</Text>
             ) : null}
@@ -138,6 +194,32 @@ export default function LoginScreen({ navigation }) {
               loading={loading}
               fullWidth
               variant="primary"
+            />
+
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginVertical: spacing.md,
+            }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              <Text style={{
+                marginHorizontal: spacing.sm,
+                color: colors.textMuted,
+                fontFamily: fonts.body,
+                fontSize: fontSize.xs,
+              }}>
+                ou
+              </Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+            </View>
+
+            <Button
+              variant="outline"
+              label="Continuer avec Google"
+              onPress={() => promptAsync()}
+              disabled={!request || loading}
+              fullWidth
+              style={{ marginBottom: spacing.md }}
             />
           </View>
 

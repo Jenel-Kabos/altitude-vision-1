@@ -57,6 +57,22 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
+  const loginWithGoogle = async (googlePayload) => {
+    try {
+      const response = await api.post('/auth/google', googlePayload);
+      const token = response.data.token;
+      const user  = response.data.data?.user || response.data.user;
+      if (!token) throw new Error('Token manquant dans la réponse /auth/google');
+      await AsyncStorage.setItem('token', token);
+      setToken(token);
+      setUser(user);
+      return user;
+    } catch (error) {
+      console.log('Google login error:', error.response?.data || error.message);
+      throw error;
+    }
+  };
+
   const logout = async () => {
     await AsyncStorage.removeItem('token');
     setToken(null);
@@ -70,7 +86,7 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={{
       user, token, loading,
-      login, register, logout, updateUser,
+      login, loginWithGoogle, register, logout, updateUser,
       isAdmin:         role === 'admin',
       isCollaborateur: role === 'collaborateur',
       isProprietaire:  role === 'proprietaire',

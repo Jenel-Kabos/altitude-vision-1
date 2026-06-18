@@ -1,9 +1,26 @@
+export const fonts = {
+  display:      'Fraunces-Bold',
+  displayItalic:'Fraunces-Italic',
+  body:         'Inter-Regular',
+  bodyItalic:   'Inter-Italic',
+  bodyBold:     'Inter-Bold',
+};
+
+export const fontSize = {
+  xs:      11,
+  sm:      13,
+  md:      16,
+  lg:      22,
+  display: 32,
+};
+
+// Styles de compatibilité — évite de casser tous les écrans d'un coup
 export const typography = {
-  display: { fontSize: 28, fontWeight: 'bold' },
-  h1:      { fontSize: 24, fontWeight: 'bold' },
-  h2:      { fontSize: 20, fontWeight: '600' },
-  h3:      { fontSize: 17, fontWeight: '600' },
-  body:    { fontSize: 15, fontWeight: '400' },
-  caption: { fontSize: 13, fontWeight: '400' },
-  tiny:    { fontSize: 11, fontWeight: '400' },
+  display: { fontFamily: fonts.display,  fontSize: fontSize.display },
+  h1:      { fontFamily: fonts.display,  fontSize: fontSize.lg },
+  h2:      { fontFamily: fonts.bodyBold, fontSize: fontSize.md },
+  h3:      { fontFamily: fonts.bodyBold, fontSize: fontSize.sm },
+  body:    { fontFamily: fonts.body,     fontSize: fontSize.md },
+  caption: { fontFamily: fonts.body,     fontSize: fontSize.sm },
+  tiny:    { fontFamily: fonts.body,     fontSize: fontSize.xs },
 };

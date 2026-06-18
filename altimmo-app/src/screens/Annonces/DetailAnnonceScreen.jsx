@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, ScrollView, Image,
+  View, Text, Image,
   TouchableOpacity, StyleSheet,
   FlatList, Dimensions, Alert,
   TextInput, SafeAreaView,
@@ -8,8 +8,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { colors, typography, spacing } from '../../theme';
-import Button from '../../components/ui/Button';
+import { Screen, Card, Button, PrixFCFA } from '../../components';
+import { colors, fonts, fontSize, spacing, radius } from '../../theme';
 
 const { width } = Dimensions.get('window');
 const DESC_LIMIT = 150;
@@ -60,7 +60,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     annonce.location?.city ||
     annonce.city ||
     '';
-  const addressText = [district, city].filter(Boolean).join(', ');
+  const addressText = [district, city].filter(Boolean).join(' · ');
 
   const surface = annonce.surface || annonce.area || 0;
   const bedrooms = annonce.bedrooms || annonce.chambres || 0;
@@ -125,7 +125,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   const demanderVisite = () => {
     Alert.alert(
-      'Demander une visite',
+      'Prendre rendez-vous',
       `Voulez-vous visiter :\n"${title}" ?`,
       [
         { text: 'Annuler', style: 'cancel' },
@@ -155,10 +155,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+      <Screen scroll style={styles.scrollContent}>
         {/* ─── Galerie ──────────────────────────────────────── */}
         <View style={styles.galleryWrap}>
           {photos.length > 0 ? (
@@ -195,31 +192,26 @@ export default function DetailAnnonceScreen({ route, navigation }) {
           )}
         </View>
 
-        {/* ─── Corps avec overlap ──────────────────────────── */}
+        {/* ─── Corps ─────────────────────────────────────────── */}
         <View style={styles.body}>
-          {/* Prix + badge type */}
+          {/* Prix + statut transaction */}
           <View style={styles.priceRow}>
-            <Text style={styles.priceText} numberOfLines={1} adjustsFontSizeToFit>
-              {prix.toLocaleString('fr-FR')} FCFA{isLocation ? '/mois' : ''}
-            </Text>
-            <View style={[
-              styles.badgeType,
-              { backgroundColor: isLocation ? colors.info : colors.success },
-            ]}>
-              <Text style={styles.badgeTypeText}>
-                {isLocation ? 'LOCATION' : 'VENTE'}
-              </Text>
+            <View style={styles.priceWrap}>
+              <PrixFCFA montant={prix} style={styles.priceFlex} />
+              {isLocation ? (
+                <Text style={styles.priceMois}> /mois</Text>
+              ) : null}
             </View>
+            <Text style={styles.statusLabel}>
+              {isLocation ? 'LOCATION' : 'VENTE'}
+            </Text>
           </View>
 
           {/* Titre + adresse */}
           <View style={styles.section}>
             <Text style={styles.titleText}>{title}</Text>
             {addressText ? (
-              <View style={styles.addressRow}>
-                <Ionicons name="location-outline" size={16} color={colors.primary} />
-                <Text style={styles.addressText}>{addressText}</Text>
-              </View>
+              <Text style={styles.addressText}>{addressText}</Text>
             ) : null}
           </View>
 
@@ -265,35 +257,36 @@ export default function DetailAnnonceScreen({ route, navigation }) {
           {/* Propriétaire */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Propriétaire</Text>
-            <View style={styles.ownerCard}>
-              {owner.photo ? (
-                <Image source={{ uri: owner.photo }} style={styles.ownerAvatar} />
-              ) : (
-                <View style={[styles.ownerAvatar, styles.ownerAvatarFallback]}>
-                  <Text style={styles.ownerInitial}>{ownerInitial}</Text>
-                </View>
-              )}
-              <View style={styles.ownerInfo}>
-                <Text style={styles.ownerName} numberOfLines={1}>{ownerName}</Text>
-                <View style={[
-                  styles.roleBadge,
-                  { backgroundColor: (ownerIsProprietaire ? colors.success : colors.info) + '22' },
-                ]}>
-                  <Text style={[
-                    styles.roleBadgeText,
-                    { color: ownerIsProprietaire ? colors.success : colors.info },
+            <Card>
+              <View style={styles.ownerInner}>
+                {owner.photo ? (
+                  <Image source={{ uri: owner.photo }} style={styles.ownerAvatar} />
+                ) : (
+                  <View style={[styles.ownerAvatar, styles.ownerAvatarFallback]}>
+                    <Text style={styles.ownerInitial}>{ownerInitial}</Text>
+                  </View>
+                )}
+                <View style={styles.ownerInfo}>
+                  <Text style={styles.ownerName} numberOfLines={1}>{ownerName}</Text>
+                  <View style={[
+                    styles.roleBadge,
+                    { borderColor: ownerIsProprietaire ? colors.gold : colors.border },
                   ]}>
-                    {ownerRoleLabel}
-                  </Text>
+                    <Text style={[
+                      styles.roleBadgeText,
+                      { color: ownerIsProprietaire ? colors.gold : colors.textSub },
+                    ]}>
+                      {ownerRoleLabel.toUpperCase()}
+                    </Text>
+                  </View>
                 </View>
+                <Button
+                  label="Échanger"
+                  variant="outline"
+                  onPress={ouvrirChat}
+                />
               </View>
-              <Button
-                label="Contacter"
-                variant="outline"
-                size="sm"
-                onPress={ouvrirChat}
-              />
-            </View>
+            </Card>
           </View>
 
           {/* Commentaires */}
@@ -304,7 +297,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
             {reviews.length === 0 ? (
               <Text style={styles.emptyComments}>
-                Soyez le premier à commenter
+                Aucun commentaire pour ce bien.
               </Text>
             ) : (
               <View style={styles.commentsList}>
@@ -352,14 +345,14 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                   color={
                     envoi || !commentaire.trim()
                       ? colors.textMuted
-                      : colors.primary
+                      : colors.gold
                   }
                 />
               </TouchableOpacity>
             </View>
           </View>
         </View>
-      </ScrollView>
+      </Screen>
 
       {/* ─── Header flottant ──────────────────────────────── */}
       <SafeAreaView style={styles.headerSafe} pointerEvents="box-none">
@@ -369,7 +362,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
             onPress={() => navigation.goBack()}
             activeOpacity={0.8}
           >
-            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+            <Ionicons name="arrow-back" size={22} color={colors.white} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerBtn}
@@ -379,7 +372,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
             <Ionicons
               name={favori ? 'heart' : 'heart-outline'}
               size={22}
-              color={colors.primary}
+              color={colors.gold}
             />
           </TouchableOpacity>
         </View>
@@ -388,13 +381,11 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       {/* ─── CTA fixe en bas ──────────────────────────────── */}
       <SafeAreaView style={styles.ctaSafe}>
         <View style={styles.ctaWrap}>
-          <TouchableOpacity
+          <Button
+            label="Prendre rendez-vous"
+            variant="primary"
             onPress={demanderVisite}
-            activeOpacity={0.85}
-            style={styles.ctaBtn}
-          >
-            <Text style={styles.ctaText}>Demander une visite</Text>
-          </TouchableOpacity>
+          />
         </View>
       </SafeAreaView>
     </View>
@@ -404,7 +395,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 function FeatureCell({ icon, value, label }) {
   return (
     <View style={styles.featureCell}>
-      <Ionicons name={icon} size={20} color={colors.primary} />
+      <Ionicons name={icon} size={20} color={colors.gold} />
       <Text style={styles.featureValue}>{value}</Text>
       <Text style={styles.featureLabel}>{label}</Text>
     </View>
@@ -414,31 +405,34 @@ function FeatureCell({ icon, value, label }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.bg,
   },
   scrollContent: {
-    paddingBottom: 120,
+    // TODO: ajuster si tab bar overlap
+    padding: 0,
+    paddingBottom: spacing.xxxl,
   },
 
   // ─── Galerie ───
   galleryWrap: {
     width,
-    height: 300,
+    height: 320,
   },
   galleryImage: {
     width,
-    height: 300,
+    height: 320,
+    borderRadius: radius.none,
   },
   placeholderImg: {
     width,
-    height: 300,
-    backgroundColor: colors.card,
+    height: 320,
+    backgroundColor: colors.bgCard,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dotsWrap: {
     position: 'absolute',
-    bottom: spacing.lg,
+    bottom: spacing.md,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -449,13 +443,13 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.gold,
   },
   dotInactive: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#FFFFFF60',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
 
   // ─── Header flottant ───
@@ -468,146 +462,146 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
   },
   headerBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#0A0A0A80',
+    backgroundColor: colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // ─── Corps ───
+  // ─── Corps (sans overlap, sans radius) ───
   body: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    marginTop: -20,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.md,
+    backgroundColor: colors.bg,
   },
 
-  // Prix
+  // ─── Prix + statut ───
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     marginBottom: spacing.md,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
-  priceText: {
-    ...typography.display,
-    color: colors.primary,
-    fontWeight: '800',
+  priceWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
     flex: 1,
   },
-  badgeType: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 8,
+  priceFlex: {
+    flexShrink: 1,
   },
-  badgeTypeText: {
-    ...typography.tiny,
-    color: '#FFFFFF',
-    fontWeight: '700',
-    letterSpacing: 0.8,
+  priceMois: {
+    fontFamily: fonts.bodyItalic,
+    fontSize: fontSize.xs,
+    color: colors.textSub,
+  },
+  statusLabel: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    letterSpacing: 1,
   },
 
-  // Sections
+  // ─── Sections ───
   section: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.lg,
   },
   sectionTitle: {
-    ...typography.h3,
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
     color: colors.text,
-    marginBottom: spacing.md,
-  },
-  titleText: {
-    ...typography.h2,
-    color: colors.text,
-    fontWeight: '700',
     marginBottom: spacing.sm,
   },
-  addressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+  titleText: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
   addressText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
   },
 
-  // Features grid
+  // ─── Features grid ───
   featuresGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     gap: spacing.sm,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   featureCell: {
     flexBasis: '30%',
     flexGrow: 1,
-    backgroundColor: colors.card,
-    borderRadius: 12,
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.none,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
     padding: spacing.sm,
     alignItems: 'center',
   },
   featureValue: {
-    ...typography.h3,
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
     color: colors.text,
-    fontWeight: '600',
     marginTop: spacing.xs,
   },
   featureLabel: {
-    fontSize: 11,
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
     color: colors.textMuted,
     marginTop: 2,
   },
 
-  // Description
+  // ─── Description ───
   descText: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: colors.textSub,
     lineHeight: 22,
   },
   lireSuite: {
-    ...typography.body,
-    color: colors.primary,
-    fontWeight: '600',
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+    color: colors.gold,
     marginTop: spacing.sm,
   },
 
-  // Commodités
+  // ─── Commodités ───
   commoditesWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
   commoditeChip: {
-    backgroundColor: colors.card,
-    borderRadius: 100,
-    paddingHorizontal: 12,
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 6,
   },
   commoditeText: {
-    fontSize: 12,
-    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.textSub,
   },
 
-  // Propriétaire
-  ownerCard: {
+  // ─── Propriétaire ───
+  ownerInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: 16,
+    gap: spacing.sm,
     padding: spacing.md,
   },
   ownerAvatar: {
@@ -616,62 +610,65 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   ownerAvatarFallback: {
-    backgroundColor: colors.cardElevated,
+    backgroundColor: colors.bgCardAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ownerInitial: {
-    ...typography.h3,
-    color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
+    color: colors.gold,
   },
   ownerInfo: {
     flex: 1,
     gap: spacing.xs,
   },
   ownerName: {
-    ...typography.body,
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
     color: colors.text,
-    fontWeight: '600',
   },
   roleBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
     paddingVertical: 2,
-    borderRadius: 100,
+    borderRadius: radius.xs,
+    borderWidth: 1,
   },
   roleBadgeText: {
-    ...typography.tiny,
-    fontWeight: '600',
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    letterSpacing: 0.8,
   },
 
-  // Commentaires
+  // ─── Commentaires ───
   emptyComments: {
-    ...typography.body,
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
     color: colors.textMuted,
     textAlign: 'center',
-    marginVertical: spacing.lg,
+    marginVertical: spacing.md,
   },
   commentsList: {
-    gap: spacing.lg,
-    marginBottom: spacing.md,
+    gap: spacing.md,
+    marginBottom: spacing.sm,
   },
   commentRow: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   commentAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.cardElevated,
+    backgroundColor: colors.bgCardAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
   commentInitial: {
-    ...typography.body,
-    color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+    color: colors.gold,
   },
   commentBody: {
     flex: 1,
@@ -683,63 +680,57 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   commentAuthor: {
-    ...typography.body,
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
     color: colors.text,
-    fontWeight: '600',
   },
   commentDate: {
-    ...typography.tiny,
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
     color: colors.textMuted,
   },
   commentText: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: colors.textSub,
     lineHeight: 20,
   },
   commentInputWrap: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.sm,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
+    backgroundColor: colors.bgCardAlt,
+    borderRadius: radius.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   commentInput: {
     flex: 1,
-    ...typography.body,
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
     color: colors.text,
     maxHeight: 100,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   sendBtn: {
-    padding: spacing.sm,
+    padding: spacing.xs,
   },
 
-  // CTA fixe
+  // ─── CTA fixe ───
   ctaSafe: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.background,
+    backgroundColor: colors.bg,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
   ctaWrap: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  ctaBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  ctaText: {
-    color: '#000',
-    fontWeight: '700',
-    fontSize: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
 });
