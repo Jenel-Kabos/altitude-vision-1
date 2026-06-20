@@ -155,7 +155,7 @@ export default function ProfilScreen({ navigation }) {
         <MenuRow
           icon="person-outline"
           label="Modifier mon profil"
-          onPress={() => {}}
+          onPress={() => navigation.navigate('EditProfile')}
         />
         <MenuRow
           icon="lock-closed-outline"

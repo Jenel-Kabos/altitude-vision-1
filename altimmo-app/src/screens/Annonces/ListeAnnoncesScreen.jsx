@@ -66,18 +66,14 @@ export default function ListeAnnoncesScreen({ navigation }) {
       || a.location?.city?.toLowerCase().includes(q);
 
     const matchFiltre = filtre === 'tous'
-      || a.transactionType?.toLowerCase() === filtre
-      || a.type?.toLowerCase() === filtre
-      || a.typeTransaction?.toLowerCase() === filtre;
+      || a.status?.toLowerCase() === filtre
+      || a.type?.toLowerCase() === filtre;
 
     return matchRecherche && matchFiltre;
   });
 
   const renderAnnonce = ({ item, index }) => {
-    const isLocation =
-      item.transactionType?.toLowerCase() === 'location' ||
-      item.type?.toLowerCase() === 'location' ||
-      item.typeTransaction?.toLowerCase() === 'location';
+    const isLocation = item.status?.toLowerCase() === 'location';
 
     const district = item.address?.district || item.location?.neighborhood || '';
     const city = item.address?.city || item.location?.city || 'Brazzaville';

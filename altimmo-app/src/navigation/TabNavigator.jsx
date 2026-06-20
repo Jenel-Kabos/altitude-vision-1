@@ -10,8 +10,8 @@ import { colors } from '../theme';
 import ListeAnnoncesScreen from '../screens/Annonces/ListeAnnoncesScreen';
 import DetailAnnonceScreen from '../screens/Annonces/DetailAnnonceScreen';
 import MessagerieStack from './stacks/MessagerieStack';
+import ProfilStack from './stacks/ProfilStack';
 import VisitesScreen from '../screens/Visites/VisitesScreen';
-import ProfilScreen from '../screens/Profil/ProfilScreen';
 import PublierBienScreen from '../screens/Publication/PublierBienScreen';
 
 const Tab = createBottomTabNavigator();
@@ -105,7 +105,7 @@ export default function TabNavigator() {
       />
       <Tab.Screen
         name="Profil"
-        component={ProfilScreen}
+        component={ProfilStack}
         options={{
           tabBarIcon: makeIcon('person', 'person-outline'),
           tabBarLabel: makeLabel('Profil'),

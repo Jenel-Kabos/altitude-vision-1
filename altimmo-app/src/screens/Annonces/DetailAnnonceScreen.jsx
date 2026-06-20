@@ -45,11 +45,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const title = annonce.title || annonce.titre || 'Bien immobilier';
   const description = annonce.description || '';
 
-  const transactionRaw =
-    annonce.transactionType || annonce.typeTransaction || annonce.type || '';
-  const isLocation =
-    typeof transactionRaw === 'string' &&
-    transactionRaw.toLowerCase() === 'location';
+  const isLocation = annonce.status?.toLowerCase() === 'location';
 
   const district =
     annonce.address?.district ||
