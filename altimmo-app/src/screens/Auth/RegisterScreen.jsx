@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, SafeAreaView, KeyboardAvoidingView,
-  Platform, ScrollView, Alert,
+  View, Text, Image, TextInput, TouchableOpacity,
+  StyleSheet, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, typography, spacing } from '../../theme';
-import Button from '../../components/ui/Button';
+import { Screen, Input, Button, Card, Checkbox } from '../../components';
+import { colors, spacing, fonts, fontSize, radius } from '../../theme';
 
 const ROLES = [
   {
@@ -34,15 +33,50 @@ const CERTS = [
 
 const STEP_LABELS = ['Infos', 'Profil', 'Engagements'];
 
+function PasswordField({
+  label, value, onChangeText, show, onToggleShow, placeholder,
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.fieldInputWrap}>
+        <TextInput
+          style={styles.fieldInput}
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={!show}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="password"
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+        />
+        <TouchableOpacity
+          onPress={onToggleShow}
+          hitSlop={8}
+          style={styles.eye}
+        >
+          <Ionicons
+            name={show ? 'eye-off-outline' : 'eye-outline'}
+            size={18}
+            color={colors.textSub}
+          />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 export default function RegisterScreen({ navigation }) {
   const { register } = useAuth();
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [role, setRole] = useState('Client');
-  const [showPass, setShowPass] = useState(false);
-  const [focused, setFocused] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [certs, setCerts] = useState({
     contratAccepte: false,
     informationsVraies: false,
@@ -57,12 +91,16 @@ export default function RegisterScreen({ navigation }) {
   const allCertsChecked = Object.values(certs).every(Boolean);
 
   const validateStep1 = () => {
-    if (!name.trim() || !email.trim() || !password) {
+    if (!name.trim() || !email.trim() || !password || !passwordConfirm) {
       setErreur('Tous les champs sont requis');
       return false;
     }
     if (password.length < 8) {
       setErreur('Mot de passe trop court (8 caractères minimum)');
+      return false;
+    }
+    if (password !== passwordConfirm) {
+      setErreur('Les mots de passe ne correspondent pas');
       return false;
     }
     setErreur('');
@@ -104,7 +142,7 @@ export default function RegisterScreen({ navigation }) {
             name: name.trim(),
             email: email.trim().toLowerCase(),
             password,
-            passwordConfirm: password,
+            passwordConfirm,
             role,
             ...certs,
           }
@@ -112,7 +150,7 @@ export default function RegisterScreen({ navigation }) {
             name: name.trim(),
             email: email.trim().toLowerCase(),
             password,
-            passwordConfirm: password,
+            passwordConfirm,
             role,
           };
       await register(payload);
@@ -138,7 +176,7 @@ export default function RegisterScreen({ navigation }) {
     if (isCompleted) {
       return (
         <View style={[styles.dot, styles.dotCompleted]}>
-          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+          <Ionicons name="checkmark" size={16} color={colors.white} />
         </View>
       );
     }
@@ -168,23 +206,18 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Brand header */}
-          <View style={styles.header}>
-            <Text style={styles.brand}>ALTIMMO</Text>
-            <View style={styles.brandRule} />
-            <Text style={styles.subtitle}>
-              Votre partenaire immobilier
-            </Text>
-          </View>
+    <Screen scroll avoidKeyboard style={styles.scroll}>
+      {/* Brand header */}
+      <View style={styles.header}>
+        <Image
+          source={require('../../../assets/Logo_Altitude_transparent.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <Text style={styles.subtitle}>
+          Votre partenaire immobilier
+        </Text>
+      </View>
 
           {/* Stepper */}
           <View style={styles.stepperRow}>
@@ -211,71 +244,52 @@ export default function RegisterScreen({ navigation }) {
           {/* Étape 1 — Infos */}
           {step === 1 && (
             <View style={styles.form}>
-              {/* Nom */}
-              <View style={[styles.inputWrap, focused === 'name' && styles.inputWrapFocused]}>
-                <Ionicons name="person-outline" size={18} color={colors.textMuted} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Nom complet"
-                  placeholderTextColor={colors.textMuted}
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                  onFocus={() => setFocused('name')}
-                  onBlur={() => setFocused(null)}
-                />
-              </View>
+              <Input
+                label="Nom complet"
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                autoCorrect={false}
+                placeholder="Jean Dupont"
+                style={styles.input}
+              />
 
-              {/* Email */}
-              <View style={[styles.inputWrap, focused === 'email' && styles.inputWrapFocused]}>
-                <Ionicons name="mail-outline" size={18} color={colors.textMuted} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email"
-                  placeholderTextColor={colors.textMuted}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  onFocus={() => setFocused('email')}
-                  onBlur={() => setFocused(null)}
-                />
-              </View>
+              <Input
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                placeholder="vous@exemple.com"
+                style={styles.input}
+              />
 
-              {/* Mot de passe */}
-              <View style={[styles.inputWrap, focused === 'password' && styles.inputWrapFocused]}>
-                <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Mot de passe (min 8 caractères)"
-                  placeholderTextColor={colors.textMuted}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPass}
-                  onFocus={() => setFocused('password')}
-                  onBlur={() => setFocused(null)}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPass(!showPass)}
-                  style={styles.eyeBtn}
-                  hitSlop={8}
-                >
-                  <Ionicons
-                    name={showPass ? 'eye-off-outline' : 'eye-outline'}
-                    size={18}
-                    color={colors.textMuted}
-                  />
-                </TouchableOpacity>
-              </View>
+              <PasswordField
+                label="Mot de passe"
+                value={password}
+                onChangeText={setPassword}
+                show={showPassword}
+                onToggleShow={() => setShowPassword(!showPassword)}
+                placeholder="Min. 8 caractères"
+              />
+
+              <PasswordField
+                label="Confirmer le mot de passe"
+                value={passwordConfirm}
+                onChangeText={setPasswordConfirm}
+                show={showPasswordConfirm}
+                onToggleShow={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                placeholder="Saisissez à nouveau"
+              />
 
               {erreur ? <Text style={styles.error}>{erreur}</Text> : null}
 
               <Button
                 label="Suivant"
                 onPress={goNext}
-                fullWidth
                 variant="primary"
-                icon="arrow-forward"
               />
             </View>
           )}
@@ -291,26 +305,32 @@ export default function RegisterScreen({ navigation }) {
                   return (
                     <TouchableOpacity
                       key={r.value}
-                      style={[styles.roleCard, selected && styles.roleCardSelected]}
                       onPress={() => setRole(r.value)}
                       activeOpacity={0.85}
                     >
-                      <View style={[styles.roleIcon, selected && styles.roleIconSelected]}>
-                        <Ionicons
-                          name={r.icon}
-                          size={24}
-                          color={selected ? colors.primary : colors.textSecondary}
-                        />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.roleLabel, selected && styles.roleLabelSelected]}>
-                          {r.label}
-                        </Text>
-                        <Text style={styles.roleDesc}>{r.desc}</Text>
-                      </View>
-                      {selected ? (
-                        <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                      ) : null}
+                      <Card
+                        selected={selected}
+                        style={!selected && styles.roleCardUnselected}
+                      >
+                        <View style={styles.roleCardInner}>
+                          <View style={[styles.roleIcon, selected && styles.roleIconSelected]}>
+                            <Ionicons
+                              name={r.icon}
+                              size={24}
+                              color={selected ? colors.gold : colors.textSub}
+                            />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.roleLabel, selected && styles.roleLabelSelected]}>
+                              {r.label}
+                            </Text>
+                            <Text style={styles.roleDesc}>{r.desc}</Text>
+                          </View>
+                          {selected ? (
+                            <Ionicons name="checkmark-circle" size={20} color={colors.gold} />
+                          ) : null}
+                        </View>
+                      </Card>
                     </TouchableOpacity>
                   );
                 })}
@@ -324,7 +344,6 @@ export default function RegisterScreen({ navigation }) {
                     label="Précédent"
                     onPress={goBack}
                     variant="outline"
-                    fullWidth
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -333,8 +352,6 @@ export default function RegisterScreen({ navigation }) {
                     onPress={handleStep2Next}
                     loading={!isProprietaire && loading}
                     variant="primary"
-                    fullWidth
-                    icon={isProprietaire ? 'arrow-forward' : undefined}
                   />
                 </View>
               </View>
@@ -347,24 +364,14 @@ export default function RegisterScreen({ navigation }) {
               <Text style={styles.sectionTitle}>Engagements propriétaire</Text>
 
               <View style={styles.certsList}>
-                {CERTS.map(c => {
-                  const checked = certs[c.key];
-                  return (
-                    <TouchableOpacity
-                      key={c.key}
-                      style={styles.certRow}
-                      onPress={() => toggleCert(c.key)}
-                      activeOpacity={0.85}
-                    >
-                      <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-                        {checked ? (
-                          <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                        ) : null}
-                      </View>
-                      <Text style={styles.certLabel}>{c.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                {CERTS.map(c => (
+                  <Checkbox
+                    key={c.key}
+                    checked={certs[c.key]}
+                    onPress={() => toggleCert(c.key)}
+                    label={c.label}
+                  />
+                ))}
               </View>
 
               {erreur ? <Text style={styles.error}>{erreur}</Text> : null}
@@ -375,7 +382,6 @@ export default function RegisterScreen({ navigation }) {
                     label="Précédent"
                     onPress={goBack}
                     variant="outline"
-                    fullWidth
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -385,7 +391,6 @@ export default function RegisterScreen({ navigation }) {
                     loading={loading}
                     disabled={!allCertsChecked}
                     variant="primary"
-                    fullWidth
                   />
                 </View>
               </View>
@@ -402,42 +407,29 @@ export default function RegisterScreen({ navigation }) {
               <Text style={styles.linkAccent}>Se connecter</Text>
             </Text>
           </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   scroll: {
     flexGrow: 1,
-    padding: spacing.xl,
   },
 
   // Brand
   header: {
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
-  brand: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: colors.primary,
-    letterSpacing: 2,
-  },
-  brandRule: {
-    width: 60,
-    height: 2,
-    backgroundColor: colors.primary,
-    marginVertical: spacing.md,
+  logo: {
+    width: 140,
+    height: 140,
+    marginBottom: spacing.md,
   },
   subtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontFamily: fonts.bodyItalic,
+    fontSize: fontSize.sm,
+    color: colors.textSub,
   },
 
   // Stepper
@@ -470,8 +462,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   dotActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.gold,
+    borderColor: colors.gold,
   },
   dotCompleted: {
     backgroundColor: colors.success,
@@ -482,144 +474,126 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   dotNumActive: {
-    ...typography.caption,
-    color: '#000',
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.sm,
+    color: colors.black,
   },
   dotNumFuture: {
-    ...typography.caption,
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.sm,
     color: colors.textMuted,
-    fontWeight: '700',
   },
   stepLabel: {
-    ...typography.tiny,
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
     color: colors.textMuted,
     marginTop: spacing.sm,
     textAlign: 'center',
   },
   stepLabelActive: {
-    color: colors.primary,
-    fontWeight: '600',
+    fontFamily: fonts.bodyBold,
+    color: colors.gold,
   },
 
   // Form
   form: {
-    marginBottom: spacing.xl,
-  },
-  inputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  inputWrapFocused: {
-    borderColor: colors.primary,
-  },
-  inputIcon: {
-    marginRight: spacing.md,
+    marginBottom: spacing.lg,
   },
   input: {
+    marginBottom: spacing.md,
+  },
+
+  // PasswordField (eye-toggle)
+  field: {
+    marginBottom: spacing.md,
+  },
+  fieldLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.sm,
+    color: colors.textSub,
+    marginBottom: spacing.xs,
+  },
+  fieldInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgCardAlt,
+    borderRadius: radius.xs,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm,
+  },
+  fieldInput: {
     flex: 1,
-    ...typography.body,
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
     color: colors.text,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.sm,
   },
-  eyeBtn: {
-    padding: spacing.sm,
+  eye: {
+    padding: spacing.xs,
   },
+
   error: {
-    ...typography.caption,
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
     color: colors.error,
     textAlign: 'center',
     marginBottom: spacing.md,
   },
   sectionTitle: {
-    ...typography.h3,
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
     color: colors.text,
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
 
-  // Role cards
+  // Role cards (wrapper Card + inner layout)
   rolesCol: {
     gap: spacing.md,
     marginBottom: spacing.lg,
   },
-  roleCard: {
+  roleCardUnselected: {
+    // Donne un bord complet 1px à la Card non-sélectionnée
+    // (par défaut Card a seulement borderBottomWidth: 1)
+    borderWidth: 1,
+  },
+  roleCardInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 16,
-    padding: spacing.lg,
     gap: spacing.md,
-  },
-  roleCardSelected: {
-    borderColor: colors.primary,
+    padding: spacing.md,
   },
   roleIcon: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.cardElevated,
+    backgroundColor: colors.bgCardAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
   roleIconSelected: {
-    backgroundColor: colors.primary + '22',
+    backgroundColor: colors.goldMuted,
   },
   roleLabel: {
-    ...typography.h3,
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
     color: colors.text,
     marginBottom: 2,
   },
   roleLabelSelected: {
-    color: colors.primary,
+    color: colors.gold,
   },
   roleDesc: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.textSub,
   },
 
   // Certs
   certsList: {
-    gap: spacing.md,
+    gap: spacing.xs,
     marginBottom: spacing.lg,
-  },
-  certRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    backgroundColor: colors.card,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  checkboxChecked: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  certLabel: {
-    flex: 1,
-    ...typography.body,
-    color: colors.text,
   },
 
   // Actions
@@ -634,11 +608,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   linkText: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.textSub,
   },
   linkAccent: {
-    color: colors.primary,
-    fontWeight: '600',
+    fontFamily: fonts.bodyBold,
+    color: colors.gold,
   },
 });

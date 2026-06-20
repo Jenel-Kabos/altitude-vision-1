@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Image, ScrollView, Alert, Switch,
+  Image, ScrollView, Alert, Switch, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, typography, spacing } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
@@ -60,12 +61,27 @@ function MenuRow({ icon, label, onPress, danger, toggle, toggleVal, onToggle }) 
 
 export default function ProfilScreen({ navigation }) {
   const { user, logout, updateUser } = useAuth();
-  const [notifs, setNotifs] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [stats, setStats] = useState({ biens: 0, vues: 0 });
 
-  const isProprietaire = user?.role?.toLowerCase() === 'proprietaire';
-  const roleColor = ROLE_COLOR[user?.role?.toLowerCase()] || colors.info;
+  const role = user?.role?.toLowerCase();
+  const isProprietaire = role === 'proprietaire';
+  const isAdmin        = role === 'admin';
+  const canSeeMyBiens  = isProprietaire || isAdmin;
+  const roleColor = ROLE_COLOR[role] || colors.info;
   const roleLabel = user?.role || 'Utilisateur';
+
+  // Persistance toggle notifications
+  useEffect(() => {
+    AsyncStorage.getItem('notifications_enabled').then((val) => {
+      if (val !== null) setNotificationsEnabled(val === 'true');
+    });
+  }, []);
+
+  const toggleNotifications = async (value) => {
+    setNotificationsEnabled(value);
+    await AsyncStorage.setItem('notifications_enabled', String(value));
+  };
 
   // Stats Proprietaire — best-effort fetch
   useEffect(() => {
@@ -150,6 +166,33 @@ export default function ProfilScreen({ navigation }) {
           </View>
         )}
 
+        {/* Mes biens — Proprietaire / Admin only */}
+        {canSeeMyBiens && (
+          <>
+            <Text style={styles.sectionTitle}>Mes biens</Text>
+            <MenuRow
+              icon="business-outline"
+              label="Mes annonces"
+              onPress={() => navigation.navigate('Annonces', {
+                screen: 'ListeAnnonces',
+                params: { filterOwner: user?._id },
+              })}
+            />
+            <MenuRow
+              icon="calendar-outline"
+              label="Mes visites"
+              onPress={() => navigation.navigate('Visites')}
+            />
+            {/* TODO: brancher quand PaiementsStack sera enregistré dans TabNavigator
+            <MenuRow
+              icon="card-outline"
+              label="Mes paiements"
+              onPress={() => navigation.navigate('Paiements')}
+            />
+            */}
+          </>
+        )}
+
         {/* Compte */}
         <Text style={styles.sectionTitle}>Compte</Text>
         <MenuRow
@@ -160,7 +203,7 @@ export default function ProfilScreen({ navigation }) {
         <MenuRow
           icon="lock-closed-outline"
           label="Changer le mot de passe"
-          onPress={() => {}}
+          onPress={() => navigation.navigate('ChangePassword')}
         />
 
         {/* Préférences */}
@@ -169,8 +212,8 @@ export default function ProfilScreen({ navigation }) {
           icon="notifications-outline"
           label="Notifications"
           toggle
-          toggleVal={notifs}
-          onToggle={setNotifs}
+          toggleVal={notificationsEnabled}
+          onToggle={toggleNotifications}
         />
 
         {/* Support */}
@@ -178,12 +221,12 @@ export default function ProfilScreen({ navigation }) {
         <MenuRow
           icon="help-circle-outline"
           label="Aide"
-          onPress={() => {}}
+          onPress={() => Linking.openURL('mailto:contact@altitudevision.agency?subject=Aide%20Altimmo')}
         />
         <MenuRow
           icon="flag-outline"
           label="Signaler un problème"
-          onPress={() => {}}
+          onPress={() => Linking.openURL('mailto:contact@altitudevision.agency?subject=Signalement%20Altimmo')}
         />
 
         {/* Danger zone */}

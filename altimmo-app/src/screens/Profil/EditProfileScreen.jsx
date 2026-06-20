@@ -63,7 +63,7 @@ export default function EditProfileScreen({ navigation }) {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll avoidKeyboard>
       <View style={styles.header}>
         <Text style={styles.title}>Modifier mon profil</Text>
         <Text style={styles.subtitle}>

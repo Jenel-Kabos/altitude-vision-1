@@ -40,7 +40,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll avoidKeyboard>
       <View style={styles.header}>
         <Text style={styles.title}>Mot de passe oublié</Text>
         <Text style={styles.subtitle}>

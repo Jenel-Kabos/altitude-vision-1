@@ -60,7 +60,7 @@ export default function ResetPasswordScreen({ route, navigation }) {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll avoidKeyboard>
       <View style={styles.header}>
         <Text style={styles.title}>Nouveau mot de passe</Text>
         <Text style={styles.subtitle}>

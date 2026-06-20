@@ -81,12 +81,22 @@ export const AuthProvider = ({ children }) => {
 
   const updateUser = (data) => setUser((prev) => ({ ...prev, ...data }));
 
+  const refreshSession = async (newToken, updatedUser) => {
+    if (newToken) {
+      await AsyncStorage.setItem('token', newToken);
+      setToken(newToken);
+    }
+    if (updatedUser) {
+      setUser((prev) => ({ ...prev, ...updatedUser }));
+    }
+  };
+
   const role = user?.role?.toLowerCase();
 
   return (
     <AuthContext.Provider value={{
       user, token, loading,
-      login, loginWithGoogle, register, logout, updateUser,
+      login, loginWithGoogle, register, logout, updateUser, refreshSession,
       isAdmin:         role === 'admin',
       isCollaborateur: role === 'collaborateur',
       isProprietaire:  role === 'proprietaire',

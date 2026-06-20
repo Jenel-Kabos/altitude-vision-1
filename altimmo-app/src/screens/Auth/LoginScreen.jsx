@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, SafeAreaView, KeyboardAvoidingView,
-  Platform, ScrollView, Alert,
+  View, Text, Image, TouchableOpacity,
+  StyleSheet, Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../../context/AuthContext';
-import { colors, typography, spacing, fonts, fontSize } from '../../theme';
-import Button from '../../components/ui/Button';
+import { Screen, Input, Button } from '../../components';
+import { colors, fonts, fontSize, spacing } from '../../theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -21,8 +19,6 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [erreur, setErreur] = useState('');
-  const [showPass, setShowPass] = useState(false);
-  const [focused, setFocused] = useState(null);
   const { login, loginWithGoogle } = useAuth();
 
   const [request, response, promptAsync] = Google.useAuthRequest({
@@ -94,223 +90,165 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
+    <Screen scroll avoidKeyboard style={styles.scroll}>
+      <View style={styles.header}>
+        <Image
+          source={require('../../../assets/Logo_Altitude_transparent.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <Text style={styles.subtitle}>
+          Votre partenaire immobilier
+        </Text>
+      </View>
+
+      <View style={styles.form}>
+        <Input
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          placeholder="vous@exemple.com"
+          style={styles.input}
+        />
+
+        <Input
+          label="Mot de passe"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="password"
+          placeholder="Votre mot de passe"
+          style={styles.input}
+        />
+
+        <TouchableOpacity
+          onPress={() => navigation.navigate('ForgotPassword')}
+          style={styles.forgotWrap}
+          hitSlop={8}
         >
-          <View style={styles.header}>
-            <Text style={styles.brand}>ALTIMMO</Text>
-            <View style={styles.brandRule} />
-            <Text style={styles.subtitle}>
-              Votre partenaire immobilier
-            </Text>
-          </View>
+          <Text style={styles.forgotText}>
+            Mot de passe oublié ?
+          </Text>
+        </TouchableOpacity>
 
-          <View style={styles.form}>
-            {/* Email */}
-            <View style={[
-              styles.inputWrap,
-              focused === 'email' && styles.inputWrapFocused,
-            ]}>
-              <Ionicons
-                name="mail-outline"
-                size={18}
-                color={colors.textMuted}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
-                placeholderTextColor={colors.textMuted}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                onFocus={() => setFocused('email')}
-                onBlur={() => setFocused(null)}
-              />
-            </View>
+        {erreur ? (
+          <Text style={styles.error}>{erreur}</Text>
+        ) : null}
 
-            {/* Password */}
-            <View style={[
-              styles.inputWrap,
-              focused === 'password' && styles.inputWrapFocused,
-            ]}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={18}
-                color={colors.textMuted}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Mot de passe"
-                placeholderTextColor={colors.textMuted}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPass}
-                onFocus={() => setFocused('password')}
-                onBlur={() => setFocused(null)}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPass(!showPass)}
-                style={styles.eyeBtn}
-                hitSlop={8}
-              >
-                <Ionicons
-                  name={showPass ? 'eye-off-outline' : 'eye-outline'}
-                  size={18}
-                  color={colors.textMuted}
-                />
-              </TouchableOpacity>
-            </View>
+        <Button
+          label="Se connecter"
+          onPress={handleLogin}
+          loading={loading}
+          variant="primary"
+          style={styles.button}
+        />
 
-            <TouchableOpacity
-              onPress={() => navigation.navigate('ForgotPassword')}
-              style={{ alignSelf: 'flex-end', marginBottom: spacing.md }}
-              hitSlop={8}
-            >
-              <Text style={{
-                fontFamily: fonts.body,
-                fontSize: fontSize.sm,
-                color: colors.gold,
-              }}>
-                Mot de passe oublié ?
-              </Text>
-            </TouchableOpacity>
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>ou</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
-            {erreur ? (
-              <Text style={styles.error}>{erreur}</Text>
-            ) : null}
+        <Button
+          variant="outline"
+          label="Continuer avec Google"
+          onPress={() => promptAsync()}
+          disabled={!request || loading}
+        />
+      </View>
 
-            <Button
-              label="Se connecter"
-              onPress={handleLogin}
-              loading={loading}
-              fullWidth
-              variant="primary"
-            />
-
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginVertical: spacing.md,
-            }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-              <Text style={{
-                marginHorizontal: spacing.sm,
-                color: colors.textMuted,
-                fontFamily: fonts.body,
-                fontSize: fontSize.xs,
-              }}>
-                ou
-              </Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-            </View>
-
-            <Button
-              variant="outline"
-              label="Continuer avec Google"
-              onPress={() => promptAsync()}
-              disabled={!request || loading}
-              fullWidth
-              style={{ marginBottom: spacing.md }}
-            />
-          </View>
-
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Register')}
-            style={styles.linkWrap}
-          >
-            <Text style={styles.linkText}>
-              Pas encore de compte ?{' '}
-              <Text style={styles.linkAccent}>S'inscrire</Text>
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Register')}
+        style={styles.signupLink}
+        hitSlop={8}
+      >
+        <Text style={styles.signupText}>
+          Pas encore de compte ?{' '}
+          <Text style={styles.signupAccent}>S'inscrire</Text>
+        </Text>
+      </TouchableOpacity>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   scroll: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: spacing.xl,
   },
   header: {
     alignItems: 'center',
-    marginBottom: spacing.xxxl,
+    marginBottom: spacing.lg,
   },
-  brand: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: colors.primary,
-    letterSpacing: 2,
-  },
-  brandRule: {
-    width: 60,
-    height: 2,
-    backgroundColor: colors.primary,
-    marginVertical: spacing.md,
-  },
-  subtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  form: {
-    marginBottom: spacing.xl,
-  },
-  inputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: spacing.lg,
+  logo: {
+    width: 140,
+    height: 140,
     marginBottom: spacing.md,
   },
-  inputWrapFocused: {
-    borderColor: colors.primary,
+  subtitle: {
+    fontFamily: fonts.bodyItalic,
+    fontSize: fontSize.sm,
+    color: colors.textSub,
   },
-  inputIcon: {
-    marginRight: spacing.md,
+  form: {
+    marginBottom: spacing.lg,
   },
   input: {
-    flex: 1,
-    ...typography.body,
-    color: colors.text,
-    paddingVertical: spacing.lg,
+    marginBottom: spacing.md,
   },
-  eyeBtn: {
-    padding: spacing.sm,
+  forgotWrap: {
+    alignSelf: 'flex-end',
+    marginBottom: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  forgotText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.gold,
   },
   error: {
-    ...typography.caption,
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
     color: colors.error,
     textAlign: 'center',
     marginBottom: spacing.md,
   },
-  linkWrap: {
+  button: {
+    marginBottom: spacing.md,
+  },
+  divider: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: spacing.md,
   },
-  linkText: {
-    ...typography.body,
-    color: colors.textSecondary,
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
   },
-  linkAccent: {
-    color: colors.primary,
-    fontWeight: '600',
+  dividerText: {
+    marginHorizontal: spacing.sm,
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+  },
+  signupLink: {
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  signupText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.textSub,
+  },
+  signupAccent: {
+    fontFamily: fonts.bodyBold,
+    color: colors.gold,
   },
 });

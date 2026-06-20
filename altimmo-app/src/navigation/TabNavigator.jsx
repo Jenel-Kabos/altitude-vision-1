@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme';
+import { HouseIcon } from '../components';
 import ListeAnnoncesScreen from '../screens/Annonces/ListeAnnoncesScreen';
 import DetailAnnonceScreen from '../screens/Annonces/DetailAnnonceScreen';
 import MessagerieStack from './stacks/MessagerieStack';
@@ -73,7 +74,12 @@ export default function TabNavigator() {
         name="Annonces"
         component={AnnoncesStack}
         options={{
-          tabBarIcon: makeIcon('home', 'home-outline'),
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconWrap}>
+              <View style={[styles.dot, focused && styles.dotActive]} />
+              <HouseIcon size={24} color={focused ? colors.gold : colors.textMuted} />
+            </View>
+          ),
           tabBarLabel: makeLabel('Annonces'),
         }}
       />
