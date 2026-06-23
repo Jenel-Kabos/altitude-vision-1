@@ -1,43 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  TouchableOpacity, Image,
-  ScrollView, RefreshControl,
+  TouchableOpacity, Image, RefreshControl,
+  ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../services/api';
-import { Screen, Card, Chip, Input, PrixFCFA } from '../../components';
+import { getRecommendedProperties } from '../../services/annonceService';
+import { getActivePublicites } from '../../services/publiciteService';
+import { PROPERTY_TYPES_WITH_ALL } from '../../constants/propertyTypes';
+import {
+  Screen, Card, PrixFCFA, RecommendedCarousel, SearchPanel,
+  GreetingBar, AdCarousel,
+} from '../../components';
 import { colors, fonts, fontSize, spacing, radius } from '../../theme';
 import EmptyState from '../../components/ui/EmptyState';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 
-const FILTERS = [
-  { value: 'tous',        label: 'Tous' },
-  { value: 'vente',       label: 'Vente' },
-  { value: 'location',    label: 'Location' },
-  { value: 'appartement', label: 'Appartement' },
-  { value: 'maison',      label: 'Maison' },
-  { value: 'terrain',     label: 'Terrain' },
-];
-
 const PLACEHOLDER_IMG =
-  'https://via.placeholder.com/600x450/111111/C8960C?text=Altimmo';
+  'https://via.placeholder.com/600x450/F5F5F2/C8960C?text=Altimmo';
+
+// TODO: remplacer par un asset local (altimmo-app/assets/hero-immobilier.jpg)
+const HERO_IMG =
+  'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1200&q=80';
+
+const DEFAULT_FILTERS = {
+  transaction: 'tous',
+  typeBien: 'tous',
+  priceRange: [0, 500000000],
+  ville: 'Toutes',
+  arrondissement: 'Tous',
+};
+
+const QUICK_TYPES = PROPERTY_TYPES_WITH_ALL;
 
 export default function ListeAnnoncesScreen({ navigation, route }) {
   const filterOwner = route?.params?.filterOwner;
 
   const [annonces, setAnnonces] = useState([]);
+  const [recommended, setRecommended] = useState([]);
+  const [pubs, setPubs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [rechercheInput, setRechercheInput] = useState('');
-  const [recherche, setRecherche] = useState('');
-  const [filtre, setFiltre] = useState('tous');
   const [erreur, setErreur] = useState('');
 
-  // Debounce — la valeur de filtrage suit l'input avec 300ms de délai
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState(DEFAULT_FILTERS);
+
+  // Biens recommandés — fetch au mount uniquement
   useEffect(() => {
-    const timer = setTimeout(() => setRecherche(rechercheInput), 300);
-    return () => clearTimeout(timer);
-  }, [rechercheInput]);
+    getRecommendedProperties().then(setRecommended).catch(() => {});
+  }, []);
+
+  // Publicités actives — fetch au mount uniquement
+  useEffect(() => {
+    getActivePublicites().then(setPubs).catch(() => {});
+  }, []);
 
   const chargerAnnonces = async () => {
     try {
@@ -68,31 +87,32 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
     chargerAnnonces();
   };
 
-  const annoncesFiltrées = annonces.filter(a => {
-    const q = recherche.trim().toLowerCase();
-    const matchRecherche = !q || [
-      a.title,
-      a.description,
-      a.type,
-      a.address?.city,
-      a.address?.district,
-      a.address?.street,
-      a.location?.city,
-    ].some(field => field?.toLowerCase().includes(q));
+  const annoncesFiltrées = annonces.filter((item) => {
+    const matchTransaction = activeFilters.transaction === 'tous'
+      || item.status?.toLowerCase() === activeFilters.transaction;
 
-    const matchFiltre = filtre === 'tous'
-      || a.status?.toLowerCase() === filtre
-      || a.type?.toLowerCase() === filtre;
+    const matchType = activeFilters.typeBien === 'tous'
+      || item.type === activeFilters.typeBien;
 
-    return matchRecherche && matchFiltre;
+    const price = item.price || 0;
+    const matchPrice = price >= activeFilters.priceRange[0]
+      && price <= activeFilters.priceRange[1];
+
+    const matchVille = activeFilters.ville === 'Toutes'
+      || item.address?.city === activeFilters.ville;
+
+    const matchArrond = activeFilters.arrondissement === 'Tous'
+      || item.address?.arrondissement === activeFilters.arrondissement;
+
+    return matchTransaction && matchType && matchPrice && matchVille && matchArrond;
   });
 
   const renderAnnonce = ({ item, index }) => {
     const isLocation = item.status?.toLowerCase() === 'location';
 
-    const district = item.address?.district || item.location?.neighborhood || '';
+    const arrondissement = item.address?.arrondissement || item.location?.neighborhood || '';
     const city = item.address?.city || item.location?.city || 'Brazzaville';
-    const addressText = district ? `${district} · ${city}` : city;
+    const addressText = arrondissement ? `${arrondissement} · ${city}` : city;
 
     const reference = `AV·${index + 1}`;
 
@@ -116,13 +136,29 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
               style={styles.image}
               resizeMode="cover"
             />
+
+            {/* Gradient bas pour lisibilité du prix (ne cache pas le badge en haut) */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.7)']}
+              style={styles.priceGradient}
+              pointerEvents="none"
+            />
+
             <View style={[
               styles.badge,
               isLocation ? styles.badgeLoc : styles.badgeVente,
             ]}>
-              <Text style={styles.badgeText}>
+              <Text style={[
+                styles.badgeText,
+                isLocation ? styles.badgeTextLoc : styles.badgeTextVente,
+              ]}>
                 {isLocation ? 'LOCATION' : 'VENTE'}
               </Text>
+            </View>
+
+            {/* Prix superposé en bas-gauche, blanc lisible sur gradient */}
+            <View style={styles.priceOverlay} pointerEvents="none">
+              <PrixFCFA montant={item.price} variant="onImage" compact />
             </View>
           </View>
 
@@ -171,8 +207,6 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
               </>
             )}
 
-            <PrixFCFA montant={item.price} style={styles.price} />
-
             <View style={styles.footer}>
               <Text style={styles.cta}>Voir →</Text>
             </View>
@@ -190,49 +224,115 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
     );
   }
 
-  return (
-    <Screen>
-      <View style={styles.header}>
-        <Text style={styles.titre}>Annonces</Text>
-        <Text style={styles.sousTitre}>
-          {annoncesFiltrées.length} bien{annoncesFiltrées.length !== 1 ? 's' : ''}
-        </Text>
+  const ListHeader = (
+    <View>
+      {/* ─── Greeting ─── */}
+      <GreetingBar onPressNotifications={() => {}} />
 
-        <Input
-          placeholder="Rechercher"
-          value={rechercheInput}
-          onChangeText={setRechercheInput}
-          style={styles.search}
-        />
+      {/* ─── HERO : carrousel de pubs si disponibles, sinon fallback statique ─── */}
+      {pubs.length > 0 ? (
+        <AdCarousel items={pubs} />
+      ) : (
+        <View style={styles.hero}>
+          <Image
+            source={{ uri: HERO_IMG }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.75)']}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <Text style={styles.heroTitle}>
+            Investir à Brazzaville en toute sérénité
+          </Text>
+        </View>
+      )}
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersScroll}
+      {/* ─── Bouton recherche (chevauche hero) ─── */}
+      <View style={styles.searchZone}>
+        <TouchableOpacity
+          style={styles.searchBtn}
+          onPress={() => setSearchOpen((s) => !s)}
+          activeOpacity={0.85}
         >
-          {FILTERS.map(f => (
-            <Chip
-              key={f.value}
-              label={f.label}
-              active={filtre === f.value}
-              onPress={() => setFiltre(f.value)}
+          <Ionicons name="search" size={18} color={colors.gold} />
+          <Text style={styles.searchBtnText}>Rechercher un bien</Text>
+          <Ionicons
+            name={searchOpen ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={colors.white}
+          />
+        </TouchableOpacity>
+
+        {searchOpen && (
+          <View style={styles.panelWrap}>
+            <SearchPanel
+              visible={searchOpen}
+              onClose={() => setSearchOpen(false)}
+              initialFilters={activeFilters}
+              onSearch={(filters) => {
+                setActiveFilters(filters);
+                setSearchOpen(false);
+              }}
             />
-          ))}
-        </ScrollView>
+          </View>
+        )}
       </View>
 
+      {/* ─── Quick filters (chips rapides type de bien) ─── */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.quickFilterRow}
+        contentContainerStyle={styles.quickFilterContent}
+      >
+        {QUICK_TYPES.map((item) => {
+          const active = activeFilters.typeBien === item.value;
+          return (
+            <TouchableOpacity
+              key={item.label}
+              onPress={() => setActiveFilters((prev) => ({
+                ...prev, typeBien: item.value,
+              }))}
+              style={[styles.quickChip, active && styles.quickChipActive]}
+              activeOpacity={0.8}
+            >
+              <View style={styles.quickChipInner}>
+                <Ionicons
+                  name={item.icon}
+                  size={14}
+                  color={active ? colors.black : colors.textSub}
+                />
+                <Text style={[
+                  styles.quickChipText,
+                  active && styles.quickChipTextActive,
+                ]}>
+                  {item.label}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* ─── Carrousel recommandés ─── */}
+      {recommended.length > 0 && (
+        <View style={styles.recoSection}>
+          <Text style={styles.recoTitle}>Biens recommandés</Text>
+          <RecommendedCarousel
+            properties={recommended}
+            onPressItem={(item) =>
+              navigation.navigate('DetailAnnonce', { annonce: item })
+            }
+          />
+        </View>
+      )}
+
+      {/* ─── Banner filterOwner ─── */}
       {filterOwner ? (
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.sm,
-        }}>
-          <Text style={{
-            fontFamily: fonts.body,
-            fontSize: fontSize.sm,
-            color: colors.textMuted,
-          }}>
+        <View style={styles.ownerBanner}>
+          <Text style={styles.ownerBannerText}>
             Affichage : mes annonces uniquement
           </Text>
           <TouchableOpacity
@@ -240,13 +340,18 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
             style={{ marginLeft: spacing.sm }}
             hitSlop={8}
           >
-            <Text style={{ color: colors.gold, fontSize: fontSize.sm }}>
-              Voir tout
-            </Text>
+            <Text style={styles.ownerBannerLink}>Voir tout</Text>
           </TouchableOpacity>
         </View>
       ) : null}
 
+      {/* ─── Titre catalogue ─── */}
+      <Text style={styles.catalogTitle}>À découvrir</Text>
+    </View>
+  );
+
+  return (
+    <Screen>
       {erreur ? (
         <EmptyState
           icon="cloud-offline-outline"
@@ -261,6 +366,7 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
           renderItem={renderAnnonce}
           keyExtractor={item => item._id || item.id}
           contentContainerStyle={styles.list}
+          ListHeaderComponent={ListHeader}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -273,7 +379,7 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
             <EmptyState
               icon="home-outline"
               title="Aucune annonce trouvée"
-              subtitle="Essayez un autre filtre ou revenez plus tard."
+              subtitle="Essayez d'élargir vos critères de recherche."
             />
           }
         />
@@ -283,34 +389,122 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  // ─── Header ───
-  header: {
-    paddingBottom: spacing.md,
+  // ─── Hero ───
+  hero: {
+    height: 230,
+    justifyContent: 'flex-end',
+    padding: spacing.lg,
+    overflow: 'hidden',
   },
-  titre: {
-    fontFamily: fonts.display,
-    fontSize: fontSize.display,
-    color: colors.text,
+  heroTitle: {
+    fontFamily: fonts.displayItalic,
+    fontSize: fontSize.lg,
+    color: colors.white,
+    paddingRight: spacing.lg,
   },
-  sousTitre: {
+
+  // ─── Zone recherche (chevauche le hero) ───
+  searchZone: {
+    paddingHorizontal: spacing.md,
+    marginTop: -28,
+  },
+  searchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.black,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+  },
+  searchBtnText: {
+    flex: 1,
     fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: colors.white,
+  },
+  panelWrap: {
+    marginTop: spacing.sm,
+  },
+
+  // ─── Quick filters (chips rapides) ───
+  quickFilterRow: {
+    marginTop: spacing.md,
+  },
+  quickFilterContent: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+  },
+  quickChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.bgCard,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickChipInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  quickChipActive: {
+    backgroundColor: colors.gold,
+    borderColor: colors.gold,
+  },
+  quickChipText: {
+    fontFamily: fonts.bodyMedium,
     fontSize: fontSize.sm,
     color: colors.textSub,
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
   },
-  search: {
-    marginBottom: spacing.md,
-  },
-  filtersScroll: {
-    gap: spacing.sm,
-    paddingRight: spacing.md,
+  quickChipTextActive: {
+    fontFamily: fonts.bodyBold,
+    color: colors.black,
   },
 
   // ─── List ───
   list: {
     paddingBottom: spacing.lg,
     gap: spacing.md,
+  },
+
+  // ─── Section recommandés ───
+  recoSection: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  recoTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+    color: colors.text,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+
+  // ─── Banner filterOwner ───
+  ownerBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  ownerBannerText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+  },
+  ownerBannerLink: {
+    color: colors.gold,
+    fontSize: fontSize.sm,
+  },
+
+  // ─── Titre catalogue ───
+  catalogTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+    color: colors.text,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
 
   // ─── Card ───
@@ -321,32 +515,53 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 4 / 3,
     backgroundColor: colors.bgCardAlt,
-    borderRadius: radius.none,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderGoldFull,
+    borderRadius: radius.sm,
   },
 
-  // Badge statut (overlay sur image, haut-droite)
+  // Badge statut (haut-droite, pill)
   badge: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: spacing.md,
+    right: spacing.md,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
-    borderRadius: 1,
+    borderRadius: radius.sm,
+  },
+
+  // Gradient bas image pour lisibilité du prix blanc
+  priceGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '40%',
+    borderBottomLeftRadius: radius.sm,
+    borderBottomRightRadius: radius.sm,
+  },
+
+  // Prix superposé en bas-gauche de l'image
+  priceOverlay: {
+    position: 'absolute',
+    bottom: spacing.md,
+    left: spacing.md,
   },
   badgeVente: {
-    backgroundColor: 'rgba(59, 130, 246, 0.72)',
+    backgroundColor: colors.goldMuted,
   },
   badgeLoc: {
-    backgroundColor: 'rgba(34, 197, 94, 0.72)',
+    backgroundColor: colors.blueMuted,
   },
   badgeText: {
-    color: colors.white,
     fontSize: 11,
     letterSpacing: 1.5,
     fontFamily: fonts.bodyBold,
     textTransform: 'uppercase',
+  },
+  badgeTextVente: {
+    color: colors.goldDark,
+  },
+  badgeTextLoc: {
+    color: colors.blue,
   },
 
   body: {
@@ -370,7 +585,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
 
-  // Stats pastilles
   statsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -396,7 +610,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
-  // Divider or — 32px (entre location et description)
   divider: {
     width: 32,
     height: 1,
@@ -411,11 +624,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
-  price: {
-    marginTop: spacing.xs,
-  },
-
-  // CTA footer
   footer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

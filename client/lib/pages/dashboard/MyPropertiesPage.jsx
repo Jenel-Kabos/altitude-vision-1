@@ -29,7 +29,7 @@ const MyPropertiesPage = () => {
       availability: "Disponible",
       type: "",
       address: {
-        district: "",
+        arrondissement: "",
         street: "",
         city: "Brazzaville",
       },
@@ -78,7 +78,7 @@ const MyPropertiesPage = () => {
       ...initialFormData(),
       ...property,
       address: {
-        district: property.address_district || "",
+        arrondissement: property.address_arrondissement || "",
         street: property.address_street || "",
         city: property.address_city || "Brazzaville",
       },
@@ -104,7 +104,7 @@ const MyPropertiesPage = () => {
 
       // 2. Adresse
       data.append("address[street]", address.street);
-      data.append("address[district]", address.district);
+      data.append("address[arrondissement]", address.arrondissement);
       data.append("address[city]", address.city);
 
       // 3. Équipements
@@ -189,7 +189,7 @@ const MyPropertiesPage = () => {
             <h3 className="text-xl font-semibold">{property.title}</h3>
             <p>{property.description}</p>
             <p>Prix : {property.price} FCFA</p>
-            <p>Adresse : {property.address_district}, {property.address_street}, {property.address_city}</p>
+            <p>Adresse : {property.address_arrondissement}, {property.address_street}, {property.address_city}</p>
             <p>Type : {property.type}</p>
             <p>Chambres : {property.bedrooms}, Salles de bain : {property.bathrooms}</p>
             <div className="flex gap-2 flex-wrap">

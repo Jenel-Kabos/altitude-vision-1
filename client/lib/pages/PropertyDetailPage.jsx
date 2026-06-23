@@ -614,7 +614,7 @@ const PropertyDetailPage = () => {
   const images = Array.isArray(property.images) && property.images.length > 0 ? property.images : [];
   const mainImage = images.length > 0 ? optimizeCloudinaryUrl(buildImageUrl(images[mainIdx]), 1200) : PLACEHOLDER;
   const displayAddress = property.address
-    ? [property.address.street, property.address.district, property.address.city].filter(Boolean).join(' — ')
+    ? [property.address.street, property.address.arrondissement, property.address.city].filter(Boolean).join(' — ')
     : 'Adresse non disponible';
 
   const stats = [

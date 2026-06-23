@@ -4,14 +4,25 @@ import { colors, fonts, fontSize } from '../theme';
 
 // Signature visuelle Altimmo
 // Usage : <PrixFCFA montant={185000000} />
-export default function PrixFCFA({ montant = 0, style }) {
+// Variante compacte (carousels, cartes étroites) : <PrixFCFA montant={...} compact />
+// Variante "sur photo" (texte blanc, lisible par-dessus image) : <PrixFCFA montant={...} variant="onImage" />
+export default function PrixFCFA({
+  montant = 0,
+  style,
+  compact = false,
+  variant = 'default',
+}) {
+  const isOnImage = variant === 'onImage';
+  const mainColor   = isOnImage ? colors.white : colors.gold;
+  const suffixColor = isOnImage ? colors.white : colors.textSub;
+
   return (
-    <Text style={style}>
+    <Text style={style} numberOfLines={compact ? 1 : undefined}>
       <Text
         style={{
           fontFamily: fonts.display,
-          fontSize: fontSize.display,
-          color: colors.gold,
+          fontSize: compact ? fontSize.lg : fontSize.display,
+          color: mainColor,
         }}
       >
         {Number(montant).toLocaleString('fr-FR')}
@@ -20,7 +31,7 @@ export default function PrixFCFA({ montant = 0, style }) {
         style={{
           fontFamily: fonts.bodyItalic,
           fontSize: fontSize.xs,
-          color: colors.textSub,
+          color: suffixColor,
         }}
       >
         {' '}fcfa

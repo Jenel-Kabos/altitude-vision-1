@@ -3,24 +3,28 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import {
-  Fraunces_700Bold,
-  Fraunces_400Regular_Italic,
-} from '@expo-google-fonts/fraunces';
+  CormorantGaramond_400Regular,
+  CormorantGaramond_400Regular_Italic,
+  CormorantGaramond_600SemiBold,
+  CormorantGaramond_700Bold,
+} from '@expo-google-fonts/cormorant-garamond';
 import {
-  Inter_400Regular,
-  Inter_400Regular_Italic,
-  Inter_700Bold,
-} from '@expo-google-fonts/inter';
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_700Bold,
+} from '@expo-google-fonts/dm-sans';
 import { AuthProvider } from './src/context/AuthContext';
 import AppNavigator from './src/navigation/AppNavigator';
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
-    'Fraunces-Bold':    Fraunces_700Bold,
-    'Fraunces-Italic':  Fraunces_400Regular_Italic,
-    'Inter-Regular':    Inter_400Regular,
-    'Inter-Italic':     Inter_400Regular_Italic,
-    'Inter-Bold':       Inter_700Bold,
+  const [fontsLoaded, fontError] = useFonts({
+    'CormorantGaramond-Regular':   CormorantGaramond_400Regular,
+    'CormorantGaramond-Italic':    CormorantGaramond_400Regular_Italic,
+    'CormorantGaramond-SemiBold':  CormorantGaramond_600SemiBold,
+    'CormorantGaramond-Bold':      CormorantGaramond_700Bold,
+    'DMSans-Regular':              DMSans_400Regular,
+    'DMSans-Medium':               DMSans_500Medium,
+    'DMSans-Bold':                 DMSans_700Bold,
   });
 
   if (!fontsLoaded) return null;

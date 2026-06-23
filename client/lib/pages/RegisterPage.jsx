@@ -108,12 +108,10 @@ const RegisterPage = () => {
                 role:            form.role,
                 ...(isProprietaire && {
                     contratAccepte: true,
-                    certifications: {
-                        informationsVraies:   certifications.informationsVraies,
-                        estProprietaireLegal: certifications.estProprietaireLegal,
-                        engagementHonnetete:  certifications.engagementHonnetete,
-                        commissionAcceptee:   certifications.commissionAcceptee,
-                    },
+                    informationsVraies:   certifications.informationsVraies,
+                    estProprietaireLegal: certifications.estProprietaireLegal,
+                    engagementHonnetete:  certifications.engagementHonnetete,
+                    commissionAcceptee:   certifications.commissionAcceptee,
                 }),
             });
             router.push(`/verify-email-pending?email=${encodeURIComponent(form.email.trim().toLowerCase())}`);

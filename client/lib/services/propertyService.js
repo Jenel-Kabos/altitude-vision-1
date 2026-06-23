@@ -108,6 +108,22 @@ export const deleteProperty = async (propertyId) => {
 };
 
 /**
+ * Toggle le statut "recommandé" d'une propriété (Admin)
+ * @param {String} propertyId - ID de la propriété
+ * @param {Boolean} recommande - Nouvelle valeur
+ * @returns {Promise<Object>} - Propriété mise à jour
+ */
+export const toggleRecommande = async (propertyId, recommande) => {
+  try {
+    const response = await api.patch(`/properties/${propertyId}/recommande`, { recommande });
+    return response.data?.data?.property;
+  } catch (error) {
+    console.error(`❌ [propertyService] Erreur toggle recommandé ${propertyId}:`, error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
  * Récupère les propriétés de l'utilisateur connecté
  * @returns {Promise<Array>} - Tableau de propriétés de l'utilisateur
  */

@@ -1,39 +1,44 @@
 export const colors = {
-  // Core (skill projet — non négociables)
+  // Core
   gold:         '#C8960C',
-  black:        '#0A0A0A',
+  goldDark:     '#A07A0A',
+  goldLight:    '#FCEFD6',
+  blue:         '#185FA5',
+  blueLight:    '#E6F1FB',
+  black:        '#1A1A1A',
   white:        '#FFFFFF',
 
-  // Backgrounds
-  bg:           '#0A0A0A',
-  bgCard:       '#111111',
-  bgCardAlt:    '#181818',
+  // Backgrounds (light theme)
+  bg:           '#FAFAF8',
+  bgCard:       '#FFFFFF',
+  bgCardAlt:    '#F5F5F2',
 
-  // Text
-  text:         '#FFFFFF',
-  textSub:      '#B0B0B0',
-  textMuted:    '#606060',
+  // Text (dark text on light bg)
+  text:         '#1A1A1A',
+  textSub:      '#666666',
+  textMuted:    '#999999',
 
   // Borders
-  border:         '#222222',
+  border:         '#F0F0EE',
   borderGold:     'rgba(200, 150, 12, 0.35)',
   borderGoldFull: '#C8960C',
 
   // Semantic
-  success:      '#22C55E',
-  error:        '#EF4444',
-  info:         '#3B82F6',
+  success:      '#3B6D11',
+  error:        '#A32D2D',
+  info:         '#185FA5',
 
   // Transparences
-  overlay:      'rgba(0, 0, 0, 0.65)',
-  goldMuted:    'rgba(200, 150, 12, 0.12)',
+  overlay:      'rgba(0, 0, 0, 0.5)',
+  goldMuted:    '#FCEFD6',
+  blueMuted:    '#E6F1FB',
 
-  // ─── Alias legacy — à retirer après recâblage des écrans ───
+  // ─── Alias legacy — pour les écrans non encore recâblés ───
   primary:       '#C8960C', // legacy → utiliser gold
-  background:    '#0A0A0A', // legacy → utiliser bg
-  surface:       '#111111', // legacy → utiliser bgCard
-  card:          '#1A1A1A', // legacy → utiliser bgCard
-  cardElevated:  '#222222', // legacy → utiliser bgCardAlt
-  textSecondary: '#B0B0B0', // legacy → utiliser textSub
-  warning:       '#F59E0B', // legacy
+  background:    '#FAFAF8', // legacy → utiliser bg
+  surface:       '#FFFFFF', // legacy → utiliser bgCard
+  card:          '#FFFFFF', // legacy → utiliser bgCard
+  cardElevated:  '#F5F5F2', // legacy → utiliser bgCardAlt
+  textSecondary: '#666666', // legacy → utiliser textSub
+  warning:       '#F59E0B', // legacy (pas d'équivalent dans la nouvelle palette)
 };

@@ -232,7 +232,7 @@ const PropertyModerationPage = () => {
                   <div>
                     <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Adresse</span>
                     <p className="text-gray-900 font-medium text-sm mt-0.5">
-                      {[selectedProperty.address?.street, selectedProperty.address?.district, selectedProperty.address?.city]
+                      {[selectedProperty.address?.street, selectedProperty.address?.arrondissement, selectedProperty.address?.city]
                         .filter(Boolean).join(', ')}
                     </p>
                   </div>

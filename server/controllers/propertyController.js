@@ -91,9 +91,9 @@ const createProperty = asyncHandler(async (req, res, next) => {
   }
 
   const finalAddress = {
-    district: addressData.district,
-    street:   addressData.street,
-    city:     addressData.city || 'Brazzaville'
+    arrondissement: addressData.arrondissement,
+    street:         addressData.street,
+    city:           addressData.city || 'Brazzaville'
   };
 
   // 4. Parsing de la Location (GeoJSON)
@@ -399,6 +399,59 @@ const adminDeleteProperty = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @description Marquer / démarquer un bien comme recommandé (Admin)
+ * @route PATCH /api/properties/:id/recommande
+ */
+const setRecommande = asyncHandler(async (req, res) => {
+  const property = await Property.findByIdAndUpdate(
+    req.params.id,
+    { recommande: !!req.body.recommande },
+    { new: true, runValidators: true }
+  );
+
+  if (!property) {
+    res.status(404);
+    throw new Error('Propriété non trouvée.');
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: { property },
+  });
+});
+
+/**
+ * @description Liste des biens recommandés (validés uniquement)
+ * @route GET /api/properties/recommended
+ */
+const getRecommendedProperties = asyncHandler(async (req, res) => {
+  let properties = await Property.find({
+    recommande: true,
+    statusAdmin: 'Validée',
+  })
+    .sort('-updatedAt')
+    .limit(10);
+
+  // Fallback : si aucun bien n'est marqué recommandé par l'admin,
+  // affiche automatiquement les 10 biens les plus chers
+  let isFallback = false;
+  if (properties.length === 0) {
+    properties = await Property.find({
+      statusAdmin: 'Validée',
+    })
+      .sort('-price')
+      .limit(10);
+    isFallback = true;
+  }
+
+  res.status(200).json({
+    status: 'success',
+    results: properties.length,
+    data: { properties, isFallback },
+  });
+});
+
 // ============================================================
 // 📤 EXPORTS
 // ============================================================
@@ -412,5 +465,7 @@ module.exports = {
   updateProperty,
   updatePropertyStatus,
   deleteProperty,
-  adminDeleteProperty
+  adminDeleteProperty,
+  setRecommande,
+  getRecommendedProperties,
 };

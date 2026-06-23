@@ -47,8 +47,8 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   const isLocation = annonce.status?.toLowerCase() === 'location';
 
-  const district =
-    annonce.address?.district ||
+  const arrondissement =
+    annonce.address?.arrondissement ||
     annonce.location?.neighborhood ||
     '';
   const city =
@@ -56,7 +56,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     annonce.location?.city ||
     annonce.city ||
     '';
-  const addressText = [district, city].filter(Boolean).join(' · ');
+  const addressText = [arrondissement, city].filter(Boolean).join(' · ');
 
   const surface = annonce.surface || annonce.area || 0;
   const bedrooms = annonce.bedrooms || annonce.chambres || 0;
@@ -128,7 +128,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
         {
           text: 'Confirmer',
           onPress: () => Alert.alert(
-            '✅ Demande envoyée',
+            'Demande envoyée ✓',
             'Un agent vous contactera sous 24h'
           ),
         },
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   galleryImage: {
     width,
     height: 320,
-    borderRadius: radius.none,
+    borderRadius: radius.sm,
   },
   placeholderImg: {
     width,
@@ -539,10 +539,8 @@ const styles = StyleSheet.create({
   featureCell: {
     flexBasis: '30%',
     flexGrow: 1,
-    backgroundColor: colors.bgCard,
-    borderRadius: radius.none,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.goldMuted,
+    borderRadius: radius.sm,
     padding: spacing.sm,
     alignItems: 'center',
   },
@@ -580,17 +578,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   commoditeChip: {
-    backgroundColor: colors.bgCard,
+    backgroundColor: colors.goldMuted,
     borderRadius: radius.xs,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderGold,
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
   },
   commoditeText: {
     fontFamily: fonts.body,
     fontSize: fontSize.sm,
-    color: colors.textSub,
+    color: colors.goldDark,
   },
 
   // ─── Propriétaire ───

@@ -35,7 +35,7 @@ const getImageUrl = (url) => {
 const emptyForm = () => ({
   title:'', description:'', price:'', pole:'Altimmo',
   status:'vente', availability:'Disponible', type:'Appartement',
-  address:{ street:'', district:'', city:'Brazzaville' },
+  address:{ street:'', arrondissement:'', city:'Brazzaville' },
   surface:'', bedrooms:'', bathrooms:'', amenities:'',
   latitude:-4.266, longitude:15.283, images:[],
 });
@@ -58,9 +58,9 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
         setFormData({
           ...emptyForm(), ...p,
           address: {
-            district: p.address?.district || '',
-            street:   p.address?.street   || '',
-            city:     p.address?.city     || 'Brazzaville',
+            arrondissement: p.address?.arrondissement || '',
+            street:         p.address?.street         || '',
+            city:           p.address?.city           || 'Brazzaville',
           },
           amenities: p.amenities?.join(', ') || '',
           latitude:  p.location?.coordinates[1] || -4.266,
@@ -94,9 +94,9 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
         if (v !== '' && v !== undefined && v !== null) fd.append(k, v);
       });
 
-      fd.append("address[street]",   formData.address.street   || '');
-      fd.append("address[district]", formData.address.district || '');
-      fd.append("address[city]",     formData.address.city     || 'Brazzaville');
+      fd.append("address[street]",         formData.address.street         || '');
+      fd.append("address[arrondissement]", formData.address.arrondissement || '');
+      fd.append("address[city]",           formData.address.city           || 'Brazzaville');
 
       const amenities = formData.amenities || '';
       amenities.split(',').map(a => a.trim()).filter(Boolean).forEach(a => fd.append("amenities", a));

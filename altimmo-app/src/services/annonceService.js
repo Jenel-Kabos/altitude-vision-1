@@ -28,6 +28,11 @@ export async function uploadToCloudinary(uri) {
   return data.secure_url;
 }
 
+export async function getRecommendedProperties() {
+  const res = await api.get('/properties/recommended');
+  return res.data?.data?.properties || res.data?.properties || [];
+}
+
 export async function creerAnnonce(payload) {
   try {
     const res = await api.post('/properties/mobile', {

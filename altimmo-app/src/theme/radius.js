@@ -1,6 +1,7 @@
-// Radius minimaliste : casse le look "Airbnb clone"
 export const radius = {
-  none: 0,   // cartes annonce, images
-  xs:   2,   // inputs, badges
-  md:   12,  // modaux, bottom sheets uniquement
+  none: 0,
+  xs:   10,
+  sm:   16,
+  md:   20,
+  lg:   28,
 };

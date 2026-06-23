@@ -37,7 +37,7 @@ const userSchema = new mongoose.Schema(
             type: String,
             // 'Proprietaire' sans accent pour compatibilité frontend
             enum:    ['User', 'Client', 'Proprietaire', 'Collaborateur', 'Admin', 'Prestataire'],
-            default: 'User',
+            default: 'Client',
         },
 
         password: {

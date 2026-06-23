@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { addProperty } from '../../services/propertyService';
 import { FaUpload, FaDollarSign, FaBed, FaBath, FaRulerCombined, FaBuilding } from 'react-icons/fa';
+import { VILLES, getArrondissementsFor } from '../../constants/locations';
+import { PROPERTY_TYPES } from '../../constants/propertyTypes';
 
 const availableAmenities = [
   'Climatisation', 'Piscine', 'Jardin', 'Garage', 'Sécurité 24/7', 
@@ -21,10 +23,10 @@ const SubmitPropertyPage = () => {
     status: 'vente',
     type: 'Appartement',
     availability: 'Disponible',
-    address: { 
-      street: '', 
-      district: '', 
-      city: 'Brazzaville' 
+    address: {
+      street: '',
+      arrondissement: '',
+      city: 'Brazzaville'
     },
     surface: '',
     bedrooms: '',
@@ -50,6 +52,20 @@ const SubmitPropertyPage = () => {
       address: {
         ...prev.address,
         [name]: value
+      }
+    }));
+  };
+
+  const handleCityChange = (e) => {
+    const newCity = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        city: newCity,
+        arrondissement: getArrondissementsFor(newCity).includes(prev.address.arrondissement)
+          ? prev.address.arrondissement
+          : ''
       }
     }));
   };
@@ -182,32 +198,57 @@ const SubmitPropertyPage = () => {
             {/* Type */}
             <div>
               <label className="block text-sm font-medium mb-2">Type *</label>
-              <input 
-                name="type" 
-                value={formData.type} 
+              <select
+                name="type"
+                value={formData.type || ''}
                 onChange={handleChange}
                 className="w-full p-3 border rounded-lg"
-                required 
-              />
+                required
+              >
+                <option value="">Sélectionner...</option>
+                {PROPERTY_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
 
-            {/* Adresse - CORRECTION */}
+            {/* Adresse */}
             <div>
-              <label className="block text-sm font-medium mb-2">Quartier *</label>
-              <input 
-                name="district" 
-                value={formData.address.district} 
-                onChange={handleAddressChange}
+              <label className="block text-sm font-medium mb-2">Ville *</label>
+              <select
+                name="city"
+                value={formData.address.city || ''}
+                onChange={handleCityChange}
                 className="w-full p-3 border rounded-lg"
-                required 
-              />
+                required
+              >
+                <option value="">Sélectionner...</option>
+                {VILLES.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Arrondissement *</label>
+              <select
+                name="arrondissement"
+                value={formData.address.arrondissement || ''}
+                onChange={handleAddressChange}
+                disabled={!formData.address.city}
+                className="w-full p-3 border rounded-lg disabled:bg-gray-100 disabled:cursor-not-allowed"
+                required
+              >
+                <option value="">Sélectionner...</option>
+                {getArrondissementsFor(formData.address.city).map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-2">Rue</label>
-              <input 
-                name="street" 
-                value={formData.address.street} 
+              <input
+                name="street"
+                value={formData.address.street}
                 onChange={handleAddressChange}
                 className="w-full p-3 border rounded-lg"
               />

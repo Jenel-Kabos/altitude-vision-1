@@ -17,7 +17,7 @@ export const buildPropertyFormData = (formData, existingImages = [], newImages =
     "status",
     "availability",
     "type",
-    "address_district",
+    "address_arrondissement",
     "address_street",
     "address_city",
     "surface",

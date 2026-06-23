@@ -7,7 +7,7 @@ export default function Card({ children, style, gold = false, selected = false }
     <View
       style={[
         styles.card,
-        gold && { borderColor: colors.borderGoldFull },
+        gold && styles.gold,
         selected && styles.selected,
         style,
       ]}
@@ -20,13 +20,15 @@ export default function Card({ children, style, gold = false, selected = false }
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.bgCard,
-    borderRadius: radius.none,
-    borderBottomWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  gold: {
+    borderWidth: 1,
+    borderColor: colors.borderGoldFull,
   },
   selected: {
-    borderColor: colors.borderGoldFull,
     borderWidth: 1.5,
-    borderBottomWidth: 1.5,
+    borderColor: colors.borderGoldFull,
   },
 });

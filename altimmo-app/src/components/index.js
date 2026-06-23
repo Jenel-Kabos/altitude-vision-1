@@ -6,3 +6,7 @@ export { default as Chip } from './Chip';
 export { default as Input } from './Input';
 export { default as Checkbox } from './Checkbox';
 export { default as HouseIcon } from './HouseIcon';
+export { default as RecommendedCarousel } from './RecommendedCarousel';
+export { default as SearchPanel } from './SearchPanel';
+export { default as AdCarousel } from './AdCarousel';
+export { default as GreetingBar } from './GreetingBar';

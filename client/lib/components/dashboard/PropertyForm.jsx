@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { VILLES, getArrondissementsFor } from "../../constants/locations";
+import { PROPERTY_TYPES } from "../../constants/propertyTypes";
 
 // Correction icônes Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -97,6 +99,21 @@ const PropertyForm = ({
       address: {
         ...prev.address,
         [name]: value,
+      },
+    }));
+  };
+
+  const handleCityChange = (e) => {
+    const newCity = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        city: newCity,
+        // Reset arrondissement si plus valide pour la nouvelle ville
+        arrondissement: getArrondissementsFor(newCity).includes(prev.address.arrondissement)
+          ? prev.address.arrondissement
+          : '',
       },
     }));
   };
@@ -215,14 +232,18 @@ const PropertyForm = ({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-        <input
+        <select
           name="type"
-          value={formData.type}
+          value={formData.type || ''}
           onChange={handleChange}
-          placeholder="Ex: Appartement, Villa, Studio"
           aria-label="Type de bien"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-        />
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+        >
+          <option value="">Sélectionner...</option>
+          {PROPERTY_TYPES.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
       </div>
 
       {/* ------------------ SECTION ADRESSE ------------------ */}
@@ -231,16 +252,38 @@ const PropertyForm = ({
 
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Quartier *</label>
-            <input
-              name="district"
-              value={formData.address.district}
-              onChange={handleAddressChange}
-              placeholder="Ex: Moungali"
-              aria-label="Quartier"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ville *</label>
+            <select
+              name="city"
+              value={formData.address.city || ''}
+              onChange={handleCityChange}
+              aria-label="Ville"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               required
-            />
+            >
+              <option value="">Sélectionner...</option>
+              {VILLES.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Arrondissement *</label>
+            <select
+              name="arrondissement"
+              value={formData.address.arrondissement || ''}
+              onChange={handleAddressChange}
+              disabled={!formData.address.city}
+              aria-label="Arrondissement"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              required
+            >
+              <option value="">Sélectionner...</option>
+              {getArrondissementsFor(formData.address.city).map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -251,18 +294,6 @@ const PropertyForm = ({
               onChange={handleAddressChange}
               placeholder="Ex: Avenue de la Paix"
               aria-label="Rue"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Ville</label>
-            <input
-              name="city"
-              value={formData.address.city}
-              onChange={handleAddressChange}
-              placeholder="Brazzaville"
-              aria-label="Ville"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
           </div>

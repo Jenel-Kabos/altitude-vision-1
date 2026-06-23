@@ -88,7 +88,7 @@ export default function ChatScreen({ route, navigation }) {
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
       },
-      headerTintColor: '#FFFFFF',
+      headerTintColor: colors.text,
       headerBackTitleVisible: false,
       headerTitleAlign: 'left',
       headerTitle: () => (

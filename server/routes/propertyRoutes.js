@@ -41,9 +41,19 @@ router.get(
  * @description Propriétés de l'utilisateur connecté
  */
 router.get(
-    '/my-properties', 
-    authController.protect, 
+    '/my-properties',
+    authController.protect,
     propertyController.getMyProperties
+);
+
+/**
+ * @route GET /api/properties/recommended
+ * @description Biens recommandés (Public) — placé avant /:id pour éviter
+ * que 'recommended' soit interprété comme un ObjectId
+ */
+router.get(
+    '/recommended',
+    propertyController.getRecommendedProperties
 );
 
 /**
@@ -106,10 +116,22 @@ router.patch(
  * @description Suppression forcée (Admin)
  */
 router.delete(
-    '/admin/:id', 
-    authController.protect, 
-    authController.restrictTo('Admin'), 
+    '/admin/:id',
+    authController.protect,
+    authController.restrictTo('Admin'),
     propertyController.adminDeleteProperty
+);
+
+/**
+ * @route PATCH /api/properties/:id/recommande
+ * @description Marquer / démarquer un bien comme recommandé (Admin)
+ * Placé ici (sous-route :id/recommande, pas conflit avec /:id qui catch-all)
+ */
+router.patch(
+    '/:id/recommande',
+    authController.protect,
+    authController.restrictTo('Admin'),
+    propertyController.setRecommande
 );
 
 

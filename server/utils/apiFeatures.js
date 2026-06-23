@@ -32,11 +32,11 @@ class APIFeatures {
             const regex = new RegExp(this.queryString.search, 'i'); // 'i' pour insensible à la casse
             console.log(`🔎 [APIFeatures] Recherche texte: /${this.queryString.search}/`);
             
-            // Recherche dans le titre, la description, le district et le type
+            // Recherche dans le titre, la description, l'arrondissement et le type
             filters.$or = [
                 { title: { $regex: regex } },
                 { description: { $regex: regex } },
-                { 'address.district': { $regex: regex } },
+                { 'address.arrondissement': { $regex: regex } },
                 { type: { $regex: regex } },
             ];
         }

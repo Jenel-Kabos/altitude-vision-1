@@ -430,7 +430,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
   const getLocation = () => {
     if (typeof property.location === 'string' && property.location.trim()) return property.location;
     if (property.address && typeof property.address === 'object') {
-      const parts = [property.address.street, property.address.district, property.address.city].filter(Boolean);
+      const parts = [property.address.street, property.address.arrondissement, property.address.city].filter(Boolean);
       if (parts.length) return parts.join(', ');
     }
     if (typeof property.address === 'string' && property.address.trim()) return property.address;

@@ -5,6 +5,8 @@ import { toast } from 'react-hot-toast';
 import { getPropertyById, updateProperty } from '../../services/propertyService';
 import LoadingSpinner from '../../components/UI/LoadingSpinner.jsx';
 import Image from 'next/image';
+import { VILLES, getArrondissementsFor } from '../../constants/locations';
+import { PROPERTY_TYPES } from '../../constants/propertyTypes';
 
 const EditPropertyPage = () => {
   const params = useParams();
@@ -21,7 +23,7 @@ const EditPropertyPage = () => {
     type: 'Appartement',
     address: {
       street: '',
-      district: '',
+      arrondissement: '',
       city: 'Brazzaville'
     },
     surface: '',
@@ -51,7 +53,7 @@ const EditPropertyPage = () => {
           type: property.type || 'Appartement',
           address: {
             street: property.address?.street || '',
-            district: property.address?.district || '',
+            arrondissement: property.address?.arrondissement || '',
             city: property.address?.city || 'Brazzaville'
           },
           surface: property.surface || '',
@@ -86,6 +88,20 @@ const EditPropertyPage = () => {
       address: {
         ...prev.address,
         [name]: value
+      }
+    }));
+  };
+
+  const handleCityChange = (e) => {
+    const newCity = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        city: newCity,
+        arrondissement: getArrondissementsFor(newCity).includes(prev.address.arrondissement)
+          ? prev.address.arrondissement
+          : ''
       }
     }));
   };
@@ -188,36 +204,119 @@ const EditPropertyPage = () => {
 
           <div>
             <label className="block text-sm font-medium mb-2">Prix *</label>
-            <input 
-              type="number" 
-              name="price" 
-              value={formData.price} 
-              onChange={handleChange} 
-              className="w-full p-3 border rounded-lg" 
-              required 
+            <input
+              type="number"
+              name="price"
+              value={formData.price}
+              onChange={handleChange}
+              className="w-full p-3 border rounded-lg"
+              required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Quartier *</label>
-            <input 
-              type="text" 
-              name="district" 
-              value={formData.address.district} 
-              onChange={handleAddressChange} 
-              className="w-full p-3 border rounded-lg" 
-              required 
+            <label className="block text-sm font-medium mb-2">Type *</label>
+            <select
+              name="type"
+              value={formData.type || ''}
+              onChange={handleChange}
+              className="w-full p-3 border rounded-lg"
+              required
+            >
+              <option value="">Sélectionner...</option>
+              {PROPERTY_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-2">Surface (m²)</label>
+              <input
+                type="number"
+                name="surface"
+                value={formData.surface || ''}
+                onChange={handleChange}
+                className="w-full p-3 border rounded-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Chambres</label>
+              <input
+                type="number"
+                name="bedrooms"
+                value={formData.bedrooms || ''}
+                onChange={handleChange}
+                className="w-full p-3 border rounded-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Salles de bain</label>
+              <input
+                type="number"
+                name="bathrooms"
+                value={formData.bathrooms || ''}
+                onChange={handleChange}
+                className="w-full p-3 border rounded-lg"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Équipements</label>
+            <input
+              type="text"
+              name="amenities"
+              value={formData.amenities || ''}
+              onChange={handleChange}
+              placeholder="Ex : Climatisation, Parking, Wifi (séparés par des virgules)"
+              className="w-full p-3 border rounded-lg"
             />
+            <p className="text-xs text-gray-500 mt-1">Séparez les équipements par des virgules</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Ville *</label>
+            <select
+              name="city"
+              value={formData.address.city || ''}
+              onChange={handleCityChange}
+              className="w-full p-3 border rounded-lg"
+              required
+            >
+              <option value="">Sélectionner...</option>
+              {VILLES.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Arrondissement *</label>
+            <select
+              name="arrondissement"
+              value={formData.address.arrondissement || ''}
+              onChange={handleAddressChange}
+              disabled={!formData.address.city}
+              className="w-full p-3 border rounded-lg disabled:bg-gray-100 disabled:cursor-not-allowed"
+              required
+            >
+              <option value="">Sélectionner...</option>
+              {getArrondissementsFor(formData.address.city).map(a => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">Rue</label>
-            <input 
-              type="text" 
-              name="street" 
-              value={formData.address.street} 
-              onChange={handleAddressChange} 
-              className="w-full p-3 border rounded-lg" 
+            <input
+              type="text"
+              name="street"
+              value={formData.address.street}
+              onChange={handleAddressChange}
+              className="w-full p-3 border rounded-lg"
             />
           </div>
 

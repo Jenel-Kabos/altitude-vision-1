@@ -3,7 +3,8 @@ const crypto    = require('crypto');
 const bcrypt    = require('bcryptjs');
 const jwt       = require('jsonwebtoken');
 const { promisify } = require('util');
-const User      = require('../models/User');
+const User                  = require('../models/User');
+const PendingRegistration   = require('../models/PendingRegistration');
 const sendEmail = require('../utils/email');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 
@@ -41,13 +42,32 @@ const createSendToken = (user, statusCode, res) => {
 // ======================================================
 exports.signup = async (req, res) => {
     try {
-        const { name, email, password, passwordConfirm, role, phone, contratAccepte, certifications } = req.body;
+        const {
+            name, email, password, passwordConfirm, role, phone,
+            contratAccepte, informationsVraies, estProprietaireLegal,
+            engagementHonnetete, commissionAcceptee,
+        } = req.body;
 
+        const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+            || req.socket?.remoteAddress
+            || req.ip;
+
+        // ─── Validation des champs ───────────────────────────────
         if (!name || !email || !password) {
             return res.status(400).json({ status: 'fail', message: 'Champs manquants.' });
         }
-
-        // Vérification contrat obligatoire pour Proprietaire
+        if (password.length < 8) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Le mot de passe doit contenir au moins 8 caractères.',
+            });
+        }
+        if (passwordConfirm !== undefined && passwordConfirm !== password) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Les mots de passe ne sont pas identiques.',
+            });
+        }
         if (role === 'Proprietaire' && !contratAccepte) {
             return res.status(400).json({
                 status:  'fail',
@@ -55,64 +75,149 @@ exports.signup = async (req, res) => {
             });
         }
 
-        const existingUser = await User.findOne({ email });
+        const normalizedEmail = email.toLowerCase().trim();
+
+        // ─── Email déjà pris ? ───────────────────────────────────
+        // On bloque uniquement si un User VÉRIFIÉ existe déjà.
+        // Si un User legacy non vérifié traîne, on le nettoie pour
+        // éviter un E11000 au moment de verifyEmail.
+        const existingUser = await User.findOne({ email: normalizedEmail });
         if (existingUser) {
-            return res.status(400).json({ status: 'fail', message: 'Adresse email déjà utilisée.' });
+            if (existingUser.isEmailVerified) {
+                return res.status(400).json({ status: 'fail', message: 'Adresse email déjà utilisée.' });
+            }
+            await User.deleteOne({ _id: existingUser._id });
+            console.log(`🧹 [Auth] Legacy User non vérifié nettoyé pour ${normalizedEmail}`);
         }
 
-        // Photo de profil à l'inscription si envoyée
-        let photoUrl;
-        if (req.file) {
-            const result = await uploadToCloudinary(req.file.buffer, {
-                folder:    'altitude-vision/users',
-                public_id: `user-signup-${Date.now()}`,
-                overwrite: true,
+        // ─── Hash password + génération token ────────────────────
+        const hashedPassword   = await bcrypt.hash(password, 12);
+        const rawToken         = crypto.randomBytes(32).toString('hex');
+        const hashedToken      = crypto.createHash('sha256').update(rawToken).digest('hex');
+        const expiresAt        = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+        // ─── Upsert PendingRegistration ──────────────────────────
+        // findOneAndUpdate avec upsert: true remplace toute demande
+        // existante pour cet email (l'utilisateur peut relancer le flow).
+        await PendingRegistration.findOneAndUpdate(
+            { email: normalizedEmail },
+            {
+                name,
+                email: normalizedEmail,
+                password: hashedPassword,
+                role: role || 'Client',
+                phone:         phone || undefined,
+                ipInscription: ip,
+                contratAccepte:       !!contratAccepte,
+                informationsVraies:   !!informationsVraies,
+                estProprietaireLegal: !!estProprietaireLegal,
+                engagementHonnetete:  !!engagementHonnetete,
+                commissionAcceptee:   !!commissionAcceptee,
+                verificationToken: hashedToken,
+                expiresAt,
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        // ─── Envoi email de vérification ─────────────────────────
+        const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${rawToken}`;
+        try {
+            await sendEmail({
+                email:     normalizedEmail,
+                subject:   '✅ Altitude Vision — Activez votre compte',
+                type:      'verification',
+                name,
+                verifyURL,
+                message:   `Bonjour ${name},\n\nActivez votre compte ici : ${verifyURL}\n\nCe lien expire dans 24h.`,
             });
-            photoUrl = result.secure_url;
+
+            return res.status(200).json({
+                status:  'success',
+                message: 'Vérifiez vos emails pour activer votre compte.',
+            });
+        } catch (err) {
+            // Email parti en erreur → on supprime le pending pour
+            // ne pas laisser un compte fantôme jusqu'au TTL (24h).
+            await PendingRegistration.deleteOne({ email: normalizedEmail });
+            console.error('❌ Erreur envoi email vérification:', err);
+            return res.status(500).json({
+                status:  'error',
+                message: "Erreur d'envoi d'email. Réessayez plus tard.",
+            });
+        }
+    } catch (error) {
+        console.error('❌ Erreur signup:', error);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+// ======================================================
+// 2. VÉRIFICATION EMAIL
+// ======================================================
+exports.verifyEmail = async (req, res) => {
+    try {
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(req.params.token)
+            .digest('hex');
+
+        // findOneAndDelete est atomique côté Mongo — race-safe si
+        // l'utilisateur clique deux fois sur le lien : un seul gagne.
+        // Double-check expiresAt explicite (TTL Mongo peut traîner ~60s).
+        const pending = await PendingRegistration.findOneAndDelete({
+            verificationToken: hashedToken,
+            expiresAt: { $gt: Date.now() },
+        });
+
+        if (!pending) {
+            return res.status(400).json({
+                status:  'fail',
+                message: 'Lien invalide ou expiré, veuillez vous réinscrire.',
+            });
         }
 
-        const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || req.ip;
-        const now = new Date();
-
+        // ─── Création du vrai User ───────────────────────────────
+        // Password déjà hashé dans pending. Pour éviter le double-hash
+        // par le pre('save') hook de User.js, on appelle unmarkModified
+        // après l'avoir set dans le constructor.
         const userData = {
-            name,
-            email,
-            password,
-            passwordConfirm,
-            role:  role  || 'Client',
-            phone: phone || '',
-            photo: photoUrl || undefined,
+            name:            pending.name,
+            email:           pending.email,
+            password:        pending.password, // déjà bcrypt.hash(.., 12)
+            role:            pending.role,
+            phone:           pending.phone || null,
+            ipInscription:   pending.ipInscription,
+            isEmailVerified: true,
         };
 
-        if (role === 'Proprietaire' && contratAccepte) {
+        if (pending.role === 'Proprietaire' && pending.contratAccepte) {
             userData.contratAccepte   = true;
-            userData.contratAccepteLe = now;
+            userData.contratAccepteLe = pending.createdAt;
             userData.contratVersion   = 'v1.0';
-            userData.ipInscription    = ip;
             userData.certifications   = {
-                informationsVraies:   true,
-                estProprietaireLegal: true,
-                engagementHonnetete:  true,
-                commissionAcceptee:   true,
-                dateCertification:    now,
+                informationsVraies:   !!pending.informationsVraies,
+                estProprietaireLegal: !!pending.estProprietaireLegal,
+                engagementHonnetete:  !!pending.engagementHonnetete,
+                commissionAcceptee:   !!pending.commissionAcceptee,
+                dateCertification:    pending.createdAt,
             };
         }
 
-        const newUser = await User.create(userData);
-
-        const verificationToken = newUser.createEmailVerificationToken();
+        const newUser = new User(userData);
+        newUser.unmarkModified('password'); // bypass pre('save') hash hook
         await newUser.save({ validateBeforeSave: false });
 
-        const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
-
-        // PDF + email contrat pour Propriétaire (fire & forget)
-        if (role === 'Proprietaire' && contratAccepte) {
-            const userId   = newUser._id;
-            const userName = newUser.name;
+        // ─── PDF contrat Proprietaire (fire & forget) ────────────
+        // Ne bloque pas la réponse HTTP — la connexion automatique
+        // part immédiatement, le PDF + emails arrivent en arrière-plan.
+        if (newUser.role === 'Proprietaire' && newUser.contratAccepte) {
+            const userId    = newUser._id;
+            const userName  = newUser.name;
             const userEmail = newUser.email;
-            const ref = `CONTRAT-${String(userId).slice(-8).toUpperCase()}-v1.0`;
-            const dateStr = now.toLocaleDateString('fr-FR');
-            const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            const acceptDate = newUser.contratAccepteLe || new Date();
+            const ref       = `CONTRAT-${String(userId).slice(-8).toUpperCase()}-v1.0`;
+            const dateStr   = acceptDate.toLocaleDateString('fr-FR');
+            const timeStr   = acceptDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
             (async () => {
                 try {
@@ -121,7 +226,7 @@ exports.signup = async (req, res) => {
 
                     const pdfBuffer = await generateContratHebergement(newUser);
 
-                    // Upload vers Cloudinary
+                    // Upload PDF vers Cloudinary
                     const uploadResult = await uploadToCloudinary(pdfBuffer, {
                         folder:        `altitude-vision/contrats/proprietaires/${userId}`,
                         resource_type: 'raw',
@@ -186,8 +291,8 @@ exports.signup = async (req, res) => {
 </div>`;
 
                     const adminEmail = process.env.ZOHO_FROM_EMAIL || 'contact@altitudevision.agency';
-                    await sendEmailWithAttachment(userEmail,   '✅ Votre contrat d\'hébergement — Altitude Vision', htmlProprio, [attachment]);
-                    await sendEmailWithAttachment(adminEmail,  `🏠 Nouveau propriétaire : ${userName}`,             htmlAdmin,   [attachment]);
+                    await sendEmailWithAttachment(userEmail,  '✅ Votre contrat d\'hébergement — Altitude Vision', htmlProprio, [attachment]);
+                    await sendEmailWithAttachment(adminEmail, `🏠 Nouveau propriétaire : ${userName}`,             htmlAdmin,   [attachment]);
 
                     console.log(`✅ [Auth] Contrat PDF envoyé à ${userEmail}`);
                 } catch (pdfErr) {
@@ -196,66 +301,8 @@ exports.signup = async (req, res) => {
             })();
         }
 
-        try {
-            await sendEmail({
-                email:     newUser.email,
-                subject:   '✅ Altitude Vision — Activez votre compte',
-                type:      'verification',
-                name:      newUser.name,
-                verifyURL,
-                message:   `Bonjour ${newUser.name},\n\nActivez votre compte ici : ${verifyURL}\n\nCe lien expire dans 24h.`,
-            });
-
-            res.status(200).json({
-                status:  'success',
-                message: "Compte créé ! Vérifiez vos emails pour l'activer.",
-            });
-        } catch (err) {
-            newUser.emailVerificationToken   = undefined;
-            newUser.emailVerificationExpires = undefined;
-            await newUser.save({ validateBeforeSave: false });
-            console.error('❌ Erreur envoi email vérification:', err);
-            return res.status(500).json({
-                status:  'error',
-                message: "Erreur d'envoi d'email. Réessayez plus tard.",
-            });
-        }
-    } catch (error) {
-        console.error('❌ Erreur signup:', error);
-        res.status(500).json({ status: 'error', message: error.message });
-    }
-};
-
-// ======================================================
-// 2. VÉRIFICATION EMAIL
-// ======================================================
-exports.verifyEmail = async (req, res) => {
-    try {
-        const hashedToken = crypto
-            .createHash('sha256')
-            .update(req.params.token)
-            .digest('hex');
-
-        const user = await User.findOne({
-            emailVerificationToken:   hashedToken,
-            emailVerificationExpires: { $gt: Date.now() },
-        });
-
-        if (!user) {
-            return res.status(400).json({
-                status:  'fail',
-                message: 'Lien de vérification invalide ou expiré. Veuillez vous réinscrire ou demander un nouveau lien.',
-            });
-        }
-
-        user.isEmailVerified          = true;
-        user.emailVerificationToken   = undefined;
-        user.emailVerificationExpires = undefined;
-        if (!user.tokenVersion) user.tokenVersion = 0;
-
-        await user.save({ validateBeforeSave: false });
-
-        createSendToken(user, 200, res);
+        // Connecte automatiquement
+        createSendToken(newUser, 200, res);
     } catch (error) {
         console.error('❌ Erreur verifyEmail:', error);
         res.status(500).json({ status: 'error', message: error.message });
@@ -268,41 +315,42 @@ exports.verifyEmail = async (req, res) => {
 exports.resendVerificationEmail = async (req, res) => {
     try {
         const { email } = req.body;
-
         if (!email) {
             return res.status(400).json({ status: 'fail', message: 'Email requis.' });
         }
 
-        const user = await User.findOne({ email });
+        const normalizedEmail = email.toLowerCase().trim();
+        const pending = await PendingRegistration.findOne({ email: normalizedEmail });
 
-        if (!user) {
-            return res.status(200).json({
-                status:  'success',
-                message: 'Si cet email existe, un nouveau lien a été envoyé.',
+        if (!pending) {
+            return res.status(404).json({
+                status:  'fail',
+                message: 'Aucune inscription en attente pour cet email. Réinscrivez-vous.',
             });
         }
 
-        if (user.isEmailVerified) {
-            return res.status(400).json({ status: 'fail', message: 'Cet email est déjà vérifié.' });
-        }
+        // Régénère un nouveau token + reset expiresAt à +24h
+        const rawToken    = crypto.randomBytes(32).toString('hex');
+        const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-        const verificationToken = user.createEmailVerificationToken();
-        await user.save({ validateBeforeSave: false });
+        pending.verificationToken = hashedToken;
+        pending.expiresAt         = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await pending.save();
 
-        const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+        const verifyURL = `${process.env.FRONTEND_URL}/verify-email/${rawToken}`;
 
         await sendEmail({
-            email:     user.email,
+            email:     pending.email,
             subject:   "✅ Altitude Vision — Nouveau lien d'activation",
             type:      'verification',
-            name:      user.name,
+            name:      pending.name,
             verifyURL,
-            message:   `Bonjour ${user.name},\n\nVoici votre nouveau lien d'activation : ${verifyURL}\n\nCe lien expire dans 24h.`,
+            message:   `Bonjour ${pending.name},\n\nVoici votre nouveau lien d'activation : ${verifyURL}\n\nCe lien expire dans 24h.`,
         });
 
         res.status(200).json({
             status:  'success',
-            message: 'Un nouveau lien de vérification a été envoyé à votre adresse email.',
+            message: 'Un nouveau lien de vérification a été envoyé.',
         });
     } catch (error) {
         console.error('❌ Erreur resendVerification:', error);

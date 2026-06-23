@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   roleBadgeText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 12,
     fontWeight: '600',
   },

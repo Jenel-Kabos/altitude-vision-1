@@ -9,12 +9,13 @@ import {
     Loader2, AlertTriangle, CheckCircle, X, ArrowRight, ArrowLeft,
 } from 'lucide-react';
 import api from '../services/api';
+import { PROPERTY_TYPES } from '../constants/propertyTypes';
 
 const GOLD      = '#C8872A';
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
 
-const TYPES_BIENS   = ['Appartement', 'Maison', 'Villa', 'Terrain', 'Bureau', 'Commerce', 'Autre'];
+const TYPES_BIENS   = [...PROPERTY_TYPES, 'Autre'];
 const ETATS_BIEN    = ['Neuf', 'Très bon état', 'Bon état', 'À rénover'];
 const DISPONIBILITES= ['Immédiatement', 'Dans la semaine', 'Dans le mois', 'Flexible'];
 

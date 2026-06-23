@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
-import { getAllProperties, deleteProperty, updateProperty, addProperty } from "../../services/propertyService";
+import { getAllProperties, deleteProperty, updateProperty, addProperty, toggleRecommande } from "../../services/propertyService";
 import { useAuth } from '../../context/AuthContext';
 import {
   PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle,
@@ -30,7 +30,7 @@ const ManagePropertiesPage = () => {
   const emptyForm = {
     title: "", description: "", price: "", pole: "Altimmo", status: "vente",
     type: "Appartement", availability: "Disponible",
-    address: { street: "", district: "", city: "Brazzaville" },
+    address: { street: "", arrondissement: "", city: "Brazzaville" },
     surface: "", bedrooms: "", bathrooms: "", livingRooms: "",
     constructionType: "Béton armé", kitchens: "", amenities: "",
     latitude: -4.266, longitude: 15.283, images: [],
@@ -45,7 +45,7 @@ const ManagePropertiesPage = () => {
       ? properties.filter(p =>
           p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           p.address?.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.address?.district?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.address?.arrondissement?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           p.type?.toLowerCase().includes(searchTerm.toLowerCase())
         )
       : properties;
@@ -89,7 +89,7 @@ const ManagePropertiesPage = () => {
       status:           property.status           || "vente",
       type:             property.type             || "Appartement",
       availability:     property.availability     || "Disponible",
-      address:          property.address          || { street: "", district: "", city: "Brazzaville" },
+      address:          property.address          || { street: "", arrondissement: "", city: "Brazzaville" },
       surface:          property.surface          || "",
       bedrooms:         property.bedrooms         || "",
       bathrooms:        property.bathrooms        || "",
@@ -154,6 +154,19 @@ const ManagePropertiesPage = () => {
       showNotif(msg, "error");
     } finally {
       setSubmit(false);
+    }
+  };
+
+  const handleToggleRecommande = async (propertyId, currentValue) => {
+    try {
+      await toggleRecommande(propertyId, !currentValue);
+      setProperties(prev => prev.map(p =>
+        p._id === propertyId ? { ...p, recommande: !currentValue } : p
+      ));
+      showNotif(!currentValue ? "Bien marqué comme recommandé" : "Recommandation retirée");
+    } catch (err) {
+      const msg = err.response?.data?.message || "Erreur lors de la mise à jour du statut recommandé";
+      showNotif(msg, "error");
     }
   };
 
@@ -235,6 +248,19 @@ const ManagePropertiesPage = () => {
                 <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">+{property.amenities.length - 3}</span>
               )}
             </div>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => handleToggleRecommande(property._id, property.recommande)}
+              title={property.statusAdmin !== 'Validée' ? 'Pas encore validé — ne s\'affichera côté public qu\'une fois validé.' : ''}
+              className={`mb-3 px-3 py-1 rounded-full text-xs font-medium transition ${
+                property.recommande
+                  ? 'bg-amber-500 text-white hover:bg-amber-600'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              } ${property.statusAdmin !== 'Validée' ? 'opacity-70' : ''}`}
+            >
+              {property.recommande ? '★ Recommandé' : 'Recommander'}
+            </button>
           )}
           <div className="flex gap-2">
             {canEdit && (

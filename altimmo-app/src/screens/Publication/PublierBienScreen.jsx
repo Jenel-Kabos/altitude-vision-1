@@ -11,6 +11,8 @@ import * as Location from 'expo-location';
 import { colors, typography, spacing } from '../../theme';
 import Button from '../../components/ui/Button';
 import { uploadToCloudinary, creerAnnonce } from '../../services/annonceService';
+import { VILLES, getArrondissementsFor } from '../../constants/locations';
+import { PROPERTY_TYPES } from '../../constants/propertyTypes';
 
 const STEPS = [
   { id: 1, label: 'Info' },
@@ -32,14 +34,7 @@ const STEP_TITLES = [
   'Récapitulatif',
 ];
 
-const TYPES = [
-  { value: 'Appartement', icon: 'business-outline' },
-  { value: 'Villa',       icon: 'home-outline' },
-  { value: 'Terrain',     icon: 'leaf-outline' },
-  { value: 'Bureau',      icon: 'briefcase-outline' },
-  { value: 'Commerce',    icon: 'storefront-outline' },
-  { value: 'Studio',      icon: 'bed-outline' },
-];
+const TYPES = PROPERTY_TYPES;
 
 const TRANSACTIONS = [
   { value: 'Vente',    icon: 'cash-outline',     desc: 'Mettre en vente' },
@@ -67,7 +62,7 @@ const initialForm = {
   period: 'Mensuel',
   prix: '',
   ville: '',
-  quartier: '',
+  arrondissement: '',
   rue: '',
   surface: 0,
   chambres: 0,
@@ -125,7 +120,7 @@ export default function PublierBienScreen({ navigation }) {
     }
     if (n === 5) {
       if (!form.ville.trim()) e.ville = 'Ville requise';
-      if (!form.quartier.trim()) e.quartier = 'Quartier requis';
+      if (!form.arrondissement.trim()) e.arrondissement = 'Arrondissement requis';
     }
     if (n === 6) {
       if (!form.surface || form.surface <= 0) e.surface = 'Surface requise';
@@ -191,12 +186,23 @@ export default function PublierBienScreen({ navigation }) {
         const places = await Location.reverseGeocodeAsync(loc.coords);
         if (places[0]) {
           const p = places[0];
-          setForm(f => ({
-            ...f,
-            ville: f.ville || p.city || p.region || '',
-            quartier: f.quartier || p.district || p.subregion || '',
-            rue: f.rue || p.street || '',
-          }));
+          // Auto-fill ville/arrondissement seulement si la valeur correspond
+          // à un choix valide (sinon l'utilisateur devra sélectionner via chips).
+          // p.district ici est un champ de expo-location, sans rapport avec
+          // notre ancien champ Mongoose.
+          setForm(f => {
+            const ville = f.ville
+              || (VILLES.includes(p.city) ? p.city : '');
+            const arronds = getArrondissementsFor(ville);
+            const arr = f.arrondissement
+              || (arronds.includes(p.district) ? p.district : '');
+            return {
+              ...f,
+              ville,
+              arrondissement: arr,
+              rue: f.rue || p.street || '',
+            };
+          });
         }
       } catch {}
     } catch {
@@ -227,7 +233,7 @@ export default function PublierBienScreen({ navigation }) {
         superficie: form.surface || null,
         chambres: form.chambres || null,
         ville: form.ville.trim(),
-        quartier: form.quartier.trim(),
+        arrondissement: form.arrondissement.trim(),
         type: form.type,
         categorie: form.categorie,
         photos: working.map(p => p.url),
@@ -333,7 +339,7 @@ export default function PublierBienScreen({ navigation }) {
                     color={sel ? colors.primary : colors.textSecondary}
                   />
                   <Text style={[styles.typeLabel, sel && { color: colors.primary }]}>
-                    {t.value}
+                    {t.label}
                   </Text>
                 </TouchableOpacity>
               );
@@ -469,13 +475,69 @@ export default function PublierBienScreen({ navigation }) {
     }
 
     if (step === 5) {
+      const arrondsList = form.ville ? getArrondissementsFor(form.ville) : [];
+
+      const handleVilleSelect = (v) => {
+        setForm(f => ({
+          ...f,
+          ville: v,
+          arrondissement: getArrondissementsFor(v).includes(f.arrondissement)
+            ? f.arrondissement
+            : '',
+        }));
+      };
+
       return (
         <View>
           <Text style={styles.fieldLabel}>Ville</Text>
-          {renderTextInput('ville', { placeholder: 'Ex : Pointe-Noire' })}
-          <Text style={styles.fieldLabel}>Quartier / District</Text>
-          {renderTextInput('quartier', { placeholder: 'Ex : Mpita' })}
-          <Text style={styles.fieldLabel}>Rue (optionnel)</Text>
+          <View style={styles.chipsWrap}>
+            {VILLES.map(v => {
+              const sel = form.ville === v;
+              return (
+                <TouchableOpacity
+                  key={v}
+                  style={[styles.chip, sel && styles.chipSelected]}
+                  onPress={() => handleVilleSelect(v)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.chipText, sel && styles.chipTextSelected]}>
+                    {v}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {errors.ville ? <Text style={styles.errorText}>{errors.ville}</Text> : null}
+
+          {form.ville ? (
+            <>
+              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                Arrondissement
+              </Text>
+              <View style={styles.chipsWrap}>
+                {arrondsList.map(a => {
+                  const sel = form.arrondissement === a;
+                  return (
+                    <TouchableOpacity
+                      key={a}
+                      style={[styles.chip, sel && styles.chipSelected]}
+                      onPress={() => setField('arrondissement', a)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.chipText, sel && styles.chipTextSelected]}>
+                        {a}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {errors.arrondissement ? (
+                <Text style={styles.errorText}>{errors.arrondissement}</Text>
+              ) : null}
+            </>
+          ) : null}
+
+          <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Rue (optionnel)</Text>
           {renderTextInput('rue', { placeholder: 'Ex : 24 Rue Mfoa' })}
 
           <Button
@@ -556,7 +618,7 @@ export default function PublierBienScreen({ navigation }) {
           <RecapRow label="Type" value={form.type} />
           <RecapRow label="Transaction" value={form.categorie} />
           <RecapRow label="Ville" value={form.ville} />
-          <RecapRow label="Quartier" value={form.quartier} />
+          <RecapRow label="Arrondissement" value={form.arrondissement} />
           {form.rue ? <RecapRow label="Rue" value={form.rue} /> : null}
 
           <View style={styles.recapDivider} />
@@ -917,6 +979,11 @@ const styles = StyleSheet.create({
   },
   chipsRow: {
     flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  chipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   chip: {

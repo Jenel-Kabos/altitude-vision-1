@@ -24,7 +24,7 @@ const MODES = [
     desc: 'Paiement via votre compte Airtel',
     icon: 'phone-portrait-outline',
     bg: '#EF4444',
-    iconColor: '#FFFFFF',
+    iconColor: colors.white,
     channel: 'MOBILE_MONEY',
   },
   {
@@ -33,7 +33,7 @@ const MODES = [
     desc: 'Visa / Mastercard',
     icon: 'card-outline',
     bg: colors.info,
-    iconColor: '#FFFFFF',
+    iconColor: colors.white,
     channel: 'CREDIT_CARD',
   },
 ];

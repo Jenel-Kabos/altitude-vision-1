@@ -121,6 +121,11 @@ mongoose.connection.once('open', async () => {
 
 const app = express();
 
+// Trust Render / Cloudflare reverse-proxy pour que req.ip retourne
+// la vraie IP du client (et non celle du proxy) — requis par
+// express-rate-limit pour limiter par utilisateur et pas globalement
+app.set('trust proxy', 1);
+
 app.get('/sitemap.xml', async (req, res) => {
   const xml = await generateSitemap();
   res.header('Content-Type', 'application/xml');
@@ -289,6 +294,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 // 🏠 Pôle Altimmo
 app.use("/api/properties", propertyRoutes);
 app.use("/api/transactions", transactionRoutes);
+app.use('/api/publicites', require('./routes/publiciteRoutes'));
 
 // 🏘️ Gestion Locative
 app.use('/api/proprietaires',    proprietaireRoutes);

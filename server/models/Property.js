@@ -23,7 +23,14 @@ const propertySchema = new mongoose.Schema(
 
     type: {
       type: String,
-      required: [true, 'Veuillez spécifier le type de propriété (Appartement, Maison, etc.)'],
+      enum: {
+        values: [
+          'Appartement', 'Appartement meublé', 'Maison', 'Villa',
+          'Terrain', 'Bureau', 'Commerce', 'Studio', 'Entrepôt',
+        ],
+        message: 'Type de propriété invalide : {VALUE}. Valeurs acceptées : Appartement, Appartement meublé, Maison, Villa, Terrain, Bureau, Commerce, Studio, Entrepôt.',
+      },
+      required: [true, 'Veuillez spécifier le type de propriété'],
     },
 
     status: {
@@ -39,9 +46,9 @@ const propertySchema = new mongoose.Schema(
 
     address: {
       street: { type: String, trim: true, default: '' },
-      district: {
+      arrondissement: {
         type: String,
-        required: [true, 'Veuillez fournir le quartier (district)'],
+        required: [true, "Veuillez fournir l'arrondissement"],
         trim: true,
       },
       city: { type: String, default: 'Brazzaville', trim: true },
@@ -123,6 +130,7 @@ const propertySchema = new mongoose.Schema(
 
     isPublished: { type: Boolean, default: false },
     hasSpecialCommission: { type: Boolean, default: false },
+    recommande: { type: Boolean, default: false },
 
     /** 🔗 Propriétaire de la propriété */
     owner: {

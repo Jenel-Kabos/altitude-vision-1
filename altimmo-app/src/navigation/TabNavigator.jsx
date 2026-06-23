@@ -77,7 +77,11 @@ export default function TabNavigator() {
           tabBarIcon: ({ focused }) => (
             <View style={styles.iconWrap}>
               <View style={[styles.dot, focused && styles.dotActive]} />
-              <HouseIcon size={24} color={focused ? colors.gold : colors.textMuted} />
+              <HouseIcon
+                size={24}
+                color={focused ? colors.gold : colors.textMuted}
+                windowColor={colors.bg}
+              />
             </View>
           ),
           tabBarLabel: makeLabel('Annonces'),

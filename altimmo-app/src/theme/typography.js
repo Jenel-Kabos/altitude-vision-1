@@ -1,9 +1,15 @@
 export const fonts = {
-  display:      'Fraunces-Bold',
-  displayItalic:'Fraunces-Italic',
-  body:         'Inter-Regular',
-  bodyItalic:   'Inter-Italic',
-  bodyBold:     'Inter-Bold',
+  display:       'CormorantGaramond-Bold',
+  displaySemi:   'CormorantGaramond-SemiBold',
+  displayItalic: 'CormorantGaramond-Italic',
+  body:          'DMSans-Regular',
+  bodyMedium:    'DMSans-Medium',
+  bodyBold:      'DMSans-Bold',
+  bodyItalic:    'CormorantGaramond-Italic',
+  // note : DM Sans italique n'est pas chargé (cohérent avec le web
+  // qui n'a pas non plus d'italique DM Sans) — on réutilise
+  // Cormorant italique pour les cas où bodyItalic est utilisé
+  // (ex: " fcfa" dans PrixFCFA)
 };
 
 export const fontSize = {

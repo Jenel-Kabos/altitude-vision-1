@@ -9,7 +9,7 @@ const createPropertyMobile = async (req, res) => {
       superficie,
       chambres,
       ville,
-      quartier,
+      arrondissement,
       type,
       categorie,
       photos,
@@ -23,10 +23,10 @@ const createPropertyMobile = async (req, res) => {
         message: 'Au moins une photo requise',
       });
     }
-    if (!quartier) {
+    if (!arrondissement) {
       return res.status(400).json({
         status: 'error',
-        message: 'Quartier requis',
+        message: 'Arrondissement requis',
       });
     }
 
@@ -38,7 +38,7 @@ const createPropertyMobile = async (req, res) => {
       bedrooms: chambres || 0,
       address: {
         city: ville,
-        district: quartier,
+        arrondissement,
       },
       type,
       status:

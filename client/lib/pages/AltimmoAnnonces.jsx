@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { getAllProperties } from '../services/propertyService';
 import PropertyCard          from '../components/PropertyCard';
+import { PROPERTY_TYPES_WITH_ALL as TYPES_FILTRE } from '../constants/propertyTypes';
 
 // ─────────────────────────────────────────────────────────────
 // Constantes — valeurs alignées sur le modèle Property
@@ -21,9 +22,6 @@ const PROPERTIES_PER_PAGE = 12;
 
 // ✅ status enum BDD : 'vente' | 'location'
 const TRANSACTION_TYPES = ['Tous', 'vente', 'location'];
-
-// ✅ type = champ libre — liste des valeurs courantes
-const PROPERTY_TYPES = ['Tous', 'Appartement', 'Maison', 'Villa', 'Terrain', 'Bureau', 'Commerce'];
 
 // ✅ availability enum BDD : 'Disponible' | 'Vendu' | 'Loué'
 const AVAILABILITY_STATUS = ['Tous', 'Disponible', 'Vendu', 'Loué'];
@@ -126,7 +124,7 @@ const AltimmoAnnonces = () => {
         if (searchTerm.trim()) {
             const q = searchTerm.toLowerCase();
             f = f.filter(p =>
-                [p.title, p.description, p.address?.city, p.address?.district, p.address?.street, p.type]
+                [p.title, p.description, p.address?.city, p.address?.arrondissement, p.address?.street, p.type]
                     .filter(Boolean).join(' ').toLowerCase().includes(q)
             );
         }
@@ -333,7 +331,7 @@ const AltimmoAnnonces = () => {
                                                 className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none transition-all"
                                                 style={{ fontFamily: "'Outfit', sans-serif" }}
                                                 onFocus={inputFocus} onBlur={inputBlur}>
-                                                {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                                {TYPES_FILTRE.map(t => <option key={t} value={t}>{t}</option>)}
                                             </select>
                                         </div>
 

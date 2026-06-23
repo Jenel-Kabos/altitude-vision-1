@@ -2,15 +2,16 @@
 const express        = require('express');
 const router         = express.Router();
 const authController = require('../controllers/authController');
+const { signupLimiter, resendVerificationLimiter } = require('../middleware/rateLimiters');
 
 // ======================================================
 // 🔓 ROUTES PUBLIQUES
 // ======================================================
 
 // Inscription & vérification email
-router.post('/signup',               authController.signup);
+router.post('/signup',               signupLimiter,             authController.signup);
 router.get('/verify-email/:token',   authController.verifyEmail);
-router.post('/resend-verification',  authController.resendVerificationEmail);
+router.post('/resend-verification',  resendVerificationLimiter, authController.resendVerificationEmail);
 
 // Connexion
 router.post('/login',                authController.login);

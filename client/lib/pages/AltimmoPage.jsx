@@ -21,6 +21,7 @@ import EstimationForm  from '../components/EstimationForm';
 import { getLatestPropertiesByPole } from '../services/propertyService';
 import { getAltimmoReviews }         from '../services/reviewService';
 import { useAuth }                   from '../context/AuthContext';
+import { PROPERTY_TYPES_WITH_ALL }   from '../constants/propertyTypes';
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
@@ -32,7 +33,7 @@ const SERVICES = [
     { icon: TrendingUp, title: 'Conseil en Investissement', desc: 'Bénéficiez de notre expertise pour des investissements judicieux et performants.',   slug: 'conseil-investissement', color: GOLD,      stat: '+50 projets'    },
 ];
 
-const TYPES_BIENS  = ['Tous', 'Appartement', 'Maison', 'Villa', 'Terrain', 'Bureau', 'Commerce'];
+const TYPES_BIENS  = PROPERTY_TYPES_WITH_ALL;
 const TRANSACTIONS = [
     { label: 'Vente',    value: 'vente'    },
     { label: 'Location', value: 'location' },

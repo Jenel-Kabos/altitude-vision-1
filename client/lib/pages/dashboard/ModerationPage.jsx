@@ -252,7 +252,7 @@ const ModerationPage = () => {
                   <MapPin className="w-4 h-4 mr-2 mt-1 text-red-500 flex-shrink-0" />
                   <span>
                     <strong>Adresse :</strong><br />
-                    {selectedProperty.address?.street}, {selectedProperty.address?.district}, {selectedProperty.address?.city}
+                    {selectedProperty.address?.street}, {selectedProperty.address?.arrondissement}, {selectedProperty.address?.city}
                   </span>
                 </p>
               </div>

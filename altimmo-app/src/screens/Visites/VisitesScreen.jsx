@@ -96,9 +96,9 @@ export default function VisitesScreen() {
   const renderVisite = ({ item }) => {
     const bien = item.bien || item.property || {};
     const title = bien.title || bien.titre || 'Bien immobilier';
-    const district = bien.address?.district || bien.location?.neighborhood || '';
+    const arrondissement = bien.address?.arrondissement || bien.location?.neighborhood || '';
     const city = bien.address?.city || bien.location?.city || '';
-    const address = [district, city].filter(Boolean).join(', ');
+    const address = [arrondissement, city].filter(Boolean).join(', ');
     const image = bien.images?.[0] || bien.photos?.[0];
     const statut = (item.statut || 'en attente').toLowerCase();
     const statutColor = STATUT_COLOR[statut] || colors.warning;
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 11,
     fontWeight: '600',
   },

@@ -20,7 +20,7 @@ const AddPropertyPage = () => {
     status:           'vente',
     type:             'Appartement',
     availability:     'Disponible',
-    address:          { street: '', district: '', city: 'Brazzaville' },
+    address:          { street: '', arrondissement: '', city: 'Brazzaville' },
     surface:          '',
     bedrooms:         '',
     bathrooms:        '',

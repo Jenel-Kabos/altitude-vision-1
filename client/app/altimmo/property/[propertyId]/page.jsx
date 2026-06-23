@@ -37,7 +37,7 @@ export default async function Page({ params }) {
     const city = property.address?.city || 'Brazzaville';
     const addressParts = [
       property.address?.street,
-      property.address?.district,
+      property.address?.arrondissement,
       city,
     ].filter(Boolean);
 

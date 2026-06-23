@@ -20,6 +20,7 @@ import {
   generatePreavis, generateEtatDesLieux, envoyerDocument,
 } from "../../services/documentService";
 import { getAllProperties } from "../../services/propertyService";
+import { PROPERTY_TYPES } from "../../constants/propertyTypes";
 
 // ── Palette ──────────────────────────────────────────────────
 const BLUE   = '#2E7BB5';
@@ -30,7 +31,7 @@ const GRAY   = '#94A3B8';
 const FONT   = "'Outfit', sans-serif";
 
 const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-const BIEN_TYPES = ['Appartement','Maison','Villa','Terrain','Bureau','Commerce','Entrepôt','Studio'];
+const BIEN_TYPES = PROPERTY_TYPES;
 const BIEN_STATUTS_LOCATION = ['Disponible','Loué','En travaux','Réservé'];
 const BIEN_STATUTS_VENTE    = ['Disponible','Vendu','Réservé'];
 
