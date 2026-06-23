@@ -10,6 +10,7 @@ import api from '../../services/api';
 import { getRecommendedProperties } from '../../services/annonceService';
 import { getActivePublicites } from '../../services/publiciteService';
 import { PROPERTY_TYPES_WITH_ALL } from '../../constants/propertyTypes';
+import { AMENITIES } from '../../constants/amenities';
 import {
   Screen, Card, PrixFCFA, RecommendedCarousel, SearchPanel,
   GreetingBar, AdCarousel,
@@ -34,6 +35,11 @@ const DEFAULT_FILTERS = {
 };
 
 const QUICK_TYPES = PROPERTY_TYPES_WITH_ALL;
+
+const getAmenityIcon = (name) => {
+  const found = AMENITIES.find(a => a.value === name);
+  return found?.icon || 'checkmark-circle-outline';
+};
 
 export default function ListeAnnoncesScreen({ navigation, route }) {
   const filterOwner = route?.params?.filterOwner;
@@ -202,6 +208,7 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
               <View style={styles.amenitiesRow}>
                 {visibleAmenities.map((a, i) => (
                   <View key={i} style={styles.amenityChip}>
+                    <Ionicons name={getAmenityIcon(a)} size={11} color={colors.blue} />
                     <Text style={styles.amenityChipText}>{a}</Text>
                   </View>
                 ))}
@@ -630,6 +637,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   amenityChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: colors.blueMuted,
     borderRadius: radius.xs,
     paddingHorizontal: spacing.sm,
