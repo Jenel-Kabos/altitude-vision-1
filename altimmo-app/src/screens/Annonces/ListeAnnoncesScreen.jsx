@@ -124,6 +124,10 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
     const surface   = item.surface   || item.area || 0;
     const hasStats  = bedrooms > 0 || bathrooms > 0 || surface > 0;
 
+    const amenities = item.amenities || [];
+    const visibleAmenities = amenities.slice(0, 3);
+    const extraCount = amenities.length - 3;
+
     return (
       <TouchableOpacity
         onPress={() => navigation.navigate('DetailAnnonce', { annonce: item })}
@@ -189,6 +193,21 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
                 {surface > 0 && (
                   <View style={styles.statChip}>
                     <Text style={styles.statText}>{surface} m²</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {amenities.length > 0 && (
+              <View style={styles.amenitiesRow}>
+                {visibleAmenities.map((a, i) => (
+                  <View key={i} style={styles.amenityChip}>
+                    <Text style={styles.amenityChipText}>{a}</Text>
+                  </View>
+                ))}
+                {extraCount > 0 && (
+                  <View style={styles.amenityChipMore}>
+                    <Text style={styles.amenityChipMoreText}>+{extraCount}</Text>
                   </View>
                 )}
               </View>
@@ -601,6 +620,36 @@ const styles = StyleSheet.create({
     color: colors.gold,
     fontSize: fontSize.xs,
     fontFamily: fonts.body,
+  },
+
+  amenitiesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  amenityChip: {
+    backgroundColor: colors.blueMuted,
+    borderRadius: radius.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  amenityChipText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: colors.blue,
+  },
+  amenityChipMore: {
+    backgroundColor: colors.bgCardAlt,
+    borderRadius: radius.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  amenityChipMoreText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
   },
 
   location: {

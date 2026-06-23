@@ -32,7 +32,7 @@ const ManagePropertiesPage = () => {
     type: "Appartement", availability: "Disponible",
     address: { street: "", arrondissement: "", city: "Brazzaville" },
     surface: "", bedrooms: "", bathrooms: "", livingRooms: "",
-    constructionType: "Béton armé", kitchens: "", amenities: "",
+    constructionType: "Non spécifié", kitchens: "", amenities: "",
     latitude: -4.266, longitude: 15.283, images: [],
   };
   const [formData, setFormData]       = useState(emptyForm);
@@ -94,7 +94,7 @@ const ManagePropertiesPage = () => {
       bedrooms:         property.bedrooms         || "",
       bathrooms:        property.bathrooms        || "",
       livingRooms:      property.livingRooms      || "",
-      constructionType: property.constructionType || "Béton armé",
+      constructionType: property.constructionType || "Non spécifié",
       kitchens:         property.kitchens         || "",
       amenities:        Array.isArray(property.amenities) ? property.amenities.join(", ") : "",
       latitude:         property.location?.coordinates?.[1] || -4.266,

@@ -60,8 +60,9 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   const surface = annonce.surface || annonce.area || 0;
   const bedrooms = annonce.bedrooms || annonce.chambres || 0;
+  const bathrooms = annonce.bathrooms || 0;
   const livingRooms = annonce.livingRooms || 0;
-  const pieces = bedrooms + livingRooms;
+  const kitchens = annonce.kitchens || 0;
   const floor = annonce.floor || annonce.etage || 0;
 
   const commodites = annonce.amenities || annonce.commodites || [];
@@ -212,11 +213,13 @@ export default function DetailAnnonceScreen({ route, navigation }) {
           </View>
 
           {/* Features grid */}
-          {(surface > 0 || bedrooms > 0 || pieces > 0 || floor > 0) ? (
+          {(surface > 0 || bedrooms > 0 || bathrooms > 0 || livingRooms > 0 || kitchens > 0 || floor > 0) ? (
             <View style={styles.featuresGrid}>
               {surface > 0 && <FeatureCell icon="resize-outline" value={surface} label="m²" />}
               {bedrooms > 0 && <FeatureCell icon="bed-outline" value={bedrooms} label="Chambres" />}
-              {pieces > 0 && <FeatureCell icon="grid-outline" value={pieces} label="Pièces" />}
+              {bathrooms > 0 && <FeatureCell icon="water-outline" value={bathrooms} label="SDB" />}
+              {livingRooms > 0 && <FeatureCell icon="tv-outline" value={livingRooms} label="Salon" />}
+              {kitchens > 0 && <FeatureCell icon="restaurant-outline" value={kitchens} label="Cuisine" />}
               {floor > 0 && <FeatureCell icon="layers-outline" value={floor} label="Étage" />}
             </View>
           ) : null}

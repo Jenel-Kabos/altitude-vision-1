@@ -25,7 +25,7 @@ const AddPropertyPage = () => {
     bedrooms:         '',
     bathrooms:        '',
     livingRooms:      '',
-    constructionType: 'Béton armé',
+    constructionType: 'Non spécifié',
     kitchens:         '',
     amenities:        '',
     latitude:         -4.266,

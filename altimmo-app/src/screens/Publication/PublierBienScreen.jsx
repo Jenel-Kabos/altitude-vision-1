@@ -13,6 +13,7 @@ import Button from '../../components/ui/Button';
 import { uploadToCloudinary, creerAnnonce } from '../../services/annonceService';
 import { VILLES, getArrondissementsFor } from '../../constants/locations';
 import { PROPERTY_TYPES } from '../../constants/propertyTypes';
+import { AMENITIES } from '../../constants/amenities';
 
 const STEPS = [
   { id: 1, label: 'Info' },
@@ -43,16 +44,7 @@ const TRANSACTIONS = [
 
 const PERIODS = ['Mensuel', 'Annuel'];
 
-const COMMODITES = [
-  { value: 'Parking',         icon: 'car-outline' },
-  { value: 'Piscine',         icon: 'water-outline' },
-  { value: 'Gardien',         icon: 'shield-outline' },
-  { value: 'Électricité',     icon: 'flash-outline' },
-  { value: 'Eau courante',    icon: 'water' },
-  { value: 'Climatisation',   icon: 'snow-outline' },
-  { value: 'Internet',        icon: 'wifi-outline' },
-  { value: 'Sécurité',        icon: 'lock-closed-outline' },
-];
+const COMMODITES = AMENITIES;
 
 const initialForm = {
   titre: '',
@@ -66,7 +58,9 @@ const initialForm = {
   rue: '',
   surface: 0,
   chambres: 0,
-  pieces: 0,
+  bathrooms: 0,
+  livingRooms: 0,
+  kitchens: 0,
   etage: 0,
 };
 
@@ -232,11 +226,15 @@ export default function PublierBienScreen({ navigation }) {
         prix: Number(form.prix),
         superficie: form.surface || null,
         chambres: form.chambres || null,
+        bathrooms: form.bathrooms || null,
+        livingRooms: form.livingRooms || null,
+        kitchens: form.kitchens || null,
         ville: form.ville.trim(),
         arrondissement: form.arrondissement.trim(),
         type: form.type,
         categorie: form.categorie,
         photos: working.map(p => p.url),
+        amenities: commodites,
         latitude: coords?.lat,
         longitude: coords?.lng,
       });
@@ -562,7 +560,9 @@ export default function PublierBienScreen({ navigation }) {
         <View>
           {renderStepperField('surface', 'Surface', 'm²')}
           {renderStepperField('chambres', 'Chambres')}
-          {renderStepperField('pieces', 'Pièces de vie')}
+          {renderStepperField('bathrooms', 'Salles de bain')}
+          {renderStepperField('livingRooms', 'Salon')}
+          {renderStepperField('kitchens', 'Cuisine')}
           {renderStepperField('etage', 'Étage (optionnel)')}
 
           <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Commodités</Text>
@@ -625,7 +625,9 @@ export default function PublierBienScreen({ navigation }) {
 
           {form.surface > 0 && <RecapRow label="Surface" value={`${form.surface} m²`} />}
           {form.chambres > 0 && <RecapRow label="Chambres" value={String(form.chambres)} />}
-          {form.pieces > 0 && <RecapRow label="Pièces" value={String(form.pieces)} />}
+          {form.bathrooms > 0 && <RecapRow label="Salles de bain" value={String(form.bathrooms)} />}
+          {form.livingRooms > 0 && <RecapRow label="Salon" value={String(form.livingRooms)} />}
+          {form.kitchens > 0 && <RecapRow label="Cuisine" value={String(form.kitchens)} />}
           {form.etage > 0 && <RecapRow label="Étage" value={String(form.etage)} />}
 
           {commodites.length > 0 && (

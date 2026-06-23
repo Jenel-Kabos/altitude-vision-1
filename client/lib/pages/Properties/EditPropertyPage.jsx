@@ -29,6 +29,9 @@ const EditPropertyPage = () => {
     surface: '',
     bedrooms: '',
     bathrooms: '',
+    livingRooms: '',
+    kitchens: '',
+    constructionType: 'Non spécifié',
     amenities: '',
     latitude: -4.266,
     longitude: 15.283,
@@ -59,6 +62,9 @@ const EditPropertyPage = () => {
           surface: property.surface || '',
           bedrooms: property.bedrooms || '',
           bathrooms: property.bathrooms || '',
+          livingRooms: property.livingRooms || '',
+          kitchens: property.kitchens || '',
+          constructionType: property.constructionType || 'Non spécifié',
           amenities: property.amenities ? property.amenities.join(', ') : '',
           latitude: property.latitude || property.location?.coordinates[1] || -4.266,
           longitude: property.longitude || property.location?.coordinates[0] || 15.283,
@@ -262,6 +268,46 @@ const EditPropertyPage = () => {
                 onChange={handleChange}
                 className="w-full p-3 border rounded-lg"
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-2">Salon</label>
+              <input
+                type="number"
+                name="livingRooms"
+                value={formData.livingRooms || ''}
+                onChange={handleChange}
+                className="w-full p-3 border rounded-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Cuisine</label>
+              <input
+                type="number"
+                name="kitchens"
+                value={formData.kitchens || ''}
+                onChange={handleChange}
+                className="w-full p-3 border rounded-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Type de construction</label>
+              <select
+                name="constructionType"
+                value={formData.constructionType}
+                onChange={handleChange}
+                className="w-full p-3 border rounded-lg"
+              >
+                <option value="Non spécifié">Non spécifié</option>
+                <option value="Béton armé">Béton armé</option>
+                <option value="Briques/Parpaings">Briques/Parpaings</option>
+                <option value="Bois">Bois</option>
+                <option value="Autre">Autre</option>
+              </select>
             </div>
           </div>
 
