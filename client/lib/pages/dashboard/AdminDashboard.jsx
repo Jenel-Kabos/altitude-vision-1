@@ -38,11 +38,11 @@ const NAV_SECTIONS = [
   {
     label: 'Administration',
     links: [
-      { to: '/dashboard/users',            end: false, Icon: Users,         label: 'Utilisateurs',      accent: '#0D9488' },
-      { to: '/dashboard/active-sessions',  end: false, Icon: ShieldCheck,   label: 'Sessions Actives',  accent: '#DC2626' },
-      { to: '/dashboard/historique',       end: false, Icon: ClipboardList, label: 'Historique',        accent: '#7C3AED' },
-      { to: '/dashboard/export-marketing', end: false, Icon: BarChart2,     label: 'Export Marketing',  accent: GOLD },
-      { to: '/dashboard/litiges',          end: false, Icon: Scale,         label: 'Litiges',            accent: '#DC2626', badge: 'litiges' },
+      { to: '/dashboard/users',            end: false, Icon: Users,         label: 'Utilisateurs',      accent: '#0D9488', adminOnly: true },
+      { to: '/dashboard/active-sessions',  end: false, Icon: ShieldCheck,   label: 'Sessions Actives',  accent: '#DC2626', adminOnly: true },
+      { to: '/dashboard/historique',       end: false, Icon: ClipboardList, label: 'Historique',        accent: '#7C3AED', adminOnly: true },
+      { to: '/dashboard/export-marketing', end: false, Icon: BarChart2,     label: 'Export Marketing',  accent: GOLD,      adminOnly: true },
+      { to: '/dashboard/litiges',          end: false, Icon: Scale,         label: 'Litiges',            accent: '#DC2626', badge: 'litiges', adminOnly: true },
     ],
   },
   {
@@ -50,7 +50,7 @@ const NAV_SECTIONS = [
     links: [
       { to: '/dashboard/messages',   end: false, Icon: Mail,       label: 'Boîte de Réception', accent: GOLD },
       { to: '/dashboard/emails',     end: false, Icon: ShieldCheck, label: 'Gestion des Emails', accent: '#F59E0B' },
-      { to: '/dashboard/publicites', end: false, Icon: Megaphone,   label: 'Publicités',         accent: GOLD },
+      { to: '/dashboard/publicites', end: false, Icon: Megaphone,   label: 'Publicités',         accent: GOLD, adminOnly: true },
     ],
   },
 ];
@@ -153,7 +153,9 @@ const AdminDashboard = ({ children }) => {
                     {section.label}
                   </p>
                 )}
-                {section.links.map(({ to, end, Icon, label, accent, badge }) => (
+                {section.links
+                  .filter(link => !link.adminOnly || user?.role === 'Admin')
+                  .map(({ to, end, Icon, label, accent, badge }) => (
                   <Link key={to} href={to} onClick={close}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 ${
                       isActive(to, end)
