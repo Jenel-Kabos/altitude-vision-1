@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
   TouchableOpacity, Image, RefreshControl,
-  ScrollView,
+  ScrollView, Modal, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -36,9 +36,29 @@ const DEFAULT_FILTERS = {
 
 const QUICK_TYPES = PROPERTY_TYPES_WITH_ALL;
 
+const TENANT_PROFILES = ['Salarié', 'Étudiant', 'Indépendant/Affairiste', 'Fonctionnaire', 'Retraité'];
+const REQUIRED_DOCUMENTS = [
+  'CNI',
+  'Justificatif de revenus',
+  '2 derniers bulletins de salaire',
+  'Caution bancaire',
+  'Attestation de travail',
+  'Quittance de loyer précédente',
+];
+
 const getAmenityIcon = (name) => {
   const found = AMENITIES.find(a => a.value === name);
   return found?.icon || 'checkmark-circle-outline';
+};
+
+const getModerationStatus = (statusAdmin) => {
+  if (statusAdmin === 'Validée') {
+    return { label: 'Publié', tone: 'published' };
+  }
+  if (statusAdmin === 'Rejetée') {
+    return { label: 'Rejeté', tone: 'rejected' };
+  }
+  return { label: 'En cours de validation', tone: 'pending' };
 };
 
 export default function ListeAnnoncesScreen({ navigation, route }) {
@@ -53,6 +73,7 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState(DEFAULT_FILTERS);
+  const [leaseModal, setLeaseModal] = useState(null);
 
   // Biens recommandés — fetch au mount uniquement
   useEffect(() => {
@@ -91,6 +112,70 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
   const onRefresh = () => {
     setRefreshing(true);
     chargerAnnonces();
+  };
+
+  const isOwnerMode = !!filterOwner;
+
+  const ownerStats = useMemo(() => ({
+    total: annonces.length,
+    disponibles: annonces.filter(item => item.availability === 'Disponible').length,
+    occupes: annonces.filter(item => ['Loué', 'Vendu'].includes(item.availability)).length,
+    attente: annonces.filter(item => item.statusAdmin === 'En attente').length,
+  }), [annonces]);
+
+  const updatePropertyPatch = async (propertyId, payload) => {
+    const response = await api.put(`/properties/${propertyId}`, payload);
+    const updated = response.data?.data?.property || response.data?.property;
+    setAnnonces(prev => prev.map(item => item._id === propertyId ? updated : item));
+    return updated;
+  };
+
+  const handleToggleAvailability = async (item) => {
+    const isLocation = item.status?.toLowerCase() === 'location';
+    const availability = item.availability === 'Disponible'
+      ? (isLocation ? 'Loué' : 'Vendu')
+      : 'Disponible';
+
+    try {
+      await updatePropertyPatch(item._id, { availability });
+    } catch (error) {
+      Alert.alert('Erreur', error.response?.data?.message || 'Impossible de modifier la disponibilité.');
+    }
+  };
+
+  const openLeaseModal = (item) => {
+    setLeaseModal({
+      property: item,
+      cautionMultiplicateur: String(item.cautionMultiplicateur ?? 2),
+      profilsLocataireRecherches: item.profilsLocataireRecherches || [],
+      documentsRequis: item.documentsRequis || [],
+    });
+  };
+
+  const toggleLeaseValue = (field, value) => {
+    setLeaseModal(current => {
+      const values = current?.[field] || [];
+      return {
+        ...current,
+        [field]: values.includes(value)
+          ? values.filter(item => item !== value)
+          : [...values, value],
+      };
+    });
+  };
+
+  const saveLeaseTerms = async () => {
+    if (!leaseModal?.property?._id) return;
+    try {
+      await updatePropertyPatch(leaseModal.property._id, {
+        cautionMultiplicateur: Number(leaseModal.cautionMultiplicateur || 0),
+        profilsLocataireRecherches: leaseModal.profilsLocataireRecherches,
+        documentsRequis: leaseModal.documentsRequis,
+      });
+      setLeaseModal(null);
+    } catch (error) {
+      Alert.alert('Erreur', error.response?.data?.message || 'Impossible de modifier les conditions de bail.');
+    }
   };
 
   const annoncesFiltrées = annonces.filter((item) => {
@@ -133,6 +218,7 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
     const amenities = item.amenities || [];
     const visibleAmenities = amenities.slice(0, 3);
     const extraCount = amenities.length - 3;
+    const moderationStatus = getModerationStatus(item.statusAdmin);
 
     return (
       <TouchableOpacity
@@ -166,6 +252,29 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
               </Text>
             </View>
 
+            {isOwnerMode && (
+              <View style={[
+                styles.moderationBadge,
+                moderationStatus.tone === 'published' && styles.moderationBadgePublished,
+                moderationStatus.tone === 'rejected' && styles.moderationBadgeRejected,
+                moderationStatus.tone === 'pending' && styles.moderationBadgePending,
+              ]}>
+                <Ionicons
+                  name={moderationStatus.tone === 'published' ? 'checkmark-circle' : moderationStatus.tone === 'rejected' ? 'close-circle' : 'time-outline'}
+                  size={13}
+                  color={moderationStatus.tone === 'published' ? colors.success : moderationStatus.tone === 'rejected' ? colors.error : colors.warning}
+                />
+                <Text style={[
+                  styles.moderationBadgeText,
+                  moderationStatus.tone === 'published' && styles.moderationBadgeTextPublished,
+                  moderationStatus.tone === 'rejected' && styles.moderationBadgeTextRejected,
+                  moderationStatus.tone === 'pending' && styles.moderationBadgeTextPending,
+                ]}>
+                  {moderationStatus.label}
+                </Text>
+              </View>
+            )}
+
             {/* Prix superposé en bas-gauche, blanc lisible sur gradient */}
             <View style={styles.priceOverlay} pointerEvents="none">
               <PrixFCFA montant={item.price} variant="onImage" compact />
@@ -177,7 +286,7 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
               <Text style={styles.metaText}>
                 {(item.type || 'Bien').toUpperCase()}
               </Text>
-              <Text style={styles.metaText}>{reference}</Text>
+              <Text style={styles.metaText}>{isOwnerMode ? moderationStatus.label : reference}</Text>
             </View>
 
             <Text style={styles.title} numberOfLines={2}>
@@ -233,8 +342,46 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
               </>
             )}
 
+            {isOwnerMode && isLocation && (
+              <View style={styles.leaseBox}>
+                <Text style={styles.leaseTitle}>Conditions de bail</Text>
+                <Text style={styles.leaseText}>Caution : {item.cautionMultiplicateur ?? 2} mois</Text>
+                <Text style={styles.leaseText} numberOfLines={2}>
+                  Profils : {item.profilsLocataireRecherches?.length ? item.profilsLocataireRecherches.join(', ') : 'Non précisé'}
+                </Text>
+                <Text style={styles.leaseText} numberOfLines={2}>
+                  Documents : {item.documentsRequis?.length ? item.documentsRequis.join(', ') : 'Non précisé'}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.footer}>
-              <Text style={styles.cta}>Voir →</Text>
+              {isOwnerMode ? (
+                <View style={styles.ownerActions}>
+                  <TouchableOpacity
+                    style={[styles.ownerActionBtn, styles.ownerActionStatus]}
+                    onPress={() => handleToggleAvailability(item)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={15} color={colors.black} />
+                    <Text style={styles.ownerActionText}>
+                      {item.availability === 'Disponible' ? (isLocation ? 'Marquer occupé' : 'Marquer vendu') : 'Marquer disponible'}
+                    </Text>
+                  </TouchableOpacity>
+                  {isLocation && (
+                    <TouchableOpacity
+                      style={[styles.ownerActionBtn, styles.ownerActionLease]}
+                      onPress={() => openLeaseModal(item)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="document-text-outline" size={15} color={colors.blue} />
+                      <Text style={[styles.ownerActionText, { color: colors.blue }]}>Bail</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : (
+                <Text style={styles.cta}>Voir →</Text>
+              )}
             </View>
           </View>
         </Card>
@@ -253,10 +400,10 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
   const ListHeader = (
     <View>
       {/* ─── Greeting ─── */}
-      <GreetingBar onPressNotifications={() => {}} />
+      {!isOwnerMode && <GreetingBar onPressNotifications={() => {}} />}
 
       {/* ─── HERO : carrousel de pubs si disponibles, sinon fallback statique ─── */}
-      {pubs.length > 0 ? (
+      {!isOwnerMode && (pubs.length > 0 ? (
         <AdCarousel items={pubs} />
       ) : (
         <View style={styles.hero}>
@@ -273,9 +420,10 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
             Investir à Brazzaville en toute sérénité
           </Text>
         </View>
-      )}
+      ))}
 
       {/* ─── Bouton recherche (chevauche hero) ─── */}
+      {!isOwnerMode && (
       <View style={styles.searchZone}>
         <TouchableOpacity
           style={styles.searchBtn}
@@ -305,8 +453,10 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
           </View>
         )}
       </View>
+      )}
 
       {/* ─── Quick filters (chips rapides type de bien) ─── */}
+      {!isOwnerMode && (
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -341,9 +491,10 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
           );
         })}
       </ScrollView>
+      )}
 
       {/* ─── Carrousel recommandés ─── */}
-      {recommended.length > 0 && (
+      {!isOwnerMode && recommended.length > 0 && (
         <View style={styles.recoSection}>
           <Text style={styles.recoTitle}>Biens recommandés</Text>
           <RecommendedCarousel
@@ -356,28 +507,95 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
       )}
 
       {/* ─── Banner filterOwner ─── */}
-      {filterOwner ? (
-        <View style={styles.ownerBanner}>
-          <Text style={styles.ownerBannerText}>
-            Affichage : mes annonces uniquement
-          </Text>
-          <TouchableOpacity
-            onPress={() => navigation.setParams({ filterOwner: undefined })}
-            style={{ marginLeft: spacing.sm }}
-            hitSlop={8}
-          >
-            <Text style={styles.ownerBannerLink}>Voir tout</Text>
-          </TouchableOpacity>
+      {isOwnerMode ? (
+        <View style={styles.ownerPanel}>
+          <Text style={styles.ownerTitle}>Espace propriétaire</Text>
+          <Text style={styles.ownerSubtitle}>Gérez vos biens, leur disponibilité et les conditions de bail.</Text>
+          <View style={styles.ownerLegend}>
+            <View style={[styles.ownerLegendDot, styles.ownerLegendPending]} />
+            <Text style={styles.ownerLegendText}>Les nouveaux biens restent invisibles au public jusqu'à validation admin.</Text>
+          </View>
+          <View style={styles.ownerStatsGrid}>
+            <View style={styles.ownerStatCard}>
+              <Text style={styles.ownerStatValue}>{ownerStats.total}</Text>
+              <Text style={styles.ownerStatLabel}>Biens</Text>
+            </View>
+            <View style={styles.ownerStatCard}>
+              <Text style={styles.ownerStatValue}>{ownerStats.disponibles}</Text>
+              <Text style={styles.ownerStatLabel}>Disponibles</Text>
+            </View>
+            <View style={styles.ownerStatCard}>
+              <Text style={styles.ownerStatValue}>{ownerStats.occupes}</Text>
+              <Text style={styles.ownerStatLabel}>Occupés</Text>
+            </View>
+            <View style={styles.ownerStatCard}>
+              <Text style={styles.ownerStatValue}>{ownerStats.attente}</Text>
+              <Text style={styles.ownerStatLabel}>En attente</Text>
+            </View>
+          </View>
         </View>
       ) : null}
 
       {/* ─── Titre catalogue ─── */}
-      <Text style={styles.catalogTitle}>À découvrir</Text>
+      <Text style={styles.catalogTitle}>{isOwnerMode ? 'Mes biens publiés' : 'À découvrir'}</Text>
     </View>
   );
 
   return (
     <Screen>
+      {leaseModal && (
+        <Modal transparent animationType="slide" visible onRequestClose={() => setLeaseModal(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Conditions de bail</Text>
+              <Text style={styles.fieldMiniLabel}>Caution demandée</Text>
+              <View style={styles.cautionRow}>
+                {[0, 1, 2, 3, 4, 5, 6].map(value => {
+                  const selected = leaseModal.cautionMultiplicateur === String(value);
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      style={[styles.cautionChip, selected && styles.cautionChipSelected]}
+                      onPress={() => setLeaseModal(current => ({ ...current, cautionMultiplicateur: String(value) }))}
+                    >
+                      <Text style={[styles.cautionChipText, selected && styles.cautionChipTextSelected]}>{value}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.fieldMiniLabel}>Profils recherchés</Text>
+              <View style={styles.modalOptions}>
+                {TENANT_PROFILES.map(profile => (
+                  <TouchableOpacity key={profile} style={styles.optionRow} onPress={() => toggleLeaseValue('profilsLocataireRecherches', profile)}>
+                    <Ionicons name={leaseModal.profilsLocataireRecherches.includes(profile) ? 'checkbox' : 'square-outline'} size={20} color={colors.blue} />
+                    <Text style={styles.optionText}>{profile}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.fieldMiniLabel}>Documents requis</Text>
+              <View style={styles.modalOptions}>
+                {REQUIRED_DOCUMENTS.map(document => (
+                  <TouchableOpacity key={document} style={styles.optionRow} onPress={() => toggleLeaseValue('documentsRequis', document)}>
+                    <Ionicons name={leaseModal.documentsRequis.includes(document) ? 'checkbox' : 'square-outline'} size={20} color={colors.blue} />
+                    <Text style={styles.optionText}>{document}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalCancel} onPress={() => setLeaseModal(null)}>
+                  <Text style={styles.modalCancelText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalSave} onPress={saveLeaseTerms}>
+                  <Text style={styles.modalSaveText}>Enregistrer</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
       {erreur ? (
         <EmptyState
           icon="cloud-offline-outline"
@@ -589,6 +807,41 @@ const styles = StyleSheet.create({
   badgeTextLoc: {
     color: colors.blue,
   },
+  moderationBadge: {
+    position: 'absolute',
+    left: spacing.md,
+    top: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    maxWidth: '68%',
+  },
+  moderationBadgePublished: {
+    backgroundColor: '#DCFCE7',
+  },
+  moderationBadgeRejected: {
+    backgroundColor: '#FEE2E2',
+  },
+  moderationBadgePending: {
+    backgroundColor: '#FEF3C7',
+  },
+  moderationBadgeText: {
+    flexShrink: 1,
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+  },
+  moderationBadgeTextPublished: {
+    color: colors.success,
+  },
+  moderationBadgeTextRejected: {
+    color: colors.error,
+  },
+  moderationBadgeTextPending: {
+    color: colors.warning,
+  },
 
   body: {
     padding: spacing.md,
@@ -694,5 +947,205 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     letterSpacing: 1,
     textTransform: 'uppercase',
+  },
+
+  ownerPanel: {
+    margin: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.bgCard,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  ownerTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.xl,
+    color: colors.text,
+  },
+  ownerSubtitle: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
+  ownerLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    backgroundColor: '#FEF3C7',
+  },
+  ownerLegendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  ownerLegendPending: {
+    backgroundColor: colors.warning,
+  },
+  ownerLegendText: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: colors.textSub,
+  },
+  ownerStatsGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  ownerStatCard: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderRadius: radius.sm,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  ownerStatValue: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.lg,
+    color: colors.blue,
+  },
+  ownerStatLabel: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: colors.textMuted,
+  },
+  leaseBox: {
+    backgroundColor: colors.blueMuted,
+    borderRadius: radius.sm,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  leaseTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.xs,
+    color: colors.blue,
+    marginBottom: 4,
+  },
+  leaseText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: colors.textSub,
+  },
+  ownerActions: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  ownerActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    borderRadius: radius.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
+  ownerActionStatus: {
+    flex: 1,
+    backgroundColor: colors.gold,
+  },
+  ownerActionLease: {
+    backgroundColor: colors.blueMuted,
+  },
+  ownerActionText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.xs,
+    color: colors.black,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  modalCard: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.lg,
+    maxHeight: '88%',
+  },
+  modalTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.xl,
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  fieldMiniLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  cautionRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  cautionChip: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cautionChipSelected: {
+    backgroundColor: colors.blue,
+    borderColor: colors.blue,
+  },
+  cautionChipText: {
+    fontFamily: fonts.bodyBold,
+    color: colors.textSub,
+  },
+  cautionChipTextSelected: {
+    color: colors.white,
+  },
+  modalOptions: {
+    gap: spacing.xs,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 5,
+  },
+  optionText: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.textSub,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  modalCancel: {
+    flex: 1,
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.sm,
+    backgroundColor: colors.bgCardAlt,
+  },
+  modalCancelText: {
+    fontFamily: fonts.bodyBold,
+    color: colors.textSub,
+  },
+  modalSave: {
+    flex: 1,
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.sm,
+    backgroundColor: colors.blue,
+  },
+  modalSaveText: {
+    fontFamily: fonts.bodyBold,
+    color: colors.white,
   },
 });

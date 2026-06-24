@@ -43,6 +43,15 @@ const TRANSACTIONS = [
 ];
 
 const PERIODS = ['Mensuel', 'Annuel'];
+const TENANT_PROFILES = ['Salarié', 'Étudiant', 'Indépendant/Affairiste', 'Fonctionnaire', 'Retraité'];
+const REQUIRED_DOCUMENTS = [
+  'CNI',
+  'Justificatif de revenus',
+  '2 derniers bulletins de salaire',
+  'Caution bancaire',
+  'Attestation de travail',
+  'Quittance de loyer précédente',
+];
 
 const COMMODITES = AMENITIES;
 
@@ -62,6 +71,9 @@ const initialForm = {
   livingRooms: 0,
   kitchens: 0,
   etage: 0,
+  cautionMultiplicateur: 2,
+  profilsLocataireRecherches: [],
+  documentsRequis: [],
 };
 
 export default function PublierBienScreen({ navigation }) {
@@ -92,6 +104,16 @@ export default function PublierBienScreen({ navigation }) {
     setForm(f => ({ ...f, [k]: Math.max(0, (Number(f[k]) || 0) + delta) }));
   const toggleCommodite = (v) =>
     setCommodites(arr => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
+  const toggleFormArray = (field, value) =>
+    setForm(current => {
+      const values = current[field] || [];
+      return {
+        ...current,
+        [field]: values.includes(value)
+          ? values.filter(item => item !== value)
+          : [...values, value],
+      };
+    });
 
   // ─── Validation par étape ───────────────────────────────────
   const validateStep = (n) => {
@@ -237,11 +259,14 @@ export default function PublierBienScreen({ navigation }) {
         amenities: commodites,
         latitude: coords?.lat,
         longitude: coords?.lng,
+        cautionMultiplicateur: form.categorie === 'Location' ? form.cautionMultiplicateur : undefined,
+        profilsLocataireRecherches: form.categorie === 'Location' ? form.profilsLocataireRecherches : [],
+        documentsRequis: form.categorie === 'Location' ? form.documentsRequis : [],
       });
 
       Alert.alert(
-        '✅ Publié !',
-        'Votre annonce est en ligne.',
+        'Annonce envoyée',
+        "Votre bien est en cours de validation par l'administrateur. Il sera publié après validation.",
         [{ text: 'OK', onPress: () => navigation.goBack() }],
       );
     } catch (err) {
@@ -466,6 +491,65 @@ export default function PublierBienScreen({ navigation }) {
                   );
                 })}
               </View>
+
+              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Caution demandée</Text>
+              <View style={styles.chipsRow}>
+                {[0, 1, 2, 3, 4, 5, 6].map(value => {
+                  const sel = Number(form.cautionMultiplicateur) === value;
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      style={[styles.chip, sel && styles.chipSelected]}
+                      onPress={() => setField('cautionMultiplicateur', value)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.chipText, sel && styles.chipTextSelected]}>
+                        {value} mois
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Profils recherchés</Text>
+              <View style={styles.commoditesGrid}>
+                {TENANT_PROFILES.map(profile => {
+                  const checked = form.profilsLocataireRecherches.includes(profile);
+                  return (
+                    <TouchableOpacity
+                      key={profile}
+                      style={styles.commoditeRow}
+                      onPress={() => toggleFormArray('profilsLocataireRecherches', profile)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                        {checked && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                      </View>
+                      <Text style={styles.commoditeText}>{profile}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Documents requis</Text>
+              <View style={styles.commoditesGrid}>
+                {REQUIRED_DOCUMENTS.map(document => {
+                  const checked = form.documentsRequis.includes(document);
+                  return (
+                    <TouchableOpacity
+                      key={document}
+                      style={styles.commoditeRow}
+                      onPress={() => toggleFormArray('documentsRequis', document)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                        {checked && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                      </View>
+                      <Text style={styles.commoditeText}>{document}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
           )}
         </View>
@@ -617,6 +701,13 @@ export default function PublierBienScreen({ navigation }) {
 
           <RecapRow label="Type" value={form.type} />
           <RecapRow label="Transaction" value={form.categorie} />
+          {isLocation && <RecapRow label="Caution" value={`${form.cautionMultiplicateur} mois`} />}
+          {isLocation && form.profilsLocataireRecherches.length > 0 && (
+            <RecapRow label="Profils" value={form.profilsLocataireRecherches.join(', ')} />
+          )}
+          {isLocation && form.documentsRequis.length > 0 && (
+            <RecapRow label="Documents" value={form.documentsRequis.join(', ')} />
+          )}
           <RecapRow label="Ville" value={form.ville} />
           <RecapRow label="Arrondissement" value={form.arrondissement} />
           {form.rue ? <RecapRow label="Rue" value={form.rue} /> : null}

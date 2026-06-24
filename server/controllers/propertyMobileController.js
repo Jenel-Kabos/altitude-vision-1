@@ -19,6 +19,9 @@ const createPropertyMobile = async (req, res) => {
       amenities,
       latitude,
       longitude,
+      cautionMultiplicateur,
+      profilsLocataireRecherches,
+      documentsRequis,
     } = req.body;
 
     if (!photos || photos.length === 0) {
@@ -44,6 +47,9 @@ const createPropertyMobile = async (req, res) => {
       livingRooms: livingRooms || 0,
       kitchens: kitchens || 0,
       amenities: Array.isArray(amenities) ? amenities : [],
+      cautionMultiplicateur: cautionMultiplicateur !== undefined ? Number(cautionMultiplicateur) : 2,
+      profilsLocataireRecherches: Array.isArray(profilsLocataireRecherches) ? profilsLocataireRecherches : [],
+      documentsRequis: Array.isArray(documentsRequis) ? documentsRequis : [],
       address: {
         city: ville,
         arrondissement,
@@ -53,6 +59,7 @@ const createPropertyMobile = async (req, res) => {
         typeof categorie === 'string' ? categorie.toLowerCase() : categorie,
       images: photos,
       pole: 'Altimmo',
+      statusAdmin: 'En attente',
       owner: req.user.id,
       latitude: latitude || -4.2661,
       longitude: longitude || 15.2832,
