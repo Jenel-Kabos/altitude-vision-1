@@ -11,6 +11,7 @@ import * as Location from 'expo-location';
 import { colors, typography, spacing } from '../../theme';
 import Button from '../../components/ui/Button';
 import { uploadToCloudinary, creerAnnonce } from '../../services/annonceService';
+import api from '../../services/api';
 import { VILLES, getArrondissementsFor } from '../../constants/locations';
 import { PROPERTY_TYPES } from '../../constants/propertyTypes';
 import { AMENITIES } from '../../constants/amenities';
@@ -76,7 +77,9 @@ const initialForm = {
   documentsRequis: [],
 };
 
-export default function PublierBienScreen({ navigation }) {
+export default function PublierBienScreen({ navigation, route }) {
+  const editProperty = route?.params?.editProperty || null;
+  const isEditing = !!editProperty?._id;
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(initialForm);
   const [photos, setPhotos] = useState([]);
@@ -89,6 +92,44 @@ export default function PublierBienScreen({ navigation }) {
 
   const scrollRef = useRef(null);
   const progressAnim = useRef(new Animated.Value(1 / STEPS.length)).current;
+
+  useEffect(() => {
+    if (!editProperty) {
+      setForm(initialForm);
+      setPhotos([]);
+      setCommodites([]);
+      setCoords(null);
+      setStep(1);
+      return;
+    }
+
+    setForm({
+      titre: editProperty.title || editProperty.titre || '',
+      description: editProperty.description || '',
+      type: editProperty.type || '',
+      categorie: editProperty.status === 'location' ? 'Location' : 'Vente',
+      period: 'Mensuel',
+      prix: String(editProperty.price || editProperty.prix || ''),
+      ville: editProperty.address?.city || 'Brazzaville',
+      arrondissement: editProperty.address?.arrondissement || '',
+      rue: editProperty.address?.street || '',
+      surface: editProperty.surface || 0,
+      chambres: editProperty.bedrooms || editProperty.chambres || 0,
+      bathrooms: editProperty.bathrooms || 0,
+      livingRooms: editProperty.livingRooms || 0,
+      kitchens: editProperty.kitchens || 0,
+      etage: editProperty.floor || editProperty.etage || 0,
+      cautionMultiplicateur: editProperty.cautionMultiplicateur ?? 2,
+      profilsLocataireRecherches: editProperty.profilsLocataireRecherches || [],
+      documentsRequis: editProperty.documentsRequis || [],
+    });
+    setPhotos((editProperty.images || editProperty.photos || []).map(url => ({ uri: url, url, uploading: false, existing: true })));
+    setCommodites(editProperty.amenities || []);
+    setCoords(editProperty.latitude && editProperty.longitude
+      ? { lat: editProperty.latitude, lng: editProperty.longitude }
+      : null);
+    setStep(1);
+  }, [editProperty?._id]);
 
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -242,7 +283,7 @@ export default function PublierBienScreen({ navigation }) {
         setPhotos([...working]);
       }
 
-      await creerAnnonce({
+      const payload = {
         titre: form.titre.trim(),
         description: form.description.trim(),
         prix: Number(form.prix),
@@ -262,11 +303,42 @@ export default function PublierBienScreen({ navigation }) {
         cautionMultiplicateur: form.categorie === 'Location' ? form.cautionMultiplicateur : undefined,
         profilsLocataireRecherches: form.categorie === 'Location' ? form.profilsLocataireRecherches : [],
         documentsRequis: form.categorie === 'Location' ? form.documentsRequis : [],
-      });
+      };
+
+      if (isEditing) {
+        await api.put(`/properties/${editProperty._id}`, {
+          title: payload.titre,
+          description: payload.description,
+          price: payload.prix,
+          surface: payload.superficie,
+          bedrooms: payload.chambres || 0,
+          bathrooms: payload.bathrooms || 0,
+          livingRooms: payload.livingRooms || 0,
+          kitchens: payload.kitchens || 0,
+          amenities: payload.amenities,
+          address: {
+            city: payload.ville,
+            arrondissement: payload.arrondissement,
+            street: form.rue || '',
+          },
+          type: payload.type,
+          status: typeof payload.categorie === 'string' ? payload.categorie.toLowerCase() : payload.categorie,
+          latitude: payload.latitude ?? -4.2661,
+          longitude: payload.longitude ?? 15.2832,
+          existingImages: working.map(p => p.url).filter(Boolean),
+          cautionMultiplicateur: payload.cautionMultiplicateur,
+          profilsLocataireRecherches: payload.profilsLocataireRecherches,
+          documentsRequis: payload.documentsRequis,
+        });
+      } else {
+        await creerAnnonce(payload);
+      }
 
       Alert.alert(
-        'Annonce envoyée',
-        "Votre bien est en cours de validation par l'administrateur. Il sera publié après validation.",
+        isEditing ? 'Publication modifiée' : 'Annonce envoyée',
+        isEditing
+          ? "Votre publication a été mise à jour."
+          : "Votre bien est en cours de validation par l'administrateur. Il sera publié après validation.",
         [{ text: 'OK', onPress: () => navigation.goBack() }],
       );
     } catch (err) {
@@ -762,7 +834,7 @@ export default function PublierBienScreen({ navigation }) {
             <Ionicons name="close-outline" size={22} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {STEP_TITLES[step - 1]}
+            {isEditing ? `Modifier · ${STEP_TITLES[step - 1]}` : STEP_TITLES[step - 1]}
           </Text>
           <Text style={styles.headerStep}>{step}/{STEPS.length}</Text>
         </View>
@@ -840,7 +912,7 @@ export default function PublierBienScreen({ navigation }) {
           <View style={{ width: spacing.md }} />
           <View style={{ flex: 2 }}>
             <Button
-              label={isLastStep ? 'Publier' : 'Suivant'}
+              label={isLastStep ? (isEditing ? 'Enregistrer' : 'Publier') : 'Suivant'}
               variant="primary"
               fullWidth
               loading={submitting}

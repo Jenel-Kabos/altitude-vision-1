@@ -118,9 +118,11 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
 
   const ownerStats = useMemo(() => ({
     total: annonces.length,
+    publies: annonces.filter(item => item.statusAdmin === 'Validée').length,
+    attente: annonces.filter(item => item.statusAdmin === 'En attente').length,
+    rejetes: annonces.filter(item => item.statusAdmin === 'Rejetée').length,
     disponibles: annonces.filter(item => item.availability === 'Disponible').length,
     occupes: annonces.filter(item => ['Loué', 'Vendu'].includes(item.availability)).length,
-    attente: annonces.filter(item => item.statusAdmin === 'En attente').length,
   }), [annonces]);
 
   const updatePropertyPatch = async (propertyId, payload) => {
@@ -141,6 +143,32 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
     } catch (error) {
       Alert.alert('Erreur', error.response?.data?.message || 'Impossible de modifier la disponibilité.');
     }
+  };
+
+  const handleEditPublication = (item) => {
+    navigation.navigate('Publier', { editProperty: item });
+  };
+
+  const handleDeletePublication = (item) => {
+    Alert.alert(
+      'Supprimer la publication',
+      `Voulez-vous vraiment supprimer "${item.title || 'ce bien'}" ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/properties/${item._id}`);
+              setAnnonces(prev => prev.filter(property => property._id !== item._id));
+            } catch (error) {
+              Alert.alert('Erreur', error.response?.data?.message || 'Impossible de supprimer cette publication.');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const openLeaseModal = (item) => {
@@ -368,6 +396,14 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
                       {item.availability === 'Disponible' ? (isLocation ? 'Marquer occupé' : 'Marquer vendu') : 'Marquer disponible'}
                     </Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.ownerActionBtn, styles.ownerActionEdit]}
+                    onPress={() => handleEditPublication(item)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="create-outline" size={15} color={colors.blue} />
+                    <Text style={[styles.ownerActionText, { color: colors.blue }]}>Modifier</Text>
+                  </TouchableOpacity>
                   {isLocation && (
                     <TouchableOpacity
                       style={[styles.ownerActionBtn, styles.ownerActionLease]}
@@ -378,6 +414,13 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
                       <Text style={[styles.ownerActionText, { color: colors.blue }]}>Bail</Text>
                     </TouchableOpacity>
                   )}
+                  <TouchableOpacity
+                    style={[styles.ownerActionBtn, styles.ownerActionDelete]}
+                    onPress={() => handleDeletePublication(item)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="trash-outline" size={15} color={colors.error} />
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <Text style={styles.cta}>Voir →</Text>
@@ -508,32 +551,45 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
 
       {/* ─── Banner filterOwner ─── */}
       {isOwnerMode ? (
-        <View style={styles.ownerPanel}>
-          <Text style={styles.ownerTitle}>Espace propriétaire</Text>
-          <Text style={styles.ownerSubtitle}>Gérez vos biens, leur disponibilité et les conditions de bail.</Text>
+        <LinearGradient
+          colors={[colors.black, '#123B5E']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.ownerPanel}
+        >
+          <View style={styles.ownerPanelHeader}>
+            <View>
+              <Text style={styles.ownerEyebrow}>Portfolio immobilier</Text>
+              <Text style={styles.ownerTitle}>Espace propriétaire</Text>
+            </View>
+            <View style={styles.ownerTotalBadge}>
+              <Text style={styles.ownerTotalValue}>{ownerStats.total}</Text>
+              <Text style={styles.ownerTotalLabel}>biens</Text>
+            </View>
+          </View>
+          <Text style={styles.ownerSubtitle}>Suivez la validation, la disponibilité et les conditions de bail de vos publications.</Text>
+          <View style={styles.ownerStatsGrid}>
+            <View style={styles.ownerStatCard}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={styles.ownerStatValue}>{ownerStats.publies}</Text>
+              <Text style={styles.ownerStatLabel}>Publiés</Text>
+            </View>
+            <View style={styles.ownerStatCard}>
+              <Ionicons name="time-outline" size={18} color={colors.warning} />
+              <Text style={styles.ownerStatValue}>{ownerStats.attente}</Text>
+              <Text style={styles.ownerStatLabel}>Validation</Text>
+            </View>
+            <View style={styles.ownerStatCard}>
+              <Ionicons name="close-circle" size={18} color={colors.error} />
+              <Text style={styles.ownerStatValue}>{ownerStats.rejetes}</Text>
+              <Text style={styles.ownerStatLabel}>Rejetés</Text>
+            </View>
+          </View>
           <View style={styles.ownerLegend}>
             <View style={[styles.ownerLegendDot, styles.ownerLegendPending]} />
             <Text style={styles.ownerLegendText}>Les nouveaux biens restent invisibles au public jusqu'à validation admin.</Text>
           </View>
-          <View style={styles.ownerStatsGrid}>
-            <View style={styles.ownerStatCard}>
-              <Text style={styles.ownerStatValue}>{ownerStats.total}</Text>
-              <Text style={styles.ownerStatLabel}>Biens</Text>
-            </View>
-            <View style={styles.ownerStatCard}>
-              <Text style={styles.ownerStatValue}>{ownerStats.disponibles}</Text>
-              <Text style={styles.ownerStatLabel}>Disponibles</Text>
-            </View>
-            <View style={styles.ownerStatCard}>
-              <Text style={styles.ownerStatValue}>{ownerStats.occupes}</Text>
-              <Text style={styles.ownerStatLabel}>Occupés</Text>
-            </View>
-            <View style={styles.ownerStatCard}>
-              <Text style={styles.ownerStatValue}>{ownerStats.attente}</Text>
-              <Text style={styles.ownerStatLabel}>En attente</Text>
-            </View>
-          </View>
-        </View>
+        </LinearGradient>
       ) : null}
 
       {/* ─── Titre catalogue ─── */}
@@ -952,21 +1008,54 @@ const styles = StyleSheet.create({
   ownerPanel: {
     margin: spacing.md,
     padding: spacing.md,
-    backgroundColor: colors.bgCard,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+  },
+  ownerPanelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+  },
+  ownerEyebrow: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.xs,
+    color: colors.gold,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   ownerTitle: {
     fontFamily: fonts.display,
-    fontSize: fontSize.xl,
-    color: colors.text,
+    fontSize: fontSize.xxl || 28,
+    color: colors.white,
+    marginTop: 2,
   },
   ownerSubtitle: {
     fontFamily: fonts.body,
     fontSize: fontSize.sm,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
+    color: 'rgba(255,255,255,0.72)',
+    marginTop: spacing.sm,
+    lineHeight: 19,
+  },
+  ownerTotalBadge: {
+    minWidth: 64,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  ownerTotalValue: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.xl,
+    color: colors.white,
+  },
+  ownerTotalLabel: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: 'rgba(255,255,255,0.68)',
   },
   ownerLegend: {
     flexDirection: 'row',
@@ -975,7 +1064,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     padding: spacing.sm,
     borderRadius: radius.sm,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   ownerLegendDot: {
     width: 8,
@@ -989,7 +1078,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: fonts.body,
     fontSize: fontSize.xs,
-    color: colors.textSub,
+    color: 'rgba(255,255,255,0.76)',
   },
   ownerStatsGrid: {
     flexDirection: 'row',
@@ -998,21 +1087,22 @@ const styles = StyleSheet.create({
   },
   ownerStatCard: {
     flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: radius.sm,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.md,
     padding: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   ownerStatValue: {
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.lg,
-    color: colors.blue,
+    color: colors.white,
+    marginTop: 4,
   },
   ownerStatLabel: {
     fontFamily: fonts.body,
     fontSize: fontSize.xs,
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.7)',
   },
   leaseBox: {
     backgroundColor: colors.blueMuted,
@@ -1049,8 +1139,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.gold,
   },
+  ownerActionEdit: {
+    backgroundColor: colors.blueMuted,
+  },
   ownerActionLease: {
     backgroundColor: colors.blueMuted,
+  },
+  ownerActionDelete: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: spacing.sm,
   },
   ownerActionText: {
     fontFamily: fonts.bodyBold,
