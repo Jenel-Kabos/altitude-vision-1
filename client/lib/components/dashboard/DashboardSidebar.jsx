@@ -19,7 +19,6 @@ import {
   Key,
   ClipboardList,
   BarChart2,
-  Megaphone,
 } from "lucide-react";
 import { useAuth } from '../../context/AuthContext';
 
@@ -127,16 +126,6 @@ const DashboardSidebar = () => {
             <MessageSquare className="w-5 h-5" />
             <span>Messagerie Interne</span>
           </Link>
-
-          {user?.role === 'Admin' && (
-            <Link
-              href="/dashboard/publicites"
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition font-medium ${activeClass('/dashboard/publicites')}`}
-            >
-              <Megaphone className="w-5 h-5" />
-              <span>Publicités</span>
-            </Link>
-          )}
         </div>
 
         {/* Section Administration */}
