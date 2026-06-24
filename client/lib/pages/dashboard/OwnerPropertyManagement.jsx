@@ -5,7 +5,7 @@ import { toast } from "react-hot-toast";
 import { useAuth } from '../../context/AuthContext';
 import {
   Building2, Plus, Edit2, Trash2, MapPin, Maximize2, Bed, Bath,
-  Loader2, AlertCircle, Home, X,
+  Loader2, AlertCircle, Home, X, CheckCircle2, Clock3, FileText,
 } from "lucide-react";
 import {
   getMyProperties, createProperty, updateProperty,
@@ -37,6 +37,8 @@ const emptyForm = () => ({
   status:'vente', availability:'Disponible', type:'Appartement',
   address:{ street:'', arrondissement:'', city:'Brazzaville' },
   surface:'', bedrooms:'', bathrooms:'', amenities:'',
+  livingRooms:'', kitchens:'', constructionType:'Non spécifié',
+  cautionMultiplicateur:2, profilsLocataireRecherches:[], documentsRequis:[],
   latitude:-4.266, longitude:15.283, images:[],
 });
 
@@ -63,6 +65,8 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
             city:           p.address?.city           || 'Brazzaville',
           },
           amenities: p.amenities?.join(', ') || '',
+          profilsLocataireRecherches: p.profilsLocataireRecherches || [],
+          documentsRequis: p.documentsRequis || [],
           latitude:  p.location?.coordinates[1] || -4.266,
           longitude: p.location?.coordinates[0] || 15.283,
           images: [],
@@ -88,7 +92,7 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
       // location (objet), updatedAt, etc. qui provoquent une erreur 500.
       const ALLOWED = ['title','description','price','pole','status','availability',
                        'type','surface','bedrooms','bathrooms','livingRooms','kitchens',
-                       'constructionType','latitude','longitude'];
+                       'constructionType','cautionMultiplicateur','latitude','longitude'];
       ALLOWED.forEach(k => {
         const v = formData[k];
         if (v !== '' && v !== undefined && v !== null) fd.append(k, v);
@@ -100,6 +104,8 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
 
       const amenities = formData.amenities || '';
       amenities.split(',').map(a => a.trim()).filter(Boolean).forEach(a => fd.append("amenities", a));
+      fd.append("profilsLocataireRecherches", JSON.stringify(formData.profilsLocataireRecherches || []));
+      fd.append("documentsRequis", JSON.stringify(formData.documentsRequis || []));
 
       fd.append("location", JSON.stringify({ type:"Point", coordinates:[formData.longitude, formData.latitude] }));
 
@@ -154,10 +160,16 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
 // ─────────────────────────────────────────────────────────────
 const ALTIMMO_FALLBACK = 'https://placehold.co/600x400/2E7BB5/FFFFFF?text=Altimmo';
 
-const PropertyCard = ({ property, onEdit, onDelete }) => {
+const PropertyCard = ({ property, onEdit, onDelete, onToggleAvailability }) => {
   const [imgSrc, setImgSrc] = useState(
     getImageUrl(property.images?.[0]) || ALTIMMO_FALLBACK
   );
+  const nextAvailability = property.status === 'location'
+    ? (property.availability === 'Disponible' ? 'Loué' : 'Disponible')
+    : (property.availability === 'Disponible' ? 'Vendu' : 'Disponible');
+  const availabilityLabel = property.status === 'location'
+    ? (property.availability === 'Disponible' ? 'Marquer occupé' : 'Marquer disponible')
+    : (property.availability === 'Disponible' ? 'Marquer vendu' : 'Marquer disponible');
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all group">
@@ -216,6 +228,25 @@ const PropertyCard = ({ property, onEdit, onDelete }) => {
             </span>
           )}
         </div>
+
+        {property.status === 'location' && (
+          <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-gray-700 mb-2">
+              <FileText size={13} style={{ color:BLUE }} /> Conditions de bail
+            </div>
+            <div className="grid grid-cols-1 gap-1 text-xs text-gray-500">
+              <span>Caution : {property.cautionMultiplicateur ?? 2} mois</span>
+              <span>Profils : {property.profilsLocataireRecherches?.length ? property.profilsLocataireRecherches.join(', ') : 'Non précisé'}</span>
+              <span>Documents : {property.documentsRequis?.length ? property.documentsRequis.join(', ') : 'Non précisé'}</span>
+            </div>
+          </div>
+        )}
+
+        <button onClick={() => onToggleAvailability(property, nextAvailability)}
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02] mb-2"
+          style={{ background: property.availability==='Disponible' ? '#FEF3C7' : '#DCFCE7', color: property.availability==='Disponible' ? '#B45309' : '#15803D', fontFamily:"'Outfit', sans-serif" }}>
+          <CheckCircle2 size={13} /> {availabilityLabel}
+        </button>
 
         <div className="flex gap-2">
           <button onClick={() => onEdit(property)}
@@ -306,6 +337,21 @@ const OwnerPropertyManagement = () => {
     }
   };
 
+  const handleToggleAvailability = async (property, availability) => {
+    try {
+      const fd = new FormData();
+      fd.append('availability', availability);
+      if (property.images?.length) {
+        property.images.forEach(image => fd.append('existingImages', image));
+      }
+      const updated = await updateProperty(property._id, fd);
+      setProperties(prev => prev.map(p => p._id === property._id ? updated : p));
+      toast.success(availability === 'Disponible' ? 'Bien marqué disponible.' : 'Disponibilité mise à jour.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Erreur lors de la mise à jour de la disponibilité.");
+    }
+  };
+
   const handleEdit   = (property) => { setEditingId(property._id); setView("edit"); };
   const handleSave   = (saved, isUpdate) => {
     setProperties(prev =>
@@ -314,6 +360,10 @@ const OwnerPropertyManagement = () => {
     setEditingId(null); setView("list");
   };
   const handleCancel = () => { setEditingId(null); setView("list"); };
+
+  const availableCount = properties.filter(p => p.availability === 'Disponible').length;
+  const occupiedCount = properties.filter(p => ['Loué', 'Vendu'].includes(p.availability)).length;
+  const pendingCount = properties.filter(p => p.statusAdmin === 'En attente').length;
 
   if (authLoading) return (
     <div className="flex items-center justify-center py-20">
@@ -343,6 +393,44 @@ const OwnerPropertyManagement = () => {
           </button>
         )}
       </div>
+
+      {view === 'list' && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background:`${BLUE}12`, color:BLUE }}>
+                <Building2 size={19} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Biens publiés</p>
+                <p className="text-xl font-bold text-gray-900">{properties.length}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-green-50 text-green-600">
+                <CheckCircle2 size={19} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Disponibles</p>
+                <p className="text-xl font-bold text-gray-900">{availableCount}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-50 text-amber-600">
+                <Clock3 size={19} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Occupés / en attente</p>
+                <p className="text-xl font-bold text-gray-900">{occupiedCount} / {pendingCount}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Formulaire ── */}
       {(view === 'add' || view === 'edit') && (
@@ -382,7 +470,8 @@ const OwnerPropertyManagement = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {properties.map(p => (
                 <PropertyCard key={p._id} property={p}
-                  onEdit={handleEdit} onDelete={handleDelete} />
+                  onEdit={handleEdit} onDelete={handleDelete}
+                  onToggleAvailability={handleToggleAvailability} />
               ))}
             </div>
           )}

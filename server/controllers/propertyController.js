@@ -58,6 +58,24 @@ const parseAmenities = (amenities) => {
   return [];
 };
 
+const parseStringArray = (value) => {
+  if (Array.isArray(value)) {
+    return value.map(item => (typeof item === 'string' ? item.trim() : item)).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => (typeof item === 'string' ? item.trim() : item)).filter(Boolean);
+      }
+    } catch (e) {
+      return value.split(',').map(item => item.trim()).filter(Boolean);
+    }
+    return value.trim() ? [value.trim()] : [];
+  }
+  return [];
+};
+
 // ============================================================
 // 🎮 CONTRÔLEURS PRINCIPAUX
 // ============================================================
@@ -77,7 +95,8 @@ const createProperty = asyncHandler(async (req, res, next) => {
   const {
     title, description, price, pole, status, availability, type,
     surface, bedrooms, bathrooms, amenities,
-    livingRooms, kitchens, constructionType,
+    livingRooms, kitchens, constructionType, cautionMultiplicateur,
+    profilsLocataireRecherches, documentsRequis,
     longitude, latitude, address, location
   } = req.body;
 
@@ -91,9 +110,9 @@ const createProperty = asyncHandler(async (req, res, next) => {
   }
 
   const finalAddress = {
-    arrondissement: addressData.arrondissement,
-    street:         addressData.street,
-    city:           addressData.city || 'Brazzaville'
+    arrondissement: addressData.arrondissement || req.body['address[arrondissement]'],
+    street:         addressData.street || req.body['address[street]'],
+    city:           addressData.city || req.body['address[city]'] || 'Brazzaville'
   };
 
   // 4. Parsing de la Location (GeoJSON)
@@ -123,6 +142,9 @@ const createProperty = asyncHandler(async (req, res, next) => {
     livingRooms:     parseInt(livingRooms || 0),
     kitchens:        parseInt(kitchens    || 0),
     constructionType,
+    cautionMultiplicateur: cautionMultiplicateur !== undefined ? parseFloat(cautionMultiplicateur) : 2,
+    profilsLocataireRecherches: parseStringArray(profilsLocataireRecherches),
+    documentsRequis: parseStringArray(documentsRequis),
     amenities:       parseAmenities(amenities),
     longitude,
     latitude,
@@ -252,6 +274,21 @@ const getMyProperties = asyncHandler(async (req, res) => {
  * @route PUT /api/properties/:id
  */
 const updateProperty = asyncHandler(async (req, res) => {
+  const property = await Property.findById(req.params.id);
+
+  if (!property) {
+    res.status(404);
+    throw new Error('Propriété non trouvée.');
+  }
+
+  const isAdmin = req.user.role === 'Admin';
+  const isOwner = property.owner && property.owner.toString() === req.user.id.toString();
+
+  if (!isAdmin && !isOwner) {
+    res.status(403);
+    throw new Error('Vous ne pouvez modifier que vos propres biens.');
+  }
+
   // Champs interdits à la modification directe
   const excludedFields = ['_id', 'owner', 'createdAt', 'statusAdmin', 'reviewedAt', 'images'];
   const updateData = { ...req.body };
@@ -278,6 +315,39 @@ const updateProperty = asyncHandler(async (req, res) => {
   if (typeof updateData.address === 'string') {
     try { updateData.address = JSON.parse(updateData.address); }
     catch (e) { delete updateData.address; }
+  }
+
+  const addressFromFields = {
+    street: req.body['address[street]'],
+    arrondissement: req.body['address[arrondissement]'],
+    city: req.body['address[city]'],
+  };
+  const hasAddressFromFields = Object.values(addressFromFields).some(value => value !== undefined);
+
+  if (hasAddressFromFields) {
+    updateData.address = {
+      ...(updateData.address || {}),
+      ...Object.fromEntries(Object.entries(addressFromFields).filter(([, value]) => value !== undefined)),
+    };
+    delete updateData['address[street]'];
+    delete updateData['address[arrondissement]'];
+    delete updateData['address[city]'];
+  }
+
+  if (updateData.amenities !== undefined) {
+    updateData.amenities = parseAmenities(updateData.amenities);
+  }
+
+  if (updateData.profilsLocataireRecherches !== undefined) {
+    updateData.profilsLocataireRecherches = parseStringArray(updateData.profilsLocataireRecherches);
+  }
+
+  if (updateData.documentsRequis !== undefined) {
+    updateData.documentsRequis = parseStringArray(updateData.documentsRequis);
+  }
+
+  if (updateData.cautionMultiplicateur !== undefined) {
+    updateData.cautionMultiplicateur = parseFloat(updateData.cautionMultiplicateur);
   }
 
   // 5. Parsing Location (GPS)
@@ -358,11 +428,21 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
  * @route DELETE /api/properties/:id
  */
 const deleteProperty = asyncHandler(async (req, res) => {
-  const property = await Property.findByIdAndDelete(req.params.id);
+  const property = await Property.findById(req.params.id);
   if (!property) {
     res.status(404);
     throw new Error('Propriété non trouvée.');
   }
+
+  const isAdmin = req.user.role === 'Admin';
+  const isOwner = property.owner && property.owner.toString() === req.user.id.toString();
+
+  if (!isAdmin && !isOwner) {
+    res.status(403);
+    throw new Error('Vous ne pouvez supprimer que vos propres biens.');
+  }
+
+  await Property.findByIdAndDelete(req.params.id);
   res.status(204).json({ status: 'success', data: null });
 
   logAction({

@@ -29,6 +29,16 @@ const getImageUrl = (url) => {
   return `${API_URL}/${normalized}`;
 };
 
+const TENANT_PROFILES = ['Salarié', 'Étudiant', 'Indépendant/Affairiste', 'Fonctionnaire', 'Retraité'];
+const REQUIRED_DOCUMENTS = [
+  'CNI',
+  'Justificatif de revenus',
+  '2 derniers bulletins de salaire',
+  'Caution bancaire',
+  'Attestation de travail',
+  'Quittance de loyer précédente',
+];
+
 const PropertyForm = ({
   formData,
   setFormData,
@@ -116,6 +126,20 @@ const PropertyForm = ({
           : '',
       },
     }));
+  };
+
+  const handleCheckboxArrayChange = (field, value) => {
+    setFormData((prev) => {
+      const currentValues = Array.isArray(prev[field]) ? prev[field] : [];
+      const nextValues = currentValues.includes(value)
+        ? currentValues.filter((item) => item !== value)
+        : [...currentValues, value];
+
+      return {
+        ...prev,
+        [field]: nextValues,
+      };
+    });
   };
 
   const handleImageChange = (e) => {
@@ -403,6 +427,71 @@ const PropertyForm = ({
         />
         <p className="text-xs text-gray-500 mt-1">Séparez les équipements par des virgules</p>
       </div>
+
+      {formData.status === 'location' && (
+        <div className="border-t pt-4 mt-4">
+          <h3 className="text-lg font-semibold mb-3">Conditions de bail</h3>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Caution demandée
+            </label>
+            <select
+              name="cautionMultiplicateur"
+              value={formData.cautionMultiplicateur ?? 2}
+              onChange={handleChange}
+              aria-label="Caution demandée"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+            >
+              <option value="0">Aucune caution</option>
+              <option value="1">1 mois de loyer</option>
+              <option value="2">2 mois de loyer</option>
+              <option value="3">3 mois de loyer</option>
+              <option value="4">4 mois de loyer</option>
+              <option value="5">5 mois de loyer</option>
+              <option value="6">6 mois de loyer</option>
+            </select>
+          </div>
+
+          <div className="mb-4">
+            <p className="block text-sm font-medium text-gray-700 mb-2">
+              Profils de locataires recherchés
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {TENANT_PROFILES.map((profile) => (
+                <label key={profile} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={(formData.profilsLocataireRecherches || []).includes(profile)}
+                    onChange={() => handleCheckboxArrayChange('profilsLocataireRecherches', profile)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  {profile}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="block text-sm font-medium text-gray-700 mb-2">
+              Documents requis
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {REQUIRED_DOCUMENTS.map((document) => (
+                <label key={document} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={(formData.documentsRequis || []).includes(document)}
+                    onChange={() => handleCheckboxArrayChange('documentsRequis', document)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  {document}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ------------------ SECTION IMAGES ------------------ */}
       <div className="border-t pt-4 mt-4">

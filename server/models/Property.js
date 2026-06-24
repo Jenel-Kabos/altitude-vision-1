@@ -128,6 +128,37 @@ const propertySchema = new mongoose.Schema(
       default: 'Disponible',
     },
 
+    // ─── Champs spécifiques location (status: 'location') ─────────
+    // Validation conditionnelle déléguée au contrôleur.
+
+    cautionMultiplicateur: {
+      type: Number,
+      min: 0,
+      max: 6,
+      default: 2,
+    },
+    // Stocke le multiplicateur (ex: 2 = 2x le loyer mensuel).
+    // Le montant réel se calcule à l'affichage : price * cautionMultiplicateur
+
+    profilsLocataireRecherches: {
+      type: [String],
+      enum: ['Salarié', 'Étudiant', 'Indépendant/Affairiste', 'Fonctionnaire', 'Retraité'],
+      default: [],
+    },
+
+    documentsRequis: {
+      type: [String],
+      enum: [
+        'CNI',
+        'Justificatif de revenus',
+        '2 derniers bulletins de salaire',
+        'Caution bancaire',
+        'Attestation de travail',
+        'Quittance de loyer précédente',
+      ],
+      default: [],
+    },
+
     isPublished: { type: Boolean, default: false },
     hasSpecialCommission: { type: Boolean, default: false },
     recommande: { type: Boolean, default: false },
