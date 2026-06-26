@@ -34,6 +34,9 @@ router.patch('/updateMyPassword',                         authController.updateM
 // ✅ Compléter le profil après connexion Google
 router.patch('/complete-profile',                         userController.completeProfile);
 
+// ✅ Enregistrer le token Expo Push (appelé par le mobile au démarrage)
+router.patch('/push-token',                               userController.savePushToken);
+
 /* =======================================
    👑 ROUTES ADMIN UNIQUEMENT
 ======================================= */

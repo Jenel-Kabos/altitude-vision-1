@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, TextInput, Image, RefreshControl,
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import api from '../../services/api';
+import { connectSocket, getSocket } from '../../services/socketService';
 import { useAuth } from '../../context/AuthContext';
 import { colors, typography, spacing } from '../../theme';
 import EmptyState from '../../components/ui/EmptyState';
@@ -45,11 +47,34 @@ export default function ConversationsScreen({ navigation }) {
     }
   };
 
-  useEffect(() => { chargerConversations(); }, []);
+  // Rechargement à chaque fois que l'écran redevient visible (retour depuis Chat)
+  useFocusEffect(useCallback(() => { chargerConversations(); }, []));
 
   useEffect(() => {
-    const id = setInterval(chargerConversations, 10000);
-    return () => clearInterval(id);
+    // Socket.IO — mise à jour en temps réel des badges + lastMessage
+    const token = api.defaults?.headers?.common?.Authorization?.replace('Bearer ', '');
+    const socket = connectSocket(token);
+
+    socket.on('new-message', ({ conversationId, message }) => {
+      if (!conversationId || !message) return;
+      setConversations(prev => prev.map(conv => {
+        if (conv._id !== conversationId.toString()) return conv;
+        return {
+          ...conv,
+          lastMessage: message.content,
+          updatedAt: message.createdAt,
+          unreadCount: (conv.unreadCount || 0) + 1,
+        };
+      }));
+    });
+
+    // Fallback polling 30s — synchronise si le socket a été silencieux
+    const id = setInterval(chargerConversations, 30000);
+
+    return () => {
+      socket.off('new-message');
+      clearInterval(id);
+    };
   }, []);
 
   const onRefresh = () => {
@@ -57,11 +82,8 @@ export default function ConversationsScreen({ navigation }) {
     chargerConversations();
   };
 
-  // Total unread across all conversations
-  const totalUnread = conversations.reduce((sum, c) => {
-    const n = c.unreadCount?.[user?._id] || 0;
-    return sum + Number(n || 0);
-  }, 0);
+  // unreadCount est un nombre scalaire (extrait côté serveur pour l'utilisateur courant)
+  const totalUnread = conversations.reduce((sum, c) => sum + Number(c.unreadCount || 0), 0);
 
   // Filtered list
   const filtered = conversations.filter(c => {
@@ -77,7 +99,7 @@ export default function ConversationsScreen({ navigation }) {
     const other = item.participants?.find(p => p._id !== user?._id);
     const name = other?.name || other?.firstName || 'Utilisateur';
     const initial = (name[0] || '?').toUpperCase();
-    const unread = Number(item.unreadCount?.[user?._id] || 0);
+    const unread = Number(item.unreadCount || 0);
     const lastMessage = item.lastMessage || 'Nouvelle conversation';
     const time = formatTime(item.updatedAt);
 

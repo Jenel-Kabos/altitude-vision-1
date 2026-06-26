@@ -19,16 +19,23 @@ try {
 exports.getConversations = asyncHandler(async (req, res) => {
   if (Conversation) {
     const conversations = await Conversation.find({
-      participants: req.user.id
+      participants: req.user.id,
+      isArchived: { $ne: true },
     })
       .populate('participants', 'name email photo')
-      .populate('lastMessage')
       .sort({ updatedAt: -1 });
+
+    // Extraire unreadCount depuis la Map Mongoose pour l'utilisateur courant
+    const withUnread = conversations.map((conv) => {
+      const obj = conv.toObject();
+      obj.unreadCount = conv.unreadCount?.get(req.user.id) || 0;
+      return obj;
+    });
 
     return res.status(200).json({
       status: 'success',
-      results: conversations.length,
-      data: { conversations },
+      results: withUnread.length,
+      data: { conversations: withUnread },
     });
   }
 
@@ -152,13 +159,13 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
 exports.markConversationAsRead = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
 
-  // ✅ CORRECTION : résoudre l'otherUserId depuis la Conversation
   let otherUserId = conversationId;
+  let convDoc = null;
 
   if (Conversation) {
-    const conversation = await Conversation.findById(conversationId);
-    if (conversation) {
-      const otherParticipant = conversation.participants.find(
+    convDoc = await Conversation.findById(conversationId);
+    if (convDoc) {
+      const otherParticipant = convDoc.participants.find(
         (p) => p.toString() !== req.user.id.toString()
       );
       if (otherParticipant) {
@@ -168,16 +175,14 @@ exports.markConversationAsRead = asyncHandler(async (req, res) => {
   }
 
   const result = await Message.updateMany(
-    {
-      sender: otherUserId,
-      receiver: req.user.id,
-      isRead: false,
-    },
-    {
-      isRead: true,
-      readAt: Date.now(),
-    }
+    { sender: otherUserId, receiver: req.user.id, isRead: false },
+    { isRead: true, readAt: Date.now() }
   );
+
+  // Synchroniser la Map unreadCount sur le doc Conversation
+  if (convDoc) {
+    await convDoc.resetUnread(req.user.id);
+  }
 
   res.status(200).json({
     status: 'success',

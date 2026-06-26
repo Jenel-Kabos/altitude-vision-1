@@ -6,7 +6,9 @@ const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
-const { cleanupUploadedFiles } = require('../middleware/uploadMiddleware'); 
+const { cleanupUploadedFiles } = require('../middleware/uploadMiddleware');
+const { getIO, isUserOnline } = require('../socket');
+const { sendExpoPushNotification } = require('../utils/expoPush');
 
 /**
  * @description Envoyer un message dans une conversation
@@ -32,21 +34,21 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     }));
 
     let targetUserId;
+    let convDoc = null;
 
     if (receiverId) {
-        // ✅ CAS 1 : receiverId fourni directement → c'est l'ID de l'utilisateur destinataire
+        // CAS 1 : receiverId fourni directement
         targetUserId = receiverId;
     } else if (conversationId) {
-        // ✅ CAS 2 : conversationId fourni → chercher l'autre participant dans la conversation
-        const conversation = await Conversation.findById(conversationId);
-        if (!conversation) {
+        // CAS 2 : conversationId fourni → chercher l'autre participant
+        convDoc = await Conversation.findById(conversationId);
+        if (!convDoc) {
             cleanupUploadedFiles(uploadedFiles);
             res.status(404);
             throw new Error('Conversation non trouvée.');
         }
 
-        // L'autre participant = celui qui n'est pas l'expéditeur
-        const otherParticipantId = conversation.participants.find(
+        const otherParticipantId = convDoc.participants.find(
             (p) => p.toString() !== req.user.id.toString()
         );
 
@@ -77,6 +79,50 @@ exports.sendMessage = asyncHandler(async (req, res) => {
 
     await message.populate('sender', 'name email avatar');
     await message.populate('receiver', 'name email avatar');
+
+    // --- 4. Mettre à jour la Conversation (lastMessage + unreadCount) ---
+    if (!convDoc) {
+        // Trouver ou créer la conversation si on est passé par receiverId
+        convDoc = await Conversation.findOne({
+            participants: { $all: [req.user.id, targetUserId] },
+        });
+        if (!convDoc) {
+            convDoc = await Conversation.create({
+                participants: [req.user.id, targetUserId],
+            });
+        }
+    }
+
+    const recipientIdStr = targetUserId.toString();
+    const currentCount = convDoc.unreadCount?.get(recipientIdStr) || 0;
+    convDoc.unreadCount.set(recipientIdStr, currentCount + 1);
+    convDoc.lastMessage = content;
+    await convDoc.save();
+
+    // --- 5. Notifier le destinataire en temps réel ---
+    try {
+        getIO().to(recipientIdStr).emit('new-message', {
+            conversationId: convDoc._id,
+            message,
+        });
+    } catch {
+        // Socket.IO non initialisé — dégradation silencieuse
+    }
+
+    // --- 6. Push notification si le destinataire n'est pas connecté en socket ---
+    if (!isUserOnline(recipientIdStr)) {
+        const recipientWithToken = await User.findById(recipientIdStr).select('pushToken name');
+        if (recipientWithToken?.pushToken) {
+            const senderName = req.user.name || 'Nouveau message';
+            const preview = content.length > 100 ? content.slice(0, 100) + '…' : content;
+            await sendExpoPushNotification(
+                recipientWithToken.pushToken,
+                senderName,
+                preview,
+                { conversationId: convDoc._id.toString(), type: 'new_message' }
+            );
+        }
+    }
 
     res.status(201).json({
         status: 'success',

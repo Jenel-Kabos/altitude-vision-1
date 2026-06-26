@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { connectSocket, getSocket, disconnectSocket } from '../../services/socketService';
 import { colors, typography, spacing } from '../../theme';
 
 // ─── Helpers date ──────────────────────────────────────────────
@@ -116,7 +117,7 @@ export default function ChatScreen({ route, navigation }) {
     });
   }, [navigation, contact, isOnline]);
 
-  // ─── Fetch + polling (socket commenté) ──────────────────────
+  // ─── Fetch initial + Socket.IO temps réel ───────────────────
   const fetchMessages = async () => {
     try {
       const res = await api.get(`/messages/${conversation._id}`);
@@ -127,26 +128,39 @@ export default function ChatScreen({ route, navigation }) {
 
   useEffect(() => {
     fetchMessages();
-    const interval = setInterval(fetchMessages, 5000);
-    return () => clearInterval(interval);
-  }, [conversation._id]);
 
-  // TODO: réactiver quand socket.io serveur est prêt
-  // useEffect(() => {
-  //   const socket = connectSocket(token);
-  //   socket.emit('join-room', conversation._id);
-  //   socket.on('new-message', (msg) => {
-  //     setMessages(prev => [msg, ...prev]);
-  //   });
-  //   socket.on('typing', ({ userId }) => {
-  //     if (userId !== user._id) setTyping(true);
-  //     setTimeout(() => setTyping(false), 2000);
-  //   });
-  //   return () => {
-  //     socket.off('new-message');
-  //     socket.off('typing');
-  //   };
-  // }, []);
+    // Socket.IO — temps réel
+    const token = api.defaults?.headers?.common?.Authorization?.replace('Bearer ', '');
+    const socket = connectSocket(token);
+
+    socket.emit('join-room', conversation._id);
+
+    socket.on('new-message', (payload) => {
+      // Le serveur émet { conversationId, message } — on accepte les deux formes
+      const msg = payload?.message ?? payload;
+      setMessages(prev => {
+        const exists = prev.some(m => m._id === msg._id);
+        return exists ? prev.map(m => m._id === msg._id ? msg : m) : [msg, ...prev];
+      });
+    });
+
+    socket.on('typing', ({ userId: typingUserId }) => {
+      if (typingUserId !== user._id) {
+        setTyping(true);
+        setTimeout(() => setTyping(false), 2000);
+      }
+    });
+
+    // Fallback polling 30s — rattrape les messages perdus pendant une
+    // déconnexion socket silencieuse (réseau instable, arrière-plan)
+    const fallback = setInterval(fetchMessages, 30000);
+
+    return () => {
+      socket.off('new-message');
+      socket.off('typing');
+      clearInterval(fallback);
+    };
+  }, [conversation._id]);
 
   // ─── Envoi optimiste ───────────────────────────────────────
   const sendMessage = async () => {
@@ -171,8 +185,7 @@ export default function ChatScreen({ route, navigation }) {
       const saved = res.data?.data?.message || res.data?.message;
       if (saved) {
         setMessages(prev => prev.map(m => m._id === tempMsg._id ? saved : m));
-        // TODO: réactiver quand socket.io serveur est prêt
-        // getSocket()?.emit('send-message', { ...saved, receiverId: contact._id });
+        getSocket()?.emit('send-message', { ...saved, receiverId: contact._id });
       }
     } catch {
       setMessages(prev => prev.map(
@@ -183,8 +196,7 @@ export default function ChatScreen({ route, navigation }) {
 
   const onTyping = (val) => {
     setText(val);
-    // TODO: réactiver quand socket.io serveur est prêt
-    // getSocket()?.emit('typing', { conversationId: conversation._id, userId: user._id });
+    getSocket()?.emit('typing', { conversationId: conversation._id, userId: user._id });
   };
 
   const isMe = (msg) => (msg.sender?._id || msg.sender) === user?._id;

@@ -530,3 +530,25 @@ exports.completeProfile = async (req, res) => {
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
+
+/**
+ * @description Enregistrer ou mettre à jour le token Expo Push de l'appareil
+ * @route PATCH /api/users/push-token
+ * @access Protected
+ */
+exports.savePushToken = async (req, res) => {
+    try {
+        const { pushToken } = req.body;
+        if (!pushToken) {
+            return res.status(400).json({ status: 'fail', message: 'pushToken requis.' });
+        }
+
+        await User.findByIdAndUpdate(req.user._id, { pushToken });
+
+        console.log(`✅ [PushToken] Enregistré pour ${req.user._id}`);
+        res.status(200).json({ status: 'success', message: 'Push token enregistré.' });
+    } catch (error) {
+        console.error('❌ Erreur savePushToken:', error.message);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};

@@ -99,6 +99,9 @@ const userSchema = new mongoose.Schema(
             default: 'Actif',
         },
 
+        // 🔹 Notifications push Expo
+        pushToken: { type: String, default: null },
+
         // 🔹 Sécurité & Sessions
         tokenVersion:    { type: Number, default: 0 },
         lastLoginAt:     Date,

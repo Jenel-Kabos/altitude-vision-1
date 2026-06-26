@@ -1,6 +1,7 @@
-// server.js 
+// server.js
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '1.1.1.1']);
+const http = require('http');
 
 const generateSitemap = require('./utils/generateSitemap');
 // ============================================================
@@ -441,11 +442,21 @@ app.use((err, req, res, next) => {
 });
 
 // ============================================================
-// 🚀 DÉMARRAGE DU SERVEUR
+// 🚀 DÉMARRAGE DU SERVEUR + SOCKET.IO
 // ============================================================
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+const httpServer = http.createServer(app);
+
+// Initialise Socket.IO avec la même config CORS qu'Express
+const { initSocket } = require('./socket');
+initSocket(httpServer, {
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST'],
+});
+
+httpServer.listen(PORT, () => {
   console.log('\n' + '='.repeat(60));
   console.log(`✅ Serveur Altitude-Vision lancé sur le port ${PORT}`);
   console.log(`🌍 Mode: ${process.env.NODE_ENV || 'development'}`);
@@ -454,6 +465,7 @@ app.listen(PORT, () => {
   console.log(`🔗 Frontend autorisé: ${process.env.FRONTEND_URL || 'localhost'}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🪝  Webhook Zoho: http://localhost:${PORT}/api/webhooks/zoho-incoming`);
+  console.log(`🔌 Socket.IO actif sur: ws://localhost:${PORT}`);
   console.log('='.repeat(60) + '\n');
 });
 
@@ -478,4 +490,4 @@ process.on('uncaughtException', (err) => {
   gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
-module.exports = app;
+module.exports = { app, httpServer };
