@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, Image,
   TouchableOpacity, StyleSheet,
@@ -7,6 +7,7 @@ import {
   Modal, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Video, ResizeMode } from 'expo-av';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Screen, Button, PrixFCFA } from '../../components';
@@ -15,11 +16,14 @@ import { colors, fonts, fontSize, spacing, radius } from '../../theme';
 const { width } = Dimensions.get('window');
 const DESC_LIMIT = 150;
 
+const isVideoUrl = (url) => /\.(mp4|mov|avi|mkv|webm|m4v)$/i.test(url);
+
 export default function DetailAnnonceScreen({ route, navigation }) {
   const [annonce, setAnnonce] = useState(route.params.annonce);
   const { user } = useAuth();
 
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [playingIndex, setPlayingIndex] = useState(null);
   const [commentaire, setCommentaire] = useState('');
   const [envoi, setEnvoi] = useState(false);
   const [favori, setFavori] = useState(false);
@@ -158,6 +162,8 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const onGalleryScroll = (e) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / width);
     setPhotoIndex(idx);
+    // Pause toute vidéo quand on swipe vers un autre slide
+    if (idx !== playingIndex) setPlayingIndex(null);
   };
 
   const formatDate = (dateStr) => {
@@ -182,13 +188,41 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 onMomentumScrollEnd={onGalleryScroll}
-                renderItem={({ item }) => (
-                  <Image
-                    source={{ uri: item }}
-                    style={styles.galleryImage}
-                    resizeMode="cover"
-                  />
-                )}
+                renderItem={({ item, index }) => {
+                  if (isVideoUrl(item)) {
+                    const playing = playingIndex === index;
+                    return (
+                      <View style={styles.galleryImage}>
+                        <Video
+                          source={{ uri: item }}
+                          style={StyleSheet.absoluteFill}
+                          resizeMode={ResizeMode.COVER}
+                          shouldPlay={playing}
+                          isLooping={false}
+                          useNativeControls={playing}
+                        />
+                        {!playing && (
+                          <TouchableOpacity
+                            style={styles.videoPlayBtn}
+                            onPress={() => setPlayingIndex(index)}
+                            activeOpacity={0.8}
+                          >
+                            <View style={styles.videoPlayCircle}>
+                              <Ionicons name="play" size={28} color={colors.white} />
+                            </View>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  }
+                  return (
+                    <Image
+                      source={{ uri: item }}
+                      style={styles.galleryImage}
+                      resizeMode="cover"
+                    />
+                  );
+                }}
                 keyExtractor={(_, i) => i.toString()}
               />
               <View style={styles.dotsWrap}>
@@ -477,6 +511,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  videoPlayBtn: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPlayCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 4, // compense l'asymétrie visuelle de l'icône play
+  },
+
   dotsWrap: {
     position: 'absolute',
     bottom: spacing.md,

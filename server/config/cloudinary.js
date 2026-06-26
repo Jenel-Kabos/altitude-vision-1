@@ -47,11 +47,12 @@ const upload = multer({
 // Les options passées en paramètre (ex: depuis propertyController.js)
 // écrasent les defaults via le spread operator → comportement préservé.
 const CLOUDINARY_DEFAULTS = {
-  folder:       'altitude-vision',
-  quality:      'auto',    // compression intelligente
-  fetch_format: 'auto',    // WebP si le navigateur le supporte
-  width:        1200,      // redimensionne si > 1200px
-  crop:         'limit',   // ne touche pas les petites images
+  folder:        'altitude-vision',
+  resource_type: 'auto',   // détecte image ou vidéo automatiquement
+  quality:       'auto',   // compression intelligente
+  fetch_format:  'auto',   // WebP si le navigateur le supporte
+  width:         1200,     // redimensionne si > 1200px (ignoré par Cloudinary pour les vidéos)
+  crop:          'limit',  // ne touche pas les petites images
 };
 
 const uploadToCloudinary = (fileBuffer, options = {}) => {

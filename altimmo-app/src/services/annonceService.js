@@ -3,17 +3,28 @@ import api from './api';
 const CLOUDINARY_CLOUD_NAME = 'dop8vzm5z';
 const CLOUDINARY_UPLOAD_PRESET = 'lqwel6X6';
 
+const VIDEO_EXTENSIONS = /\.(mp4|mov|avi|mkv|webm)$/i;
+
+function getUploadMeta(uri) {
+  if (VIDEO_EXTENSIONS.test(uri)) {
+    const ext = uri.split('.').pop().toLowerCase();
+    const mime = ext === 'mov' ? 'video/quicktime'
+      : ext === 'avi' ? 'video/x-msvideo'
+      : ext === 'webm' ? 'video/webm'
+      : 'video/mp4';
+    return { name: `upload_${Date.now()}.${ext}`, type: mime };
+  }
+  return { name: `upload_${Date.now()}.jpg`, type: 'image/jpeg' };
+}
+
 export async function uploadToCloudinary(uri) {
+  const { name, type } = getUploadMeta(uri);
   const fd = new FormData();
-  fd.append('file', {
-    uri,
-    name: `upload_${Date.now()}.jpg`,
-    type: 'image/jpeg',
-  });
+  fd.append('file', { uri, name, type });
   fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
   const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,
     {
       method: 'POST',
       body: fd,

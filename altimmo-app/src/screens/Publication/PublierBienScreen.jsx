@@ -213,7 +213,8 @@ export default function PublierBienScreen({ navigation, route }) {
       quality: 0.8,
       allowsMultipleSelection: true,
       selectionLimit: 10 - photos.length,
-      mediaTypes: ['images'],
+      mediaTypes: ['images', 'videos'],
+      videoMaxDuration: 60,
     });
     if (!res.canceled && res.assets?.length) {
       const additions = res.assets.map(a => ({
@@ -225,6 +226,8 @@ export default function PublierBienScreen({ navigation, route }) {
 
   const supprimerPhoto = (idx) =>
     setPhotos(prev => prev.filter((_, i) => i !== idx));
+
+  const isVideo = (uri = '') => /\.(mp4|mov|avi|mkv|webm)$/i.test(uri);
 
   // ─── Géolocalisation ────────────────────────────────────────
   const utiliserMaPosition = async () => {
@@ -479,7 +482,18 @@ export default function PublierBienScreen({ navigation, route }) {
           <View style={styles.photoGrid}>
             {photos.map((p, idx) => (
               <View key={`${p.uri}-${idx}`} style={styles.photoCell}>
-                <Image source={{ uri: p.uri }} style={styles.photoImg} />
+                {isVideo(p.uri) ? (
+                  <View style={[styles.photoImg, styles.videoThumb]}>
+                    <Ionicons name="videocam-outline" size={28} color="rgba(255,255,255,0.6)" />
+                  </View>
+                ) : (
+                  <Image source={{ uri: p.uri }} style={styles.photoImg} />
+                )}
+                {isVideo(p.uri) && !p.uploading && (
+                  <View style={styles.playOverlay} pointerEvents="none">
+                    <Ionicons name="play-circle" size={30} color="#FFFFFF" />
+                  </View>
+                )}
                 {p.uploading && (
                   <View style={styles.photoOverlay}>
                     <ActivityIndicator color="#FFFFFF" />
@@ -1098,6 +1112,15 @@ const styles = StyleSheet.create({
   photoImg: {
     width: 100, height: 100,
     borderRadius: 8,
+  },
+  videoThumb: {
+    backgroundColor: '#1a1a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
   },
   photoOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
