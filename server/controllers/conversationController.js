@@ -49,45 +49,54 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
 
   const skip = (page - 1) * limit;
 
-  // ✅ CORRECTION : résoudre l'ID de l'autre participant depuis la Conversation
-  let otherUserId = conversationId; // valeur par défaut (fallback ancien comportement)
-
-  if (Conversation) {
-    const conversation = await Conversation.findById(conversationId);
-    if (conversation) {
-      // Trouver l'autre participant (celui qui n'est pas l'utilisateur connecté)
-      const otherParticipant = conversation.participants.find(
-        (p) => p.toString() !== req.user.id.toString()
-      );
-      if (otherParticipant) {
-        otherUserId = otherParticipant.toString();
-      }
+  // Résoudre la conversation et l'autre participant
+  let otherUserId = conversationId;
+  const convDoc = await Conversation.findById(conversationId);
+  if (convDoc) {
+    const otherParticipant = convDoc.participants.find(
+      (p) => p.toString() !== req.user.id.toString()
+    );
+    if (otherParticipant) {
+      otherUserId = otherParticipant.toString();
     }
   }
 
-  // Maintenant chercher les messages entre req.user.id et otherUserId
-  const messages = await Message.find({
-    $or: [
-      { sender: req.user.id, receiver: otherUserId },
-      { sender: otherUserId, receiver: req.user.id },
-    ],
-  })
+  // Requête prioritaire par conversation._id (couvre staff-inbox + nouveaux messages)
+  // Fallback sur sender/receiver pour les messages antérieurs à la migration
+  const msgQuery = convDoc
+    ? {
+        $or: [
+          { conversation: convDoc._id },
+          {
+            conversation: { $exists: false },
+            $or: [
+              { sender: req.user.id, receiver: otherUserId },
+              { sender: otherUserId, receiver: req.user.id },
+            ],
+          },
+        ],
+      }
+    : {
+        $or: [
+          { sender: req.user.id, receiver: otherUserId },
+          { sender: otherUserId, receiver: req.user.id },
+        ],
+      };
+
+  const messages = await Message.find(msgQuery)
     .populate('sender', 'name email photo')
     .populate('receiver', 'name email photo')
     .sort({ createdAt: 1 })
     .limit(parseInt(limit))
     .skip(skip);
 
-  const total = await Message.countDocuments({
-    $or: [
-      { sender: req.user.id, receiver: otherUserId },
-      { sender: otherUserId, receiver: req.user.id },
-    ],
-  });
+  const total = await Message.countDocuments(msgQuery);
 
-  // Marquer les messages reçus comme lus
+  // Marquer les messages reçus comme lus (par conversation si disponible)
   await Message.updateMany(
-    { sender: otherUserId, receiver: req.user.id, isRead: false },
+    convDoc
+      ? { conversation: convDoc._id, sender: { $ne: req.user.id }, isRead: false }
+      : { sender: otherUserId, receiver: req.user.id, isRead: false },
     { isRead: true, readAt: Date.now() }
   );
 
