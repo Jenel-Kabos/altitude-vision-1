@@ -23,6 +23,7 @@ const NAV_SECTIONS = [
     links: [
       { to: '/dashboard',             end: true, Icon: BarChart3,    label: 'Tableau de bord',   accent: BLUE },
       { to: '/dashboard/properties',         end: false, Icon: Home,     label: 'Altimmo',          accent: BLUE },
+      { to: '/dashboard/visites',            end: false, Icon: Calendar, label: 'Rendez-vous',       accent: GOLD },
       { to: '/dashboard/gestion-locative',   end: false, Icon: Building, label: 'Gestion Locative', accent: BLUE, badge: 'contratsActifs' },
       { to: '/dashboard/events',      end: false, Icon: Calendar,     label: 'Mila Events',       accent: '#D42B2B' },
       { to: '/dashboard/altcom',      end: false, Icon: Briefcase,    label: 'Altcom',            accent: GOLD },

@@ -97,18 +97,24 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const demanderVisite = () => {
     Alert.alert(
       'Prendre rendez-vous',
-      'Souhaitez-vous démarrer une conversation avec notre équipe pour ce bien ?',
+      'Souhaitez-vous demander une visite pour ce bien ?',
       [
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Confirmer',
           onPress: async () => {
             try {
-              const res = await api.post('/conversations/start', {
+              const convRes = await api.post('/conversations/start', {
                 propertyId: annonce._id,
                 message: `Je souhaite prendre rendez-vous pour visiter : ${title}`,
               });
-              const conversation = res.data?.data?.conversation;
+              const conversation = convRes.data?.data?.conversation;
+
+              await api.post('/visites', {
+                propertyId: annonce._id,
+                conversationId: conversation?._id,
+              });
+
               navigation.navigate('Messages', {
                 screen: 'Chat',
                 params: {
@@ -119,7 +125,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
             } catch (err) {
               Alert.alert(
                 'Erreur',
-                err.response?.data?.message || "Impossible de contacter l'équipe pour le moment."
+                err.response?.data?.message || "Impossible d'envoyer la demande de visite."
               );
             }
           },

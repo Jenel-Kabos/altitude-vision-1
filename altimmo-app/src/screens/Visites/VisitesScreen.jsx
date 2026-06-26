@@ -34,6 +34,8 @@ const STATUT_COLOR = {
   'en attente': colors.warning,
   'annulée':   colors.error,
   'annulee':   colors.error,
+  'terminée':  colors.textSecondary,
+  'terminee':  colors.textSecondary,
 };
 
 export default function VisitesScreen() {
@@ -43,12 +45,8 @@ export default function VisitesScreen() {
 
   const chargerVisites = async () => {
     try {
-      const response = await api.get('/visites');
-      const data = response.data?.data?.visites
-        || response.data?.data
-        || response.data?.visites
-        || response.data
-        || [];
+      const response = await api.get('/visites/my');
+      const data = response.data?.data?.visites || [];
       setVisites(Array.isArray(data) ? data : []);
     } catch (error) {
       console.log('Erreur visites:', error.message);
@@ -60,49 +58,50 @@ export default function VisitesScreen() {
 
   useEffect(() => { chargerVisites(); }, []);
 
-  const now = new Date();
-  const isFuture = (v) => {
-    const d = new Date(v.date);
-    return !isNaN(d) && d.getTime() >= now.getTime();
-  };
+  // "À venir" = En attente ou Confirmée (date non encore passée ou non fixée)
+  // "Passées" = Terminée ou Annulée
+  const isActive = (v) => v.statut !== 'Annulée' && v.statut !== 'Terminée';
 
   const filtered = visites.filter(v =>
-    tab === 'venir' ? isFuture(v) : !isFuture(v)
+    tab === 'venir' ? isActive(v) : !isActive(v)
   );
 
   const annulerVisite = (visite) => {
-    Alert.alert(
-      'Annuler la visite',
-      `Confirmer l'annulation de la visite du ${formatVisiteDate(visite.date)} ?`,
-      [
-        { text: 'Retour', style: 'cancel' },
-        {
-          text: 'Annuler la visite',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // TODO: confirmer l'endpoint exact côté backend
-              await api.patch(`/visites/${visite._id}`, { statut: 'annulée' });
-              chargerVisites();
-            } catch {
-              Alert.alert('Erreur', 'Impossible d\'annuler la visite.');
-            }
-          },
+    const dateAffichee = formatVisiteDate(visite.dateConfirmee || visite.dateProposee);
+    const msg = dateAffichee
+      ? `Confirmer l'annulation de la visite du ${dateAffichee} ?`
+      : 'Confirmer l\'annulation de cette demande de visite ?';
+
+    Alert.alert('Annuler la visite', msg, [
+      { text: 'Retour', style: 'cancel' },
+      {
+        text: 'Annuler la visite',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.patch(`/visites/${visite._id}/cancel`);
+            chargerVisites();
+          } catch {
+            Alert.alert('Erreur', 'Impossible d\'annuler la visite.');
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const renderVisite = ({ item }) => {
-    const bien = item.bien || item.property || {};
-    const title = bien.title || bien.titre || 'Bien immobilier';
-    const arrondissement = bien.address?.arrondissement || bien.location?.neighborhood || '';
-    const city = bien.address?.city || bien.location?.city || '';
+    const property = item.property || {};
+    const title = property.title || 'Bien immobilier';
+    const arrondissement = property.address?.arrondissement || '';
+    const city = property.address?.city || '';
     const address = [arrondissement, city].filter(Boolean).join(', ');
-    const image = bien.images?.[0] || bien.photos?.[0];
+    const image = property.images?.[0];
     const statut = (item.statut || 'en attente').toLowerCase();
     const statutColor = STATUT_COLOR[statut] || colors.warning;
-    const showCancel = tab === 'venir' && !statut.includes('annul');
+    // Date à afficher : confirmée en priorité, sinon proposée, sinon placeholder
+    const dateStr = item.dateConfirmee || item.dateProposee;
+    const dateLabel = dateStr ? formatVisiteDate(dateStr) : 'En attente de proposition';
+    const showCancel = tab === 'venir';
 
     return (
       <View style={styles.card}>
@@ -124,7 +123,7 @@ export default function VisitesScreen() {
             {address ? (
               <Text style={styles.address} numberOfLines={1}>{address}</Text>
             ) : null}
-            <Text style={styles.date}>{formatVisiteDate(item.date)}</Text>
+            <Text style={[styles.date, !dateStr && styles.datePending]}>{dateLabel}</Text>
           </View>
         </View>
 
@@ -299,6 +298,10 @@ const styles = StyleSheet.create({
   date: {
     ...typography.caption,
     color: colors.textSecondary,
+  },
+  datePending: {
+    color: colors.warning,
+    fontStyle: 'italic',
   },
 
   // Cancel button

@@ -267,6 +267,7 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const likeRoutes = require("./routes/likeRoutes");
 const commentRoutes = require("./routes/commentRoutes");
 const conversationRoutes = require("./routes/conversationRoutes");
+const visiteRoutes = require('./routes/visiteRoutes');
 const messageRoutes = require("./routes/messageRoutes");
 const internalMailRoutes = require("./routes/internalMailRoutes");
 const companyEmailRoutes = require("./routes/companyEmailRoutes");
@@ -321,6 +322,7 @@ app.use("/api/dashboard", dashboardRoutes);
 // 💬 Messagerie & Emails
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/messages", messageRoutes);
+app.use('/api/visites', visiteRoutes);
 app.use("/api/internal-mails", internalMailRoutes);
 app.use("/api/company-emails", companyEmailRoutes);
 app.use("/api/emails", emailRoutes);
