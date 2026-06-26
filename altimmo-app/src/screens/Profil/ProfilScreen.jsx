@@ -173,10 +173,7 @@ export default function ProfilScreen({ navigation }) {
             <MenuRow
               icon="business-outline"
               label="Mes annonces"
-              onPress={() => navigation.navigate('Annonces', {
-                screen: 'ListeAnnonces',
-                params: { filterOwner: user?._id },
-              })}
+              onPress={() => navigation.navigate('MesAnnonces')}
             />
             <MenuRow
               icon="calendar-outline"

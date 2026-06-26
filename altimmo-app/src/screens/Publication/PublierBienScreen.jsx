@@ -107,7 +107,7 @@ export default function PublierBienScreen({ navigation, route }) {
       titre: editProperty.title || editProperty.titre || '',
       description: editProperty.description || '',
       type: editProperty.type || '',
-      categorie: editProperty.status === 'location' ? 'Location' : 'Vente',
+      categorie: editProperty.status?.toLowerCase() === 'location' ? 'Location' : 'Vente',
       period: 'Mensuel',
       prix: String(editProperty.price || editProperty.prix || ''),
       ville: editProperty.address?.city || 'Brazzaville',

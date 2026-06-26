@@ -290,9 +290,14 @@ const updateProperty = asyncHandler(async (req, res) => {
   }
 
   // Champs interdits à la modification directe
-  const excludedFields = ['_id', 'owner', 'createdAt', 'statusAdmin', 'reviewedAt', 'images'];
+  const excludedFields = ['_id', 'owner', 'createdAt', 'reviewedAt', 'images'];
   const updateData = { ...req.body };
   excludedFields.forEach(field => delete updateData[field]);
+  delete updateData.statusAdmin; // toujours exclu du body
+  // Un propriétaire qui modifie son bien repasse en modération
+  if (!isAdmin) {
+    updateData.statusAdmin = 'En attente';
+  }
 
   // 1. Upload des nouvelles images vers Cloudinary (avec optimisation WebP)
   const newImages = await uploadFilesToCloudinary(req.files);
