@@ -7,40 +7,60 @@
    ================================================================ */
 
 :root {
-  --gold:        #C8872A;
-  --gold-light:  #E5A84B;
-  --gold-dark:   #A0671A;
+  /* ── Brand Gold ─────────────────────────── */
+  --gold:        #C8960C;
+  --gold-light:  #DCA815;
+  --gold-dark:   #9A710A;
+  --gold-subtle: rgba(200,150,12,0.10);
+  --gold-border: rgba(200,150,12,0.18);
+
+  /* ── Couleurs d'accent ───────────────────── */
   --blue:        #2E7BB5;
   --blue-dark:   #1A5A8A;
-  --red:         #D42B2B;
+  --red:         #DC2626;
   --red-dark:    #A01E1E;
-  --dark:        #0A0C0F;
-  --dark2:       #111418;
-  --dark3:       #181C22;
-  --text:        #E8E4DC;
-  --muted:       rgba(232,228,220,0.55);
-  --faint:       rgba(232,228,220,0.2);
-  --border:      rgba(232,228,220,0.07);
-  --font-display: var(--font-cormorant), Georgia, serif;
-  --font-body:    var(--font-dm-sans), -apple-system, sans-serif;
-  --radius-sm:   6px;
-  --radius-md:   12px;
-  --radius-lg:   20px;
-  --radius-pill: 40px;
-  --transition:  0.3s cubic-bezier(0.4,0,0.2,1);
+  --green:       #16A34A;
+
+  /* ── Fonds ─ */
+  --dark:        #090B0E;
+  --dark2:       #111318;
+  --dark3:       #181C24;
+
+  /* ── Texte ── */
+  --text:        #F0EDE8;
+  --muted:       rgba(240,237,232,0.52);
+  --faint:       rgba(240,237,232,0.2);
+  --border:      rgba(240,237,232,0.07);
+
+  /* ── Typographie ── */
+  --font-display:       var(--font-cinzel), var(--font-cormorant), Georgia, serif;
+  --font-display-serif: var(--font-cormorant), Georgia, serif;
+  --font-body:          var(--font-dm-sans), -apple-system, sans-serif;
+
+  /* ── Rayons ── */
+  --radius-sharp: 0px;
+  --radius-sm:    4px;
+  --radius-md:    8px;
+  --radius-lg:    12px;
+  --radius-pill:  40px;
+
+  /* ── Ombres ── */
+  --shadow-card:  0 4px 24px rgba(0,0,0,0.4);
+  --shadow-hover: 0 16px 48px rgba(0,0,0,0.6);
+  --shadow-gold:  0 0 24px rgba(200,150,12,0.15);
+
+  /* ── Transitions ── */
+  --transition:       0.2s cubic-bezier(0.4,0,0.2,1);
+  --transition-slow:  0.4s cubic-bezier(0.22,1,0.36,1);
+
+  /* ── Espacement ── */
   --px: clamp(16px, 5vw, 80px);
   --py: clamp(60px, 7vw, 120px);
 }
 
-@media (min-width: 1440px) {
-  :root { --px: 80px; --py: 120px; }
-}
-@media (min-width: 1920px) {
-  :root { --px: 120px; --py: 140px; }
-}
-@media (min-width: 2560px) {
-  :root { --px: 160px; --py: 160px; }
-}
+@media (min-width: 1440px) { :root { --px: 80px; --py: 120px; } }
+@media (min-width: 1920px) { :root { --px: 120px; --py: 140px; } }
+@media (min-width: 2560px) { :root { --px: 160px; --py: 160px; } }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -71,33 +91,47 @@ img { max-width: 100%; display: block; }
 ::selection { background: var(--gold); color: var(--dark); }
 :focus-visible { outline: 1px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
 
-/* ================================================================
-   BOUTONS
-   ================================================================ */
-
 .btn-gold {
   display: inline-flex; align-items: center; gap: 8px;
-  padding: 12px 28px; border-radius: var(--radius-pill);
+  padding: 11px 26px; border-radius: var(--radius-sm);
   background: var(--gold); color: var(--dark);
-  font-size: 0.78rem; font-weight: 500;
+  font-size: 0.76rem; font-weight: 600;
   letter-spacing: 0.08em; text-transform: uppercase;
-  border: none; transition: var(--transition); white-space: nowrap;
+  border: none; cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
+  white-space: nowrap; min-height: 44px;
 }
-.btn-gold:hover { background: var(--gold-light); transform: translateY(-1px); }
+.btn-gold:hover {
+  background: var(--gold-light);
+  box-shadow: var(--shadow-gold);
+  transform: translateY(-1px);
+}
 
 .btn-outline {
   display: inline-flex; align-items: center; gap: 8px;
-  padding: 11px 28px; border-radius: var(--radius-pill);
-  background: transparent; border: 1px solid rgba(232,228,220,0.2);
-  color: rgba(232,228,220,0.75); font-size: 0.78rem; font-weight: 400;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  transition: var(--transition); white-space: nowrap;
+  padding: 10px 26px; border-radius: var(--radius-sm);
+  background: transparent; border: 1px solid rgba(240,237,232,0.18);
+  color: rgba(240,237,232,0.65); font-size: 0.76rem; font-weight: 400;
+  letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+  white-space: nowrap; min-height: 44px;
 }
-.btn-outline:hover { border-color: var(--text); color: var(--text); }
+.btn-outline:hover { border-color: rgba(240,237,232,0.5); color: var(--text); }
 
-/* ================================================================
-   INPUT
-   ================================================================ */
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 20px; border-radius: var(--radius-sm);
+  background: transparent; border: 1px solid var(--gold-border);
+  color: rgba(200,150,12,0.8); font-size: 0.76rem; font-weight: 400;
+  letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  white-space: nowrap; min-height: 44px;
+}
+.btn-ghost:hover {
+  border-color: rgba(200,150,12,0.4);
+  color: var(--gold);
+  background: var(--gold-subtle);
+}
 
 @layer components {
   .input-style {
@@ -111,26 +145,14 @@ img { max-width: 100%; display: block; }
   .input-style::placeholder { color: var(--faint); }
 }
 
-/* ================================================================
-   ANIMATIONS
-   ================================================================ */
-
 @keyframes avFadeUp    { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
 @keyframes avFadeIn    { from{opacity:0} to{opacity:1} }
 @keyframes avTicker    { from{transform:translateX(0)} to{transform:translateX(-50%)} }
 @keyframes avPulse     { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.3)} }
 @keyframes avSkeleton  { 0%,100%{opacity:.4} 50%{opacity:.8} }
-
-@keyframes pulse-slow {
-  0%, 100% { opacity: 0.2; transform: scale(1); }
-  50%       { opacity: 0.35; transform: scale(1.05); }
-}
+@keyframes pulse-slow  { 0%,100%{opacity:0.2;transform:scale(1)} 50%{opacity:0.35;transform:scale(1.05)} }
 
 .animate-pulse-slow { animation: pulse-slow 6s ease-in-out infinite; }
-
-/* ================================================================
-   ACCESSIBILITÉ — REDUCED MOTION
-   ================================================================ */
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -141,61 +163,12 @@ img { max-width: 100%; display: block; }
   }
 }
 
-/* ================================================================
-   CONTAINERS — empêche le contenu de s'étirer sur très grands écrans
-   ================================================================ */
-
-.section-inner {
-  max-width: 1400px;
-  margin-left: auto;
-  margin-right: auto;
-  width: 100%;
-}
-
-/* ================================================================
-   LEAFLET
-   ================================================================ */
-
+.section-inner { max-width: 1400px; margin-left: auto; margin-right: auto; width: 100%; }
 .leaflet-container { height: 300px; width: 100%; }
 
-/* ================================================================
-   FORMULAIRES — LISIBILITÉ SUR FONDS CLAIRS
-   Le body utilise color: var(--text) (#E8E4DC) pour le thème sombre
-   du site public. Sur les pages dashboard et modals à fond blanc/gris,
-   ce texte clair devient quasi-invisible dans les champs de saisie.
-   Ces règles forcent un texte sombre pour tous les inputs, en
-   restaurant ensuite la couleur correcte pour les inputs dark-theme
-   (.input-style) grâce à la spécificité de sélecteur de classe.
-   ================================================================ */
-
-input,
-textarea,
-select {
-  color: #1a1a1a !important;
-}
-
-/* Restaurer la couleur claire pour les champs sur fond sombre */
-.input-style {
-  color: var(--text) !important;
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: #9ca3af !important;
-  opacity: 1;
-}
-
-.input-style::placeholder {
-  color: var(--faint) !important;
-}
-
-option {
-  color: #1a1a1a !important;
-  background-color: #ffffff;
-}
-
-input:disabled,
-textarea:disabled,
-select:disabled {
-  color: #6b7280 !important;
-}
+input, textarea, select { color: #1a1a1a !important; }
+.input-style { color: var(--text) !important; }
+input::placeholder, textarea::placeholder { color: #9ca3af !important; opacity: 1; }
+.input-style::placeholder { color: var(--faint) !important; }
+option { color: #1a1a1a !important; background-color: #ffffff; }
+input:disabled, textarea:disabled, select:disabled { color: #6b7280 !important; }

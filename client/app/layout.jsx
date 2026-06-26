@@ -1,10 +1,17 @@
 import "./globals.css";
-import { Cormorant_Garamond, DM_Sans } from 'next/font/google';
+import { Cinzel, Cormorant_Garamond, DM_Sans } from 'next/font/google';
 import Script from 'next/script';
 import AppProviders from "./AppProviders";
 import ClientLayout from "./ClientLayout";
 import JsonLd from "@/lib/components/JsonLd";
 import { buildMetadata, SITE_URL } from "@/lib/seo";
+
+const cinzel = Cinzel({
+  subsets: ['latin'],
+  weight: ['400', '600', '700'],
+  variable: '--font-cinzel',
+  display: 'swap',
+});
 
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
@@ -82,7 +89,7 @@ const LOCAL_BUSINESS_SCHEMA = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="fr" className={`${cormorant.variable} ${dmSans.variable}`}>
+    <html lang="fr" className={`${cinzel.variable} ${cormorant.variable} ${dmSans.variable}`}>
       <body>
         <JsonLd schemas={[LOCAL_BUSINESS_SCHEMA]} />
         <AppProviders>

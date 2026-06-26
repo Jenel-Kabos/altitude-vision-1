@@ -18,8 +18,8 @@ import Breadcrumb from '../components/Breadcrumb';
 // ─── Design tokens ─────────────────────────────────────────────
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
-const GOLD      = '#C8872A';
-const GOLD_PALE = 'rgba(200,135,42,0.08)';
+const GOLD      = '#C8960C';
+const GOLD_PALE = 'rgba(200,150,12,0.08)';
 const INK       = '#1A1612';
 const INK_MID   = '#4A3F35';
 const INK_SOFT  = '#8C7B6E';
@@ -75,7 +75,7 @@ const STYLES = `
     position: sticky; top: 0; z-index: 40;
     background: rgba(250,248,245,0.92);
     backdrop-filter: blur(16px);
-    border-bottom: 1px solid rgba(200,135,42,0.12);
+    border-bottom: 1px solid rgba(200,150,12,0.12);
   }
   .pdp-nav-inner {
     max-width: 1200px; margin: 0 auto;
@@ -93,7 +93,7 @@ const STYLES = `
     white-space: nowrap; flex-shrink: 0;
   }
   .pdp-nav-back:hover { color: ${GOLD}; }
-  .pdp-nav-sep { color: rgba(200,135,42,0.3); font-size: 12px; flex-shrink: 0; }
+  .pdp-nav-sep { color: rgba(200,150,12,0.3); font-size: 12px; flex-shrink: 0; }
   .pdp-nav-title {
     font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.62rem, 1.5vw, 0.68rem);
@@ -184,7 +184,7 @@ const STYLES = `
     bottom: clamp(8px, 2vw, 14px); right: clamp(8px, 2vw, 14px);
     padding: clamp(6px, 1.2vw, 8px) clamp(10px, 2vw, 16px); border-radius: 1px;
     background: rgba(26,22,18,0.82); backdrop-filter: blur(10px);
-    border: 1px solid rgba(200,135,42,0.38);
+    border: 1px solid rgba(200,150,12,0.38);
   }
   .pdp-img-price-value {
     font-family: var(--font-cormorant), serif;
@@ -197,13 +197,13 @@ const STYLES = `
     position: absolute; top: 50%; transform: translateY(-50%);
     /* Cible tactile 44px minimum */
     width: clamp(36px, 5vw, 44px); height: clamp(36px, 5vw, 44px);
-    background: rgba(26,22,18,0.55); border: 1px solid rgba(200,135,42,0.25);
+    background: rgba(26,22,18,0.55); border: 1px solid rgba(200,150,12,0.25);
     backdrop-filter: blur(8px); color: #fff; cursor: pointer; border-radius: 1px;
     display: flex; align-items: center; justify-content: center;
     opacity: 0; transition: opacity 0.25s, background 0.2s;
   }
   .pdp-gallery-wrap:hover .pdp-arrow { opacity: 1; }
-  .pdp-arrow:hover { background: rgba(200,135,42,0.55); }
+  .pdp-arrow:hover { background: rgba(200,150,12,0.55); }
   .pdp-arrow-left  { left: clamp(8px, 1.5vw, 16px); }
   .pdp-arrow-right { right: clamp(8px, 1.5vw, 16px); }
   /* Sur mobile : flèches toujours visibles (pas de hover) */
@@ -252,7 +252,7 @@ const STYLES = `
   /* ── CARDS contenu ── */
   .pdp-card {
     background: #FDFCFA;
-    border: 1px solid rgba(200,135,42,0.14);
+    border: 1px solid rgba(200,150,12,0.14);
     border-radius: 2px;
     padding: clamp(18px, 4vw, 32px);
     margin-bottom: clamp(14px, 3vw, 22px);
@@ -267,7 +267,7 @@ const STYLES = `
   }
   .pdp-card-title::after {
     content: ''; flex: 1; height: 1px;
-    background: linear-gradient(90deg, rgba(200,135,42,0.28), transparent);
+    background: linear-gradient(90deg, rgba(200,150,12,0.28), transparent);
   }
 
   /* ── STATS (caractéristiques) ── */
@@ -284,17 +284,17 @@ const STYLES = `
   .pdp-stat {
     display: flex; align-items: center; gap: clamp(8px, 1.5vw, 12px);
     padding: clamp(10px, 2vw, 14px) clamp(10px, 2vw, 18px);
-    border: 1px solid rgba(200,135,42,0.14); border-radius: 2px;
+    border: 1px solid rgba(200,150,12,0.14); border-radius: 2px;
     background: ${CREAM}; transition: border-color 0.2s, box-shadow 0.2s;
   }
   .pdp-stat:hover {
-    border-color: rgba(200,135,42,0.35);
-    box-shadow: 0 4px 16px rgba(200,135,42,0.08);
+    border-color: rgba(200,150,12,0.35);
+    box-shadow: 0 4px 16px rgba(200,150,12,0.08);
   }
   .pdp-stat-icon {
     width: clamp(30px, 5vw, 38px); height: clamp(30px, 5vw, 38px);
     display: flex; align-items: center; justify-content: center;
-    background: ${GOLD_PALE}; border: 1px solid rgba(200,135,42,0.15);
+    background: ${GOLD_PALE}; border: 1px solid rgba(200,150,12,0.15);
     border-radius: 1px; flex-shrink: 0;
   }
   .pdp-stat-val {
@@ -337,7 +337,7 @@ const STYLES = `
   .pdp-tag {
     display: inline-flex; align-items: center; gap: 5px;
     padding: clamp(6px, 1.2vw, 7px) clamp(10px, 2vw, 14px);
-    border: 1px solid rgba(200,135,42,0.2); border-radius: 1px;
+    border: 1px solid rgba(200,150,12,0.2); border-radius: 1px;
     font-size: clamp(0.62rem, 1.3vw, 0.68rem); font-weight: 500;
     letter-spacing: 0.12em; text-transform: uppercase;
     color: ${INK_MID}; background: transparent;
@@ -355,13 +355,13 @@ const STYLES = `
 
   .pdp-sidebar-price {
     padding: clamp(20px, 4vw, 32px) clamp(18px, 4vw, 28px) clamp(16px, 3vw, 24px);
-    border-bottom: 1px solid rgba(200,135,42,0.2);
+    border-bottom: 1px solid rgba(200,150,12,0.2);
   }
   .pdp-sidebar-price-label {
     font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.52rem, 1.1vw, 0.56rem); font-weight: 600;
     letter-spacing: 0.25em; text-transform: uppercase;
-    color: rgba(200,135,42,0.6); margin-bottom: 8px;
+    color: rgba(200,150,12,0.6); margin-bottom: 8px;
   }
   .pdp-sidebar-price-value {
     font-family: var(--font-cormorant), serif;
@@ -409,10 +409,10 @@ const STYLES = `
   .pdp-cta-tel {
     display: flex; align-items: center; justify-content: center; gap: 8px;
     width: 100%; padding: clamp(11px, 2.2vw, 14px);
-    background: transparent; color: rgba(200,135,42,0.9);
+    background: transparent; color: rgba(200,150,12,0.9);
     font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.76rem, 1.6vw, 0.82rem); font-weight: 500; letter-spacing: 0.08em;
-    border: 1px solid rgba(200,135,42,0.3); cursor: pointer; border-radius: 1px;
+    border: 1px solid rgba(200,150,12,0.3); cursor: pointer; border-radius: 1px;
     transition: border-color 0.2s, color 0.2s; text-decoration: none;
   }
   .pdp-cta-tel:hover { border-color: ${GOLD}; color: ${GOLD}; }
@@ -429,7 +429,7 @@ const STYLES = `
   }
   .pdp-reassurance-icon {
     width: clamp(24px, 3.5vw, 28px); height: clamp(24px, 3.5vw, 28px);
-    border-radius: 1px; border: 1px solid rgba(200,135,42,0.2);
+    border-radius: 1px; border: 1px solid rgba(200,150,12,0.2);
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .pdp-reassurance-text {
@@ -442,7 +442,7 @@ const STYLES = `
   .pdp-badge {
     display: inline-flex; align-items: center; gap: 5px;
     padding: clamp(4px, 0.8vw, 5px) clamp(10px, 2vw, 12px);
-    border: 1px solid rgba(200,135,42,0.3); color: ${GOLD};
+    border: 1px solid rgba(200,150,12,0.3); color: ${GOLD};
     font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.58rem, 1.1vw, 0.62rem); font-weight: 600;
     letter-spacing: 0.18em; text-transform: uppercase;
@@ -477,12 +477,12 @@ const STYLES = `
   .pdp-lightbox-close {
     position: fixed; top: clamp(12px, 2.5vw, 20px); right: clamp(12px, 2.5vw, 20px);
     width: clamp(36px, 5vw, 40px); height: clamp(36px, 5vw, 40px); border-radius: 1px;
-    background: rgba(250,248,245,0.08); border: 1px solid rgba(200,135,42,0.25);
+    background: rgba(250,248,245,0.08); border: 1px solid rgba(200,150,12,0.25);
     color: rgba(255,255,255,0.7); font-size: 20px;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     transition: background 0.2s;
   }
-  .pdp-lightbox-close:hover { background: rgba(200,135,42,0.25); }
+  .pdp-lightbox-close:hover { background: rgba(200,150,12,0.25); }
   .pdp-lightbox-counter {
     position: fixed; bottom: clamp(14px, 3vw, 24px); left: 50%; transform: translateX(-50%);
     font-family: var(--font-dm-sans), sans-serif;
@@ -493,7 +493,7 @@ const STYLES = `
     position: fixed; top: 50%; transform: translateY(-50%);
     width: clamp(40px, 5vw, 44px); height: clamp(40px, 5vw, 44px); border-radius: 1px;
     background: rgba(26,22,18,0.6); backdrop-filter: blur(8px);
-    border: 1px solid rgba(200,135,42,0.2);
+    border: 1px solid rgba(200,150,12,0.2);
     color: #fff; cursor: pointer; font-size: 22px;
     display: flex; align-items: center; justify-content: center;
     transition: border-color 0.2s;
@@ -505,7 +505,7 @@ const STYLES = `
     position: fixed; bottom: clamp(40px, 7vw, 60px); left: 50%; transform: translateX(-50%);
     display: flex; gap: 5px; padding: clamp(6px, 1.2vw, 8px) clamp(10px, 2vw, 12px);
     background: rgba(26,22,18,0.72); backdrop-filter: blur(10px);
-    border-radius: 2px; border: 1px solid rgba(200,135,42,0.15);
+    border-radius: 2px; border: 1px solid rgba(200,150,12,0.15);
     max-width: 90vw; overflow-x: auto; scrollbar-width: none;
   }
   .pdp-lightbox-strip::-webkit-scrollbar { display: none; }
@@ -601,7 +601,7 @@ const PropertyDetailPage = () => {
         <Link href="/altimmo/annonces" style={{
           display:'inline-flex', alignItems:'center', gap:8,
           padding:'12px 24px', background:INK, color:'#fff',
-          fontFamily:"'Jost', sans-serif", fontSize:'clamp(0.68rem,1.5vw,0.75rem)',
+          fontFamily:"'DM Sans', sans-serif", fontSize:'clamp(0.68rem,1.5vw,0.75rem)',
           letterSpacing:'0.15em', textTransform:'uppercase',
           textDecoration:'none', borderRadius:1,
         }}>
@@ -740,13 +740,13 @@ const PropertyDetailPage = () => {
           ) : (
             <div style={{
               height:'clamp(180px,40vw,240px)', borderRadius:2,
-              border:'1px dashed rgba(200,135,42,0.25)', background:GOLD_PALE,
+              border:'1px dashed rgba(200,150,12,0.25)', background:GOLD_PALE,
               display:'flex', alignItems:'center', justifyContent:'center',
               flexDirection:'column', gap:10, color:INK_SOFT,
               marginBottom:'clamp(20px,4vw,28px)',
             }}>
               <MapPin size={24} style={{ opacity:0.3 }} />
-              <p style={{ fontFamily:"'Jost', sans-serif", fontSize:'clamp(0.62rem,1.3vw,0.68rem)', letterSpacing:'0.12em' }}>
+              <p style={{ fontFamily:"'DM Sans', sans-serif", fontSize:'clamp(0.62rem,1.3vw,0.68rem)', letterSpacing:'0.12em' }}>
                 AUCUNE IMAGE
               </p>
             </div>
@@ -838,7 +838,7 @@ const PropertyDetailPage = () => {
                 </p>
                 <div className="pdp-sidebar-badges">
                   <span className="pdp-sidebar-badge" style={{
-                    border:'1px solid rgba(200,135,42,0.3)', color:GOLD,
+                    border:'1px solid rgba(200,150,12,0.3)', color:GOLD,
                   }}>
                     En {property.status || 'vente'}
                   </span>
@@ -882,7 +882,7 @@ const PropertyDetailPage = () => {
                   ].map(({ Icon, text }, i) => (
                     <div key={i} className="pdp-reassurance-item">
                       <div className="pdp-reassurance-icon">
-                        <Icon size={11} color="rgba(200,135,42,0.7)" />
+                        <Icon size={11} color="rgba(200,150,12,0.7)" />
                       </div>
                       <p className="pdp-reassurance-text">{text}</p>
                     </div>
