@@ -4,6 +4,7 @@ import {
   TouchableOpacity, StyleSheet,
   FlatList, Dimensions, Alert,
   TextInput, SafeAreaView,
+  Modal, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
@@ -23,6 +24,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const [envoi, setEnvoi] = useState(false);
   const [favori, setFavori] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [bailModalVisible, setBailModalVisible] = useState(false);
 
   const galleryRef = useRef(null);
 
@@ -38,6 +40,25 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     };
     recharger();
   }, [annonce._id]);
+
+  // Charger l'état réel du favori depuis l'API
+  useEffect(() => {
+    api.get(`/likes/status/Property/${annonce._id}`)
+      .then(res => setFavori(res.data?.data?.liked || false))
+      .catch(() => {});
+  }, [annonce._id]);
+
+  const toggleFavori = async () => {
+    try {
+      const res = await api.post('/likes', {
+        targetType: 'Property',
+        targetId: annonce._id,
+      });
+      setFavori(res.data?.data?.liked ?? !favori);
+    } catch {
+      Alert.alert('Erreur', 'Impossible de mettre à jour vos favoris.');
+    }
+  };
 
   // ─── Données dérivées (avec fallbacks legacy) ──────────────────
   const photos = annonce.images || annonce.photos || [];
@@ -250,6 +271,71 @@ export default function DetailAnnonceScreen({ route, navigation }) {
             </View>
           )}
 
+          {/* Bouton conditions de bail */}
+          {isLocation && (
+            <TouchableOpacity
+              style={styles.bailButton}
+              onPress={() => setBailModalVisible(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="document-text-outline" size={20} color={colors.gold} />
+              <Text style={styles.bailButtonText}>Voir les conditions de bail</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          {/* Modal conditions de bail */}
+          <Modal
+            visible={bailModalVisible}
+            animationType="slide"
+            transparent
+            onRequestClose={() => setBailModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Conditions de bail</Text>
+                  <TouchableOpacity onPress={() => setBailModalVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <Text style={styles.modalSectionTitle}>Caution demandée</Text>
+                  <Text style={styles.modalValue}>
+                    {(prix * (annonce.cautionMultiplicateur || 2)).toLocaleString('fr-FR')} FCFA
+                    {' '}({annonce.cautionMultiplicateur || 2} mois de loyer)
+                  </Text>
+
+                  {annonce.profilsLocataireRecherches?.length > 0 && (
+                    <>
+                      <Text style={styles.modalSectionTitle}>Profil locataire recherché</Text>
+                      <View style={styles.modalChipsRow}>
+                        {annonce.profilsLocataireRecherches.map((p, i) => (
+                          <View key={i} style={styles.modalChip}>
+                            <Text style={styles.modalChipText}>{p}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </>
+                  )}
+
+                  {annonce.documentsRequis?.length > 0 && (
+                    <>
+                      <Text style={styles.modalSectionTitle}>Documents à fournir</Text>
+                      {annonce.documentsRequis.map((d, i) => (
+                        <View key={i} style={styles.modalDocRow}>
+                          <Ionicons name="checkmark-circle-outline" size={16} color={colors.gold} />
+                          <Text style={styles.modalDocText}>{d}</Text>
+                        </View>
+                      ))}
+                    </>
+                  )}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
           {/* Commentaires */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
@@ -327,7 +413,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerBtn}
-            onPress={() => setFavori(!favori)}
+            onPress={toggleFavori}
             activeOpacity={0.8}
           >
             <Ionicons
@@ -632,6 +718,97 @@ const styles = StyleSheet.create({
   },
   sendBtn: {
     padding: spacing.xs,
+  },
+
+  // ─── Bouton bail ───
+  bailButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.goldMuted,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  bailButtonText: {
+    flex: 1,
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSize.md,
+    color: colors.goldDark,
+  },
+
+  // ─── Modal bail ───
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: spacing.lg,
+    maxHeight: '75%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
+    color: colors.text,
+  },
+  modalSectionTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  modalValue: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSize.md,
+    color: colors.text,
+  },
+  modalChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  modalChip: {
+    backgroundColor: colors.goldMuted,
+    borderRadius: radius.xs,
+    borderWidth: 1,
+    borderColor: colors.borderGold,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
+  modalChipText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.goldDark,
+  },
+  modalDocRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  modalDocText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: colors.textSub,
+    flex: 1,
   },
 
   // ─── CTA fixe ───

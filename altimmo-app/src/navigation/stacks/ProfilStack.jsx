@@ -4,6 +4,7 @@ import EditProfileScreen from '../../screens/Profil/EditProfileScreen';
 import ChangePasswordScreen from '../../screens/Profil/ChangePasswordScreen';
 import MesAnnoncesScreen from '../../screens/MesBiens/MesAnnoncesScreen';
 import PublierBienScreen from '../../screens/Publication/PublierBienScreen';
+import FavorisScreen from '../../screens/Profil/FavorisScreen';
 
 const Stack = createStackNavigator();
 
@@ -15,6 +16,7 @@ export default function ProfilStack() {
       <Stack.Screen name="ChangePassword"  component={ChangePasswordScreen} />
       <Stack.Screen name="MesAnnonces"     component={MesAnnoncesScreen} />
       <Stack.Screen name="PublierBien"     component={PublierBienScreen} />
+      <Stack.Screen name="Favoris"         component={FavorisScreen} />
     </Stack.Navigator>
   );
 }

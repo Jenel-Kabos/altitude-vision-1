@@ -190,6 +190,14 @@ export default function ProfilScreen({ navigation }) {
           </>
         )}
 
+        {/* Favoris — tous les utilisateurs */}
+        <Text style={styles.sectionTitle}>Favoris</Text>
+        <MenuRow
+          icon="heart-outline"
+          label="Mes favoris"
+          onPress={() => navigation.navigate('Favoris')}
+        />
+
         {/* Compte */}
         <Text style={styles.sectionTitle}>Compte</Text>
         <MenuRow
