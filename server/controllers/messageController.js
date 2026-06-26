@@ -33,14 +33,14 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         size: file.size
     }));
 
-    let targetUserId;
+    let targetUserId = null;
     let convDoc = null;
+    let isStaffInbox = false;
 
     if (receiverId) {
-        // CAS 1 : receiverId fourni directement
+        // CAS 1 : receiverId fourni directement (conv 1-à-1)
         targetUserId = receiverId;
     } else if (conversationId) {
-        // CAS 2 : conversationId fourni → chercher l'autre participant
         convDoc = await Conversation.findById(conversationId);
         if (!convDoc) {
             cleanupUploadedFiles(uploadedFiles);
@@ -48,41 +48,60 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             throw new Error('Conversation non trouvée.');
         }
 
-        const otherParticipantId = convDoc.participants.find(
-            (p) => p.toString() !== req.user.id.toString()
-        );
-
-        if (!otherParticipantId) {
-            cleanupUploadedFiles(uploadedFiles);
-            res.status(404);
-            throw new Error('Destinataire non trouvé dans la conversation.');
+        if (convDoc.isStaffInbox) {
+            // CAS 2 : boîte partagée staff
+            isStaffInbox = true;
+            const senderIsClient = convDoc.participants.some(
+                (p) => p.toString() === req.user.id.toString()
+            );
+            if (senderIsClient) {
+                // Client → staff : pas de destinataire fixe
+                targetUserId = null;
+            } else {
+                // Staff → client : le seul participant est le client
+                targetUserId = convDoc.participants[0];
+            }
+        } else {
+            // CAS 3 : conv 1-à-1 classique
+            const otherParticipantId = convDoc.participants.find(
+                (p) => p.toString() !== req.user.id.toString()
+            );
+            if (!otherParticipantId) {
+                cleanupUploadedFiles(uploadedFiles);
+                res.status(404);
+                throw new Error('Destinataire non trouvé dans la conversation.');
+            }
+            targetUserId = otherParticipantId;
         }
-
-        targetUserId = otherParticipantId;
     }
 
-    // --- 2. Vérifier le destinataire ---
-    const receiver = await User.findById(targetUserId);
-    if (!receiver) {
-        cleanupUploadedFiles(uploadedFiles);
-        res.status(404);
-        throw new Error('Destinataire non trouvé.');
+    // --- 2. Vérifier le destinataire (sauf si staff-inbox sans cible fixe) ---
+    let receiver = null;
+    if (targetUserId) {
+        receiver = await User.findById(targetUserId);
+        if (!receiver) {
+            cleanupUploadedFiles(uploadedFiles);
+            res.status(404);
+            throw new Error('Destinataire non trouvé.');
+        }
     }
 
     // --- 3. Créer le message ---
     const message = await Message.create({
         sender: req.user.id,
-        receiver: targetUserId,
+        receiver: targetUserId || null,
+        conversation: convDoc?._id || null,
         content,
         attachments: attachmentsData,
     });
 
     await message.populate('sender', 'name email avatar');
-    await message.populate('receiver', 'name email avatar');
+    if (targetUserId) {
+        await message.populate('receiver', 'name email avatar');
+    }
 
     // --- 4. Mettre à jour la Conversation (lastMessage + unreadCount) ---
     if (!convDoc) {
-        // Trouver ou créer la conversation si on est passé par receiverId
         convDoc = await Conversation.findOne({
             participants: { $all: [req.user.id, targetUserId] },
         });
@@ -93,42 +112,53 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         }
     }
 
-    const recipientIdStr = targetUserId.toString();
-    const currentCount = convDoc.unreadCount?.get(recipientIdStr) || 0;
-    convDoc.unreadCount.set(recipientIdStr, currentCount + 1);
     convDoc.lastMessage = content;
+
+    if (targetUserId) {
+        const recipientIdStr = targetUserId.toString();
+        const currentCount = convDoc.unreadCount?.get(recipientIdStr) || 0;
+        convDoc.unreadCount.set(recipientIdStr, currentCount + 1);
+    }
     await convDoc.save();
 
-    // --- 5. Notifier le destinataire en temps réel ---
+    const preview = content.length > 100 ? content.slice(0, 100) + '…' : content;
+    const senderName = req.user.name || 'Nouveau message';
+
+    // --- 5. Notification temps réel ---
     try {
-        getIO().to(recipientIdStr).emit('new-message', {
-            conversationId: convDoc._id,
-            message,
-        });
+        if (isStaffInbox && !targetUserId) {
+            // Client → staff : notifier tous les membres du staff
+            const STAFF_ROLES = ['Admin', 'Collaborateur'];
+            const staff = await User.find({ role: { $in: STAFF_ROLES } }).select('_id pushToken');
+            for (const s of staff) {
+                const sid = s._id.toString();
+                getIO().to(sid).emit('new-staff-message', { conversationId: convDoc._id, message });
+                if (!isUserOnline(sid) && s.pushToken) {
+                    await sendExpoPushNotification(s.pushToken, senderName, preview, {
+                        conversationId: convDoc._id.toString(), type: 'new_staff_message',
+                    });
+                }
+            }
+        } else if (targetUserId) {
+            // Conv 1-à-1 ou staff → client : notifier le destinataire
+            const recipientIdStr = targetUserId.toString();
+            getIO().to(recipientIdStr).emit('new-message', { conversationId: convDoc._id, message });
+            if (!isUserOnline(recipientIdStr)) {
+                const r = await User.findById(recipientIdStr).select('pushToken');
+                if (r?.pushToken) {
+                    await sendExpoPushNotification(r.pushToken, senderName, preview, {
+                        conversationId: convDoc._id.toString(), type: 'new_message',
+                    });
+                }
+            }
+        }
     } catch {
         // Socket.IO non initialisé — dégradation silencieuse
     }
 
-    // --- 6. Push notification si le destinataire n'est pas connecté en socket ---
-    if (!isUserOnline(recipientIdStr)) {
-        const recipientWithToken = await User.findById(recipientIdStr).select('pushToken name');
-        if (recipientWithToken?.pushToken) {
-            const senderName = req.user.name || 'Nouveau message';
-            const preview = content.length > 100 ? content.slice(0, 100) + '…' : content;
-            await sendExpoPushNotification(
-                recipientWithToken.pushToken,
-                senderName,
-                preview,
-                { conversationId: convDoc._id.toString(), type: 'new_message' }
-            );
-        }
-    }
-
     res.status(201).json({
         status: 'success',
-        data: {
-            message,
-        },
+        data: { message },
     });
 });
 

@@ -2,14 +2,9 @@
 const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
 const User = require('../models/User');
+const Conversation = require('../models/Conversation');
 
-// Gestion optionnelle du modèle Conversation
-let Conversation = null;
-try {
-  Conversation = require('../models/Conversation');
-} catch (error) {
-  // Le modèle n'existe pas encore, on fera sans (mode basé sur les messages)
-}
+const STAFF_ROLES = ['Admin', 'Collaborateur'];
 
 /**
  * @description Récupérer toutes les conversations de l'utilisateur
@@ -17,69 +12,24 @@ try {
  * @access Protected
  */
 exports.getConversations = asyncHandler(async (req, res) => {
-  if (Conversation) {
-    const conversations = await Conversation.find({
-      participants: req.user.id,
-      isArchived: { $ne: true },
-    })
-      .populate('participants', 'name email photo')
-      .sort({ updatedAt: -1 });
-
-    // Extraire unreadCount depuis la Map Mongoose pour l'utilisateur courant
-    const withUnread = conversations.map((conv) => {
-      const obj = conv.toObject();
-      obj.unreadCount = conv.unreadCount?.get(req.user.id) || 0;
-      return obj;
-    });
-
-    return res.status(200).json({
-      status: 'success',
-      results: withUnread.length,
-      data: { conversations: withUnread },
-    });
-  }
-
-  // Fallback : construire les conversations à partir des messages
-  const messages = await Message.find({
-    $or: [{ sender: req.user.id }, { receiver: req.user.id }],
+  const conversations = await Conversation.find({
+    participants: req.user.id,
+    isArchived: { $ne: true },
+    isStaffInbox: false, // les convs staff-inbox sont via GET /staff-inbox
   })
-    .populate('sender', 'name email photo')
-    .populate('receiver', 'name email photo')
-    .sort({ createdAt: -1 });
+    .populate('participants', 'name email photo')
+    .sort({ updatedAt: -1 });
 
-  const conversationsMap = new Map();
-
-  messages.forEach((message) => {
-    const isSender = message.sender._id.toString() === req.user.id;
-    const otherUserId = isSender ? message.receiver._id.toString() : message.sender._id.toString();
-    const otherUser = isSender ? message.receiver : message.sender;
-
-    if (!conversationsMap.has(otherUserId)) {
-      conversationsMap.set(otherUserId, {
-        _id: otherUserId,
-        user: otherUser,
-        lastMessage: message,
-        unreadCount: 0,
-        updatedAt: message.createdAt,
-      });
-    }
+  const withUnread = conversations.map((conv) => {
+    const obj = conv.toObject();
+    obj.unreadCount = conv.unreadCount?.get(req.user.id) || 0;
+    return obj;
   });
-
-  for (const [userId, conversation] of conversationsMap.entries()) {
-    const unreadCount = await Message.countDocuments({
-      sender: userId,
-      receiver: req.user.id,
-      isRead: false,
-    });
-    conversation.unreadCount = unreadCount;
-  }
-
-  const conversations = Array.from(conversationsMap.values());
 
   res.status(200).json({
     status: 'success',
-    results: conversations.length,
-    data: { conversations },
+    results: withUnread.length,
+    data: { conversations: withUnread },
   });
 });
 
@@ -312,3 +262,156 @@ exports.getUnreadCount = asyncHandler(async (req, res) => {
     data: { unreadCount },
   });
 });
+
+/**
+ * @description Créer ou récupérer une conversation avec routage staff/client
+ * @route POST /api/conversations/start
+ * @access Protected
+ *
+ * Règles :
+ *  - Staff → n'importe qui : conversation 1-à-1 classique (isStaffInbox: false)
+ *  - Client/Proprietaire → staff uniquement : boîte partagée (isStaffInbox: true)
+ *    Le client ne peut PAS contacter directement un autre client/propriétaire.
+ *
+ * REMPLACE `createOrGetConversation` (POST /) pour les nouveaux flux.
+ * L'ancienne route est conservée pour compatibilité avec le mobile existant.
+ */
+exports.startConversation = async (req, res) => {
+  try {
+    const { recipientId, propertyId, message } = req.body;
+    const isSenderStaff = STAFF_ROLES.includes(req.user.role);
+
+    // ── Blocage client → client ──────────────────────────────────
+    if (!isSenderStaff && recipientId) {
+      const recipient = await User.findById(recipientId).select('role');
+      if (!recipient) {
+        return res.status(404).json({ status: 'fail', message: 'Destinataire introuvable.' });
+      }
+      if (!STAFF_ROLES.includes(recipient.role)) {
+        return res.status(403).json({
+          status: 'fail',
+          message: 'Vous ne pouvez contacter que notre équipe.',
+        });
+      }
+    }
+
+    // ── Trouver ou créer la conversation ─────────────────────────
+    let conversation;
+
+    if (isSenderStaff) {
+      // Staff → destinataire précis : conversation 1-à-1
+      if (!recipientId) {
+        return res.status(400).json({ status: 'fail', message: 'recipientId requis pour le staff.' });
+      }
+      conversation = await Conversation.findOne({
+        participants: { $all: [req.user.id, recipientId] },
+        isStaffInbox: false,
+      });
+      if (!conversation) {
+        conversation = await Conversation.create({
+          participants: [req.user.id, recipientId],
+          relatedProperty: propertyId || null,
+          isStaffInbox: false,
+        });
+      } else if (propertyId && !conversation.relatedProperty) {
+        conversation.relatedProperty = propertyId;
+        await conversation.save();
+      }
+    } else {
+      // Client/Proprietaire → boîte staff partagée
+      // Une seule conversation par (client + bien) pour éviter le doublon
+      const query = {
+        participants: req.user.id,
+        isStaffInbox: true,
+      };
+      if (propertyId) query.relatedProperty = propertyId;
+
+      conversation = await Conversation.findOne(query);
+      if (!conversation) {
+        conversation = await Conversation.create({
+          participants: [req.user.id],
+          relatedProperty: propertyId || null,
+          isStaffInbox: true,
+        });
+      }
+    }
+
+    // ── Premier message optionnel ─────────────────────────────────
+    if (message?.trim()) {
+      const { getIO, isUserOnline } = require('../socket');
+      const { sendExpoPushNotification } = require('../utils/expoPush');
+
+      const newMsg = await Message.create({
+        sender: req.user.id,
+        receiver: isSenderStaff ? recipientId : null,
+        conversation: conversation._id,
+        content: message.trim(),
+      });
+
+      conversation.lastMessage = message.trim();
+      await conversation.save();
+
+      if (isSenderStaff) {
+        // Notifier le destinataire direct
+        try { getIO().to(recipientId.toString()).emit('new-message', { conversationId: conversation._id, message: newMsg }); } catch {}
+        if (!isUserOnline(recipientId.toString())) {
+          const r = await User.findById(recipientId).select('pushToken name');
+          if (r?.pushToken) {
+            await sendExpoPushNotification(r.pushToken, req.user.name || 'Message', message.trim().slice(0, 100), {
+              conversationId: conversation._id.toString(), type: 'new_message',
+            });
+          }
+        }
+      } else {
+        // Notifier tout le staff en temps réel
+        const staff = await User.find({ role: { $in: STAFF_ROLES } }).select('_id pushToken');
+        for (const s of staff) {
+          const sid = s._id.toString();
+          try { getIO().to(sid).emit('new-staff-message', { conversationId: conversation._id, message: newMsg }); } catch {}
+          if (!isUserOnline(sid) && s.pushToken) {
+            await sendExpoPushNotification(s.pushToken, req.user.name || 'Nouveau message client', message.trim().slice(0, 100), {
+              conversationId: conversation._id.toString(), type: 'new_staff_message',
+            });
+          }
+        }
+      }
+    }
+
+    await conversation.populate('participants', 'name email photo role');
+    if (conversation.relatedProperty) {
+      await conversation.populate('relatedProperty', 'title images');
+    }
+
+    res.status(200).json({ status: 'success', data: { conversation } });
+  } catch (error) {
+    console.error('❌ [startConversation]', error.message);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+/**
+ * @description Boîte partagée du staff — toutes les conversations isStaffInbox
+ * @route GET /api/conversations/staff-inbox
+ * @access Protected (Admin / Collaborateur uniquement)
+ */
+exports.getStaffInbox = async (req, res) => {
+  try {
+    if (!STAFF_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ status: 'fail', message: 'Accès réservé au staff.' });
+    }
+
+    const conversations = await Conversation.find({ isStaffInbox: true, isArchived: { $ne: true } })
+      .populate('participants', 'name email photo role')
+      .populate('relatedProperty', 'title images')
+      .sort('-updatedAt');
+
+    res.status(200).json({
+      status: 'success',
+      results: conversations.length,
+      data: { conversations },
+    });
+  } catch (error) {
+    console.error('❌ [getStaffInbox]', error.message);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};

@@ -32,6 +32,12 @@ const conversationSchema = new mongoose.Schema({
         ref: 'Event',
         default: null,
     },
+    // true = conversation initiée par un non-staff vers le staff (boîte partagée)
+    // visible par tout Admin/Collaborateur, sans destinataire unique fixe
+    isStaffInbox: {
+        type: Boolean,
+        default: false,
+    },
 }, {
     timestamps: true 
 });

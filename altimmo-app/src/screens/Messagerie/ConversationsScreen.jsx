@@ -25,8 +25,11 @@ const formatTime = (dateStr) => {
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
 };
 
+const STAFF_ROLES = ['Admin', 'Collaborateur'];
+
 export default function ConversationsScreen({ navigation }) {
   const { user } = useAuth();
+  const isStaff = STAFF_ROLES.includes(user?.role);
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,11 +37,10 @@ export default function ConversationsScreen({ navigation }) {
 
   const chargerConversations = async () => {
     try {
-      const res = await api.get('/conversations');
-      setConversations(
-        res.data?.data?.conversations ||
-        res.data?.conversations || []
-      );
+      // Le staff voit la boîte partagée ; les clients voient leurs convs 1-à-1
+      const endpoint = isStaff ? '/conversations/staff-inbox' : '/conversations';
+      const res = await api.get(endpoint);
+      setConversations(res.data?.data?.conversations || []);
     } catch (error) {
       console.log('Erreur conversations:', error.message);
     } finally {
@@ -55,7 +57,7 @@ export default function ConversationsScreen({ navigation }) {
     const token = api.defaults?.headers?.common?.Authorization?.replace('Bearer ', '');
     const socket = connectSocket(token);
 
-    socket.on('new-message', ({ conversationId, message }) => {
+    const handleIncoming = ({ conversationId, message }) => {
       if (!conversationId || !message) return;
       setConversations(prev => prev.map(conv => {
         if (conv._id !== conversationId.toString()) return conv;
@@ -66,13 +68,20 @@ export default function ConversationsScreen({ navigation }) {
           unreadCount: (conv.unreadCount || 0) + 1,
         };
       }));
-    });
+    };
+
+    socket.on('new-message', handleIncoming);
+    // Staff reçoit new-staff-message quand un client écrit dans la boîte partagée
+    if (isStaff) {
+      socket.on('new-staff-message', handleIncoming);
+    }
 
     // Fallback polling 30s — synchronise si le socket a été silencieux
     const id = setInterval(chargerConversations, 30000);
 
     return () => {
-      socket.off('new-message');
+      socket.off('new-message', handleIncoming);
+      if (isStaff) socket.off('new-staff-message', handleIncoming);
       clearInterval(id);
     };
   }, []);
@@ -82,22 +91,42 @@ export default function ConversationsScreen({ navigation }) {
     chargerConversations();
   };
 
-  // unreadCount est un nombre scalaire (extrait côté serveur pour l'utilisateur courant)
   const totalUnread = conversations.reduce((sum, c) => sum + Number(c.unreadCount || 0), 0);
 
-  // Filtered list
+  // Données d'affichage selon le type de conversation
+  const getConvDisplay = (item) => {
+    if (item.isStaffInbox) {
+      // Staff voit : nom du client + bien concerné
+      const client = item.participants?.[0];
+      const name = client?.name || client?.firstName || 'Client';
+      const propertyTitle = item.relatedProperty?.title;
+      return {
+        name,
+        subtitle: propertyTitle ? `Bien : ${propertyTitle}` : 'Demande de contact',
+        photo: client?.photo || null,
+        contact: { _id: client?._id, name },
+      };
+    }
+    // Conv 1-à-1 : l'autre participant
+    const other = item.participants?.find(p => p._id !== user?._id);
+    return {
+      name: other?.name || other?.firstName || 'Utilisateur',
+      subtitle: null,
+      photo: other?.photo || null,
+      contact: other,
+    };
+  };
+
   const filtered = conversations.filter(c => {
     if (!search.trim()) return true;
-    const other = c.participants?.find(p => p._id !== user?._id);
-    const name = (other?.name || '').toLowerCase();
+    const { name, subtitle } = getConvDisplay(c);
     const last = (c.lastMessage || '').toLowerCase();
     const q = search.trim().toLowerCase();
-    return name.includes(q) || last.includes(q);
+    return name.toLowerCase().includes(q) || last.includes(q) || (subtitle || '').toLowerCase().includes(q);
   });
 
   const renderItem = ({ item }) => {
-    const other = item.participants?.find(p => p._id !== user?._id);
-    const name = other?.name || other?.firstName || 'Utilisateur';
+    const { name, subtitle, photo, contact } = getConvDisplay(item);
     const initial = (name[0] || '?').toUpperCase();
     const unread = Number(item.unreadCount || 0);
     const lastMessage = item.lastMessage || 'Nouvelle conversation';
@@ -106,11 +135,11 @@ export default function ConversationsScreen({ navigation }) {
     return (
       <TouchableOpacity
         style={styles.conv}
-        onPress={() => navigation.navigate('Chat', { conversation: item, contact: other })}
+        onPress={() => navigation.navigate('Chat', { conversation: item, contact })}
         activeOpacity={0.7}
       >
-        {other?.photo ? (
-          <Image source={{ uri: other.photo }} style={styles.avatar} />
+        {photo ? (
+          <Image source={{ uri: photo }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, styles.avatarFallback]}>
             <Text style={styles.avatarInitial}>{initial}</Text>
@@ -119,9 +148,19 @@ export default function ConversationsScreen({ navigation }) {
 
         <View style={styles.right}>
           <View style={styles.row1}>
-            <Text style={styles.name} numberOfLines={1}>{name}</Text>
+            <View style={styles.nameWrap}>
+              <Text style={styles.name} numberOfLines={1}>{name}</Text>
+              {item.isStaffInbox && (
+                <View style={styles.staffBadge}>
+                  <Text style={styles.staffBadgeText}>CLIENT</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.time}>{time}</Text>
           </View>
+          {subtitle ? (
+            <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
+          ) : null}
           <View style={styles.row2}>
             <Text style={styles.lastMsg} numberOfLines={1}>{lastMessage}</Text>
             {unread > 0 && (
@@ -147,7 +186,7 @@ export default function ConversationsScreen({ navigation }) {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.title}>Messages</Text>
+          <Text style={styles.title}>{isStaff ? 'Boîte staff' : 'Messages'}</Text>
           {totalUnread > 0 && (
             <View style={styles.titleBadge}>
               <Text style={styles.titleBadgeText}>{totalUnread}</Text>
@@ -191,7 +230,9 @@ export default function ConversationsScreen({ navigation }) {
           <EmptyState
             icon="chatbubbles-outline"
             title="Aucune conversation"
-            subtitle="Contactez un propriétaire depuis une annonce."
+            subtitle={isStaff
+              ? 'Aucune demande client pour le moment.'
+              : 'Contactez notre équipe depuis une annonce.'}
           />
         }
       />
@@ -277,11 +318,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
+  nameWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
   name: {
     ...typography.body,
     color: colors.text,
     fontWeight: '600',
-    flex: 1,
+    flexShrink: 1,
+  },
+  staffBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  staffBadgeText: {
+    color: '#000',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  subtitle: {
+    fontSize: 11,
+    color: colors.primary,
+    marginBottom: 2,
   },
   time: {
     color: colors.textMuted,

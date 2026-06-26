@@ -2,47 +2,43 @@
 const express = require('express');
 const router = express.Router();
 
-// ✅ IMPORT 1 : Sécurité unifiée
-// On utilise authController pour être sûr que les règles (email vérifié, ban, etc.) s'appliquent partout
 const authController = require('../controllers/authController');
-
-// ✅ IMPORT 2 : Contrôleur avec les NOUVEAUX noms
 const {
   getConversations,
   getConversationMessages,
   markConversationAsRead,
-  createOrGetConversation,
+  createOrGetConversation,  // ⚠️  DÉPRÉCIÉ — conservé pour compat mobile (ouvrirChat)
   deleteConversation,
-  getUnreadCount, // 👈 C'est lui le coupable ! (Renommé pour correspondre au contrôleur)
+  getUnreadCount,
+  startConversation,        // ✅  NOUVEAU — remplace createOrGetConversation pour les nouveaux flux
+  getStaffInbox,            // ✅  NOUVEAU — boîte partagée staff
 } = require('../controllers/conversationController');
 
-// 🔒 Protection : Toutes les routes nécessitent d'être connecté
+// 🔒 Toutes les routes nécessitent un token valide
 router.use(authController.protect);
 
-// ==========================================================
-// --- 📌 Routes principales ---
-// ==========================================================
+// ── Routes statiques (AVANT /:conversationId pour éviter les conflits) ──────
 
-// Compter les messages non lus (doit être AVANT les routes dynamiques)
+// Compteur global de non-lus
 router.get('/count/unread', getUnreadCount);
 
-// Récupérer toutes les conversations
+// Boîte partagée staff (Admin / Collaborateur uniquement)
+router.get('/staff-inbox', getStaffInbox);
+
+// ✅ Nouvelle route de création — routage staff/client automatique
+router.post('/start', startConversation);
+
+// Liste des conversations 1-à-1 de l'utilisateur
 router.get('/', getConversations);
 
-// Créer ou récupérer une conversation
+// ⚠️  DÉPRÉCIÉ — ancienne création, conservée pour le mobile existant (DetailAnnonceScreen.ouvrirChat)
+//     Migrer vers POST /start dès que le mobile est mis à jour.
 router.post('/', createOrGetConversation);
 
-// ==========================================================
-// --- 🔗 Routes dynamiques (avec conversationId) ---
-// ==========================================================
+// ── Routes dynamiques ────────────────────────────────────────────────────────
 
-// Récupérer les messages d'une conversation spécifique
 router.get('/:conversationId/messages', getConversationMessages);
-
-// Marquer une conversation comme lue
 router.patch('/:conversationId/mark-read', markConversationAsRead);
-
-// Supprimer une conversation
 router.delete('/:conversationId', deleteConversation);
 
 module.exports = router;

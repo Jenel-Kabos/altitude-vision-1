@@ -181,6 +181,8 @@ const getAllProperties = asyncHandler(async (req, res) => {
   if (!isAdmin) {
     req.query.statusAdmin = 'Validée';
   }
+  // Toujours forcer availability, indépendamment du rôle et des query params client
+  req.query.availability = 'Disponible';
 
   const features = new APIFeatures(Property.find(), req.query)
     .filter()
@@ -511,9 +513,11 @@ const setRecommande = asyncHandler(async (req, res) => {
  * @route GET /api/properties/recommended
  */
 const getRecommendedProperties = asyncHandler(async (req, res) => {
+  const publicFilter = { statusAdmin: 'Validée', availability: 'Disponible' };
+
   let properties = await Property.find({
+    ...publicFilter,
     recommande: true,
-    statusAdmin: 'Validée',
   })
     .sort('-updatedAt')
     .limit(10);
@@ -522,9 +526,7 @@ const getRecommendedProperties = asyncHandler(async (req, res) => {
   // affiche automatiquement les 10 biens les plus chers
   let isFallback = false;
   if (properties.length === 0) {
-    properties = await Property.find({
-      statusAdmin: 'Validée',
-    })
+    properties = await Property.find(publicFilter)
       .sort('-price')
       .limit(10);
     isFallback = true;

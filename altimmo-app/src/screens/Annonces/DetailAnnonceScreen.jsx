@@ -8,7 +8,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Screen, Card, Button, PrixFCFA } from '../../components';
+import { Screen, Button, PrixFCFA } from '../../components';
 import { colors, fonts, fontSize, spacing, radius } from '../../theme';
 
 const { width } = Dimensions.get('window');
@@ -67,12 +67,6 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   const commodites = annonce.amenities || annonce.commodites || [];
 
-  const owner = annonce.owner || annonce.proprietaire || {};
-  const ownerName = owner.name || 'Propriétaire';
-  const ownerInitial = (ownerName[0] || '?').toUpperCase();
-  const ownerIsProprietaire = owner.role === 'Proprietaire';
-  const ownerRoleLabel = ownerIsProprietaire ? 'Propriétaire' : (owner.role || 'Agent');
-
   const reviews = annonce.reviews || annonce.comments || [];
 
   const needsTruncate = description.length > DESC_LIMIT;
@@ -100,38 +94,35 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     }
   };
 
-  const ouvrirChat = async () => {
-    try {
-      const res = await api.post('/conversations', {
-        participantId: annonce.proprietaire?._id || annonce.owner?._id,
-        relatedProperty: annonce._id,
-      });
-      const conversation = res.data?.data?.conversation || res.data?.conversation;
-      const contact = {
-        _id: annonce.proprietaire?._id || annonce.owner?._id,
-        name: annonce.proprietaire?.name || annonce.owner?.name || 'Propriétaire',
-      };
-      navigation.navigate('Messages', {
-        screen: 'Chat',
-        params: { conversation, contact },
-      });
-    } catch (err) {
-      Alert.alert('Erreur', err.response?.data?.message || "Impossible d'ouvrir le chat");
-    }
-  };
-
   const demanderVisite = () => {
     Alert.alert(
       'Prendre rendez-vous',
-      `Voulez-vous visiter :\n"${title}" ?`,
+      'Souhaitez-vous démarrer une conversation avec notre équipe pour ce bien ?',
       [
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Confirmer',
-          onPress: () => Alert.alert(
-            'Demande envoyée ✓',
-            'Un agent vous contactera sous 24h'
-          ),
+          onPress: async () => {
+            try {
+              const res = await api.post('/conversations/start', {
+                propertyId: annonce._id,
+                message: `Je souhaite prendre rendez-vous pour visiter : ${title}`,
+              });
+              const conversation = res.data?.data?.conversation;
+              navigation.navigate('Messages', {
+                screen: 'Chat',
+                params: {
+                  conversation,
+                  contact: { _id: null, name: 'Équipe Altitude Vision' },
+                },
+              });
+            } catch (err) {
+              Alert.alert(
+                'Erreur',
+                err.response?.data?.message || "Impossible de contacter l'équipe pour le moment."
+              );
+            }
+          },
         },
       ],
     );
@@ -252,41 +243,6 @@ export default function DetailAnnonceScreen({ route, navigation }) {
               </View>
             </View>
           )}
-
-          {/* Propriétaire */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Propriétaire</Text>
-            <Card>
-              <View style={styles.ownerInner}>
-                {owner.photo ? (
-                  <Image source={{ uri: owner.photo }} style={styles.ownerAvatar} />
-                ) : (
-                  <View style={[styles.ownerAvatar, styles.ownerAvatarFallback]}>
-                    <Text style={styles.ownerInitial}>{ownerInitial}</Text>
-                  </View>
-                )}
-                <View style={styles.ownerInfo}>
-                  <Text style={styles.ownerName} numberOfLines={1}>{ownerName}</Text>
-                  <View style={[
-                    styles.roleBadge,
-                    { borderColor: ownerIsProprietaire ? colors.gold : colors.border },
-                  ]}>
-                    <Text style={[
-                      styles.roleBadgeText,
-                      { color: ownerIsProprietaire ? colors.gold : colors.textSub },
-                    ]}>
-                      {ownerRoleLabel.toUpperCase()}
-                    </Text>
-                  </View>
-                </View>
-                <Button
-                  label="Échanger"
-                  variant="outline"
-                  onPress={ouvrirChat}
-                />
-              </View>
-            </Card>
-          </View>
 
           {/* Commentaires */}
           <View style={styles.section}>
@@ -592,50 +548,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: fontSize.sm,
     color: colors.goldDark,
-  },
-
-  // ─── Propriétaire ───
-  ownerInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  ownerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-  },
-  ownerAvatarFallback: {
-    backgroundColor: colors.bgCardAlt,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ownerInitial: {
-    fontFamily: fonts.display,
-    fontSize: fontSize.lg,
-    color: colors.gold,
-  },
-  ownerInfo: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  ownerName: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.md,
-    color: colors.text,
-  },
-  roleBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: radius.xs,
-    borderWidth: 1,
-  },
-  roleBadgeText: {
-    fontFamily: fonts.body,
-    fontSize: fontSize.xs,
-    letterSpacing: 0.8,
   },
 
   // ─── Commentaires ───
