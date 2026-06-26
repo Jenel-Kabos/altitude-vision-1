@@ -99,3 +99,27 @@ export const getUnreadCount = async () => {
         return 0;
     }
 };
+
+/**
+ * @description Boîte partagée staff — toutes les conversations clients (isStaffInbox: true)
+ */
+export const getStaffInbox = async () => {
+    const res = await api.get('/conversations/staff-inbox');
+    return res.data?.data?.conversations || [];
+};
+
+/**
+ * @description Charger les messages d'une conversation
+ */
+export const getConversationMessages = async (conversationId) => {
+    const res = await api.get(`/conversations/${conversationId}/messages`);
+    return res.data?.data?.messages || [];
+};
+
+/**
+ * @description Envoyer une réponse staff dans une conversation
+ */
+export const sendStaffReply = async (conversationId, content) => {
+    const res = await api.post('/messages', { conversationId, content });
+    return res.data?.data?.message;
+};

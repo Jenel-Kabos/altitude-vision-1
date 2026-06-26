@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   Home, Calendar, Briefcase, LogOut, BarChart3, Globe, Users,
   CheckCircle2, ShieldCheck, Mail, Menu, X, Star, Mountain, Building,
-  ClipboardList, BarChart2, Scale, Megaphone,
+  ClipboardList, BarChart2, Scale, Megaphone, MessageCircle,
 } from "lucide-react";
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -49,9 +49,10 @@ const NAV_SECTIONS = [
   {
     label: 'Communications',
     links: [
-      { to: '/dashboard/messages',   end: false, Icon: Mail,       label: 'Boîte de Réception', accent: GOLD },
-      { to: '/dashboard/emails',     end: false, Icon: ShieldCheck, label: 'Gestion des Emails', accent: '#F59E0B' },
-      { to: '/dashboard/publicites', end: false, Icon: Megaphone,   label: 'Publicités',         accent: GOLD, adminOnly: true },
+      { to: '/dashboard/messages',       end: false, Icon: Mail,            label: 'Boîte de Réception', accent: GOLD },
+      { to: '/dashboard/conversations',  end: false, Icon: MessageCircle,   label: 'Messages clients',   accent: GOLD },
+      { to: '/dashboard/emails',         end: false, Icon: ShieldCheck,     label: 'Gestion des Emails', accent: '#F59E0B' },
+      { to: '/dashboard/publicites',     end: false, Icon: Megaphone,       label: 'Publicités',         accent: GOLD, adminOnly: true },
     ],
   },
 ];
