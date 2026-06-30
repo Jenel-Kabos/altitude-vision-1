@@ -4,33 +4,34 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Users, Zap, Loader2, X, Send,
+    Users, Loader2, X, Send,
     Calendar, CalendarClock, MapPin, Sparkles,
     ArrowRight, Video, PartyPopper, Star,
     MessageSquarePlus, ChevronDown, CheckCircle,
     Heart, Camera, Clock,
 } from 'lucide-react';
+import Image from 'next/image';
 
 import HeroSliderMila  from '../components/HeroSliderMila';
 import ReviewCard      from '../components/ReviewCard';
+import MilaContact     from '../components/MilaContact';
 import { getAllEvents }          from '../services/eventService';
 import { createQuoteRequest }   from '../services/quoteService';
 import { getMilaEventsReviews } from '../services/reviewService';
 import { getFirstValidImage }   from '../utils/imageUtils';
 import { useAuth }              from '../context/AuthContext';
 import toast from '@/lib/utils/toast';
-import Image from 'next/image';
 
 const EVENTS_PER_PAGE = 6;
 const EVENT_TYPES = ['Tous', 'Mariage', 'Anniversaire', 'Gala', 'Conférence', 'Lancement'];
 const RED      = '#D42B2B';
 const RED_DARK = '#A01E1E';
 const RED_SOFT = '#F08080';
-const GOLD     = '#C8872A';
+const GOLD     = '#C8960C';
 
 const SERVICES = [
-    { id: 1, icon: Heart,  title: "Événements Privés",      desc: "Mariages, anniversaires, fêtes privées — chaque détail orchestré avec soin.", stat: '+30 événements', color: RED      },
-    { id: 2, icon: Users,  title: "Événements Corporatifs", desc: "Séminaires, conférences, lancements de produits — une image à la hauteur.",   stat: '+20 événements', color: RED_DARK },
+    { id: 1, icon: Heart,  title: "Événements Privés",      desc: "Mariages, anniversaires, fêtes privées — chaque détail orchestré avec soin.", stat: '+50 événements', color: RED      },
+    { id: 2, icon: Users,  title: "Événements Corporatifs", desc: "Séminaires, conférences, lancements de produits — une image à la hauteur.",   stat: '+30 événements', color: RED_DARK },
     { id: 3, icon: Camera, title: "Design & Scénographie",  desc: "Décors et ambiances thématiques uniques qui transforment l'espace.",           stat: 'Sur mesure',    color: RED      },
 ];
 
@@ -43,6 +44,7 @@ const ATOUTS = [
 
 // ─── EventCard ────────────────────────────────────────────────
 const MILA_FALLBACK = 'https://placehold.co/600x400/D42B2B/FFFFFF?text=Mila+Events';
+
 const EventCard = ({ event, index }) => {
     const router = useRouter();
     const d = {
@@ -51,7 +53,7 @@ const EventCard = ({ event, index }) => {
         description: event.description,
         date:        event.date,
         location:    event.location,
-        imageUrl:    getFirstValidImage(event.images, 'https://placehold.co/600x400/D42B2B/FFFFFF?text=Mila+Events'),
+        imageUrl:    getFirstValidImage(event.images, MILA_FALLBACK),
         category:    event.category || 'Événement',
         guests:      event.guests,
         videos:      event.videos || [],
@@ -63,24 +65,27 @@ const EventCard = ({ event, index }) => {
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.1 }} transition={{ duration: 0.5, delay: index * 0.06 }}
-            whileHover={{ y: -6 }}
-            className="group bg-white rounded-3xl border overflow-hidden cursor-pointer transition-all duration-500 hover:shadow-2xl"
-            style={{ borderColor: `${RED}1F` }}
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.1 }}
+            transition={{ duration: 0.5, delay: index * 0.06 }}
+            whileHover={{ y: -5 }}
+            className="group rounded-2xl border overflow-hidden cursor-pointer"
+            style={{ background: '#FFFFFF', borderColor: `${RED}22`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', transition: 'all 0.4s ease' }}
             onClick={() => router.push(`/mila-events/event/${d._id}`)}
         >
             <div className="relative h-52 overflow-hidden">
-                <Image src={imgSrc} alt={d.title}
-                    fill
+                <Image
+                    src={imgSrc} alt={d.title} fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                     className="object-cover group-hover:scale-110 transition-transform duration-700"
-                    onError={() => setImgSrc(MILA_FALLBACK)} />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                <div className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: RED }} />
+                    onError={() => setImgSrc(MILA_FALLBACK)}
+                />
+                <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(5,5,8,0.85) 0%, rgba(5,5,8,0.15) 60%, transparent 100%)' }} />
+                <div className="absolute top-0 left-0 right-0 h-px opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: RED }} />
                 <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
                     <span className="text-white text-xs font-bold px-3 py-1 rounded-full"
-                        style={{ background: `${RED}D9`, backdropFilter: 'blur(8px)' }}>
+                        style={{ background: `${RED}CC`, backdropFilter: 'blur(8px)', fontFamily: "'DM Sans', sans-serif" }}>
                         {d.category}
                     </span>
                     {d.videos?.length > 0 && (
@@ -97,21 +102,28 @@ const EventCard = ({ event, index }) => {
                     </span>
                 )}
             </div>
-            <div className="p-5">
-                <h3 className="font-bold text-gray-900 text-lg mb-1.5 line-clamp-1 group-hover:text-[#D42B2B] transition-colors">{d.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed mb-4 line-clamp-2">{d.description}</p>
-                <div className="space-y-1.5 text-xs text-gray-400 mb-4">
-                    <div className="flex items-center gap-2">
+            <div style={{ padding: '18px' }}>
+                <h3 className="font-bold line-clamp-1 mb-1.5"
+                    style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '1rem', color: '#111827' }}>
+                    {d.title}
+                </h3>
+                <p className="text-sm leading-relaxed mb-4 line-clamp-2"
+                    style={{ color: '#6B7280', fontFamily: "'DM Sans', sans-serif" }}>
+                    {d.description}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '14px' }}>
+                    <div className="flex items-center gap-2" style={{ color: '#6B7280', fontSize: '0.75rem', fontFamily: "'DM Sans', sans-serif" }}>
                         <Calendar className="w-3.5 h-3.5 flex-shrink-0" style={{ color: RED }} />
                         {formattedDate}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2" style={{ color: '#6B7280', fontSize: '0.75rem', fontFamily: "'DM Sans', sans-serif" }}>
                         <MapPin className="w-3.5 h-3.5 flex-shrink-0" style={{ color: RED }} />
                         <span className="line-clamp-1">{d.location}</span>
                     </div>
                 </div>
-                <div className="pt-4 border-t border-gray-100">
-                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: RED }}>
+                <div style={{ paddingTop: '12px', borderTop: '1px solid rgba(17,24,39,0.08)' }}>
+                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold group-hover:gap-2.5 transition-all"
+                        style={{ color: RED, fontFamily: "'DM Sans', sans-serif" }}>
                         Voir les détails
                         <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                     </span>
@@ -127,26 +139,32 @@ const Pagination = ({ totalPages, currentPage, onPageChange }) => {
     return (
         <div className="flex justify-center items-center gap-2 mt-10">
             <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}
-                className="p-2.5 rounded-xl bg-white border border-gray-200 shadow-sm disabled:opacity-30 transition-all">
-                <ArrowRight className="w-4 h-4 rotate-180 text-gray-500" />
+                aria-label="Page précédente"
+                className="p-2.5 rounded-xl disabled:opacity-30"
+                style={{ background: 'rgba(17,24,39,0.05)', border: '1px solid rgba(17,24,39,0.12)' }}>
+                <ArrowRight className="w-4 h-4 rotate-180" style={{ color: '#6B7280' }} />
             </button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
                 <button key={p} onClick={() => onPageChange(p)}
-                    className="min-w-[38px] px-3 py-2 rounded-xl font-semibold text-sm transition-all"
+                    aria-label={`Page ${p}`}
+                    aria-current={p === currentPage ? 'page' : undefined}
+                    className="min-w-[38px] px-3 py-2 rounded-xl font-semibold text-sm"
                     style={{
-                        background: p === currentPage ? `linear-gradient(135deg, ${RED}, ${RED_DARK})` : 'white',
+                        background: p === currentPage ? `linear-gradient(135deg, ${RED}, ${RED_DARK})` : 'rgba(17,24,39,0.04)',
                         color:      p === currentPage ? 'white' : '#374151',
-                        border:     p === currentPage ? 'none' : '1px solid #E5E7EB',
-                        boxShadow:  p === currentPage ? `0 4px 12px ${RED}59` : 'none',
+                        border:     p === currentPage ? 'none' : '1px solid rgba(17,24,39,0.12)',
+                        boxShadow:  p === currentPage ? `0 4px 12px ${RED}55` : 'none',
                         transform:  p === currentPage ? 'scale(1.08)' : 'scale(1)',
-                        fontFamily: "'Outfit', sans-serif",
+                        fontFamily: "'DM Sans', sans-serif",
                     }}>
                     {p}
                 </button>
             ))}
             <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}
-                className="p-2.5 rounded-xl bg-white border border-gray-200 shadow-sm disabled:opacity-30 transition-all">
-                <ArrowRight className="w-4 h-4 text-gray-500" />
+                aria-label="Page suivante"
+                className="p-2.5 rounded-xl disabled:opacity-30"
+                style={{ background: 'rgba(17,24,39,0.05)', border: '1px solid rgba(17,24,39,0.12)' }}>
+                <ArrowRight className="w-4 h-4" style={{ color: '#6B7280' }} />
             </button>
         </div>
     );
@@ -161,8 +179,20 @@ const QuoteModal = ({ serviceTitle, onClose, onFormSubmit }) => {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const set = field => e => setFormData(p => ({ ...p, [field]: e.target.value }));
-    const cls = "w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-sm focus:outline-none focus:border-[#D42B2B] focus:ring-2 focus:ring-[#D42B2B]/10 focus:bg-white transition-all";
-    const lbl = "block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5";
+
+    const inputStyle = {
+        width: '100%', padding: '10px 14px',
+        background: 'rgba(232,228,220,0.05)',
+        border: '1px solid rgba(232,228,220,0.1)',
+        borderRadius: '10px', color: '#E8E4DC',
+        fontSize: '0.85rem', fontFamily: "'DM Sans', sans-serif",
+        outline: 'none',
+    };
+    const labelStyle = {
+        display: 'block', fontSize: '0.6rem', fontWeight: 700,
+        letterSpacing: '0.15em', textTransform: 'uppercase',
+        color: 'rgba(232,228,220,0.35)', fontFamily: "'DM Sans', sans-serif", marginBottom: '6px',
+    };
 
     const handleSubmit = async e => {
         e.preventDefault();
@@ -177,91 +207,124 @@ const QuoteModal = ({ serviceTitle, onClose, onFormSubmit }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.3 }}
-                className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl relative max-h-[92vh] overflow-y-auto">
-                <div className="sticky top-0 bg-white z-10 px-7 pt-7 pb-5 border-b border-gray-100">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}>
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.3 }}
+                className="w-full max-w-2xl rounded-2xl relative max-h-[92vh] overflow-y-auto"
+                style={{ background: '#0F1117', border: '1px solid rgba(232,228,220,0.1)' }}>
+
+                <div className="sticky top-0 z-10 px-7 pt-6 pb-5"
+                    style={{ background: '#0F1117', borderBottom: '1px solid rgba(232,228,220,0.07)' }}>
                     <button onClick={onClose} disabled={isSubmitting}
-                        className="absolute top-5 right-5 w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors">
-                        <X className="w-5 h-5 text-gray-400" />
+                        className="absolute top-5 right-5 w-9 h-9 flex items-center justify-center rounded-xl"
+                        style={{ background: 'rgba(232,228,220,0.06)', border: '1px solid rgba(232,228,220,0.1)' }}>
+                        <X className="w-4 h-4" style={{ color: 'rgba(232,228,220,0.5)' }} />
                     </button>
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
                             style={{ background: `linear-gradient(135deg, ${RED}, ${RED_DARK})` }}>
                             <Sparkles className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-gray-900 text-xl">Demander un Devis</h3>
-                            <p className="text-xs text-gray-400">Réponse sous 24h — Sans engagement</p>
+                            <h3 className="font-bold text-lg" style={{ color: '#E8E4DC', fontFamily: "'DM Sans', sans-serif" }}>
+                                Demander un Devis
+                            </h3>
+                            <p className="text-xs" style={{ color: 'rgba(232,228,220,0.4)', fontFamily: "'DM Sans', sans-serif" }}>
+                                Réponse sous 24h — Sans engagement
+                            </p>
                         </div>
                     </div>
                 </div>
-                <form onSubmit={handleSubmit} className="px-7 py-6 space-y-4">
+
+                <form onSubmit={handleSubmit} style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl"
-                        style={{ backgroundColor: `${RED}0F`, border: `1px solid ${RED}26` }}>
+                        style={{ background: `${RED}12`, border: `1px solid ${RED}28` }}>
                         <Sparkles className="w-4 h-4" style={{ color: RED }} />
-                        <span className="text-sm font-semibold" style={{ color: RED }}>{formData.service}</span>
+                        <span className="text-sm font-semibold" style={{ color: RED, fontFamily: "'DM Sans', sans-serif" }}>
+                            {formData.service}
+                        </span>
                     </div>
+
                     <div>
-                        <label className={lbl}>Type d'événement <span className="text-red-400">*</span></label>
-                        <div className="relative">
-                            <select value={formData.eventType} onChange={set('eventType')} required className={cls + " appearance-none pr-8"}>
-                                {['Mariage','Anniversaire','Gala','Conférence','Lancement','Autre'].map(t => <option key={t} value={t}>{t}</option>)}
+                        <label style={labelStyle}>Type d'événement <span style={{ color: RED }}>*</span></label>
+                        <div style={{ position: 'relative' }}>
+                            <select value={formData.eventType} onChange={set('eventType')} required style={inputStyle}>
+                                {['Mariage','Anniversaire','Gala','Conférence','Lancement','Autre'].map(t => (
+                                    <option key={t} value={t} style={{ background: '#1A1E28' }}>{t}</option>
+                                ))}
                             </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+                                style={{ color: 'rgba(232,228,220,0.3)' }} />
                         </div>
                     </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className={lbl}>Date <span className="text-red-400">*</span></label>
-                            <input type="date" value={formData.date} onChange={set('date')} required className={cls} />
+                            <label style={labelStyle}>Date <span style={{ color: RED }}>*</span></label>
+                            <input type="date" value={formData.date} onChange={set('date')} required
+                                style={{ ...inputStyle, colorScheme: 'dark' }} />
                         </div>
                         <div>
-                            <label className={lbl}>Nb d'invités <span className="text-red-400">*</span></label>
-                            <input type="number" value={formData.guests} onChange={set('guests')} required min="1" placeholder="Ex: 150" className={cls} />
+                            <label style={labelStyle}>Nb d'invités <span style={{ color: RED }}>*</span></label>
+                            <input type="number" value={formData.guests} onChange={set('guests')} required min="1" placeholder="150"
+                                style={inputStyle} />
                         </div>
                     </div>
+
                     <div>
-                        <label className={lbl}>Budget</label>
-                        <div className="relative">
-                            <select value={formData.budget} onChange={set('budget')} className={cls + " appearance-none pr-8"}>
-                                <option value="">Non précisé</option>
-                                <option value="Moins de 1M">Moins de 1M FCFA</option>
-                                <option value="1M-5M">1M – 5M FCFA</option>
-                                <option value="5M-10M">5M – 10M FCFA</option>
-                                <option value="Plus de 10M">Plus de 10M FCFA</option>
+                        <label style={labelStyle}>Budget</label>
+                        <div style={{ position: 'relative' }}>
+                            <select value={formData.budget} onChange={set('budget')} style={inputStyle}>
+                                <option value="" style={{ background: '#1A1E28' }}>Non précisé</option>
+                                {['Moins de 1M FCFA','1M – 5M FCFA','5M – 10M FCFA','Plus de 10M FCFA'].map(b => (
+                                    <option key={b} value={b} style={{ background: '#1A1E28' }}>{b}</option>
+                                ))}
                             </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+                                style={{ color: 'rgba(232,228,220,0.3)' }} />
                         </div>
                     </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className={lbl}>Nom <span className="text-red-400">*</span></label>
-                            <input type="text" value={formData.name} onChange={set('name')} required className={cls} />
+                            <label style={labelStyle}>Nom <span style={{ color: RED }}>*</span></label>
+                            <input type="text" value={formData.name} onChange={set('name')} required style={inputStyle} placeholder="Votre nom" />
                         </div>
                         <div>
-                            <label className={lbl}>Email <span className="text-red-400">*</span></label>
-                            <input type="email" value={formData.email} onChange={set('email')} required className={cls} />
+                            <label style={labelStyle}>Email <span style={{ color: RED }}>*</span></label>
+                            <input type="email" value={formData.email} onChange={set('email')} required style={inputStyle} placeholder="votre@email.com" />
                         </div>
                     </div>
+
                     <div>
-                        <label className={lbl}>Téléphone</label>
-                        <input type="tel" value={formData.phone} onChange={set('phone')} className={cls} />
+                        <label style={labelStyle}>Téléphone</label>
+                        <input type="tel" value={formData.phone} onChange={set('phone')} style={inputStyle} placeholder="+242..." />
                     </div>
+
                     <div>
-                        <label className={lbl}>Description <span className="text-red-400">*</span></label>
+                        <label style={labelStyle}>Description <span style={{ color: RED }}>*</span></label>
                         <textarea value={formData.description} onChange={set('description')} required rows={4}
                             maxLength={1000} placeholder="Décrivez votre projet..."
-                            className={cls + " resize-none"} />
-                        <p className="text-xs text-gray-400 mt-1 text-right">{formData.description.length}/1000</p>
+                            style={{ ...inputStyle, resize: 'none' }} />
+                        <p style={{ textAlign: 'right', fontSize: '0.72rem', color: 'rgba(232,228,220,0.25)', marginTop: '4px', fontFamily: "'DM Sans', sans-serif" }}>
+                            {formData.description.length}/1000
+                        </p>
                     </div>
+
                     <motion.button type="submit" disabled={isSubmitting}
-                        whileHover={{ scale: isSubmitting ? 1 : 1.02 }} whileTap={{ scale: 0.98 }}
-                        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-white text-sm"
+                        whileHover={{ scale: isSubmitting ? 1 : 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-white text-sm"
                         style={{
-                            background: isSubmitting ? '#9CA3AF' : `linear-gradient(135deg, ${RED}, ${RED_DARK})`,
-                            boxShadow:  isSubmitting ? 'none' : `0 4px 20px ${RED}59`,
+                            background:    isSubmitting ? 'rgba(232,228,220,0.1)' : `linear-gradient(135deg, ${RED}, ${RED_DARK})`,
+                            boxShadow:     isSubmitting ? 'none' : `0 4px 20px ${RED}55`,
+                            border:        'none', cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                            fontFamily:    "'DM Sans', sans-serif",
+                            letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.76rem',
                         }}>
                         {isSubmitting
                             ? <><Loader2 className="w-4 h-4 animate-spin" /> Envoi...</>
@@ -273,13 +336,15 @@ const QuoteModal = ({ serviceTitle, onClose, onFormSubmit }) => {
     );
 };
 
+// ─── Skeleton chargement ──────────────────────────────────────
 const EventSkeleton = () => (
-    <div className="animate-pulse bg-white rounded-3xl border border-gray-100 overflow-hidden">
-        <div className="bg-gray-200 h-52" />
-        <div className="p-5 space-y-3">
-            <div className="h-4 bg-gray-100 rounded-full w-3/4" />
-            <div className="h-3 bg-gray-100 rounded-full" />
-            <div className="h-3 bg-gray-100 rounded-full w-2/3" />
+    <div className="rounded-2xl overflow-hidden animate-pulse"
+        style={{ background: '#FFFFFF', border: '1px solid rgba(17,24,39,0.08)', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ height: '208px', background: '#F3F4F6' }} />
+        <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ height: '14px', background: '#E5E7EB', borderRadius: '6px', width: '70%' }} />
+            <div style={{ height: '11px', background: '#F3F4F6', borderRadius: '5px' }} />
+            <div style={{ height: '11px', background: '#F3F4F6', borderRadius: '5px', width: '60%' }} />
         </div>
     </div>
 );
@@ -287,18 +352,17 @@ const EventSkeleton = () => (
 // ─── Page principale ──────────────────────────────────────────
 const MilaEventsPage = () => {
     const router = useRouter();
-    const { user }  = useAuth();
+    const { user } = useAuth();
 
-    const [events,          setEvents]         = useState([]);
-    const [reviews,         setReviews]        = useState([]);
-    const [loading,         setLoading]        = useState(true);
-    const [reviewsLoading,  setReviewsLoading] = useState(true);
-    const [error,           setError]          = useState(null);
-    const [showQuoteModal,  setShowQuoteModal] = useState(false);
-    const [selectedService, setSelectedService]= useState('');
-    const [showNotif,       setShowNotif]      = useState({ visible: false, message: '', type: 'success' });
-    const [currentPage,     setCurrentPage]    = useState(1);
-    const [filterType,      setFilterType]     = useState('Tous');
+    const [events,         setEvents]         = useState([]);
+    const [reviews,        setReviews]        = useState([]);
+    const [loading,        setLoading]        = useState(true);
+    const [reviewsLoading, setReviewsLoading] = useState(true);
+    const [error,          setError]          = useState(null);
+    const [showQuoteModal, setShowQuoteModal] = useState(false);
+    const [selectedService,setSelectedService]= useState('');
+    const [currentPage,    setCurrentPage]    = useState(1);
+    const [filterType,     setFilterType]     = useState('Tous');
 
     const filteredEvents = useMemo(() =>
         filterType === 'Tous' ? events : events.filter(e => (e.category || '') === filterType),
@@ -310,7 +374,7 @@ const MilaEventsPage = () => {
     );
 
     useEffect(() => {
-        const fetchEvents  = async () => {
+        const fetchEvents = async () => {
             try { setEvents(await getAllEvents()); }
             catch { setError("Impossible de charger les événements."); }
             finally { setLoading(false); }
@@ -341,34 +405,18 @@ const MilaEventsPage = () => {
     const handleFormSubmit = async (formData) => {
         try {
             await createQuoteRequest(formData);
-            setShowNotif({ visible: true, message: 'Demande envoyée !', type: 'success' });
-            setTimeout(() => setShowNotif({ visible: false, message: '', type: 'success' }), 5000);
+            toast.success('Demande envoyée avec succès !');
         } catch (err) {
-            setShowNotif({ visible: true, message: err.message || "Erreur.", type: 'error' });
-            setTimeout(() => setShowNotif({ visible: false, message: '', type: 'success' }), 5000);
+            toast.error(err.message || "Erreur lors de l'envoi.");
             throw err;
         }
     };
 
-    const handleLeaveReview = () =>
-        router.push(user ? '/avis/nouveau' : '/login');
+    const handleLeaveReview = () => router.push(user ? '/avis/nouveau' : '/login');
     const openQuote = title => { setSelectedService(title); setShowQuoteModal(true); };
 
     return (
-        <div className="min-h-screen bg-white" style={{ fontFamily: "'Outfit', sans-serif" }}>
-
-
-            {/* Notifications */}
-            <AnimatePresence>
-                {showNotif.visible && (
-                    <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                        className="fixed top-4 right-4 z-50 px-5 py-3.5 rounded-2xl shadow-2xl text-white text-sm font-semibold flex items-center gap-2"
-                        style={{ background: showNotif.type === 'success' ? 'linear-gradient(135deg,#059669,#047857)' : `linear-gradient(135deg,${RED},${RED_DARK})` }}>
-                        {showNotif.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                        {showNotif.message}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+        <div style={{ minHeight: '100vh', background: '#F8F8F8', fontFamily: "'DM Sans', sans-serif" }}>
 
             <AnimatePresence>
                 {showQuoteModal && (
@@ -380,26 +428,18 @@ const MilaEventsPage = () => {
                 )}
             </AnimatePresence>
 
-            {/* ══ HERO ═════════════════════════════════════════════════
-                Le HeroSliderMila gère tout le contenu narratif.
-                Cette section ne contient que :
-                - Le slider en fond
-                - Deux CTAs flottants (devis + réalisations)
-                - La bande d'atouts en bas
-            ════════════════════════════════════════════════════════ */}
+            {/* ══ HERO ═════════════════════════════════════════════════ */}
             <header className="relative text-white overflow-hidden"
                 style={{ height: 'calc(100vh - 0px)', minHeight: '640px', maxHeight: '860px' }}>
-
                 <HeroSliderMila />
-
-                {/* ── Bande atouts ─────────────────────────────────── */}
                 <div className="absolute bottom-0 left-0 right-0 z-10">
-                    <div className="h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)' }} />
-                    <div className="backdrop-blur-md bg-black/30 grid grid-cols-2 sm:grid-cols-4 divide-x divide-white/10">
+                    <div className="h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.07), transparent)' }} />
+                    <div style={{ backdropFilter: 'blur(12px)', background: 'rgba(0,0,0,0.35)', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)' }}
+                        className="sm:grid-cols-4">
                         {ATOUTS.map(({ icon: Icon, label }, i) => (
-                            <div key={i} className="flex items-center gap-2.5 px-5 py-3.5">
-                                <Icon className="w-4 h-4 flex-shrink-0" style={{ color: RED_SOFT }} aria-hidden="true" />
-                                <span className="text-white/70 text-xs font-medium">{label}</span>
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                                <Icon style={{ width: '14px', height: '14px', color: RED_SOFT, flexShrink: 0 }} />
+                                <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.72rem' }}>{label}</span>
                             </div>
                         ))}
                     </div>
@@ -407,37 +447,42 @@ const MilaEventsPage = () => {
             </header>
 
             {/* ══ PHILOSOPHIE ══════════════════════════════════════════ */}
-            <section className="py-20 sm:py-24 bg-white overflow-hidden">
+            <section style={{ padding: 'clamp(52px,9vw,96px) 0', background: '#F8F8F8', position: 'relative', overflow: 'hidden' }}>
+                <div className="absolute top-0 left-0 right-0 h-px"
+                    style={{ background: `linear-gradient(to right, transparent, ${RED}22, transparent)` }} />
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
                         <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }}
                             viewport={{ once: true }} transition={{ duration: 0.7 }} className="mb-12 lg:mb-0">
-                            <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: RED }}>Notre Philosophie</p>
-                            <h2 className="text-gray-900 mb-5"
-                                style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
-                                Chaque Événement,
-                                <span className="block" style={{ color: RED }}>Une Signature</span>
-                            </h2>
-                            <div className="h-0.5 w-16 rounded-full mb-6" style={{ background: `linear-gradient(to right, ${RED}, ${GOLD})` }} />
-                            <p className="text-gray-600 leading-relaxed mb-6 text-base sm:text-lg">
-                                Nous offrons une planification d'événements de A à Z avec une touche d'<span className="font-semibold text-gray-900">excellence</span> et une <span className="font-semibold text-gray-900">attention inégalée</span> aux détails.
+                            <p style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: RED, marginBottom: '12px' }}>
+                                Notre Philosophie
                             </p>
-                            <ul className="space-y-3 mb-8">
+                            <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 300, lineHeight: 1.08, color: '#111827', marginBottom: '16px' }}>
+                                Chaque Événement,
+                                <span style={{ display: 'block', color: RED }}>Une Signature</span>
+                            </h2>
+                            <div style={{ height: '2px', width: '48px', borderRadius: '2px', marginBottom: '22px', background: `linear-gradient(to right, ${RED}, ${GOLD})` }} />
+                            <p style={{ color: '#6B7280', lineHeight: 1.75, marginBottom: '20px', fontSize: 'clamp(0.9rem,2vw,1rem)' }}>
+                                Nous offrons une planification d'événements de A à Z avec une touche d'
+                                <strong style={{ color: '#111827' }}>excellence</strong> et une{' '}
+                                <strong style={{ color: '#111827' }}>attention inégalée</strong> aux détails.
+                            </p>
+                            <ul style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '28px' }}>
                                 {[
                                     'Coordination complète de A à Z',
                                     'Prestataires sélectionnés avec soin',
                                     'Décoration & scénographie personnalisées',
                                     'Présence garantie le jour J',
                                 ].map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-sm text-gray-600">
-                                        <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: RED }} />
+                                    <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', color: '#6B7280' }}>
+                                        <CheckCircle style={{ width: '14px', height: '14px', color: RED, flexShrink: 0 }} />
                                         {item}
                                     </li>
                                 ))}
                             </ul>
                             <button onClick={() => openQuote('Demande Générale')}
-                                className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white text-sm transition-all hover:scale-105 group"
-                                style={{ background: `linear-gradient(135deg, ${RED}, ${RED_DARK})`, boxShadow: `0 4px 20px ${RED}4D`, fontFamily: "'Outfit', sans-serif" }}>
+                                className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white text-sm group"
+                                style={{ background: `linear-gradient(135deg, ${RED}, ${RED_DARK})`, boxShadow: `0 4px 20px ${RED}4D`, fontFamily: "'DM Sans', sans-serif", border: 'none', cursor: 'pointer' }}>
                                 Demander un devis gratuit
                                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                             </button>
@@ -447,20 +492,20 @@ const MilaEventsPage = () => {
                             viewport={{ once: true }} transition={{ duration: 0.7, delay: 0.1 }}
                             className="grid grid-cols-2 gap-4">
                             {[
-                                { value: '50+',  label: 'Événements organisés', color: RED      },
-                                { value: '98%',  label: 'Clients satisfaits',   color: RED_DARK },
-                                { value: '5 ans',label: "D'expérience",          color: RED      },
-                                { value: '24h',  label: 'Délai de réponse',      color: GOLD     },
+                                { value: '80+',   label: 'Événements organisés', color: RED      },
+                                { value: '98%',   label: 'Clients satisfaits',   color: RED_DARK },
+                                { value: '5 ans', label: "D'expérience",          color: RED      },
+                                { value: '24h',   label: 'Délai de réponse',      color: GOLD     },
                             ].map(({ value, label, color }, i) => (
                                 <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
                                     viewport={{ once: true }} transition={{ delay: 0.2 + i * 0.1 }}
-                                    className="p-6 rounded-2xl border text-center"
-                                    style={{ backgroundColor: `${color}0D`, borderColor: `${color}33` }}>
-                                    <p className="mb-1"
-                                        style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '2.5rem', fontWeight: 700, color, lineHeight: 1 }}>
+                                    style={{ padding: 'clamp(18px,3.5vw,26px)', borderRadius: '10px', textAlign: 'center', background: `${color}08`, border: `1px solid ${color}20` }}>
+                                    <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(2rem,6vw,4rem)', fontWeight: 300, color, lineHeight: 1, marginBottom: '6px' }}>
                                         {value}
                                     </p>
-                                    <p className="text-xs text-gray-500 font-medium">{label}</p>
+                                    <p style={{ fontSize: '0.68rem', color: '#6B7280', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                        {label}
+                                    </p>
                                 </motion.div>
                             ))}
                         </motion.div>
@@ -469,39 +514,49 @@ const MilaEventsPage = () => {
             </section>
 
             {/* ══ SERVICES ═════════════════════════════════════════════ */}
-            <section className="py-16 sm:py-20 bg-gray-50">
+            <section style={{ padding: 'clamp(52px,9vw,96px) 0', background: '#FFFFFF', position: 'relative' }}>
+                <div className="absolute top-0 left-0 right-0 h-px"
+                    style={{ background: `linear-gradient(to right, transparent, ${RED}18, transparent)` }} />
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <motion.div className="text-center mb-12" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-                        <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: RED }}>Nos Engagements</p>
-                        <h2 className="text-gray-900 mb-3"
-                            style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                        <p style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: RED, marginBottom: '10px' }}>
+                            Nos Engagements
+                        </p>
+                        <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 300, lineHeight: 1.08, color: '#111827', marginBottom: '8px' }}>
                             Nos Services Exclusifs
                         </h2>
-                        <p className="text-gray-500 text-sm max-w-xl mx-auto">De l'intime au grandiose, nos prestations couvrent tous vos besoins</p>
+                        <p style={{ fontSize: '0.85rem', color: '#6B7280', maxWidth: '480px', margin: '0 auto' }}>
+                            De l'intime au grandiose, nos prestations couvrent tous vos besoins
+                        </p>
                     </motion.div>
                     <div className="grid md:grid-cols-3 gap-5">
                         {SERVICES.map((s, i) => {
                             const Icon = s.icon;
                             return (
-                                <motion.div key={s.id} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
+                                <motion.div key={s.id}
+                                    initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
                                     viewport={{ once: true, amount: 0.2 }} transition={{ duration: 0.5, delay: i * 0.1 }}
-                                    whileHover={{ y: -6 }}
-                                    className="group relative bg-white rounded-3xl p-7 border transition-all duration-500 hover:shadow-xl overflow-hidden"
-                                    style={{ borderColor: `${s.color}33` }}>
-                                    <div className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: s.color }} />
-                                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"
-                                        style={{ backgroundColor: `${s.color}26`, border: `1px solid ${s.color}40` }}>
+                                    whileHover={{ y: -5 }}
+                                    className="group relative rounded-2xl p-7 overflow-hidden"
+                                    style={{ background: '#FFFFFF', border: `1px solid ${s.color}18`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', transition: 'all 0.4s ease' }}>
+                                    <div className="absolute top-0 left-0 right-0 h-px opacity-0 group-hover:opacity-100 transition-opacity"
+                                        style={{ backgroundColor: s.color }} />
+                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"
+                                        style={{ background: `${s.color}16`, border: `1px solid ${s.color}28` }}>
                                         <Icon className="w-6 h-6" style={{ color: s.color }} />
                                     </div>
-                                    <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full mb-3"
-                                        style={{ backgroundColor: `${s.color}1A`, color: s.color }}>
+                                    <span style={{ display: 'inline-block', fontSize: '0.64rem', fontWeight: 700, padding: '3px 9px', borderRadius: '40px', marginBottom: '10px', background: `${s.color}12`, color: s.color }}>
                                         {s.stat}
                                     </span>
-                                    <h3 className="font-bold text-gray-900 text-lg mb-2">{s.title}</h3>
-                                    <p className="text-gray-500 text-sm leading-relaxed mb-5">{s.desc}</p>
+                                    <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '8px', fontFamily: "'DM Sans', sans-serif" }}>
+                                        {s.title}
+                                    </h3>
+                                    <p style={{ fontSize: '0.83rem', color: '#6B7280', lineHeight: 1.7, marginBottom: '18px' }}>
+                                        {s.desc}
+                                    </p>
                                     <button onClick={() => openQuote(s.title)}
-                                        className="inline-flex items-center gap-2 text-sm font-semibold transition-all group-hover:gap-3"
-                                        style={{ color: s.color }}>
+                                        className="inline-flex items-center gap-2 text-sm font-semibold group-hover:gap-3 transition-all"
+                                        style={{ color: s.color, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: "'DM Sans', sans-serif" }}>
                                         Demander un devis
                                         <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                     </button>
@@ -513,13 +568,16 @@ const MilaEventsPage = () => {
             </section>
 
             {/* ══ RÉALISATIONS ═════════════════════════════════════════ */}
-            <section id="realisations" className="py-16 sm:py-20 bg-white">
+            <section id="realisations" style={{ padding: 'clamp(52px,9vw,96px) 0', background: '#F8F8F8', position: 'relative' }}>
+                <div className="absolute top-0 left-0 right-0 h-px"
+                    style={{ background: `linear-gradient(to right, transparent, ${RED}15, transparent)` }} />
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10">
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-                            <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: RED }}>Notre Portfolio</p>
-                            <h2 className="text-gray-900"
-                                style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            <p style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: RED, marginBottom: '8px' }}>
+                                Notre Portfolio
+                            </p>
+                            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1.8rem, 3.5vw, 4rem)', fontWeight: 300, lineHeight: 1.1, color: '#111827' }}>
                                 Nos Réalisations
                             </h2>
                         </motion.div>
@@ -529,40 +587,59 @@ const MilaEventsPage = () => {
                             Voir tout <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </Link>
                     </div>
+
+                    {/* Filtres */}
                     <div className="flex flex-wrap gap-2 mb-8">
-                        {EVENT_TYPES.map(type => (
-                            <button key={type} onClick={() => { setFilterType(type); setCurrentPage(1); }}
-                                className="px-4 py-2 rounded-full text-sm font-semibold transition-all border"
-                                style={{
-                                    background:  filterType === type ? `linear-gradient(135deg, ${RED}, ${RED_DARK})` : 'white',
-                                    color:       filterType === type ? 'white' : RED,
-                                    borderColor: filterType === type ? 'transparent' : `${RED}40`,
-                                    boxShadow:   filterType === type ? `0 4px 12px ${RED}4D` : 'none',
-                                    fontFamily:  "'Outfit', sans-serif",
-                                }}>
-                                {type}
-                            </button>
-                        ))}
+                        {EVENT_TYPES.map(type => {
+                            const count = type === 'Tous' ? events.length : events.filter(e => (e.category || '') === type).length;
+                            const isActive = filterType === type;
+                            return (
+                                <button key={type} onClick={() => { setFilterType(type); setCurrentPage(1); }}
+                                    className="px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2"
+                                    style={{
+                                        background: isActive ? `linear-gradient(135deg, ${RED}, ${RED_DARK})` : 'transparent',
+                                        color:      isActive ? 'white' : `${RED}CC`,
+                                        border:     isActive ? 'none' : `1px solid ${RED}28`,
+                                        boxShadow:  isActive ? `0 4px 12px ${RED}4D` : 'none',
+                                        fontFamily: "'DM Sans', sans-serif",
+                                        cursor:     'pointer',
+                                        transition: 'all 0.25s ease',
+                                    }}>
+                                    {type}
+                                    <span style={{
+                                        fontSize: '0.7rem', fontWeight: 700,
+                                        padding: '1px 6px', borderRadius: '20px',
+                                        background: isActive ? 'rgba(255,255,255,0.2)' : `${RED}22`,
+                                        color:      isActive ? 'white' : RED,
+                                    }}>
+                                        {count}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
+
                     {error && (
-                        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl mb-8 max-w-xl">
+                        <div className="flex items-center gap-3 p-4 rounded-xl mb-8 max-w-xl"
+                            style={{ background: `${RED}10`, border: `1px solid ${RED}22` }}>
                             <span>⚠️</span>
-                            <p className="text-red-700 text-sm font-medium">{error}</p>
+                            <p style={{ color: RED_SOFT, fontSize: '0.85rem', fontWeight: 500 }}>{error}</p>
                         </div>
                     )}
+
                     {loading ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(14px,2vw,22px)' }}>
                             {[1,2,3,4,5,6].map(i => <EventSkeleton key={i} />)}
                         </div>
                     ) : currentEvents.length === 0 ? (
-                        <div className="text-center py-16 rounded-3xl border border-dashed"
-                            style={{ borderColor: `${RED}40`, backgroundColor: `${RED}08` }}>
-                            <PartyPopper className="w-10 h-10 mx-auto mb-4" style={{ color: RED }} />
-                            <p className="font-bold text-gray-700">Aucune réalisation disponible</p>
+                        <div className="text-center py-16 rounded-2xl"
+                            style={{ border: `1px dashed ${RED}35`, background: `${RED}06` }}>
+                            <PartyPopper className="w-10 h-10 mx-auto mb-4" style={{ color: `${RED}66` }} />
+                            <p style={{ fontWeight: 600, color: '#374151' }}>Aucune réalisation disponible</p>
                         </div>
                     ) : (
                         <>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(16px, 2vw, 24px)' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'clamp(14px,2vw,22px)' }}>
                                 {currentEvents.map((e, i) => <EventCard key={e._id} event={e} index={i} />)}
                             </div>
                             <Pagination
@@ -579,38 +656,43 @@ const MilaEventsPage = () => {
             </section>
 
             {/* ══ AVIS ═════════════════════════════════════════════════ */}
-            <section className="py-16 sm:py-20 bg-gray-50">
+            <section style={{ padding: 'clamp(52px,9vw,96px) 0', background: '#FFFFFF', position: 'relative' }}>
+                <div className="absolute top-0 left-0 right-0 h-px"
+                    style={{ background: `linear-gradient(to right, transparent, ${RED}18, transparent)` }} />
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10">
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-                            <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: RED }}>Témoignages</p>
-                            <h2 className="text-gray-900"
-                                style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                            <p style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: RED, marginBottom: '8px' }}>
+                                Témoignages
+                            </p>
+                            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(1.8rem, 3.5vw, 4rem)', fontWeight: 300, lineHeight: 1.1, color: '#111827' }}>
                                 Ce Que Disent Nos Clients
                             </h2>
                         </motion.div>
                         <motion.button onClick={handleLeaveReview} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
                             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-white text-sm flex-shrink-0"
-                            style={{ background: `linear-gradient(135deg, ${RED}, ${RED_DARK})`, boxShadow: `0 4px 16px ${RED}4D`, fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ background: `linear-gradient(135deg, ${RED}, ${RED_DARK})`, boxShadow: `0 4px 16px ${RED}4D`, fontFamily: "'DM Sans', sans-serif", border: 'none', cursor: 'pointer' }}>
                             <MessageSquarePlus className="w-4 h-4" />
                             Laisser un avis
-                            {!user && <span className="opacity-50 text-xs font-normal">(connexion)</span>}
+                            {!user && <span style={{ opacity: 0.5, fontSize: '0.64rem', fontWeight: 400 }}>(connexion)</span>}
                         </motion.button>
                     </div>
+
                     {reviewsLoading ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                             {[1,2,3].map(i => (
-                                <div key={i} className="animate-pulse bg-white rounded-3xl p-6 border border-gray-100">
-                                    <div className="flex gap-3 mb-4">
-                                        <div className="w-10 h-10 bg-gray-200 rounded-full" />
-                                        <div className="flex-1 space-y-2">
-                                            <div className="h-3 bg-gray-200 rounded-full w-2/3" />
-                                            <div className="h-2 bg-gray-100 rounded-full w-1/3" />
+                                <div key={i} className="rounded-2xl p-6 animate-pulse"
+                                    style={{ background: '#FFFFFF', border: `1px solid rgba(17,24,39,0.08)` }}>
+                                    <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
+                                        <div style={{ width: '36px', height: '36px', background: '#E5E7EB', borderRadius: '50%', flexShrink: 0 }} />
+                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                                            <div style={{ height: '11px', background: '#E5E7EB', borderRadius: '5px', width: '58%' }} />
+                                            <div style={{ height: '9px', background: '#F3F4F6', borderRadius: '4px', width: '32%' }} />
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <div className="h-3 bg-gray-100 rounded-full" />
-                                        <div className="h-3 bg-gray-100 rounded-full w-4/5" />
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                                        <div style={{ height: '11px', background: '#F3F4F6', borderRadius: '5px' }} />
+                                        <div style={{ height: '11px', background: '#F3F4F6', borderRadius: '5px', width: '78%' }} />
                                     </div>
                                 </div>
                             ))}
@@ -625,43 +707,42 @@ const MilaEventsPage = () => {
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-14 rounded-3xl border border-dashed"
-                            style={{ borderColor: `${RED}33`, backgroundColor: `${RED}08` }}>
-                            <Star className="w-8 h-8 mx-auto mb-3 text-gray-300" />
-                            <p className="font-bold text-gray-700 mb-1">Aucun avis pour le moment</p>
-                            <p className="text-sm text-gray-500">Soyez le premier à partager votre expérience !</p>
+                        <div className="text-center py-14 rounded-2xl"
+                            style={{ border: `1px dashed ${RED}28`, background: `${RED}06` }}>
+                            <Star className="w-8 h-8 mx-auto mb-3" style={{ color: '#9CA3AF' }} />
+                            <p style={{ fontWeight: 600, color: '#374151', marginBottom: '4px' }}>Aucun avis pour le moment</p>
+                            <p style={{ fontSize: '0.85rem', color: '#6B7280' }}>Soyez le premier à partager votre expérience !</p>
                         </div>
                     )}
                 </div>
             </section>
 
+            {/* ══ CONTACT ══════════════════════════════════════════════ */}
+            <MilaContact />
+
             {/* ══ CTA FINAL ════════════════════════════════════════════ */}
-            <section className="py-20 px-4 sm:px-6 relative overflow-hidden"
-                style={{ background: `linear-gradient(135deg, #0D1117 0%, #1a0808 50%, #0D1117 100%)` }}>
-                <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-0 left-1/4 w-80 h-80 rounded-full blur-[120px] opacity-15" style={{ background: RED }} />
-                    <div className="absolute bottom-0 right-1/4 w-80 h-80 rounded-full blur-[120px] opacity-8"  style={{ background: GOLD }} />
-                </div>
-                <div className="container mx-auto max-w-4xl text-center relative z-10">
+            <section style={{ padding: 'clamp(52px,9vw,96px) 0', position: 'relative', overflow: 'hidden', background: '#F8F8F8' }}>
+                <div className="container mx-auto max-w-4xl text-center" style={{ position: 'relative', zIndex: 10, padding: '0 20px' }}>
                     <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-                        <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: RED_SOFT }}>Commençons</p>
-                        <h2 className="text-white mb-5"
-                            style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                        <p style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: RED, marginBottom: '14px' }}>
+                            Commençons
+                        </p>
+                        <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 300, lineHeight: 1.08, color: '#111827', marginBottom: '16px' }}>
                             Prêt à créer votre événement de rêve ?
                         </h2>
-                        <p className="text-white/60 mb-10 max-w-2xl mx-auto leading-relaxed">
+                        <p style={{ color: '#6B7280', marginBottom: '36px', maxWidth: '520px', margin: '0 auto 36px', lineHeight: 1.7 }}>
                             Consultation gratuite — transformons ensemble vos idées en réalité.
                         </p>
                         <div className="flex flex-wrap justify-center gap-4">
                             <motion.button onClick={() => openQuote('Demande Générale')}
                                 whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
                                 className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-semibold text-white text-base"
-                                style={{ background: `linear-gradient(135deg, ${RED}, ${RED_DARK})`, boxShadow: `0 8px 32px ${RED}66`, fontFamily: "'Outfit', sans-serif" }}>
+                                style={{ background: `linear-gradient(135deg, ${RED}, ${RED_DARK})`, boxShadow: `0 8px 32px ${RED}66`, fontFamily: "'DM Sans', sans-serif", border: 'none', cursor: 'pointer' }}>
                                 <Sparkles className="w-5 h-5" /> Lancer votre Projet
                             </motion.button>
                             <Link href="/mila-events/annonces"
-                                className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-semibold text-white/80 text-base border border-white/15 hover:bg-white/10 transition-all"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                className="inline-flex items-center gap-2 px-8 py-4 rounded-full font-semibold text-base hover:bg-gray-100 transition-all"
+                                style={{ color: '#374151', border: '1px solid rgba(17,24,39,0.15)', fontFamily: "'DM Sans', sans-serif" }}>
                                 <CalendarClock className="w-5 h-5" /> Voir nos réalisations
                             </Link>
                         </div>

@@ -2,6 +2,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const logger = require('../utils/logger');
 
 // Définir les types de fichiers acceptés pour les pièces jointes de messages
 const MESSAGE_ATTACHMENT_TYPES = [
@@ -38,11 +39,11 @@ const storage = multer.diskStorage({
     // Créer le dossier s'il n'existe pas
     if (!fs.existsSync(fullPath)) {
       fs.mkdirSync(fullPath, { recursive: true });
-      console.log(`📁 [Upload] Dossier créé: ${fullPath}`);
+      logger.info(`📁 [Upload] Dossier créé: ${fullPath}`);
     }
     
-    console.log(`📤 [Upload] Destination: ${fullPath}`);
-    console.log(`📤 [Upload] Route: ${req.baseUrl}${req.path}`);
+    logger.info(`📤 [Upload] Destination: ${fullPath}`);
+    logger.info(`📤 [Upload] Route: ${req.baseUrl}${req.path}`);
     
     cb(null, fullPath);
   },
@@ -52,9 +53,9 @@ const storage = multer.diskStorage({
     const safeOriginalName = file.originalname.replace(/\s/g, '_');
     const uniqueName = `${userId}-${Date.now()}-${safeOriginalName}`;
     
-    console.log(`📝 [Upload] Nom du fichier: ${uniqueName}`);
-    console.log(`📝 [Upload] Fichier original: ${file.originalname}`);
-    console.log(`📝 [Upload] Type MIME: ${file.mimetype}`);
+    logger.info(`📝 [Upload] Nom du fichier: ${uniqueName}`);
+    logger.info(`📝 [Upload] Fichier original: ${file.originalname}`);
+    logger.info(`📝 [Upload] Type MIME: ${file.mimetype}`);
     
     cb(null, uniqueName);
   },
@@ -64,24 +65,24 @@ const storage = multer.diskStorage({
  * Filtre personnalisé : images pour les avatars/propriétés, tout pour les messages
  */
 function checkFileType(req, file, cb) {
-  console.log(`🔍 [Upload] Vérification du type: ${file.mimetype}`);
+  logger.info(`🔍 [Upload] Vérification du type: ${file.mimetype}`);
   
   // Logique spécifique aux PIÈCES JOINTES de messages
   if (req.baseUrl.includes('/messages')) {
     if (MESSAGE_ATTACHMENT_TYPES.some(type => file.mimetype.startsWith(type))) {
-      console.log(`✅ [Upload] Fichier accepté (Pièce jointe): ${file.originalname}`);
+      logger.success(`✅ [Upload] Fichier accepté (Pièce jointe): ${file.originalname}`);
       return cb(null, true);
     } else {
-      console.log(`❌ [Upload] Fichier rejeté (Pièce jointe): ${file.originalname}`);
+      logger.info(`❌ [Upload] Fichier rejeté (Pièce jointe): ${file.originalname}`);
       cb(new Error('Erreur : Ce format de pièce jointe n\'est pas autorisé.'));
     }
   } 
   // Logique par défaut (pour les autres routes comme /users, /properties, etc.)
   else if (file.mimetype.startsWith('image/')) {
-    console.log(`✅ [Upload] Fichier accepté (Image): ${file.originalname}`);
+    logger.success(`✅ [Upload] Fichier accepté (Image): ${file.originalname}`);
     return cb(null, true);
   } else {
-    console.log(`❌ [Upload] Fichier rejeté (Image): ${file.originalname} (type: ${file.mimetype})`);
+    logger.info(`❌ [Upload] Fichier rejeté (Image): ${file.originalname} (type: ${file.mimetype})`);
     cb(new Error('Erreur : Seules les images sont autorisées sur cette route !'));
   }
 }
@@ -105,8 +106,8 @@ const cleanupUploadedFiles = (files) => {
     if (Array.isArray(files) && files.length > 0) {
         files.forEach(file => {
             fs.unlink(file.path, (err) => {
-                if (err) console.error("⚠️ [Cleanup Error] Échec de la suppression du fichier:", file.path, err.message);
-                else console.log(`🗑️ [Cleanup] Fichier supprimé: ${file.path}`);
+                if (err) logger.error("⚠️ [Cleanup Error] Échec de la suppression du fichier:", file.path, err.message);
+                else logger.info(`🗑️ [Cleanup] Fichier supprimé: ${file.path}`);
             });
         });
     }
@@ -115,7 +116,7 @@ const cleanupUploadedFiles = (files) => {
 // Middleware de gestion des erreurs Multer
 const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    console.error('❌ [Multer Error]:', err.message, err.code);
+    logger.error('❌ [Multer Error]:', err.message, err.code);
     // Tenter de nettoyer les fichiers si une erreur Multer survient après le stockage
     cleanupUploadedFiles(req.files); 
 
@@ -130,7 +131,7 @@ const handleMulterError = (err, req, res, next) => {
       message: `Erreur d'upload: ${err.message}`
     });
   } else if (err) {
-    console.error('❌ [Upload Error]:', err.message);
+    logger.error('❌ [Upload Error]:', err.message);
     // Tenter de nettoyer les fichiers pour toute autre erreur (ex: fileFilter)
     cleanupUploadedFiles(req.files);
     return res.status(400).json({

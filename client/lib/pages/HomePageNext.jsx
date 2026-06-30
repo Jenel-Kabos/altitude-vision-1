@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { ArrowRight, Building2, Calendar, Briefcase, MapPin, Phone, Mail } from 'lucide-react';
@@ -21,7 +20,7 @@ import { getAllPortfolioItems }        from '../services/portfolioService';
 const poles = [
   {
     id: 'Altimmo', name: 'Altimmo', num: '01',
-    route: '/altimmo/annonces', pageroute: '/altimmo',
+    route: '/immobilier/annonces', pageroute: '/immobilier',
     icon: Building2, color: '#2E7BB5',
     colorLight: 'rgba(46,123,181,0.08)', colorBorder: 'rgba(46,123,181,0.16)',
     gradient: 'linear-gradient(135deg, #1A5A8A, #2E7BB5)',
@@ -30,7 +29,7 @@ const poles = [
   },
   {
     id: 'MilaEvents', name: 'Mila Events', num: '02',
-    route: '/mila-events/annonces', pageroute: '/mila-events',
+    route: '/evenementiel/annonces', pageroute: '/evenementiel',
     icon: Calendar, color: '#D42B2B',
     colorLight: 'rgba(212,43,43,0.08)', colorBorder: 'rgba(212,43,43,0.16)',
     gradient: 'linear-gradient(135deg, #A01E1E, #D42B2B)',
@@ -39,10 +38,10 @@ const poles = [
   },
   {
     id: 'Altcom', name: 'Altcom', num: '03',
-    route: '/altcom/annonces', pageroute: '/altcom',
-    icon: Briefcase, color: '#C8872A',
+    route: '/communication/annonces', pageroute: '/communication',
+    icon: Briefcase, color: '#C8960C',
     colorLight: 'rgba(200,135,42,0.08)', colorBorder: 'rgba(200,135,42,0.16)',
-    gradient: 'linear-gradient(135deg, #A0671A, #C8872A)',
+    gradient: 'linear-gradient(135deg, #A0671A, #C8960C)',
     description: 'Stratégie de communication, branding et visibilité digitale pour propulser votre image.',
     tag: 'Communication',
   },
@@ -76,19 +75,23 @@ const GLOBAL_CSS = `
   :root {
     --px: 16px;
     --py: clamp(40px, 7.5vw, 88px);
-    --gold: #C8872A;
+    --gold: #C8960C;
     --blue: #2E7BB5;
     --red:  #D42B2B;
-    --bg:   #0A0C0F;
-    --text: #E8E4DC;
-    --muted: rgba(232,228,220,0.38);
-    --border: rgba(232,228,220,0.06);
+    --bg:   #F8F8F8;
+    --text: #111827;
+    --muted: #6B7280;
+    --border: rgba(17,24,39,0.08);
   }
   @media (min-width: 375px)  { :root { --px: 20px; } }
   @media (min-width: 640px)  { :root { --px: 32px; } }
   @media (min-width: 768px)  { :root { --px: 40px; } }
   @media (min-width: 1024px) { :root { --px: 56px; } }
   @media (min-width: 1200px) { :root { --px: 64px; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hp-ticker-inner { animation-duration: 0.01ms !important; }
+  }
 
   *, *::before, *::after { box-sizing: border-box; }
 
@@ -197,7 +200,7 @@ const GLOBAL_CSS = `
     .hp-pole-card { border-bottom: none; border-right: 1px solid var(--border); }
     .hp-pole-card:last-child { border-right: none; }
   }
-  .hp-pole-card:hover { background: var(--pole-bg, rgba(232,228,220,0.04)); }
+  .hp-pole-card:hover { background: var(--pole-bg, rgba(17,24,39,0.04)); }
   .hp-pole-card:hover .hp-pole-accent { opacity: 1 !important; }
   .hp-pole-card:hover .hp-pole-link   { opacity: 1 !important; transform: translateY(0) !important; }
   @media (hover: none) {
@@ -208,7 +211,7 @@ const GLOBAL_CSS = `
   .hp-pole-num {
     display: block; font-family: 'Cormorant Garamond', serif;
     font-size: clamp(0.70rem, 1.5vw, 0.85rem); font-weight: 300;
-    color: rgba(232,228,220,0.18); letter-spacing: 0.15em;
+    color: rgba(17,24,39,0.18); letter-spacing: 0.15em;
     margin-bottom: clamp(14px, 2.5vw, 32px);
   }
   .hp-pole-icon-wrap {
@@ -228,7 +231,7 @@ const GLOBAL_CSS = `
   }
   .hp-pole-sep { height: 1px; background: var(--border); margin-bottom: clamp(10px, 2vw, 16px); }
   .hp-pole-desc {
-    font-size: clamp(0.82rem, 1.8vw, 0.86rem); color: rgba(232,228,220,0.42);
+    font-size: clamp(0.82rem, 1.8vw, 0.86rem); color: #6B7280;
     line-height: 1.72; font-weight: 300; margin-bottom: clamp(14px, 2.5vw, 26px);
     word-break: break-word;
   }
@@ -259,7 +262,7 @@ const GLOBAL_CSS = `
   }
   .hp-contact-row {
     display: flex; align-items: center; gap: 10px;
-    font-size: clamp(0.78rem, 1.8vw, 0.82rem); color: rgba(232,228,220,0.4); font-weight: 300;
+    font-size: clamp(0.78rem, 1.8vw, 0.82rem); color: #6B7280; font-weight: 300;
     /* email peut être long sur 320px */
     overflow-wrap: break-word; word-break: break-all;
   }
@@ -279,7 +282,7 @@ const GLOBAL_CSS = `
   }
   .hp-mini-sub {
     font-size: clamp(0.60rem, 1.3vw, 0.65rem); letter-spacing: 0.12em;
-    text-transform: uppercase; color: rgba(232,228,220,0.30);
+    text-transform: uppercase; color: #9CA3AF;
   }
   .hp-mini-cta {
     display: flex; align-items: center; gap: 4px;
@@ -349,18 +352,10 @@ const GLOBAL_CSS = `
     font-weight: 400; color: var(--text); font-size: clamp(0.88rem, 2vw, 1rem); margin-bottom: 6px;
   }
   .hp-empty-sub {
-    font-size: clamp(0.78rem, 1.8vw, 0.84rem); color: rgba(232,228,220,0.36); font-weight: 300; word-break: break-word;
+    font-size: clamp(0.78rem, 1.8vw, 0.84rem); color: #6B7280; font-weight: 300; word-break: break-word;
   }
 `;
 
-let _hpInjected = false;
-const injectHpStyles = () => {
-  if (_hpInjected || typeof document === 'undefined') return;
-  const s = document.createElement('style');
-  s.textContent = GLOBAL_CSS;
-  document.head.appendChild(s);
-  _hpInjected = true;
-};
 
 /* ─── Composants internes ─── */
 const Eyebrow = ({ children }) => (
@@ -368,12 +363,6 @@ const Eyebrow = ({ children }) => (
     <span className="hp-eyebrow-line" />
     {children}
   </p>
-);
-
-const PageSkeleton = () => (
-  <div style={{ minHeight:'100vh', background:'#0A0C0F' }}>
-    <div style={{ height:'100vh', background:'linear-gradient(160deg,#0D1520,#080B0E)' }} />
-  </div>
 );
 
 const Ticker = () => {
@@ -414,11 +403,8 @@ const FadeIn = ({ children, delay = 0, x = 0, y = 20 }) => (
 const HomePage = () => {
   const [latestProperties, setLatestProperties] = useState({});
   const [isLoading,  setIsLoading]  = useState(true);
+  const [loadError,  setLoadError]  = useState(false);
   const [activePole, setActivePole] = useState(poles[0].id);
-
-  useEffect(() => {
-    injectHpStyles();
-  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -436,7 +422,7 @@ const HomePage = () => {
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
             .slice(0, 5),
         });
-      } catch { setLatestProperties({}); }
+      } catch { setLatestProperties({}); setLoadError(true); }
       finally  { setIsLoading(false); }
     };
     fetchData();
@@ -445,10 +431,9 @@ const HomePage = () => {
   const activePoleItems = latestProperties[activePole] || [];
   const activePoleData  = poles.find(p => p.id === activePole);
 
-  if (isLoading) return <PageSkeleton />;
-
   return (
     <div className="hp-root">
+      <style>{GLOBAL_CSS}</style>
       {/* ══ HERO ══ */}
       <header style={{ position:'relative', height:'100svh', minHeight:'560px', overflow:'hidden' }}>
         <HeroSlider />
@@ -456,23 +441,6 @@ const HomePage = () => {
 
       {/* ══ TICKER ══ */}
       <Ticker />
-
-      {/* ══ STATS ══ */}
-      <div className="hp-stats-grid">
-        {[
-          { num:'150+', label:'Biens sélectionnés',      color:'#2E7BB5' },
-          { num:'80+',  label:'Événements livrés',        color:'#D42B2B' },
-          { num:'80+',  label:'Entreprises accompagnées', color:'#C8872A' },
-          { num:'5+',   label:'Années au Congo',          color:'#C8872A' },
-        ].map((stat, i) => (
-          <FadeIn key={i} delay={i * 0.07} y={14}>
-            <div className="hp-stat-item">
-              <div className="hp-stat-num" style={{ color:stat.color }}>{stat.num}</div>
-              <div className="hp-stat-label">{stat.label}</div>
-            </div>
-          </FadeIn>
-        ))}
-      </div>
 
       {/* ══ PÔLES ══ */}
       <section className="hp-section">
@@ -482,7 +450,7 @@ const HomePage = () => {
               <Eyebrow>Notre Expertise</Eyebrow>
               <h2 className="hp-h2">
                 Trois pôles,{' '}
-                <em style={{ fontStyle:'italic', color:'#C8872A' }}>une seule vision</em>
+                <em style={{ fontStyle:'italic', color:'#C8960C' }}>une seule vision</em>
               </h2>
             </div>
           </FadeIn>
@@ -528,13 +496,13 @@ const HomePage = () => {
             <FadeIn x={-20}>
               <Eyebrow>À propos</Eyebrow>
               <h2 className="hp-h2" style={{ marginBottom:'clamp(14px,2.5vw,20px)' }}>
-                Qui sommes-<em style={{ fontStyle:'italic', color:'#C8872A' }}>nous ?</em>
+                Qui sommes-<em style={{ fontStyle:'italic', color:'#C8960C' }}>nous ?</em>
               </h2>
-              <p className="hp-about-p" style={{ color:'rgba(232,228,220,0.5)', marginBottom:'12px' }}>
-                <span style={{ color:'#E8E4DC', fontWeight:400 }}>Altitude-Vision</span>{' '}
+              <p className="hp-about-p" style={{ color:'#6B7280', marginBottom:'12px' }}>
+                <span style={{ color:'#111827', fontWeight:400 }}>Altitude-Vision</span>{' '}
                 est la seule agence à Brazzaville qui réunit l'immobilier, l'événementiel et la communication sous un même toit.
               </p>
-              <p className="hp-about-p" style={{ color:'rgba(232,228,220,0.34)', marginBottom:'clamp(20px,4vw,32px)' }}>
+              <p className="hp-about-p" style={{ color:'#6B7280', marginBottom:'clamp(20px,4vw,32px)' }}>
                 200+ familles logées, 80+ événements réussis, 80+ marques accompagnées — ce sont nos preuves. Confiez-nous un projet : nous livrons.
               </p>
               <div style={{ display:'flex', flexDirection:'column', gap:'10px', marginBottom:'clamp(22px,4vw,34px)' }}>
@@ -544,7 +512,7 @@ const HomePage = () => {
                   { icon:Mail,   text:'contact@altitudevision.agency' },
                 ].map(({ icon:Icon, text }, i) => (
                   <div key={i} className="hp-contact-row">
-                    <Icon size={12} style={{ color:'#C8872A', flexShrink:0 }} />
+                    <Icon size={12} style={{ color:'#C8960C', flexShrink:0 }} />
                     {text}
                   </div>
                 ))}
@@ -555,41 +523,48 @@ const HomePage = () => {
             </FadeIn>
 
             <FadeIn x={20} delay={0.1}>
-              <div style={{ position:'relative', borderRadius:'20px', overflow:'hidden', height:'clamp(280px,35vw,420px)' }}>
-                <Image
-                  src="https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=1200&auto=format&fit=crop"
-                  alt="Équipe Altitude-Vision en réunion"
-                  fill sizes="(max-width: 768px) 100vw, 600px"
-                  className="object-cover"
-                />
-                <div style={{
-                  position:'absolute', inset:0,
-                  background:'linear-gradient(to top, rgba(10,12,15,0.65) 0%, transparent 55%)',
-                  borderRadius:'20px',
-                }} />
-                <div style={{
-                  position:'absolute', bottom:'20px', left:'20px', right:'20px',
-                  display:'flex', alignItems:'center', gap:'12px',
-                  background:'rgba(10,12,15,0.72)', backdropFilter:'blur(12px)',
-                  border:'1px solid rgba(200,135,42,0.25)',
-                  borderRadius:'14px', padding:'12px 16px',
-                }}>
-                  <div style={{
-                    width:'36px', height:'36px', borderRadius:'10px', flexShrink:0,
-                    background:'linear-gradient(135deg, #A0671A, #C8872A)',
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                  }}>
-                    <Briefcase size={16} style={{ color:'#fff' }} />
-                  </div>
-                  <div>
-                    <p style={{ color:'#E8E4DC', fontWeight:500, fontSize:'0.85rem', lineHeight:1.2 }}>
-                      Agence multidisciplinaire
-                    </p>
-                    <p style={{ color:'rgba(232,228,220,0.45)', fontSize:'0.72rem' }}>
-                      Immobilier · Événementiel · Communication
-                    </p>
-                  </div>
-                </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'clamp(10px,2vw,16px)' }}>
+                {[
+                  { num:'200+', label:'Familles logées',        color:'#2E7BB5', icon: Building2 },
+                  { num:'80+',  label:'Événements livrés',      color:'#D42B2B', icon: Calendar },
+                  { num:'80+',  label:'Marques accompagnées',   color:'#C8960C', icon: Briefcase },
+                  { num:'5+',   label:'Années à Brazzaville',   color:'#C8960C', icon: MapPin },
+                ].map((item, i) => {
+                  const ItemIcon = item.icon;
+                  return (
+                    <div key={i} style={{
+                      padding:'clamp(16px,3vw,28px)',
+                      borderRadius:'14px',
+                      border:`1px solid ${item.color}22`,
+                      background:`${item.color}08`,
+                      display:'flex', flexDirection:'column', gap:'8px',
+                    }}>
+                      <div style={{
+                        width:'32px', height:'32px', borderRadius:'9px',
+                        background:`${item.color}18`,
+                        border:`1px solid ${item.color}25`,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        marginBottom:'2px',
+                      }}>
+                        <ItemIcon size={14} style={{ color: item.color }} />
+                      </div>
+                      <div style={{
+                        fontFamily:"'Cormorant Garamond', serif",
+                        fontSize:'clamp(1.8rem,4vw,2.8rem)',
+                        fontWeight:300, color:item.color, lineHeight:1,
+                      }}>
+                        {item.num}
+                      </div>
+                      <div style={{
+                        fontSize:'clamp(0.60rem,1.2vw,0.68rem)',
+                        letterSpacing:'0.14em', textTransform:'uppercase',
+                        color:'#6B7280', fontWeight:400,
+                      }}>
+                        {item.label}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </FadeIn>
 
@@ -600,19 +575,19 @@ const HomePage = () => {
       <StatsCounter />
 
       {/* ══ ANNONCES ══ */}
-      <section className="hp-section" style={{ background:'linear-gradient(to bottom,rgba(17,20,24,0.5),transparent)' }}>
+      <section className="hp-section" style={{ background:'rgba(17,24,39,0.02)' }}>
         <div className="hp-container">
           <FadeIn>
             <div style={{ marginBottom:'clamp(22px,4vw,48px)' }}>
               <Eyebrow>Notre Sélection</Eyebrow>
               <h2 className="hp-h2">
                 Nos Dernières{' '}
-                <em style={{ fontStyle:'italic', color:'#C8872A' }}>Annonces</em>
+                <em style={{ fontStyle:'italic', color:'#C8960C' }}>Annonces</em>
               </h2>
             </div>
           </FadeIn>
 
-          <div className="hp-tabs">
+          <div className="hp-tabs" role="tablist" aria-label="Pôles d'activité">
             {poles.map(pole => {
               const Icon     = pole.icon;
               const isActive = activePole === pole.id;
@@ -621,21 +596,38 @@ const HomePage = () => {
                   onClick={() => setActivePole(pole.id)}
                   whileTap={{ scale: 0.96 }}
                   className="hp-tab-btn"
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={`tabpanel-${pole.id}`}
+                  id={`tab-${pole.id}`}
                   style={{
                     border:     isActive ? 'none' : `1px solid ${pole.colorBorder}`,
                     background: isActive ? pole.gradient : 'transparent',
                     color:      isActive ? '#fff' : pole.color,
                     boxShadow:  isActive ? `0 4px 20px ${pole.color}28` : 'none',
-                  }}
-                  aria-pressed={isActive}>
+                  }}>
                   <Icon size={13} aria-hidden="true" /> {pole.name}
                 </motion.button>
               );
             })}
           </div>
 
+          {loadError && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '12px 16px', borderRadius: '10px', marginBottom: '16px',
+              background: 'rgba(212,43,43,0.08)', border: '1px solid rgba(212,43,43,0.2)',
+              fontSize: '0.82rem', color: '#6B7280',
+            }}>
+              ⚠️ Impossible de charger les annonces pour le moment. Réessayez plus tard.
+            </div>
+          )}
+
           <AnimatePresence mode="wait">
             <motion.div key={activePole}
+              role="tabpanel"
+              id={`tabpanel-${activePole}`}
+              aria-labelledby={`tab-${activePole}`}
               initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
               exit={{ opacity:0, y:-8 }} transition={{ duration:0.28 }}>
 
@@ -649,11 +641,12 @@ const HomePage = () => {
                 </Link>
               </div>
 
-              {activePoleItems.length > 0 ? (
+              {isLoading || activePoleItems.length > 0 ? (
                 <HomeSlider
                   properties={activePoleItems}
                   isEvent={activePole === 'MilaEvents'}
                   isPortfolio={activePole === 'Altcom'}
+                  loading={isLoading}
                 />
               ) : (
                 <div className="hp-empty" style={{

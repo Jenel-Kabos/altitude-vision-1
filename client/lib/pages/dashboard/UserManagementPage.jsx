@@ -1,6 +1,6 @@
 // src/pages/UserManagementPage.jsx
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '@/lib/services/api';
 import toast from '@/lib/utils/toast';
 
 const UserManagementPage = () => {
@@ -8,17 +8,12 @@ const UserManagementPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null); // pour suppression
-  const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api'}/admin/owners`;
-
 
   // Récupération des utilisateurs
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.get('/admin/owners');
       setUsers(res.data.data.owners);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -34,8 +29,7 @@ const UserManagementPage = () => {
   // Actions utilisateurs : verify, suspend, activate, delete
   const handleAction = async (userId, action) => {
     try {
-      const token = localStorage.getItem('token');
-      let url = `/api/admin/owners/${userId}`;
+      let url = `/admin/owners/${userId}`;
       let method = 'patch';
       let data = {};
 
@@ -56,7 +50,7 @@ const UserManagementPage = () => {
           return;
       }
 
-      const res = await axios({ url, method, data, headers: { Authorization: `Bearer ${token}` } });
+      const res = await api({ url, method, data });
 
       if (action === 'delete') {
         setUsers(users.filter((u) => u._id !== userId));

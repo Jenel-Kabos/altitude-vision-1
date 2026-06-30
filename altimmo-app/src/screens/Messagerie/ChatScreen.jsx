@@ -1,211 +1,230 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, {
+  useState, useEffect, useRef, useLayoutEffect,
+  useMemo, useCallback, memo,
+} from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
-  StyleSheet, KeyboardAvoidingView, Platform, Image,
-  Animated,
+  StyleSheet, KeyboardAvoidingView, Platform, Animated,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
-import { connectSocket, getSocket, disconnectSocket } from '../../services/socketService';
-import { colors, typography, spacing } from '../../theme';
+import { connectSocket, getSocket } from '../../services/socketService';
+import { fonts, fontSize, spacing } from '../../theme';
 
-// ─── Helpers date ──────────────────────────────────────────────
+// ─── Helpers date ─────────────────────────────────────────────────────────────
+
 const isSameDay = (a, b) =>
   a.getFullYear() === b.getFullYear()
   && a.getMonth() === b.getMonth()
-  && a.getDate() === b.getDate();
+  && a.getDate()  === b.getDate();
 
 const formatDateSep = (dateStr) => {
-  const d = new Date(dateStr);
-  const today = new Date();
+  const d         = new Date(dateStr);
+  const today     = new Date();
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  if (isSameDay(d, today)) return "Aujourd'hui";
+  if (isSameDay(d, today))     return "Aujourd'hui";
   if (isSameDay(d, yesterday)) return 'Hier';
-  return d.toLocaleDateString('fr-FR', {
-    day: 'numeric', month: 'long', year: 'numeric',
-  });
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 };
 
-const formatTime = (dateStr) => {
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-};
+const formatTime = (dateStr) =>
+  new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
-// ─── Composant indicateur "en train d'écrire" ──────────────────
-function TypingDots() {
+// ─── Indicateur "en train d'écrire" ──────────────────────────────────────────
+
+const TypingDots = memo(function TypingDots({ bubbleStyle, dotStyle }) {
   const dot1 = useRef(new Animated.Value(0.2)).current;
   const dot2 = useRef(new Animated.Value(0.2)).current;
   const dot3 = useRef(new Animated.Value(0.2)).current;
 
   useEffect(() => {
-    const animateDot = (anim, delay) => Animated.loop(
+    const anim = (val, delay) => Animated.loop(
       Animated.sequence([
         Animated.delay(delay),
-        Animated.timing(anim, {
-          toValue: 1, duration: 400, useNativeDriver: true,
-        }),
-        Animated.timing(anim, {
-          toValue: 0.2, duration: 400, useNativeDriver: true,
-        }),
+        Animated.timing(val, { toValue: 1,   duration: 400, useNativeDriver: true }),
+        Animated.timing(val, { toValue: 0.2, duration: 400, useNativeDriver: true }),
       ])
     );
-    const a1 = animateDot(dot1, 0);
-    const a2 = animateDot(dot2, 150);
-    const a3 = animateDot(dot3, 300);
+    const a1 = anim(dot1, 0);
+    const a2 = anim(dot2, 150);
+    const a3 = anim(dot3, 300);
     a1.start(); a2.start(); a3.start();
     return () => { a1.stop(); a2.stop(); a3.stop(); };
-  }, []);
+  }, [dot1, dot2, dot3]);
 
   return (
-    <View style={styles.typingBubble}>
-      <Animated.View style={[styles.typingDot, { opacity: dot1 }]} />
-      <Animated.View style={[styles.typingDot, { opacity: dot2 }]} />
-      <Animated.View style={[styles.typingDot, { opacity: dot3 }]} />
+    <View style={bubbleStyle}>
+      <Animated.View style={[dotStyle, { opacity: dot1 }]} />
+      <Animated.View style={[dotStyle, { opacity: dot2 }]} />
+      <Animated.View style={[dotStyle, { opacity: dot3 }]} />
     </View>
   );
-}
+});
 
-// ─── Écran ────────────────────────────────────────────────────
+// ─── ChatScreen ───────────────────────────────────────────────────────────────
+
 export default function ChatScreen({ route, navigation }) {
-  const { conversation, contact } = route.params;
-  const { user } = useAuth();
-  const [messages, setMessages] = useState([]);
-  const [text, setText] = useState('');
-  const [typing, setTyping] = useState(false);
-  const [isOnline, setIsOnline] = useState(false);
-  const flatRef = useRef(null);
+  const { conversation, contact }  = route.params;
+  const { user }           = useAuth();
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
 
-  // Custom header via navigation.setOptions
+  const [messages, setMessages] = useState([]);
+  const [text,     setText]     = useState('');
+  const [typing,   setTyping]   = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+
+  // ─── Header personnalisé ───
+  const HeaderTitle = useCallback(() => (
+    <View style={styles.customHeader}>
+      {contact?.photo ? (
+        <Image
+          source={{ uri: contact.photo }}
+          style={styles.headerAvatar}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          accessible={false}
+        />
+      ) : (
+        <View style={[styles.headerAvatar, styles.headerAvatarFallback]}>
+          <Text style={styles.headerAvatarInitial}>
+            {(contact?.name?.[0] || '?').toUpperCase()}
+          </Text>
+        </View>
+      )}
+      <View>
+        <Text style={styles.headerName}>{contact?.name || 'Contact'}</Text>
+        {isOnline && (
+          <View style={styles.onlineRow}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.onlineText}>En ligne</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  ), [contact, isOnline, styles]);
+
   useLayoutEffect(() => {
     navigation.setOptions({
       headerShown: true,
       headerStyle: {
-        backgroundColor: colors.surface,
+        backgroundColor: c.bgCard,
         shadowOpacity: 0,
         elevation: 0,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: c.border,
       },
-      headerTintColor: colors.text,
+      headerTintColor:        c.text,
       headerBackTitleVisible: false,
-      headerTitleAlign: 'left',
-      headerTitle: () => (
-        <View style={styles.customHeader}>
-          {contact?.photo ? (
-            <Image source={{ uri: contact.photo }} style={styles.headerAvatar} />
-          ) : (
-            <View style={[styles.headerAvatar, styles.headerAvatarFallback]}>
-              <Text style={styles.headerAvatarInitial}>
-                {(contact?.name?.[0] || '?').toUpperCase()}
-              </Text>
-            </View>
-          )}
-          <View>
-            <Text style={styles.headerName}>{contact?.name || 'Contact'}</Text>
-            {isOnline && (
-              <View style={styles.onlineRow}>
-                <View style={styles.onlineDot} />
-                <Text style={styles.onlineText}>En ligne</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      ),
+      headerTitleAlign:       'left',
+      headerTitle:            HeaderTitle,
     });
-  }, [navigation, contact, isOnline]);
+  }, [navigation, c, HeaderTitle]);
 
-  // ─── Fetch initial + Socket.IO temps réel ───────────────────
-  const fetchMessages = async () => {
+  // ─── Chargement messages ───
+  const fetchMessages = useCallback(async () => {
     try {
-      const res = await api.get(`/messages/${conversation._id}`);
+      const res  = await api.get(`/messages/${conversation._id}`);
       const msgs = res.data?.data?.messages || res.data?.messages || [];
       setMessages(msgs.reverse());
     } catch {}
-  };
+  }, [conversation._id]);
 
+  // ─── Socket.IO + polling de rattrapage ───
   useEffect(() => {
     fetchMessages();
 
-    // Socket.IO — temps réel
-    const token = api.defaults?.headers?.common?.Authorization?.replace('Bearer ', '');
+    const token  = api.defaults?.headers?.common?.Authorization?.replace('Bearer ', '');
     const socket = connectSocket(token);
 
     socket.emit('join-room', conversation._id);
 
-    socket.on('new-message', (payload) => {
-      // Le serveur émet { conversationId, message } — on accepte les deux formes
+    const handleNewMessage = (payload) => {
       const msg = payload?.message ?? payload;
       setMessages(prev => {
         const exists = prev.some(m => m._id === msg._id);
-        return exists ? prev.map(m => m._id === msg._id ? msg : m) : [msg, ...prev];
+        return exists
+          ? prev.map(m => m._id === msg._id ? msg : m)
+          : [msg, ...prev];
       });
-    });
+    };
 
-    socket.on('typing', ({ userId: typingUserId }) => {
+    const handleTyping = ({ userId: typingUserId }) => {
       if (typingUserId !== user._id) {
         setTyping(true);
         setTimeout(() => setTyping(false), 2000);
       }
-    });
+    };
 
-    // Fallback polling 30s — rattrape les messages perdus pendant une
-    // déconnexion socket silencieuse (réseau instable, arrière-plan)
-    const fallback = setInterval(fetchMessages, 30000);
+    socket.on('new-message', handleNewMessage);
+    socket.on('typing',      handleTyping);
+
+    // Polling de rattrapage si le socket est silencieux (réseau instable)
+    const fallback = setInterval(fetchMessages, 30_000);
 
     return () => {
-      socket.off('new-message');
-      socket.off('typing');
+      socket.off('new-message', handleNewMessage);
+      socket.off('typing',      handleTyping);
       clearInterval(fallback);
     };
-  }, [conversation._id]);
+  }, [conversation._id, user._id, fetchMessages]);
 
-  // ─── Envoi optimiste ───────────────────────────────────────
-  const sendMessage = async () => {
+  // ─── Envoi optimiste ───
+  const sendMessage = useCallback(async () => {
     const content = text.trim();
     if (!content) return;
     setText('');
 
     const tempMsg = {
-      _id: `temp-${Date.now()}`,
+      _id:       `temp-${Date.now()}`,
       content,
-      sender: user,
+      sender:    user,
       createdAt: new Date().toISOString(),
-      pending: true,
+      pending:   true,
     };
     setMessages(prev => [tempMsg, ...prev]);
 
     try {
-      const res = await api.post('/messages', {
-        conversationId: conversation._id,
-        content,
-      });
+      const res   = await api.post('/messages', { conversationId: conversation._id, content });
       const saved = res.data?.data?.message || res.data?.message;
       if (saved) {
         setMessages(prev => prev.map(m => m._id === tempMsg._id ? saved : m));
         getSocket()?.emit('send-message', { ...saved, receiverId: contact._id });
       }
     } catch {
-      setMessages(prev => prev.map(
-        m => m._id === tempMsg._id ? { ...m, error: true } : m
-      ));
+      setMessages(prev =>
+        prev.map(m => m._id === tempMsg._id ? { ...m, error: true } : m)
+      );
     }
-  };
+  }, [text, user, conversation._id, contact]);
 
-  const onTyping = (val) => {
+  const onTyping = useCallback((val) => {
     setText(val);
     getSocket()?.emit('typing', { conversationId: conversation._id, userId: user._id });
-  };
+  }, [conversation._id, user._id]);
 
-  const isMe = (msg) => (msg.sender?._id || msg.sender) === user?._id;
+  const isMe = useCallback(
+    (msg) => (msg.sender?._id || msg.sender) === user?._id,
+    [user],
+  );
 
-  // ─── Render ─────────────────────────────────────────────────
-  const renderMessage = ({ item, index }) => {
-    const mine = isMe(item);
-    // In inverted list : index+1 is the older message
-    const olderMsg = messages[index + 1];
+  const keyExtractor = useCallback((item, i) => item._id || String(i), []);
+
+  // Indicateur de frappe mémorisé — évite unmount/remount à chaque render FlatList
+  const typingHeader = useMemo(() => {
+    if (!typing) return null;
+    return <TypingDots bubbleStyle={styles.typingBubble} dotStyle={styles.typingDot} />;
+  }, [typing, styles]);
+
+  // ─── Rendu message ───
+  const renderMessage = useCallback(({ item, index }) => {
+    const mine        = isMe(item);
+    const olderMsg    = messages[index + 1];
     const showDateSep = !olderMsg
       || !isSameDay(new Date(item.createdAt), new Date(olderMsg.createdAt));
 
@@ -213,9 +232,7 @@ export default function ChatScreen({ route, navigation }) {
       <View>
         {showDateSep && (
           <View style={styles.dateSepWrap}>
-            <Text style={styles.dateSepText}>
-              {formatDateSep(item.createdAt)}
-            </Text>
+            <Text style={styles.dateSepText}>{formatDateSep(item.createdAt)}</Text>
           </View>
         )}
         <View style={mine ? styles.bubbleRowMe : styles.bubbleRowThem}>
@@ -225,12 +242,9 @@ export default function ChatScreen({ route, navigation }) {
             </Text>
           </View>
         </View>
-        <View style={[
-          styles.metaRow,
-          mine ? styles.metaRowMe : styles.metaRowThem,
-        ]}>
+        <View style={[styles.metaRow, mine ? styles.metaRowMe : styles.metaRowThem]}>
           <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
-          {mine ? (
+          {mine && (
             <Ionicons
               name={
                 item.pending ? 'time-outline'
@@ -238,13 +252,13 @@ export default function ChatScreen({ route, navigation }) {
                 : 'checkmark-done'
               }
               size={12}
-              color={item.error ? colors.error : colors.textMuted}
+              color={item.error ? c.error : c.textMuted}
             />
-          ) : null}
+          )}
         </View>
       </View>
     );
-  };
+  }, [isMe, messages, styles, c]);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -254,33 +268,32 @@ export default function ChatScreen({ route, navigation }) {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <FlatList
-          ref={flatRef}
           data={messages}
-          keyExtractor={(item, i) => item._id || String(i)}
+          keyExtractor={keyExtractor}
           renderItem={renderMessage}
           inverted
           contentContainerStyle={styles.msgList}
-          ListHeaderComponent={typing ? <TypingDots /> : null}
+          ListHeaderComponent={typingHeader}
         />
 
         <View style={styles.inputBar}>
           <TextInput
             style={styles.input}
             placeholder="Message..."
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={c.textMuted}
             value={text}
             onChangeText={onTyping}
             multiline
             maxLength={1000}
+            accessibilityLabel="Écrire un message"
           />
           <TouchableOpacity
-            style={[
-              styles.sendBtn,
-              !text.trim() && styles.sendBtnDisabled,
-            ]}
+            style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
             onPress={sendMessage}
             disabled={!text.trim()}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Envoyer le message"
           >
             <Ionicons name="send" size={18} color="#FFFFFF" />
           </TouchableOpacity>
@@ -290,13 +303,15 @@ export default function ChatScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const makeStyles = (c) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
   },
 
-  // ─── Header custom ───
+  // ─── Header ───
   customHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -308,19 +323,19 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   headerAvatarFallback: {
-    backgroundColor: colors.cardElevated,
+    backgroundColor: c.bgCardAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerAvatarInitial: {
-    color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     fontSize: 14,
+    color: c.gold,
   },
   headerName: {
-    ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+    color: c.text,
   },
   onlineRow: {
     flexDirection: 'row',
@@ -332,11 +347,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.success,
+    backgroundColor: c.success,
   },
   onlineText: {
+    fontFamily: fonts.body,
     fontSize: 11,
-    color: colors.textSecondary,
+    color: c.textSub,
   },
 
   // ─── Liste ───
@@ -345,25 +361,22 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
 
-  // ─── Date sep ───
+  // ─── Séparateur de date ───
   dateSepWrap: {
     alignItems: 'center',
     marginVertical: spacing.md,
   },
   dateSepText: {
+    fontFamily: fonts.body,
     fontSize: 11,
-    color: colors.textMuted,
+    color: c.textMuted,
   },
 
   // ─── Bulles ───
-  bubbleRowMe: {
-    alignItems: 'flex-end',
-  },
-  bubbleRowThem: {
-    alignItems: 'flex-start',
-  },
+  bubbleRowMe:   { alignItems: 'flex-end' },
+  bubbleRowThem: { alignItems: 'flex-start' },
   bubbleMe: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.gold,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: 18,
@@ -371,7 +384,7 @@ const styles = StyleSheet.create({
     maxWidth: '78%',
   },
   bubbleThem: {
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: 18,
@@ -379,12 +392,14 @@ const styles = StyleSheet.create({
     maxWidth: '78%',
   },
   bubbleTextMe: {
-    ...typography.body,
-    color: '#000',
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: '#0A0A0A',
   },
   bubbleTextThem: {
-    ...typography.body,
-    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: c.text,
   },
 
   // ─── Méta (heure + statut) ───
@@ -394,20 +409,17 @@ const styles = StyleSheet.create({
     gap: 4,
     marginTop: 2,
   },
-  metaRowMe: {
-    alignSelf: 'flex-end',
-  },
-  metaRowThem: {
-    alignSelf: 'flex-start',
-  },
+  metaRowMe:   { alignSelf: 'flex-end' },
+  metaRowThem: { alignSelf: 'flex-start' },
   timeText: {
+    fontFamily: fonts.body,
     fontSize: 10,
-    color: colors.textMuted,
+    color: c.textMuted,
   },
 
   // ─── Typing dots ───
   typingBubble: {
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: 18,
@@ -421,38 +433,41 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: colors.textMuted,
+    backgroundColor: c.textMuted,
   },
 
-  // ─── Input bar ───
+  // ─── Barre de saisie ───
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.sm,
-    backgroundColor: colors.surface,
+    backgroundColor: c.bgCard,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
     padding: spacing.md,
   },
   input: {
     flex: 1,
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCardAlt,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: c.border,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    color: colors.text,
-    ...typography.body,
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: c.text,
     maxHeight: 100,
   },
   sendBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.primary,
+    backgroundColor: c.gold,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendBtnDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
 });

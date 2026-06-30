@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, StyleSheet, Image, Alert,
   ActivityIndicator, SafeAreaView, Animated,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { colors, typography, spacing } from '../../theme';
+import { typography, spacing, fonts, fontSize, radius } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
 import Button from '../../components/ui/Button';
 import { uploadToCloudinary, creerAnnonce } from '../../services/annonceService';
 import api from '../../services/api';
@@ -17,26 +19,17 @@ import { PROPERTY_TYPES } from '../../constants/propertyTypes';
 import { AMENITIES } from '../../constants/amenities';
 
 const STEPS = [
-  { id: 1, label: 'Info' },
-  { id: 2, label: 'Type' },
-  { id: 3, label: 'Photos' },
-  { id: 4, label: 'Prix' },
-  { id: 5, label: 'Localisation' },
-  { id: 6, label: 'Commodités' },
-  { id: 7, label: 'Récap' },
+  { id: 1, label: 'Info',        title: 'Informations' },
+  { id: 2, label: 'Type',        title: 'Type de bien' },
+  { id: 3, label: 'Photos',      title: 'Photos' },
+  { id: 4, label: 'Prix',        title: 'Prix' },
+  { id: 5, label: 'Localisation',title: 'Localisation' },
+  { id: 6, label: 'Caractères',  title: 'Caractéristiques' },
+  { id: 7, label: 'Récap',       title: 'Récapitulatif' },
 ];
 
-const STEP_TITLES = [
-  'Informations',
-  'Type de bien',
-  'Photos',
-  'Prix',
-  'Localisation',
-  'Caractéristiques',
-  'Récapitulatif',
-];
-
-const TYPES = PROPERTY_TYPES;
+// Largeur d'un bloc step (cercle 28px + label) + connecteur (24px)
+const STEP_SLOT_W = 88;
 
 const TRANSACTIONS = [
   { value: 'Vente',    icon: 'cash-outline',     desc: 'Mettre en vente' },
@@ -53,8 +46,6 @@ const REQUIRED_DOCUMENTS = [
   'Attestation de travail',
   'Quittance de loyer précédente',
 ];
-
-const COMMODITES = AMENITIES;
 
 const initialForm = {
   titre: '',
@@ -78,6 +69,9 @@ const initialForm = {
 };
 
 export default function PublierBienScreen({ navigation, route }) {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+
   const editProperty = route?.params?.editProperty || null;
   const isEditing = !!editProperty?._id;
   const [step, setStep] = useState(1);
@@ -90,7 +84,8 @@ export default function PublierBienScreen({ navigation, route }) {
   const [submitting, setSubmitting] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
 
-  const scrollRef = useRef(null);
+  const scrollRef    = useRef(null);
+  const stepperRef   = useRef(null);
   const progressAnim = useRef(new Animated.Value(1 / STEPS.length)).current;
 
   useEffect(() => {
@@ -138,6 +133,9 @@ export default function PublierBienScreen({ navigation, route }) {
       useNativeDriver: false,
     }).start();
     scrollRef.current?.scrollTo({ y: 0, animated: false });
+    // Auto-scroll stepper : centre l'étape active
+    const offset = Math.max(0, (step - 2) * STEP_SLOT_W);
+    stepperRef.current?.scrollTo({ x: offset, animated: true });
   }, [step]);
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -276,15 +274,19 @@ export default function PublierBienScreen({ navigation, route }) {
   const handlePublish = async () => {
     setSubmitting(true);
     try {
-      const working = [...photos];
-      for (let i = 0; i < working.length; i++) {
-        if (working[i].url) continue;
-        working[i] = { ...working[i], uploading: true };
-        setPhotos([...working]);
-        const url = await uploadToCloudinary(working[i].uri);
-        working[i] = { ...working[i], uploading: false, url };
-        setPhotos([...working]);
-      }
+      // Marquer toutes les photos à uploader comme "en cours"
+      const working = photos.map(p => p.url ? p : { ...p, uploading: true });
+      setPhotos(working);
+
+      // Upload en parallèle de toutes les photos sans URL
+      const uploaded = await Promise.all(
+        working.map(async (p) => {
+          if (p.url) return p;
+          const url = await uploadToCloudinary(p.uri);
+          return { ...p, uploading: false, url };
+        })
+      );
+      setPhotos(uploaded);
 
       const payload = {
         titre: form.titre.trim(),
@@ -299,7 +301,7 @@ export default function PublierBienScreen({ navigation, route }) {
         arrondissement: form.arrondissement.trim(),
         type: form.type,
         categorie: form.categorie,
-        photos: working.map(p => p.url),
+        photos: uploaded.map(p => p.url),
         amenities: commodites,
         latitude: coords?.lat,
         longitude: coords?.lng,
@@ -328,7 +330,7 @@ export default function PublierBienScreen({ navigation, route }) {
           status: typeof payload.categorie === 'string' ? payload.categorie.toLowerCase() : payload.categorie,
           latitude: payload.latitude ?? -4.2661,
           longitude: payload.longitude ?? 15.2832,
-          existingImages: working.map(p => p.url).filter(Boolean),
+          existingImages: uploaded.map(p => p.url).filter(Boolean),
           cautionMultiplicateur: payload.cautionMultiplicateur,
           profilsLocataireRecherches: payload.profilsLocataireRecherches,
           documentsRequis: payload.documentsRequis,
@@ -361,7 +363,7 @@ export default function PublierBienScreen({ navigation, route }) {
           focused === name && styles.inputFocused,
         ]}
         placeholder={opts.placeholder}
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={c.textMuted}
         value={form[name]}
         onChangeText={(v) => setField(name, v)}
         onFocus={() => setFocused(name)}
@@ -370,6 +372,7 @@ export default function PublierBienScreen({ navigation, route }) {
         numberOfLines={opts.multiline ? 4 : 1}
         keyboardType={opts.keyboardType || 'default'}
         textAlignVertical={opts.multiline ? 'top' : 'center'}
+        accessibilityLabel={opts.placeholder || name}
       />
       {errors[name] ? <Text style={styles.errorText}>{errors[name]}</Text> : null}
     </View>
@@ -383,21 +386,26 @@ export default function PublierBienScreen({ navigation, route }) {
           style={styles.stepBtn}
           onPress={() => adjustNum(name, -1)}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`Diminuer ${label}`}
         >
-          <Ionicons name="remove" size={18} color={colors.primary} />
+          <Ionicons name="remove" size={18} color={c.gold} />
         </TouchableOpacity>
         <TextInput
           style={styles.numberInput}
           value={String(form[name])}
           onChangeText={(v) => setField(name, Math.max(0, Number(v.replace(/[^0-9]/g, '')) || 0))}
           keyboardType="numeric"
+          accessibilityLabel={`Valeur pour ${label}`}
         />
         <TouchableOpacity
           style={styles.stepBtn}
           onPress={() => adjustNum(name, 1)}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`Augmenter ${label}`}
         >
-          <Ionicons name="add" size={18} color={colors.primary} />
+          <Ionicons name="add" size={18} color={c.gold} />
         </TouchableOpacity>
       </View>
       {errors[name] ? <Text style={styles.errorText}>{errors[name]}</Text> : null}
@@ -422,7 +430,7 @@ export default function PublierBienScreen({ navigation, route }) {
         <View>
           <Text style={styles.fieldLabel}>Type de bien</Text>
           <View style={styles.grid2}>
-            {TYPES.map(t => {
+            {PROPERTY_TYPES.map(t => {
               const sel = form.type === t.value;
               return (
                 <TouchableOpacity
@@ -430,13 +438,16 @@ export default function PublierBienScreen({ navigation, route }) {
                   style={[styles.typeCard, sel && styles.cardSelected]}
                   onPress={() => setField('type', t.value)}
                   activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Sélectionner ${t.label}`}
+                  accessibilityState={{ selected: sel }}
                 >
                   <Ionicons
                     name={t.icon}
                     size={28}
-                    color={sel ? colors.primary : colors.textSecondary}
+                    color={sel ? c.gold : c.textSub}
                   />
-                  <Text style={[styles.typeLabel, sel && { color: colors.primary }]}>
+                  <Text style={[styles.typeLabel, sel && { color: c.gold }]}>
                     {t.label}
                   </Text>
                 </TouchableOpacity>
@@ -455,13 +466,16 @@ export default function PublierBienScreen({ navigation, route }) {
                   style={[styles.txCard, sel && styles.cardSelected]}
                   onPress={() => setField('categorie', t.value)}
                   activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.desc}
+                  accessibilityState={{ selected: sel }}
                 >
                   <Ionicons
                     name={t.icon}
                     size={28}
-                    color={sel ? colors.primary : colors.textSecondary}
+                    color={sel ? c.gold : c.textSub}
                   />
-                  <Text style={[styles.typeLabel, sel && { color: colors.primary }]}>
+                  <Text style={[styles.typeLabel, sel && { color: c.gold }]}>
                     {t.value}
                   </Text>
                   <Text style={styles.txDesc}>{t.desc}</Text>
@@ -487,7 +501,7 @@ export default function PublierBienScreen({ navigation, route }) {
                     <Ionicons name="videocam-outline" size={28} color="rgba(255,255,255,0.6)" />
                   </View>
                 ) : (
-                  <Image source={{ uri: p.uri }} style={styles.photoImg} />
+                  <Image source={{ uri: p.uri }} style={styles.photoImg} accessible={false} />
                 )}
                 {isVideo(p.uri) && !p.uploading && (
                   <View style={styles.playOverlay} pointerEvents="none">
@@ -499,10 +513,17 @@ export default function PublierBienScreen({ navigation, route }) {
                     <ActivityIndicator color="#FFFFFF" />
                   </View>
                 )}
+                {idx === 0 && (
+                  <View style={styles.photoPrimaryBadge} pointerEvents="none">
+                    <Text style={styles.photoPrimaryText}>Couverture</Text>
+                  </View>
+                )}
                 <TouchableOpacity
                   style={styles.photoRemove}
                   onPress={() => supprimerPhoto(idx)}
                   hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Supprimer la photo"
                 >
                   <Ionicons name="close" size={14} color="#FFFFFF" />
                 </TouchableOpacity>
@@ -513,8 +534,10 @@ export default function PublierBienScreen({ navigation, route }) {
                 style={styles.photoEmpty}
                 onPress={ajouterPhotos}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Ajouter des photos"
               >
-                <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
+                <Ionicons name="add-circle-outline" size={28} color={c.gold} />
               </TouchableOpacity>
             )}
           </View>
@@ -545,12 +568,13 @@ export default function PublierBienScreen({ navigation, route }) {
               <TextInput
                 style={styles.priceInput}
                 placeholder="0"
-                placeholderTextColor={colors.textMuted}
+                placeholderTextColor={c.textMuted}
                 value={form.prix}
                 onChangeText={(v) => setField('prix', v.replace(/[^0-9]/g, ''))}
                 onFocus={() => setFocused('prix')}
                 onBlur={() => setFocused(null)}
                 keyboardType="numeric"
+                accessibilityLabel="Prix en FCFA"
               />
               <Text style={styles.priceSuffix}>FCFA</Text>
             </View>
@@ -569,6 +593,9 @@ export default function PublierBienScreen({ navigation, route }) {
                       style={[styles.chip, sel && styles.chipSelected]}
                       onPress={() => setField('period', p)}
                       activeOpacity={0.8}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={`Période ${p}`}
+                      accessibilityState={{ checked: sel }}
                     >
                       <Text style={[styles.chipText, sel && styles.chipTextSelected]}>
                         {p}
@@ -588,6 +615,9 @@ export default function PublierBienScreen({ navigation, route }) {
                       style={[styles.chip, sel && styles.chipSelected]}
                       onPress={() => setField('cautionMultiplicateur', value)}
                       activeOpacity={0.8}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={`Caution ${value} mois`}
+                      accessibilityState={{ checked: sel }}
                     >
                       <Text style={[styles.chipText, sel && styles.chipTextSelected]}>
                         {value} mois
@@ -607,6 +637,9 @@ export default function PublierBienScreen({ navigation, route }) {
                       style={styles.commoditeRow}
                       onPress={() => toggleFormArray('profilsLocataireRecherches', profile)}
                       activeOpacity={0.7}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={`Profil ${profile}`}
+                      accessibilityState={{ checked }}
                     >
                       <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
                         {checked && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
@@ -627,6 +660,9 @@ export default function PublierBienScreen({ navigation, route }) {
                       style={styles.commoditeRow}
                       onPress={() => toggleFormArray('documentsRequis', document)}
                       activeOpacity={0.7}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={`Document requis : ${document}`}
+                      accessibilityState={{ checked }}
                     >
                       <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
                         {checked && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
@@ -667,6 +703,9 @@ export default function PublierBienScreen({ navigation, route }) {
                   style={[styles.chip, sel && styles.chipSelected]}
                   onPress={() => handleVilleSelect(v)}
                   activeOpacity={0.8}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={`Ville : ${v}`}
+                  accessibilityState={{ checked: sel }}
                 >
                   <Text style={[styles.chipText, sel && styles.chipTextSelected]}>
                     {v}
@@ -691,6 +730,9 @@ export default function PublierBienScreen({ navigation, route }) {
                       style={[styles.chip, sel && styles.chipSelected]}
                       onPress={() => setField('arrondissement', a)}
                       activeOpacity={0.8}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={`Arrondissement : ${a}`}
+                      accessibilityState={{ checked: sel }}
                     >
                       <Text style={[styles.chipText, sel && styles.chipTextSelected]}>
                         {a}
@@ -717,9 +759,12 @@ export default function PublierBienScreen({ navigation, route }) {
             loading={locationLoading}
           />
           {coords && (
-            <Text style={styles.coordsText}>
-              📍 {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
-            </Text>
+            <View style={styles.coordsRow}>
+              <Ionicons name="location" size={13} color={c.textSub} />
+              <Text style={styles.coordsText}>
+                {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+              </Text>
+            </View>
           )}
         </View>
       );
@@ -737,20 +782,23 @@ export default function PublierBienScreen({ navigation, route }) {
 
           <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Commodités</Text>
           <View style={styles.commoditesGrid}>
-            {COMMODITES.map(c => {
-              const checked = commodites.includes(c.value);
+            {AMENITIES.map(com => {
+              const checked = commodites.includes(com.value);
               return (
                 <TouchableOpacity
-                  key={c.value}
+                  key={com.value}
                   style={styles.commoditeRow}
-                  onPress={() => toggleCommodite(c.value)}
+                  onPress={() => toggleCommodite(com.value)}
                   activeOpacity={0.7}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={`Commodité : ${com.value}`}
+                  accessibilityState={{ checked }}
                 >
                   <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
                     {checked && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
                   </View>
-                  <Ionicons name={c.icon} size={16} color={colors.primary} />
-                  <Text style={styles.commoditeText}>{c.value}</Text>
+                  <Ionicons name={com.icon} size={16} color={c.gold} />
+                  <Text style={styles.commoditeText}>{com.value}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -765,10 +813,11 @@ export default function PublierBienScreen({ navigation, route }) {
       return (
         <View style={styles.recapCard}>
           {photos[0] && (
-            <Image
+            <ExpoImage
               source={{ uri: photos[0].uri }}
               style={styles.recapThumb}
-              resizeMode="cover"
+              contentFit="cover"
+              accessible={false}
             />
           )}
 
@@ -785,32 +834,32 @@ export default function PublierBienScreen({ navigation, route }) {
 
           <View style={styles.recapDivider} />
 
-          <RecapRow label="Type" value={form.type} />
-          <RecapRow label="Transaction" value={form.categorie} />
-          {isLocation && <RecapRow label="Caution" value={`${form.cautionMultiplicateur} mois`} />}
+          <RecapRow label="Type" value={form.type} styles={styles} />
+          <RecapRow label="Transaction" value={form.categorie} styles={styles} />
+          {isLocation && <RecapRow label="Caution" value={`${form.cautionMultiplicateur} mois`} styles={styles} />}
           {isLocation && form.profilsLocataireRecherches.length > 0 && (
-            <RecapRow label="Profils" value={form.profilsLocataireRecherches.join(', ')} />
+            <RecapRow label="Profils" value={form.profilsLocataireRecherches.join(', ')} styles={styles} />
           )}
           {isLocation && form.documentsRequis.length > 0 && (
-            <RecapRow label="Documents" value={form.documentsRequis.join(', ')} />
+            <RecapRow label="Documents" value={form.documentsRequis.join(', ')} styles={styles} />
           )}
-          <RecapRow label="Ville" value={form.ville} />
-          <RecapRow label="Arrondissement" value={form.arrondissement} />
-          {form.rue ? <RecapRow label="Rue" value={form.rue} /> : null}
+          <RecapRow label="Ville" value={form.ville} styles={styles} />
+          <RecapRow label="Arrondissement" value={form.arrondissement} styles={styles} />
+          {form.rue ? <RecapRow label="Rue" value={form.rue} styles={styles} /> : null}
 
           <View style={styles.recapDivider} />
 
-          {form.surface > 0 && <RecapRow label="Surface" value={`${form.surface} m²`} />}
-          {form.chambres > 0 && <RecapRow label="Chambres" value={String(form.chambres)} />}
-          {form.bathrooms > 0 && <RecapRow label="Salles de bain" value={String(form.bathrooms)} />}
-          {form.livingRooms > 0 && <RecapRow label="Salon" value={String(form.livingRooms)} />}
-          {form.kitchens > 0 && <RecapRow label="Cuisine" value={String(form.kitchens)} />}
-          {form.etage > 0 && <RecapRow label="Étage" value={String(form.etage)} />}
+          {form.surface > 0 && <RecapRow label="Surface" value={`${form.surface} m²`} styles={styles} />}
+          {form.chambres > 0 && <RecapRow label="Chambres" value={String(form.chambres)} styles={styles} />}
+          {form.bathrooms > 0 && <RecapRow label="Salles de bain" value={String(form.bathrooms)} styles={styles} />}
+          {form.livingRooms > 0 && <RecapRow label="Salon" value={String(form.livingRooms)} styles={styles} />}
+          {form.kitchens > 0 && <RecapRow label="Cuisine" value={String(form.kitchens)} styles={styles} />}
+          {form.etage > 0 && <RecapRow label="Étage" value={String(form.etage)} styles={styles} />}
 
           {commodites.length > 0 && (
             <>
               <View style={styles.recapDivider} />
-              <RecapRow label="Commodités" value={commodites.join(', ')} />
+              <RecapRow label="Commodités" value={commodites.join(', ')} styles={styles} />
             </>
           )}
 
@@ -844,17 +893,20 @@ export default function PublierBienScreen({ navigation, route }) {
             style={styles.closeBtn}
             onPress={() => navigation.goBack()}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Fermer"
           >
-            <Ionicons name="close-outline" size={22} color={colors.text} />
+            <Ionicons name="close-outline" size={22} color={c.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {isEditing ? `Modifier · ${STEP_TITLES[step - 1]}` : STEP_TITLES[step - 1]}
+            {isEditing ? `Modifier · ${STEPS[step - 1].title}` : STEPS[step - 1].title}
           </Text>
           <Text style={styles.headerStep}>{step}/{STEPS.length}</Text>
         </View>
 
         {/* Stepper horizontal */}
         <ScrollView
+          ref={stepperRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.stepperContent}
@@ -940,7 +992,7 @@ export default function PublierBienScreen({ navigation, route }) {
   );
 }
 
-function RecapRow({ label, value }) {
+function RecapRow({ label, value, styles }) {
   return (
     <View style={styles.recapRow}>
       <Text style={styles.recapLabel}>{label}</Text>
@@ -949,8 +1001,8 @@ function RecapRow({ label, value }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (c) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg },
 
   // ─── Header ───
   header: {
@@ -962,18 +1014,19 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: {
     flex: 1,
     ...typography.h3,
-    color: colors.text,
+    color: c.text,
     textAlign: 'center',
   },
   headerStep: {
-    color: colors.textSecondary,
-    fontSize: 13,
+    fontFamily: fonts.body,
+    color: c.textSub,
+    fontSize: fontSize.sm,
     minWidth: 28,
     textAlign: 'right',
   },
@@ -993,33 +1046,37 @@ const styles = StyleSheet.create({
     width: 28, height: 28, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
   },
-  stepCircleCompleted: { backgroundColor: colors.success },
-  stepCircleActive:    { backgroundColor: colors.primary },
-  stepCircleFuture:    { backgroundColor: colors.card },
+  stepCircleCompleted: { backgroundColor: c.success },
+  stepCircleActive:    { backgroundColor: c.gold },
+  stepCircleFuture: {
+    backgroundColor: c.bgCard,
+    borderWidth: 1.5,
+    borderColor: c.border,
+  },
   stepNumActive: { color: '#000', fontWeight: '700', fontSize: 13 },
-  stepNumFuture: { color: colors.textMuted, fontWeight: '700', fontSize: 13 },
+  stepNumFuture: { color: c.textMuted, fontWeight: '700', fontSize: 13 },
   stepLabel: {
     fontSize: 10,
-    color: colors.textMuted,
+    color: c.textMuted,
     marginTop: spacing.xs,
     textAlign: 'center',
   },
-  stepLabelActive: { color: colors.primary, fontWeight: '600' },
+  stepLabelActive: { color: c.gold, fontWeight: '600' },
   connector: {
     width: 24, height: 2,
-    backgroundColor: colors.border,
+    backgroundColor: c.border,
     marginTop: 13,
   },
-  connectorFilled: { backgroundColor: colors.success },
+  connectorFilled: { backgroundColor: c.success },
 
   // ─── Progress bar ───
   progressTrack: {
     height: 3,
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
   },
   progressFill: {
     height: 3,
-    backgroundColor: colors.primary,
+    backgroundColor: c.gold,
   },
 
   // ─── Step content ───
@@ -1032,27 +1089,27 @@ const styles = StyleSheet.create({
   field: { marginBottom: spacing.md },
   fieldLabel: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSub,
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
   },
   input: {
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
+    borderColor: c.border,
+    color: c.text,
     fontSize: 15,
   },
   inputMultiline: {
     minHeight: 100,
     textAlignVertical: 'top',
   },
-  inputFocused: { borderColor: colors.primary },
+  inputFocused: { borderColor: c.gold },
   errorText: {
-    color: colors.error,
+    color: c.error,
     fontSize: 13,
     marginTop: spacing.xs,
   },
@@ -1066,7 +1123,7 @@ const styles = StyleSheet.create({
   typeCard: {
     flexBasis: '48%',
     flexGrow: 1,
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     borderRadius: 12,
     padding: spacing.md,
     alignItems: 'center',
@@ -1074,16 +1131,16 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  cardSelected: { borderColor: colors.primary },
+  cardSelected: { borderColor: c.gold },
   typeLabel: {
     ...typography.body,
-    color: colors.text,
+    color: c.text,
     fontWeight: '600',
   },
   txCard: {
     flexBasis: '48%',
     flexGrow: 1,
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     borderRadius: 12,
     padding: spacing.md,
     alignItems: 'center',
@@ -1093,7 +1150,7 @@ const styles = StyleSheet.create({
   },
   txDesc: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSub,
     textAlign: 'center',
   },
 
@@ -1128,19 +1185,34 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
   },
+  photoPrimaryBadge: {
+    position: 'absolute',
+    bottom: 5,
+    left: 5,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  photoPrimaryText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 9,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
   photoRemove: {
     position: 'absolute',
     top: -6, right: -6,
     width: 20, height: 20, borderRadius: 10,
-    backgroundColor: colors.error,
+    backgroundColor: c.error,
     alignItems: 'center', justifyContent: 'center',
   },
   photoEmpty: {
     width: 100, height: 100,
     borderRadius: 8,
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderStyle: 'dashed',
     alignItems: 'center', justifyContent: 'center',
   },
@@ -1149,20 +1221,20 @@ const styles = StyleSheet.create({
   priceWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     borderRadius: 12,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   priceInput: {
     flex: 1,
     paddingVertical: 14,
-    color: colors.text,
+    color: c.text,
     fontSize: 15,
   },
   priceSuffix: {
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 14,
   },
   chipsRow: {
@@ -1178,12 +1250,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: 100,
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
   },
-  chipSelected: { backgroundColor: colors.primary },
+  chipSelected: { backgroundColor: c.gold },
   chipText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSub,
   },
   chipTextSelected: {
     color: '#000',
@@ -1191,11 +1263,17 @@ const styles = StyleSheet.create({
   },
 
   // ─── Step 5 : localisation ───
+  coordsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: spacing.sm,
+  },
   coordsText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSub,
     textAlign: 'center',
-    marginTop: spacing.sm,
   },
 
   // ─── Step 6 : stepper +/- ───
@@ -1206,20 +1284,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   stepBtn: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: colors.cardElevated,
+    backgroundColor: c.bgCardAlt,
     alignItems: 'center', justifyContent: 'center',
   },
   numberInput: {
     flex: 1,
     textAlign: 'center',
-    color: colors.text,
+    color: c.text,
     fontSize: 18,
     fontWeight: '600',
     padding: 0,
@@ -1242,24 +1320,24 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     width: 22, height: 22, borderRadius: 8,
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: c.border,
     alignItems: 'center', justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: c.gold,
+    borderColor: c.gold,
   },
   commoditeText: {
     ...typography.body,
-    color: colors.text,
+    color: c.text,
     flex: 1,
   },
 
   // ─── Récap ───
   recapCard: {
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     borderRadius: 16,
     padding: spacing.md,
   },
@@ -1271,17 +1349,17 @@ const styles = StyleSheet.create({
   },
   recapSectionTitle: {
     ...typography.h3,
-    color: colors.text,
+    color: c.text,
     fontWeight: '700',
   },
   recapDesc: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSub,
     marginTop: spacing.xs,
   },
   recapPrice: {
     ...typography.h2,
-    color: colors.primary,
+    color: c.gold,
     fontWeight: '800',
   },
   recapRow: {
@@ -1292,22 +1370,22 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   recapLabel: {
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 13,
   },
   recapValue: {
-    color: colors.text,
+    color: c.text,
     fontSize: 13,
     textAlign: 'right',
     flex: 1,
   },
   recapDivider: {
     height: 1,
-    backgroundColor: colors.border,
+    backgroundColor: c.border,
     marginVertical: spacing.sm,
   },
   recapWarn: {
-    color: colors.warning,
+    color: c.warning,
     fontSize: 13,
     textAlign: 'center',
     marginTop: spacing.md,
@@ -1318,7 +1396,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.background,
+    borderTopColor: c.border,
+    backgroundColor: c.bg,
   },
 });

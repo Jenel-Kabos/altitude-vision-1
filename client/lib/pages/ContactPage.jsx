@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 const BLUE = '#2E7BB5';
-const GOLD = '#C8872A';
+const GOLD = '#C8960C';
 const RED  = '#D42B2B';
 
 // ── Coordonnées réelles Altitude-Vision (P7JJ+VX Brazzaville) ──

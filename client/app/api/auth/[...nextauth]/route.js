@@ -36,7 +36,10 @@ const { handlers } = NextAuth({
         try {
           const res  = await fetch(`${API_URL}/auth/google-token`, {
             method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-nextauth-secret': process.env.NEXTAUTH_API_SECRET || '',
+            },
             body:    JSON.stringify({ email: token.email }),
           });
           const data = await res.json();

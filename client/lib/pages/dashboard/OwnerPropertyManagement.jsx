@@ -15,7 +15,7 @@ import PropertyForm from "../../components/dashboard/PropertyForm";
 import Image from 'next/image';
 
 const BLUE = '#2E7BB5';
-const GOLD = '#C8872A';
+const GOLD = '#C8960C';
 
 // ✅ Préfixe les URLs relatives avec l'URL du backend.
 // Le controller sauvegarde les chemins sous la forme "/uploads/events/photo.jpg"
@@ -134,7 +134,7 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
-        <h3 className="font-bold text-gray-900 text-lg" style={{ fontFamily:"'Outfit', sans-serif" }}>
+        <h3 className="font-bold text-gray-900 text-lg" style={{ fontFamily:"'DM Sans', sans-serif" }}>
           {isEditing ? "Modifier le bien" : "Ajouter un bien"}
         </h3>
         <button onClick={onCancel}
@@ -180,16 +180,16 @@ const PropertyCard = ({ property, onEdit, onDelete, onToggleAvailability }) => {
           onError={() => setImgSrc(ALTIMMO_FALLBACK)} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
         <span className="absolute top-3 left-3 text-white text-xs font-semibold px-2.5 py-1 rounded-full"
-          style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})`, fontFamily:"'Outfit', sans-serif" }}>
+          style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})`, fontFamily:"'DM Sans', sans-serif" }}>
           {property.type || 'Bien'}
         </span>
         <span className="absolute top-3 right-3 text-white text-xs font-semibold px-2.5 py-1 rounded-full"
-          style={{ background: property.availability==='Disponible' ? 'linear-gradient(135deg,#15803D,#16A34A)' : 'linear-gradient(135deg,#B45309,#D97706)', fontFamily:"'Outfit', sans-serif" }}>
+          style={{ background: property.availability==='Disponible' ? 'linear-gradient(135deg,#15803D,#16A34A)' : 'linear-gradient(135deg,#B45309,#D97706)', fontFamily:"'DM Sans', sans-serif" }}>
           {property.availability || property.status}
         </span>
         <div className="absolute bottom-3 left-3">
           <span className="text-white text-sm font-bold"
-            style={{ fontFamily:"'Outfit', sans-serif", textShadow:'0 1px 4px rgba(0,0,0,0.5)' }}>
+            style={{ fontFamily:"'DM Sans', sans-serif", textShadow:'0 1px 4px rgba(0,0,0,0.5)' }}>
             {property.price ? `${Number(property.price).toLocaleString('fr-FR')} FCFA` : '—'}
           </span>
         </div>
@@ -197,7 +197,7 @@ const PropertyCard = ({ property, onEdit, onDelete, onToggleAvailability }) => {
 
       <div className="p-4">
         <h3 className="font-bold text-gray-900 mb-1 line-clamp-1"
-          style={{ fontFamily:"'Outfit', sans-serif" }}>
+          style={{ fontFamily:"'DM Sans', sans-serif" }}>
           {property.title}
         </h3>
         <p className="text-xs text-gray-400 line-clamp-2 mb-3">{property.description}</p>
@@ -244,19 +244,19 @@ const PropertyCard = ({ property, onEdit, onDelete, onToggleAvailability }) => {
 
         <button onClick={() => onToggleAvailability(property, nextAvailability)}
           className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02] mb-2"
-          style={{ background: property.availability==='Disponible' ? '#FEF3C7' : '#DCFCE7', color: property.availability==='Disponible' ? '#B45309' : '#15803D', fontFamily:"'Outfit', sans-serif" }}>
+          style={{ background: property.availability==='Disponible' ? '#FEF3C7' : '#DCFCE7', color: property.availability==='Disponible' ? '#B45309' : '#15803D', fontFamily:"'DM Sans', sans-serif" }}>
           <CheckCircle2 size={13} /> {availabilityLabel}
         </button>
 
         <div className="flex gap-2">
           <button onClick={() => onEdit(property)}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
-            style={{ background:`${BLUE}15`, color:BLUE, fontFamily:"'Outfit', sans-serif" }}>
+            style={{ background:`${BLUE}15`, color:BLUE, fontFamily:"'DM Sans', sans-serif" }}>
             <Edit2 size={13} /> Modifier
           </button>
           <button onClick={() => onDelete(property._id)}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
-            style={{ background:'#FEE2E2', color:'#DC2626', fontFamily:"'Outfit', sans-serif" }}>
+            style={{ background:'#FEE2E2', color:'#DC2626', fontFamily:"'DM Sans', sans-serif" }}>
             <Trash2 size={13} /> Supprimer
           </button>
         </div>
@@ -275,17 +275,17 @@ const ConfirmDialog = ({ message, onConfirm, onCancel }) => (
         style={{ background:'#FEE2E2' }}>
         <AlertCircle size={22} className="text-red-500" />
       </div>
-      <h3 className="font-bold text-gray-900 mb-2" style={{ fontFamily:"'Outfit', sans-serif" }}>Confirmation</h3>
+      <h3 className="font-bold text-gray-900 mb-2" style={{ fontFamily:"'DM Sans', sans-serif" }}>Confirmation</h3>
       <p className="text-sm text-gray-500 mb-6">{message}</p>
       <div className="flex gap-3">
         <button onClick={onCancel}
           className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all"
-          style={{ fontFamily:"'Outfit', sans-serif" }}>
+          style={{ fontFamily:"'DM Sans', sans-serif" }}>
           Annuler
         </button>
         <button onClick={onConfirm}
           className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
-          style={{ background:'linear-gradient(135deg,#B91C1C,#DC2626)', fontFamily:"'Outfit', sans-serif" }}>
+          style={{ background:'linear-gradient(135deg,#B91C1C,#DC2626)', fontFamily:"'DM Sans', sans-serif" }}>
           Supprimer
         </button>
       </div>
@@ -378,17 +378,17 @@ const OwnerPropertyManagement = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-900"
-            style={{ fontFamily:"'Outfit', sans-serif" }}>
+            style={{ fontFamily:"'DM Sans', sans-serif" }}>
             {view === 'list' ? 'Mes Biens Immobiliers' : view === 'add' ? 'Ajouter un bien' : 'Modifier le bien'}
           </h2>
-          <p className="text-sm text-gray-400 mt-0.5" style={{ fontFamily:"'Outfit', sans-serif" }}>
+          <p className="text-sm text-gray-400 mt-0.5" style={{ fontFamily:"'DM Sans', sans-serif" }}>
             {properties.length} bien{properties.length!==1?'s':''} publiés
           </p>
         </div>
         {view === 'list' && (
           <button onClick={() => setView("add")}
             className="flex items-center gap-2 px-4 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105"
-            style={{ background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, boxShadow:`0 4px 16px ${BLUE}35`, fontFamily:"'Outfit', sans-serif" }}>
+            style={{ background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, boxShadow:`0 4px 16px ${BLUE}35`, fontFamily:"'DM Sans', sans-serif" }}>
             <Plus size={16} /> Ajouter un bien
           </button>
         )}
@@ -456,13 +456,13 @@ const OwnerPropertyManagement = () => {
                 style={{ background:`${BLUE}12` }}>
                 <Home size={28} style={{ color:BLUE }} />
               </div>
-              <p className="font-bold text-gray-700 mb-1" style={{ fontFamily:"'Outfit', sans-serif" }}>Aucun bien publié</p>
-              <p className="text-sm text-gray-400 mb-5" style={{ fontFamily:"'Outfit', sans-serif" }}>
+              <p className="font-bold text-gray-700 mb-1" style={{ fontFamily:"'DM Sans', sans-serif" }}>Aucun bien publié</p>
+              <p className="text-sm text-gray-400 mb-5" style={{ fontFamily:"'DM Sans', sans-serif" }}>
                 Commencez par ajouter votre premier bien immobilier.
               </p>
               <button onClick={() => setView("add")}
                 className="flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105"
-                style={{ background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, fontFamily:"'Outfit', sans-serif" }}>
+                style={{ background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, fontFamily:"'DM Sans', sans-serif" }}>
                 <Plus size={16} /> Ajouter un bien
               </button>
             </div>

@@ -139,7 +139,7 @@ const AltcomServiceDetailPage = () => {
     if (serviceData) {
       setService(serviceData);
     } else {
-      navigate('/altcom');
+      navigate('/communication');
     }
   }, [serviceId, navigate]);
 
@@ -167,7 +167,7 @@ const AltcomServiceDetailPage = () => {
       >
         <div className="container mx-auto px-6 py-4">
           <button
-            onClick={() => navigate('/altcom')}
+            onClick={() => navigate('/communication')}
             className="flex items-center text-gray-600 hover:text-blue-600 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
@@ -194,7 +194,7 @@ const AltcomServiceDetailPage = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => navigate('/altcom', { state: { openQuoteModal: true, service: service.title } })}
+                onClick={() => navigate('/communication', { state: { openQuoteModal: true, service: service.title } })}
                 className="bg-white text-blue-600 px-8 py-4 rounded-full font-bold text-lg shadow-xl hover:shadow-2xl transition-all flex items-center gap-2"
               >
                 <Send className="w-5 h-5" />
@@ -308,7 +308,7 @@ const AltcomServiceDetailPage = () => {
                 <button
                   onClick={() => {
                     setSelectedPlan(key);
-                    navigate('/altcom', { state: { openQuoteModal: true, service: `${service.title} - ${plan.name}` } });
+                    navigate('/communication', { state: { openQuoteModal: true, service: `${service.title} - ${plan.name}` } });
                   }}
                   className={`w-full py-4 rounded-xl font-bold transition-all ${
                     selectedPlan === key
@@ -368,7 +368,7 @@ const AltcomServiceDetailPage = () => {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => navigate('/altcom', { state: { openQuoteModal: true, service: service.title } })}
+            onClick={() => navigate('/communication', { state: { openQuoteModal: true, service: service.title } })}
             className="bg-white text-blue-600 px-10 py-5 rounded-full font-bold text-xl shadow-2xl hover:shadow-3xl transition-all inline-flex items-center gap-3"
           >
             <Send className="w-6 h-6" />

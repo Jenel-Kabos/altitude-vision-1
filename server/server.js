@@ -9,8 +9,9 @@ const generateSitemap = require('./utils/generateSitemap');
 // ============================================================
 const dotenv = require("dotenv");
 dotenv.config();
+const logger = require('./utils/logger');
 
-console.log("🔍 MONGO_URI chargé:", process.env.MONGO_URI ? "✅ OK" : "❌ UNDEFINED");
+logger.info("🔍 MONGO_URI chargé:", process.env.MONGO_URI ? "✅ OK" : "❌ UNDEFINED");
 
 // --- Importations principales ---
 const express = require("express");
@@ -31,23 +32,33 @@ connectDB();
 const cron = require('node-cron');
 const { syncFacebook } = require('./scripts/sync-facebook');
 
-// 🔄 Sync au démarrage du serveur (dès que MongoDB est connecté)
+// 🔄 Tâches de démarrage une fois MongoDB connecté (un seul handler)
 mongoose.connection.once('open', async () => {
-  console.log('🔄 [STARTUP] Sync Facebook au démarrage...');
+  // Sync Facebook
   try {
     await syncFacebook();
-    console.log('✅ [STARTUP] Sync Facebook terminée');
+    logger.success('✅ [STARTUP] Sync Facebook terminée');
   } catch (error) {
-    console.error('❌ [STARTUP] Erreur sync:', error.message);
+    logger.error('❌ [STARTUP] Erreur sync Facebook:', error.message);
   }
+
+  // Premier polling IMAP Zoho (délai 10s pour laisser le serveur se stabiliser)
+  setTimeout(async () => {
+    try {
+      const stats = await pollZohoInbox();
+      if (stats.imported > 0) logger.success(`✅ [STARTUP] IMAP — ${stats.imported} email(s) importé(s)`);
+    } catch (err) {
+      logger.error('❌ [STARTUP] Erreur premier poll IMAP:', err.message);
+    }
+  }, 10000);
 });
 
 // ⏰ Sync automatique toutes les heures
 cron.schedule('0 * * * *', async () => {
-  console.log('⏰ [CRON] Démarrage synchronisation Facebook...');
+  logger.info('⏰ [CRON] Démarrage synchronisation Facebook...');
   try {
     await syncFacebook();
-    console.log('✅ [CRON] Synchronisation Facebook terminée');
+    logger.success('✅ [CRON] Synchronisation Facebook terminée');
 
     // Nettoyage posts > 5 jours
     const FacebookPost = mongoose.models.FacebookPost;
@@ -57,15 +68,15 @@ cron.schedule('0 * * * *', async () => {
       const deleted = await FacebookPost.deleteMany({
         date_sync: { $lt: cinqJoursAvant }
       });
-      console.log(`🧹 [CRON] ${deleted.deletedCount} vieux posts supprimés`);
+      logger.info(`🧹 [CRON] ${deleted.deletedCount} vieux posts supprimés`);
     }
 
   } catch (error) {
-    console.error('❌ [CRON] Erreur:', error.message);
+    logger.error('❌ [CRON] Erreur:', error.message);
   }
 });
 
-console.log('⏰ [CRON] Planificateur Facebook activé (toutes les heures)');
+logger.info('⏰ [CRON] Planificateur Facebook activé (toutes les heures)');
 
 // ============================================================
 // 📬 CRON JOB — Polling IMAP Zoho (emails entrants)
@@ -76,18 +87,18 @@ const { pollZohoInbox } = require('./services/zohoImapService');
 
 // ⏰ Polling toutes les 5 minutes
 cron.schedule('*/5 * * * *', async () => {
-    console.log('⏰ [CRON] Démarrage polling IMAP Zoho...');
+    logger.info('⏰ [CRON] Démarrage polling IMAP Zoho...');
     try {
         const stats = await pollZohoInbox();
         if (stats.imported > 0) {
-            console.log(`✅ [CRON] IMAP — ${stats.imported} email(s) importé(s)`);
+            logger.success(`✅ [CRON] IMAP — ${stats.imported} email(s) importé(s)`);
         }
     } catch (error) {
-        console.error('❌ [CRON] Erreur polling IMAP:', error.message);
+        logger.error('❌ [CRON] Erreur polling IMAP:', error.message);
     }
 });
 
-console.log('⏰ [CRON] Polling IMAP Zoho activé (toutes les 5 minutes)');
+logger.info('⏰ [CRON] Polling IMAP Zoho activé (toutes les 5 minutes)');
 
 // ============================================================
 // 💸 CRON JOB — Pénalités de retard locatif (6h du matin)
@@ -95,30 +106,17 @@ console.log('⏰ [CRON] Polling IMAP Zoho activé (toutes les 5 minutes)');
 const { verifierPaiementsEnRetard } = require('./services/alerteService');
 
 cron.schedule('0 6 * * *', async () => {
-  console.log('⏰ [CRON] Vérification paiements en retard...');
+  logger.info('⏰ [CRON] Vérification paiements en retard...');
   try {
     const result = await verifierPaiementsEnRetard();
-    console.log(`✅ [CRON] ${result.verifies} paiements vérifiés, ${result.penalites} pénalité(s) appliquée(s)`);
+    logger.success(`✅ [CRON] ${result.verifies} paiements vérifiés, ${result.penalites} pénalité(s) appliquée(s)`);
   } catch (err) {
-    console.error('❌ [CRON] Erreur vérification paiements:', err.message);
+    logger.error('❌ [CRON] Erreur vérification paiements:', err.message);
   }
 });
 
-console.log('⏰ [CRON] Vérification pénalités locatives activée (6h quotidien)');
+logger.info('⏰ [CRON] Vérification pénalités locatives activée (6h quotidien)');
 
-// ── Polling immédiat au démarrage (optionnel) ─────────────────
-mongoose.connection.once('open', async () => {
-    // Attendre 10s que le serveur soit stabilisé avant le premier poll
-    setTimeout(async () => {
-        console.log('🔄 [STARTUP] Premier polling IMAP Zoho...');
-        try {
-            const stats = await pollZohoInbox();
-            console.log(`✅ [STARTUP] IMAP — ${stats.imported} email(s) importé(s)`);
-        } catch (err) {
-            console.error('❌ [STARTUP] Erreur premier poll IMAP:', err.message);
-        }
-    }, 10000);
-});
 
 const app = express();
 
@@ -139,7 +137,7 @@ app.get('/sitemap.xml', async (req, res) => {
 // ============================================================
 app.use(
   helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }, 
+    crossOriginResourcePolicy: { policy: "cross-origin" },
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
   })
@@ -164,22 +162,22 @@ const allowedOrigins = [
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
-console.log('🌍 [CORS] Origines autorisées:', allowedOrigins);
+logger.info('🌍 [CORS] Origines autorisées:', allowedOrigins);
 
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) {
-      console.log('✅ [CORS] Requête sans origine autorisée');
+      logger.success('✅ [CORS] Requête sans origine autorisée');
       return callback(null, true);
     }
-    
+
     if (allowedOrigins.includes(origin)) {
-      console.log('✅ [CORS] Origine autorisée:', origin);
+      logger.success('✅ [CORS] Origine autorisée:', origin);
       callback(null, true);
     } else {
-      console.log('🚫 [CORS] Origine bloquée:', origin);
+      logger.info('🚫 [CORS] Origine bloquée:', origin);
       if (process.env.NODE_ENV === 'development') {
-        console.log('⚠️ [CORS] Mode dev: origine autorisée malgré tout');
+        logger.warn('⚠️ [CORS] Mode dev: origine autorisée malgré tout');
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
@@ -210,7 +208,7 @@ const uploadDirs = [
 uploadDirs.forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
-    console.log(`📁 [Setup] Dossier créé: ${dir}`);
+    logger.info(`📁 [Setup] Dossier créé: ${dir}`);
   }
 });
 
@@ -218,11 +216,11 @@ uploadDirs.forEach((dir) => {
 // 📸 GESTION DES FICHIERS STATIQUES (IMAGES)
 // ============================================================
 app.use('/uploads', (req, res, next) => {
-  console.log(`📸 [Static] Requête image: ${req.path}`);
+  logger.info(`📸 [Static] Requête image: ${req.path}`);
   next();
 });
 
-app.use('/uploads', 
+app.use('/uploads',
   express.static(path.join(__dirname, 'uploads'), {
     setHeaders: (res, path) => {
       res.set('Access-Control-Allow-Origin', '*');
@@ -236,23 +234,25 @@ app.use('/uploads',
 app.get('/api/check-image/:folder/:filename', (req, res) => {
   const { folder, filename } = req.params;
   const imagePath = path.join(__dirname, 'uploads', folder, filename);
-  
+
   if (fs.existsSync(imagePath)) {
-    res.json({ 
-      exists: true, 
+    res.json({
+      exists: true,
       path: `/uploads/${folder}/${filename}`,
       fullUrl: `${req.protocol}://${req.get('host')}/uploads/${folder}/${filename}`
     });
   } else {
-    res.status(404).json({ 
-      exists: false, 
+    res.status(404).json({
+      exists: false,
       message: 'Image non trouvée',
-      searchedPath: imagePath 
+      searchedPath: imagePath
     });
   }
 });
 
 // --- Importation des routes ---
+const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+
 const userRoutes = require("./routes/userRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const propertyRoutes = require("./routes/propertyRoutes");
@@ -384,10 +384,10 @@ app.get('/api/health', (req, res) => {
 // 404 pour images manquantes
 app.use('/uploads/*', (req, res) => {
   const requestedPath = path.join(__dirname, req.path);
-  console.error(`❌ [Static] Image non trouvée: ${req.path}`);
-  console.error(`❌ [Static] Chemin complet: ${requestedPath}`);
-  
-  res.status(404).json({ 
+  logger.error(`❌ [Static] Image non trouvée: ${req.path}`);
+  logger.error(`❌ [Static] Chemin complet: ${requestedPath}`);
+
+  res.status(404).json({
     status: 'fail',
     message: 'Image non trouvée',
     path: req.path,
@@ -396,52 +396,10 @@ app.use('/uploads/*', (req, res) => {
 });
 
 // 404 - Route introuvable
-app.use("*", (req, res) => {
-  res.status(404).json({
-    status: "fail",
-    message: `Route introuvable : ${req.originalUrl}`,
-    availableEndpoints: [
-      '/api/properties',
-      '/api/events', 
-      '/api/dashboard',
-      '/api/facebook-posts/recent',
-      '/api/facebook-posts/actus',
-      '/api/webhooks/zoho-incoming',
-      '/uploads/:folder/:filename'
-    ]
-  });
-});
+app.use(notFound);
 
-// Gestionnaire global d'erreurs
-app.use((err, req, res, next) => {
-  if (err.message === "Not allowed by CORS") {
-    console.error('❌ [CORS] Requête bloquée:', req.headers.origin);
-    return res.status(403).json({ 
-      status: "fail", 
-      message: "Bloqué par la politique CORS",
-      origin: req.headers.origin,
-      tip: "Contactez l'administrateur pour ajouter votre domaine à la whitelist"
-    });
-  }
-
-  if (err.name === 'MulterError') {
-    console.error('❌ [Upload] Erreur Multer:', err.message);
-    return res.status(400).json({
-      status: 'fail',
-      message: 'Erreur lors de l\'upload du fichier',
-      error: err.message
-    });
-  }
-
-  console.error("❌ [Serveur] Erreur:", err.stack);
-
-  const statusCode = err.statusCode || 500;
-  res.status(statusCode).json({
-    status: "error",
-    message: err.message || "Erreur interne du serveur.",
-    ...(process.env.NODE_ENV === "development" && { stack: err.stack })
-  });
-});
+// Handler global (Mongoose CastError, E11000, ValidationError, CORS, Multer…)
+app.use(errorHandler);
 
 // ============================================================
 // 🚀 DÉMARRAGE DU SERVEUR + SOCKET.IO
@@ -459,36 +417,38 @@ initSocket(httpServer, {
 });
 
 httpServer.listen(PORT, () => {
-  console.log('\n' + '='.repeat(60));
-  console.log(`✅ Serveur Altitude-Vision lancé sur le port ${PORT}`);
-  console.log(`🌍 Mode: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 API disponible sur: http://localhost:${PORT}/api`);
-  console.log(`📸 Images disponibles sur: http://localhost:${PORT}/uploads`);
-  console.log(`🔗 Frontend autorisé: ${process.env.FRONTEND_URL || 'localhost'}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🪝  Webhook Zoho: http://localhost:${PORT}/api/webhooks/zoho-incoming`);
-  console.log(`🔌 Socket.IO actif sur: ws://localhost:${PORT}`);
-  console.log('='.repeat(60) + '\n');
+  logger.info('\n' + '='.repeat(60));
+  logger.success(`✅ Serveur Altitude-Vision lancé sur le port ${PORT}`);
+  logger.info(`🌍 Mode: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`🔗 API disponible sur: http://localhost:${PORT}/api`);
+  logger.info(`📸 Images disponibles sur: http://localhost:${PORT}/uploads`);
+  logger.info(`🔗 Frontend autorisé: ${process.env.FRONTEND_URL || 'localhost'}`);
+  logger.info(`📊 Health check: http://localhost:${PORT}/api/health`);
+  logger.info(`🪝  Webhook Zoho: http://localhost:${PORT}/api/webhooks/zoho-incoming`);
+  logger.info(`🔌 Socket.IO actif sur: ws://localhost:${PORT}`);
+  logger.info('='.repeat(60) + '\n');
 });
 
 // ============================================================
 // 🛑 GRACEFUL SHUTDOWN
 // ============================================================
 const gracefulShutdown = (signal) => {
-  console.log(`\n⚠️ Signal ${signal} reçu. Arrêt gracieux du serveur...`);
+  logger.warn(`\n⚠️ Signal ${signal} reçu. Arrêt gracieux du serveur...`);
   process.exit(0);
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-process.on('unhandledRejection', (err) => {
-  console.error('❌ [UNHANDLED REJECTION]', err);
-  gracefulShutdown('UNHANDLED_REJECTION');
+// Ne pas tuer le serveur sur une promise rejetée isolée (cron job, service tiers…)
+// Un exit sur Render entraîne un cold start de 30+ secondes.
+process.on('unhandledRejection', (reason) => {
+  logger.error('❌ [UNHANDLED REJECTION] Promise non gérée :', reason);
+  // On logue sans exit — le process reste vivant.
 });
 
 process.on('uncaughtException', (err) => {
-  console.error('❌ [UNCAUGHT EXCEPTION]', err);
+  logger.error('❌ [UNCAUGHT EXCEPTION]', err);
   gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 

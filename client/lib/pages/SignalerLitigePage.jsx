@@ -7,7 +7,7 @@ import { AlertTriangle, Upload, X, CheckCircle, Loader2, Scale } from "lucide-re
 import { createLitige } from "../services/litigeService";
 
 const BLUE = '#2E7BB5';
-const GOLD = '#C8872A';
+const GOLD = '#C8960C';
 
 const TYPE_OPTIONS = [
   { value: 'Information_fausse',  label: 'Information fausse' },
@@ -83,7 +83,7 @@ const SignalerLitigePage = () => {
   // ── Succès ──────────────────────────────────────────────────
   if (success) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4"
-      style={{ fontFamily: "'Outfit', sans-serif" }}>
+      style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-10 max-w-md w-full text-center">
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
           style={{ background: 'linear-gradient(135deg, #059669, #10B981)' }}>
@@ -113,7 +113,7 @@ const SignalerLitigePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4"
-      style={{ fontFamily: "'Outfit', sans-serif" }}>
+      style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
       <div className="max-w-2xl mx-auto">
 
@@ -248,7 +248,7 @@ const SignalerLitigePage = () => {
               style={{
                 background: loading ? '#9CA3AF' : 'linear-gradient(135deg, #B45309, #D97706)',
                 boxShadow:  loading ? 'none' : '0 4px 20px rgba(180,83,9,0.3)',
-                fontFamily: "'Outfit', sans-serif",
+                fontFamily: "'DM Sans', sans-serif",
               }}>
               {loading
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Envoi en cours...</>

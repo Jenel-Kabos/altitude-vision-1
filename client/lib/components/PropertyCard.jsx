@@ -33,7 +33,7 @@ const CARD_STYLES = `
     --cream: #FAF8F5; --cream-dark: #F0EDE8; --border: rgba(200,150,12,0.2);
   }
   .pcard-grid {
-    position: relative; background: #FDFCFA; border-radius: 0; overflow: hidden;
+    position: relative; background: #FDFCFA; border-radius: 10px; overflow: hidden;
     border: 1px solid var(--border); box-shadow: 0 2px 20px rgba(26,22,18,0.06);
     transition: box-shadow 0.35s ease, transform 0.35s ease, border-color 0.35s ease;
     display: flex; flex-direction: column; height: 100%; cursor: pointer;
@@ -61,10 +61,10 @@ const CARD_STYLES = `
   .pcard-desc { font-size: clamp(0.75rem, 1.1vw, 0.9rem); line-height: 1.65; color: var(--ink-mid); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 18px; flex: 1; }
   .pcard-stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
   .pcard-stat { display: flex; align-items: center; gap: 6px; font-size: clamp(0.68rem, 1vw, 0.85rem); color: var(--ink-soft); }
-  .pcard-stat-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: var(--gold-pale); border: 1px solid rgba(200,150,12,0.15); border-radius: 0; }
+  .pcard-stat-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: var(--gold-pale); border: 1px solid rgba(200,150,12,0.15); border-radius: 6px; }
   .pcard-stat strong { color: var(--ink); font-weight: 500; }
   .pcard-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
-  .pcard-tag { font-size: clamp(0.55rem, 0.9vw, 0.7rem); letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 10px; border: 1px solid var(--border); color: var(--ink-soft); background: transparent; border-radius: 1px; transition: border-color 0.2s, color 0.2s; }
+  .pcard-tag { font-size: clamp(0.55rem, 0.9vw, 0.7rem); letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 10px; border: 1px solid var(--border); color: var(--ink-soft); background: transparent; border-radius: 4px; transition: border-color 0.2s, color 0.2s; }
   .pcard-grid:hover .pcard-tag { border-color: rgba(200,135,42,0.35); color: var(--gold); }
   .pcard-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; border-top: 1px solid var(--cream-dark); }
   .pcard-date { display: flex; align-items: center; gap: 5px; font-size: clamp(0.62rem, 0.9vw, 0.78rem); color: var(--ink-soft); letter-spacing: 0.05em; }
@@ -73,7 +73,7 @@ const CARD_STYLES = `
   .pcard-cta::after { content: '→'; transition: transform 0.2s; }
   .pcard-grid:hover .pcard-cta::after { transform: translateX(3px); }
   .pcard-noimg { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--cream-dark) 0%, #E8E2DA 100%); color: var(--ink-soft); gap: 8px; font-size: 12px; letter-spacing: 0.08em; }
-  .pcard-list { position: relative; background: #FDFCFA; border-radius: 0; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 2px 20px rgba(26,22,18,0.06); transition: box-shadow 0.35s ease, transform 0.35s ease, border-color 0.35s ease; cursor: pointer; }
+  .pcard-list { position: relative; background: #FDFCFA; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 2px 20px rgba(26,22,18,0.06); transition: box-shadow 0.35s ease, transform 0.35s ease, border-color 0.35s ease; cursor: pointer; }
   .pcard-list:hover { box-shadow: 0 12px 44px rgba(26,22,18,0.14), 0 0 0 1px rgba(200,150,12,0.3); transform: translateY(-3px); border-color: rgba(200,150,12,0.3); }
   .pcard-list-inner { display: flex; flex-direction: column; }
   @media (min-width: 768px) { .pcard-list-inner { flex-direction: row; } }
@@ -143,7 +143,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
       <motion.div className="pcard-root pcard-list"
         initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}>
-        <Link href={`/altimmo/property/${property._id}`} className="pcard-list-inner">
+        <Link href={`/immobilier/property/${property._id}`} className="pcard-list-inner">
           <div className="pcard-list-img">
             {!imageError && imgUrl
               ? <Image src={imgUrl} alt={property.title} fill sizes="(max-width: 768px) 100vw, 360px" className="object-cover" onError={() => setImageError(true)} />
@@ -185,7 +185,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
     <motion.div className="pcard-root pcard-grid"
       initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}>
-      <Link href={`/altimmo/property/${property._id}`} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Link href={`/immobilier/property/${property._id}`} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div className="pcard-img-wrap">
           {!imageError && imgUrl
             ? <Image src={imgUrl} alt={property.title} fill sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw" className="pcard-img" onError={() => setImageError(true)} />

@@ -3,7 +3,7 @@ import { Building2, CalendarCheck, Briefcase, BookOpen } from 'lucide-react';
 
 export const BLUE      = '#2E7BB5';
 export const BLUE_DARK = '#1A5A8A';
-export const GOLD      = '#C8872A';
+export const GOLD      = '#C8960C';
 export const GOLD_DARK = '#A0671A';
 export const RED       = '#D42B2B';
 
@@ -19,7 +19,7 @@ export const ARTICLES = [
         date: '2025-03-15',
         readTime: '5 min',
         image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1600&auto=format&fit=crop',
-        servicePage: '/altimmo',
+        servicePage: '/immobilier',
         serviceLabel: 'Découvrir Altimmo',
         tags: ['Immobilier', 'Brazzaville', 'Investissement', 'Marché 2025'],
         sections: [
@@ -101,7 +101,7 @@ export const ARTICLES = [
         date: '2025-02-28',
         readTime: '4 min',
         image: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?q=80&w=1600&auto=format&fit=crop',
-        servicePage: '/mila-events',
+        servicePage: '/evenementiel',
         serviceLabel: 'Découvrir Mila Events',
         tags: ['Événementiel', 'Luxe', 'Mariage', 'Gala', 'Brazzaville'],
         sections: [
@@ -183,7 +183,7 @@ export const ARTICLES = [
         date: '2025-02-10',
         readTime: '3 min',
         image: 'https://images.unsplash.com/photo-1611926653458-09294b3142bf?q=80&w=1600&auto=format&fit=crop',
-        servicePage: '/altcom',
+        servicePage: '/communication',
         serviceLabel: 'Découvrir Altcom',
         tags: ['Communication', 'Digital', 'PME', 'Réseaux sociaux', 'Branding'],
         sections: [

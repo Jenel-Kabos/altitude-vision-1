@@ -61,10 +61,10 @@ const AltcomServicePage = () => {
 
     if (!service) return (
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center px-4"
-            style={{ fontFamily: "'Outfit',sans-serif" }}>
+            style={{ fontFamily: "'DM Sans',sans-serif" }}>
             <p className="text-2xl font-bold text-gray-800">Service introuvable</p>
             <p className="text-gray-500">Ce service n'existe pas ou a été déplacé.</p>
-            <Link href="/altcom"
+            <Link href="/communication"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white text-sm"
                 style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})` }}>
                 <ArrowLeft className="w-4 h-4" /> Retour à Altcom
@@ -76,7 +76,7 @@ const AltcomServicePage = () => {
     const otherServices = SERVICES.filter(s => s._id !== service._id);
 
     return (
-        <div className="min-h-screen bg-white" style={{ fontFamily: "'Outfit',sans-serif" }}>
+        <div className="min-h-screen bg-white" style={{ fontFamily: "'DM Sans',sans-serif" }}>
 
 
             {/* Toast */}
@@ -124,7 +124,7 @@ const AltcomServicePage = () => {
                     {/* Breadcrumb */}
                     <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
                         className="flex items-center gap-2 text-sm mb-10" style={{ color: 'rgba(232,228,220,0.4)' }}>
-                        <button onClick={() => router.push('/altcom')}
+                        <button onClick={() => router.push('/communication')}
                             className="flex items-center gap-1.5 hover:text-white/80 transition-colors">
                             <ArrowLeft className="w-3.5 h-3.5" /> Altcom
                         </button>
@@ -166,7 +166,7 @@ const AltcomServicePage = () => {
                                     style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})`, boxShadow: `0 4px 20px ${GOLD}50` }}>
                                     <Send className="w-4 h-4" /> Demander un devis
                                 </button>
-                                <button onClick={() => router.push('/altcom')}
+                                <button onClick={() => router.push('/communication')}
                                     className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white/70 text-sm border border-white/15 hover:bg-white/10 transition-all">
                                     <ArrowLeft className="w-4 h-4" /> Tous les services
                                 </button>
@@ -255,23 +255,19 @@ const AltcomServicePage = () => {
 
             {/* ══ NOTRE PROCESSUS ═══════════════════════════ */}
             <section className="relative py-16 sm:py-20 overflow-x-hidden"
-                style={{ background: 'linear-gradient(135deg,#0D1117 0%,#0e1e30 60%,#0D1117 100%)' }}>
-                <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-1/3 right-0 w-64 h-64 rounded-full blur-[100px] opacity-8"
-                        style={{ background: GOLD }} />
-                </div>
+                style={{ background: '#F8F8F8' }}>
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
                     <motion.div className="text-center mb-14"
                         initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}>
-                        <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GOLD_LIGHT }}>
+                        <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GOLD }}>
                             Méthodologie
                         </p>
-                        <h2 className="text-white mb-3"
-                            style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 'clamp(1.8rem,3.5vw,2.8rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                        <h2 className="mb-3"
+                            style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 'clamp(1.8rem,3.5vw,2.8rem)', fontWeight: 700, lineHeight: 1.1, color: '#111827' }}>
                             Notre Processus de Livraison
                         </h2>
-                        <p className="text-white/50 text-sm max-w-xl mx-auto">
+                        <p className="text-sm max-w-xl mx-auto" style={{ color: '#6B7280' }}>
                             Une approche structurée et transparente pour garantir des résultats à la hauteur de vos attentes
                         </p>
                     </motion.div>
@@ -312,11 +308,11 @@ const AltcomServicePage = () => {
                                             </div>
                                         </div>
 
-                                        <h3 className="font-bold text-white text-sm mb-2 leading-tight"
-                                            style={{ fontFamily: "'Outfit',sans-serif" }}>
+                                        <h3 className="font-bold text-sm mb-2 leading-tight"
+                                            style={{ fontFamily: "'DM Sans',sans-serif", color: '#111827' }}>
                                             {step.title}
                                         </h3>
-                                        <p className="text-white/45 text-xs leading-relaxed mb-3 flex-1">
+                                        <p className="text-xs leading-relaxed mb-3 flex-1" style={{ color: '#6B7280' }}>
                                             {step.desc}
                                         </p>
                                         <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
@@ -334,7 +330,7 @@ const AltcomServicePage = () => {
                     <motion.div className="text-center mt-14"
                         initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}>
-                        <p className="text-white/50 text-sm mb-5">
+                        <p className="text-sm mb-5" style={{ color: '#6B7280' }}>
                             Prêt à démarrer votre projet {service.title.toLowerCase()} ?
                         </p>
                         <button onClick={() => setShowQuote(true)}
@@ -421,8 +417,8 @@ const AltcomServicePage = () => {
                                             <span className="text-xs font-bold uppercase tracking-wider"
                                                 style={{ color: s.color }}>{s.stat}</span>
                                         </div>
-                                        <p className="font-bold text-gray-800 text-sm mb-1 group-hover:text-[#C8872A] transition-colors"
-                                            style={{ fontFamily: "'Outfit',sans-serif" }}>
+                                        <p className="font-bold text-gray-800 text-sm mb-1 group-hover:text-[#C8960C] transition-colors"
+                                            style={{ fontFamily: "'DM Sans',sans-serif" }}>
                                             {s.title}
                                         </p>
                                         <p className="text-xs text-gray-500 leading-relaxed line-clamp-2 mb-3">
@@ -442,20 +438,20 @@ const AltcomServicePage = () => {
 
             {/* ══ CTA FINAL ═════════════════════════════════ */}
             <section className="py-16 relative overflow-hidden"
-                style={{ background: 'linear-gradient(135deg,#0D1117 0%,#1a1505 50%,#0D1117 100%)' }}>
+                style={{ background: '#F8F8F8' }}>
                 <div className="absolute top-0 left-0 right-0 h-px"
-                    style={{ background: `linear-gradient(to right,transparent,${GOLD}50,transparent)` }} />
+                    style={{ background: `linear-gradient(to right,transparent,${GOLD}30,transparent)` }} />
                 <div className="container mx-auto px-4 sm:px-6 max-w-3xl text-center relative z-10">
                     <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
                         <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-5"
                             style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})` }}>
                             <Zap className="w-6 h-6 text-white" />
                         </div>
-                        <h2 className="text-white mb-4"
-                            style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 'clamp(1.8rem,3.5vw,3rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                        <h2 className="mb-4"
+                            style={{ fontFamily: "'Cormorant Garamond',Georgia,serif", fontSize: 'clamp(1.8rem,3.5vw,3rem)', fontWeight: 700, lineHeight: 1.1, color: '#111827' }}>
                             Prêt à démarrer ?
                         </h2>
-                        <p className="text-white/60 mb-8 leading-relaxed">
+                        <p className="mb-8 leading-relaxed" style={{ color: '#6B7280' }}>
                             Contactez-nous pour discuter de votre projet et obtenir un devis personnalisé sous 24h.
                         </p>
                         <div className="flex flex-wrap justify-center gap-3">
@@ -465,8 +461,9 @@ const AltcomServicePage = () => {
                                 style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})`, boxShadow: `0 8px 32px ${GOLD}40` }}>
                                 <Send className="w-4 h-4" /> Demander un devis
                             </motion.button>
-                            <Link href="/altcom"
-                                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full font-semibold text-white/80 text-sm border border-white/15 hover:bg-white/10 transition-all">
+                            <Link href="/communication"
+                                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-full font-semibold text-sm hover:bg-gray-100 transition-all"
+                                style={{ color: '#374151', border: '1px solid rgba(17,24,39,0.15)' }}>
                                 <Briefcase className="w-4 h-4" /> Tous les services
                             </Link>
                         </div>

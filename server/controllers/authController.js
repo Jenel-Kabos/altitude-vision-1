@@ -7,6 +7,7 @@ const User                  = require('../models/User');
 const PendingRegistration   = require('../models/PendingRegistration');
 const sendEmail = require('../utils/email');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
+const logger = require('../utils/logger');
 
 // ======================================================
 // 🔑 UTILITAIRES JWT
@@ -87,7 +88,7 @@ exports.signup = async (req, res) => {
                 return res.status(400).json({ status: 'fail', message: 'Adresse email déjà utilisée.' });
             }
             await User.deleteOne({ _id: existingUser._id });
-            console.log(`🧹 [Auth] Legacy User non vérifié nettoyé pour ${normalizedEmail}`);
+            logger.info(`🧹 [Auth] Legacy User non vérifié nettoyé pour ${normalizedEmail}`);
         }
 
         // ─── Hash password + génération token ────────────────────
@@ -139,14 +140,14 @@ exports.signup = async (req, res) => {
             // Email parti en erreur → on supprime le pending pour
             // ne pas laisser un compte fantôme jusqu'au TTL (24h).
             await PendingRegistration.deleteOne({ email: normalizedEmail });
-            console.error('❌ Erreur envoi email vérification:', err);
+            logger.error('❌ Erreur envoi email vérification:', err);
             return res.status(500).json({
                 status:  'error',
                 message: "Erreur d'envoi d'email. Réessayez plus tard.",
             });
         }
     } catch (error) {
-        console.error('❌ Erreur signup:', error);
+        logger.error('❌ Erreur signup:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
@@ -294,9 +295,9 @@ exports.verifyEmail = async (req, res) => {
                     await sendEmailWithAttachment(userEmail,  '✅ Votre contrat d\'hébergement — Altitude Vision', htmlProprio, [attachment]);
                     await sendEmailWithAttachment(adminEmail, `🏠 Nouveau propriétaire : ${userName}`,             htmlAdmin,   [attachment]);
 
-                    console.log(`✅ [Auth] Contrat PDF envoyé à ${userEmail}`);
+                    logger.success(`✅ [Auth] Contrat PDF envoyé à ${userEmail}`);
                 } catch (pdfErr) {
-                    console.error('❌ [Auth] Erreur génération/envoi contrat PDF:', pdfErr.message);
+                    logger.error('❌ [Auth] Erreur génération/envoi contrat PDF:', pdfErr.message);
                 }
             })();
         }
@@ -304,7 +305,7 @@ exports.verifyEmail = async (req, res) => {
         // Connecte automatiquement
         createSendToken(newUser, 200, res);
     } catch (error) {
-        console.error('❌ Erreur verifyEmail:', error);
+        logger.error('❌ Erreur verifyEmail:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
@@ -353,7 +354,7 @@ exports.resendVerificationEmail = async (req, res) => {
             message: 'Un nouveau lien de vérification a été envoyé.',
         });
     } catch (error) {
-        console.error('❌ Erreur resendVerification:', error);
+        logger.error('❌ Erreur resendVerification:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
@@ -388,7 +389,7 @@ exports.login = async (req, res) => {
 
         createSendToken(user, 200, res);
     } catch (error) {
-        console.error('❌ Erreur login:', error);
+        logger.error('❌ Erreur login:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
@@ -501,7 +502,7 @@ exports.updateMyPassword = async (req, res) => {
 
         createSendToken(user, 200, res);
     } catch (error) {
-        console.error('❌ Erreur updateMyPassword:', error);
+        logger.error('❌ Erreur updateMyPassword:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
@@ -532,7 +533,7 @@ exports.updateMe = async (req, res) => {
         // Avec multer memoryStorage, req.file.path n'existe PAS.
         // Il faut uploader le buffer manuellement vers Cloudinary.
         if (req.file) {
-            console.log('📸 [updateMe] Fichier reçu:', req.file.originalname, req.file.size, 'bytes');
+            logger.info('📸 [updateMe] Fichier reçu:', req.file.originalname, req.file.size, 'bytes');
             const result = await uploadToCloudinary(req.file.buffer, {
                 folder:         'altitude-vision/users',
                 public_id:      `user-${req.user.id}`,
@@ -542,14 +543,14 @@ exports.updateMe = async (req, res) => {
             });
             await destroyFromCloudinary(currentUser?.photo);
             filteredBody.photo = result.secure_url;
-            console.log('✅ [updateMe] Photo Cloudinary:', filteredBody.photo);
+            logger.success('✅ [updateMe] Photo Cloudinary:', filteredBody.photo);
         }
 
         // ✅ Cas 2 : suppression explicite
         else if (req.body.removePhoto === 'true') {
             await destroyFromCloudinary(currentUser?.photo);
             filteredBody.photo = null;
-            console.log('🗑️  [updateMe] Photo supprimée pour user:', req.user.id);
+            logger.info('🗑️  [updateMe] Photo supprimée pour user:', req.user.id);
         }
 
         const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, {
@@ -560,7 +561,7 @@ exports.updateMe = async (req, res) => {
 
         res.status(200).json({ status: 'success', data: { user: updatedUser } });
     } catch (error) {
-        console.error('❌ Erreur updateMe:', error);
+        logger.error('❌ Erreur updateMe:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
@@ -612,7 +613,7 @@ exports.forgotPassword = async (req, res) => {
                 message:  `Bonjour ${user.name},\n\nRéinitialisez votre mot de passe ici : ${resetURL}\n\nCe lien expire dans 10 minutes.\n\nSi vous n'avez pas fait cette demande, ignorez cet email.`,
             });
 
-            console.log(`✅ [Auth] Email reset envoyé à: ${user.email}`);
+            logger.success(`✅ [Auth] Email reset envoyé à: ${user.email}`);
 
             res.status(200).json({
                 status:  'success',
@@ -624,14 +625,14 @@ exports.forgotPassword = async (req, res) => {
             user.passwordResetExpires = undefined;
             await user.save({ validateBeforeSave: false });
 
-            console.error('❌ [Auth] Erreur envoi email reset:', err.message);
+            logger.error('❌ [Auth] Erreur envoi email reset:', err.message);
             return res.status(500).json({
                 status:  'error',
                 message: "Erreur lors de l'envoi de l'email. Réessayez dans quelques minutes.",
             });
         }
     } catch (error) {
-        console.error('❌ [Auth] Erreur forgotPassword:', error);
+        logger.error('❌ [Auth] Erreur forgotPassword:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
@@ -682,7 +683,7 @@ exports.googleAuth = async (req, res) => {
 
         createSendToken(user, 200, res);
     } catch (error) {
-        console.error('❌ [Auth] Erreur googleAuth:', error);
+        logger.error('❌ [Auth] Erreur googleAuth:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
@@ -693,20 +694,23 @@ exports.googleAuth = async (req, res) => {
 // ======================================================
 exports.googleGetToken = async (req, res) => {
     try {
-        const { email } = req.body;
+        // Vérification du secret partagé NextAuth → Backend
+        const secret = req.headers['x-nextauth-secret'];
+        if (!secret || secret !== process.env.NEXTAUTH_API_SECRET) {
+            return res.status(403).json({ status: 'fail', message: 'Accès non autorisé.' });
+        }
 
+        const { email } = req.body;
         if (!email) {
             return res.status(400).json({ status: 'fail', message: 'email requis.' });
         }
 
         const user = await User.findOne({ email });
-
         if (!user) {
             return res.status(404).json({ status: 'fail', message: 'Utilisateur non trouvé.' });
         }
 
         const token = signToken(user._id, user.tokenVersion);
-
         res.status(200).json({
             status: 'success',
             token,
@@ -714,7 +718,7 @@ exports.googleGetToken = async (req, res) => {
             role:   user.role,
         });
     } catch (error) {
-        console.error('❌ [Auth] Erreur googleGetToken:', error);
+        logger.error('❌ [Auth] Erreur googleGetToken:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
@@ -777,12 +781,12 @@ exports.resetPassword = async (req, res) => {
 
         await user.save();
 
-        console.log(`✅ [Auth] Mot de passe réinitialisé pour: ${user.email}`);
+        logger.success(`✅ [Auth] Mot de passe réinitialisé pour: ${user.email}`);
 
         // Connecter automatiquement l'utilisateur après reset
         createSendToken(user, 200, res);
     } catch (error) {
-        console.error('❌ [Auth] Erreur resetPassword:', error);
+        logger.error('❌ [Auth] Erreur resetPassword:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };

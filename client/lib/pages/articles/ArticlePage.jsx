@@ -21,14 +21,14 @@ const SectionIntro = ({ content }) => (
 
 const SectionHeading = ({ content }) => (
     <h2 className="font-bold text-gray-900 mt-10 mb-4"
-        style={{ fontFamily: "'Outfit', sans-serif", fontSize: '1.25rem', lineHeight: 1.3 }}>
+        style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '1.25rem', lineHeight: 1.3 }}>
         {content}
     </h2>
 );
 
 const SectionParagraph = ({ content }) => (
     <p className="text-gray-600 leading-relaxed mb-5"
-        style={{ fontFamily: "'Outfit', sans-serif", fontSize: '0.97rem' }}>
+        style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.97rem' }}>
         {content}
     </p>
 );
@@ -36,9 +36,9 @@ const SectionParagraph = ({ content }) => (
 const SectionStat = ({ label, value, sub, color }) => (
     <div className="my-8 rounded-2xl p-6 text-center border"
         style={{ backgroundColor: `${color}08`, borderColor: `${color}20` }}>
-        <p className="text-5xl font-black mb-1" style={{ color, fontFamily: "'Outfit', sans-serif" }}>{value}</p>
-        <p className="font-semibold text-gray-900 text-sm" style={{ fontFamily: "'Outfit', sans-serif" }}>{label}</p>
-        {sub && <p className="text-gray-400 text-xs mt-0.5" style={{ fontFamily: "'Outfit', sans-serif" }}>{sub}</p>}
+        <p className="text-5xl font-black mb-1" style={{ color, fontFamily: "'DM Sans', sans-serif" }}>{value}</p>
+        <p className="font-semibold text-gray-900 text-sm" style={{ fontFamily: "'DM Sans', sans-serif" }}>{label}</p>
+        {sub && <p className="text-gray-400 text-xs mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>{sub}</p>}
     </div>
 );
 
@@ -53,7 +53,7 @@ const SectionPullquote = ({ content, author }) => (
             </p>
             {author && (
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     — {author}
                 </p>
             )}
@@ -65,7 +65,7 @@ const SectionList = ({ items }) => (
     <ul className="my-5 space-y-2.5">
         {items.map((item, i) => (
             <li key={i} className="flex items-start gap-3 text-gray-600 text-sm leading-relaxed"
-                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 <span className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: '#2E7BB5' }} />
                 {item}
             </li>
@@ -99,11 +99,11 @@ const RelatedCard = ({ article }) => {
             </div>
             <div className="min-w-0">
                 <span className="inline-flex items-center gap-1 text-xs font-bold mb-1"
-                    style={{ color: article.categoryColor, fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ color: article.categoryColor, fontFamily: "'DM Sans', sans-serif" }}>
                     <Icon className="w-3 h-3" /> {article.category}
                 </span>
                 <p className="text-gray-800 text-xs font-semibold leading-snug line-clamp-2 group-hover:text-gray-900"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {article.title}
                 </p>
             </div>
@@ -130,7 +130,7 @@ const ArticlePage = ({ slug }) => {
     if (!article) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50"
-                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 <div className="text-center">
                     <p className="text-gray-400 text-5xl mb-4">404</p>
                     <p className="text-gray-600 mb-6">Article introuvable.</p>
@@ -149,14 +149,14 @@ const ArticlePage = ({ slug }) => {
     const fmtDate = d => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 
     return (
-        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
             {/* ── Barre de progression ──────────────────────────────── */}
             <div className="fixed top-0 left-0 right-0 h-0.5 z-50 bg-gray-100">
                 <motion.div className="h-full origin-left"
                     style={{
                         width: `${scrollProgress}%`,
-                        background: `linear-gradient(to right, ${article.categoryColor}, #C8872A)`,
+                        background: `linear-gradient(to right, ${article.categoryColor}, #C8960C)`,
                         transition: 'width 0.1s linear',
                     }}
                 />
@@ -235,7 +235,7 @@ const ArticlePage = ({ slug }) => {
                                 {article.tags.map(tag => (
                                     <span key={tag}
                                         className="text-xs font-semibold px-3 py-1 rounded-full border"
-                                        style={{ color: article.categoryColor, backgroundColor: `${article.categoryColor}0D`, borderColor: `${article.categoryColor}25`, fontFamily: "'Outfit', sans-serif" }}>
+                                        style={{ color: article.categoryColor, backgroundColor: `${article.categoryColor}0D`, borderColor: `${article.categoryColor}25`, fontFamily: "'DM Sans', sans-serif" }}>
                                         {tag}
                                     </span>
                                 ))}
@@ -250,19 +250,19 @@ const ArticlePage = ({ slug }) => {
                                     style={{ backgroundColor: article.categoryColor, transform: 'translate(30%, -30%)' }} />
                                 <div className="p-7 relative z-10">
                                     <p className="text-xs font-bold uppercase tracking-widest mb-2"
-                                        style={{ color: article.categoryColor, fontFamily: "'Outfit', sans-serif" }}>
+                                        style={{ color: article.categoryColor, fontFamily: "'DM Sans', sans-serif" }}>
                                         {article.category}
                                     </p>
                                     <h3 className="font-bold text-gray-900 text-lg mb-1 leading-snug"
-                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                        style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                         Vous souhaitez en savoir plus ?
                                     </h3>
-                                    <p className="text-gray-500 text-sm mb-5" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                    <p className="text-gray-500 text-sm mb-5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                         Découvrez nos services et commencez votre projet avec nos équipes.
                                     </p>
                                     <Link href={article.servicePage}
                                         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:opacity-90"
-                                        style={{ background: `linear-gradient(135deg, ${article.categoryColor}CC, ${article.categoryColor})`, fontFamily: "'Outfit', sans-serif" }}>
+                                        style={{ background: `linear-gradient(135deg, ${article.categoryColor}CC, ${article.categoryColor})`, fontFamily: "'DM Sans', sans-serif" }}>
                                         {article.serviceLabel}
                                         <ArrowRight className="w-4 h-4" />
                                     </Link>
@@ -279,10 +279,10 @@ const ArticlePage = ({ slug }) => {
                                 className="bg-white rounded-2xl border p-5"
                                 style={{ borderColor: 'rgba(0,0,0,0.07)' }}>
                                 <h3 className="font-bold text-gray-900 text-sm mb-4"
-                                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                     À propos de cet article
                                 </h3>
-                                <div className="space-y-3 text-sm text-gray-600" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                <div className="space-y-3 text-sm text-gray-600" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                     <div className="flex items-center gap-2.5">
                                         <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                                             style={{ backgroundColor: `${article.categoryColor}15` }}>
@@ -322,7 +322,7 @@ const ArticlePage = ({ slug }) => {
                                 className="bg-white rounded-2xl border p-5"
                                 style={{ borderColor: 'rgba(0,0,0,0.07)' }}>
                                 <h3 className="font-bold text-gray-900 text-sm mb-4"
-                                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                     Autres articles
                                 </h3>
                                 <div className="space-y-1">
@@ -331,7 +331,7 @@ const ArticlePage = ({ slug }) => {
                                 <div className="mt-4 pt-4 border-t border-gray-100">
                                     <Link href="/actualites"
                                         className="inline-flex items-center gap-1.5 text-xs font-semibold"
-                                        style={{ color: article.categoryColor, fontFamily: "'Outfit', sans-serif" }}>
+                                        style={{ color: article.categoryColor, fontFamily: "'DM Sans', sans-serif" }}>
                                         Toutes les actualités <ChevronRight className="w-3.5 h-3.5" />
                                     </Link>
                                 </div>

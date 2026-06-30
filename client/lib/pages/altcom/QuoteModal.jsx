@@ -48,10 +48,10 @@ const QuoteModal = ({ serviceTitle, onClose, onSubmit }) => {
                         </div>
                         <div>
                             <h3 className="font-bold text-gray-900 text-lg leading-tight"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                 Demander un devis
                             </h3>
-                            <p className="text-xs text-gray-400" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            <p className="text-xs text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                 {serviceTitle}
                             </p>
                         </div>
@@ -66,11 +66,11 @@ const QuoteModal = ({ serviceTitle, onClose, onSubmit }) => {
                     {/* Type projet */}
                     <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             Type de projet <span className="text-red-400">*</span>
                         </label>
                         <select value={form.projectType} onChange={e => set('projectType', e.target.value)}
-                            className={inputCls} style={{ fontFamily: "'Outfit', sans-serif" }}
+                            className={inputCls} style={{ fontFamily: "'DM Sans', sans-serif" }}
                             onFocus={focusGold} onBlur={blurGold}>
                             {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
@@ -80,22 +80,22 @@ const QuoteModal = ({ serviceTitle, onClose, onSubmit }) => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                 Nom complet <span className="text-red-400">*</span>
                             </label>
                             <input type="text" placeholder="Votre nom"
                                 value={form.name} onChange={e => set('name', e.target.value)}
-                                required className={inputCls} style={{ fontFamily: "'Outfit', sans-serif" }}
+                                required className={inputCls} style={{ fontFamily: "'DM Sans', sans-serif" }}
                                 onFocus={focusGold} onBlur={blurGold} />
                         </div>
                         <div>
                             <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                 Email <span className="text-red-400">*</span>
                             </label>
                             <input type="email" placeholder="votre@email.com"
                                 value={form.email} onChange={e => set('email', e.target.value)}
-                                required className={inputCls} style={{ fontFamily: "'Outfit', sans-serif" }}
+                                required className={inputCls} style={{ fontFamily: "'DM Sans', sans-serif" }}
                                 onFocus={focusGold} onBlur={blurGold} />
                         </div>
                     </div>
@@ -104,17 +104,17 @@ const QuoteModal = ({ serviceTitle, onClose, onSubmit }) => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>Téléphone</label>
+                                style={{ fontFamily: "'DM Sans', sans-serif" }}>Téléphone</label>
                             <input type="tel" placeholder="+242 06 000 00 00"
                                 value={form.phone} onChange={e => set('phone', e.target.value)}
-                                className={inputCls} style={{ fontFamily: "'Outfit', sans-serif" }}
+                                className={inputCls} style={{ fontFamily: "'DM Sans', sans-serif" }}
                                 onFocus={focusGold} onBlur={blurGold} />
                         </div>
                         <div>
                             <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>Budget estimé</label>
+                                style={{ fontFamily: "'DM Sans', sans-serif" }}>Budget estimé</label>
                             <select value={form.budget} onChange={e => set('budget', e.target.value)}
-                                className={inputCls} style={{ fontFamily: "'Outfit', sans-serif" }}
+                                className={inputCls} style={{ fontFamily: "'DM Sans', sans-serif" }}
                                 onFocus={focusGold} onBlur={blurGold}>
                                 {BUDGETS.map(b => <option key={b.v} value={b.v}>{b.l}</option>)}
                             </select>
@@ -124,16 +124,16 @@ const QuoteModal = ({ serviceTitle, onClose, onSubmit }) => {
                     {/* Description */}
                     <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             Description du projet <span className="text-red-400">*</span>
                         </label>
                         <textarea rows={4} maxLength={1000} placeholder="Décrivez votre projet..."
                             value={form.description} onChange={e => set('description', e.target.value)}
                             required className={`${inputCls} resize-none`}
-                            style={{ fontFamily: "'Outfit', sans-serif" }}
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}
                             onFocus={focusGold} onBlur={blurGold} />
                         <p className="text-right text-xs text-gray-400 mt-1"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             {form.description.length}/1000
                         </p>
                     </div>
@@ -144,7 +144,7 @@ const QuoteModal = ({ serviceTitle, onClose, onSubmit }) => {
                         style={{
                             background: loading ? '#9CA3AF' : `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`,
                             boxShadow:  loading ? 'none' : `0 4px 20px ${GOLD}40`,
-                            fontFamily: "'Outfit', sans-serif",
+                            fontFamily: "'DM Sans', sans-serif",
                         }}>
                         {loading
                             ? <><Loader2 className="w-4 h-4 animate-spin" /> Envoi...</>

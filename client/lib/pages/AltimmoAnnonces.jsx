@@ -7,6 +7,7 @@ import {
     ChevronLeft, ChevronRight, Grid3x3, List,
     SlidersHorizontal, Building2, Tag, AlertTriangle,
 } from 'lucide-react';
+import Link from 'next/link';
 import { getAllProperties } from '../services/propertyService';
 import PropertyCard          from '../components/PropertyCard';
 import { PropertySkeletonGrid, PropertySkeletonList } from '../components/PropertySkeleton';
@@ -53,7 +54,7 @@ const Pagination = ({ totalPages, currentPage, onPageChange }) => {
                 aria-label="Page précédente"
                 style={{
                     width: 36, height: 36, border: '1px solid rgba(200,150,12,0.2)',
-                    background: '#FDFCFA', display: 'flex', alignItems: 'center',
+                    background: '#FFFFFF', display: 'flex', alignItems: 'center',
                     justifyContent: 'center', cursor: currentPage === 1 ? 'default' : 'pointer',
                     opacity: currentPage === 1 ? 0.3 : 1, transition: '0.2s',
                     borderRadius: 0,
@@ -71,7 +72,7 @@ const Pagination = ({ totalPages, currentPage, onPageChange }) => {
                         minWidth: 36, height: 36, padding: '0 10px',
                         background: p === currentPage
                             ? `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`
-                            : '#FDFCFA',
+                            : '#FFFFFF',
                         color:  p === currentPage ? '#0A0C0F' : '#6B5D52',
                         border: `1px solid ${p === currentPage ? 'transparent' : 'rgba(200,150,12,0.15)'}`,
                         boxShadow: p === currentPage ? `0 4px 16px rgba(200,150,12,0.28)` : 'none',
@@ -92,7 +93,7 @@ const Pagination = ({ totalPages, currentPage, onPageChange }) => {
                 aria-label="Page suivante"
                 style={{
                     width: 36, height: 36, border: '1px solid rgba(200,150,12,0.2)',
-                    background: '#FDFCFA', display: 'flex', alignItems: 'center',
+                    background: '#FFFFFF', display: 'flex', alignItems: 'center',
                     justifyContent: 'center', cursor: currentPage === totalPages ? 'default' : 'pointer',
                     opacity: currentPage === totalPages ? 0.3 : 1, transition: '0.2s',
                     borderRadius: 0,
@@ -189,6 +190,9 @@ const AltimmoAnnonces = () => {
     const hasFilters = searchTerm.trim() || selStatus !== 'Tous' || selType !== 'Tous' ||
         selAvail !== 'Tous' || priceRange.min || priceRange.max;
 
+    const priceRangeInvalid = priceRange.min && priceRange.max &&
+        Number(priceRange.min) > Number(priceRange.max);
+
     const totalPages        = Math.ceil(filtered.length / PROPERTIES_PER_PAGE);
     const currentProperties = filtered.slice((currentPage - 1) * PROPERTIES_PER_PAGE, currentPage * PROPERTIES_PER_PAGE);
 
@@ -200,7 +204,7 @@ const AltimmoAnnonces = () => {
         fontFamily: "'DM Sans', sans-serif",
         fontSize: '0.875rem',
         color: '#1A1612',
-        background: '#FAF8F5',
+        background: '#F9FAFB',
         border: '1px solid rgba(200,150,12,0.18)',
         borderRadius: 0,
         padding: '10px 14px',
@@ -210,8 +214,8 @@ const AltimmoAnnonces = () => {
     };
 
     if (error) return (
-        <div style={{ minHeight: '100vh', background: '#F5F3EF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div style={{ background: '#FDFCFA', border: '1px solid rgba(200,150,12,0.15)', padding: 40, maxWidth: 400, width: '100%', textAlign: 'center' }}>
+        <div style={{ minHeight: '100vh', background: '#F8F8F8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div style={{ background: '#FFFFFF', border: '1px solid rgba(200,150,12,0.15)', padding: 40, maxWidth: 400, width: '100%', textAlign: 'center' }}>
                 <div style={{ width: 56, height: 56, background: 'rgba(200,150,12,0.08)', border: '1px solid rgba(200,150,12,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                     <AlertCircle size={24} color={GOLD} />
                 </div>
@@ -228,7 +232,7 @@ const AltimmoAnnonces = () => {
     );
 
     return (
-        <div style={{ minHeight: '100vh', background: '#F5F3EF', fontFamily: "'DM Sans', sans-serif" }}>
+        <div style={{ minHeight: '100vh', background: '#F8F8F8', fontFamily: "'DM Sans', sans-serif" }}>
 
             {/* ── Hero ─────────────────────────────────── */}
             <div style={{
@@ -275,7 +279,7 @@ const AltimmoAnnonces = () => {
             <div style={{ maxWidth: 1280, margin: '0 auto', padding: 'clamp(24px, 4vw, 48px) clamp(16px, 4vw, 48px)' }}>
 
                 {/* Barre recherche */}
-                <div style={{ background: '#FDFCFA', border: '1px solid rgba(200,150,12,0.15)', padding: 'clamp(16px, 2vw, 24px)', marginBottom: 24 }}>
+                <div style={{ background: '#FFFFFF', border: '1px solid rgba(200,150,12,0.15)', padding: 'clamp(16px, 2vw, 24px)', marginBottom: 24 }}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
                         {/* Search input */}
                         <div style={{ position: 'relative', flex: '1 1 220px' }}>
@@ -417,13 +421,20 @@ const AltimmoAnnonces = () => {
                                                 <input type="number" placeholder="Min" aria-label="Prix minimum (FCFA)"
                                                     value={priceRange.min}
                                                     onChange={e => setPriceRange(p => ({ ...p, min: e.target.value }))}
-                                                    style={inputStyle} onFocus={inputFocus} onBlur={inputBlur} />
+                                                    style={{ ...inputStyle, borderColor: priceRangeInvalid ? '#DC2626' : 'rgba(200,150,12,0.18)' }}
+                                                    onFocus={inputFocus} onBlur={inputBlur} />
                                                 <span style={{ color: '#9A8A7A', fontWeight: 700, flexShrink: 0 }} aria-hidden="true">—</span>
                                                 <input type="number" placeholder="Max" aria-label="Prix maximum (FCFA)"
                                                     value={priceRange.max}
                                                     onChange={e => setPriceRange(p => ({ ...p, max: e.target.value }))}
-                                                    style={inputStyle} onFocus={inputFocus} onBlur={inputBlur} />
+                                                    style={{ ...inputStyle, borderColor: priceRangeInvalid ? '#DC2626' : 'rgba(200,150,12,0.18)' }}
+                                                    onFocus={inputFocus} onBlur={inputBlur} />
                                             </div>
+                                            {priceRangeInvalid && (
+                                                <p style={{ marginTop: 6, fontSize: '0.75rem', color: '#DC2626', fontFamily: "'DM Sans', sans-serif" }}>
+                                                    Le prix minimum ne peut pas dépasser le maximum.
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
@@ -509,11 +520,11 @@ const AltimmoAnnonces = () => {
                                     <motion.div key={property._id} variants={cardVariants}>
                                         <PropertyCard property={property} index={i} viewMode={viewMode} />
                                         <div style={{ textAlign: 'center', paddingTop: 6 }}>
-                                            <a href={`/signaler-un-litige?bien=${property._id}`}
+                                            <Link href={`/signaler-un-litige?bien=${property._id}`}
                                                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.7rem', color: '#B0A090', textDecoration: 'none' }}>
                                                 <AlertTriangle size={10} />
                                                 Signaler cette annonce
-                                            </a>
+                                            </Link>
                                         </div>
                                     </motion.div>
                                 ))}

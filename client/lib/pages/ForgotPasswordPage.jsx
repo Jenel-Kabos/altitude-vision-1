@@ -9,7 +9,7 @@ import api from '../services/api';
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 
 const focusIn  = e => { e.target.style.borderColor = BLUE; e.target.style.boxShadow = `0 0 0 3px ${BLUE}15`; e.target.style.backgroundColor = '#fff'; };
 const focusOut = e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = '#F9FAFB'; };
@@ -38,7 +38,7 @@ const ForgotPasswordPage = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
             {/* Halos décoratifs */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -83,7 +83,7 @@ const ForgotPasswordPage = () => {
                                         <CheckCircle className="w-8 h-8 text-green-500" />
                                     </div>
                                     <h3 className="font-bold text-gray-900 text-lg mb-2"
-                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                        style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                         Email envoyé !
                                     </h3>
                                     <p className="text-gray-500 text-sm leading-relaxed mb-2">
@@ -95,12 +95,12 @@ const ForgotPasswordPage = () => {
                                     <div className="space-y-3">
                                         <button onClick={() => { setSuccess(false); setEmail(''); }}
                                             className="w-full py-3 rounded-2xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             Renvoyer un email
                                         </button>
                                         <Link href="/login"
                                             className="block w-full py-3 rounded-2xl text-sm font-semibold text-white text-center transition-all hover:opacity-90"
-                                            style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`, fontFamily: "'Outfit', sans-serif" }}>
+                                            style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`, fontFamily: "'DM Sans', sans-serif" }}>
                                             Retour à la connexion
                                         </Link>
                                     </div>
@@ -134,7 +134,7 @@ const ForgotPasswordPage = () => {
                                                 value={email} onChange={e => { setEmail(e.target.value); setError(''); }}
                                                 required autoFocus
                                                 className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm focus:outline-none transition-all placeholder-gray-400"
-                                                style={{ fontFamily: "'Outfit', sans-serif" }}
+                                                style={{ fontFamily: "'DM Sans', sans-serif" }}
                                                 onFocus={focusIn} onBlur={focusOut} />
                                         </div>
                                     </div>
@@ -145,7 +145,7 @@ const ForgotPasswordPage = () => {
                                         style={{
                                             background: loading ? '#9CA3AF' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
                                             boxShadow:  loading ? 'none' : `0 4px 20px ${BLUE}35`,
-                                            fontFamily: "'Outfit', sans-serif",
+                                            fontFamily: "'DM Sans', sans-serif",
                                         }}>
                                         {loading
                                             ? <><Loader2 className="w-4 h-4 animate-spin" /> Envoi en cours...</>

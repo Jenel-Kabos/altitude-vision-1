@@ -15,9 +15,9 @@ import UnreadMessagesBadge from '../messaging/UnreadMessagesBadge';
 
 const NAV_LINKS = [
   { to: '/',            label: 'Accueil',     Icon: Home      },
-  { to: '/altimmo',     label: 'Altimmo',     Icon: Building  },
-  { to: '/mila-events', label: 'Mila Events', Icon: null      },
-  { to: '/altcom',      label: 'Altcom',      Icon: null      },
+  { to: '/immobilier',     label: 'Altimmo',     Icon: Building  },
+  { to: '/evenementiel', label: 'Mila Events', Icon: null      },
+  { to: '/communication',      label: 'Altcom',      Icon: null      },
   { to: '/actualites',  label: 'Actualités',  Icon: Newspaper },
   { to: '/contact',     label: 'Contact',     Icon: Phone     },
 ];
@@ -285,7 +285,7 @@ const Header = () => {
 
           {!isMobile && !user && (
             <>
-              <Link href="/altimmo" className="header-ghost-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: isTablet ? '8px 14px' : '9px 20px', borderRadius: '4px', border: '1px solid rgba(200,150,12,0.2)', color: `rgba(200,150,12,0.75)`, fontSize: isTablet ? '0.68rem' : isXL ? '0.76rem' : '0.72rem', fontWeight: 400, letterSpacing: '0.07em', textTransform: 'uppercase', textDecoration: 'none', whiteSpace: 'nowrap', minHeight: '44px' }}>
+              <Link href="/immobilier" className="header-ghost-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: isTablet ? '8px 14px' : '9px 20px', borderRadius: '4px', border: '1px solid rgba(200,150,12,0.2)', color: `rgba(200,150,12,0.75)`, fontSize: isTablet ? '0.68rem' : isXL ? '0.76rem' : '0.72rem', fontWeight: 400, letterSpacing: '0.07em', textTransform: 'uppercase', textDecoration: 'none', whiteSpace: 'nowrap', minHeight: '44px' }}>
                 {!isTablet && <Building size={13} />}{!isTablet ? 'Publier un bien' : 'Publier'}
               </Link>
               <Link href="/login" className="header-ghost-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: isTablet ? '8px 14px' : '9px 20px', borderRadius: '4px', border: '1px solid rgba(240,237,232,0.14)', color: 'rgba(240,237,232,0.6)', fontSize: isTablet ? '0.68rem' : isXL ? '0.76rem' : '0.72rem', fontWeight: 400, letterSpacing: '0.07em', textTransform: 'uppercase', textDecoration: 'none', whiteSpace: 'nowrap', minHeight: '44px' }}>
@@ -358,7 +358,7 @@ const Header = () => {
               </>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <Link href="/altimmo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '4px', border: `1px solid rgba(200,150,12,0.25)`, color: `rgba(200,150,12,0.8)`, fontSize: '0.82rem', fontWeight: 400, letterSpacing: '0.06em', textTransform: 'uppercase', textDecoration: 'none', minHeight: '44px' }}>
+                <Link href="/immobilier" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '4px', border: `1px solid rgba(200,150,12,0.25)`, color: `rgba(200,150,12,0.8)`, fontSize: '0.82rem', fontWeight: 400, letterSpacing: '0.06em', textTransform: 'uppercase', textDecoration: 'none', minHeight: '44px' }}>
                   <Building size={14} /> Publier un bien
                 </Link>
                 <Link href="/login" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '4px', border: '1px solid rgba(240,237,232,0.14)', color: 'rgba(240,237,232,0.65)', fontSize: '0.82rem', fontWeight: 400, letterSpacing: '0.06em', textTransform: 'uppercase', textDecoration: 'none', minHeight: '44px' }}>

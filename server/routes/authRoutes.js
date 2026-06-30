@@ -2,7 +2,8 @@
 const express        = require('express');
 const router         = express.Router();
 const authController = require('../controllers/authController');
-const { signupLimiter, resendVerificationLimiter } = require('../middleware/rateLimiters');
+const { signupLimiter, resendVerificationLimiter, loginLimiter } = require('../middleware/rateLimiters');
+const { protect } = require('../middleware/authMiddleware');
 
 // ======================================================
 // 🔓 ROUTES PUBLIQUES
@@ -14,7 +15,7 @@ router.get('/verify-email/:token',   authController.verifyEmail);
 router.post('/resend-verification',  resendVerificationLimiter, authController.resendVerificationEmail);
 
 // Connexion
-router.post('/login',                authController.login);
+router.post('/login',                loginLimiter, authController.login);
 
 // Google OAuth
 router.post('/google',               authController.googleAuth);
@@ -29,7 +30,7 @@ router.patch('/reset-password/:token', authController.resetPassword);
 // ======================================================
 // 🔒 ROUTES PROTÉGÉES
 // ======================================================
-router.use(authController.protect);
+router.use(protect);
 
 router.patch('/update-my-password',  authController.updateMyPassword);
 router.patch('/update-me',           authController.updateMe);

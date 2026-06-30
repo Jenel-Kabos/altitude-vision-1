@@ -8,7 +8,7 @@ import { User, Mail, Phone, Shield, ArrowLeft, Settings } from 'lucide-react';
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 
 const ROLE_LABELS = {
     Admin:         'Administrateur',
@@ -26,24 +26,16 @@ const ProfilePage = () => {
 
     return (
         <div className="min-h-screen py-16 px-4"
-            style={{ background: 'linear-gradient(135deg, #0D1117 0%, #0e1e30 60%, #0D1117 100%)' }}>
-
-            {/* Halo décoratif */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute top-1/4 right-1/3 w-96 h-96 rounded-full blur-[120px] opacity-8"
-                    style={{ background: BLUE }} />
-                <div className="absolute bottom-1/4 left-1/4 w-64 h-64 rounded-full blur-[100px] opacity-5"
-                    style={{ background: GOLD }} />
-            </div>
+            style={{ background: '#F8F8F8' }}>
 
             <div className="container mx-auto max-w-lg relative z-10">
 
                 {/* Retour */}
                 <Link href="/"
                     className="inline-flex items-center gap-2 mb-8 text-sm transition-all"
-                    style={{ color: 'rgba(232,228,220,0.4)', fontFamily: "'DM Sans', sans-serif" }}
-                    onMouseEnter={e => e.currentTarget.style.color = 'rgba(232,228,220,0.8)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(232,228,220,0.4)'}
+                    style={{ color: '#9CA3AF', fontFamily: "'DM Sans', sans-serif" }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#111827'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#9CA3AF'}
                 >
                     <ArrowLeft className="w-4 h-4" />
                     Retour à l'accueil
@@ -51,18 +43,16 @@ const ProfilePage = () => {
 
                 {/* Card */}
                 <div style={{
-                    background:    'rgba(10,12,15,0.85)',
-                    backdropFilter: 'blur(24px)',
-                    WebkitBackdropFilter: 'blur(24px)',
-                    border:        '1px solid rgba(232,228,220,0.07)',
-                    borderRadius:  '28px',
-                    overflow:      'hidden',
-                    boxShadow:     '0 32px 80px rgba(0,0,0,0.6)',
+                    background:   '#FFFFFF',
+                    border:       '1px solid rgba(17,24,39,0.08)',
+                    borderRadius: '28px',
+                    overflow:     'hidden',
+                    boxShadow:    '0 8px 32px rgba(0,0,0,0.08)',
                 }}>
 
                     {/* ── Hero ── */}
                     <div className="relative px-8 py-12 text-center overflow-hidden"
-                        style={{ borderBottom: '1px solid rgba(232,228,220,0.06)' }}>
+                        style={{ borderBottom: '1px solid rgba(17,24,39,0.08)' }}>
 
                         {/* Ligne déco top */}
                         <div className="absolute top-0 left-0 right-0 h-px"
@@ -98,7 +88,7 @@ const ProfilePage = () => {
                         </div>
 
                         {/* Nom */}
-                        <h1 className="mt-4 text-white"
+                        <h1 className="mt-4" style={{ color: '#111827' }}
                             style={{
                                 fontFamily: "'Cormorant Garamond', serif",
                                 fontSize:   '1.9rem',
@@ -173,8 +163,8 @@ const ProfilePage = () => {
 const InfoRow = ({ icon, iconColor, label, value }) => (
     <div className="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all"
         style={{
-            background: 'rgba(232,228,220,0.03)',
-            border:     '1px solid rgba(232,228,220,0.05)',
+            background: '#F9FAFB',
+            border:     '1px solid rgba(17,24,39,0.06)',
         }}>
         <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: `${iconColor}15`, color: iconColor }}>
@@ -182,11 +172,11 @@ const InfoRow = ({ icon, iconColor, label, value }) => (
         </div>
         <div className="min-w-0">
             <p className="text-xs uppercase tracking-wider font-semibold mb-0.5"
-                style={{ color: 'rgba(232,228,220,0.3)', fontFamily: "'DM Sans', sans-serif" }}>
+                style={{ color: '#9CA3AF', fontFamily: "'DM Sans', sans-serif" }}>
                 {label}
             </p>
             <p className="text-sm font-medium truncate"
-                style={{ color: 'rgba(232,228,220,0.85)', fontFamily: "'DM Sans', sans-serif" }}>
+                style={{ color: '#111827', fontFamily: "'DM Sans', sans-serif" }}>
                 {value}
             </p>
         </div>

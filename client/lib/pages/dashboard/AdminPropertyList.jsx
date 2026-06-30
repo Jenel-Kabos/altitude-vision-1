@@ -10,7 +10,7 @@ import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const BLUE = '#2E7BB5';
-const GOLD = '#C8872A';
+const GOLD = '#C8960C';
 const RED  = '#D42B2B';
 
 // ─────────────────────────────────────────────────────────────
@@ -28,21 +28,21 @@ const ConfirmDialog = ({ title, message, confirmLabel = 'Confirmer', confirmStyl
           style={{ background: confirmStyle === 'red' ? '#FEE2E2' : `${BLUE}15` }}>
           <AlertCircle size={22} style={{ color: confirmStyle === 'red' ? '#DC2626' : BLUE }} />
         </div>
-        <h3 className="font-bold text-gray-900 mb-2" style={{ fontFamily: "'Outfit', sans-serif" }}>
+        <h3 className="font-bold text-gray-900 mb-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
           {title}
         </h3>
-        <p className="text-sm text-gray-500 mb-6" style={{ fontFamily: "'Outfit', sans-serif" }}>
+        <p className="text-sm text-gray-500 mb-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
           {message}
         </p>
         <div className="flex gap-3">
           <button onClick={onCancel}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Annuler
           </button>
           <button onClick={onConfirm}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
-            style={{ background: confirmBg, fontFamily: "'Outfit', sans-serif" }}>
+            style={{ background: confirmBg, fontFamily: "'DM Sans', sans-serif" }}>
             {confirmLabel}
           </button>
         </div>
@@ -60,7 +60,7 @@ const InlineNotif = ({ message, type, onClose }) => (
       background: type === 'error' ? '#FEF2F2' : '#F0FDF4',
       color:      type === 'error' ? '#DC2626'  : '#16A34A',
       border:     `1px solid ${type === 'error' ? '#FCA5A5' : '#86EFAC'}`,
-      fontFamily: "'Outfit', sans-serif",
+      fontFamily: "'DM Sans', sans-serif",
     }}>
     <span className="flex-1">{message}</span>
     <button onClick={onClose} className="opacity-60 hover:opacity-100 transition-opacity"><X size={14} /></button>
@@ -75,7 +75,7 @@ const StatusBadge = ({ isApproved }) => (
     style={{
       background: isApproved ? '#F0FDF4' : '#FFFBEB',
       color:      isApproved ? '#16A34A' : '#D97706',
-      fontFamily: "'Outfit', sans-serif",
+      fontFamily: "'DM Sans', sans-serif",
     }}>
     {isApproved
       ? <><CheckCircle size={11} /> Approuvé</>
@@ -186,11 +186,11 @@ const AdminPropertyList = () => {
           </div>
           <div>
             <h2 className="font-bold text-gray-900 text-lg"
-              style={{ fontFamily: "'Outfit', sans-serif" }}>
+              style={{ fontFamily: "'DM Sans', sans-serif" }}>
               Modération des Biens
             </h2>
             <p className="text-xs text-gray-400"
-              style={{ fontFamily: "'Outfit', sans-serif" }}>
+              style={{ fontFamily: "'DM Sans', sans-serif" }}>
               {pendingCount > 0
                 ? `${pendingCount} bien${pendingCount > 1 ? 's' : ''} en attente d'approbation`
                 : 'Tous les biens sont à jour'}
@@ -203,7 +203,7 @@ const AdminPropertyList = () => {
           style={{
             background: `linear-gradient(135deg, #1A5A8A, ${BLUE})`,
             boxShadow:  `0 4px 16px ${BLUE}35`,
-            fontFamily: "'Outfit', sans-serif",
+            fontFamily: "'DM Sans', sans-serif",
           }}>
           <Plus size={16} /> Ajouter un bien
         </Link>
@@ -223,7 +223,7 @@ const AdminPropertyList = () => {
               <button key={id} onClick={() => setStatus(id)}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
                 style={{
-                  fontFamily: "'Outfit', sans-serif",
+                  fontFamily: "'DM Sans', sans-serif",
                   background: statusFilter === id ? `linear-gradient(135deg,#1A5A8A,${BLUE})` : '#F1F5F9',
                   color:      statusFilter === id ? '#fff' : '#64748B',
                   boxShadow:  statusFilter === id ? `0 2px 8px ${BLUE}30` : 'none',
@@ -248,7 +248,7 @@ const AdminPropertyList = () => {
               onChange={e => setSearch(e.target.value)}
               aria-label="Rechercher un bien immobilier"
               className="w-full pl-10 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none transition-all"
-              style={{ fontFamily: "'Outfit', sans-serif" }}
+              style={{ fontFamily: "'DM Sans', sans-serif" }}
               onFocus={e => { e.target.style.borderColor = BLUE; e.target.style.boxShadow = `0 0 0 3px ${BLUE}18`; }}
               onBlur={e  => { e.target.style.borderColor = '#E2E8F0'; e.target.style.boxShadow = 'none'; }}
             />
@@ -261,7 +261,7 @@ const AdminPropertyList = () => {
         <div className="flex items-center justify-center py-24">
           <div className="text-center">
             <Loader2 size={32} className="animate-spin mx-auto mb-3" style={{ color: BLUE }} />
-            <p className="text-sm text-gray-400" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <p className="text-sm text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               Chargement des biens…
             </p>
           </div>
@@ -273,11 +273,11 @@ const AdminPropertyList = () => {
             <Home size={24} style={{ color: BLUE }} />
           </div>
           <p className="font-semibold text-gray-600 mb-1"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Aucun bien trouvé
           </p>
           <p className="text-sm text-gray-400"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             {search
               ? `Aucun résultat pour "${search}".`
               : statusFilter === 'pending'
@@ -287,7 +287,7 @@ const AdminPropertyList = () => {
           {(search || statusFilter !== 'all') && (
             <button onClick={() => { setSearch(''); setStatus('all'); }}
               className="mt-4 text-xs font-medium flex items-center gap-1 transition-opacity hover:opacity-70"
-              style={{ color: BLUE, fontFamily: "'Outfit', sans-serif" }}>
+              style={{ color: BLUE, fontFamily: "'DM Sans', sans-serif" }}>
               <X size={12} /> Réinitialiser les filtres
             </button>
           )}
@@ -306,7 +306,7 @@ const AdminPropertyList = () => {
               { label: 'Actions',       col: 'col-span-2 text-right' },
             ].map(({ label, col }) => (
               <div key={label} className={`${col} text-xs font-semibold uppercase tracking-wide text-gray-400`}
-                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 {label}
               </div>
             ))}
@@ -327,12 +327,12 @@ const AdminPropertyList = () => {
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-gray-900 text-sm truncate"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {property.title}
                   </p>
                   {property.address?.city && (
                     <p className="text-xs text-gray-400 truncate"
-                      style={{ fontFamily: "'Outfit', sans-serif" }}>
+                      style={{ fontFamily: "'DM Sans', sans-serif" }}>
                       {property.address.city}
                     </p>
                   )}
@@ -342,7 +342,7 @@ const AdminPropertyList = () => {
               {/* Propriétaire */}
               <div className="col-span-2 min-w-0">
                 <p className="text-sm text-gray-600 truncate"
-                  style={{ fontFamily: "'Outfit', sans-serif" }}>
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}>
                   {property.user?.name || <span className="text-gray-300">—</span>}
                 </p>
               </div>
@@ -359,7 +359,7 @@ const AdminPropertyList = () => {
                     style={{
                       background: `${GOLD}12`,
                       color: GOLD,
-                      fontFamily: "'Outfit', sans-serif",
+                      fontFamily: "'DM Sans', sans-serif",
                     }}>
                     {property.pole}
                   </span>
@@ -407,7 +407,7 @@ const AdminPropertyList = () => {
           {/* Footer */}
           <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between"
             style={{ background: '#FAFAFA' }}>
-            <p className="text-xs text-gray-400" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <p className="text-xs text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               {filtered.length} bien{filtered.length !== 1 ? 's' : ''} affiché{filtered.length !== 1 ? 's' : ''}
               {pendingCount > 0 && (
                 <span style={{ color: '#D97706' }}>
@@ -418,7 +418,7 @@ const AdminPropertyList = () => {
             {(search || statusFilter !== 'all') && (
               <button onClick={() => { setSearch(''); setStatus('all'); }}
                 className="text-xs font-medium flex items-center gap-1 transition-opacity hover:opacity-70"
-                style={{ color: BLUE, fontFamily: "'Outfit', sans-serif" }}>
+                style={{ color: BLUE, fontFamily: "'DM Sans', sans-serif" }}>
                 <X size={12} /> Réinitialiser
               </button>
             )}

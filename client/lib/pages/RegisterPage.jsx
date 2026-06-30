@@ -15,7 +15,7 @@ import { contratHebergement } from "../data/contratHebergement";
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 
 const focusIn  = e => { e.target.style.borderColor = BLUE; e.target.style.boxShadow = `0 0 0 3px ${BLUE}15`; e.target.style.backgroundColor = '#fff'; };
 const focusOut = e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = '#F9FAFB'; };
@@ -127,7 +127,7 @@ const RegisterPage = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4"
-            style={{ fontFamily:"'Outfit', sans-serif" }}>
+            style={{ fontFamily:"'DM Sans', sans-serif" }}>
 
             {/* Halos */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -256,7 +256,7 @@ const RegisterPage = () => {
                                         value={form.confirmPassword} onChange={e => set('confirmPassword', e.target.value)}
                                         required minLength={8}
                                         className="w-full pl-10 pr-16 py-3 border rounded-2xl bg-gray-50 text-gray-900 text-sm focus:outline-none transition-all placeholder-gray-400"
-                                        style={{ borderColor: form.confirmPassword ? (pwMatch ? '#22C55E' : '#EF4444') : '#E5E7EB', fontFamily:"'Outfit', sans-serif" }}
+                                        style={{ borderColor: form.confirmPassword ? (pwMatch ? '#22C55E' : '#EF4444') : '#E5E7EB', fontFamily:"'DM Sans', sans-serif" }}
                                         onFocus={e => { if (!form.confirmPassword) focusIn(e); }}
                                         onBlur={e => { if (!form.confirmPassword) focusOut(e); }} />
                                     <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -280,7 +280,7 @@ const RegisterPage = () => {
                                     <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                     <select value={form.role} onChange={e => set('role', e.target.value)}
                                         className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm focus:outline-none transition-all appearance-none cursor-pointer"
-                                        style={{ fontFamily:"'Outfit', sans-serif" }}
+                                        style={{ fontFamily:"'DM Sans', sans-serif" }}
                                         onFocus={focusIn} onBlur={focusOut}>
                                         <option value="Client">Client (recherche de bien)</option>
                                         <option value="Proprietaire">Propriétaire / Apporteur d'affaires</option>
@@ -355,7 +355,7 @@ const RegisterPage = () => {
                                 style={{
                                     background:  (loading || (isProprietaire && !toutAccepte)) ? '#9CA3AF' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
                                     boxShadow:   (loading || (isProprietaire && !toutAccepte)) ? 'none' : `0 4px 20px ${BLUE}35`,
-                                    fontFamily:  "'Outfit', sans-serif",
+                                    fontFamily:  "'DM Sans', sans-serif",
                                     cursor:      (isProprietaire && !toutAccepte) ? 'not-allowed' : 'pointer',
                                     opacity:     (isProprietaire && !toutAccepte) ? 0.6 : 1,
                                 }}>

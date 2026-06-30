@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const ContactMessage = require('../models/ContactMessage');
+const logger = require('../utils/logger');
 
 /**
  * @description Créer un nouveau message de contact
@@ -7,7 +8,7 @@ const ContactMessage = require('../models/ContactMessage');
  * @access Public
  */
 exports.createContactMessage = asyncHandler(async (req, res) => {
-  console.log('📥 [Contact] Réception d\'un nouveau message:', req.body);
+  logger.info('📥 [Contact] Réception d\'un nouveau message:', req.body);
 
   const { name, email, subject, message } = req.body;
 
@@ -37,7 +38,7 @@ exports.createContactMessage = asyncHandler(async (req, res) => {
     userAgent,
   });
 
-  console.log('✅ [Contact] Message créé avec succès:', contactMessage._id);
+  logger.success('✅ [Contact] Message créé avec succès:', contactMessage._id);
 
   // TODO: Envoyer un email de notification à l'équipe
   // TODO: Envoyer un email de confirmation au client
@@ -79,7 +80,7 @@ exports.getAllContactMessages = asyncHandler(async (req, res) => {
 
   const total = await ContactMessage.countDocuments(filter);
 
-  console.log(`✅ [Contact] ${messages.length} messages récupérés`);
+  logger.success(`✅ [Contact] ${messages.length} messages récupérés`);
 
   res.status(200).json({
     status: 'success',
@@ -112,7 +113,7 @@ exports.getContactMessageById = asyncHandler(async (req, res) => {
     await message.save();
   }
 
-  console.log(`✅ [Contact] Message récupéré: ${message._id}`);
+  logger.success(`✅ [Contact] Message récupéré: ${message._id}`);
 
   res.status(200).json({
     status: 'success',
@@ -156,7 +157,7 @@ exports.updateMessageStatus = asyncHandler(async (req, res) => {
     throw new Error('Message non trouvé.');
   }
 
-  console.log(`✅ [Contact] Statut du message ${message._id} mis à jour: ${status}`);
+  logger.success(`✅ [Contact] Statut du message ${message._id} mis à jour: ${status}`);
 
   res.status(200).json({
     status: 'success',
@@ -180,7 +181,7 @@ exports.deleteContactMessage = asyncHandler(async (req, res) => {
     throw new Error('Message non trouvé.');
   }
 
-  console.log(`✅ [Contact] Message supprimé: ${message._id}`);
+  logger.success(`✅ [Contact] Message supprimé: ${message._id}`);
 
   res.status(204).json({
     status: 'success',
@@ -219,7 +220,7 @@ exports.getContactStats = asyncHandler(async (req, res) => {
     }, {}),
   };
 
-  console.log('✅ [Contact] Statistiques récupérées');
+  logger.success('✅ [Contact] Statistiques récupérées');
 
   res.status(200).json({
     status: 'success',

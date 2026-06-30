@@ -1,20 +1,37 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { typography, spacing } from '../../theme';
 import Button from './Button';
 
 export default function EmptyState({
+  // Soit une illustration SVG (composant React), soit une icône Ionicons fallback
+  illustration,
   icon = 'document-outline',
   title,
   subtitle,
   actionLabel,
   onAction,
 }) {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+
+  const Illustration = illustration;
+
   return (
     <View style={styles.container}>
-      <Ionicons name={icon} size={64} color={colors.textMuted} />
-      {title ? <Text style={styles.title}>{title}</Text> : null}
+      {Illustration ? (
+        <Illustration
+          size={160}
+          gold={c.gold}
+          muted={c.textMuted}
+          bg={c.bgCardAlt}
+        />
+      ) : (
+        <Ionicons name={icon} size={64} color={c.textMuted} />
+      )}
+      {title    ? <Text style={styles.title}>{title}</Text>       : null}
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       {actionLabel && onAction ? (
         <View style={styles.action}>
@@ -25,7 +42,7 @@ export default function EmptyState({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
@@ -34,13 +51,13 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h2,
-    color: colors.text,
+    color: c.text,
     marginTop: spacing.lg,
     textAlign: 'center',
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSub,
     marginTop: spacing.sm,
     textAlign: 'center',
   },

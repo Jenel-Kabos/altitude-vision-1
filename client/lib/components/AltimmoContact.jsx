@@ -4,132 +4,152 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Send, MessageSquare, Clock, CheckCircle } from 'lucide-react';
 
-// ─────────────────────────────────────────────────────────────
-// Données
-// ─────────────────────────────────────────────────────────────
+const BLUE = '#2E7BB5';
+const GOLD = '#C8960C';
+
 const CONTACT_INFO = [
     {
-        icon:    MapPin,
-        title:   "Adresse de l'agence",
-        lines:   ['24 Rue de Mfoa, Poto-Poto', 'Derrière Canal Olympia', 'Brazzaville, Congo'],
-        color:   '#2E7BB5',
+        icon:  MapPin,
+        title: "Adresse de l'agence",
+        lines: ['24 Rue de Mfoa, Poto-Poto', 'Derrière Canal Olympia', 'Brazzaville, Congo'],
+        color: BLUE,
     },
     {
-        icon:    Mail,
-        title:   'Email professionnel',
-        lines:   ['altimmo@altitudevision.agency'],
-        href:    'mailto:altimmo@altitudevision.agency',
-        color:   '#C8872A',
+        icon:  Mail,
+        title: 'Email professionnel',
+        lines: ['altimmo@altitudevision.agency'],
+        href:  'mailto:altimmo@altitudevision.agency',
+        color: GOLD,
     },
     {
-        icon:    Phone,
-        title:   'Téléphone',
-        lines:   ['+242 06 800 21 51'],
-        href:    'tel:+242068002151',
-        color:   '#2E7BB5',
+        icon:  Phone,
+        title: 'Téléphone',
+        lines: ['+242 06 800 21 51'],
+        href:  'tel:+242068002151',
+        color: BLUE,
     },
 ];
 
 const HORAIRES = [
-    { day: 'Lundi – Vendredi', time: '8h00 – 18h00',  closed: false },
-    { day: 'Samedi',           time: '9h00 – 14h00',  closed: false },
+    { day: 'Lundi – Vendredi', time: '8h00 – 18h00', closed: false },
+    { day: 'Samedi',           time: '9h00 – 14h00', closed: false },
     { day: 'Dimanche',         time: 'Fermé',          closed: true  },
 ];
 
-// ─────────────────────────────────────────────────────────────
-// Champ formulaire
-// ─────────────────────────────────────────────────────────────
+const inputStyle = {
+    width: '100%',
+    padding: '10px 14px',
+    background: 'rgba(232,228,220,0.04)',
+    border: '1px solid rgba(232,228,220,0.1)',
+    borderRadius: '10px',
+    color: '#E8E4DC',
+    fontSize: '0.85rem',
+    fontFamily: "'DM Sans', sans-serif",
+    outline: 'none',
+    transition: 'border-color 0.2s',
+};
+
 const Field = ({ label, id, type = 'text', required, isTextArea }) => (
     <div>
-        <label htmlFor={id}
-            className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
-            {label}{required && <span className="text-red-400 ml-1">*</span>}
+        <label
+            htmlFor={id}
+            style={{
+                display: 'block',
+                fontSize: '0.6rem',
+                fontWeight: 700,
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
+                color: 'rgba(232,228,220,0.35)',
+                fontFamily: "'DM Sans', sans-serif",
+                marginBottom: '6px',
+            }}
+        >
+            {label}{required && <span style={{ color: '#D42B2B', marginLeft: '3px' }}>*</span>}
         </label>
         {isTextArea ? (
-            <textarea id={id} name={id} rows={4} required={required}
-                className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm resize-none transition-all duration-200 focus:outline-none focus:border-[#2E7BB5] focus:ring-2 focus:ring-[#2E7BB5]/10 focus:bg-white hover:border-gray-300 placeholder-gray-400"
-                style={{ fontFamily: "'Outfit', sans-serif" }}
-                placeholder="Décrivez votre projet immobilier..."
+            <textarea
+                id={id} name={id} rows={4} required={required}
+                placeholder="Décrivez votre projet immobilier…"
+                style={{ ...inputStyle, resize: 'none' }}
+                onFocus={e => { e.target.style.borderColor = `${BLUE}55`; }}
+                onBlur={e  => { e.target.style.borderColor = 'rgba(232,228,220,0.1)'; }}
             />
         ) : (
-            <input type={type} id={id} name={id} required={required}
-                className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm transition-all duration-200 focus:outline-none focus:border-[#2E7BB5] focus:ring-2 focus:ring-[#2E7BB5]/10 focus:bg-white hover:border-gray-300 placeholder-gray-400"
-                style={{ fontFamily: "'Outfit', sans-serif" }}
+            <input
+                type={type} id={id} name={id} required={required}
                 placeholder={`Votre ${label.toLowerCase().replace(' *', '')}`}
+                style={inputStyle}
+                onFocus={e => { e.target.style.borderColor = `${BLUE}55`; }}
+                onBlur={e  => { e.target.style.borderColor = 'rgba(232,228,220,0.1)'; }}
             />
         )}
     </div>
 );
 
-// ─────────────────────────────────────────────────────────────
-// Composant principal
-// ─────────────────────────────────────────────────────────────
 const AltimmoContact = () => {
     const [sent, setSent] = useState(false);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Logique d'envoi ici
         setSent(true);
         setTimeout(() => setSent(false), 4000);
     };
 
     return (
-        <section id="contact-altimmo" className="py-20 sm:py-24 bg-white relative overflow-hidden">
+        <section
+            id="contact-altimmo"
+            style={{ padding: 'clamp(52px,9vw,96px) 0', background: '#0A0C0F', position: 'relative', overflow: 'hidden' }}
+        >
+            {/* Décorations */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '1px', background: `linear-gradient(to right, transparent, ${BLUE}28, transparent)` }} />
+            <div style={{ position: 'absolute', right: '-80px', top: '50%', transform: 'translateY(-50%)', width: '360px', height: '360px', borderRadius: '50%', filter: 'blur(130px)', opacity: 0.06, background: BLUE, pointerEvents: 'none' }} />
 
-            {/* Décoration fond */}
-            <div className="absolute top-0 left-0 right-0 h-px"
-                style={{ background: 'linear-gradient(to right, transparent, rgba(46,123,181,0.2), transparent)' }} />
-            <div className="absolute -right-32 top-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-[140px] opacity-[0.04] pointer-events-none"
-                style={{ background: '#2E7BB5' }} />
+            <div className="container mx-auto px-4 sm:px-6 max-w-7xl" style={{ position: 'relative', zIndex: 10 }}>
 
-            <div className="container mx-auto px-4 sm:px-6 max-w-7xl relative z-10">
-
-                {/* ── En-tête ─────────────────────────── */}
+                {/* En-tête */}
                 <motion.div
-                    className="mb-14"
+                    style={{ marginBottom: 'clamp(32px,5vw,52px)' }}
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6 }}
                 >
-                    <p className="text-xs font-bold uppercase tracking-widest mb-3"
-                        style={{ color: '#2E7BB5', fontFamily: "'Outfit', sans-serif" }}>
+                    <p style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: BLUE, fontFamily: "'DM Sans', sans-serif", marginBottom: '10px' }}>
                         Contactez-nous
                     </p>
-                    <h2 className="text-gray-900"
-                        style={{
-                            fontFamily: "'Cormorant Garamond', Georgia, serif",
-                            fontSize:   'clamp(2rem, 4vw, 4.5rem)',
-                            fontWeight: 700,
-                            lineHeight: 1.1,
-                        }}>
+                    <h2 style={{
+                        fontFamily: "'Cormorant Garamond', Georgia, serif",
+                        fontSize: 'clamp(2rem, 4vw, 4.5rem)',
+                        fontWeight: 300,
+                        lineHeight: 1.08,
+                        color: '#E8E4DC',
+                    }}>
                         Prenons Contact
                     </h2>
-                    <div className="h-0.5 w-12 mt-3 rounded-full"
-                        style={{ background: 'linear-gradient(to right, #2E7BB5, #C8872A)' }} />
+                    <div style={{ height: '2px', width: '48px', borderRadius: '2px', marginTop: '12px', background: `linear-gradient(to right, ${BLUE}, ${GOLD})` }} />
                 </motion.div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
 
-                    {/* ── Formulaire ──────────────────────── */}
+                    {/* ── Formulaire ── */}
                     <motion.div
                         initial={{ opacity: 0, x: -24 }}
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true }}
                         transition={{ duration: 0.6 }}
                     >
-                        <div className="bg-white rounded-3xl border border-gray-100 p-7 shadow-sm hover:shadow-lg transition-shadow duration-500">
-
+                        <div style={{
+                            background: 'rgba(17,20,24,0.8)',
+                            borderRadius: '14px',
+                            border: '1px solid rgba(232,228,220,0.07)',
+                            padding: 'clamp(22px,4vw,32px)',
+                        }}>
                             {/* Card header */}
-                            <div className="flex items-center gap-3 mb-7 pb-5 border-b border-gray-100">
-                                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                                    style={{ background: 'linear-gradient(135deg, #2E7BB5, #1A5A8A)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', paddingBottom: '18px', borderBottom: '1px solid rgba(232,228,220,0.07)' }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: `linear-gradient(135deg, ${BLUE}, #1A5A8A)` }}>
                                     <MessageSquare className="w-4 h-4 text-white" />
                                 </div>
-                                <h3 className="font-bold text-gray-900 text-lg"
-                                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                <h3 style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '1rem', fontWeight: 600, color: '#E8E4DC' }}>
                                     Envoyez-nous un message
                                 </h3>
                             </div>
@@ -138,47 +158,51 @@ const AltimmoContact = () => {
                                 <motion.div
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    className="flex flex-col items-center justify-center py-12 gap-4"
+                                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: '14px' }}
                                 >
-                                    <div className="w-14 h-14 rounded-full flex items-center justify-center"
-                                        style={{ background: 'rgba(46,123,181,0.1)' }}>
-                                        <CheckCircle className="w-7 h-7" style={{ color: '#2E7BB5' }} />
+                                    <div style={{ width: '52px', height: '52px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `rgba(46,123,181,0.12)` }}>
+                                        <CheckCircle className="w-6 h-6" style={{ color: BLUE }} />
                                     </div>
-                                    <p className="font-bold text-gray-900 text-lg"
-                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
-                                        Message envoyé !
-                                    </p>
-                                    <p className="text-gray-500 text-sm text-center"
-                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                    <p style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, color: '#E8E4DC', fontSize: '1.05rem' }}>Message envoyé !</p>
+                                    <p style={{ fontFamily: "'DM Sans', sans-serif", color: 'rgba(232,228,220,0.45)', fontSize: '0.85rem', textAlign: 'center' }}>
                                         Notre équipe vous répondra sous 24h.
                                     </p>
                                 </motion.div>
                             ) : (
-                                <form onSubmit={handleSubmit} className="space-y-4">
+                                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <Field label="Nom complet"    id="fullName" required />
-                                        <Field label="Téléphone"      id="phone"    type="tel" />
+                                        <Field label="Nom complet"   id="fullName" required />
+                                        <Field label="Téléphone"     id="phone"    type="tel" />
                                     </div>
-                                    <Field label="Adresse email"  id="email"   type="email" required />
-                                    <Field label="Votre message"  id="message" required isTextArea />
+                                    <Field label="Adresse email" id="email"   type="email" required />
+                                    <Field label="Votre message" id="message" required isTextArea />
 
                                     <motion.button
                                         type="submit"
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-white text-sm transition-all duration-300"
                                         style={{
-                                            background: 'linear-gradient(135deg, #2E7BB5, #1A5A8A)',
-                                            boxShadow:  '0 4px 20px rgba(46,123,181,0.3)',
-                                            fontFamily: "'Outfit', sans-serif",
+                                            width: '100%',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                            padding: '12px',
+                                            borderRadius: '10px',
+                                            fontFamily: "'DM Sans', sans-serif",
+                                            fontSize: '0.76rem',
+                                            fontWeight: 600,
+                                            letterSpacing: '0.06em',
+                                            textTransform: 'uppercase',
+                                            color: '#fff',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            background: `linear-gradient(135deg, ${BLUE}, #1A5A8A)`,
+                                            boxShadow: `0 4px 20px ${BLUE}30`,
                                         }}
                                     >
                                         <Send className="w-4 h-4" />
                                         Envoyer le message
                                     </motion.button>
 
-                                    <p className="text-center text-xs text-gray-400"
-                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                    <p style={{ textAlign: 'center', fontSize: '0.72rem', color: 'rgba(232,228,220,0.28)', fontFamily: "'DM Sans', sans-serif" }}>
                                         Réponse garantie sous 24h ouvrées
                                     </p>
                                 </form>
@@ -186,44 +210,50 @@ const AltimmoContact = () => {
                         </div>
                     </motion.div>
 
-                    {/* ── Infos contact ───────────────────── */}
+                    {/* ── Infos contact ── */}
                     <motion.div
                         initial={{ opacity: 0, x: 24 }}
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true }}
                         transition={{ duration: 0.6, delay: 0.1 }}
-                        className="space-y-4"
+                        style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
                     >
-                        {/* Cards contact */}
                         {CONTACT_INFO.map(({ icon: Icon, title, lines, href, color }, i) => (
                             <motion.div
                                 key={i}
                                 initial={{ opacity: 0, y: 16 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
-                                transition={{ duration: 0.5, delay: i * 0.1 }}
-                                className="group flex items-start gap-4 p-5 rounded-2xl border border-gray-100 bg-white hover:shadow-md transition-all duration-300"
-                                style={{ borderColor: 'rgba(0,0,0,0.06)' }}
+                                transition={{ duration: 0.5, delay: i * 0.08 }}
+                                className="group"
+                                style={{
+                                    display: 'flex', alignItems: 'flex-start', gap: '14px',
+                                    padding: '18px',
+                                    borderRadius: '12px',
+                                    border: '1px solid rgba(232,228,220,0.07)',
+                                    background: 'rgba(17,20,24,0.6)',
+                                    transition: 'border-color 0.3s',
+                                }}
                             >
-                                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
-                                    style={{ backgroundColor: `${color}12`, border: `1px solid ${color}20` }}>
-                                    <Icon className="w-5 h-5" style={{ color }} />
+                                <div style={{
+                                    width: '38px', height: '38px', borderRadius: '10px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                    backgroundColor: `${color}12`,
+                                    border: `1px solid ${color}22`,
+                                }}>
+                                    <Icon className="w-4 h-4" style={{ color }} />
                                 </div>
-                                <div className="min-w-0">
-                                    <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1"
-                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                <div style={{ minWidth: 0 }}>
+                                    <p style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(232,228,220,0.32)', fontFamily: "'DM Sans', sans-serif", marginBottom: '4px' }}>
                                         {title}
                                     </p>
                                     {lines.map((line, j) =>
                                         href && j === 0 ? (
-                                            <a key={j} href={href}
-                                                className="block text-sm font-semibold transition-colors duration-200"
-                                                style={{ color, fontFamily: "'Outfit', sans-serif" }}>
+                                            <a key={j} href={href} style={{ display: 'block', fontSize: '0.9rem', fontWeight: 600, color, fontFamily: "'DM Sans', sans-serif", textDecoration: 'none' }}>
                                                 {line}
                                             </a>
                                         ) : (
-                                            <p key={j} className="text-sm text-gray-600"
-                                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            <p key={j} style={{ fontSize: '0.85rem', color: 'rgba(232,228,220,0.45)', fontFamily: "'DM Sans', sans-serif" }}>
                                                 {line}
                                             </p>
                                         )
@@ -237,35 +267,29 @@ const AltimmoContact = () => {
                             initial={{ opacity: 0, y: 16 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
-                            transition={{ duration: 0.5, delay: 0.35 }}
-                            className="p-5 rounded-2xl border"
+                            transition={{ duration: 0.5, delay: 0.3 }}
                             style={{
-                                backgroundColor: 'rgba(46,123,181,0.04)',
-                                borderColor:     'rgba(46,123,181,0.12)',
+                                padding: '18px',
+                                borderRadius: '12px',
+                                border: `1px solid rgba(46,123,181,0.14)`,
+                                background: 'rgba(46,123,181,0.04)',
                             }}
                         >
-                            <div className="flex items-center gap-2.5 mb-4">
-                                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                                    style={{ backgroundColor: 'rgba(46,123,181,0.12)' }}>
-                                    <Clock className="w-4 h-4" style={{ color: '#2E7BB5' }} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                                <div style={{ width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(46,123,181,0.12)' }}>
+                                    <Clock className="w-4 h-4" style={{ color: BLUE }} />
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-sm"
-                                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                <h4 style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.85rem', fontWeight: 600, color: '#E8E4DC' }}>
                                     Horaires d'ouverture
                                 </h4>
                             </div>
-                            <div className="space-y-2">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 {HORAIRES.map(({ day, time, closed }, i) => (
-                                    <div key={i} className="flex items-center justify-between text-sm">
-                                        <span className="text-gray-600 font-medium"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span style={{ fontSize: '0.83rem', color: 'rgba(232,228,220,0.5)', fontFamily: "'DM Sans', sans-serif" }}>
                                             {day}
                                         </span>
-                                        <span className="font-semibold"
-                                            style={{
-                                                color:      closed ? '#D42B2B' : '#2E7BB5',
-                                                fontFamily: "'Outfit', sans-serif",
-                                            }}>
+                                        <span style={{ fontSize: '0.83rem', fontWeight: 600, color: closed ? '#D42B2B' : BLUE, fontFamily: "'DM Sans', sans-serif" }}>
                                             {time}
                                         </span>
                                     </div>

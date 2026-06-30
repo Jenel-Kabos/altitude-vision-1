@@ -44,9 +44,9 @@ const NotFoundPage = () => {
   };
 
   const poles = [
-    { to: "/altimmo",     label: "Altimmo",     sub: "Immobilier",    icon: Building2, color: "#2E7BB5", bg: "rgba(46,123,181,0.08)",  border: "rgba(46,123,181,0.18)" },
-    { to: "/mila-events", label: "Mila Events", sub: "Événementiel",  icon: Calendar,  color: "#D42B2B", bg: "rgba(212,43,43,0.08)",   border: "rgba(212,43,43,0.18)"  },
-    { to: "/altcom",      label: "Altcom",      sub: "Communication", icon: Briefcase, color: "#C8872A", bg: "rgba(200,135,42,0.08)",  border: "rgba(200,135,42,0.18)" },
+    { to: "/immobilier",     label: "Altimmo",     sub: "Immobilier",    icon: Building2, color: "#2E7BB5", bg: "rgba(46,123,181,0.08)",  border: "rgba(46,123,181,0.18)" },
+    { to: "/evenementiel", label: "Mila Events", sub: "Événementiel",  icon: Calendar,  color: "#D42B2B", bg: "rgba(212,43,43,0.08)",   border: "rgba(212,43,43,0.18)"  },
+    { to: "/altcom",      label: "Altcom",      sub: "Communication", icon: Briefcase, color: "#C8960C", bg: "rgba(200,135,42,0.08)",  border: "rgba(200,135,42,0.18)" },
   ];
 
   return (
@@ -57,7 +57,7 @@ const NotFoundPage = () => {
         alignItems: "center",
         justifyContent: "center",
         minHeight: "100vh",
-        background: "#0A0C0F",
+        background: "#F8F8F8",
         textAlign: "center",
         padding: "clamp(40px, 8vw, 80px) clamp(16px, 5vw, 40px)",
         fontFamily: "'DM Sans', sans-serif",
@@ -79,7 +79,7 @@ const NotFoundPage = () => {
             fontFamily: "'Cormorant Garamond', serif",
             fontSize: "clamp(5rem, 18vw, 10rem)",
             fontWeight: 300,
-            color: "#C8872A",
+            color: "#C8960C",
             lineHeight: 1,
             letterSpacing: "-0.04em",
             marginBottom: "8px",
@@ -98,7 +98,7 @@ const NotFoundPage = () => {
             fontFamily: "'Cormorant Garamond', serif",
             fontSize: "clamp(1.4rem, 4vw, 2.2rem)",
             fontWeight: 300,
-            color: "#E8E4DC",
+            color: "#111827",
             marginBottom: "clamp(10px, 2vw, 16px)",
           }}
           initial="hidden"
@@ -113,7 +113,7 @@ const NotFoundPage = () => {
         <motion.p
           style={{
             fontSize: "clamp(0.875rem, 2vw, 1rem)",
-            color: "rgba(232,228,220,0.42)",
+            color: "#6B7280",
             fontWeight: 300,
             maxWidth: "440px",
             lineHeight: 1.7,
@@ -141,7 +141,7 @@ const NotFoundPage = () => {
               alignItems: "center",
               gap: "8px",
               padding: "clamp(11px, 2vw, 14px) clamp(22px, 4vw, 30px)",
-              background: "#C8872A",
+              background: "#C8960C",
               color: "#0A0C0F",
               fontWeight: 600,
               fontSize: "clamp(0.72rem, 1.6vw, 0.82rem)",
@@ -207,8 +207,8 @@ const NotFoundPage = () => {
                 <Icon size={16} style={{ color }} aria-hidden="true" />
               </div>
               <div>
-                <p style={{ color: "#E8E4DC", fontWeight: 500, fontSize: "0.85rem", marginBottom: "2px" }}>{label}</p>
-                <p style={{ color: "rgba(232,228,220,0.35)", fontSize: "0.68rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>{sub}</p>
+                <p style={{ color: "#111827", fontWeight: 500, fontSize: "0.85rem", marginBottom: "2px" }}>{label}</p>
+                <p style={{ color: "#9CA3AF", fontSize: "0.68rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>{sub}</p>
               </div>
             </Link>
           ))}

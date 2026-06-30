@@ -7,6 +7,9 @@ export default function Chip({ label, active = false, onPress, small = false }) 
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
       style={[
         styles.chip,
         small && styles.chipSmall,

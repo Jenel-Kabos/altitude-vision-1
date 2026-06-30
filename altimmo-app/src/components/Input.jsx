@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
-import { colors, radius, fonts, fontSize, spacing } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { radius, fonts, fontSize, spacing } from '../theme';
 
 export default function Input({
   label,
@@ -9,17 +10,21 @@ export default function Input({
   style,
   ...props
 }) {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+
   return (
     <View style={style}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
       <TextInput
+        accessibilityLabel={label || props.placeholder}
         {...props}
         multiline={multiline}
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={c.textMuted}
         style={[
           styles.input,
           multiline && styles.multiline,
-          { borderColor: error ? colors.error : colors.border },
+          { borderColor: error ? c.error : c.border },
         ]}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -27,22 +32,22 @@ export default function Input({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   label: {
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.sm,
-    color: colors.textSub,
+    color: c.textSub,
     marginBottom: spacing.xs,
   },
   input: {
-    backgroundColor: colors.bgCardAlt,
+    backgroundColor: c.bgCardAlt,
     borderRadius: radius.xs,
     borderWidth: 1.5,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
     fontFamily: fonts.body,
     fontSize: fontSize.md,
-    color: colors.text,
+    color: c.text,
   },
   multiline: {
     minHeight: 80,
@@ -51,7 +56,7 @@ const styles = StyleSheet.create({
   error: {
     fontFamily: fonts.body,
     fontSize: fontSize.xs,
-    color: colors.error,
+    color: c.error,
     marginTop: spacing.xs,
   },
 });

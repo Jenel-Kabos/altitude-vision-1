@@ -12,6 +12,7 @@ import {
   TrendingUp, CheckCircle, Clock, Menu, Star, Briefcase,
   Activity, Home, Zap, Eye,
 } from "lucide-react";
+import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
 import { getDashboardStats } from "../../services/dashboardService";
 import { getAllQuotes } from "../../services/quoteService";
@@ -21,10 +22,10 @@ import { getAllUsers } from "../../services/userService";
 import { getRecentActionLogs } from "../../services/actionLogService";
 
 const BLUE  = '#2E7BB5';
-const GOLD  = '#C8872A';
+const GOLD  = '#C8960C';
 const RED   = '#D42B2B';
 const GREEN = '#16A34A';
-const FONT  = "'Outfit', sans-serif";
+const FONT  = "'DM Sans', sans-serif";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ const DashboardHome = () => {
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
   const [activeTab, setActiveTab]   = useState('overview');
-  const [mobileMenuOpen, setMobileMenu] = useState(true);
+  const [mobileMenuOpen, setMobileMenu] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -116,7 +117,7 @@ const DashboardHome = () => {
       }
     };
     load();
-  }, [authLoading, router]);
+  }, [authLoading, user, router]);
 
   const menuItems = [
     { id:'overview', label:"Vue d'ensemble",    Icon:LayoutDashboard, count:stats.Altimmo+milaCount+stats.Altcom+quotesStats.total, color: BLUE  },
@@ -398,10 +399,10 @@ const DashboardHome = () => {
                         </div>
                       )}
                       <div className="px-5 py-3">
-                        <a href="/dashboard/gestion-locative"
+                        <Link href="/dashboard/gestion-locative"
                           className="text-xs font-semibold hover:underline" style={{ color:BLUE, fontFamily:FONT }}>
                           Voir les détails →
-                        </a>
+                        </Link>
                       </div>
                     </div>
                   </div>
@@ -434,10 +435,10 @@ const DashboardHome = () => {
                         </span>
                       </div>
                       <div className="px-5 py-3">
-                        <a href="/dashboard/users"
+                        <Link href="/dashboard/users"
                           className="text-xs font-semibold hover:underline" style={{ color:BLUE, fontFamily:FONT }}>
                           Gérer l'équipe →
-                        </a>
+                        </Link>
                       </div>
                     </div>
                   </div>
@@ -452,15 +453,15 @@ const DashboardHome = () => {
                       <Activity size={15} style={{ color:BLUE }} />
                       <h3 className="font-bold text-gray-900 text-sm flex-1" style={{ fontFamily:FONT }}>Activité récente</h3>
                       {user?.role === 'Admin' && recentLogs.length > 0 && (
-                        <a href="/dashboard/historique" className="text-xs font-semibold hover:underline" style={{ color:BLUE, fontFamily:FONT }}>
+                        <Link href="/dashboard/historique" className="text-xs font-semibold hover:underline" style={{ color:BLUE, fontFamily:FONT }}>
                           Voir tout →
-                        </a>
+                        </Link>
                       )}
                     </div>
                     <div className="divide-y divide-gray-50">
                       {user?.role === 'Admin' && recentLogs.length > 0 ? (
                         recentLogs.map((log, i) => {
-                          const TYPE_COLORS_MAP = { CRÉATION:'#16A34A', MODIFICATION:'#2E7BB5', SUPPRESSION:'#D42B2B', VALIDATION:'#059669', REJET:'#DC2626', PAIEMENT:'#C8872A', 'GÉNÉRATION_PDF':'#7C3AED', ENVOI_EMAIL:'#EA580C', 'CHANGEMENT_RÔLE':'#D97706' };
+                          const TYPE_COLORS_MAP = { CRÉATION:'#16A34A', MODIFICATION:'#2E7BB5', SUPPRESSION:'#D42B2B', VALIDATION:'#059669', REJET:'#DC2626', PAIEMENT:'#C8960C', 'GÉNÉRATION_PDF':'#7C3AED', ENVOI_EMAIL:'#EA580C', 'CHANGEMENT_RÔLE':'#D97706' };
                           const TYPE_ICONS_MAP  = { CRÉATION:'➕', MODIFICATION:'✏️', SUPPRESSION:'🗑️', VALIDATION:'✅', REJET:'❌', PAIEMENT:'💰', 'GÉNÉRATION_PDF':'📄', ENVOI_EMAIL:'📧', 'CHANGEMENT_RÔLE':'🎭', CONNEXION:'🔓', DÉCONNEXION:'🔒' };
                           const c = TYPE_COLORS_MAP[log.typeAction] || '#94A3B8';
                           return (
@@ -630,16 +631,15 @@ const DashboardHome = () => {
                       </BarChart>
                     </ResponsiveContainer>
                   </ChartCard>
-                  <ChartCard title="Évolution">
+                  <ChartCard title="Détail par statut">
                     <ResponsiveContainer width="100%" height={240}>
-                      <LineChart data={getChartData()}>
+                      <BarChart data={getChartData()}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
                         <XAxis dataKey="name" axisLine={false} tickLine={false} dy={8} tick={{ fill:'#94A3B8', fontSize:12 }} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fill:'#94A3B8', fontSize:12 }} />
-                        <Tooltip contentStyle={{ borderRadius:'12px',border:'none',boxShadow:'0 4px 24px rgba(0,0,0,0.08)'}} />
-                        <Line type="monotone" dataKey="Annonces" stroke={GOLD} strokeWidth={3}
-                          dot={{ r:5, fill:GOLD, strokeWidth:2, stroke:'white' }} />
-                      </LineChart>
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill:'#94A3B8', fontSize:12 }} allowDecimals={false} />
+                        <Tooltip cursor={{ fill:'#F8FAFC' }} contentStyle={{ borderRadius:'12px',border:'none',boxShadow:'0 4px 24px rgba(0,0,0,0.08)'}} />
+                        <Bar dataKey="Annonces" fill={GOLD} radius={[6,6,0,0]} barSize={44} />
+                      </BarChart>
                     </ResponsiveContainer>
                   </ChartCard>
                 </div>

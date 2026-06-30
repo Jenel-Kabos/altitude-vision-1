@@ -12,7 +12,7 @@ import {
 } from "../../services/conversationService";
 import { useAuth } from "../../context/AuthContext";
 
-const GOLD = "#C8872A";
+const GOLD = "#C8960C";
 
 const formatTime = (d) => {
   if (!d) return "";
@@ -113,7 +113,7 @@ const StaffInboxPage = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col" style={{ fontFamily: "'Outfit', sans-serif" }}>
+    <div className="h-[calc(100vh-4rem)] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* Notification */}
       {notif && (

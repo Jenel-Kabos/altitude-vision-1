@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 const BLUE = '#2E7BB5';
-const GOLD = '#C8872A';
+const GOLD = '#C8960C';
 const RED  = '#D42B2B';
 const WHATSAPP_NUMBER = '242068002151'; // sans +
 
@@ -229,7 +229,7 @@ const ChatWidget = ({ currentPageTitle = '' }) => {
           : <MessageCircle size={24} color="white" />}
         {!open && unread > 0 && (
           <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold"
-            style={{ background: RED, fontFamily:"'Outfit', sans-serif" }}>
+            style={{ background: RED, fontFamily:"'DM Sans', sans-serif" }}>
             {unread}
           </span>
         )}
@@ -263,16 +263,16 @@ const ChatWidget = ({ currentPageTitle = '' }) => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-bold"
-                  style={{ fontFamily:"'Outfit', sans-serif" }}>Assistant Altitude-Vision</p>
+                  style={{ fontFamily:"'DM Sans', sans-serif" }}>Assistant Altitude-Vision</p>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-green-400" />
-                  <p className="text-xs text-gray-400" style={{ fontFamily:"'Outfit', sans-serif" }}>En ligne</p>
+                  <p className="text-xs text-gray-400" style={{ fontFamily:"'DM Sans', sans-serif" }}>En ligne</p>
                 </div>
               </div>
               {(view === 'category' || view === 'chat') && (
                 <button onClick={handleBack}
                   className="text-xs text-gray-400 hover:text-white px-3 py-1 rounded-lg transition"
-                  style={{ background:'rgba(255,255,255,0.05)', fontFamily:"'Outfit', sans-serif" }}>
+                  style={{ background:'rgba(255,255,255,0.05)', fontFamily:"'DM Sans', sans-serif" }}>
                   ← Retour
                 </button>
               )}
@@ -293,7 +293,7 @@ const ChatWidget = ({ currentPageTitle = '' }) => {
                     <div className="rounded-2xl rounded-tl-none px-4 py-3 max-w-[85%]"
                       style={{ background:'#161B22', border:'1px solid rgba(255,255,255,0.06)' }}>
                       <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line"
-                        style={{ fontFamily:"'Outfit', sans-serif" }}>
+                        style={{ fontFamily:"'DM Sans', sans-serif" }}>
                         {WELCOME.text}
                       </p>
                     </div>
@@ -301,7 +301,7 @@ const ChatWidget = ({ currentPageTitle = '' }) => {
 
                   {/* Catégories */}
                   <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 px-1 pt-1"
-                    style={{ fontFamily:"'Outfit', sans-serif" }}>
+                    style={{ fontFamily:"'DM Sans', sans-serif" }}>
                     Choisissez un sujet
                   </p>
                   {FAQ.map((cat) => (
@@ -313,7 +313,7 @@ const ChatWidget = ({ currentPageTitle = '' }) => {
                         <cat.icon size={15} style={{ color: cat.color }} />
                       </div>
                       <span className="flex-1 text-sm font-medium text-gray-200"
-                        style={{ fontFamily:"'Outfit', sans-serif" }}>{cat.category}</span>
+                        style={{ fontFamily:"'DM Sans', sans-serif" }}>{cat.category}</span>
                       <ChevronRight size={14} className="text-gray-500" />
                     </button>
                   ))}
@@ -321,7 +321,7 @@ const ChatWidget = ({ currentPageTitle = '' }) => {
                   {/* WhatsApp CTA */}
                   <button onClick={handleWhatsApp}
                     className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl text-white text-sm font-semibold mt-2 transition hover:opacity-90"
-                    style={{ background:'linear-gradient(135deg, #1DAA61, #128C7E)', fontFamily:"'Outfit', sans-serif" }}>
+                    style={{ background:'linear-gradient(135deg, #1DAA61, #128C7E)', fontFamily:"'DM Sans', sans-serif" }}>
                     <Phone size={15} />
                     Parler à un conseiller
                   </button>
@@ -332,7 +332,7 @@ const ChatWidget = ({ currentPageTitle = '' }) => {
               {view === 'category' && activeCategory && (
                 <>
                   <p className="text-xs font-semibold uppercase tracking-widest px-1"
-                    style={{ color: activeCategory.color, fontFamily:"'Outfit', sans-serif" }}>
+                    style={{ color: activeCategory.color, fontFamily:"'DM Sans', sans-serif" }}>
                     {activeCategory.category}
                   </p>
                   {activeCategory.questions.map(({ q, a }) => (
@@ -340,7 +340,7 @@ const ChatWidget = ({ currentPageTitle = '' }) => {
                       className="w-full text-left p-3.5 rounded-2xl transition-all hover:scale-[1.01]"
                       style={{ background:'#161B22', border:'1px solid rgba(255,255,255,0.06)' }}>
                       <p className="text-gray-200 text-sm leading-snug"
-                        style={{ fontFamily:"'Outfit', sans-serif" }}>{q}</p>
+                        style={{ fontFamily:"'DM Sans', sans-serif" }}>{q}</p>
                     </button>
                   ))}
                 </>
@@ -363,9 +363,9 @@ const ChatWidget = ({ currentPageTitle = '' }) => {
                           ? { background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, borderBottomRightRadius:'4px' }
                           : { background:'#161B22', border:'1px solid rgba(255,255,255,0.06)', borderTopLeftRadius:'4px' }}>
                         <p className="text-sm text-white leading-relaxed whitespace-pre-line"
-                          style={{ fontFamily:"'Outfit', sans-serif" }}>{msg.text}</p>
+                          style={{ fontFamily:"'DM Sans', sans-serif" }}>{msg.text}</p>
                         <p className="text-xs mt-1.5 opacity-50 text-right"
-                          style={{ fontFamily:"'Outfit', sans-serif" }}>{msg.time}</p>
+                          style={{ fontFamily:"'DM Sans', sans-serif" }}>{msg.time}</p>
                       </div>
                     </div>
                   ))}
@@ -390,7 +390,7 @@ const ChatWidget = ({ currentPageTitle = '' }) => {
                     background: '#0D1117',
                     border: `1px solid ${inputFocused ? BLUE : 'rgba(255,255,255,0.08)'}`,
                     boxShadow: inputFocused ? `0 0 0 3px ${BLUE}25` : 'none',
-                    fontFamily:"'Outfit', sans-serif",
+                    fontFamily:"'DM Sans', sans-serif",
                     transition: 'all 0.2s',
                   }} />
                 <button onClick={handleSend}
@@ -401,7 +401,7 @@ const ChatWidget = ({ currentPageTitle = '' }) => {
                 </button>
               </div>
               <p className="text-center text-xs text-gray-600 mt-2"
-                style={{ fontFamily:"'Outfit', sans-serif" }}>
+                style={{ fontFamily:"'DM Sans', sans-serif" }}>
                 Altitude-Vision © {new Date().getFullYear()}
               </p>
             </div>
@@ -422,9 +422,9 @@ import { usePathname } from 'next/navigation';
 
 // Dans le composant App, récupérer le titre selon la route:
 const pathname = usePathname();
-const pageTitle = pathname?.startsWith('/altimmo') ? 'Altimmo'
-  : pathname?.startsWith('/mila-events') ? 'Mila Events'
-  : pathname?.startsWith('/altcom') ? 'Altcom'
+const pageTitle = pathname?.startsWith('/immobilier') ? 'Altimmo'
+  : pathname?.startsWith('/evenementiel') ? 'Mila Events'
+  : pathname?.startsWith('/communication') ? 'Altcom'
   : '';
 
 // Ajouter après <Footer /> ou dans le layout principal:

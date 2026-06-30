@@ -664,16 +664,17 @@ const AltcomPage = () => {
         whileInView="visible"
         viewport={{ once: true, amount: 0.4 }}
         variants={sectionFadeIn}
-        className="bg-gradient-to-r from-purple-700 to-blue-700 py-20 text-white shadow-xl"
+        className="bg-gray-50 py-20 shadow-sm border-t border-gray-100"
       >
         <div className="container mx-auto px-6 text-center">
-          <h2 className="text-4xl lg:text-5xl font-extrabold mb-6 drop-shadow-lg">Prêt à propulser votre marque ?</h2>
-          <p className="text-xl lg:text-2xl font-light mb-10 max-w-3xl mx-auto">Discutons de votre stratégie de communication pour atteindre de nouveaux sommets.</p>
-          <motion.button 
-            whileHover={{ scale: 1.08, boxShadow: "0 10px 30px rgba(255, 255, 255, 0.4)" }}
+          <h2 className="text-4xl lg:text-5xl font-extrabold mb-6 text-gray-900">Prêt à propulser votre marque ?</h2>
+          <p className="text-xl lg:text-2xl font-light mb-10 max-w-3xl mx-auto text-gray-600">Discutons de votre stratégie de communication pour atteindre de nouveaux sommets.</p>
+          <motion.button
+            whileHover={{ scale: 1.08, boxShadow: "0 10px 30px rgba(200,150,12,0.3)" }}
             whileTap={{ scale: 0.92 }}
             onClick={() => handleQuoteRequest('Projet Sur Mesure')}
-            className="px-10 py-5 bg-white text-blue-700 font-bold text-xl rounded-full shadow-2xl hover:bg-gray-100 transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-white"
+            className="px-10 py-5 font-bold text-xl rounded-full shadow-lg transition-colors duration-300 focus:outline-none focus:ring-4"
+            style={{ background: '#C8960C', color: '#0A0C0F', focusRingColor: '#C8960C' }}
           >
             Contactez l'Équipe Altcom
           </motion.button>
@@ -681,15 +682,15 @@ const AltcomPage = () => {
       </motion.section>
 
       {/* --- Footer --- */}
-      <footer className="bg-gray-900 text-white py-12">
+      <footer className="bg-white border-t border-gray-100 py-12">
         <div className="container mx-auto px-6 text-center">
-          <p className="text-3xl font-extrabold text-red-400 mb-3">Altcom</p>
-          <p className="text-md text-gray-400">&copy; {new Date().getFullYear()} Tous droits réservés. | Communication d'Altitude.</p>
+          <p className="text-3xl font-extrabold text-gray-800 mb-3">Altcom</p>
+          <p className="text-md text-gray-500">&copy; {new Date().getFullYear()} Tous droits réservés. | Communication d'Altitude.</p>
           <div className="mt-6 flex justify-center space-x-8 text-lg">
-            <a href="#" className="text-gray-400 hover:text-white transition duration-200">Services</a>
-            <a href="#" className="text-gray-400 hover:text-white transition duration-200">Portfolio</a>
-            <a href="#" className="text-gray-400 hover:text-white transition duration-200">Contact</a>
-            <a href="#" className="text-gray-400 hover:text-white transition duration-200">Mentions Légales</a>
+            <a href="#" className="text-gray-500 hover:text-gray-900 transition duration-200">Services</a>
+            <a href="#" className="text-gray-500 hover:text-gray-900 transition duration-200">Portfolio</a>
+            <a href="#" className="text-gray-500 hover:text-gray-900 transition duration-200">Contact</a>
+            <a href="#" className="text-gray-500 hover:text-gray-900 transition duration-200">Mentions Légales</a>
           </div>
         </div>
       </footer>

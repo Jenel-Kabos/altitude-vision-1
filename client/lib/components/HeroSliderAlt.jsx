@@ -17,7 +17,7 @@ const slides = [
         headline: 'Chaque famille mérite\nsa maison de rêve.',
         body:    'De la recherche à la remise des clés, nous vous accompagnons à chaque étape.',
         quote:   '"Grâce à Altimmo, nous avons trouvé notre chez-nous en 3 semaines."',
-        cta:     { label: 'Nos annonces', to: '/altimmo/annonces' },
+        cta:     { label: 'Nos annonces', to: '/immobilier/annonces' },
         stat:    { value: '200+', label: 'familles accompagnées' },
         accent:  '#2E7BB5', accentLight: '#7BB8E0',
         grad1: 'linear-gradient(108deg, rgba(5,12,22,0.93) 0%, rgba(5,10,18,0.60) 50%, rgba(5,10,18,0.08) 100%)',
@@ -33,7 +33,7 @@ const slides = [
         headline: 'Investir à Brazzaville\nen toute sérénité.',
         body:    "Notre équipe analyse le marché local pour vous offrir les meilleures opportunités.",
         quote:   '"Un partenaire qui connaît vraiment le marché congolais."',
-        cta:     { label: 'Conseil gratuit', to: '/altimmo' },
+        cta:     { label: 'Conseil gratuit', to: '/immobilier' },
         stat:    { value: '98%', label: 'clients satisfaits' },
         accent:  '#1A5A8A', accentLight: '#5A9AC0',
         grad1: 'linear-gradient(108deg, rgba(3,10,20,0.94) 0%, rgba(3,8,16,0.62) 50%, rgba(3,8,16,0.08) 100%)',
@@ -49,9 +49,9 @@ const slides = [
         headline: "L'élégance,\nà votre portée.",
         body:    "Villas d'exception et appartements exclusifs, sélectionnés pour une clientèle exigeante.",
         quote:   '"Une sélection impeccable, un service d\'une rare qualité."',
-        cta:     { label: "Voir l'exclusif", to: '/altimmo/annonces' },
+        cta:     { label: "Voir l'exclusif", to: '/immobilier/annonces' },
         stat:    { value: '5 ans', label: "d'expertise locale" },
-        accent:  '#C8872A', accentLight: '#E8B86D',
+        accent:  '#C8960C', accentLight: '#E8B86D',
         grad1: 'linear-gradient(108deg, rgba(18,10,2,0.93) 0%, rgba(12,6,0,0.60) 50%, rgba(12,6,0,0.08) 100%)',
         grad2: 'linear-gradient(to top, rgba(12,6,0,0.90) 0%, rgba(12,6,0,0.30) 40%, transparent 65%)',
     },
@@ -117,7 +117,7 @@ const SLIDER_CSS = `
     animation: altPulse 2.2s ease-in-out infinite;
   }
   .ash-eyebrow-text {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.58rem, 0.9vw, 0.85rem); font-weight: 600;
     letter-spacing: 0.22em; text-transform: uppercase;
   }
@@ -140,7 +140,7 @@ const SLIDER_CSS = `
 
   /* ══ CORPS — 2 lignes max mobile ══ */
   .ash-body {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.80rem, 1.5vw, 1.3rem);
     font-weight: 300; line-height: 1.65;
     color: rgba(245,242,238,0.78);
@@ -177,7 +177,7 @@ const SLIDER_CSS = `
     display: inline-flex; align-items: center; gap: 6px;
     padding: 10px 20px;
     border-radius: 5px;
-    color: #fff; font-family: 'Outfit', sans-serif;
+    color: #fff; font-family: 'DM Sans', sans-serif;
     font-size: 0.72rem; font-weight: 600;
     letter-spacing: 0.10em; text-transform: uppercase;
     text-decoration: none;
@@ -198,7 +198,7 @@ const SLIDER_CSS = `
     font-weight: 600; line-height: 1; margin-bottom: 1px;
   }
   .ash-stat-label {
-    font-family: 'Outfit', sans-serif; font-size: 0.52rem;
+    font-family: 'DM Sans', sans-serif; font-size: 0.52rem;
     font-weight: 400; letter-spacing: 0.10em;
     color: rgba(245,242,238,0.55); text-transform: uppercase; white-space: nowrap;
   }
@@ -249,7 +249,7 @@ const SLIDER_CSS = `
   }
   .ash-dot-inner { display: block; height: 3px; border-radius: 2px; transition: all 0.4s ease; }
   .ash-counter {
-    font-family: 'Outfit', sans-serif; font-size: 0.48rem;
+    font-family: 'DM Sans', sans-serif; font-size: 0.48rem;
     letter-spacing: 0.12em; color: rgba(245,242,238,0.20);
     user-select: none; writing-mode: vertical-rl;
   }

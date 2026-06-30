@@ -15,7 +15,7 @@ import ServiceFormModal from '../../components/modals/ServiceFormModal';
 import PortfolioFormModal from '../../components/modals/PortfolioFormModal';
 import Image from 'next/image';
 
-const GOLD  = '#C8872A';
+const GOLD  = '#C8960C';
 const BLUE  = '#2E7BB5';
 const RED   = '#D42B2B';
 const ITEMS_PER_PAGE = 10;
@@ -36,19 +36,19 @@ const ConfirmDialog = ({ message, onConfirm, onCancel }) => (
         style={{ background: '#FEE2E2' }}>
         <AlertCircle size={22} className="text-red-500" />
       </div>
-      <h3 className="font-bold text-gray-900 mb-2" style={{ fontFamily: "'Outfit', sans-serif" }}>
+      <h3 className="font-bold text-gray-900 mb-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         Confirmation
       </h3>
       <p className="text-sm text-gray-500 mb-6">{message}</p>
       <div className="flex gap-3">
         <button onClick={onCancel}
           className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all"
-          style={{ fontFamily: "'Outfit', sans-serif" }}>
+          style={{ fontFamily: "'DM Sans', sans-serif" }}>
           Annuler
         </button>
         <button onClick={onConfirm}
           className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
-          style={{ background: 'linear-gradient(135deg,#B91C1C,#DC2626)', fontFamily: "'Outfit', sans-serif" }}>
+          style={{ background: 'linear-gradient(135deg,#B91C1C,#DC2626)', fontFamily: "'DM Sans', sans-serif" }}>
           Supprimer
         </button>
       </div>
@@ -60,7 +60,7 @@ const ConfirmDialog = ({ message, onConfirm, onCancel }) => (
 const StatCard = ({ title, value, icon: Icon, accent }) => (
   <div className="bg-white p-6 rounded-xl shadow-md">
     <div className="flex items-center justify-between mb-2">
-      <span className="text-gray-600 text-sm font-medium" style={{ fontFamily: "'Outfit', sans-serif" }}>
+      <span className="text-gray-600 text-sm font-medium" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         {title}
       </span>
       <div className="w-8 h-8 rounded-xl flex items-center justify-center"
@@ -68,7 +68,7 @@ const StatCard = ({ title, value, icon: Icon, accent }) => (
         <Icon size={16} style={{ color: accent }} />
       </div>
     </div>
-    <p className="text-3xl font-bold text-gray-800" style={{ fontFamily: "'Outfit', sans-serif" }}>
+    <p className="text-3xl font-bold text-gray-800" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {value}
     </p>
   </div>
@@ -82,7 +82,7 @@ const TabButton = ({ active, onClick, icon, label, accent }) => (
       background: active ? `linear-gradient(135deg, ${accent}CC, ${accent})` : 'transparent',
       color: active ? '#fff' : '#374151',
       boxShadow: active ? `0 4px 16px ${accent}40` : 'none',
-      fontFamily: "'Outfit', sans-serif",
+      fontFamily: "'DM Sans', sans-serif",
     }}>
     {icon}
     {label}
@@ -221,7 +221,7 @@ const ProjectsTable = ({ data, onView, onStatusChange, onDelete }) => (
                 <select value={project.status}
                   onChange={(e) => onStatusChange(project._id, e.target.value)}
                   className="px-3 py-1 rounded-full text-white text-xs font-semibold border-0 outline-none cursor-pointer"
-                  style={{ background: sc.bg, fontFamily: "'Outfit', sans-serif" }}>
+                  style={{ background: sc.bg, fontFamily: "'DM Sans', sans-serif" }}>
                   {Object.keys(STATUS_CONFIG).map(s => (
                     <option key={s} value={s} style={{ background: '#fff', color: '#374151' }}>{s}</option>
                   ))}
@@ -264,7 +264,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => (
           background: page === currentPage ? `linear-gradient(135deg,#A06820,${GOLD})` : '#fff',
           color: page === currentPage ? '#fff' : '#374151',
           boxShadow: page === currentPage ? `0 2px 8px ${GOLD}40` : 'none',
-          fontFamily: "'Outfit', sans-serif",
+          fontFamily: "'DM Sans', sans-serif",
         }}>
         {page}
       </button>
@@ -548,7 +548,7 @@ const ManageAltcomPage = () => {
           <motion.div initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
             className="fixed top-4 right-4 z-50 px-6 py-4 rounded-xl shadow-lg text-white"
-            style={{ background: notification.type === 'success' ? '#16A34A' : '#DC2626', fontFamily: "'Outfit', sans-serif" }}>
+            style={{ background: notification.type === 'success' ? '#16A34A' : '#DC2626', fontFamily: "'DM Sans', sans-serif" }}>
             {notification.message}
           </motion.div>
         )}
@@ -564,7 +564,7 @@ const ManageAltcomPage = () => {
           <h1 className="text-3xl font-bold text-gray-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
             Gestion Altcom
           </h1>
-          <p className="text-sm text-gray-500" style={{ fontFamily: "'Outfit', sans-serif" }}>
+          <p className="text-sm text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Gérez vos services, portfolio et projets de communication
           </p>
         </div>
@@ -593,14 +593,14 @@ const ManageAltcomPage = () => {
             <input type="text" placeholder="Rechercher…" value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)} aria-label="Rechercher un projet Altcom"
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none transition-all"
-              style={{ fontFamily: "'Outfit', sans-serif" }}
+              style={{ fontFamily: "'DM Sans', sans-serif" }}
               onFocus={e => { e.target.style.borderColor = GOLD; e.target.style.boxShadow = `0 0 0 3px ${GOLD}20`; }}
               onBlur={e  => { e.target.style.borderColor = '#E2E8F0'; e.target.style.boxShadow = 'none'; }} />
           </div>
           {activeTab !== 'projects' && (
             <button onClick={() => openModal('create')}
               className="flex items-center gap-2 px-6 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105"
-              style={{ background: `linear-gradient(135deg,#A06820,${GOLD})`, boxShadow: `0 4px 16px ${GOLD}35`, fontFamily: "'Outfit', sans-serif" }}>
+              style={{ background: `linear-gradient(135deg,#A06820,${GOLD})`, boxShadow: `0 4px 16px ${GOLD}35`, fontFamily: "'DM Sans', sans-serif" }}>
               <Plus size={16} /> Ajouter
             </button>
           )}
@@ -610,7 +610,7 @@ const ManageAltcomPage = () => {
       {/* Erreur */}
       {error && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl mb-6 text-sm"
-          style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', fontFamily: "'Outfit', sans-serif" }}>
+          style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', fontFamily: "'DM Sans', sans-serif" }}>
           <AlertCircle size={16} /> {error}
         </div>
       )}
@@ -622,7 +622,7 @@ const ManageAltcomPage = () => {
             style={{ background: `${GOLD}12` }}>
             <Sparkles size={24} style={{ color: GOLD }} />
           </div>
-          <p className="font-semibold text-gray-600 mb-1" style={{ fontFamily: "'Outfit', sans-serif" }}>Aucun élément trouvé</p>
+          <p className="font-semibold text-gray-600 mb-1" style={{ fontFamily: "'DM Sans', sans-serif" }}>Aucun élément trouvé</p>
         </div>
       ) : (
         <>

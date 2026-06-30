@@ -63,6 +63,29 @@ const nextConfig = {
     config.resolve.alias['@'] = path.resolve(__dirname);
     return config;
   },
+  async redirects() {
+    return [
+      // Altimmo → Immobilier
+      { source: '/altimmo',                                  destination: '/immobilier',                                  permanent: true },
+      { source: '/altimmo/annonces',                         destination: '/immobilier/annonces',                         permanent: true },
+      { source: '/altimmo/property/:id',                     destination: '/immobilier/property/:id',                     permanent: true },
+      { source: '/altimmo/services/vente-de-biens',          destination: '/immobilier/services/vente-de-biens',          permanent: true },
+      { source: '/altimmo/services/location-gestion',        destination: '/immobilier/services/location-gestion',        permanent: true },
+      { source: '/altimmo/services/conseil-investissement',  destination: '/immobilier/services/conseil-investissement',  permanent: true },
+      // Mila Events → Événementiel
+      { source: '/mila-events',                              destination: '/evenementiel',                                permanent: true },
+      { source: '/mila-events/annonces',                     destination: '/evenementiel/annonces',                       permanent: true },
+      { source: '/mila-events/event/:id',                    destination: '/evenementiel/event/:id',                      permanent: true },
+      { source: '/mila-events/creer-projet',                 destination: '/evenementiel/creer-projet',                   permanent: true },
+      // Altcom → Communication
+      { source: '/altcom',                                   destination: '/communication',                               permanent: true },
+      { source: '/altcom/annonces',                          destination: '/communication/annonces',                      permanent: true },
+      { source: '/altcom/portfolio/:id',                     destination: '/communication/portfolio/:id',                 permanent: true },
+      { source: '/altcom/service/:id',                       destination: '/communication/service/:id',                   permanent: true },
+      { source: '/altcom/couverture-mediatique',             destination: '/communication/couverture-mediatique',         permanent: true },
+      { source: '/altcom/:serviceSlug',                      destination: '/communication/:serviceSlug',                  permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: '/(.*)', headers: SECURITY_HEADERS }];
   },

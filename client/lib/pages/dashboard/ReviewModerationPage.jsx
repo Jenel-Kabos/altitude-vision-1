@@ -11,7 +11,7 @@ import Image from 'next/image';
 
 const BLUE = '#2E7BB5';
 const RED  = '#D42B2B';
-const GOLD = '#C8872A';
+const GOLD = '#C8960C';
 
 const POLE_META = {
   Altimmo:   { color: BLUE, bg: `${BLUE}15`,  label: 'Altimmo' },
@@ -26,7 +26,7 @@ const Toast = ({ msg, type, onDone }) => {
   return (
     <motion.div initial={{ opacity:0, y:-40 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-40 }}
       className="fixed top-5 right-5 z-[100] px-5 py-3.5 rounded-xl shadow-xl text-white text-sm font-medium"
-      style={{ background: bg, fontFamily:"'Outfit', sans-serif" }}>
+      style={{ background: bg, fontFamily:"'DM Sans', sans-serif" }}>
       {msg}
     </motion.div>
   );
@@ -44,16 +44,16 @@ const ConfirmDialog = ({ message, onConfirm, onCancel, variant = 'red' }) => {
           <AlertCircle size={22} style={{ color: accent }} />
         </div>
         <p className="text-center text-gray-700 text-sm mb-6 leading-relaxed"
-          style={{ fontFamily:"'Outfit', sans-serif" }}>{message}</p>
+          style={{ fontFamily:"'DM Sans', sans-serif" }}>{message}</p>
         <div className="flex gap-3">
           <button onClick={onCancel}
             className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition"
-            style={{ fontFamily:"'Outfit', sans-serif" }}>
+            style={{ fontFamily:"'DM Sans', sans-serif" }}>
             Annuler
           </button>
           <button onClick={onConfirm}
             className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition hover:opacity-90"
-            style={{ background: accent, fontFamily:"'Outfit', sans-serif" }}>
+            style={{ background: accent, fontFamily:"'DM Sans', sans-serif" }}>
             Confirmer
           </button>
         </div>
@@ -80,7 +80,7 @@ const Avatar = ({ user, size = 40 }) => {
         unoptimized className="rounded-full object-cover flex-shrink-0" />
     : <div className="rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold"
         style={{ width:size, height:size, background:`linear-gradient(135deg, ${BLUE}, ${GOLD})`,
-          fontSize: size * 0.38, fontFamily:"'Outfit', sans-serif" }}>
+          fontSize: size * 0.38, fontFamily:"'DM Sans', sans-serif" }}>
         {letter}
       </div>;
 };
@@ -96,7 +96,7 @@ const ReviewCard = ({ review, onClick }) => {
 
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold px-3 py-1 rounded-full"
-          style={{ background: meta.bg, color: meta.color, fontFamily:"'Outfit', sans-serif" }}>
+          style={{ background: meta.bg, color: meta.color, fontFamily:"'DM Sans', sans-serif" }}>
           {meta.label}
         </span>
         <Stars rating={review.rating} />
@@ -106,35 +106,35 @@ const ReviewCard = ({ review, onClick }) => {
         <Avatar user={review.author} size={36} />
         <div className="min-w-0">
           <p className="font-semibold text-gray-800 text-sm truncate"
-            style={{ fontFamily:"'Outfit', sans-serif" }}>
+            style={{ fontFamily:"'DM Sans', sans-serif" }}>
             {review.author?.name || 'Utilisateur'}
           </p>
-          <p className="text-xs text-gray-400" style={{ fontFamily:"'Outfit', sans-serif" }}>
+          <p className="text-xs text-gray-400" style={{ fontFamily:"'DM Sans', sans-serif" }}>
             {new Date(review.createdAt).toLocaleDateString('fr-FR')}
           </p>
         </div>
       </div>
 
       <p className="text-sm text-gray-600 line-clamp-3 italic leading-relaxed"
-        style={{ fontFamily:"'Outfit', sans-serif" }}>
+        style={{ fontFamily:"'DM Sans', sans-serif" }}>
         « {review.comment} »
       </p>
 
       <div className="flex items-center gap-2 pt-2 border-t border-gray-50 mt-auto">
         {review.adminResponse && (
           <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full"
-            style={{ background:'#16A34A18', color:'#16A34A', fontFamily:"'Outfit', sans-serif" }}>
+            style={{ background:'#16A34A18', color:'#16A34A', fontFamily:"'DM Sans', sans-serif" }}>
             <Reply size={10} /> Répondu
           </span>
         )}
         {review.rating === 5 && (
           <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full"
-            style={{ background:'#F59E0B18', color:'#D97706', fontFamily:"'Outfit', sans-serif" }}>
+            style={{ background:'#F59E0B18', color:'#D97706', fontFamily:"'DM Sans', sans-serif" }}>
             <Star size={10} className="fill-current" /> Excellent
           </span>
         )}
         <span className="ml-auto text-xs font-semibold flex items-center gap-1"
-          style={{ color: BLUE, fontFamily:"'Outfit', sans-serif" }}>
+          style={{ color: BLUE, fontFamily:"'DM Sans', sans-serif" }}>
           <Eye size={12} /> Voir
         </span>
       </div>
@@ -158,7 +158,7 @@ const DetailModal = ({ review, onClose, onDelete, onDeleteResponse, onSubmitResp
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <span className="text-sm font-bold px-3 py-1 rounded-full"
-              style={{ background: meta.bg, color: meta.color, fontFamily:"'Outfit', sans-serif" }}>
+              style={{ background: meta.bg, color: meta.color, fontFamily:"'DM Sans', sans-serif" }}>
               {meta.label}
             </span>
             <Stars rating={review.rating} size={16} />
@@ -179,7 +179,7 @@ const DetailModal = ({ review, onClose, onDelete, onDeleteResponse, onSubmitResp
                 {review.author?.name || 'Utilisateur'}
               </p>
               <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5"
-                style={{ fontFamily:"'Outfit', sans-serif" }}>
+                style={{ fontFamily:"'DM Sans', sans-serif" }}>
                 <Calendar size={11} />
                 {new Date(review.createdAt).toLocaleDateString('fr-FR', {
                   day:'numeric', month:'long', year:'numeric'
@@ -191,11 +191,11 @@ const DetailModal = ({ review, onClose, onDelete, onDeleteResponse, onSubmitResp
           {/* Commentaire */}
           <div className="rounded-xl p-4" style={{ background:`${BLUE}08` }}>
             <p className="text-xs font-semibold uppercase tracking-wide mb-2"
-              style={{ color: BLUE, fontFamily:"'Outfit', sans-serif" }}>
+              style={{ color: BLUE, fontFamily:"'DM Sans', sans-serif" }}>
               Commentaire
             </p>
             <p className="text-gray-700 text-sm leading-relaxed italic"
-              style={{ fontFamily:"'Outfit', sans-serif" }}>
+              style={{ fontFamily:"'DM Sans', sans-serif" }}>
               « {review.comment} »
             </p>
           </div>
@@ -205,7 +205,7 @@ const DetailModal = ({ review, onClose, onDelete, onDeleteResponse, onSubmitResp
             <div className="rounded-xl p-4 border-l-4" style={{ background:'#16A34A0A', borderColor:'#16A34A' }}>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
-                  style={{ color:'#16A34A', fontFamily:"'Outfit', sans-serif" }}>
+                  style={{ color:'#16A34A', fontFamily:"'DM Sans', sans-serif" }}>
                   <Reply size={12} /> Réponse administration
                 </p>
                 <button onClick={() => onDeleteResponse(review._id)}
@@ -214,10 +214,10 @@ const DetailModal = ({ review, onClose, onDelete, onDeleteResponse, onSubmitResp
                 </button>
               </div>
               <p className="text-gray-700 text-sm leading-relaxed"
-                style={{ fontFamily:"'Outfit', sans-serif" }}>
+                style={{ fontFamily:"'DM Sans', sans-serif" }}>
                 {review.adminResponse.text}
               </p>
-              <p className="text-xs text-gray-400 mt-2" style={{ fontFamily:"'Outfit', sans-serif" }}>
+              <p className="text-xs text-gray-400 mt-2" style={{ fontFamily:"'DM Sans', sans-serif" }}>
                 Par {review.adminResponse.respondedBy?.name || 'Admin'} ·{' '}
                 {new Date(review.adminResponse.respondedAt).toLocaleDateString('fr-FR')}
               </p>
@@ -228,7 +228,7 @@ const DetailModal = ({ review, onClose, onDelete, onDeleteResponse, onSubmitResp
           {!review.adminResponse && (
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5"
-                style={{ color: BLUE, fontFamily:"'Outfit', sans-serif" }}>
+                style={{ color: BLUE, fontFamily:"'DM Sans', sans-serif" }}>
                 <Reply size={12} /> Répondre à cet avis
               </p>
               <textarea
@@ -240,14 +240,14 @@ const DetailModal = ({ review, onClose, onDelete, onDeleteResponse, onSubmitResp
                 placeholder="Votre réponse en tant qu'administrateur..."
                 className="w-full rounded-xl border text-sm p-3 resize-none outline-none transition-all"
                 style={{
-                  fontFamily:"'Outfit', sans-serif",
+                  fontFamily:"'DM Sans', sans-serif",
                   borderColor: focused ? BLUE : '#E2E8F0',
                   boxShadow: focused ? `0 0 0 3px ${BLUE}20` : 'none',
                 }} />
               <button
                 onClick={() => { if (response.trim()) { onSubmitResponse(review._id, response); onClose(); } }}
                 className="mt-2 flex items-center gap-2 text-white text-sm font-semibold px-5 py-2 rounded-xl transition hover:opacity-90"
-                style={{ background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, fontFamily:"'Outfit', sans-serif" }}>
+                style={{ background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, fontFamily:"'DM Sans', sans-serif" }}>
                 <Reply size={14} /> Publier la réponse
               </button>
             </div>
@@ -258,12 +258,12 @@ const DetailModal = ({ review, onClose, onDelete, onDeleteResponse, onSubmitResp
         <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
           <button onClick={() => onDelete(review._id)}
             className="flex items-center gap-2 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition hover:opacity-90"
-            style={{ background:`linear-gradient(135deg, #991B1B, ${RED})`, fontFamily:"'Outfit', sans-serif" }}>
+            style={{ background:`linear-gradient(135deg, #991B1B, ${RED})`, fontFamily:"'DM Sans', sans-serif" }}>
             <Trash2 size={15} /> Supprimer l'avis
           </button>
           <button onClick={onClose}
             className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-white transition"
-            style={{ fontFamily:"'Outfit', sans-serif" }}>
+            style={{ fontFamily:"'DM Sans', sans-serif" }}>
             Fermer
           </button>
         </div>
@@ -392,7 +392,7 @@ const ReviewModerationPage = () => {
       <div className="flex items-center gap-3 p-4 rounded-xl border"
         style={{ background:`${RED}08`, borderColor:`${RED}30` }}>
         <AlertCircle size={20} style={{ color: RED }} />
-        <p className="text-sm" style={{ color: RED, fontFamily:"'Outfit', sans-serif" }}>{error}</p>
+        <p className="text-sm" style={{ color: RED, fontFamily:"'DM Sans', sans-serif" }}>{error}</p>
       </div>
     </div>
   );
@@ -423,7 +423,7 @@ const ReviewModerationPage = () => {
             style={{ fontFamily:"'Cormorant Garamond', serif" }}>
             Modération des Avis
           </h1>
-          <p className="text-xs text-gray-400" style={{ fontFamily:"'Outfit', sans-serif" }}>
+          <p className="text-xs text-gray-400" style={{ fontFamily:"'DM Sans', sans-serif" }}>
             {stats.total} avis au total
           </p>
         </div>
@@ -439,9 +439,9 @@ const ReviewModerationPage = () => {
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p className="text-xs font-semibold uppercase tracking-wide mb-1"
-              style={{ color, fontFamily:"'Outfit', sans-serif" }}>{label}</p>
+              style={{ color, fontFamily:"'DM Sans', sans-serif" }}>{label}</p>
             <p className="text-3xl font-extrabold text-gray-900"
-              style={{ fontFamily:"'Outfit', sans-serif" }}>{value}</p>
+              style={{ fontFamily:"'DM Sans', sans-serif" }}>{value}</p>
           </div>
         ))}
       </div>
@@ -459,7 +459,7 @@ const ReviewModerationPage = () => {
                 style={{
                   background: isActive ? (meta?.color || BLUE) : '#F1F5F9',
                   color:      isActive ? '#fff'                 : '#64748B',
-                  fontFamily:"'Outfit', sans-serif",
+                  fontFamily:"'DM Sans', sans-serif",
                 }}>
                 {pole === 'Tous' ? 'Tous' : meta?.label}
                 {pole !== 'Tous' && (
@@ -481,7 +481,7 @@ const ReviewModerationPage = () => {
             aria-label="Rechercher un avis"
             className="pl-8 pr-4 py-2 text-sm rounded-xl border outline-none transition-all w-64"
             style={{
-              fontFamily:"'Outfit', sans-serif",
+              fontFamily:"'DM Sans', sans-serif",
               borderColor: searchFocused ? BLUE : '#E2E8F0',
               boxShadow:   searchFocused ? `0 0 0 3px ${BLUE}20` : 'none',
             }} />
@@ -495,13 +495,13 @@ const ReviewModerationPage = () => {
             style={{ background:`${BLUE}12` }}>
             <MessageSquare size={26} style={{ color: BLUE }} />
           </div>
-          <p className="text-gray-500 font-semibold" style={{ fontFamily:"'Outfit', sans-serif" }}>
+          <p className="text-gray-500 font-semibold" style={{ fontFamily:"'DM Sans', sans-serif" }}>
             Aucun avis {selectedPole !== 'Tous' ? `pour ${selectedPole}` : ''}
           </p>
           {search && (
             <button onClick={() => setSearch('')}
               className="mt-3 text-xs font-semibold px-4 py-1.5 rounded-full"
-              style={{ background:`${BLUE}15`, color:BLUE, fontFamily:"'Outfit', sans-serif" }}>
+              style={{ background:`${BLUE}15`, color:BLUE, fontFamily:"'DM Sans', sans-serif" }}>
               Réinitialiser la recherche
             </button>
           )}

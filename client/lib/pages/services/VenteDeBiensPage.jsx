@@ -57,7 +57,7 @@ const VenteDeBiensPage = () => {
 
     const handleContactClick = (e) => {
         e.preventDefault();
-        router.push('/altimmo');
+        router.push('/immobilier');
         setTimeout(() => {
             document.getElementById('contact-altimmo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
@@ -75,7 +75,7 @@ const VenteDeBiensPage = () => {
                 </div>
 
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10 py-24">
-                    <Link href="/altimmo" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-10 transition-colors group">
+                    <Link href="/immobilier" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-10 transition-colors group">
                         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                         Retour à Altimmo
                     </Link>

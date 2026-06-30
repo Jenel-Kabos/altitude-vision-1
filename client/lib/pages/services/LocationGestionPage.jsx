@@ -80,7 +80,7 @@ const LocationGestionPage = () => {
                 </div>
 
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10 py-24">
-                    <Link href="/altimmo" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-10 transition-colors group">
+                    <Link href="/immobilier" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-10 transition-colors group">
                         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                         Retour à Altimmo
                     </Link>
@@ -104,7 +104,7 @@ const LocationGestionPage = () => {
 
                     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }} className="flex flex-wrap gap-4">
-                        <Link href="/altimmo#contact-altimmo" onClick={scrollToContact}
+                        <Link href="/immobilier#contact-altimmo" onClick={scrollToContact}
                             className="inline-flex items-center gap-2 px-7 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-full transition-all hover:scale-105 shadow-xl">
                             <Sparkles className="w-4 h-4" /> Demander un devis
                         </Link>
@@ -254,7 +254,7 @@ const LocationGestionPage = () => {
                                                 </li>
                                             ))}
                                         </ul>
-                                        <Link href="/altimmo#contact-altimmo" onClick={scrollToContact}
+                                        <Link href="/immobilier#contact-altimmo" onClick={scrollToContact}
                                             className={`block w-full py-2.5 text-center font-semibold rounded-full text-sm transition-all ${plan.featured ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}>
                                             Choisir
                                         </Link>
@@ -279,7 +279,7 @@ const LocationGestionPage = () => {
                             Contactez-nous pour découvrir comment nous pouvons vous aider
                         </p>
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-                            <Link href="/altimmo#contact-altimmo" onClick={scrollToContact}
+                            <Link href="/immobilier#contact-altimmo" onClick={scrollToContact}
                                 className="inline-flex items-center gap-3 px-8 py-4 bg-white text-emerald-600 font-semibold rounded-full shadow-2xl hover:shadow-white/30 transition-all">
                                 <Sparkles className="w-5 h-5" /> Demander un Devis Gratuit
                             </Link>

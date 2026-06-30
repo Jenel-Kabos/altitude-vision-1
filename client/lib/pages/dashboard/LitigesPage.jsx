@@ -8,7 +8,7 @@ import {
 import { getLitiges, getLitigeStats, updateLitigeStatut, addLitigeMessage, resolveLitige } from "../../services/litigeService";
 
 const BLUE = '#2E7BB5';
-const GOLD = '#C8872A';
+const GOLD = '#C8960C';
 
 const STATUTS = ['Ouvert', 'En_cours_médiation', 'Résolu', 'Escaladé', 'Fermé'];
 const PRIORITES = ['Faible', 'Normale', 'Haute', 'Urgente'];
@@ -57,7 +57,7 @@ const StatCard = ({ label, value, color, icon: Icon }) => (
       <Icon className="w-5 h-5" style={{ color }} />
     </div>
     <div>
-      <p className="text-2xl font-bold text-gray-900" style={{ fontFamily: "'Outfit', sans-serif" }}>{value}</p>
+      <p className="text-2xl font-bold text-gray-900" style={{ fontFamily: "'DM Sans', sans-serif" }}>{value}</p>
       <p className="text-xs text-gray-500">{label}</p>
     </div>
   </div>
@@ -110,7 +110,7 @@ const LitigeModal = ({ litige, onClose, onRefresh }) => {
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-        style={{ fontFamily: "'Outfit', sans-serif" }}>
+        style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
@@ -317,7 +317,7 @@ const LitigesPage = () => {
   ];
 
   return (
-    <div style={{ fontFamily: "'Outfit', sans-serif" }}>
+    <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* Modal */}
       {selected && (

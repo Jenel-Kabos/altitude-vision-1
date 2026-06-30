@@ -86,7 +86,7 @@ const ConseilInvestissementPage = () => {
                 </div>
 
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10 py-24">
-                    <Link href="/altimmo" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-10 transition-colors group">
+                    <Link href="/immobilier" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-10 transition-colors group">
                         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                         Retour à Altimmo
                     </Link>
@@ -110,7 +110,7 @@ const ConseilInvestissementPage = () => {
 
                     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }} className="flex flex-wrap gap-4">
-                        <Link href="/altimmo#contact-altimmo" onClick={scrollToContact}
+                        <Link href="/immobilier#contact-altimmo" onClick={scrollToContact}
                             className="inline-flex items-center gap-2 px-7 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-full transition-all hover:scale-105 shadow-xl">
                             <Sparkles className="w-4 h-4" /> Consultation gratuite
                         </Link>
@@ -296,7 +296,7 @@ const ConseilInvestissementPage = () => {
                             Rencontrons-nous pour discuter de vos projets et élaborer votre stratégie patrimoniale
                         </p>
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                            <Link href="/altimmo#contact-altimmo" onClick={scrollToContact}
+                            <Link href="/immobilier#contact-altimmo" onClick={scrollToContact}
                                 className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold rounded-full shadow-2xl hover:shadow-indigo-500/40 transition-all">
                                 <Sparkles className="w-5 h-5" /> Demander une Consultation Gratuite
                             </Link>

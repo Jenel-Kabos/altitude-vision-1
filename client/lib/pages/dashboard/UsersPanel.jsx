@@ -10,7 +10,7 @@ import {
   ChevronDown, Clock, FileText, Send,
 } from 'lucide-react';
 import { getAllUsers, updateUserRole, createUserByAdmin, deleteAdminUser } from '../../services/userService';
-import axios from 'axios';
+import api from '../../services/api';
 
 const BLUE = '#2E7BB5';
 const RED  = '#D42B2B';
@@ -18,8 +18,6 @@ const GOLD = '#C8872A';
 const GREEN = '#16A34A';
 const GRAY  = '#94A3B8';
 const FONT  = "'Outfit', sans-serif";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api';
 
 // ── Helpers ───────────────────────────────────────────────────
 const ROLE_META = {
@@ -343,10 +341,7 @@ const UserDetailModal = ({ user: target, onClose, showToast }) => {
   const handleRenvoyerContrat = async () => {
     setRenvoyerLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(`${API_URL}/users/${target._id}/renvoyer-contrat`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.post(`/users/${target._id}/renvoyer-contrat`, {});
       showToast?.('Contrat renvoyé par email avec succès.');
     } catch (err) {
       showToast?.(err.response?.data?.message || 'Erreur lors du renvoi', 'error');
@@ -574,10 +569,7 @@ const UsersPanel = () => {
   const handleVerify = async (user) => {
     setActionLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      await axios.patch(`${API_URL}/admin/owners/${user._id}/verify`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.patch(`/admin/owners/${user._id}/verify`, {});
       setUsers(prev => prev.map(u => u._id === user._id ? { ...u, isVerified: true } : u));
       showToast('Propriétaire vérifié.');
     } catch (err) {
@@ -589,10 +581,7 @@ const UsersPanel = () => {
     setActionLoading(true);
     const isActive = !user.status || user.status === 'Actif' || user.status === 'active';
     try {
-      const token = localStorage.getItem('token');
-      await axios.patch(`${API_URL}/admin/owners/${user._id}/${isActive ? 'suspend' : 'activate'}`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.patch(`/admin/owners/${user._id}/${isActive ? 'suspend' : 'activate'}`, {});
       setUsers(prev => prev.map(u => u._id === user._id ? { ...u, status: isActive ? 'Suspendu' : 'Actif' } : u));
       showToast(isActive ? 'Compte suspendu.' : 'Compte réactivé.');
     } catch (err) {

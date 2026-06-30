@@ -9,10 +9,10 @@ import { FaFacebook, FaInstagram, FaWhatsapp } from 'react-icons/fa';
 const currentYear = new Date().getFullYear();
 
 const LINKS_POLES = [
-  { to: '/altimmo',              label: 'Altimmo',       color: '#2E7BB5' },
-  { to: '/mila-events',          label: 'Mila Events',   color: '#D42B2B' },
-  { to: '/altcom',               label: 'Altcom',        color: '#C8872A' },
-  { to: '/trouve-ta-commission', label: 'Ma Commission', color: '#C8872A' },
+  { to: '/immobilier',              label: 'Altimmo',       color: '#2E7BB5' },
+  { to: '/evenementiel',          label: 'Mila Events',   color: '#D42B2B' },
+  { to: '/communication',               label: 'Altcom',        color: '#C8960C' },
+  { to: '/trouve-ta-commission', label: 'Ma Commission', color: '#C8960C' },
 ];
 
 const LINKS_INFO = [
@@ -34,7 +34,7 @@ const CONTACT_ITEMS = [
     lines: ['Rue Mfoa n°24, Poto-Poto', 'Derrière Canal Olympia', 'Brazzaville, Congo'],
   },
   {
-    icon: Mail, color: '#C8872A',
+    icon: Mail, color: '#C8960C',
     lines: ['contact@altitudevision.agency'],
     href: 'mailto:contact@altitudevision.agency',
   },
@@ -89,12 +89,12 @@ const FOOTER_CSS = `
     font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.78rem, 1.1vw, 1rem);
     font-weight: 400;
-    color: rgba(232,228,220,0.72);
+    color: #374151;
     transition: color 0.2s;
     text-decoration: none;
   }
   .av-footer-nav-link:hover,
-  .av-footer-nav-link.active { color: #E8E4DC; }
+  .av-footer-nav-link.active { color: #111827; }
 `;
 
 // ✅ CORRECTION HIÉRARCHIE DES TITRES
@@ -118,7 +118,7 @@ const ColTitle = ({ children, id }) => (
       // Avant : rgba(232,228,220,0.28) → ratio ~1.4:1 ❌
       // Après : rgba(232,228,220,0.55) → ratio ~3.1:1 ✅ (texte large/uppercase)
       // Les textes uppercase > 14px bold bénéficient du seuil 3:1 (WCAG AA grande taille)
-      color: 'rgba(232,228,220,0.55)',
+      color: '#6B7280',
       fontWeight: 500,
       marginBottom: '8px',
       margin: '0 0 22px 0',
@@ -129,7 +129,7 @@ const ColTitle = ({ children, id }) => (
 );
 
 const Footer = () => (
-  <footer style={{ background: '#080A0D' }} aria-label="Pied de page Altitude-Vision">
+  <footer style={{ background: '#F8F8F8', borderTop: '1px solid rgba(17,24,39,0.08)' }} aria-label="Pied de page Altitude-Vision">
     <style>{FOOTER_CSS}</style>
 
     {/* Ligne dégradée haute */}
@@ -155,7 +155,7 @@ const Footer = () => (
         <p style={{
           fontFamily: "'DM Sans', sans-serif",
           fontSize: 'clamp(0.78rem, 1.1vw, 1rem)',
-          color: 'rgba(232,228,220,0.65)',
+          color: '#374151',
           lineHeight: 1.8,
           fontWeight: 300,
           maxWidth: '340px',
@@ -177,13 +177,12 @@ const Footer = () => (
                 width: 'clamp(36px, 3vw, 48px)',
                 height: 'clamp(36px, 3vw, 48px)',
                 borderRadius: '10px',
-                border: '1px solid rgba(232,228,220,0.08)',
+                border: '1px solid rgba(17,24,39,0.10)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                // ✅ couleur initiale plus visible : 0.32 → 0.55
-                color: 'rgba(232,228,220,0.55)',
-                background: 'rgba(232,228,220,0.03)',
+                color: '#6B7280',
+                background: 'rgba(17,24,39,0.03)',
                 transition: '0.25s',
               }}
               onMouseEnter={e => {
@@ -192,9 +191,9 @@ const Footer = () => (
                 e.currentTarget.style.color = color;
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = 'rgba(232,228,220,0.03)';
-                e.currentTarget.style.borderColor = 'rgba(232,228,220,0.08)';
-                e.currentTarget.style.color = 'rgba(232,228,220,0.55)';
+                e.currentTarget.style.background = 'rgba(17,24,39,0.03)';
+                e.currentTarget.style.borderColor = 'rgba(17,24,39,0.10)';
+                e.currentTarget.style.color = '#6B7280';
               }}
             >
               <Icon size={16} />
@@ -227,7 +226,7 @@ const Footer = () => (
           {LINKS_INFO.map(({ to, label }) => (
             <li key={to}>
               <Link href={to} className="av-footer-nav-link">
-                <ArrowUpRight size={13} style={{ color: '#C8872A', opacity: 0.8, flexShrink: 0 }} aria-hidden="true" />
+                <ArrowUpRight size={13} style={{ color: '#C8960C', opacity: 0.8, flexShrink: 0 }} aria-hidden="true" />
                 {label}
               </Link>
             </li>
@@ -264,8 +263,7 @@ const Footer = () => (
                         display: 'block',
                         fontFamily: "'DM Sans', sans-serif",
                         fontSize: 'clamp(0.75rem, 1.1vw, 1rem)',
-                        // ✅ CORRECTION CONTRASTE : 0.42 → 0.72 (ratio ~4.6:1 ✅)
-                        color: 'rgba(232,228,220,0.72)',
+                        color: '#374151',
                         fontWeight: 400,
                         lineHeight: 1.6,
                         transition: '0.2s',
@@ -273,8 +271,8 @@ const Footer = () => (
                         display: 'flex',
                         alignItems: 'center',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.color = '#E8E4DC'; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = 'rgba(232,228,220,0.72)'; }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#111827'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = '#374151'; }}
                     >
                       {line}
                     </a>
@@ -284,8 +282,7 @@ const Footer = () => (
                       style={{
                         fontFamily: "'DM Sans', sans-serif",
                         fontSize: 'clamp(0.75rem, 1.1vw, 1rem)',
-                        // ✅ CORRECTION CONTRASTE : 0.36 → 0.62 (ratio ~3.7:1 ✅)
-                        color: 'rgba(232,228,220,0.62)',
+                        color: '#6B7280',
                         fontWeight: 300,
                         lineHeight: 1.6,
                         margin: 0,
@@ -303,15 +300,14 @@ const Footer = () => (
     </div>
 
     {/* Séparateur */}
-    <div style={{ borderTop: '1px solid rgba(232,228,220,0.05)', margin: '0 var(--px)' }} />
+    <div style={{ borderTop: '1px solid rgba(17,24,39,0.08)', margin: '0 var(--px)' }} />
 
     {/* Copyright */}
     <div className="av-footer-bottom">
       <p style={{
         fontFamily: "'DM Sans', sans-serif",
         fontSize: 'clamp(0.68rem, 1.1vw, 0.85rem)',
-        // ✅ 0.2 → 0.45 pour passer le seuil 3:1 sur texte small
-        color: 'rgba(232,228,220,0.45)',
+        color: '#6B7280',
         fontWeight: 300,
         margin: 0,
       }}>

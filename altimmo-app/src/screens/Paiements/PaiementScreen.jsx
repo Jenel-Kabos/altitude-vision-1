@@ -1,12 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, SafeAreaView,
+  ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as WebBrowser from 'expo-web-browser';
-import { colors, typography, spacing } from '../../theme';
+import * as Haptics from 'expo-haptics';
+import { useTheme } from '../../context/ThemeContext';
+import { fonts, fontSize, spacing, radius } from '../../theme';
 import api from '../../services/api';
+
+// ─── Modes de paiement ───────────────────────────────────────────────────────
 
 const MODES = [
   {
@@ -15,7 +21,7 @@ const MODES = [
     desc: 'Paiement via votre compte MTN',
     icon: 'phone-portrait-outline',
     bg: '#FFCC00',
-    iconColor: '#000000',
+    iconColor: '#0A0A0A',
     channel: 'MOBILE_MONEY',
   },
   {
@@ -24,7 +30,7 @@ const MODES = [
     desc: 'Paiement via votre compte Airtel',
     icon: 'phone-portrait-outline',
     bg: '#EF4444',
-    iconColor: colors.white,
+    iconColor: '#FFFFFF',
     channel: 'MOBILE_MONEY',
   },
   {
@@ -32,34 +38,96 @@ const MODES = [
     label: 'Carte bancaire',
     desc: 'Visa / Mastercard',
     icon: 'card-outline',
-    bg: colors.info,
-    iconColor: colors.white,
+    bg: '#185FA5',
+    iconColor: '#FFFFFF',
     channel: 'CREDIT_CARD',
   },
 ];
 
 const fmt = (n) => Number(n || 0).toLocaleString('fr-FR');
 
+// ─── Carte de méthode de paiement ────────────────────────────────────────────
+
+const ModeCard = memo(function ModeCard({ mode, index, selected, onSelect, styles, c }) {
+  const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onSelect(mode.id);
+  }, [mode.id, onSelect]);
+
+  return (
+    <Animated.View entering={FadeInDown.delay(index * 80).duration(280).springify().damping(18)}>
+      <TouchableOpacity
+        style={[styles.methodCard, selected && styles.methodCardSelected]}
+        onPress={handlePress}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={mode.label}
+        accessibilityState={{ selected }}
+      >
+        <View style={[styles.methodIcon, { backgroundColor: mode.bg }]}>
+          <Ionicons name={mode.icon} size={22} color={mode.iconColor} />
+        </View>
+
+        <View style={styles.methodInfo}>
+          <Text style={[styles.methodLabel, selected && styles.methodLabelSelected]}>
+            {mode.label}
+          </Text>
+          <Text style={styles.methodDesc}>{mode.desc}</Text>
+        </View>
+
+        <View style={[styles.methodCheck, selected && styles.methodCheckSelected]}>
+          {selected && <Ionicons name="checkmark" size={14} color="#0A0A0A" />}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}, (prev, next) => prev.selected === next.selected && prev.styles === next.styles);
+
+// ─── Ligne récapitulatif ──────────────────────────────────────────────────────
+
+const SummaryRow = memo(function SummaryRow({ label, value, styles, total = false }) {
+  return (
+    <View style={styles.summaryRow}>
+      <Text style={total ? styles.totalLabel : styles.summaryLabel}>{label}</Text>
+      <Text style={[total ? styles.totalValue : styles.summaryValue]} numberOfLines={2}>
+        {value}
+      </Text>
+    </View>
+  );
+});
+
+// ─── Écran ────────────────────────────────────────────────────────────────────
+
 export default function PaiementScreen({ route, navigation }) {
   const {
-    montant = 0,
+    montant     = 0,
     description = 'Paiement',
-    bien = '',
-    type = '',
-    duree = '',
+    bien        = '',
+    type        = '',
+    duree       = '',
   } = route.params || {};
 
-  const [modeSelected, setMode] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const { themeColors: c } = useTheme();
+  const styles  = useMemo(() => makeStyles(c), [c]);
+  const insets  = useSafeAreaInsets();
 
-  const initierPaiement = async () => {
+  const [modeSelected, setMode]   = useState(null);
+  const [loading,      setLoading] = useState(false);
+
+  const montantFmt = useMemo(() => fmt(montant), [montant]);
+
+  // ─── Handlers ───
+  const handleBack   = useCallback(() => navigation.goBack(), [navigation]);
+  const handleSelect = useCallback((id) => setMode(id), []);
+
+  const initierPaiement = useCallback(async () => {
     if (!modeSelected) {
-      Alert.alert('Mode requis', 'Choisissez un mode de paiement.');
+      Alert.alert('Mode requis', 'Veuillez choisir un mode de paiement.');
       return;
     }
     setLoading(true);
     try {
-      const mode = MODES.find(m => m.id === modeSelected);
+      const mode          = MODES.find(m => m.id === modeSelected);
       const transactionId = `AV-${Date.now()}`;
       const res = await api.post('/paiements/initier', {
         montant,
@@ -74,195 +142,204 @@ export default function PaiementScreen({ route, navigation }) {
       }
     } catch (err) {
       Alert.alert(
-        'Erreur',
-        err.response?.data?.message || "Impossible d'initier le paiement.",
+        'Erreur de paiement',
+        err.response?.data?.message || "Impossible d'initier le paiement. Réessayez.",
       );
     } finally {
       setLoading(false);
     }
-  };
+  }, [modeSelected, montant, description]);
+
+  const isDisabled = !modeSelected || loading;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Header back */}
-        <View style={styles.topRow}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backBtn}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="arrow-back" size={22} color={colors.text} />
-          </TouchableOpacity>
-        </View>
+    <View style={styles.root}>
+      <SafeAreaView edges={['top']} style={styles.safeTop}>
 
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Paiement</Text>
-          <Text style={styles.headerAmount}>{fmt(montant)} FCFA</Text>
-          {bien ? (
-            <Text style={styles.headerSubtitle} numberOfLines={1}>{bien}</Text>
-          ) : null}
-        </View>
-
-        {/* Méthodes de paiement */}
-        <Text style={styles.sectionTitle}>Mode de paiement</Text>
-        <View style={styles.methodsList}>
-          {MODES.map(m => {
-            const selected = modeSelected === m.id;
-            return (
-              <TouchableOpacity
-                key={m.id}
-                style={[styles.methodCard, selected && styles.methodCardSelected]}
-                onPress={() => setMode(m.id)}
-                activeOpacity={0.85}
-              >
-                <View style={[styles.methodIcon, { backgroundColor: m.bg }]}>
-                  <Ionicons name={m.icon} size={22} color={m.iconColor} />
-                </View>
-                <View style={styles.methodInfo}>
-                  <Text style={styles.methodLabel}>{m.label}</Text>
-                  <Text style={styles.methodDesc}>{m.desc}</Text>
-                </View>
-                {selected ? (
-                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                ) : null}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Récapitulatif */}
-        <Text style={styles.sectionTitle}>Récapitulatif</Text>
-        <View style={styles.summaryCard}>
-          {bien ? (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Bien</Text>
-              <Text style={styles.summaryValue} numberOfLines={1}>{bien}</Text>
-            </View>
-          ) : null}
-          {description ? (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Détail</Text>
-              <Text style={styles.summaryValue} numberOfLines={2}>{description}</Text>
-            </View>
-          ) : null}
-          {type ? (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Type</Text>
-              <Text style={styles.summaryValue}>{type}</Text>
-            </View>
-          ) : null}
-          {duree ? (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Durée</Text>
-              <Text style={styles.summaryValue}>{duree}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.divider} />
-
-          <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>{fmt(montant)} FCFA</Text>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
+        >
+          {/* ─── Bouton retour ─── */}
+          <View style={styles.topRow}>
+            <TouchableOpacity
+              onPress={handleBack}
+              style={styles.backBtn}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Retour"
+            >
+              <Ionicons name="arrow-back" size={22} color={c.text} />
+            </TouchableOpacity>
           </View>
-        </View>
 
-        <View style={styles.securityRow}>
-          <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
-          <Text style={styles.securityText}>Paiement sécurisé par CinetPay</Text>
-        </View>
-      </ScrollView>
+          {/* ─── Hero montant ─── */}
+          <Animated.View
+            entering={FadeInDown.delay(0).duration(320).springify().damping(18)}
+            style={styles.hero}
+          >
+            <Text style={styles.heroLabel}>Montant à payer</Text>
+            <Text style={styles.heroAmount}>{montantFmt} FCFA</Text>
+            {bien ? (
+              <Text style={styles.heroBien} numberOfLines={1}>{bien}</Text>
+            ) : null}
+          </Animated.View>
 
-      {/* CTA fixe */}
-      <View style={styles.ctaWrap}>
+          {/* ─── Méthodes de paiement ─── */}
+          <Animated.View
+            entering={FadeInDown.delay(80).duration(300).springify().damping(18)}
+          >
+            <Text style={styles.sectionTitle}>Mode de paiement</Text>
+          </Animated.View>
+
+          <View style={styles.methodsList}>
+            {MODES.map((m, i) => (
+              <ModeCard
+                key={m.id}
+                mode={m}
+                index={i}
+                selected={modeSelected === m.id}
+                onSelect={handleSelect}
+                styles={styles}
+                c={c}
+              />
+            ))}
+          </View>
+
+          {/* ─── Récapitulatif ─── */}
+          <Animated.View
+            entering={FadeInDown.delay(320).duration(300).springify().damping(18)}
+          >
+            <Text style={styles.sectionTitle}>Récapitulatif</Text>
+            <View style={styles.summaryCard}>
+              {bien        && <SummaryRow label="Bien"   value={bien}        styles={styles} />}
+              {description && <SummaryRow label="Détail" value={description} styles={styles} />}
+              {type        && <SummaryRow label="Type"   value={type}        styles={styles} />}
+              {duree       && <SummaryRow label="Durée"  value={duree}       styles={styles} />}
+
+              <View style={styles.divider} />
+
+              <SummaryRow
+                label={`Total`}
+                value={`${montantFmt} FCFA`}
+                styles={styles}
+                total
+              />
+            </View>
+          </Animated.View>
+
+          {/* ─── Mention sécurité ─── */}
+          <Animated.View
+            entering={FadeInDown.delay(400).duration(280)}
+            style={styles.securityRow}
+          >
+            <Ionicons name="lock-closed-outline" size={13} color={c.textMuted} />
+            <Text style={styles.securityText}>Paiement sécurisé par CinetPay</Text>
+          </Animated.View>
+        </ScrollView>
+      </SafeAreaView>
+
+      {/* ─── CTA fixe en bas ─── */}
+      <View style={[styles.ctaSafe, { paddingBottom: insets.bottom + spacing.sm }]}>
         <TouchableOpacity
           onPress={initierPaiement}
-          disabled={!modeSelected || loading}
+          disabled={isDisabled}
           activeOpacity={0.85}
-          style={[
-            styles.ctaBtn,
-            (!modeSelected || loading) && styles.ctaBtnDisabled,
-          ]}
+          style={[styles.ctaBtn, isDisabled && styles.ctaBtnDisabled]}
+          accessibilityRole="button"
+          accessibilityLabel={loading ? 'Initialisation en cours…' : `Payer ${montantFmt} FCFA`}
+          accessibilityState={{ disabled: isDisabled }}
         >
-          <Text style={styles.ctaText}>
-            {loading ? 'Initialisation…' : 'Payer maintenant'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator size="small" color="#0A0A0A" />
+          ) : (
+            <>
+              <Ionicons name="shield-checkmark-outline" size={18} color="#0A0A0A" />
+              <Text style={styles.ctaText}>Payer {montantFmt} FCFA</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { paddingBottom: 120 },
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
-  topRow: {
+const makeStyles = (c) => StyleSheet.create({
+  root:    { flex: 1, backgroundColor: c.bg },
+  safeTop: { flex: 1 },
+
+  scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
   },
+
+  // ─── Retour ───
+  topRow: { marginBottom: spacing.sm },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
+    borderWidth: 1,
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Header
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
+  // ─── Hero ───
+  hero: {
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  headerTitle: {
-    ...typography.h1,
-    color: colors.text,
-    marginBottom: spacing.md,
+  heroLabel: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: c.textMuted,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
-  headerAmount: {
-    ...typography.display,
-    fontWeight: '800',
-    color: colors.primary,
+  heroAmount: {
+    fontFamily: fonts.display,
+    fontSize: 38,
+    color: c.gold,
+    letterSpacing: -0.5,
   },
-  headerSubtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
+  heroBien: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: c.textSub,
+    marginTop: 2,
   },
 
-  // Section
+  // ─── Titres sections ───
   sectionTitle: {
-    ...typography.h3,
-    color: colors.text,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    marginTop: spacing.md,
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.sm,
+    color: c.textMuted,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
 
-  // Méthodes
-  methodsList: {
-    paddingHorizontal: spacing.lg,
-  },
+  // ─── Méthodes ───
+  methodsList: { gap: spacing.sm },
   methodCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: 16,
+    backgroundColor: c.bgCard,
+    borderRadius: radius.md,
     padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1.5,
+    borderColor: c.border,
   },
   methodCardSelected: {
-    borderWidth: 2,
-    borderColor: colors.primary,
+    borderColor: c.gold,
+    backgroundColor: c.goldMuted,
   },
   methodIcon: {
     width: 44,
@@ -271,26 +348,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  methodInfo: {
-    flex: 1,
-  },
+  methodInfo:  { flex: 1 },
   methodLabel: {
-    ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSize.md,
+    color: c.text,
+  },
+  methodLabelSelected: {
+    fontFamily: fonts.bodyBold,
+    color: c.goldDark,
   },
   methodDesc: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: c.textMuted,
     marginTop: 2,
   },
+  methodCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: c.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  methodCheckSelected: {
+    backgroundColor: c.gold,
+    borderColor: c.gold,
+  },
 
-  // Récap
+  // ─── Récapitulatif ───
   summaryCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
+    backgroundColor: c.bgCard,
+    borderRadius: radius.md,
     padding: spacing.md,
-    marginHorizontal: spacing.lg,
+    borderWidth: 1,
+    borderColor: c.border,
+    gap: 2,
+    marginBottom: spacing.sm,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -300,70 +396,77 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   summaryLabel: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: c.textMuted,
     flexShrink: 0,
   },
   summaryValue: {
-    ...typography.body,
-    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: c.text,
     textAlign: 'right',
     flex: 1,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.border,
+    backgroundColor: c.border,
     marginVertical: spacing.sm,
   },
   totalLabel: {
-    ...typography.body,
-    color: colors.text,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+    color: c.text,
+    flexShrink: 0,
   },
   totalValue: {
-    ...typography.h3,
-    color: colors.primary,
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+    color: c.gold,
+    textAlign: 'right',
+    flex: 1,
   },
 
-  // Security
+  // ─── Sécurité ───
   securityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
     marginTop: spacing.lg,
+    marginBottom: spacing.md,
   },
   securityText: {
-    ...typography.caption,
-    color: colors.textMuted,
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: c.textMuted,
   },
 
-  // CTA
-  ctaWrap: {
+  // ─── CTA ───
+  ctaSafe: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingTop: spacing.md,
   },
   ctaBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    paddingVertical: 16,
+    backgroundColor: c.gold,
+    borderRadius: radius.md,
+    paddingVertical: 15,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
   },
-  ctaBtnDisabled: {
-    opacity: 0.5,
-  },
+  ctaBtnDisabled: { opacity: 0.45 },
   ctaText: {
-    color: '#000',
-    fontWeight: '700',
-    fontSize: 16,
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+    color: '#0A0A0A',
   },
 });

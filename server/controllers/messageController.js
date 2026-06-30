@@ -9,6 +9,7 @@ const Conversation = require('../models/Conversation');
 const { cleanupUploadedFiles } = require('../middleware/uploadMiddleware');
 const { getIO, isUserOnline } = require('../socket');
 const { sendExpoPushNotification } = require('../utils/expoPush');
+const logger = require('../utils/logger');
 
 /**
  * @description Envoyer un message dans une conversation
@@ -171,7 +172,7 @@ exports.getMessages = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
   const { page = 1, limit = 50 } = req.query;
 
-  console.log(`📖 [getMessages] ConversationId: ${conversationId}, User: ${req.user.id}`);
+  logger.info(`📖 [getMessages] ConversationId: ${conversationId}, User: ${req.user.id}`);
 
   if (!conversationId || !conversationId.match(/^[0-9a-fA-F]{24}$/)) {
     res.status(400);
@@ -229,7 +230,7 @@ exports.getMessages = asyncHandler(async (req, res) => {
     { isRead: true, readAt: Date.now() }
   );
 
-  console.log(`✅ [getMessages] ${messages.length} messages trouvés dans la conversation`);
+  logger.success(`✅ [getMessages] ${messages.length} messages trouvés dans la conversation`);
 
   res.status(200).json({
     status: 'success',
@@ -265,7 +266,7 @@ exports.markAsRead = asyncHandler(async (req, res) => {
   message.readAt = Date.now();
   await message.save();
 
-  console.log(`✅ [markAsRead] Message ${message._id} marqué comme lu`);
+  logger.success(`✅ [markAsRead] Message ${message._id} marqué comme lu`);
 
   res.status(200).json({
     status: 'success',
@@ -298,7 +299,7 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
 
   await Message.findByIdAndDelete(req.params.messageId);
 
-  console.log(`✅ [deleteMessage] Message ${message._id} supprimé`);
+  logger.success(`✅ [deleteMessage] Message ${message._id} supprimé`);
 
   res.status(204).json({
     status: 'success',
@@ -312,7 +313,7 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
  * @access Protected
  */
 exports.getConversations = asyncHandler(async (req, res) => {
-  console.log(`💬 [getConversations] User: ${req.user.id}`);
+  logger.info(`💬 [getConversations] User: ${req.user.id}`);
 
   const messages = await Message.find({
     $or: [{ sender: req.user.id }, { receiver: req.user.id }],
@@ -354,7 +355,7 @@ exports.getConversations = asyncHandler(async (req, res) => {
 
   const conversations = Array.from(conversationsMap.values());
 
-  console.log(`✅ [getConversations] ${conversations.length} conversations trouvées`);
+  logger.success(`✅ [getConversations] ${conversations.length} conversations trouvées`);
 
   res.status(200).json({
     status: 'success',

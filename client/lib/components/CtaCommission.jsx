@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
 // ─── Design tokens (cohérents avec la charte Altimmo) ──────────
-const GOLD     = '#C8872A';
+const GOLD     = '#C8960C';
 const INK      = '#1A1612';
 const INK_SOFT = '#8C7B6E';
 const CREAM    = '#FAF8F5';
@@ -48,7 +48,7 @@ const CTA_CSS = `
 
   /* ── Conteneur global ── */
   .cta-outer {
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     max-width: 1400px;
     margin: 0 auto;
   }
@@ -217,7 +217,7 @@ const CTA_CSS = `
     padding: clamp(13px, 2.2vw, 17px) clamp(20px, 3.5vw, 30px);
     background: ${GOLD};
     color: ${INK};
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.68rem, 1.4vw, 1rem);
     font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase;
     text-decoration: none; border-radius: 1px;
@@ -331,7 +331,7 @@ const CtaCommission = () => {
             <ArrowRight size={13} className="cta-btn-icon" aria-hidden="true" />
           </Link>
 
-          <Link href="/altimmo#contact" className="cta-sub-link">
+          <Link href="/immobilier#contact" className="cta-sub-link">
             En savoir plus →
           </Link>
 

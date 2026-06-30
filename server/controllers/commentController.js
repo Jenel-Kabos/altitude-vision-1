@@ -3,6 +3,7 @@ const asyncHandler = require('express-async-handler');
 const Comment = require('../models/Comment');
 const Property = require('../models/Property');
 const Event = require('../models/Event');
+const logger = require('../utils/logger');
 
 /**
  * @description Créer un commentaire
@@ -13,7 +14,7 @@ exports.createComment = asyncHandler(async (req, res) => {
   const { targetType, targetId, content } = req.body;
   const userId = req.user.id;
 
-  console.log(`💬 [createComment] User: ${userId}, Type: ${targetType}, Target: ${targetId}`);
+  logger.info(`💬 [createComment] User: ${userId}, Type: ${targetType}, Target: ${targetId}`);
 
   // Validation
   if (!targetType || !targetId || !content) {
@@ -55,7 +56,7 @@ exports.createComment = asyncHandler(async (req, res) => {
   // Populate l'auteur
   await comment.populate('author', 'name email avatar');
 
-  console.log(`✅ [createComment] Commentaire créé:`, comment._id);
+  logger.success(`✅ [createComment] Commentaire créé:`, comment._id);
 
   res.status(201).json({
     status: 'success',
@@ -74,7 +75,7 @@ exports.createComment = asyncHandler(async (req, res) => {
 exports.getComments = asyncHandler(async (req, res) => {
   const { targetType, targetId, limit = 20, page = 1 } = req.query;
 
-  console.log(`📖 [getComments] Type: ${targetType}, Target: ${targetId}, Page: ${page}`);
+  logger.info(`📖 [getComments] Type: ${targetType}, Target: ${targetId}, Page: ${page}`);
 
   if (!targetType || !targetId) {
     res.status(400);
@@ -90,7 +91,7 @@ exports.getComments = asyncHandler(async (req, res) => {
 
   const totalComments = await Comment.countComments(targetType, targetId);
 
-  console.log(`✅ [getComments] ${comments.length} commentaire(s) trouvé(s)`);
+  logger.success(`✅ [getComments] ${comments.length} commentaire(s) trouvé(s)`);
 
   res.status(200).json({
     status: 'success',
@@ -112,7 +113,7 @@ exports.updateComment = asyncHandler(async (req, res) => {
   const { content } = req.body;
   const userId = req.user.id;
 
-  console.log(`✏️ [updateComment] Comment: ${id}, User: ${userId}`);
+  logger.info(`✏️ [updateComment] Comment: ${id}, User: ${userId}`);
 
   if (!content || content.length < 3 || content.length > 1000) {
     res.status(400);
@@ -135,7 +136,7 @@ exports.updateComment = asyncHandler(async (req, res) => {
   await comment.editComment(content);
   await comment.populate('author', 'name email avatar');
 
-  console.log(`✅ [updateComment] Commentaire modifié`);
+  logger.success(`✅ [updateComment] Commentaire modifié`);
 
   res.status(200).json({
     status: 'success',
@@ -156,7 +157,7 @@ exports.deleteComment = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const isAdmin = req.user.role === 'Admin';
 
-  console.log(`🗑️ [deleteComment] Comment: ${id}, User: ${userId}, Admin: ${isAdmin}`);
+  logger.info(`🗑️ [deleteComment] Comment: ${id}, User: ${userId}, Admin: ${isAdmin}`);
 
   const comment = await Comment.findById(id);
 
@@ -173,7 +174,7 @@ exports.deleteComment = asyncHandler(async (req, res) => {
 
   await Comment.findByIdAndDelete(id);
 
-  console.log(`✅ [deleteComment] Commentaire supprimé`);
+  logger.success(`✅ [deleteComment] Commentaire supprimé`);
 
   res.status(204).json({
     status: 'success',
@@ -190,7 +191,7 @@ exports.getUserComments = asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const { limit = 20, page = 1 } = req.query;
 
-  console.log(`👤 [getUserComments] User: ${userId}, Page: ${page}`);
+  logger.info(`👤 [getUserComments] User: ${userId}, Page: ${page}`);
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -202,7 +203,7 @@ exports.getUserComments = asyncHandler(async (req, res) => {
 
   const totalComments = await Comment.countDocuments({ author: userId });
 
-  console.log(`✅ [getUserComments] ${comments.length} commentaire(s) trouvé(s)`);
+  logger.success(`✅ [getUserComments] ${comments.length} commentaire(s) trouvé(s)`);
 
   res.status(200).json({
     status: 'success',

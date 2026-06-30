@@ -10,10 +10,10 @@ import {
 } from "../../services/actionLogService";
 
 const BLUE  = "#2E7BB5";
-const GOLD  = "#C8872A";
+const GOLD  = "#C8960C";
 const RED   = "#D42B2B";
 const GREEN = "#16A34A";
-const FONT  = "'Outfit', sans-serif";
+const FONT  = "'DM Sans', sans-serif";
 
 const MODULES = [
   "Altimmo", "MilaEvents", "Altcom", "GestionLocative",
@@ -28,7 +28,7 @@ const TYPE_ACTIONS = [
 
 const MODULE_COLORS = {
   Altimmo:        "#2E7BB5",
-  MilaEvents:     "#C8872A",
+  MilaEvents:     "#C8960C",
   Altcom:         "#7C3AED",
   GestionLocative:"#16A34A",
   Utilisateurs:   "#D42B2B",
@@ -47,7 +47,7 @@ const TYPE_COLORS = {
   REJET:          "#DC2626",
   CONNEXION:      "#0891B2",
   DÉCONNEXION:    "#64748B",
-  PAIEMENT:       "#C8872A",
+  PAIEMENT:       "#C8960C",
   GÉNÉRATION_PDF: "#7C3AED",
   ENVOI_EMAIL:    "#EA580C",
   "CHANGEMENT_RÔLE": "#D97706",

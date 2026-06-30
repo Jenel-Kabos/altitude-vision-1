@@ -13,7 +13,7 @@ import {
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 
 const focusIn  = e => { e.target.style.borderColor = BLUE; e.target.style.boxShadow = `0 0 0 3px ${BLUE}15`; e.target.style.backgroundColor = '#fff'; };
 const focusOut = e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = '#F9FAFB'; };
@@ -24,12 +24,12 @@ const inputCls = "w-full pl-10 pr-4 py-3 border border-gray-200 rounded-2xl bg-g
 const InputField = ({ label, type = 'text', name, value, onChange, placeholder, Icon }) => (
     <div>
         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>{label}</label>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>{label}</label>
         <div className="relative">
             <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input type={type} name={name} value={value} onChange={onChange}
                 placeholder={placeholder} required
-                className={inputCls} style={{ fontFamily: "'Outfit', sans-serif" }}
+                className={inputCls} style={{ fontFamily: "'DM Sans', sans-serif" }}
                 onFocus={focusIn} onBlur={focusOut} />
         </div>
     </div>
@@ -71,7 +71,7 @@ const PhoneField = ({ value, onChange }) => {
     return (
         <div>
             <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5"
-                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 Téléphone
                 <span className="normal-case font-normal tracking-normal text-gray-300" style={{ fontSize: '0.65rem' }}>
                     (optionnel)
@@ -81,7 +81,7 @@ const PhoneField = ({ value, onChange }) => {
                 <div className="relative flex-shrink-0">
                     <select value={dialCode} onChange={handleDialChange}
                         className="h-full pl-3 pr-7 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm focus:outline-none appearance-none cursor-pointer transition-all"
-                        style={{ fontFamily: "'Outfit', sans-serif", minWidth: '90px' }}
+                        style={{ fontFamily: "'DM Sans', sans-serif", minWidth: '90px' }}
                         onFocus={focusIn} onBlur={focusOut}>
                         {DIAL_CODES.map(d => (
                             <option key={d.code} value={d.code}>{d.flag} {d.code}</option>
@@ -97,12 +97,12 @@ const PhoneField = ({ value, onChange }) => {
                     <input type="tel" value={local} onChange={handleLocalChange}
                         placeholder="06 123 45 67"
                         className={inputCls}
-                        style={{ fontFamily: "'Outfit', sans-serif" }}
+                        style={{ fontFamily: "'DM Sans', sans-serif" }}
                         onFocus={focusIn} onBlur={focusOut} />
                 </div>
             </div>
             {local && (
-                <p className="text-xs text-gray-400 mt-1.5 pl-1" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                <p className="text-xs text-gray-400 mt-1.5 pl-1" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {selected.flag} Numéro complet :{' '}
                     <span className="text-gray-500 font-medium">{dialCode} {local}</span>
                 </p>
@@ -115,13 +115,13 @@ const PhoneField = ({ value, onChange }) => {
 const PassField = ({ label, name, value, onChange, placeholder, error, show, onToggle }) => (
     <div>
         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>{label}</label>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>{label}</label>
         <div className="relative">
             <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input type={show ? 'text' : 'password'} name={name} value={value} onChange={onChange}
                 placeholder={placeholder} required
                 className="w-full pl-10 pr-10 py-3 border rounded-2xl bg-gray-50 text-gray-900 text-sm focus:outline-none transition-all placeholder-gray-400"
-                style={{ borderColor: error ? '#EF4444' : '#E5E7EB', fontFamily: "'Outfit', sans-serif" }}
+                style={{ borderColor: error ? '#EF4444' : '#E5E7EB', fontFamily: "'DM Sans', sans-serif" }}
                 onFocus={e => { if (!error) focusIn(e); }}
                 onBlur={e => { if (!error) focusOut(e); }} />
             <button type="button" onClick={onToggle}
@@ -134,7 +134,7 @@ const PassField = ({ label, name, value, onChange, placeholder, error, show, onT
                 <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                     className="text-xs text-red-500 mt-1 flex items-center gap-1 overflow-hidden"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     <AlertTriangle className="w-3 h-3 flex-shrink-0" />{error}
                 </motion.p>
             )}
@@ -176,19 +176,19 @@ const AvatarUpload = ({ user, preview, onFileChange, onRemove, uploading }) => {
             <div className="flex items-center gap-2">
                 <button type="button" onClick={() => fileRef.current?.click()}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
-                    style={{ background: `${BLUE}12`, color: BLUE, fontFamily: "'Outfit', sans-serif", border: `1px solid ${BLUE}20` }}>
+                    style={{ background: `${BLUE}12`, color: BLUE, fontFamily: "'DM Sans', sans-serif", border: `1px solid ${BLUE}20` }}>
                     <Upload className="w-3 h-3" />
                     {hasPhoto ? 'Changer' : 'Ajouter une photo'}
                 </button>
                 {hasPhoto && (
                     <button type="button" onClick={onRemove}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
-                        style={{ background: '#FEF2F2', color: '#EF4444', fontFamily: "'Outfit', sans-serif", border: '1px solid #FECACA' }}>
+                        style={{ background: '#FEF2F2', color: '#EF4444', fontFamily: "'DM Sans', sans-serif", border: '1px solid #FECACA' }}>
                         <Trash2 className="w-3 h-3" /> Supprimer
                     </button>
                 )}
             </div>
-            <p className="text-xs text-gray-400" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <p className="text-xs text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 JPG, PNG ou WebP · Max 5 Mo
             </p>
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp"
@@ -354,7 +354,7 @@ const AccountPage = () => {
 
     if (!user) return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div className="flex items-center gap-3 text-gray-500" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <div className="flex items-center gap-3 text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 <Loader2 className="w-5 h-5 animate-spin" style={{ color: BLUE }} />
                 Chargement du profil...
             </div>
@@ -362,18 +362,12 @@ const AccountPage = () => {
     );
 
     return (
-        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             {/* ── Hero ─────────────────────────────────────── */}
-            <div className="relative py-16 text-white overflow-hidden"
-                style={{ background: `linear-gradient(135deg, #0D1117 0%, #0e1e30 60%, #0D1117 100%)` }}>
-                <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-0 right-1/3 w-64 h-64 rounded-full blur-[100px] opacity-10"
-                        style={{ background: BLUE }} />
-                    <div className="absolute bottom-0 left-1/4 w-48 h-48 rounded-full blur-[80px] opacity-6"
-                        style={{ background: GOLD }} />
-                </div>
+            <div className="relative py-16 overflow-hidden"
+                style={{ background: '#F8F8F8', borderBottom: '1px solid rgba(17,24,39,0.07)' }}>
                 <div className="absolute top-0 left-0 right-0 h-px"
-                    style={{ background: `linear-gradient(to right, transparent, ${BLUE}50, transparent)` }} />
+                    style={{ background: `linear-gradient(to right, transparent, ${BLUE}30, transparent)` }} />
 
                 <div className="container mx-auto max-w-4xl px-4 sm:px-6 relative z-10 text-center">
                     <motion.div
@@ -384,7 +378,7 @@ const AccountPage = () => {
                         className="relative w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center mx-auto mb-4"
                         style={{
                             background: heroPhoto ? 'transparent' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
-                            boxShadow:  `0 0 0 3px rgba(46,123,181,0.2), 0 8px 32px rgba(0,0,0,0.4)`,
+                            boxShadow:  `0 0 0 3px rgba(46,123,181,0.15), 0 8px 24px rgba(0,0,0,0.12)`,
                         }}
                     >
                         {heroPhoto
@@ -393,13 +387,13 @@ const AccountPage = () => {
                         }
                     </motion.div>
 
-                    <h1 className="text-white mb-2"
-                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700 }}>
+                    <h1 className="mb-2"
+                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, color: '#111827' }}>
                         Mon Compte
                     </h1>
                     <div className="h-0.5 w-12 rounded-full mx-auto mb-3"
                         style={{ background: `linear-gradient(to right, ${BLUE}, ${GOLD})` }} />
-                    <div className="flex items-center justify-center gap-3 text-white/50 text-sm flex-wrap">
+                    <div className="flex items-center justify-center gap-3 text-sm flex-wrap" style={{ color: '#6B7280' }}>
                         <span>{user.name} · {user.email}</span>
                         {user.phone && (
                             <>
@@ -428,7 +422,7 @@ const AccountPage = () => {
                                 <User className="w-4 h-4" style={{ color: BLUE }} />
                             </div>
                             <h2 className="font-bold text-gray-900 text-base"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                 Informations du Profil
                             </h2>
                         </div>
@@ -438,7 +432,7 @@ const AccountPage = () => {
                             {/* Photo */}
                             <div className="pb-5 border-b border-gray-100">
                                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
-                                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                     Photo de profil
                                 </label>
                                 <AvatarUpload
@@ -459,7 +453,7 @@ const AccountPage = () => {
                                                 background: photoFile ? `${BLUE}08` : '#FEF2F2',
                                                 color:      photoFile ? BLUE : '#EF4444',
                                                 border:     `1px solid ${photoFile ? `${BLUE}18` : '#FECACA'}`,
-                                                fontFamily: "'Outfit', sans-serif",
+                                                fontFamily: "'DM Sans', sans-serif",
                                             }}
                                         >
                                             <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -486,7 +480,7 @@ const AccountPage = () => {
                                 style={{
                                     background: infoLoading ? '#9CA3AF' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
                                     boxShadow:  infoLoading ? 'none' : `0 4px 16px ${BLUE}30`,
-                                    fontFamily: "'Outfit', sans-serif",
+                                    fontFamily: "'DM Sans', sans-serif",
                                 }}>
                                 {infoLoading
                                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Mise à jour...</>
@@ -506,7 +500,7 @@ const AccountPage = () => {
                                 <Lock className="w-4 h-4" style={{ color: GOLD }} />
                             </div>
                             <h2 className="font-bold text-gray-900 text-base"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                 Changer le Mot de Passe
                             </h2>
                         </div>
@@ -533,7 +527,7 @@ const AccountPage = () => {
                                 style={{
                                     background: passDisabled ? '#9CA3AF' : `linear-gradient(135deg, #7A5520, ${GOLD})`,
                                     boxShadow:  passDisabled ? 'none' : `0 4px 16px ${GOLD}40`,
-                                    fontFamily: "'Outfit', sans-serif",
+                                    fontFamily: "'DM Sans', sans-serif",
                                     cursor:     passDisabled ? 'not-allowed' : 'pointer',
                                 }}>
                                 {passLoading
@@ -544,7 +538,7 @@ const AccountPage = () => {
                             <div className="flex items-start gap-2 pt-1">
                                 <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: '#F59E0B' }} />
                                 <p className="text-xs text-gray-400 leading-relaxed"
-                                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                     Après le changement, vous serez reconnecté automatiquement.
                                 </p>
                             </div>

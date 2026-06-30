@@ -1,13 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '@/lib/services/api';
 import { ShieldCheck, User, Trash2, Globe, Clock, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import confirm from '@/lib/utils/confirm';
-
-// ✅ URL de l'API (Prod ou Dev)
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api';
 
 const ActiveSessionsPage = () => {
   const [sessions, setSessions] = useState([]);
@@ -18,11 +15,8 @@ const ActiveSessionsPage = () => {
   const fetchActiveSessions = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
       // Appel à la route que nous avons créée dans adminRoutes.js
-      const res = await axios.get(`${API_URL}/admin/owners/active-sessions`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get('/admin/owners/active-sessions');
 
       // Le backend renvoie { data: { activeUsers: [...] } }
       setSessions(res.data.data.activeUsers || []);
@@ -49,11 +43,8 @@ const ActiveSessionsPage = () => {
     if (!await confirm(`Voulez-vous vraiment déconnecter de force ${userName} ?`, { title: 'Déconnecter la session', danger: true })) return;
 
     try {
-      const token = localStorage.getItem('token');
       // On utilise la route "ban" ou "suspend" pour invalider le token de l'utilisateur
-      await axios.patch(`${API_URL}/admin/owners/${userId}/suspend`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.patch(`/admin/owners/${userId}/suspend`, {});
 
       toast.success(`${userName} a été déconnecté avec succès.`);
       // Mise à jour locale de la liste

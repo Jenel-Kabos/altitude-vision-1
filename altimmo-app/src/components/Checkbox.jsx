@@ -1,9 +1,11 @@
 import React from 'react';
 import { TouchableOpacity, View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, fontSize, spacing, radius } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { fonts, fontSize, spacing, radius } from '../theme';
 
 export default function Checkbox({ checked, onPress, label, style }) {
+  const { themeColors: c } = useTheme();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -16,22 +18,25 @@ export default function Checkbox({ checked, onPress, label, style }) {
         style,
       ]}
       activeOpacity={0.8}
+      accessibilityRole="checkbox"
+      accessibilityLabel={label || 'Case à cocher'}
+      accessibilityState={{ checked: !!checked }}
     >
       <View
         style={{
           width: 22,
           height: 22,
           borderRadius: radius.xs,
-          backgroundColor: checked ? colors.gold : colors.bgCardAlt,
+          backgroundColor: checked ? c.gold : c.bgCardAlt,
           borderWidth: 1.5,
-          borderColor: checked ? colors.gold : colors.border,
+          borderColor: checked ? c.gold : c.border,
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: spacing.sm,
         }}
       >
         {checked && (
-          <Ionicons name="checkmark" size={14} color={colors.black} />
+          <Ionicons name="checkmark" size={14} color="#0A0A0A" />
         )}
       </View>
       {label && (
@@ -40,7 +45,7 @@ export default function Checkbox({ checked, onPress, label, style }) {
             flex: 1,
             fontFamily: fonts.body,
             fontSize: fontSize.sm,
-            color: colors.text,
+            color: c.text,
           }}
         >
           {label}

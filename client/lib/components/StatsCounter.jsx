@@ -19,7 +19,7 @@ const STATS = [
     },
     {
         icon:    Calendar,
-        value:   50,
+        value:   80,
         suffix:  '+',
         label:   'Événements organisés',
         sublabel:'Moments inoubliables',
@@ -32,7 +32,7 @@ const STATS = [
         suffix:  ' ans',
         label:   "D'expérience",
         sublabel:"Au service de l'excellence",
-        color:   '#C8872A',   // Or Altcom
+        color:   '#C8960C',   // Or Altcom
         delay:   0.2,
     },
     {
@@ -124,7 +124,7 @@ const StatCard = ({ stat, started, index }) => {
                 <span
                     className="pb-1"
                     style={{
-                        fontFamily: "'Outfit', sans-serif",
+                        fontFamily: "'DM Sans', sans-serif",
                         fontSize:   'clamp(1.2rem, 2vw, 2.5rem)',
                         fontWeight: 600,
                         color:      stat.color,
@@ -139,7 +139,7 @@ const StatCard = ({ stat, started, index }) => {
             <p
                 className="font-bold text-white mb-1"
                 style={{
-                    fontFamily: "'Outfit', sans-serif",
+                    fontFamily: "'DM Sans', sans-serif",
                     fontSize:   'clamp(0.95rem, 1.5vw, 1.2rem)',
                 }}
             >
@@ -149,7 +149,7 @@ const StatCard = ({ stat, started, index }) => {
             {/* Sous-label */}
             <p
                 className="text-xs text-gray-500"
-                style={{ fontFamily: "'Outfit', sans-serif" }}
+                style={{ fontFamily: "'DM Sans', sans-serif" }}
             >
                 {stat.sublabel}
             </p>
@@ -188,7 +188,7 @@ const StatsCounter = () => {
                 />
                 <div
                     className="absolute bottom-0 right-0 w-80 h-80 rounded-full blur-[120px] opacity-8"
-                    style={{ background: '#C8872A' }}
+                    style={{ background: '#C8960C' }}
                 />
                 <div
                     className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full blur-[100px] opacity-5"
@@ -212,7 +212,7 @@ const StatsCounter = () => {
                 >
                     <p
                         className="text-xs font-bold uppercase tracking-widest mb-3"
-                        style={{ color: '#C8872A', fontFamily: "'Outfit', sans-serif" }}
+                        style={{ color: '#C8960C', fontFamily: "'DM Sans', sans-serif" }}
                     >
                         Altitude-Vision en chiffres
                     </p>

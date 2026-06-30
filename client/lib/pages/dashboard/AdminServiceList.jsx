@@ -8,7 +8,7 @@ import {
 import api from '../../services/api';
 
 const BLUE = '#2E7BB5';
-const GOLD = '#C8872A';
+const GOLD = '#C8960C';
 const RED  = '#D42B2B';
 
 // ─────────────────────────────────────────────────────────────
@@ -22,17 +22,17 @@ const ConfirmDialog = ({ message, onConfirm, onCancel }) => (
         <AlertCircle size={22} className="text-red-500" />
       </div>
       <h3 className="font-bold text-gray-900 mb-2"
-        style={{ fontFamily: "'Outfit', sans-serif" }}>Confirmation</h3>
+        style={{ fontFamily: "'DM Sans', sans-serif" }}>Confirmation</h3>
       <p className="text-sm text-gray-500 mb-6">{message}</p>
       <div className="flex gap-3">
         <button onClick={onCancel}
           className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all"
-          style={{ fontFamily: "'Outfit', sans-serif" }}>
+          style={{ fontFamily: "'DM Sans', sans-serif" }}>
           Annuler
         </button>
         <button onClick={onConfirm}
           className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
-          style={{ background: 'linear-gradient(135deg,#B91C1C,#DC2626)', fontFamily: "'Outfit', sans-serif" }}>
+          style={{ background: 'linear-gradient(135deg,#B91C1C,#DC2626)', fontFamily: "'DM Sans', sans-serif" }}>
           Supprimer
         </button>
       </div>
@@ -49,7 +49,7 @@ const InlineNotif = ({ message, type, onClose }) => (
       background: type === 'error' ? '#FEF2F2' : '#F0FDF4',
       color:      type === 'error' ? '#DC2626' : '#16A34A',
       border:     `1px solid ${type === 'error' ? '#FCA5A5' : '#86EFAC'}`,
-      fontFamily: "'Outfit', sans-serif",
+      fontFamily: "'DM Sans', sans-serif",
     }}>
     <span className="flex-1">{message}</span>
     <button onClick={onClose} className="opacity-60 hover:opacity-100 transition-opacity">
@@ -127,11 +127,11 @@ const AdminServiceList = () => {
           </div>
           <div>
             <h2 className="font-bold text-gray-900 text-lg"
-              style={{ fontFamily: "'Outfit', sans-serif" }}>
+              style={{ fontFamily: "'DM Sans', sans-serif" }}>
               Gestion des Services
             </h2>
             <p className="text-xs text-gray-400"
-              style={{ fontFamily: "'Outfit', sans-serif" }}>
+              style={{ fontFamily: "'DM Sans', sans-serif" }}>
               {services.length} service{services.length !== 1 ? 's' : ''} configuré{services.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -142,7 +142,7 @@ const AdminServiceList = () => {
           style={{
             background: `linear-gradient(135deg, #A06820, ${GOLD})`,
             boxShadow:  `0 4px 16px ${GOLD}35`,
-            fontFamily: "'Outfit', sans-serif",
+            fontFamily: "'DM Sans', sans-serif",
           }}>
           <Plus size={16} /> Ajouter un service
         </button>
@@ -164,7 +164,7 @@ const AdminServiceList = () => {
             onChange={e => setSearch(e.target.value)}
             aria-label="Rechercher un service"
             className="w-full pl-10 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none transition-all"
-            style={{ fontFamily: "'Outfit', sans-serif" }}
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
             onFocus={e => { e.target.style.borderColor = BLUE; e.target.style.boxShadow = `0 0 0 3px ${BLUE}18`; }}
             onBlur={e  => { e.target.style.borderColor = '#E2E8F0'; e.target.style.boxShadow = 'none'; }}
           />
@@ -176,7 +176,7 @@ const AdminServiceList = () => {
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <Loader2 size={32} className="animate-spin mx-auto mb-3" style={{ color: GOLD }} />
-            <p className="text-sm text-gray-400" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <p className="text-sm text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               Chargement des services…
             </p>
           </div>
@@ -188,11 +188,11 @@ const AdminServiceList = () => {
             <Sparkles size={24} style={{ color: GOLD }} />
           </div>
           <p className="font-semibold text-gray-600 mb-1"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             {search ? 'Aucun résultat' : 'Aucun service configuré'}
           </p>
           <p className="text-sm text-gray-400 mb-5"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             {search
               ? `Aucun service ne correspond à "${search}".`
               : 'Commencez par ajouter votre premier service.'}
@@ -200,7 +200,7 @@ const AdminServiceList = () => {
           {!search && (
             <button onClick={() => router.push('/admin/services/creer')}
               className="flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105"
-              style={{ background: `linear-gradient(135deg, #A06820, ${GOLD})`, fontFamily: "'Outfit', sans-serif" }}>
+              style={{ background: `linear-gradient(135deg, #A06820, ${GOLD})`, fontFamily: "'DM Sans', sans-serif" }}>
               <Plus size={16} /> Ajouter un service
             </button>
           )}
@@ -217,7 +217,7 @@ const AdminServiceList = () => {
               { label: 'Actions',        col: 'col-span-2 text-right' },
             ].map(({ label, col }) => (
               <div key={label} className={`${col} text-xs font-semibold uppercase tracking-wide text-gray-400`}
-                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 {label}
               </div>
             ))}
@@ -237,7 +237,7 @@ const AdminServiceList = () => {
                   <Sparkles size={14} style={{ color: GOLD }} />
                 </div>
                 <span className="font-semibold text-gray-900 text-sm truncate"
-                  style={{ fontFamily: "'Outfit', sans-serif" }}>
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}>
                   {service.name || service.title || '—'}
                 </span>
               </div>
@@ -246,7 +246,7 @@ const AdminServiceList = () => {
               <div className="col-span-3">
                 {service.category ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
-                    style={{ background: `${BLUE}12`, color: BLUE, fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ background: `${BLUE}12`, color: BLUE, fontFamily: "'DM Sans', sans-serif" }}>
                     <Tag size={10} />
                     {service.category}
                   </span>
@@ -259,7 +259,7 @@ const AdminServiceList = () => {
               <div className="col-span-3 flex items-center gap-1.5">
                 <DollarSign size={13} className="text-green-500 flex-shrink-0" />
                 <span className="font-bold text-sm text-gray-800"
-                  style={{ fontFamily: "'Outfit', sans-serif" }}>
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}>
                   {formatPrice(service.basePrice ?? service.price)}
                 </span>
               </div>
@@ -287,14 +287,14 @@ const AdminServiceList = () => {
           {/* Footer */}
           <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between"
             style={{ background: '#FAFAFA' }}>
-            <p className="text-xs text-gray-400" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <p className="text-xs text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               {filtered.length} service{filtered.length !== 1 ? 's' : ''}
               {search && ` trouvé${filtered.length !== 1 ? 's' : ''} pour "${search}"`}
             </p>
             {search && (
               <button onClick={() => setSearch('')}
                 className="text-xs font-medium flex items-center gap-1 transition-opacity hover:opacity-70"
-                style={{ color: BLUE, fontFamily: "'Outfit', sans-serif" }}>
+                style={{ color: BLUE, fontFamily: "'DM Sans', sans-serif" }}>
                 <X size={12} /> Effacer la recherche
               </button>
             )}

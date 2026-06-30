@@ -12,7 +12,7 @@ export default function Card({ children, padding = spacing.lg, style }) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.bgCard,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,

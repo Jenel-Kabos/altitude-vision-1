@@ -13,7 +13,7 @@ import Image from 'next/image';
 // ─────────────────────────────────────────────────────────────
 // Constantes
 // ─────────────────────────────────────────────────────────────
-const GOLD        = '#C8872A';
+const GOLD        = '#C8960C';
 const GOLD_DARK   = '#A06820';
 const GOLD_LIGHT  = '#E5A84B';
 const BLUE        = '#2E7BB5';
@@ -68,7 +68,7 @@ const PortfolioCardGrid = ({ item }) => {
     return (
         <motion.div
             whileHover={{ y: -5 }}
-            onClick={() => router.push(`/altcom/portfolio/${item._id}`)}
+            onClick={() => router.push(`/communication/portfolio/${item._id}`)}
             className="group bg-white rounded-3xl border overflow-hidden cursor-pointer transition-all duration-500 hover:shadow-xl"
             style={{ borderColor: 'rgba(0,0,0,0.06)' }}
         >
@@ -86,7 +86,7 @@ const PortfolioCardGrid = ({ item }) => {
                     <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm">
                         <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
                         <span className="text-xs font-bold text-gray-900"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             {item.averageRating.toFixed(1)}
                         </span>
                     </div>
@@ -101,30 +101,30 @@ const PortfolioCardGrid = ({ item }) => {
             <div className="p-5">
                 {/* Badge catégorie */}
                 <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full mb-3"
-                    style={{ backgroundColor: `${GOLD}12`, color: GOLD, fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ backgroundColor: `${GOLD}12`, color: GOLD, fontFamily: "'DM Sans', sans-serif" }}>
                     {item.category}
                 </span>
 
-                <h3 className="font-bold text-gray-900 mb-2 line-clamp-1 text-lg transition-colors group-hover:text-[#C8872A]"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                <h3 className="font-bold text-gray-900 mb-2 line-clamp-1 text-lg transition-colors group-hover:text-[#C8960C]"
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {item.title}
                 </h3>
                 <p className="text-sm text-gray-500 mb-4 line-clamp-2 leading-relaxed"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {item.description}
                 </p>
 
                 <div className="flex items-center justify-between text-xs text-gray-400 pt-3 border-t border-gray-100">
                     {item.client && (
                         <span className="flex items-center gap-1.5"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             <Tag className="w-3.5 h-3.5" style={{ color: GOLD }} />
                             {item.client}
                         </span>
                     )}
                     {item.projectDate && (
                         <span className="flex items-center gap-1.5"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             <Calendar className="w-3.5 h-3.5" style={{ color: BLUE }} />
                             {new Date(item.projectDate).getFullYear()}
                         </span>
@@ -145,7 +145,7 @@ const PortfolioCardList = ({ item }) => {
     return (
         <motion.div
             whileHover={{ x: 4 }}
-            onClick={() => router.push(`/altcom/portfolio/${item._id}`)}
+            onClick={() => router.push(`/communication/portfolio/${item._id}`)}
             className="group bg-white rounded-3xl border overflow-hidden cursor-pointer transition-all duration-400 hover:shadow-lg flex flex-col sm:flex-row"
             style={{ borderColor: 'rgba(0,0,0,0.06)' }}
         >
@@ -165,11 +165,11 @@ const PortfolioCardList = ({ item }) => {
                     <div className="flex items-start justify-between mb-3 gap-3">
                         <div>
                             <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-full mb-2"
-                                style={{ backgroundColor: `${GOLD}12`, color: GOLD, fontFamily: "'Outfit', sans-serif" }}>
+                                style={{ backgroundColor: `${GOLD}12`, color: GOLD, fontFamily: "'DM Sans', sans-serif" }}>
                                 {item.category}
                             </span>
-                            <h3 className="font-bold text-gray-900 text-xl line-clamp-1 transition-colors group-hover:text-[#C8872A]"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            <h3 className="font-bold text-gray-900 text-xl line-clamp-1 transition-colors group-hover:text-[#C8960C]"
+                                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                 {item.title}
                             </h3>
                         </div>
@@ -177,33 +177,33 @@ const PortfolioCardList = ({ item }) => {
                             <div className="flex items-center gap-1 flex-shrink-0 px-2.5 py-1.5 rounded-full border"
                                 style={{ borderColor: `${GOLD}25`, backgroundColor: `${GOLD}08` }}>
                                 <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-                                <span className="text-xs font-bold" style={{ color: GOLD_DARK, fontFamily: "'Outfit', sans-serif" }}>
+                                <span className="text-xs font-bold" style={{ color: GOLD_DARK, fontFamily: "'DM Sans', sans-serif" }}>
                                     {item.averageRating.toFixed(1)}
                                 </span>
                             </div>
                         )}
                     </div>
                     <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed"
-                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        style={{ fontFamily: "'DM Sans', sans-serif" }}>
                         {item.description}
                     </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400 mt-4 pt-3 border-t border-gray-100">
                     {item.client && (
-                        <span className="flex items-center gap-1.5" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        <span className="flex items-center gap-1.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             <Tag className="w-3.5 h-3.5" style={{ color: GOLD }} />
                             {item.client}
                         </span>
                     )}
                     {item.projectDate && (
-                        <span className="flex items-center gap-1.5" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        <span className="flex items-center gap-1.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             <Calendar className="w-3.5 h-3.5" style={{ color: BLUE }} />
                             {new Date(item.projectDate).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' })}
                         </span>
                     )}
                     <span className="ml-auto flex items-center gap-1.5 font-semibold transition-all group-hover:gap-2.5"
-                        style={{ color: GOLD, fontFamily: "'Outfit', sans-serif" }}>
+                        style={{ color: GOLD, fontFamily: "'DM Sans', sans-serif" }}>
                         Voir le projet
                         <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                     </span>
@@ -232,7 +232,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
                         color:       p === currentPage ? 'white' : '#6B7280',
                         border:      `1px solid ${p === currentPage ? 'transparent' : '#E5E7EB'}`,
                         boxShadow:   p === currentPage ? `0 4px 12px ${GOLD}40` : 'none',
-                        fontFamily:  "'Outfit', sans-serif",
+                        fontFamily:  "'DM Sans', sans-serif",
                     }}>
                     {p}
                 </button>
@@ -327,7 +327,7 @@ const AltcomAnnonces = () => {
     const inputBlur  = e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; };
 
     return (
-        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
             {/* ── Hero ─────────────────────────────── */}
             <div className="relative py-20 text-white overflow-hidden"
@@ -393,7 +393,7 @@ const AltcomAnnonces = () => {
                             <input type="text" placeholder="Rechercher par titre, client, tags..."
                                 value={filters.search} onChange={e => setFilter('search', e.target.value)}
                                 className="w-full pl-11 pr-10 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none focus:bg-white transition-all placeholder-gray-400"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}
+                                style={{ fontFamily: "'DM Sans', sans-serif" }}
                                 onFocus={inputFocus} onBlur={inputBlur} />
                             {filters.search && (
                                 <button onClick={() => setFilter('search', '')}
@@ -411,7 +411,7 @@ const AltcomAnnonces = () => {
                                     background:  showFilters ? `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})` : '#F9FAFB',
                                     color:       showFilters ? 'white' : '#374151',
                                     border:      `1px solid ${showFilters ? 'transparent' : '#E5E7EB'}`,
-                                    fontFamily:  "'Outfit', sans-serif",
+                                    fontFamily:  "'DM Sans', sans-serif",
                                 }}>
                                 <SlidersHorizontal className="w-4 h-4" />
                                 Filtres
@@ -444,7 +444,7 @@ const AltcomAnnonces = () => {
                                     {/* Catégories */}
                                     <div>
                                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             Catégorie
                                         </label>
                                         <div className="flex flex-wrap gap-2">
@@ -456,7 +456,7 @@ const AltcomAnnonces = () => {
                                                         color:       filters.category === cat ? 'white' : '#6B7280',
                                                         border:      `1px solid ${filters.category === cat ? 'transparent' : '#E5E7EB'}`,
                                                         boxShadow:   filters.category === cat ? `0 4px 12px ${GOLD}30` : 'none',
-                                                        fontFamily:  "'Outfit', sans-serif",
+                                                        fontFamily:  "'DM Sans', sans-serif",
                                                     }}>
                                                     {cat === 'all' ? 'Toutes' : cat}
                                                 </button>
@@ -467,12 +467,12 @@ const AltcomAnnonces = () => {
                                     {/* Tri */}
                                     <div>
                                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             Trier par
                                         </label>
                                         <select value={filters.sortBy} onChange={e => setFilter('sortBy', e.target.value)}
                                             className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none transition-all"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}
+                                            style={{ fontFamily: "'DM Sans', sans-serif" }}
                                             onFocus={inputFocus} onBlur={inputBlur}>
                                             <option value="recent">Plus récent</option>
                                             <option value="oldest">Plus ancien</option>
@@ -486,7 +486,7 @@ const AltcomAnnonces = () => {
                                     <div className="flex justify-end mt-4">
                                         <button onClick={resetFilters}
                                             className="flex items-center gap-1.5 text-sm font-semibold text-gray-400 hover:text-gray-700 transition-colors"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             <X className="w-4 h-4" />
                                             Réinitialiser
                                         </button>
@@ -499,14 +499,14 @@ const AltcomAnnonces = () => {
 
                 {/* Compteur */}
                 <div className="flex items-center justify-between mb-6 px-1">
-                    <p className="text-sm text-gray-500" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    <p className="text-sm text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                         <span className="font-bold text-gray-900">{filtered.length}</span>{' '}
                         projet{filtered.length > 1 ? 's' : ''} trouvé{filtered.length > 1 ? 's' : ''}
                     </p>
                     {hasFilters && (
                         <button onClick={resetFilters}
                             className="text-sm font-semibold transition-colors hover:opacity-80"
-                            style={{ color: GOLD, fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ color: GOLD, fontFamily: "'DM Sans', sans-serif" }}>
                             Voir tous les projets
                         </button>
                     )}
@@ -519,7 +519,7 @@ const AltcomAnnonces = () => {
                         <p className="text-red-700 text-sm font-medium">{error}</p>
                         <button onClick={fetchPortfolio}
                             className="ml-auto text-sm font-semibold px-4 py-1.5 rounded-full text-white"
-                            style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, fontFamily: "'DM Sans', sans-serif" }}>
                             Réessayer
                         </button>
                     </div>
@@ -538,17 +538,17 @@ const AltcomAnnonces = () => {
                             <Briefcase className="w-8 h-8 text-white" />
                         </div>
                         <h3 className="font-bold text-gray-800 text-xl mb-2"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             Aucun projet trouvé
                         </h3>
                         <p className="text-gray-500 text-sm mb-6"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             Essayez de modifier vos critères de recherche
                         </p>
                         {hasFilters && (
                             <button onClick={resetFilters}
                                 className="px-6 py-2.5 rounded-full font-semibold text-white text-sm"
-                                style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, fontFamily: "'Outfit', sans-serif" }}>
+                                style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, fontFamily: "'DM Sans', sans-serif" }}>
                                 Réinitialiser les filtres
                             </button>
                         )}

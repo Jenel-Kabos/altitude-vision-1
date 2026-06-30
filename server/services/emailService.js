@@ -1,5 +1,6 @@
 const Email = require('../models/Email');
 const zohoMailService = require('./zohoMailService');
+const logger = require('../utils/logger');
 
 // Récupérer tous les emails de la base de données
 const getAllEmails = async () => {
@@ -9,7 +10,7 @@ const getAllEmails = async () => {
       .sort({ createdAt: -1 });
     return emails;
   } catch (error) {
-    console.error('❌ [EmailService] Erreur getAllEmails:', error);
+    logger.error('❌ [EmailService] Erreur getAllEmails:', error);
     throw new Error('Erreur lors de la récupération des emails: ' + error.message);
   }
 };
@@ -36,15 +37,15 @@ const createEmail = async (emailData) => {
     });
 
     await newEmail.save();
-    
-    console.log(`✅ [EmailService] Email ${emailData.email} créé dans la base de données`);
+
+    logger.success(`✅ [EmailService] Email ${emailData.email} créé dans la base de données`);
 
     // Peupler les données de l'utilisateur assigné
     await newEmail.populate('assignedTo', 'name email');
 
     return newEmail;
   } catch (error) {
-    console.error('❌ [EmailService] Erreur createEmail:', error);
+    logger.error('❌ [EmailService] Erreur createEmail:', error);
     throw new Error('Erreur lors de la création de l\'email: ' + error.message);
   }
 };
@@ -68,10 +69,10 @@ const updateEmail = async (emailId, updateData) => {
       throw new Error('Email non trouvé');
     }
 
-    console.log(`✅ [EmailService] Email ${email.email} mis à jour`);
+    logger.success(`✅ [EmailService] Email ${email.email} mis à jour`);
     return email;
   } catch (error) {
-    console.error('❌ [EmailService] Erreur updateEmail:', error);
+    logger.error('❌ [EmailService] Erreur updateEmail:', error);
     throw new Error('Erreur lors de la mise à jour: ' + error.message);
   }
 };
@@ -80,15 +81,15 @@ const updateEmail = async (emailId, updateData) => {
 const deleteEmail = async (emailId) => {
   try {
     const email = await Email.findByIdAndDelete(emailId);
-    
+
     if (!email) {
       throw new Error('Email non trouvé');
     }
 
-    console.log(`✅ [EmailService] Email ${email.email} supprimé`);
+    logger.success(`✅ [EmailService] Email ${email.email} supprimé`);
     return { message: 'Email supprimé avec succès', email: email.email };
   } catch (error) {
-    console.error('❌ [EmailService] Erreur deleteEmail:', error);
+    logger.error('❌ [EmailService] Erreur deleteEmail:', error);
     throw new Error('Erreur lors de la suppression: ' + error.message);
   }
 };
@@ -97,7 +98,7 @@ const deleteEmail = async (emailId) => {
 const toggleEmailStatus = async (emailId) => {
   try {
     const email = await Email.findById(emailId);
-    
+
     if (!email) {
       throw new Error('Email non trouvé');
     }
@@ -105,12 +106,12 @@ const toggleEmailStatus = async (emailId) => {
     email.isActive = !email.isActive;
     await email.save();
 
-    console.log(`✅ [EmailService] Statut de ${email.email} changé: ${email.isActive ? 'Actif' : 'Inactif'}`);
+    logger.success(`✅ [EmailService] Statut de ${email.email} changé: ${email.isActive ? 'Actif' : 'Inactif'}`);
 
     await email.populate('assignedTo', 'name email');
     return email;
   } catch (error) {
-    console.error('❌ [EmailService] Erreur toggleEmailStatus:', error);
+    logger.error('❌ [EmailService] Erreur toggleEmailStatus:', error);
     throw new Error('Erreur lors du changement de statut: ' + error.message);
   }
 };
@@ -128,10 +129,10 @@ const updateNotifications = async (emailId, notifications) => {
       throw new Error('Email non trouvé');
     }
 
-    console.log(`✅ [EmailService] Notifications de ${email.email} mises à jour`);
+    logger.success(`✅ [EmailService] Notifications de ${email.email} mises à jour`);
     return email;
   } catch (error) {
-    console.error('❌ [EmailService] Erreur updateNotifications:', error);
+    logger.error('❌ [EmailService] Erreur updateNotifications:', error);
     throw new Error('Erreur lors de la mise à jour des notifications: ' + error.message);
   }
 };
@@ -140,11 +141,11 @@ const updateNotifications = async (emailId, notifications) => {
 const getGlobalStats = async () => {
   try {
     const emails = await Email.find();
-    
+
     const totalEmails = emails.length;
     const activeEmails = emails.filter(e => e.isActive).length;
     const totalSent = emails.reduce((acc, e) => acc + (e.emailsSent || 0), 0);
-    const withNotifications = emails.filter(e => 
+    const withNotifications = emails.filter(e =>
       Object.values(e.notifications || {}).some(v => v === true)
     ).length;
 
@@ -157,10 +158,10 @@ const getGlobalStats = async () => {
       withNotifications
     };
 
-    console.log(`📊 [EmailService] Stats: ${totalEmails} emails, ${activeEmails} actifs, ${totalSent} envoyés`);
+    logger.info(`📊 [EmailService] Stats: ${totalEmails} emails, ${activeEmails} actifs, ${totalSent} envoyés`);
     return stats;
   } catch (error) {
-    console.error('❌ [EmailService] Erreur getGlobalStats:', error);
+    logger.error('❌ [EmailService] Erreur getGlobalStats:', error);
     throw new Error('Erreur lors de la récupération des statistiques: ' + error.message);
   }
 };
@@ -168,7 +169,7 @@ const getGlobalStats = async () => {
 // Envoyer un email via Zoho
 const sendEmailViaZoho = async (fromEmail, toEmail, subject, content) => {
   try {
-    console.log(`📧 [EmailService] Envoi email de ${fromEmail} vers ${toEmail}`);
+    logger.info(`📧 [EmailService] Envoi email de ${fromEmail} vers ${toEmail}`);
 
     // Récupérer le compte pour le nom affiché (optionnel — pas bloquant)
     const emailAccount = await Email.findOne({ email: fromEmail });
@@ -186,7 +187,7 @@ const sendEmailViaZoho = async (fromEmail, toEmail, subject, content) => {
       await emailAccount.save();
     }
 
-    console.log(`✅ [EmailService] Email envoyé de ${fromAddress} vers ${toEmail}`);
+    logger.success(`✅ [EmailService] Email envoyé de ${fromAddress} vers ${toEmail}`);
 
     return {
       success: true,
@@ -196,7 +197,7 @@ const sendEmailViaZoho = async (fromEmail, toEmail, subject, content) => {
       zohoResponse: result
     };
   } catch (error) {
-    console.error('❌ [EmailService] Erreur sendEmailViaZoho:', error);
+    logger.error('❌ [EmailService] Erreur sendEmailViaZoho:', error);
     throw new Error('Erreur lors de l\'envoi de l\'email: ' + error.message);
   }
 };
@@ -204,10 +205,10 @@ const sendEmailViaZoho = async (fromEmail, toEmail, subject, content) => {
 // Synchroniser avec Zoho Mail
 const syncWithZoho = async () => {
   try {
-    console.log('🔄 [EmailService] Début de la synchronisation avec Zoho...');
+    logger.info('🔄 [EmailService] Début de la synchronisation avec Zoho...');
 
     const zohoAccounts = await zohoMailService.getAllAccounts();
-    
+
     const syncResults = {
       total: zohoAccounts.length,
       synced: 0,
@@ -220,7 +221,7 @@ const syncWithZoho = async () => {
       try {
         // Vérifier si l'email existe déjà dans la base de données
         let email = await Email.findOne({ email: zohoAccount.primaryEmailAddress });
-        
+
         if (!email) {
           // Créer un nouvel enregistrement
           email = new Email({
@@ -232,28 +233,28 @@ const syncWithZoho = async () => {
             zohoAccountId: zohoAccount.accountId,
             emailsSent: 0
           });
-          
+
           await email.save();
           syncResults.synced++;
-          console.log(`✅ [EmailService] Nouveau compte synchronisé: ${zohoAccount.primaryEmailAddress}`);
+          logger.success(`✅ [EmailService] Nouveau compte synchronisé: ${zohoAccount.primaryEmailAddress}`);
         } else {
           // Mettre à jour les informations si nécessaire
           let updated = false;
-          
+
           if (email.zohoAccountId !== zohoAccount.accountId) {
             email.zohoAccountId = zohoAccount.accountId;
             updated = true;
           }
-          
+
           if (email.isActive !== zohoAccount.status) {
             email.isActive = zohoAccount.status;
             updated = true;
           }
-          
+
           if (updated) {
             await email.save();
             syncResults.updated++;
-            console.log(`🔄 [EmailService] Compte mis à jour: ${zohoAccount.primaryEmailAddress}`);
+            logger.info(`🔄 [EmailService] Compte mis à jour: ${zohoAccount.primaryEmailAddress}`);
           } else {
             syncResults.skipped++;
           }
@@ -263,14 +264,14 @@ const syncWithZoho = async () => {
           email: zohoAccount.primaryEmailAddress,
           error: err.message
         });
-        console.error(`❌ [EmailService] Erreur sync pour ${zohoAccount.primaryEmailAddress}:`, err.message);
+        logger.error(`❌ [EmailService] Erreur sync pour ${zohoAccount.primaryEmailAddress}:`, err.message);
       }
     }
 
-    console.log(`✅ [EmailService] Synchronisation terminée: ${syncResults.synced} créés, ${syncResults.updated} mis à jour, ${syncResults.skipped} ignorés`);
+    logger.success(`✅ [EmailService] Synchronisation terminée: ${syncResults.synced} créés, ${syncResults.updated} mis à jour, ${syncResults.skipped} ignorés`);
     return syncResults;
   } catch (error) {
-    console.error('❌ [EmailService] Erreur syncWithZoho:', error);
+    logger.error('❌ [EmailService] Erreur syncWithZoho:', error);
     throw new Error('Erreur lors de la synchronisation: ' + error.message);
   }
 };
@@ -279,13 +280,13 @@ const syncWithZoho = async () => {
 const sendNotificationEmail = async (emailType, recipientEmail, data) => {
   try {
     // Trouver le compte email approprié selon le type
-    const emailAccount = await Email.findOne({ 
-      emailType: emailType, 
-      isActive: true 
+    const emailAccount = await Email.findOne({
+      emailType: emailType,
+      isActive: true
     });
 
     if (!emailAccount) {
-      console.warn(`⚠️ [EmailService] Aucun compte actif trouvé pour le type: ${emailType}`);
+      logger.warn(`⚠️ [EmailService] Aucun compte actif trouvé pour le type: ${emailType}`);
       return null;
     }
 
@@ -337,7 +338,7 @@ const sendNotificationEmail = async (emailType, recipientEmail, data) => {
 
     return await sendEmailViaZoho(emailAccount.email, recipientEmail, subject, content);
   } catch (error) {
-    console.error('❌ [EmailService] Erreur sendNotificationEmail:', error);
+    logger.error('❌ [EmailService] Erreur sendNotificationEmail:', error);
     throw new Error('Erreur lors de l\'envoi de la notification: ' + error.message);
   }
 };
@@ -347,14 +348,14 @@ const getEmailByAddress = async (emailAddress) => {
   try {
     const email = await Email.findOne({ email: emailAddress })
       .populate('assignedTo', 'name email');
-    
+
     if (!email) {
       throw new Error('Email non trouvé');
     }
 
     return email;
   } catch (error) {
-    console.error('❌ [EmailService] Erreur getEmailByAddress:', error);
+    logger.error('❌ [EmailService] Erreur getEmailByAddress:', error);
     throw new Error('Erreur lors de la récupération de l\'email: ' + error.message);
   }
 };
@@ -378,7 +379,7 @@ const sendEmailWithAttachment = async (toEmail, subject, htmlBody, attachments =
     html: htmlBody,
     attachments,
   });
-  console.log(`✅ [EmailService] Email avec pièce jointe envoyé à ${toEmail}`);
+  logger.success(`✅ [EmailService] Email avec pièce jointe envoyé à ${toEmail}`);
 };
 
 module.exports = {

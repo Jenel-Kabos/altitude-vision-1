@@ -1,4 +1,5 @@
 import api from './api';
+import { cache } from './cacheService';
 
 const CLOUDINARY_CLOUD_NAME = 'dop8vzm5z';
 const CLOUDINARY_UPLOAD_PRESET = 'lqwel6X6';
@@ -40,8 +41,14 @@ export async function uploadToCloudinary(uri) {
 }
 
 export async function getRecommendedProperties() {
+  const KEY = 'recommended:properties';
+  const hit = cache.get(KEY);
+  if (hit) return hit;
   const res = await api.get('/properties/recommended');
-  return res.data?.data?.properties || res.data?.properties || [];
+  const data = res.data?.data?.properties || res.data?.properties || [];
+  // Mise en cache 10 minutes — les recommandés changent rarement
+  cache.set(KEY, data, 10 * 60 * 1000);
+  return data;
 }
 
 export async function creerAnnonce(payload) {

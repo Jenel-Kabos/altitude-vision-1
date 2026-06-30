@@ -11,7 +11,7 @@ import { useAuth } from '@/lib/context/AuthContext';
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 
 const CERTIFICATIONS_LIST = [
   { key: 'contratAccepte',       label: "J'ai lu et j'accepte intégralement le contrat d'hébergement d'Altitude Vision" },
@@ -100,7 +100,7 @@ export default function CompleterProfil() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4"
-      style={{ fontFamily: "'Outfit', sans-serif" }}>
+      style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full blur-[140px]"

@@ -4,26 +4,22 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { FaHome, FaBuilding, FaCalendarAlt, FaBriefcase, FaSignOutAlt } from 'react-icons/fa';
-import { logout, getCurrentUser } from '../../services/authService';
+import { useAuth } from '../../context/AuthContext';
 
 const DashboardLayout = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const user = getCurrentUser();
+  const { user, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
     router.push('/login');
   };
 
-  // Fonction pour mettre en surbrillance le lien actif
-  const isActive = (path) => pathname?.startsWith(path)
-    ? 'bg-gray-700'
-    : '';
+  const isActive = (path) => pathname?.startsWith(path) ? 'bg-gray-700' : '';
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
       <aside className="w-64 bg-gray-800 text-white flex flex-col">
         <div className="p-4 text-2xl font-bold border-b border-gray-700">
           Altitude-Vision
@@ -72,7 +68,6 @@ const DashboardLayout = ({ children }) => {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 p-8 overflow-y-auto">
         {children}
       </main>

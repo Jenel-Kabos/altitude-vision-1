@@ -1,207 +1,371 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  View, Text, Image, TouchableOpacity,
-  StyleSheet, Alert,
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { AntDesign, Ionicons } from '@expo/vector-icons';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
-import { Screen, Input, Button } from '../../components';
-import { colors, fonts, fontSize, spacing } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { Button } from '../../components';
+import { fonts, fontSize, spacing, radius } from '../../theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const ANDROID_CLIENT_ID =
-  '872164120879-o3j19vs2ro8l7pm93u3g1po8v10tgruv.apps.googleusercontent.com';
+const LOGO           = require('../../../assets/Logo_Altitude_transparent.png');
+const ANDROID_CLIENT = '872164120879-o3j19vs2ro8l7pm93u3g1po8v10tgruv.apps.googleusercontent.com';
+const EMAIL_RE       = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen({ navigation }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+
+  const [email, setEmail]     = useState('');
+  const [password, setPass]   = useState('');
+  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [erreur, setErreur] = useState('');
+  const [erreur, setErreur]   = useState('');
+
+  const passRef = useRef(null);
+
   const { login, loginWithGoogle } = useAuth();
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: ANDROID_CLIENT_ID,
+    androidClientId: ANDROID_CLIENT,
   });
 
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { authentication } = response;
-      handleGoogleLogin(authentication.accessToken);
-    }
-  }, [response]);
-
-  const handleGoogleLogin = async (accessToken) => {
+  const handleGoogleLogin = useCallback(async (accessToken) => {
+    setLoading(true);
+    setErreur('');
     try {
-      setLoading(true);
-      const userInfoRes = await fetch(
-        'https://www.googleapis.com/userinfo/v2/me',
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      const userInfo = await userInfoRes.json();
-
+      const res      = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const userInfo = await res.json();
       await loginWithGoogle({
         email:    userInfo.email,
         name:     userInfo.name,
         googleId: userInfo.id,
         avatar:   userInfo.picture,
       });
-      // Nav vers app principale : géré par AppNavigator qui switch sur user/token
-    } catch (err) {
-      console.log('Google login error:', err.message);
-      Alert.alert('Erreur', 'Connexion Google échouée. Réessayez.');
+    } catch {
+      setErreur('Connexion Google échouée. Réessayez.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [loginWithGoogle]);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
+  useEffect(() => {
+    if (response?.type === 'success') {
+      handleGoogleLogin(response.authentication.accessToken);
+    }
+  }, [response, handleGoogleLogin]);
+
+  const handleLogin = useCallback(async () => {
+    if (!email.trim() || !password) {
       setErreur('Email et mot de passe requis');
       return;
     }
-
+    if (!EMAIL_RE.test(email.trim())) {
+      setErreur('Adresse email invalide');
+      return;
+    }
     setLoading(true);
     setErreur('');
-
     try {
-      const response = await fetch(
-        'https://altitude-vision.onrender.com/api/auth/login',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        }
-      );
-      const data = await response.json();
-
-      if (data.token) {
-        await login(email, password);
-      } else {
-        setErreur(data.message || 'Identifiants incorrects');
-      }
-    } catch (error) {
-      Alert.alert('Erreur réseau', error.message);
-      setErreur(error.message);
+      await login(email.trim(), password);
+    } catch (err) {
+      setErreur(err.response?.data?.message || err.message || 'Identifiants incorrects');
     } finally {
       setLoading(false);
     }
-  };
+  }, [email, password, login]);
 
   return (
-    <Screen scroll avoidKeyboard style={styles.scroll}>
-      <View style={styles.header}>
-        <Image
-          source={require('../../../assets/Logo_Altitude_transparent.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.subtitle}>
-          Votre partenaire immobilier
-        </Text>
-      </View>
-
-      <View style={styles.form}>
-        <Input
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          placeholder="vous@exemple.com"
-          style={styles.input}
-        />
-
-        <Input
-          label="Mot de passe"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="password"
-          placeholder="Votre mot de passe"
-          style={styles.input}
-        />
-
-        <TouchableOpacity
-          onPress={() => navigation.navigate('ForgotPassword')}
-          style={styles.forgotWrap}
-          hitSlop={8}
-        >
-          <Text style={styles.forgotText}>
-            Mot de passe oublié ?
-          </Text>
-        </TouchableOpacity>
-
-        {erreur ? (
-          <Text style={styles.error}>{erreur}</Text>
-        ) : null}
-
-        <Button
-          label="Se connecter"
-          onPress={handleLogin}
-          loading={loading}
-          variant="primary"
-          style={styles.button}
-        />
-
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>ou</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <Button
-          variant="outline"
-          label="Continuer avec Google"
-          onPress={() => promptAsync()}
-          disabled={!request || loading}
-        />
-      </View>
-
-      <TouchableOpacity
-        onPress={() => navigation.navigate('Register')}
-        style={styles.signupLink}
-        hitSlop={8}
+    <SafeAreaView style={styles.root} edges={['bottom']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Text style={styles.signupText}>
-          Pas encore de compte ?{' '}
-          <Text style={styles.signupAccent}>S'inscrire</Text>
-        </Text>
-      </TouchableOpacity>
-    </Screen>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ─── Hero ─────────────────────────────────────────── */}
+          <View style={styles.hero}>
+            <LinearGradient
+              colors={['#0A0A0A', '#1C1408', '#2D1E04']}
+              style={StyleSheet.absoluteFillObject}
+            />
+
+            <Animated.View
+              entering={FadeInDown.delay(0).springify().damping(18)}
+              style={styles.logoWrap}
+            >
+              <Image
+                source={LOGO}
+                style={styles.logo}
+                contentFit="contain"
+                cachePolicy="memory"
+                accessible={false}
+              />
+            </Animated.View>
+
+            <Animated.View
+              entering={FadeInDown.delay(80).springify().damping(18)}
+              style={styles.heroText}
+            >
+              <Text style={styles.heroTitle}>Bon retour !</Text>
+              <Text style={styles.heroSub}>Connectez-vous à votre espace</Text>
+            </Animated.View>
+          </View>
+
+          {/* ─── Carte formulaire ─────────────────────────────── */}
+          <Animated.View
+            entering={FadeInDown.delay(160).springify().damping(18)}
+            style={styles.card}
+          >
+            {/* ─── Email ─── */}
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Email</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons
+                  name="mail-outline"
+                  size={18}
+                  color={c.textMuted}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.textInput}
+                  value={email}
+                  onChangeText={(v) => { setEmail(v); setErreur(''); }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  autoFocus
+                  placeholder="vous@exemple.com"
+                  placeholderTextColor={c.textMuted}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passRef.current?.focus()}
+                  accessibilityLabel="Adresse email"
+                />
+              </View>
+            </View>
+
+            {/* ─── Mot de passe ─── */}
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Mot de passe</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={18}
+                  color={c.textMuted}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  ref={passRef}
+                  style={[styles.textInput, styles.textInputPassword]}
+                  value={password}
+                  onChangeText={(v) => { setPass(v); setErreur(''); }}
+                  secureTextEntry={!showPass}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="password"
+                  placeholder="Votre mot de passe"
+                  placeholderTextColor={c.textMuted}
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                  accessibilityLabel="Mot de passe"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPass(v => !v)}
+                  style={styles.eyeBtn}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPass ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                >
+                  <Ionicons
+                    name={showPass ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={c.textMuted}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* ─── Mot de passe oublié ─── */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ForgotPassword')}
+              style={styles.forgotWrap}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Mot de passe oublié"
+            >
+              <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
+            </TouchableOpacity>
+
+            {/* ─── Erreur ─── */}
+            {erreur ? (
+              <Animated.View
+                entering={FadeInDown.duration(250)}
+                style={styles.errorWrap}
+              >
+                <Ionicons name="alert-circle-outline" size={15} color={c.error} />
+                <Text style={styles.errorText}>{erreur}</Text>
+              </Animated.View>
+            ) : null}
+
+            {/* ─── CTA connexion ─── */}
+            <Button
+              label="Se connecter"
+              onPress={handleLogin}
+              loading={loading}
+              variant="primary"
+              style={styles.loginBtn}
+            />
+
+            {/* ─── Divider ─── */}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>ou</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* ─── Google ─── */}
+            <TouchableOpacity
+              style={[styles.googleBtn, (!request || loading) && styles.googleBtnDisabled]}
+              onPress={() => promptAsync()}
+              disabled={!request || loading}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Continuer avec Google"
+            >
+              <AntDesign name="google" size={18} color="#EA4335" />
+              <Text style={styles.googleBtnText}>Continuer avec Google</Text>
+            </TouchableOpacity>
+
+            {/* ─── Lien inscription ─── */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Register')}
+              style={styles.signupLink}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Créer un compte"
+            >
+              <Text style={styles.signupText}>
+                Pas encore de compte ?{' '}
+                <Text style={styles.signupAccent}>S'inscrire</Text>
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#0A0A0A',
+  },
   scroll: {
     flexGrow: 1,
-    justifyContent: 'center',
   },
-  header: {
+
+  // ─── Hero ───
+  hero: {
+    height: 280,
+    justifyContent: 'flex-end',
+    paddingBottom: spacing.xl,
+    overflow: 'hidden',
+  },
+  logoWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    paddingTop: spacing.xl,
   },
   logo: {
-    width: 140,
-    height: 140,
-    marginBottom: spacing.md,
+    width: 90,
+    height: 90,
+    opacity: 0.9,
   },
-  subtitle: {
-    fontFamily: fonts.bodyItalic,
+  heroText: {
+    paddingHorizontal: spacing.lg,
+  },
+  heroTitle: {
+    fontFamily: fonts.displayItalic,
+    fontSize: 36,
+    color: '#F0EDE8',
+    lineHeight: 42,
+    marginBottom: spacing.xs,
+  },
+  heroSub: {
+    fontFamily: fonts.body,
     fontSize: fontSize.sm,
-    color: colors.textSub,
+    color: 'rgba(240,237,232,0.55)',
+    letterSpacing: 0.3,
   },
-  form: {
-    marginBottom: spacing.lg,
+
+  // ─── Carte formulaire ───
+  card: {
+    flex: 1,
+    backgroundColor: c.bg,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -20,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
-  input: {
+
+  // ─── Champs ───
+  field: {
     marginBottom: spacing.md,
   },
+  fieldLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.sm,
+    color: c.textSub,
+    marginBottom: spacing.xs,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: c.bgCardAlt,
+    borderRadius: radius.xs,
+    borderWidth: 1.5,
+    borderColor: c.border,
+    paddingHorizontal: spacing.sm,
+  },
+  inputIcon: {
+    marginRight: spacing.xs,
+  },
+  textInput: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: c.text,
+    paddingVertical: spacing.sm,
+  },
+  textInputPassword: {
+    paddingRight: spacing.xs,
+  },
+  eyeBtn: {
+    padding: spacing.xs,
+  },
+
+  // ─── Mot de passe oublié ───
   forgotWrap: {
     alignSelf: 'flex-end',
     marginBottom: spacing.md,
@@ -210,18 +374,35 @@ const styles = StyleSheet.create({
   forgotText: {
     fontFamily: fonts.body,
     fontSize: fontSize.sm,
-    color: colors.gold,
+    color: c.gold,
   },
-  error: {
+
+  // ─── Erreur ───
+  errorWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: 'rgba(163,45,45,0.1)',
+    borderRadius: radius.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(163,45,45,0.25)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  errorText: {
     fontFamily: fonts.body,
     fontSize: fontSize.sm,
-    color: colors.error,
-    textAlign: 'center',
+    color: c.error,
+    flex: 1,
+  },
+
+  // ─── Bouton connexion ───
+  loginBtn: {
     marginBottom: spacing.md,
   },
-  button: {
-    marginBottom: spacing.md,
-  },
+
+  // ─── Divider ───
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -230,14 +411,38 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: colors.border,
+    backgroundColor: c.border,
   },
   dividerText: {
     marginHorizontal: spacing.sm,
     fontFamily: fonts.body,
     fontSize: fontSize.xs,
-    color: colors.textMuted,
+    color: c.textMuted,
   },
+
+  // ─── Bouton Google ───
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: c.border,
+    borderRadius: radius.xs,
+    backgroundColor: c.bgCard,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  googleBtnDisabled: {
+    opacity: 0.45,
+  },
+  googleBtnText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSize.md,
+    color: c.text,
+  },
+
+  // ─── Lien inscription ───
   signupLink: {
     alignItems: 'center',
     paddingVertical: spacing.xs,
@@ -245,10 +450,10 @@ const styles = StyleSheet.create({
   signupText: {
     fontFamily: fonts.body,
     fontSize: fontSize.sm,
-    color: colors.textSub,
+    color: c.textSub,
   },
   signupAccent: {
     fontFamily: fonts.bodyBold,
-    color: colors.gold,
+    color: c.gold,
   },
 });

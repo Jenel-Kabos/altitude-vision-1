@@ -3,6 +3,7 @@ const express = require('express');
 const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
 const { upload } = require('../config/cloudinary');
+const { protect, restrictTo } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ router.get( '/verify-email/:token',                         authController.verif
 /* =======================================
    🧭 ROUTES PROTÉGÉES (token requis)
 ======================================= */
-router.use(authController.protect);
+router.use(protect);
 
 /* ===========================
    👤 UTILISATEUR CONNECTÉ
@@ -40,7 +41,7 @@ router.patch('/push-token',                               userController.savePus
 /* =======================================
    👑 ROUTES ADMIN UNIQUEMENT
 ======================================= */
-router.use(authController.restrictTo('Admin'));
+router.use(restrictTo('Admin'));
 
 router.get('/',        userController.getAllUsers);
 router.get('/owners',  userController.getAllOwners);

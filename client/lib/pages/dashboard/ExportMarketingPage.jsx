@@ -7,10 +7,10 @@ import { getExportStats, downloadExportCsv } from "../../services/exportMarketin
 
 // ── Constantes ───────────────────────────────────────────────
 const BLUE  = "#2E7BB5";
-const GOLD  = "#C8872A";
+const GOLD  = "#C8960C";
 const GREEN = "#16A34A";
 const RED   = "#D42B2B";
-const FONT  = "'Outfit', sans-serif";
+const FONT  = "'DM Sans', sans-serif";
 
 const SOURCES = [
   { key: "proprietaires", label: "Propriétaires",       icon: "👤" },

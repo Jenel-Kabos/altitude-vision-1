@@ -37,21 +37,21 @@ const Navbar = () => {
           <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-6">
               <NavLink 
-                to="/altimmo" 
+                to="/immobilier" 
                 style={({ isActive }) => isActive ? activeLinkStyle : undefined}
                 className="text-gray-600 hover:text-primary transition-colors duration-300"
               >
                 Altimmo
               </NavLink>
               <NavLink 
-                to="/mila-events" 
+                to="/evenementiel" 
                 style={({ isActive }) => isActive ? activeLinkStyle : undefined}
                 className="text-gray-600 hover:text-primary transition-colors duration-300"
               >
                 Mila Events
               </NavLink>
               <NavLink 
-                to="/altcom" 
+                to="/communication" 
                 style={({ isActive }) => isActive ? activeLinkStyle : undefined}
                 className="text-gray-600 hover:text-primary transition-colors duration-300"
               >
@@ -112,9 +112,9 @@ const Navbar = () => {
       {isMobileMenuOpen && (
         <div className="md:hidden" id="mobile-menu">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            <NavLink to="/altimmo" onClick={() => setMobileMenuOpen(false)} className="text-gray-600 hover:bg-gray-100 block px-3 py-2 rounded-md text-base font-medium">Altimmo</NavLink>
-            <NavLink to="/mila-events" onClick={() => setMobileMenuOpen(false)} className="text-gray-600 hover:bg-gray-100 block px-3 py-2 rounded-md text-base font-medium">Mila Events</NavLink>
-            <NavLink to="/altcom" onClick={() => setMobileMenuOpen(false)} className="text-gray-600 hover:bg-gray-100 block px-3 py-2 rounded-md text-base font-medium">Altcom</NavLink>
+            <NavLink to="/immobilier" onClick={() => setMobileMenuOpen(false)} className="text-gray-600 hover:bg-gray-100 block px-3 py-2 rounded-md text-base font-medium">Altimmo</NavLink>
+            <NavLink to="/evenementiel" onClick={() => setMobileMenuOpen(false)} className="text-gray-600 hover:bg-gray-100 block px-3 py-2 rounded-md text-base font-medium">Mila Events</NavLink>
+            <NavLink to="/communication" onClick={() => setMobileMenuOpen(false)} className="text-gray-600 hover:bg-gray-100 block px-3 py-2 rounded-md text-base font-medium">Altcom</NavLink>
           </div>
           {/* Section Utilisateur Mobile */}
           <div className="pt-4 pb-3 border-t border-gray-200">

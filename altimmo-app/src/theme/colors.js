@@ -33,12 +33,6 @@ export const colors = {
   goldMuted:    '#FCEFD6',
   blueMuted:    '#E6F1FB',
 
-  // ─── Alias legacy — pour les écrans non encore recâblés ───
-  primary:       '#C8960C', // legacy → utiliser gold
-  background:    '#FAFAF8', // legacy → utiliser bg
-  surface:       '#FFFFFF', // legacy → utiliser bgCard
-  card:          '#FFFFFF', // legacy → utiliser bgCard
-  cardElevated:  '#F5F5F2', // legacy → utiliser bgCardAlt
-  textSecondary: '#666666', // legacy → utiliser textSub
-  warning:       '#F59E0B', // legacy (pas d'équivalent dans la nouvelle palette)
+  // Semantic (suite)
+  warning:       '#F59E0B',
 };

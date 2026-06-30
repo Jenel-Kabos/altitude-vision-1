@@ -17,9 +17,9 @@ const slides = [
         headline:    'Votre marque mérite\nd\'être entendue.',
         body:        'Nous bâtissons des stratégies de communication sur-mesure qui amplifient votre voix et propulsent votre visibilité au Congo et au-delà.',
         quote:       '"Altcom a transformé notre présence digitale en véritable atout commercial."',
-        cta:         { label: 'Démarrer un projet', to: '/altcom', action: 'openProject' },
+        cta:         { label: 'Démarrer un projet', to: '/communication', action: 'openProject' },
         stat:        { value: '80+', label: 'projets réalisés' },
-        accent:      '#C8872A',
+        accent:      '#C8960C',
         accentLight: '#E8B86D',
         grad1: 'linear-gradient(108deg, rgba(30,18,2,0.92) 0%, rgba(12,8,0,0.6) 55%, rgba(12,8,0,0.12) 100%)',
         grad2: 'linear-gradient(to top, rgba(10,6,0,0.88) 0%, transparent 50%)',
@@ -34,7 +34,7 @@ const slides = [
         headline:    'Une identité visuelle\nqui marque les esprits.',
         body:        'Logo, charte graphique, supports de communication — nous créons des identités visuelles cohérentes qui distinguent votre marque de la concurrence.',
         quote:       '"Notre nouveau logo est reconnu partout. Altcom a capturé l\'essence de notre marque."',
-        cta:         { label: 'Voir nos créations', to: '/altcom/annonces' },
+        cta:         { label: 'Voir nos créations', to: '/communication/annonces' },
         stat:        { value: '100%', label: 'sur mesure' },
         accent:      '#B87520',
         accentLight: '#DFA050',
@@ -51,7 +51,7 @@ const slides = [
         headline:    'Chaque moment\ncapturé avec précision.',
         body:        'Photographie corporate, films institutionnels, couverture événementielle — nos équipes créatives immortalisent vos instants clés avec un niveau de qualité premium.',
         quote:       '"Les photos de notre événement ont été partagées des centaines de fois."',
-        cta:         { label: 'Contacter l\'équipe', to: '/altcom' },
+        cta:         { label: 'Contacter l\'équipe', to: '/communication' },
         stat:        { value: '5 ans', label: 'd\'expertise locale' },
         accent:      '#D4972E',
         accentLight: '#F0BC60',
@@ -165,7 +165,7 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                                     animation: 'altcomPulse 2.2s ease-in-out infinite',
                                 }} />
                                 <span style={{
-                                    fontFamily: "'Outfit', sans-serif",
+                                    fontFamily: "'DM Sans', sans-serif",
                                     fontSize: 'clamp(0.65rem,0.9vw,0.85rem)', fontWeight: 500,
                                     letterSpacing: '0.2em', textTransform: 'uppercase', color: s.accentLight,
                                 }}>
@@ -202,7 +202,7 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                         {/* Corps — 1 seul paragraphe, taille réduite */}
                         <motion.p variants={stagger(0.28)} initial="hidden" animate="visible" exit="exit"
                             style={{
-                                fontFamily: "'Outfit', sans-serif",
+                                fontFamily: "'DM Sans', sans-serif",
                                 fontSize: 'clamp(0.8rem,1.3vw,1.2rem)',
                                 fontWeight: 300, lineHeight: 1.72,
                                 color: 'rgba(251,246,238,0.6)',
@@ -241,7 +241,7 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                                         borderRadius: '40px',
                                         background: "linear-gradient(135deg, " + s.accent + ", " + s.accent + "CC)",
                                         color: '#0A0800', border: 'none', cursor: 'pointer',
-                                        fontFamily: "'Outfit', sans-serif",
+                                        fontFamily: "'DM Sans', sans-serif",
                                         fontSize: 'clamp(0.68rem,1.1vw,0.82rem)',
                                         fontWeight: 600, letterSpacing: '0.07em',
                                         textTransform: 'uppercase',
@@ -262,7 +262,7 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                                         borderRadius: '40px',
                                         background: "linear-gradient(135deg, " + s.accent + ", " + s.accent + "CC)",
                                         color: '#0A0800',
-                                        fontFamily: "'Outfit', sans-serif",
+                                        fontFamily: "'DM Sans', sans-serif",
                                         fontSize: 'clamp(0.68rem,1.1vw,0.82rem)',
                                         fontWeight: 600, letterSpacing: '0.07em',
                                         textTransform: 'uppercase', textDecoration: 'none',
@@ -289,7 +289,7 @@ const HeroSliderAltcom = ({ onStartProject }) => {
                                         {s.stat.value}
                                     </p>
                                     <p style={{
-                                        fontFamily: "'Outfit', sans-serif",
+                                        fontFamily: "'DM Sans', sans-serif",
                                         fontSize: 'clamp(0.54rem,0.9vw,0.6rem)',
                                         fontWeight: 300, letterSpacing: '0.1em',
                                         color: 'rgba(251,246,238,0.32)',
@@ -375,7 +375,7 @@ const HeroSliderAltcom = ({ onStartProject }) => {
 
                 {/* Compteur */}
                 <p style={{
-                    fontFamily: "'Outfit', sans-serif",
+                    fontFamily: "'DM Sans', sans-serif",
                     fontSize: '0.56rem', letterSpacing: '0.16em',
                     color: 'rgba(251,246,238,0.25)', userSelect: 'none',
                     writingMode: 'vertical-rl',

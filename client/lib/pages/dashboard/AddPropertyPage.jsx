@@ -115,11 +115,11 @@ const AddPropertyPage = () => {
         </div>
         <div>
           <h2 className="font-bold text-gray-900 text-lg"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Ajouter un nouveau bien
           </h2>
           <p className="text-xs text-gray-400"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Remplissez les informations du bien immobilier
           </p>
         </div>
@@ -132,7 +132,7 @@ const AddPropertyPage = () => {
           style={{ background: '#F8FAFC' }}>
           <PlusCircle size={16} style={{ color: BLUE }} />
           <span className="text-sm font-semibold text-gray-700"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Nouveau bien — Altimmo
           </span>
         </div>
@@ -148,7 +148,7 @@ const AddPropertyPage = () => {
           {/* Indicateur de chargement global si redirection en cours */}
           {redirect && (
             <div className="flex items-center gap-2 mt-4 text-sm text-gray-400"
-              style={{ fontFamily: "'Outfit', sans-serif" }}>
+              style={{ fontFamily: "'DM Sans', sans-serif" }}>
               <Loader2 size={15} className="animate-spin" style={{ color: BLUE }} />
               Redirection vers vos propriétés…
             </div>

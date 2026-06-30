@@ -5,7 +5,7 @@ import JsonLd from "@/lib/components/JsonLd";
 export const metadata = buildMetadata({
   title:       "Altcom — Agence de Communication & Branding à Brazzaville",
   description: "80 entreprises congolaises accompagnées. Branding, digital, stratégie — une seule agence pour construire votre image et multiplier vos clients à Brazzaville.",
-  url:         "/altcom",
+  url:         "/communication",
 });
 
 const SCHEMAS = [
@@ -14,7 +14,7 @@ const SCHEMAS = [
     "@type":    "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Accueil", item: SITE_URL },
-      { "@type": "ListItem", position: 2, name: "Altcom",  item: `${SITE_URL}/altcom` },
+      { "@type": "ListItem", position: 2, name: "Altcom",  item: `${SITE_URL}/communication` },
     ],
   },
   {
@@ -22,7 +22,7 @@ const SCHEMAS = [
     "@type":      "ProfessionalService",
     name:          "Altcom — Altitude-Vision",
     description:   "Agence de communication à Brazzaville : branding, stratégie digitale, publicité et production audiovisuelle.",
-    url:           `${SITE_URL}/altcom`,
+    url:           `${SITE_URL}/communication`,
     areaServed:    { "@type": "City", name: "Brazzaville" },
     address: {
       "@type":         "PostalAddress",

@@ -28,28 +28,28 @@ export default async function sitemap() {
 
   const staticRoutes = [
     { url: `${SITE_URL}/`,                   priority: 1.0, changeFrequency: 'daily'   },
-    { url: `${SITE_URL}/altimmo`,            priority: 0.9, changeFrequency: 'daily'   },
-    { url: `${SITE_URL}/altimmo/annonces`,   priority: 0.9, changeFrequency: 'daily'   },
-    { url: `${SITE_URL}/mila-events`,        priority: 0.9, changeFrequency: 'daily'   },
-    { url: `${SITE_URL}/mila-events/annonces`, priority: 0.8, changeFrequency: 'daily' },
+    { url: `${SITE_URL}/immobilier`,            priority: 0.9, changeFrequency: 'daily'   },
+    { url: `${SITE_URL}/immobilier/annonces`,   priority: 0.9, changeFrequency: 'daily'   },
+    { url: `${SITE_URL}/evenementiel`,        priority: 0.9, changeFrequency: 'daily'   },
+    { url: `${SITE_URL}/evenementiel/annonces`, priority: 0.8, changeFrequency: 'daily' },
     { url: `${SITE_URL}/altcom`,             priority: 0.8, changeFrequency: 'weekly'  },
     { url: `${SITE_URL}/altcom/annonces`,    priority: 0.7, changeFrequency: 'weekly'  },
     { url: `${SITE_URL}/contact`,            priority: 0.6, changeFrequency: 'monthly' },
     { url: `${SITE_URL}/actualites`,         priority: 0.6, changeFrequency: 'daily'   },
-    { url: `${SITE_URL}/altimmo/services/vente-de-biens`,         priority: 0.7, changeFrequency: 'monthly' },
-    { url: `${SITE_URL}/altimmo/services/location-gestion`,       priority: 0.7, changeFrequency: 'monthly' },
-    { url: `${SITE_URL}/altimmo/services/conseil-investissement`,  priority: 0.7, changeFrequency: 'monthly' },
+    { url: `${SITE_URL}/immobilier/services/vente-de-biens`,         priority: 0.7, changeFrequency: 'monthly' },
+    { url: `${SITE_URL}/immobilier/services/location-gestion`,       priority: 0.7, changeFrequency: 'monthly' },
+    { url: `${SITE_URL}/immobilier/services/conseil-investissement`,  priority: 0.7, changeFrequency: 'monthly' },
   ];
 
   const propertyRoutes = properties.map(p => ({
-    url:             `${SITE_URL}/altimmo/property/${p._id}`,
+    url:             `${SITE_URL}/immobilier/property/${p._id}`,
     lastModified:    p.updatedAt ? new Date(p.updatedAt) : new Date(),
     priority:        0.8,
     changeFrequency: 'weekly',
   }));
 
   const eventRoutes = events.map(e => ({
-    url:             `${SITE_URL}/mila-events/event/${e._id}`,
+    url:             `${SITE_URL}/evenementiel/event/${e._id}`,
     lastModified:    e.updatedAt ? new Date(e.updatedAt) : new Date(),
     priority:        0.7,
     changeFrequency: 'weekly',

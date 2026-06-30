@@ -11,7 +11,7 @@ import {
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
-const GOLD = '#C8872A';
+const GOLD = '#C8960C';
 const BLUE = '#2E7BB5';
 
 // ─────────────────────────────────────────────────────────────
@@ -115,8 +115,8 @@ const AdminDashboard = ({ children }) => {
                   Altitude<span style={{ color: GOLD }}>-</span>Vision
                 </span>
                 <span className="block text-white/30"
-                  style={{ fontFamily: "'Outfit', sans-serif", fontSize: '0.52rem', letterSpacing: '0.2em' }}>
-                  ADMIN
+                  style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.6rem', letterSpacing: '0.22em' }}>
+                  ADMINISTRATION
                 </span>
               </div>
             </div>
@@ -137,9 +137,9 @@ const AdminDashboard = ({ children }) => {
               </div>
               <div className="min-w-0">
                 <p className="text-white text-xs font-semibold truncate"
-                  style={{ fontFamily: "'Outfit', sans-serif" }}>{user.name || 'Admin'}</p>
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}>{user.name || 'Admin'}</p>
                 <p className="text-white/35 text-xs truncate"
-                  style={{ fontFamily: "'Outfit', sans-serif" }}>{user.role || 'Administrateur'}</p>
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}>{user.role || 'Administrateur'}</p>
               </div>
             </div>
           )}
@@ -151,7 +151,7 @@ const AdminDashboard = ({ children }) => {
               <div key={si}>
                 {section.label && (
                   <p className="px-3 pt-3 pb-1 text-white/25 text-xs font-semibold uppercase tracking-widest"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {section.label}
                   </p>
                 )}
@@ -159,13 +159,18 @@ const AdminDashboard = ({ children }) => {
                   .filter(link => !link.adminOnly || user?.role === 'Admin')
                   .map(({ to, end, Icon, label, accent, badge }) => (
                   <Link key={to} href={to} onClick={close}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 ${
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
                       isActive(to, end)
-                        ? 'text-white bg-white/10'
-                        : 'text-white/50 hover:text-white hover:bg-white/6'
+                        ? 'text-white'
+                        : 'text-white/45 hover:text-white/80 hover:bg-white/5'
                     }`}
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
-                    <Icon size={16} style={{ color: isActive(to, end) ? accent : undefined, flexShrink: 0 }} />
+                    style={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      background: isActive(to, end) ? `${accent}18` : undefined,
+                      borderLeft: isActive(to, end) ? `2px solid ${accent}` : '2px solid transparent',
+                      paddingLeft: '10px',
+                    }}>
+                    <Icon size={15} style={{ color: isActive(to, end) ? accent : 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
                     <span>{label}</span>
                     {badge === 'contratsActifs' && contratsActifs > 0 && (
                       <span className="ml-auto text-xs font-bold px-1.5 py-0.5 rounded-full text-white"
@@ -195,13 +200,13 @@ const AdminDashboard = ({ children }) => {
           style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <button onClick={() => { router.push('/'); close(); }}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-white hover:bg-white/6 transition-all"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             <Globe size={16} className="flex-shrink-0" />
             Accueil du site
           </button>
           <button onClick={handleLogout}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition-all"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             <LogOut size={16} className="flex-shrink-0" />
             Déconnexion
           </button>
@@ -219,7 +224,7 @@ const AdminDashboard = ({ children }) => {
             <Menu size={22} />
           </button>
           <span className="text-sm font-bold text-gray-800"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Dashboard Admin
           </span>
           <div className="w-8" />

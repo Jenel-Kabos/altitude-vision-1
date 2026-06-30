@@ -30,7 +30,7 @@ export default function AppProviders({ children }) {
             borderRadius: '8px',
             fontSize: '0.875rem',
           },
-          success: { iconTheme: { primary: '#C8872A', secondary: '#0A0C0F' } },
+          success: { iconTheme: { primary: '#C8960C', secondary: '#0A0C0F' } },
           error:   { iconTheme: { primary: '#D42B2B', secondary: '#0A0C0F' } },
         }}
       />

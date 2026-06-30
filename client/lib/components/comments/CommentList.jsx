@@ -7,7 +7,7 @@ import CommentForm from './CommentForm';
 import CommentItem from './CommentItem';
 import { createComment, getComments, updateComment, deleteComment } from '../../services/commentService';
 
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 const GOLD_PALE = 'rgba(200,135,42,0.08)';
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
@@ -17,7 +17,7 @@ const INK_SOFT  = '#8C7B6E';
 const CREAM     = '#FAF8F5';
 
 const LIST_CSS = `
-  .cl-root { font-family: 'Jost', sans-serif; }
+  .cl-root { font-family: 'DM Sans', sans-serif; }
 
   /* ── En-tête section ── */
   .cl-header {
@@ -46,7 +46,7 @@ const LIST_CSS = `
     background: ${GOLD_PALE};
     border: 1px solid rgba(200,135,42,0.22);
     border-radius: 1px;
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.60rem, 1.3vw, 0.66rem);
     font-weight: 600; letter-spacing: 0.14em;
     color: ${GOLD}; margin-left: 10px;
@@ -121,7 +121,7 @@ const LIST_CSS = `
     padding: 0 clamp(8px, 1.5vw, 12px);
     border: 1px solid rgba(200,135,42,0.2);
     border-radius: 1px;
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.60rem, 1.2vw, 0.66rem);
     font-weight: 600; letter-spacing: 0.1em;
     color: ${INK_SOFT}; background: #FDFCFA; cursor: pointer;

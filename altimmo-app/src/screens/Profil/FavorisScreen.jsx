@@ -1,34 +1,133 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  TouchableOpacity, Image, RefreshControl, SafeAreaView,
+  TouchableOpacity, RefreshControl,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../services/api';
-import { Card, PrixFCFA } from '../../components';
-import { colors, fonts, fontSize, spacing, radius } from '../../theme';
+import { PrixFCFA } from '../../components';
+import { useTheme } from '../../context/ThemeContext';
+import { fonts, fontSize, spacing, radius } from '../../theme';
 import EmptyState from '../../components/ui/EmptyState';
+import IllustrationNoFavoris from '../../components/illustrations/IllustrationNoFavoris';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
-import { AMENITIES } from '../../constants/amenities';
 
-const PLACEHOLDER_IMG =
-  'https://via.placeholder.com/600x450/F5F5F2/C8960C?text=Altimmo';
+const PLACEHOLDER = require('../../../assets/Logo_Altitude_transparent.png');
 
-const getAmenityIcon = (name) => {
-  const found = AMENITIES.find(a => a.value === name);
-  return found?.icon || 'checkmark-circle-outline';
-};
+// ─── FavCard ─────────────────────────────────────────────────────────────────
+const FavCard = React.memo(function FavCard({ item, onPress, styles, c }) {
+  const isLocation    = item.status?.toLowerCase() === 'location';
+  const arrondissement = item.address?.arrondissement || '';
+  const city          = item.address?.city || 'Brazzaville';
+  const addressText   = arrondissement ? `${arrondissement}, ${city}` : city;
+  const bedrooms      = item.bedrooms  || 0;
+  const bathrooms     = item.bathrooms || 0;
+  const surface       = item.surface   || item.area || 0;
+  const hasStats      = bedrooms > 0 || bathrooms > 0 || surface > 0;
+  const imgUri        = item.images?.[0] || item.photos?.[0];
 
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.88}
+      style={styles.card}
+      accessibilityRole="button"
+      accessibilityLabel={`Voir le bien ${item.title}`}
+    >
+      {/* ─── Image ─── */}
+      <View style={styles.imageWrap}>
+        <Image
+          source={imgUri ? { uri: imgUri } : PLACEHOLDER}
+          style={styles.image}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
+
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.72)']}
+          style={styles.gradient}
+          pointerEvents="none"
+        />
+
+        {/* Badge statut — haut-gauche */}
+        <View style={[styles.badge, isLocation ? styles.badgeLoc : styles.badgeVente]}>
+          <Text style={[styles.badgeText, isLocation ? styles.badgeTextLoc : styles.badgeTextVente]}>
+            {isLocation ? 'LOCATION' : 'VENTE'}
+          </Text>
+        </View>
+
+        {/* Cœur — haut-droite */}
+        <View style={styles.heartBadge}>
+          <Ionicons name="heart" size={13} color={c.gold} />
+        </View>
+
+        {/* Prix — bas-droite */}
+        <View style={styles.priceWrap} pointerEvents="none">
+          <PrixFCFA montant={item.price} variant="onImage" compact />
+        </View>
+      </View>
+
+      {/* ─── Corps ─── */}
+      <View style={styles.body}>
+        {/* Type */}
+        <Text style={styles.typeLabel} numberOfLines={1}>
+          {(item.type || 'Bien').toUpperCase()}
+        </Text>
+
+        {/* Titre */}
+        <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+
+        {/* Adresse */}
+        <View style={styles.addrRow}>
+          <Ionicons name="location-outline" size={12} color={c.textMuted} />
+          <Text style={styles.addrText} numberOfLines={1}>{addressText}</Text>
+        </View>
+
+        {/* Stats */}
+        {hasStats && (
+          <View style={styles.statsRow}>
+            {bedrooms > 0 && (
+              <View style={styles.statItem}>
+                <Ionicons name="bed-outline" size={13} color={c.textSub} />
+                <Text style={styles.statText}>{bedrooms}</Text>
+              </View>
+            )}
+            {bathrooms > 0 && (
+              <View style={styles.statItem}>
+                <Ionicons name="water-outline" size={13} color={c.textSub} />
+                <Text style={styles.statText}>{bathrooms}</Text>
+              </View>
+            )}
+            {surface > 0 && (
+              <View style={styles.statItem}>
+                <Ionicons name="resize-outline" size={13} color={c.textSub} />
+                <Text style={styles.statText}>{surface} m²</Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}, (prev, next) => prev.item._id === next.item._id && prev.styles === next.styles);
+
+// ─── FavorisScreen ────────────────────────────────────────────────────────────
 export default function FavorisScreen({ navigation }) {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+
   const [properties, setProperties] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const chargerFavoris = async () => {
+  const chargerFavoris = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
     try {
-      const res = await api.get('/likes/my-favorites?type=Property');
+      const res  = await api.get('/likes/my-favorites?type=Property');
       const favs = res.data?.data?.favorites?.properties || [];
       setProperties(favs);
     } catch {
@@ -37,118 +136,25 @@ export default function FavorisScreen({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
-  // Recharge à chaque fois que l'écran devient actif
-  useFocusEffect(useCallback(() => { chargerFavoris(); }, []));
+  useFocusEffect(useCallback(() => { chargerFavoris(); }, [chargerFavoris]));
 
-  const onRefresh = () => { setRefreshing(true); chargerFavoris(); };
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    chargerFavoris(true);
+  }, [chargerFavoris]);
 
-  const renderItem = ({ item }) => {
-    const isLocation   = item.status?.toLowerCase() === 'location';
-    const arrondissement = item.address?.arrondissement || '';
-    const city         = item.address?.city || 'Brazzaville';
-    const addressText  = arrondissement ? `${arrondissement} · ${city}` : city;
-    const description  = item.description || '';
-    const bedrooms     = item.bedrooms  || 0;
-    const bathrooms    = item.bathrooms || 0;
-    const surface      = item.surface   || item.area || 0;
-    const hasStats     = bedrooms > 0 || bathrooms > 0 || surface > 0;
-    const amenities    = item.amenities || [];
-    const visibleAmenities = amenities.slice(0, 3);
-    const extraCount   = amenities.length - 3;
+  const renderItem = useCallback(({ item }) => (
+    <FavCard
+      item={item}
+      onPress={() => navigation.navigate('DetailAnnonce', { annonce: item })}
+      styles={styles}
+      c={c}
+    />
+  ), [navigation, styles, c]);
 
-    return (
-      <TouchableOpacity
-        onPress={() => navigation.navigate('DetailAnnonce', { annonce: item })}
-        activeOpacity={0.85}
-      >
-        <Card>
-          <View style={styles.imageWrap}>
-            <Image
-              source={{ uri: item.images?.[0] || item.photos?.[0] || PLACEHOLDER_IMG }}
-              style={styles.image}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.7)']}
-              style={styles.priceGradient}
-              pointerEvents="none"
-            />
-            <View style={[styles.badge, isLocation ? styles.badgeLoc : styles.badgeVente]}>
-              <Text style={[styles.badgeText, isLocation ? styles.badgeTextLoc : styles.badgeTextVente]}>
-                {isLocation ? 'LOCATION' : 'VENTE'}
-              </Text>
-            </View>
-            <View style={styles.priceOverlay} pointerEvents="none">
-              <PrixFCFA montant={item.price} variant="onImage" compact />
-            </View>
-            {/* Cœur plein pour rappeler que c'est un favori */}
-            <View style={styles.heartBadge}>
-              <Ionicons name="heart" size={14} color={colors.gold} />
-            </View>
-          </View>
-
-          <View style={styles.body}>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaText}>{(item.type || 'Bien').toUpperCase()}</Text>
-            </View>
-
-            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-
-            {hasStats && (
-              <View style={styles.statsRow}>
-                {bedrooms > 0 && (
-                  <View style={styles.statChip}>
-                    <Text style={styles.statText}>{bedrooms} ch.</Text>
-                  </View>
-                )}
-                {bathrooms > 0 && (
-                  <View style={styles.statChip}>
-                    <Text style={styles.statText}>{bathrooms} SDB</Text>
-                  </View>
-                )}
-                {surface > 0 && (
-                  <View style={styles.statChip}>
-                    <Text style={styles.statText}>{surface} m²</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {amenities.length > 0 && (
-              <View style={styles.amenitiesRow}>
-                {visibleAmenities.map((a, i) => (
-                  <View key={i} style={styles.amenityChip}>
-                    <Ionicons name={getAmenityIcon(a)} size={11} color={colors.blue} />
-                    <Text style={styles.amenityChipText}>{a}</Text>
-                  </View>
-                ))}
-                {extraCount > 0 && (
-                  <View style={styles.amenityChipMore}>
-                    <Text style={styles.amenityChipMoreText}>+{extraCount}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            <Text style={styles.location} numberOfLines={1}>{addressText}</Text>
-
-            {description.trim().length > 0 && (
-              <>
-                <View style={styles.divider} />
-                <Text style={styles.description} numberOfLines={2}>{description}</Text>
-              </>
-            )}
-
-            <View style={styles.footer}>
-              <Text style={styles.cta}>Voir →</Text>
-            </View>
-          </View>
-        </Card>
-      </TouchableOpacity>
-    );
-  };
+  const keyExtractor = useCallback((item) => item._id || item.id, []);
 
   if (loading) {
     return (
@@ -159,31 +165,51 @@ export default function FavorisScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+
+      {/* ─── Header ──────────────────────────────────────────── */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.headerBack}
+          hitSlop={8}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
+          <Ionicons name="arrow-back" size={22} color={c.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mes favoris</Text>
-        <View style={{ width: 22 }} />
+
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Mes favoris</Text>
+          {properties.length > 0 && (
+            <View style={styles.headerCount}>
+              <Text style={styles.headerCountText}>{properties.length}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={{ width: 30 }} />
       </View>
 
+      {/* ─── Liste ───────────────────────────────────────────── */}
       <FlatList
         data={properties}
         renderItem={renderItem}
-        keyExtractor={item => item._id || item.id}
+        keyExtractor={keyExtractor}
         contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.gold}
-            colors={[colors.gold]}
+            tintColor={c.gold}
+            colors={[c.gold]}
           />
         }
         ListEmptyComponent={
           <EmptyState
-            icon="heart-outline"
+            illustration={IllustrationNoFavoris}
             title="Aucun bien favori"
             subtitle="Appuyez sur le cœur d'une annonce pour la retrouver ici."
           />
@@ -193,159 +219,165 @@ export default function FavorisScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (c) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg },
 
+  // ─── Header ───
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: c.border,
+  },
+  headerBack: {
+    width: 30,
+    alignItems: 'flex-start',
+  },
+  headerCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   headerTitle: {
+    fontFamily: fonts.display,
     fontSize: fontSize.lg,
+    color: c.text,
+  },
+  headerCount: {
+    backgroundColor: c.goldMuted,
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  headerCountText: {
     fontFamily: fonts.bodyBold,
-    color: colors.text,
+    fontSize: fontSize.xs,
+    color: c.gold,
   },
 
-  list: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
+  // ─── Liste ───
+  list: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
+  },
 
-  // Card — identique à ListeAnnoncesScreen
-  imageWrap: { width: '100%' },
+  // ─── Card ───
+  card: {
+    backgroundColor: c.bgCard,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+
+  // ─── Image ───
+  imageWrap: {
+    width: '100%',
+  },
   image: {
     width: '100%',
     aspectRatio: 4 / 3,
-    backgroundColor: colors.bgCardAlt,
-    borderRadius: radius.sm,
+    backgroundColor: c.bgCardAlt,
   },
-  priceGradient: {
+  gradient: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
-    height: '40%',
-    borderBottomLeftRadius: radius.sm,
-    borderBottomRightRadius: radius.sm,
-  },
-  badge: {
-    position: 'absolute',
-    top: spacing.md, right: spacing.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.sm,
-  },
-  badgeVente: { backgroundColor: colors.goldMuted },
-  badgeLoc:   { backgroundColor: colors.blueMuted },
-  badgeText: {
-    fontSize: 11,
-    letterSpacing: 1.5,
-    fontFamily: fonts.bodyBold,
-    textTransform: 'uppercase',
-  },
-  badgeTextVente: { color: colors.goldDark },
-  badgeTextLoc:   { color: colors.blue },
-  priceOverlay: {
-    position: 'absolute',
-    bottom: spacing.md, left: spacing.md,
-  },
-  heartBadge: {
-    position: 'absolute',
-    top: spacing.md, left: spacing.md,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 100,
-    padding: 5,
+    height: '45%',
   },
 
-  body: { padding: spacing.md },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
+  // ─── Badges image ───
+  badge: {
+    position: 'absolute',
+    top: spacing.sm,
+    left: spacing.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
   },
-  metaText: {
-    fontFamily: fonts.body,
-    fontSize: fontSize.sm,
-    color: colors.textMuted,
+  badgeVente: {
+    backgroundColor: 'rgba(200,150,12,0.15)',
+    borderColor: 'rgba(200,150,12,0.4)',
+  },
+  badgeLoc: {
+    backgroundColor: 'rgba(24,95,165,0.15)',
+    borderColor: 'rgba(24,95,165,0.4)',
+  },
+  badgeText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 9,
     letterSpacing: 1,
+  },
+  badgeTextVente: { color: '#C8960C' },
+  badgeTextLoc:   { color: '#185FA5' },
+
+  heartBadge: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 100,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  priceWrap: {
+    position: 'absolute',
+    bottom: spacing.sm,
+    right: spacing.sm,
+  },
+
+  // ─── Corps ───
+  body: {
+    padding: spacing.sm,
+    gap: 4,
+  },
+  typeLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    color: c.gold,
+    letterSpacing: 0.8,
   },
   title: {
     fontFamily: fonts.display,
-    fontSize: fontSize.lg,
-    color: colors.text,
-    marginBottom: spacing.xs,
+    fontSize: fontSize.md,
+    color: c.text,
+    lineHeight: 20,
   },
-  statsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  statChip: {
-    backgroundColor: colors.goldMuted,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.xs,
-  },
-  statText: { color: colors.gold, fontSize: fontSize.xs, fontFamily: fonts.body },
-  amenitiesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  amenityChip: {
+  addrRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.blueMuted,
-    borderRadius: radius.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
   },
-  amenityChipText: {
+  addrText: {
     fontFamily: fonts.body,
     fontSize: fontSize.xs,
-    color: colors.blue,
+    color: c.textMuted,
+    flex: 1,
   },
-  amenityChipMore: {
-    backgroundColor: colors.bgCardAlt,
-    borderRadius: radius.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  amenityChipMoreText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.xs,
-    color: colors.textMuted,
-  },
-  location: {
-    fontFamily: fonts.body,
-    fontSize: fontSize.sm,
-    color: colors.textMuted,
-    marginBottom: spacing.sm,
-  },
-  divider: {
-    width: 32, height: 1,
-    backgroundColor: colors.gold,
-    marginBottom: spacing.sm,
-  },
-  description: {
-    fontFamily: fonts.body,
-    fontSize: fontSize.sm,
-    color: colors.textSub,
-    lineHeight: 18,
-    marginBottom: spacing.sm,
-  },
-  footer: {
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: spacing.sm,
+    gap: spacing.sm,
+    marginTop: 2,
   },
-  cta: {
-    color: colors.gold,
-    fontFamily: fonts.bodyBold,
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    fontFamily: fonts.body,
     fontSize: fontSize.xs,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    color: c.textSub,
   },
 });

@@ -8,7 +8,7 @@ import {
     CalendarCheck, Video, ImageIcon, Share2,
 } from 'lucide-react';
 
-export const GOLD       = '#C8872A';
+export const GOLD       = '#C8960C';
 export const GOLD_DARK  = '#A06820';
 export const GOLD_LIGHT = '#E5A84B';
 export const BLUE       = '#2E7BB5';
@@ -21,7 +21,7 @@ export const SERVICES = [
         h1:         'Communication Digitale à Brazzaville',
         stat:       'Web & Social',
         color:      GOLD,
-        route:      '/altcom/communication-digitale',
+        route:      '/communication/communication-digitale',
         shortDesc:  'Création de contenus et campagnes sur mesure pour le web et les réseaux sociaux.',
         fullDesc:   "Altcom accompagne les entreprises et particuliers à Brazzaville et dans tout le Congo dans leur stratégie de communication digitale : gestion des réseaux sociaux, création de contenus engageants, campagnes email et bien plus. Notre équipe vous accompagne de la conception à l'exécution pour maximiser votre présence en ligne.",
         features:   [
@@ -82,7 +82,7 @@ export const SERVICES = [
         h1:         'Branding & Design à Brazzaville',
         stat:       'Identité visuelle',
         color:      BLUE,
-        route:      '/altcom/branding-design',
+        route:      '/communication/branding-design',
         shortDesc:  "Définition d'identité visuelle et supports graphiques professionnels.",
         fullDesc:   "Altcom accompagne les entreprises et particuliers à Brazzaville et dans tout le Congo dans la création de leur identité visuelle. Du logo à la charte graphique complète, en passant par les supports print et digitaux, nous donnons à votre marque une image professionnelle et mémorable.",
         features:   [
@@ -141,7 +141,7 @@ export const SERVICES = [
         h1:         'Conseil & Stratégie à Brazzaville',
         stat:       'Stratégie 360°',
         color:      GOLD,
-        route:      '/altcom/conseil-strategie',
+        route:      '/communication/conseil-strategie',
         shortDesc:  'Accompagnement stratégique pour optimiser votre communication.',
         fullDesc:   "Altcom accompagne les entreprises et particuliers à Brazzaville et dans tout le Congo dans la définition et l'exécution de leur stratégie de communication globale. Audit de l'existant, positionnement, plan de communication et suivi des résultats : nous vous guidons à chaque étape.",
         features:   [
@@ -200,7 +200,7 @@ export const SERVICES = [
         h1:         'Couverture Médiatique à Brazzaville',
         stat:       'Photo & Vidéo',
         color:      BLUE,
-        route:      '/altcom/couverture-mediatique',
+        route:      '/communication/couverture-mediatique',
         shortDesc:  'Organisation et couverture complète de vos événements avec reportage photo/vidéo.',
         fullDesc:   "Altcom accompagne les entreprises et particuliers à Brazzaville et dans tout le Congo dans la couverture médiatique de leurs événements : conférences, inaugurations, soirées corporate, lancements produits. Notre équipe photo/vidéo capture les moments clés et produit des contenus de qualité professionnelle.",
         features:   [

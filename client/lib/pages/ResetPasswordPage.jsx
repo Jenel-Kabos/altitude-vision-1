@@ -14,7 +14,7 @@ import api from '../services/api';
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 
 const focusIn  = e => { e.target.style.borderColor = BLUE; e.target.style.boxShadow = `0 0 0 3px ${BLUE}15`; e.target.style.backgroundColor = '#fff'; };
 const focusOut = e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = '#F9FAFB'; };
@@ -95,7 +95,7 @@ const ResetPasswordPage = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
             {/* Halos */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -148,7 +148,7 @@ const ResetPasswordPage = () => {
                                     </p>
                                     <Link href="/"
                                         className="block w-full py-3 rounded-2xl text-sm font-semibold text-white text-center"
-                                        style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`, fontFamily: "'Outfit', sans-serif" }}>
+                                        style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`, fontFamily: "'DM Sans', sans-serif" }}>
                                         Aller à l'accueil
                                     </Link>
                                 </motion.div>
@@ -169,7 +169,7 @@ const ResetPasswordPage = () => {
                                     </p>
                                     <Link href="/forgot-password"
                                         className="block w-full py-3 rounded-2xl text-sm font-semibold text-white text-center"
-                                        style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`, fontFamily: "'Outfit', sans-serif" }}>
+                                        style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`, fontFamily: "'DM Sans', sans-serif" }}>
                                         Nouvelle demande
                                     </Link>
                                 </motion.div>
@@ -207,7 +207,7 @@ const ResetPasswordPage = () => {
                                                     onChange={e => { set('password', e.target.value); setError(''); }}
                                                     required minLength={8} autoFocus
                                                     className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm focus:outline-none transition-all placeholder-gray-400"
-                                                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                                                    style={{ fontFamily: "'DM Sans', sans-serif" }}
                                                     onFocus={focusIn} onBlur={focusOut} />
                                                 <button type="button" onClick={() => setShowPass(!showPass)}
                                                     className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
@@ -242,7 +242,7 @@ const ResetPasswordPage = () => {
                                                     className="w-full pl-10 pr-16 py-3 border rounded-2xl bg-gray-50 text-gray-900 text-sm focus:outline-none transition-all placeholder-gray-400"
                                                     style={{
                                                         borderColor: form.passwordConfirm ? (pwMatch ? '#22C55E' : '#EF4444') : '#E5E7EB',
-                                                        fontFamily: "'Outfit', sans-serif",
+                                                        fontFamily: "'DM Sans', sans-serif",
                                                     }}
                                                     onFocus={e => { if (!form.passwordConfirm) focusIn(e); }}
                                                     onBlur={e => { if (!form.passwordConfirm) focusOut(e); }} />
@@ -283,7 +283,7 @@ const ResetPasswordPage = () => {
                                             style={{
                                                 background: loading ? '#9CA3AF' : `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})`,
                                                 boxShadow:  loading ? 'none' : `0 4px 20px ${BLUE}35`,
-                                                fontFamily: "'Outfit', sans-serif",
+                                                fontFamily: "'DM Sans', sans-serif",
                                             }}>
                                             {loading
                                                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Réinitialisation...</>

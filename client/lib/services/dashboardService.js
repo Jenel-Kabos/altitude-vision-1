@@ -1,15 +1,8 @@
 // client/lib/services/dashboardService.js
 import api from "./api";
 
-const getToken = () => localStorage.getItem("token");
-
 export const getDashboardStats = async () => {
-  const token = getToken();
-  if (!token) throw new Error("Token manquant, utilisateur non connecté");
-
-  const response = await api.get("/dashboard/stats", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await api.get("/dashboard/stats");
 
   const data = response.data?.data || {};
 

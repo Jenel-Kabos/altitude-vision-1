@@ -1,5 +1,5 @@
 // ======================================================
-// 🧩 MIDDLEWARE D’AUTHENTIFICATION ET D’AUTORISATION
+// 🧩 MIDDLEWARE D'AUTHENTIFICATION ET D'AUTORISATION
 // ======================================================
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('express-async-handler');
@@ -10,62 +10,62 @@ const Property = require('../models/Property');
 // 🔒 MIDDLEWARE : AUTHENTIFICATION OBLIGATOIRE
 // ======================================================
 /**
- * @description Bloque la requête si l’utilisateur n’a pas de token valide.
+ * @description Bloque la requête si l'utilisateur n'a pas de token valide.
  * Vérifie le statut du compte et la version du token.
  */
 const protect = asyncHandler(async (req, res, next) => {
-  let token;
-
-  // Vérifie la présence et le format du header d'autorisation
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    try {
-      token = req.headers.authorization.split(' ')[1];
-
-      // Décoder et vérifier le token JWT
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Récupérer l’utilisateur depuis la BD
-      const user = await User.findById(decoded.id).select('-password');
-
-      if (!user) {
-        console.error('❌ [Auth] Utilisateur non trouvé (token valide)');
-        res.status(401);
-        throw new Error('Non autorisé : utilisateur inexistant');
-      }
-
-      // Vérifie la version du token (token invalidé ?)
-      if (decoded.tokenVersion !== undefined && decoded.tokenVersion < user.tokenVersion) {
-        console.warn('⚠️ [Auth] Token expiré suite à une réinitialisation de session.');
-        res.status(401);
-        throw new Error('Session expirée, veuillez vous reconnecter.');
-      }
-
-      // Vérifie le statut du compte
-      if (user.status === 'Suspendu' || user.status === 'Banni' || !user.isActive) {
-        console.warn(`🚫 [Auth] Compte inactif ou ${user.status}`);
-        res.status(403);
-        throw new Error(`Accès refusé : votre compte est ${user.status.toLowerCase()}.`);
-      }
-
-      // Injection de l’utilisateur dans la requête
-      req.user = user;
-      next();
-    } catch (error) {
-      console.error('❌ [Auth] Erreur de vérification du token:', error.message);
-      res.status(401);
-      throw new Error('Non autorisé : token invalide ou expiré.');
-    }
-  } else {
+  if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer')) {
     res.status(401);
     throw new Error('Non autorisé : aucun token fourni.');
   }
+
+  const token = req.headers.authorization.split(' ')[1];
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    res.status(401);
+    throw new Error('Non autorisé : token invalide ou expiré.');
+  }
+
+  const user = await User.findById(decoded.id).select('-password');
+
+  if (!user) {
+    res.status(401);
+    throw new Error('Non autorisé : utilisateur inexistant');
+  }
+
+  // Invalidation par tokenVersion (logout global, reset password)
+  if (decoded.tokenVersion !== undefined && decoded.tokenVersion < user.tokenVersion) {
+    res.status(401);
+    throw new Error('Session expirée, veuillez vous reconnecter.');
+  }
+
+  // Changement de mot de passe après émission du token
+  if (typeof user.changedPasswordAfter === 'function' && user.changedPasswordAfter(decoded.iat)) {
+    res.status(401);
+    throw new Error('Mot de passe modifié. Veuillez vous reconnecter.');
+  }
+
+  // Compte suspendu ou banni
+  if (user.status === 'Suspendu' || user.status === 'Banni' || !user.isActive) {
+    res.status(403);
+    throw new Error(`Accès refusé : votre compte est ${(user.status || 'inactif').toLowerCase()}.`);
+  }
+
+  // Mise à jour de l'activité (non bloquante)
+  User.findByIdAndUpdate(user._id, { lastActivityAt: new Date() }).catch(() => {});
+
+  req.user = user;
+  next();
 });
 
 // ======================================================
 // 🧩 AUTHENTIFICATION OPTIONNELLE
 // ======================================================
 /**
- * @description Vérifie le token s’il existe, mais ne bloque pas la requête sinon.
+ * @description Vérifie le token s'il existe, mais ne bloque pas la requête sinon.
  * Utile pour les routes publiques qui veulent savoir si un utilisateur est connecté.
  */
 const optionalAuth = asyncHandler(async (req, res, next) => {
@@ -100,7 +100,7 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
 // 🎯 MIDDLEWARE DE RÔLE (ROLE-BASED ACCESS CONTROL)
 // ======================================================
 /**
- * @description Vérifie que le rôle de l’utilisateur est dans la liste autorisée.
+ * @description Vérifie que le rôle de l'utilisateur est dans la liste autorisée.
  * Exemple : restrictTo('Admin', 'Collaborateur')
  */
 const restrictTo = (...roles) => (req, res, next) => {
@@ -128,7 +128,7 @@ const adminOnly = (req, res, next) => {
 // 🏠 CONTRÔLE DE PROPRIÉTÉ (Propriétaire OU Admin)
 // ======================================================
 /**
- * @description Vérifie que l’utilisateur est soit Admin, soit propriétaire de la propriété.
+ * @description Vérifie que l'utilisateur est soit Admin, soit propriétaire de la propriété.
  * Utilisé pour les routes UPDATE / DELETE de propriétés.
  */
 const checkPropertyOwnership = asyncHandler(async (req, res, next) => {

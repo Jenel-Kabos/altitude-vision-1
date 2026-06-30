@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { isAuthenticated } from '../services/authService';
+import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight, Home, Key, Calculator, CheckCircle,
@@ -14,7 +14,7 @@ import {
 /* ═══════════════════════════════════════════════════════════════
    DESIGN TOKENS — charte Altimmo
 ═══════════════════════════════════════════════════════════════ */
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 const GOLD_PALE = 'rgba(200,135,42,0.08)';
 const GOLD_MID  = 'rgba(200,135,42,0.18)';
 const INK       = '#1A1612';
@@ -615,7 +615,8 @@ const SLIDER_CONFIG = {
 ═══════════════════════════════════════════════════════════════ */
 const CommissionCalculatorPage = () => {
   const router = useRouter();
-  const isLoggedIn = isAuthenticated();
+  const { isAuthenticated } = useAuth();
+  const isLoggedIn = isAuthenticated;
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);

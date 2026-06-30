@@ -21,3 +21,16 @@ exports.resendVerificationLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// Protège contre les attaques brute-force sur le mot de passe
+exports.loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: {
+    status: 'fail',
+    message: 'Trop de tentatives de connexion. Réessayez dans 15 minutes.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // ne pénalise pas les connexions réussies
+});

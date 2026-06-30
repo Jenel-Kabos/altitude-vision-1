@@ -9,7 +9,7 @@ import { fr } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import confirm from '@/lib/utils/confirm';
 
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 const GOLD_PALE = 'rgba(200,135,42,0.08)';
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
@@ -20,7 +20,7 @@ const CREAM     = '#FAF8F5';
 
 const ITEM_CSS = `
   .ci-root {
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     display: flex; gap: clamp(10px, 2.5vw, 14px);
     padding: clamp(14px, 3vw, 20px);
     background: #FDFCFA;
@@ -126,7 +126,7 @@ const ITEM_CSS = `
     border: 1px solid rgba(200,135,42,0.25);
     border-radius: 1px;
     background: ${CREAM};
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.82rem, 2vw, 0.88rem);
     color: ${INK}; line-height: 1.65; resize: none;
     transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
@@ -149,7 +149,7 @@ const ITEM_CSS = `
     display: inline-flex; align-items: center; gap: 5px;
     padding: clamp(5px, 1vw, 7px) clamp(12px, 2vw, 16px);
     background: ${INK}; color: ${GOLD};
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.60rem, 1.2vw, 0.66rem);
     font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
     border: 1px solid rgba(200,135,42,0.25); border-radius: 1px; cursor: pointer;
@@ -164,7 +164,7 @@ const ITEM_CSS = `
     display: inline-flex; align-items: center; gap: 5px;
     padding: clamp(5px, 1vw, 7px) clamp(12px, 2vw, 16px);
     background: transparent; color: ${INK_SOFT};
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.60rem, 1.2vw, 0.66rem);
     font-weight: 500; letter-spacing: 0.10em; text-transform: uppercase;
     border: 1px solid rgba(26,22,18,0.14); border-radius: 1px; cursor: pointer;

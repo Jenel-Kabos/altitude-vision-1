@@ -11,7 +11,7 @@ import {
 import api from '../services/api';
 import { PROPERTY_TYPES } from '../constants/propertyTypes';
 
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
 
@@ -114,7 +114,7 @@ const EstimationForm = () => {
                     <Calculator className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
-                    <h3 className="text-white font-bold text-base" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    <h3 className="text-white font-bold text-base" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                         {step === 1 ? 'Votre bien' : 'Vos coordonnées'}
                     </h3>
                     <p className="text-white/40 text-xs mt-0.5">Étape {step} sur 2</p>
@@ -151,7 +151,7 @@ const EstimationForm = () => {
                             style={{ background: 'rgba(34,197,94,0.15)', border: '2px solid rgba(34,197,94,0.3)' }}>
                             <CheckCircle className="w-8 h-8 text-green-400" />
                         </div>
-                        <h4 className="text-white font-bold text-lg mb-2" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        <h4 className="text-white font-bold text-lg mb-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             Demande envoyée !
                         </h4>
                         <p className="text-white/50 text-sm leading-relaxed max-w-xs">
@@ -159,7 +159,7 @@ const EstimationForm = () => {
                         </p>
                         <button onClick={() => setStatus(null)}
                             className="mt-6 px-5 py-2.5 rounded-full text-sm font-semibold text-white/60 border border-white/10 hover:border-white/20 transition-all"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             Nouvelle demande
                         </button>
                     </motion.div>
@@ -182,7 +182,7 @@ const EstimationForm = () => {
                                     {/* Type */}
                                     <Field label="Type de bien" error={errors.typeBien} icon={Building2} required>
                                         <select value={form.typeBien} onChange={e => set('typeBien', e.target.value)}
-                                            className={selectCls(errors.typeBien)} style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            className={selectCls(errors.typeBien)} style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             <option value="" className="text-gray-900">Sélectionner...</option>
                                             {TYPES_BIENS.map(t => <option key={t} value={t} className="text-gray-900">{t}</option>)}
                                         </select>
@@ -191,7 +191,7 @@ const EstimationForm = () => {
                                     {/* Objectif */}
                                     <Field label="Objectif" icon={null}>
                                         <select value={form.transaction} onChange={e => set('transaction', e.target.value)}
-                                            className={selectCls()} style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            className={selectCls()} style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             <option value="vente"    className="text-gray-900">Je veux vendre</option>
                                             <option value="location" className="text-gray-900">Je veux louer</option>
                                         </select>
@@ -205,7 +205,7 @@ const EstimationForm = () => {
                                                 <input type="text" placeholder="Ex: Bacongo, Brazzaville"
                                                     value={form.adresse} onChange={e => set('adresse', e.target.value)}
                                                     className={`${inputCls(errors.adresse)} pl-10`}
-                                                    style={{ fontFamily: "'Outfit', sans-serif" }} />
+                                                    style={{ fontFamily: "'DM Sans', sans-serif" }} />
                                             </div>
                                         </Field>
                                     </div>
@@ -214,20 +214,20 @@ const EstimationForm = () => {
                                     <Field label="Surface (m²)" error={errors.surface} icon={Maximize2} required>
                                         <input type="number" min="1" placeholder="Ex: 120"
                                             value={form.surface} onChange={e => set('surface', e.target.value)}
-                                            className={inputCls(errors.surface)} style={{ fontFamily: "'Outfit', sans-serif" }} />
+                                            className={inputCls(errors.surface)} style={{ fontFamily: "'DM Sans', sans-serif" }} />
                                     </Field>
 
                                     {/* Chambres */}
                                     <Field label="Nombre de chambres" icon={BedDouble}>
                                         <input type="number" min="0" placeholder="Ex: 3"
                                             value={form.chambres} onChange={e => set('chambres', e.target.value)}
-                                            className={inputCls()} style={{ fontFamily: "'Outfit', sans-serif" }} />
+                                            className={inputCls()} style={{ fontFamily: "'DM Sans', sans-serif" }} />
                                     </Field>
 
                                     {/* État */}
                                     <Field label="État du bien" icon={Wrench}>
                                         <select value={form.etat} onChange={e => set('etat', e.target.value)}
-                                            className={selectCls()} style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            className={selectCls()} style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             <option value="" className="text-gray-900">Sélectionner...</option>
                                             {ETATS_BIEN.map(e => <option key={e} value={e} className="text-gray-900">{e}</option>)}
                                         </select>
@@ -236,7 +236,7 @@ const EstimationForm = () => {
                                     {/* Disponibilité */}
                                     <Field label="Disponibilité" icon={CalendarClock}>
                                         <select value={form.disponibilite} onChange={e => set('disponibilite', e.target.value)}
-                                            className={selectCls()} style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            className={selectCls()} style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             <option value="" className="text-gray-900">Sélectionner...</option>
                                             {DISPONIBILITES.map(d => <option key={d} value={d} className="text-gray-900">{d}</option>)}
                                         </select>
@@ -249,7 +249,7 @@ const EstimationForm = () => {
                                                 placeholder="Piscine, parking, vue, rénovations récentes..."
                                                 value={form.description} onChange={e => set('description', e.target.value)}
                                                 className={`${inputCls()} resize-none`}
-                                                style={{ fontFamily: "'Outfit', sans-serif" }} />
+                                                style={{ fontFamily: "'DM Sans', sans-serif" }} />
                                             <p className="text-right text-white/20 text-xs mt-1">{form.description.length}/500</p>
                                         </Field>
                                     </div>
@@ -259,7 +259,7 @@ const EstimationForm = () => {
                                 <motion.button type="button" onClick={goToStep2}
                                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                     className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-semibold text-white text-sm mt-2"
-                                    style={{ background: `linear-gradient(135deg, ${GOLD}, #E5A84B)`, boxShadow: `0 4px 24px ${GOLD}40`, fontFamily: "'Outfit', sans-serif" }}>
+                                    style={{ background: `linear-gradient(135deg, ${GOLD}, #E5A84B)`, boxShadow: `0 4px 24px ${GOLD}40`, fontFamily: "'DM Sans', sans-serif" }}>
                                     Continuer — Mes coordonnées
                                     <ArrowRight className="w-4 h-4" />
                                 </motion.button>
@@ -286,7 +286,7 @@ const EstimationForm = () => {
                                     </div>
                                     <button type="button" onClick={() => setStep(1)}
                                         className="ml-auto text-white/30 hover:text-white/60 transition-colors flex-shrink-0 text-xs underline"
-                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                        style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                         Modifier
                                     </button>
                                 </div>
@@ -303,7 +303,7 @@ const EstimationForm = () => {
                                             <input type="text" placeholder="Votre nom complet"
                                                 value={form.nom} onChange={e => set('nom', e.target.value)}
                                                 className={`${inputCls(errors.nom)} pl-10`}
-                                                style={{ fontFamily: "'Outfit', sans-serif" }} />
+                                                style={{ fontFamily: "'DM Sans', sans-serif" }} />
                                         </div>
                                     </Field>
 
@@ -314,7 +314,7 @@ const EstimationForm = () => {
                                             <input type="email" placeholder="votre@email.com"
                                                 value={form.email} onChange={e => set('email', e.target.value)}
                                                 className={`${inputCls(errors.email)} pl-10`}
-                                                style={{ fontFamily: "'Outfit', sans-serif" }} />
+                                                style={{ fontFamily: "'DM Sans', sans-serif" }} />
                                         </div>
                                     </Field>
 
@@ -325,7 +325,7 @@ const EstimationForm = () => {
                                             <input type="tel" placeholder="+242 06 000 00 00"
                                                 value={form.telephone} onChange={e => set('telephone', e.target.value)}
                                                 className={`${inputCls()} pl-10`}
-                                                style={{ fontFamily: "'Outfit', sans-serif" }} />
+                                                style={{ fontFamily: "'DM Sans', sans-serif" }} />
                                         </div>
                                     </Field>
                                 </div>
@@ -334,7 +334,7 @@ const EstimationForm = () => {
                                 <div className="flex gap-3 mt-2">
                                     <button type="button" onClick={() => setStep(1)}
                                         className="flex items-center gap-2 px-5 py-4 rounded-2xl font-semibold text-white/60 text-sm border border-white/10 hover:border-white/20 transition-all"
-                                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                        style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                         <ArrowLeft className="w-4 h-4" /> Retour
                                     </button>
 
@@ -345,7 +345,7 @@ const EstimationForm = () => {
                                             background: sending ? '#374151' : `linear-gradient(135deg, ${BLUE}, ${BLUE_DARK})`,
                                             boxShadow:  sending ? 'none' : `0 4px 24px ${BLUE}40`,
                                             cursor:     sending ? 'not-allowed' : 'pointer',
-                                            fontFamily: "'Outfit', sans-serif",
+                                            fontFamily: "'DM Sans', sans-serif",
                                         }}>
                                         {sending
                                             ? <><Loader2 className="w-4 h-4 animate-spin" /> Envoi...</>

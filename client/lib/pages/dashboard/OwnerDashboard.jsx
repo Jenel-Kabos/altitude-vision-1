@@ -8,7 +8,7 @@ import { toast } from "react-hot-toast";
 import { useAuth } from '../../context/AuthContext';
 
 const BLUE  = '#2E7BB5';
-const GOLD  = '#C8872A';
+const GOLD  = '#C8960C';
 const GREEN = '#16A34A';
 
 const NAV_LINKS = [
@@ -63,7 +63,7 @@ const OwnerDashboard = ({ children }) => {
                   Altitude<span style={{ color: GOLD }}>-</span>Vision
                 </span>
                 <span className="block text-white/30"
-                  style={{ fontFamily: "'Outfit', sans-serif", fontSize: '0.52rem', letterSpacing: '0.2em' }}>
+                  style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.52rem', letterSpacing: '0.2em' }}>
                   PROPRIÉTAIRE
                 </span>
               </div>
@@ -85,9 +85,9 @@ const OwnerDashboard = ({ children }) => {
               </div>
               <div className="min-w-0">
                 <p className="text-white text-xs font-semibold truncate"
-                  style={{ fontFamily: "'Outfit', sans-serif" }}>{user.name || 'Propriétaire'}</p>
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}>{user.name || 'Propriétaire'}</p>
                 <p className="text-white/35 text-xs truncate"
-                  style={{ fontFamily: "'Outfit', sans-serif" }}>Espace Propriétaire</p>
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}>Espace Propriétaire</p>
               </div>
             </div>
           )}
@@ -101,7 +101,7 @@ const OwnerDashboard = ({ children }) => {
                     ? 'text-white bg-white/10'
                     : 'text-white/50 hover:text-white hover:bg-white/6'
                 }`}
-                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 <Icon size={16} style={{ color: isActive(to, end) ? accent : undefined, flexShrink: 0 }} />
                 <span>{label}</span>
                 {isActive(to, end) && (
@@ -118,13 +118,13 @@ const OwnerDashboard = ({ children }) => {
           style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <button onClick={() => { router.push('/'); close(); }}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-white hover:bg-white/6 transition-all"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             <Globe size={16} className="flex-shrink-0" />
             Accueil du site
           </button>
           <button onClick={handleLogout}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition-all"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             <LogOut size={16} className="flex-shrink-0" />
             Déconnexion
           </button>
@@ -142,7 +142,7 @@ const OwnerDashboard = ({ children }) => {
             <Menu size={22} />
           </button>
           <span className="text-sm font-bold text-gray-800"
-            style={{ fontFamily: "'Outfit', sans-serif" }}>
+            style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Espace Propriétaire
           </span>
           <div className="w-8" />

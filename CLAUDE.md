@@ -35,7 +35,21 @@ cd client && npm run build:next
 cd server && npm start
 ```
 
-> No automated tests exist. Manual testing only. Use `supertest` if adding API tests.
+### Testing
+
+```bash
+# Server (Jest + Supertest) — 20 tests
+cd server && npm test
+cd server && npm run test:coverage
+
+# Client (Vitest + Testing Library) — 31 tests
+cd client && npm test
+cd client && npm run test:watch
+```
+
+**Server tests** live in `server/__tests__/` — unit tests for middleware and controller validation (no DB needed, models mocked).
+
+**Client tests** live in `client/lib/__tests__/` — unit tests for utility functions (`imageUtils`, `formUtils`).
 
 ## Architecture
 

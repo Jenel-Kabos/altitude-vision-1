@@ -16,7 +16,7 @@ export default function Image() {
         <div style={{ display:'flex', position:'absolute', top:0, left:0, right:0, height:'5px' }}>
           <div style={{ display:'flex', flex:1, background:'#2E7BB5' }} />
           <div style={{ display:'flex', flex:1, background:'#D42B2B' }} />
-          <div style={{ display:'flex', flex:1, background:'#C8872A' }} />
+          <div style={{ display:'flex', flex:1, background:'#C8960C' }} />
         </div>
 
         {/* Decorative ring top-right */}
@@ -28,7 +28,7 @@ export default function Image() {
 
           {/* Brand row */}
           <div style={{ display:'flex', alignItems:'center', gap:'14px', marginBottom:'44px' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'48px', height:'48px', borderRadius:'12px', background:'linear-gradient(135deg,#A0671A,#C8872A)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'48px', height:'48px', borderRadius:'12px', background:'linear-gradient(135deg,#A0671A,#C8960C)' }}>
               <span style={{ color:'#fff', fontSize:'18px', fontWeight:700, letterSpacing:'-0.02em' }}>AV</span>
             </div>
             <div style={{ display:'flex', flexDirection:'column' }}>
@@ -41,7 +41,7 @@ export default function Image() {
           <div style={{ display:'flex', flexDirection:'column', marginBottom:'18px' }}>
             <span style={{ color:'#E8E4DC', fontSize:'60px', fontWeight:300, lineHeight:1.1, letterSpacing:'-0.02em' }}>Immobilier, Événements</span>
             <span style={{ color:'#E8E4DC', fontSize:'60px', fontWeight:300, lineHeight:1.1, letterSpacing:'-0.02em' }}>
-              {'& '}<span style={{ color:'#C8872A' }}>Communication</span>
+              {'& '}<span style={{ color:'#C8960C' }}>Communication</span>
             </span>
           </div>
 
@@ -58,7 +58,7 @@ export default function Image() {
             {[
               { num:'200+', label:'Familles logées',     color:'#2E7BB5', sep:true  },
               { num:'80+',  label:'Événements réussis',   color:'#D42B2B', sep:true  },
-              { num:'80+',  label:'Marques accompagnées', color:'#C8872A', sep:false },
+              { num:'80+',  label:'Marques accompagnées', color:'#C8960C', sep:false },
             ].map((s, i) => (
               <div key={i} style={{ display:'flex', flexDirection:'column', paddingRight:'36px', marginRight:'36px', borderRight: s.sep ? '1px solid rgba(232,228,220,0.07)' : 'none' }}>
                 <span style={{ color:s.color, fontSize:'36px', fontWeight:700, lineHeight:1, marginBottom:'4px' }}>{s.num}</span>

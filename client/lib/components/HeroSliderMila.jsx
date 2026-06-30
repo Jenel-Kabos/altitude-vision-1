@@ -17,7 +17,7 @@ const slides = [
         headline:    'Le plus beau jour\nde votre vie, sublimé.',
         body:        'Chaque détail orchestré avec une attention absolue — décors, traiteur, musique, coordination — pour que vous viviez pleinement chaque instant.',
         quote:       '"Mila Events a transformé notre mariage en un conte de fées inoubliable."',
-        cta:         { label: 'Demander un devis', to: '/mila-events' },
+        cta:         { label: 'Demander un devis', to: '/evenementiel' },
         stat:        { value: '30+', label: 'mariages organisés' },
         accent:      '#D42B2B',
         accentLight: '#F08080',
@@ -34,7 +34,7 @@ const slides = [
         headline:    'Des événements\nqui marquent les esprits.',
         body:        'Conférences, galas, lancements de produits — nous concevons des expériences professionnelles qui reflètent l\'excellence de votre marque.',
         quote:       '"Un niveau d\'organisation et de rigueur qui dépasse toutes nos attentes."',
-        cta:         { label: 'Nos réalisations', to: '/mila-events/annonces' },
+        cta:         { label: 'Nos réalisations', to: '/evenementiel/annonces' },
         stat:        { value: '20+', label: 'événements corporate' },
         accent:      '#A01E1E',
         accentLight: '#D88080',
@@ -51,9 +51,9 @@ const slides = [
         headline:    'Chaque espace,\nune signature unique.',
         body:        'Nos créateurs transforment vos lieux en décors sur-mesure — fleurs, lumières, structures — pour créer des ambiances qui vous ressemblent.',
         quote:       '"La salle était d\'une beauté à couper le souffle, exactement notre vision."',
-        cta:         { label: 'Voir nos créations', to: '/mila-events/annonces' },
+        cta:         { label: 'Voir nos créations', to: '/evenementiel/annonces' },
         stat:        { value: '100%', label: 'sur mesure' },
-        accent:      '#C8872A',
+        accent:      '#C8960C',
         accentLight: '#E8B86D',
         grad1: 'linear-gradient(108deg, rgba(30,15,0,0.92) 0%, rgba(10,5,0,0.6) 52%, rgba(10,5,0,0.08) 100%)',
         grad2: 'linear-gradient(to top, rgba(10,5,0,0.88) 0%, transparent 50%)',
@@ -167,7 +167,7 @@ const HeroSliderMila = () => {
                                     animation: 'milaPulse 2.2s ease-in-out infinite',
                                 }} />
                                 <span style={{
-                                    fontFamily: "'Outfit', sans-serif",
+                                    fontFamily: "'DM Sans', sans-serif",
                                     fontSize: 'clamp(0.65rem,0.9vw,0.85rem)', fontWeight: 500,
                                     letterSpacing: '0.2em', textTransform: 'uppercase', color: s.accentLight,
                                 }}>
@@ -204,7 +204,7 @@ const HeroSliderMila = () => {
                         {/* Corps */}
                         <motion.p variants={stagger(0.28)} initial="hidden" animate="visible" exit="exit"
                             style={{
-                                fontFamily: "'Outfit', sans-serif",
+                                fontFamily: "'DM Sans', sans-serif",
                                 fontSize: 'clamp(0.8rem,1.3vw,1.2rem)',
                                 fontWeight: 300, lineHeight: 1.72,
                                 color: 'rgba(253,248,245,0.6)',
@@ -242,7 +242,7 @@ const HeroSliderMila = () => {
                                     borderRadius: '40px',
                                     background: "linear-gradient(135deg, " + s.accent + ", " + s.accent + "CC)",
                                     color: '#fff',
-                                    fontFamily: "'Outfit', sans-serif",
+                                    fontFamily: "'DM Sans', sans-serif",
                                     fontSize: 'clamp(0.68rem,1.1vw,0.82rem)',
                                     fontWeight: 600, letterSpacing: '0.07em',
                                     textTransform: 'uppercase', textDecoration: 'none',
@@ -267,7 +267,7 @@ const HeroSliderMila = () => {
                                         {s.stat.value}
                                     </p>
                                     <p style={{
-                                        fontFamily: "'Outfit', sans-serif",
+                                        fontFamily: "'DM Sans', sans-serif",
                                         fontSize: 'clamp(0.54rem,0.9vw,0.6rem)',
                                         fontWeight: 300, letterSpacing: '0.1em',
                                         color: 'rgba(253,248,245,0.32)',
@@ -349,7 +349,7 @@ const HeroSliderMila = () => {
                 </div>
 
                 <p style={{
-                    fontFamily: "'Outfit', sans-serif",
+                    fontFamily: "'DM Sans', sans-serif",
                     fontSize: '0.56rem', letterSpacing: '0.16em',
                     color: 'rgba(253,248,245,0.25)', userSelect: 'none',
                     writingMode: 'vertical-rl',

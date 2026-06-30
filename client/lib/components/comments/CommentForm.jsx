@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useAuth } from '../../context/AuthContext';
 
 // ─── Design tokens (cohérents avec PropertyDetailPage) ─────────
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 const GOLD_PALE = 'rgba(200,135,42,0.08)';
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
@@ -17,7 +17,7 @@ const CREAM     = '#FAF8F5';
 
 const FORM_CSS = `
   .cf-root {
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
   }
 
   /* ── Zone non connecté ── */
@@ -45,7 +45,7 @@ const FORM_CSS = `
     padding: clamp(7px, 1.5vw, 9px) clamp(14px, 2.5vw, 20px);
     background: ${INK};
     color: #fff;
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.62rem, 1.4vw, 0.68rem);
     font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
     text-decoration: none; border-radius: 1px;
@@ -91,7 +91,7 @@ const FORM_CSS = `
     border: 1px solid rgba(200,135,42,0.2);
     border-radius: 1px;
     background: ${CREAM};
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.84rem, 2vw, 0.90rem);
     color: ${INK}; line-height: 1.65;
     resize: none; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
@@ -117,7 +117,7 @@ const FORM_CSS = `
     font-weight: 500; letter-spacing: 0.08em;
     color: ${INK_SOFT};
   }
-  .cf-counter--warn { color: #C8872A; }
+  .cf-counter--warn { color: #C8960C; }
   .cf-counter--over { color: #DC2626; }
 
   /* Erreur */
@@ -133,7 +133,7 @@ const FORM_CSS = `
     padding: clamp(8px, 1.5vw, 10px) clamp(16px, 3vw, 22px);
     background: ${INK};
     color: rgba(200,135,42,0.9);
-    font-family: 'Jost', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: clamp(0.64rem, 1.4vw, 0.70rem);
     font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
     border: 1px solid rgba(200,135,42,0.25);

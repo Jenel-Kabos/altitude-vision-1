@@ -1,9 +1,17 @@
 import React from 'react';
 import {
-  TouchableOpacity, Text, ActivityIndicator, View, StyleSheet,
+  Pressable, Text, ActivityIndicator, View, StyleSheet,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing } from '../../theme';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function Button({
   label,
@@ -14,29 +22,59 @@ export default function Button({
   fullWidth = false,
   icon,
   size = 'md',
+  style,
 }) {
   const isPrimary = variant === 'primary';
   const isOutline = variant === 'outline';
   const isSm = size === 'sm';
 
-  const bgColor = isPrimary ? colors.primary : 'transparent';
-  const fgColor = isPrimary ? '#000' : colors.primary;
+  const bgColor = isPrimary ? colors.gold : 'transparent';
+  const fgColor = isPrimary ? '#000' : colors.gold;
+
+  const scale = useSharedValue(1);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const onPressIn = () => {
+    scale.value = withSpring(0.95, { damping: 10, stiffness: 400 });
+  };
+
+  const onPressOut = () => {
+    scale.value = withSpring(1, { damping: 10, stiffness: 400 });
+  };
+
+  const handlePress = () => {
+    if (isPrimary) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onPress?.();
+  };
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
+    <AnimatedPressable
+      onPress={handlePress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       disabled={disabled || loading}
-      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled || loading }}
       style={[
+        animStyle,
         styles.btn,
         isSm && styles.btnSm,
         {
           backgroundColor: bgColor,
-          borderColor: isOutline ? colors.primary : 'transparent',
+          borderColor: isOutline ? colors.gold : 'transparent',
           borderWidth: isOutline ? 1.5 : 0,
         },
         fullWidth && styles.fullWidth,
         (disabled || loading) && styles.disabled,
+        style,
       ]}
     >
       {loading ? (
@@ -57,7 +95,7 @@ export default function Button({
           </Text>
         </View>
       )}
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 }
 
@@ -68,10 +106,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 52,
   },
   btnSm: {
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
+    minHeight: 36,
   },
   fullWidth: { width: '100%' },
   disabled: { opacity: 0.5 },

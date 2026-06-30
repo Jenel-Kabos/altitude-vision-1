@@ -8,13 +8,14 @@ const { simpleParser }      = require('mailparser');
 const InternalMail          = require('../models/InternalMail');
 const User                  = require('../models/User');
 const { uploadToCloudinary } = require('../config/cloudinary');
+const logger                = require('../utils/logger');
 
 // ── Fonction principale ───────────────────────────────────────
 const pollZohoInbox = async () => {
-    console.log('📬 [IMAP] Démarrage du polling Zoho...');
+    logger.info('📬 [IMAP] Démarrage du polling Zoho...');
 
     if (!process.env.ZOHO_FROM_EMAIL || !process.env.ZOHO_IMAP_PASSWORD) {
-        console.warn('⚠️ [IMAP] ZOHO_FROM_EMAIL ou ZOHO_IMAP_PASSWORD non configurés — polling ignoré');
+        logger.warn('⚠️ [IMAP] ZOHO_FROM_EMAIL ou ZOHO_IMAP_PASSWORD non configurés — polling ignoré');
         return { imported: 0, skipped: 0, errors: 0 };
     }
 
@@ -37,13 +38,13 @@ const pollZohoInbox = async () => {
     // 'error' de l'EventEmitter. Sans listener, Node.js traite ça comme une
     // exception non gérée et crashe le processus.
     client.on('error', (err) => {
-        console.error('❌ [IMAP] Erreur socket (absorbée):', err.message);
+        logger.error('❌ [IMAP] Erreur socket (absorbée):', err.message);
     });
 
     try {
         // 1. Connexion
         await client.connect();
-        console.log('✅ [IMAP] Connexion Zoho établie');
+        logger.success('✅ [IMAP] Connexion Zoho établie');
 
         // 2. Ouvrir INBOX
         const lock = await client.getMailboxLock('INBOX');
@@ -51,7 +52,7 @@ const pollZohoInbox = async () => {
         try {
             // 3. Chercher les emails non lus
             const uids = await client.search({ seen: false });
-            console.log(`📨 [IMAP] ${uids.length} email(s) non lu(s) trouvé(s)`);
+            logger.info(`📨 [IMAP] ${uids.length} email(s) non lu(s) trouvé(s)`);
 
             if (uids.length === 0) return stats;
 
@@ -68,12 +69,12 @@ const pollZohoInbox = async () => {
                     const htmlContent = parsed.html      || '';
                     const messageId   = parsed.messageId || `imap-uid-${message.uid}-${Date.now()}`;
 
-                    console.log(`  📧 [IMAP] "${subject}" — de: ${fromAddress}`);
+                    logger.info(`  📧 [IMAP] "${subject}" — de: ${fromAddress}`);
 
                     // 5. Éviter les doublons
                     const existing = await InternalMail.findOne({ zohoMessageId: messageId });
                     if (existing) {
-                        console.log(`  ℹ️  [IMAP] Doublon ignoré: ${messageId}`);
+                        logger.info(`  ℹ️  [IMAP] Doublon ignoré: ${messageId}`);
                         stats.skipped++;
                         await client.messageFlagsAdd({ uid: message.uid }, ['\\Seen']);
                         continue;
@@ -101,20 +102,20 @@ const pollZohoInbox = async () => {
                                 mimetype: att.contentType || 'application/octet-stream',
                                 size:     att.size || att.content.length || 0,
                             });
-                            console.log(`  📎 [IMAP] PJ uploadée: ${att.filename}`);
+                            logger.info(`  📎 [IMAP] PJ uploadée: ${att.filename}`);
                         } catch (attErr) {
-                            console.error(`  ⚠️ [IMAP] PJ non uploadée "${att.filename}":`, attErr.message);
+                            logger.error(`  ⚠️ [IMAP] PJ non uploadée "${att.filename}":`, attErr.message);
                         }
                     }
 
                     // 6. Trouver le destinataire interne
                     let recipientUser = await User.findOne({ email: toAddress });
                     if (!recipientUser) {
-                        console.warn(`  ⚠️  [IMAP] ${toAddress} inconnu → recherche admin`);
+                        logger.warn(`  ⚠️  [IMAP] ${toAddress} inconnu → recherche admin`);
                         recipientUser = await User.findOne({ role: 'Admin', isActive: true });
                     }
                     if (!recipientUser) {
-                        console.warn(`  ❌ [IMAP] Aucun destinataire — email ignoré`);
+                        logger.warn(`  ❌ [IMAP] Aucun destinataire — email ignoré`);
                         stats.skipped++;
                         continue;
                     }
@@ -141,11 +142,11 @@ const pollZohoInbox = async () => {
                     // 8. Marquer comme lu dans Zoho
                     await client.messageFlagsAdd({ uid: message.uid }, ['\\Seen']);
 
-                    console.log(`  ✅ [IMAP] Importé pour ${recipientUser.email} : "${subject}"`);
+                    logger.success(`  ✅ [IMAP] Importé pour ${recipientUser.email} : "${subject}"`);
                     stats.imported++;
 
                 } catch (msgErr) {
-                    console.error(`  ❌ [IMAP] Erreur message:`, msgErr.message);
+                    logger.error(`  ❌ [IMAP] Erreur message:`, msgErr.message);
                     stats.errors++;
                 }
             }
@@ -155,15 +156,15 @@ const pollZohoInbox = async () => {
         }
 
         await client.logout();
-        console.log(`📬 [IMAP] Terminé — importés: ${stats.imported}, ignorés: ${stats.skipped}, erreurs: ${stats.errors}`);
+        logger.info(`📬 [IMAP] Terminé — importés: ${stats.imported}, ignorés: ${stats.skipped}, erreurs: ${stats.errors}`);
         return stats;
 
     } catch (error) {
         const isNetworkErr = ['ETIMEOUT', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'].includes(error.code);
         if (isNetworkErr) {
-            console.warn(`⚠️ [IMAP] Timeout/réseau (${error.code}) — polling ignoré, serveur intact`);
+            logger.warn(`⚠️ [IMAP] Timeout/réseau (${error.code}) — polling ignoré, serveur intact`);
         } else {
-            console.error('❌ [IMAP] Erreur connexion:', error.message);
+            logger.error('❌ [IMAP] Erreur connexion:', error.message);
         }
         try { client.close(); } catch {}
         return { ...stats, errors: stats.errors + 1 };

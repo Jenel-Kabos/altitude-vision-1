@@ -30,7 +30,7 @@ class APIFeatures {
         // ⭐ ÉTAPE 1 : GESTION DE LA RECHERCHE TEXTUELLE GLOBALE
         if (this.queryString.search) {
             const regex = new RegExp(this.queryString.search, 'i'); // 'i' pour insensible à la casse
-            console.log(`🔎 [APIFeatures] Recherche texte: /${this.queryString.search}/`);
+            logger.info(`🔎 [APIFeatures] Recherche texte: /${this.queryString.search}/`);
             
             // Recherche dans le titre, la description, l'arrondissement et le type
             filters.$or = [
@@ -52,10 +52,10 @@ class APIFeatures {
                 $regex: new RegExp(filters.constructionType, 'i')
             };
             */
-            console.log(`🧱 [APIFeatures] Filtre constructionType: ${filters.constructionType}`);
+            logger.info(`🧱 [APIFeatures] Filtre constructionType: ${filters.constructionType}`);
         }
         
-        console.log("🔍 [APIFeatures] Filtres finaux appliqués:", filters);
+        logger.info("🔍 [APIFeatures] Filtres finaux appliqués:", filters);
 
         this.query = this.query.find(filters);
 
@@ -69,7 +69,7 @@ class APIFeatures {
     sort() {
         if (this.queryString.sort) {
             const sortBy = this.queryString.sort.split(',').join(' ');
-            console.log("📊 [APIFeatures] Tri appliqué:", sortBy);
+            logger.info("📊 [APIFeatures] Tri appliqué:", sortBy);
             this.query = this.query.sort(sortBy);
         } else {
             this.query = this.query.sort('-createdAt'); 
@@ -85,7 +85,7 @@ class APIFeatures {
     limitFields() {
         if (this.queryString.fields) {
             const fields = this.queryString.fields.split(',').join(' ');
-            console.log("📋 [APIFeatures] Champs limités:", fields);
+            logger.info("📋 [APIFeatures] Champs limités:", fields);
             this.query = this.query.select(fields);
         } else {
             this.query = this.query.select('-__v');
@@ -103,7 +103,7 @@ class APIFeatures {
         const limit = this.queryString.limit * 1 || 10; 
         const skip = (page - 1) * limit;
 
-        console.log("📄 [APIFeatures] Pagination:", { page, limit, skip });
+        logger.info("📄 [APIFeatures] Pagination:", { page, limit, skip });
 
         this.query = this.query.skip(skip).limit(limit);
 

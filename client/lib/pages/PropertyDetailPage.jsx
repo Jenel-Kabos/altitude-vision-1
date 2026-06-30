@@ -598,7 +598,7 @@ const PropertyDetailPage = () => {
           Annonce introuvable
         </p>
         <p style={{ color:INK_SOFT, fontSize:'clamp(0.82rem,2vw,0.88rem)', marginBottom:24 }}>{error}</p>
-        <Link href="/altimmo/annonces" style={{
+        <Link href="/immobilier/annonces" style={{
           display:'inline-flex', alignItems:'center', gap:8,
           padding:'12px 24px', background:INK, color:'#fff',
           fontFamily:"'DM Sans', sans-serif", fontSize:'clamp(0.68rem,1.5vw,0.75rem)',
@@ -643,8 +643,8 @@ const PropertyDetailPage = () => {
       <div className="pdp-nav">
         <div className="pdp-nav-inner">
           <Breadcrumb items={[
-            { label: 'Altimmo',   href: '/altimmo' },
-            { label: 'Annonces',  href: '/altimmo/annonces' },
+            { label: 'Altimmo',   href: '/immobilier' },
+            { label: 'Annonces',  href: '/immobilier/annonces' },
             { label: property.title },
           ]} />
         </div>

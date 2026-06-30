@@ -5,6 +5,7 @@ const User = require('../models/User');
 const APIFeatures = require('../utils/apiFeatures');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+const logger = require('../utils/logger');
 
 // ============================================================
 // 🛠️ UTILITAIRES
@@ -85,11 +86,11 @@ const parseStringArray = (value) => {
  * @route POST /api/properties
  */
 const createProperty = asyncHandler(async (req, res, next) => {
-  console.log('--- 🆕 Création de propriété ---');
+  logger.info('--- 🆕 Création de propriété ---');
 
   // 1. Upload des images vers Cloudinary (avec optimisation WebP)
   const imagePaths = await uploadFilesToCloudinary(req.files);
-  console.log('📸 Images Cloudinary:', imagePaths);
+  logger.info('📸 Images Cloudinary:', imagePaths);
 
   // 2. Préparation des données
   const {
@@ -153,7 +154,7 @@ const createProperty = asyncHandler(async (req, res, next) => {
     statusAdmin:     'En attente'
   });
 
-  console.log('✅ Propriété créée :', newProperty._id);
+  logger.success('✅ Propriété créée :', newProperty._id);
 
   res.status(201).json({
     status: 'success',
@@ -204,13 +205,13 @@ const getAllProperties = asyncHandler(async (req, res) => {
  * @route GET /api/properties/status/pending
  */
 const getPendingProperties = asyncHandler(async (req, res) => {
-  console.log('📡 [Admin] Récupération des annonces en attente...');
+  logger.info('📡 [Admin] Récupération des annonces en attente...');
 
   const properties = await Property.find({ statusAdmin: 'En attente' })
     .populate('owner', 'name email photo role phone')
     .sort('-createdAt');
 
-  console.log('✅', properties.length, 'annonces en attente.');
+  logger.success('✅', properties.length, 'annonces en attente.');
 
   res.status(200).json({
     status: 'success',
@@ -303,7 +304,7 @@ const updateProperty = asyncHandler(async (req, res) => {
 
   // 1. Upload des nouvelles images vers Cloudinary (avec optimisation WebP)
   const newImages = await uploadFilesToCloudinary(req.files);
-  console.log('📸 Nouvelles images Cloudinary:', newImages);
+  logger.info('📸 Nouvelles images Cloudinary:', newImages);
 
   // 2. Récupérer les images existantes envoyées par le frontend
   let existingImages = req.body.existingImages || [];

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../services/api';
+import api, { saveToken, getToken, deleteToken } from '../services/api';
+import { enregistrerNotifications } from '../services/notificationsService';
 
 const AuthContext = createContext({});
 
@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
 
   const loadStoredAuth = async () => {
     try {
-      const storedToken = await AsyncStorage.getItem('token');
+      const storedToken = await getToken();
       if (storedToken) {
         setToken(storedToken);
         const timeoutPromise = new Promise((_, reject) =>
@@ -25,11 +25,14 @@ export const AuthProvider = ({ children }) => {
           }),
           timeoutPromise,
         ]);
-        setUser(response.data?.data?.user || response.data?.user || null);
+        const loadedUser = response.data?.data?.user || response.data?.user || null;
+        setUser(loadedUser);
+        if (loadedUser?._id) {
+          enregistrerNotifications(loadedUser._id).catch(() => {});
+        }
       }
     } catch (error) {
-      console.log('Auth load error:', error.message);
-      await AsyncStorage.removeItem('token');
+      await deleteToken();
     } finally {
       setLoading(false);
     }
@@ -42,12 +45,12 @@ export const AuthProvider = ({ children }) => {
       console.log('Login response:', response.data);
       const token = response.data.token;
       const user = response.data.data?.user || response.data.user;
-      await AsyncStorage.setItem('token', token);
+      await saveToken(token);
       setToken(token);
       setUser(user);
+      enregistrerNotifications(user?._id).catch(() => {});
       return user;
     } catch (error) {
-      console.log('Login error:', error.response?.data || error.message);
       throw error;
     }
   };
@@ -63,18 +66,18 @@ export const AuthProvider = ({ children }) => {
       const token = response.data.token;
       const user  = response.data.data?.user || response.data.user;
       if (!token) throw new Error('Token manquant dans la réponse /auth/google');
-      await AsyncStorage.setItem('token', token);
+      await saveToken(token);
       setToken(token);
       setUser(user);
+      enregistrerNotifications(user?._id).catch(() => {});
       return user;
     } catch (error) {
-      console.log('Google login error:', error.response?.data || error.message);
       throw error;
     }
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem('token');
+    await deleteToken();
     setToken(null);
     setUser(null);
   };
@@ -83,7 +86,7 @@ export const AuthProvider = ({ children }) => {
 
   const refreshSession = async (newToken, updatedUser) => {
     if (newToken) {
-      await AsyncStorage.setItem('token', newToken);
+      await saveToken(newToken);
       setToken(newToken);
     }
     if (updatedUser) {

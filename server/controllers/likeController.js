@@ -3,6 +3,7 @@ const asyncHandler = require('express-async-handler');
 const Like = require('../models/Like');
 const Property = require('../models/Property');
 const Event = require('../models/Event');
+const logger = require('../utils/logger');
 
 /**
  * @description Liker/Unliker un élément
@@ -13,7 +14,7 @@ exports.toggleLike = asyncHandler(async (req, res) => {
   const { targetType, targetId } = req.body;
   const userId = req.user.id;
 
-  console.log(`📍 [toggleLike] User: ${userId}, Type: ${targetType}, Target: ${targetId}`);
+  logger.info(`📍 [toggleLike] User: ${userId}, Type: ${targetType}, Target: ${targetId}`);
 
   // Validation
   if (!targetType || !targetId) {
@@ -49,7 +50,7 @@ exports.toggleLike = asyncHandler(async (req, res) => {
   if (existingLike) {
     // Unliker
     await Like.findByIdAndDelete(existingLike._id);
-    console.log(`💔 [toggleLike] Unlike effectué`);
+    logger.info(`💔 [toggleLike] Unlike effectué`);
 
     const likesCount = await Like.countLikes(targetType, targetId);
 
@@ -69,7 +70,7 @@ exports.toggleLike = asyncHandler(async (req, res) => {
       targetId
     });
 
-    console.log(`❤️ [toggleLike] Like effectué:`, newLike._id);
+    logger.info(`❤️ [toggleLike] Like effectué:`, newLike._id);
 
     const likesCount = await Like.countLikes(targetType, targetId);
 
@@ -94,7 +95,7 @@ exports.getLikeStatus = asyncHandler(async (req, res) => {
   const { targetType, targetId } = req.params;
   const userId = req.user?.id;
 
-  console.log(`📊 [getLikeStatus] Type: ${targetType}, Target: ${targetId}, User: ${userId || 'Non authentifié'}`);
+  logger.info(`📊 [getLikeStatus] Type: ${targetType}, Target: ${targetId}, User: ${userId || 'Non authentifié'}`);
 
   // Compter les likes
   const likesCount = await Like.countLikes(targetType, targetId);
@@ -123,7 +124,7 @@ exports.getMyFavorites = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { type } = req.query; // Filtrer par type (optionnel)
 
-  console.log(`⭐ [getMyFavorites] User: ${userId}, Type: ${type || 'Tous'}`);
+  logger.info(`⭐ [getMyFavorites] User: ${userId}, Type: ${type || 'Tous'}`);
 
   const query = { user: userId };
   if (type) {
@@ -165,7 +166,7 @@ exports.getMyFavorites = asyncHandler(async (req, res) => {
     }
   });
 
-  console.log(`✅ [getMyFavorites] ${likes.length} favori(s) trouvé(s)`);
+  logger.success(`✅ [getMyFavorites] ${likes.length} favori(s) trouvé(s)`);
 
   res.status(200).json({
     status: 'success',
@@ -184,7 +185,7 @@ exports.getMyFavorites = asyncHandler(async (req, res) => {
 exports.getLikeUsers = asyncHandler(async (req, res) => {
   const { targetType, targetId } = req.params;
 
-  console.log(`👥 [getLikeUsers] Type: ${targetType}, Target: ${targetId}`);
+  logger.info(`👥 [getLikeUsers] Type: ${targetType}, Target: ${targetId}`);
 
   const likes = await Like.find({ targetType, targetId })
     .populate('user', 'name email avatar')

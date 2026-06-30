@@ -11,7 +11,7 @@ import PortfolioCard from './PortfolioCard';
 const POLE_COLORS = {
   property:  { primary: '#2E7BB5', shadow: 'rgba(46,123,181,0.22)'  },
   event:     { primary: '#D42B2B', shadow: 'rgba(212,43,43,0.22)'   },
-  portfolio: { primary: '#C8872A', shadow: 'rgba(200,135,42,0.22)'  },
+  portfolio: { primary: '#C8960C', shadow: 'rgba(200,135,42,0.22)'  },
 };
 
 const SLIDER_CSS = `

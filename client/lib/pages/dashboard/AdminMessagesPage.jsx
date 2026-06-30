@@ -9,7 +9,7 @@ import { getUserConversations } from '../../services/conversationService';
 import { useAuth } from '../../context/AuthContext';
 
 const BLUE = '#2E7BB5';
-const GOLD = '#C8872A';
+const GOLD = '#C8960C';
 const RED  = '#D42B2B';
 
 const AdminMessagesPage = () => {
@@ -61,11 +61,11 @@ const AdminMessagesPage = () => {
             </div>
             <div>
               <h1 className="font-bold text-gray-900 text-base leading-tight"
-                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 Messagerie
               </h1>
               <p className="text-xs text-gray-400"
-                style={{ fontFamily: "'Outfit', sans-serif" }}>
+                style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 Conversations avec les clients
               </p>
             </div>
@@ -73,7 +73,7 @@ const AdminMessagesPage = () => {
 
           {totalUnread > 0 && (
             <span className="text-white text-xs font-bold px-3 py-1.5 rounded-full"
-              style={{ background: RED, fontFamily: "'Outfit', sans-serif" }}>
+              style={{ background: RED, fontFamily: "'DM Sans', sans-serif" }}>
               {totalUnread} non lu{totalUnread > 1 ? 's' : ''}
             </span>
           )}
@@ -89,7 +89,7 @@ const AdminMessagesPage = () => {
             <button key={id} onClick={() => setFilter(id)}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
               style={{
-                fontFamily: "'Outfit', sans-serif",
+                fontFamily: "'DM Sans', sans-serif",
                 background: filter === id ? `linear-gradient(135deg, #1A5A8A, ${BLUE})` : '#F1F5F9',
                 color:      filter === id ? '#fff' : '#64748B',
                 boxShadow:  filter === id ? `0 2px 8px ${BLUE}30` : 'none',
@@ -111,7 +111,7 @@ const AdminMessagesPage = () => {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <Loader2 size={32} className="animate-spin mx-auto mb-3" style={{ color: BLUE }} />
-            <p className="text-sm text-gray-400" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <p className="text-sm text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               Chargement des conversations…
             </p>
           </div>
@@ -130,11 +130,11 @@ const AdminMessagesPage = () => {
                     <Inbox size={24} style={{ color: BLUE }} />
                   </div>
                   <p className="font-semibold text-gray-600 mb-1"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     Aucune conversation
                   </p>
                   <p className="text-xs text-gray-400"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {filter === 'active' ? 'Les nouvelles conversations apparaîtront ici.' : 'Aucune conversation archivée.'}
                   </p>
                 </div>
@@ -166,11 +166,11 @@ const AdminMessagesPage = () => {
                     <MessageCircle size={36} style={{ color: `${BLUE}60` }} />
                   </div>
                   <h3 className="font-bold text-gray-700 mb-2"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     Sélectionnez une conversation
                   </h3>
                   <p className="text-sm text-gray-400"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     Choisissez une conversation dans la liste pour commencer.
                   </p>
                 </div>

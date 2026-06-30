@@ -197,8 +197,14 @@ const propertySchema = new mongoose.Schema(
   }
 );
 
-// Index géospatial (déjà présent et correct)
+// Index géospatial
 propertySchema.index({ location: '2dsphere' });
+
+// Index composés pour les requêtes de listing les plus fréquentes
+propertySchema.index({ pole: 1, status: 1, createdAt: -1 });       // listing public filtré par pôle
+propertySchema.index({ statusAdmin: 1, createdAt: -1 });            // file d'approbation admin
+propertySchema.index({ owner: 1, createdAt: -1 });                  // "mes annonces"
+propertySchema.index({ status: 1, price: 1 });                      // tri par prix
 
 // Middleware : synchronisation automatique de la location
 propertySchema.pre('save', function (next) {

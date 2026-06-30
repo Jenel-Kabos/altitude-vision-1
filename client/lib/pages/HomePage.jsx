@@ -20,7 +20,7 @@ import { getAllPortfolioItems }        from '../services/portfolioService';
 const poles = [
   {
     id: 'Altimmo', name: 'Altimmo', num: '01',
-    route: '/altimmo/annonces', pageroute: '/altimmo',
+    route: '/immobilier/annonces', pageroute: '/immobilier',
     icon: Building2, color: '#2E7BB5',
     colorLight: 'rgba(46,123,181,0.08)', colorBorder: 'rgba(46,123,181,0.16)',
     gradient: 'linear-gradient(135deg, #1A5A8A, #2E7BB5)',
@@ -29,7 +29,7 @@ const poles = [
   },
   {
     id: 'MilaEvents', name: 'Mila Events', num: '02',
-    route: '/mila-events/annonces', pageroute: '/mila-events',
+    route: '/evenementiel/annonces', pageroute: '/evenementiel',
     icon: Calendar, color: '#D42B2B',
     colorLight: 'rgba(212,43,43,0.08)', colorBorder: 'rgba(212,43,43,0.16)',
     gradient: 'linear-gradient(135deg, #A01E1E, #D42B2B)',
@@ -38,10 +38,10 @@ const poles = [
   },
   {
     id: 'Altcom', name: 'Altcom', num: '03',
-    route: '/altcom/annonces', pageroute: '/altcom',
-    icon: Briefcase, color: '#C8872A',
+    route: '/communication/annonces', pageroute: '/communication',
+    icon: Briefcase, color: '#C8960C',
     colorLight: 'rgba(200,135,42,0.08)', colorBorder: 'rgba(200,135,42,0.16)',
-    gradient: 'linear-gradient(135deg, #A0671A, #C8872A)',
+    gradient: 'linear-gradient(135deg, #A0671A, #C8960C)',
     description: 'Stratégie de communication, branding et visibilité digitale pour propulser votre image.',
     tag: 'Communication',
   },
@@ -74,7 +74,7 @@ const GLOBAL_CSS = `
   :root {
     --px: 16px;
     --py: clamp(40px, 7.5vw, 140px);
-    --gold: #C8872A;
+    --gold: #C8960C;
     --blue: #2E7BB5;
     --red:  #D42B2B;
     --bg:   #0A0C0F;
@@ -474,10 +474,10 @@ const HomePage = () => {
         {/* ══ STATS ══ */}
         <div className="hp-stats-grid">
           {[
-            { num: '3',    label: "Pôles d'expertise",    color: '#C8872A' },
+            { num: '3',    label: "Pôles d'expertise",    color: '#C8960C' },
             { num: '150+', label: 'Biens immobiliers',    color: '#2E7BB5' },
             { num: '80+',  label: 'Événements organisés', color: '#D42B2B' },
-            { num: '5+',   label: 'Années d\'expérience', color: '#C8872A' },
+            { num: '5+',   label: 'Années d\'expérience', color: '#C8960C' },
           ].map((stat, i) => (
             <FadeIn key={i} delay={i * 0.07} y={14}>
               <div className="hp-stat-item">
@@ -496,7 +496,7 @@ const HomePage = () => {
                 <Eyebrow>Notre Expertise</Eyebrow>
                 <h2 id="poles-heading" className="hp-h2">
                   Trois pôles,{' '}
-                  <em style={{ fontStyle: 'italic', color: '#C8872A' }}>une seule vision</em>
+                  <em style={{ fontStyle: 'italic', color: '#C8960C' }}>une seule vision</em>
                 </h2>
               </div>
             </FadeIn>
@@ -542,7 +542,7 @@ const HomePage = () => {
               <FadeIn x={-20}>
                 <Eyebrow>À propos</Eyebrow>
                 <h2 id="about-heading" className="hp-h2" style={{ marginBottom: 'clamp(14px,2.5vw,20px)' }}>
-                  Qui sommes-<em style={{ fontStyle: 'italic', color: '#C8872A' }}>nous ?</em>
+                  Qui sommes-<em style={{ fontStyle: 'italic', color: '#C8960C' }}>nous ?</em>
                 </h2>
                 <p className="hp-about-p" style={{ color: 'rgba(232,228,220,0.5)', marginBottom: '12px' }}>
                   <span style={{ color: '#E8E4DC', fontWeight: 400 }}>Altitude-Vision</span>{' '}
@@ -558,7 +558,7 @@ const HomePage = () => {
                     { icon: Mail,   text: 'contact@altitudevision.agency', href: 'mailto:contact@altitudevision.agency' },
                   ].map(({ icon: Icon, text, href }, i) => (
                     <div key={i} className="hp-contact-row">
-                      <Icon size={12} style={{ color: '#C8872A', flexShrink: 0 }} aria-hidden="true" />
+                      <Icon size={12} style={{ color: '#C8960C', flexShrink: 0 }} aria-hidden="true" />
                       {href
                         ? <a href={href} style={{ color: 'inherit', textDecoration: 'none' }}>{text}</a>
                         : text
@@ -597,7 +597,7 @@ const HomePage = () => {
                   }}>
                     <div style={{
                       width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
-                      background: 'linear-gradient(135deg, #A0671A, #C8872A)',
+                      background: 'linear-gradient(135deg, #A0671A, #C8960C)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
                       <Briefcase size={16} style={{ color: '#fff' }} aria-hidden="true" />
@@ -632,7 +632,7 @@ const HomePage = () => {
                 <Eyebrow>Notre Sélection</Eyebrow>
                 <h2 id="annonces-heading" className="hp-h2">
                   Nos Dernières{' '}
-                  <em style={{ fontStyle: 'italic', color: '#C8872A' }}>Annonces</em>
+                  <em style={{ fontStyle: 'italic', color: '#C8960C' }}>Annonces</em>
                 </h2>
               </div>
             </FadeIn>

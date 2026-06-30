@@ -83,7 +83,7 @@ const EventDetailPage = () => {
 
   // ✅ MODIFICATION : Redirection vers MilaEventsPage avec modal
   const handleRequestQuote = () => {
-    router.push('/mila-events');
+    router.push('/evenementiel');
   };
 
   const getVideoEmbedUrl = (url) => {
@@ -119,7 +119,7 @@ const EventDetailPage = () => {
           </div>
           <p className="text-red-700 mb-6">{error || 'Événement introuvable'}</p>
           <button
-            onClick={() => router.push('/mila-events')}
+            onClick={() => router.push('/evenementiel')}
             className="inline-flex items-center text-blue-600 hover:text-blue-700 font-semibold"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
@@ -152,15 +152,15 @@ const EventDetailPage = () => {
       <div className="bg-white shadow-sm sticky top-0 z-10">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
           <button
-            onClick={() => router.push('/mila-events')}
+            onClick={() => router.push('/evenementiel')}
             className="flex items-center text-gray-600 hover:text-blue-600 transition font-semibold"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
             Retour
           </button>
           <Breadcrumb items={[
-            { label: 'Mila Events',  href: '/mila-events' },
-            { label: 'Événements',   href: '/mila-events/annonces' },
+            { label: 'Mila Events',  href: '/evenementiel' },
+            { label: 'Événements',   href: '/evenementiel/annonces' },
             { label: event?.title ?? 'Événement' },
           ]} />
         </div>

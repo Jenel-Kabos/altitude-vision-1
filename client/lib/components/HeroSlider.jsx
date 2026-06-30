@@ -13,7 +13,7 @@ const slides = [
     image:    "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1600&q=80",
     imgWidth: 1600,
     imgHeight:1067,
-    cta:      { label: "Trouver mon bien", route: "/altimmo/annonces" },
+    cta:      { label: "Trouver mon bien", route: "/immobilier/annonces" },
     accent:   "#2E7BB5",
     pole:     "Altimmo",
   },
@@ -23,7 +23,7 @@ const slides = [
     image:    "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?q=80&w=1170&auto=format&fit=crop",
     imgWidth: 1170,
     imgHeight:780,
-    cta:      { label: "Réserver ma date", route: "/mila-events" },
+    cta:      { label: "Réserver ma date", route: "/evenementiel" },
     accent:   "#D42B2B",
     pole:     "Mila Events",
   },
@@ -34,15 +34,15 @@ const slides = [
     imgWidth: 1170,
     imgHeight:780,
     cta:      { label: "Booster ma marque", route: "/altcom" },
-    accent:   "#C8872A",
+    accent:   "#C8960C",
     pole:     "Altcom",
   },
 ];
 
 const poles = [
-  { label: "Altimmo",     sub: "Immobilier",    icon: Building2, route: "/altimmo",     color: "#2E7BB5" },
-  { label: "Mila Events", sub: "Événementiel",  icon: Calendar,  route: "/mila-events", color: "#D42B2B" },
-  { label: "Altcom",      sub: "Communication", icon: Briefcase, route: "/altcom",      color: "#C8872A" },
+  { label: "Altimmo",     sub: "Immobilier",    icon: Building2, route: "/immobilier",     color: "#2E7BB5" },
+  { label: "Mila Events", sub: "Événementiel",  icon: Calendar,  route: "/evenementiel", color: "#D42B2B" },
+  { label: "Altcom",      sub: "Communication", icon: Briefcase, route: "/altcom",      color: "#C8960C" },
 ];
 
 const SLIDE_DURATION = 7000;

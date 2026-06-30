@@ -24,11 +24,11 @@ import { PROPERTY_TYPES } from "../../constants/propertyTypes";
 
 // ── Palette ──────────────────────────────────────────────────
 const BLUE   = '#2E7BB5';
-const GOLD   = '#C8872A';
+const GOLD   = '#C8960C';
 const GREEN  = '#16A34A';
 const RED    = '#D42B2B';
 const GRAY   = '#94A3B8';
-const FONT   = "'Outfit', sans-serif";
+const FONT   = "'DM Sans', sans-serif";
 
 const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
 const BIEN_TYPES = PROPERTY_TYPES;

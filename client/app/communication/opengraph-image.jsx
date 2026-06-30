@@ -1,0 +1,66 @@
+import { ImageResponse } from 'next/og';
+
+export const size        = { width: 1200, height: 630 };
+export const contentType = 'image/png';
+export const alt         = 'Altcom — 80 entreprises congolaises ont décollé avec nous';
+
+export default function Image() {
+  const GOLD = '#C8960C';
+
+  return new ImageResponse(
+    (
+      <div style={{ display:'flex', width:'1200px', height:'630px', background:'#0A0C0F' }}>
+        <div style={{ display:'flex', position:'absolute', inset:'0', background:'linear-gradient(130deg,#1A1008 0%,#0A0C0F 60%)' }} />
+        <div style={{ display:'flex', position:'absolute', top:0, left:0, right:0, height:'5px', background:GOLD }} />
+        <div style={{ display:'flex', position:'absolute', top:'56px', left:0, width:'4px', height:'518px', background:`linear-gradient(to bottom,${GOLD},transparent)` }} />
+        <div style={{ display:'flex', position:'absolute', top:'-80px', right:'-80px', width:'300px', height:'300px', borderRadius:'50%', border:'1px solid rgba(200,135,42,0.12)' }} />
+        <div style={{ display:'flex', position:'absolute', top:'-20px', right:'-20px', width:'180px', height:'180px', borderRadius:'50%', border:'1px solid rgba(200,135,42,0.07)' }} />
+
+        <div style={{ display:'flex', flexDirection:'column', flex:1, padding:'56px 80px 48px 96px', zIndex:1 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'44px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'44px', height:'44px', borderRadius:'10px', background:'linear-gradient(135deg,#A0671A,#C8960C)' }}>
+                <span style={{ color:'#fff', fontSize:'16px', fontWeight:700 }}>AV</span>
+              </div>
+              <span style={{ color:'rgba(232,228,220,0.5)', fontSize:'13px', fontWeight:400, letterSpacing:'0.20em', textTransform:'uppercase' }}>ALTITUDE-VISION</span>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 16px', borderRadius:'40px', border:'1px solid rgba(200,135,42,0.25)', background:'rgba(200,135,42,0.08)' }}>
+              <span style={{ color:GOLD, fontSize:'11px', letterSpacing:'0.20em', textTransform:'uppercase', fontWeight:500 }}>Altcom — Communication</span>
+            </div>
+          </div>
+
+          <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'16px' }}>
+            <div style={{ display:'flex', width:'18px', height:'1px', background:GOLD }} />
+            <span style={{ color:GOLD, fontSize:'11px', letterSpacing:'0.22em', textTransform:'uppercase', fontWeight:500 }}>Branding · Digital · Stratégie</span>
+          </div>
+
+          <div style={{ display:'flex', flexDirection:'column', marginBottom:'20px' }}>
+            <span style={{ color:'#E8E4DC', fontSize:'60px', fontWeight:300, lineHeight:1.08, letterSpacing:'-0.02em' }}>80 entreprises congolaises</span>
+            <span style={{ color:'#E8E4DC', fontSize:'60px', fontWeight:300, lineHeight:1.08, letterSpacing:'-0.02em' }}>
+              {'ont '}<span style={{ color:GOLD }}>décollé avec nous</span>
+            </span>
+          </div>
+
+          <div style={{ display:'flex', height:'1px', width:'72px', background:'rgba(200,135,42,0.45)', marginBottom:'18px' }} />
+
+          <div style={{ display:'flex', color:'rgba(232,228,220,0.40)', fontSize:'20px', fontWeight:300, lineHeight:1.5, marginBottom:'auto' }}>
+            Une seule agence pour construire votre image et multiplier vos clients.
+          </div>
+
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:'18px', borderTop:'1px solid rgba(232,228,220,0.06)' }}>
+            <div style={{ display:'flex', gap:'24px' }}>
+              {[['80+','Entreprises accompagnées'], ['5+','Années au Congo']].map(([n,l]) => (
+                <div key={n} style={{ display:'flex', flexDirection:'column' }}>
+                  <span style={{ color:GOLD, fontSize:'26px', fontWeight:700, lineHeight:1 }}>{n}</span>
+                  <span style={{ color:'rgba(232,228,220,0.28)', fontSize:'11px', letterSpacing:'0.10em', textTransform:'uppercase' }}>{l}</span>
+                </div>
+              ))}
+            </div>
+            <span style={{ color:'rgba(200,135,42,0.45)', fontSize:'13px' }}>altitudevision.agency/communication</span>
+          </div>
+        </div>
+      </div>
+    ),
+    { width:1200, height:630 }
+  );
+}

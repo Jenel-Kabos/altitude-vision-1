@@ -220,7 +220,7 @@ const CouvertureMediatiquePage = () => {
                 
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
                     <Link 
-                        href="/altcom" 
+                        href="/communication" 
                         className="inline-flex items-center gap-2 text-white/90 hover:text-white mb-8 transition-colors group"
                     >
                         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -717,15 +717,15 @@ const CouvertureMediatiquePage = () => {
             </AnimatePresence>
 
             {/* Footer */}
-            <footer className="bg-gray-900 text-white py-8 border-t border-gray-800">
+            <footer className="bg-white text-gray-700 py-8 border-t border-gray-200">
                 <div className="container mx-auto px-4 sm:px-6 text-center max-w-6xl">
                     <div className="flex items-center justify-center gap-2 mb-3">
-                        <Radio className="w-5 h-5 text-orange-400" />
-                        <p className="text-2xl font-bold text-white">Altcom</p>
+                        <Radio className="w-5 h-5 text-orange-500" />
+                        <p className="text-2xl font-bold text-gray-800">Altcom</p>
                     </div>
-                    <p className="text-xs sm:text-sm text-gray-400">
-                        &copy; {new Date().getFullYear()} Tous droits réservés | 
-                        <Link href="/mentions-legales" className="text-gray-400 hover:text-orange-400 transition duration-200 ml-2 underline underline-offset-2">
+                    <p className="text-xs sm:text-sm text-gray-500">
+                        &copy; {new Date().getFullYear()} Tous droits réservés |
+                        <Link href="/mentions-legales" className="text-gray-500 hover:text-orange-500 transition duration-200 ml-2 underline underline-offset-2">
                             Mentions Légales
                         </Link>
                     </p>

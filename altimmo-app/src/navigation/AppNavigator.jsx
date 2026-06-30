@@ -1,27 +1,60 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
-import { colors, typography } from '../theme';
+import { fonts, fontSize } from '../theme';
 import AuthNavigator from './AuthNavigator';
 import TabNavigator from './TabNavigator';
+import OnboardingScreen from '../screens/Onboarding/OnboardingScreen';
+
+const LOGO = require('../../assets/Logo_Altitude_transparent.png');
 
 const Stack = createStackNavigator();
 
 export default function AppNavigator() {
   const { user, loading } = useAuth();
+  const [onboardingDone, setOnboardingDone] = useState(null);
 
-  if (loading) {
+  useEffect(() => {
+    AsyncStorage.getItem('onboarding_complete').then((val) => {
+      setOnboardingDone(val === '1');
+    });
+  }, []);
+
+  const handleOnboardingDone  = useCallback(() => setOnboardingDone(true), []);
+
+  // Passer onLogin : marque l'onboarding comme terminé ET force le flow Auth
+  // (sans user, TabNavigator ne s'affiche pas — AuthNavigator prend le relais)
+  const handleOnboardingLogin = useCallback(async () => {
+    await AsyncStorage.setItem('onboarding_complete', '1');
+    setOnboardingDone(true);
+  }, []);
+
+  if (loading || onboardingDone === null) {
     return (
       <View style={styles.splash}>
-        <Text style={styles.logo}>Altimmo</Text>
-        <ActivityIndicator
-          size="large"
-          color={colors.primary}
-          style={styles.spinner}
+        <Image
+          source={LOGO}
+          style={styles.splashLogo}
+          contentFit="contain"
+          cachePolicy="memory"
+          accessible={false}
         />
+        <Text style={styles.splashName}>Altimmo</Text>
+        <Text style={styles.splashSub}>par Altitude Vision</Text>
       </View>
+    );
+  }
+
+  if (!onboardingDone) {
+    return (
+      <OnboardingScreen
+        onDone={handleOnboardingDone}
+        onLogin={handleOnboardingLogin}
+      />
     );
   }
 
@@ -30,21 +63,13 @@ export default function AppNavigator() {
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          cardStyle: {
-            backgroundColor: colors.background,
-          },
+          cardStyle: { backgroundColor: '#0A0A0A' },
         }}
       >
         {user ? (
-          <Stack.Screen
-            name="Main"
-            component={TabNavigator}
-          />
+          <Stack.Screen name="Main" component={TabNavigator} />
         ) : (
-          <Stack.Screen
-            name="Auth"
-            component={AuthNavigator}
-          />
+          <Stack.Screen name="Auth" component={AuthNavigator} />
         )}
       </Stack.Navigator>
     </NavigationContainer>
@@ -54,16 +79,26 @@ export default function AppNavigator() {
 const styles = StyleSheet.create({
   splash: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#0A0A0A',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
-  logo: {
-    ...typography.display,
-    color: colors.primary,
+  splashLogo: {
+    width: 80,
+    height: 80,
+    marginBottom: 4,
+  },
+  splashName: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.display,
+    color: '#C8960C',
     letterSpacing: 1,
   },
-  spinner: {
-    marginTop: 24,
+  splashSub: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: 'rgba(240,237,232,0.35)',
+    letterSpacing: 0.5,
   },
 });

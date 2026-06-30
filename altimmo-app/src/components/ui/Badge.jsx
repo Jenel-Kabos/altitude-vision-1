@@ -1,22 +1,27 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, typography, spacing } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { typography, spacing } from '../../theme';
 
-export default function Badge({ label, color = colors.primary, style }) {
+export default function Badge({ label, color, style }) {
+  const { themeColors: c } = useTheme();
+  const effectiveColor = color ?? c.gold;
+  const styles = useMemo(() => makeStyles(), []);
+
   return (
     <View
       style={[
         styles.badge,
-        { backgroundColor: color + '22', borderColor: color },
+        { backgroundColor: effectiveColor + '22', borderColor: effectiveColor },
         style,
       ]}
     >
-      <Text style={[styles.text, { color }]}>{label}</Text>
+      <Text style={[styles.text, { color: effectiveColor }]}>{label}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
     borderWidth: 1,

@@ -219,7 +219,7 @@ const CouvertureMediatiquePage = () => {
                 
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
                     <Link 
-                        to="/altcom" 
+                        to="/communication" 
                         className="inline-flex items-center gap-2 text-white/90 hover:text-white mb-8 transition-colors group"
                     >
                         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />

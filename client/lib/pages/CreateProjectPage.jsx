@@ -253,7 +253,7 @@ Budget: ${formData.budget} FCFA
       });
 
       setTimeout(() => {
-        router.push('/mila-events');
+        router.push('/evenementiel');
       }, 3000);
       
     } catch (error) {
@@ -287,7 +287,7 @@ Budget: ${formData.budget} FCFA
       <div className="bg-gradient-to-r from-blue-900 to-blue-700 text-white py-12 shadow-xl">
         <div className="container mx-auto px-6">
           <button
-            onClick={() => router.push('/mila-events')}
+            onClick={() => router.push('/evenementiel')}
             className="flex items-center text-blue-100 hover:text-white mb-6 transition"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />

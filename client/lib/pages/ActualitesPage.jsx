@@ -14,7 +14,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://altitude-vision.onre
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
-const GOLD      = '#C8872A';
+const GOLD      = '#C8960C';
 const GOLD_DARK = '#A0671A';
 const RED       = '#D42B2B';
 
@@ -66,32 +66,28 @@ const ActualitesPage = () => {
     const fmtHeure = d => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
     return (
-        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
             {/* ── Hero ─────────────────────────────────────────────── */}
-            <section className="relative text-white pt-32 pb-16 px-4 overflow-hidden"
-                style={{ background: 'linear-gradient(135deg, #0D1117 0%, #0e1e30 50%, #0D1117 100%)' }}>
-                <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-0 left-1/4 w-80 h-80 rounded-full blur-[120px] opacity-10" style={{ background: BLUE }} />
-                    <div className="absolute bottom-0 right-1/4 w-64 h-64 rounded-full blur-[100px] opacity-8" style={{ background: GOLD }} />
-                </div>
+            <section className="relative pt-32 pb-16 px-4 overflow-hidden"
+                style={{ background: '#F8F8F8', borderBottom: '1px solid rgba(17,24,39,0.07)' }}>
                 <div className="absolute top-0 left-0 right-0 h-px"
-                    style={{ background: `linear-gradient(to right, transparent, ${BLUE}50, transparent)` }} />
+                    style={{ background: `linear-gradient(to right, transparent, ${BLUE}30, transparent)` }} />
 
                 <div className="container mx-auto max-w-6xl relative z-10">
                     <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest text-white border border-white/15 backdrop-blur-sm mb-6"
-                            style={{ backgroundColor: `${BLUE}25` }}>
-                            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#90C8F0' }} />
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border mb-6"
+                            style={{ backgroundColor: `${BLUE}10`, borderColor: `${BLUE}25`, color: BLUE }}>
+                            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: BLUE }} />
                             Blog & Actualités
                         </div>
-                        <h1 className="text-white mb-3"
-                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2.2rem,5vw,4rem)', fontWeight: 700, lineHeight: 1.1 }}>
+                        <h1 className="mb-3"
+                            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2.2rem,5vw,4rem)', fontWeight: 700, lineHeight: 1.1, color: '#111827' }}>
                             Actualités
                         </h1>
                         <div className="h-0.5 w-12 rounded-full mb-4"
                             style={{ background: `linear-gradient(to right, ${BLUE}, ${GOLD})` }} />
-                        <p className="text-white/55 max-w-xl text-base leading-relaxed">
+                        <p className="max-w-xl text-base leading-relaxed" style={{ color: '#6B7280' }}>
                             Nos dernières publications, actualités des pôles et fils d'actualité Facebook
                         </p>
                     </motion.div>
@@ -107,7 +103,7 @@ const ActualitesPage = () => {
                         <div>
                             <div className="flex items-center gap-2 mb-6">
                                 <BookOpen className="w-5 h-5" style={{ color: GOLD }} />
-                                <h2 className="font-bold text-gray-900 text-lg" style={{ fontFamily: "'Outfit',sans-serif" }}>
+                                <h2 className="font-bold text-gray-900 text-lg" style={{ fontFamily: "'DM Sans',sans-serif" }}>
                                     Articles & Analyses
                                 </h2>
                             </div>
@@ -212,7 +208,7 @@ const ActualitesPage = () => {
                                         style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` }}>
                                         f
                                     </div>
-                                    <h2 className="font-bold text-gray-900 text-lg" style={{ fontFamily: "'Outfit',sans-serif" }}>
+                                    <h2 className="font-bold text-gray-900 text-lg" style={{ fontFamily: "'DM Sans',sans-serif" }}>
                                         Facebook
                                     </h2>
                                 </div>

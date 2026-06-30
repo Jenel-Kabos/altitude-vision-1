@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getCurrentUser, logout } from "../../services/authService";
+import { useAuth } from "../../context/AuthContext";
 import {
   FaHome,
   FaBuilding,
@@ -15,7 +15,7 @@ import {
 } from "react-icons/fa";
 
 const DashboardSidebar = () => {
-  const user = getCurrentUser();
+  const { user, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 

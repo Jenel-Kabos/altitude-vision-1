@@ -15,6 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.altitudevision.altimmo",
+      "associatedDomains": ["applinks:altitudevision.agency"],
       "infoPlist": {
         "NSCameraUsageDescription": "Altitude Vision utilise la caméra pour photographier votre bien.",
         "NSPhotoLibraryUsageDescription": "Altitude Vision accède à vos photos pour illustrer votre annonce."
@@ -26,6 +27,19 @@
         "backgroundColor": "#0A0A0A"
       },
       "package": "com.altitudevision.altimmo",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDHgPyL-Oqu-gpHTg7HNnXDqrR3zPjfceo"
+        }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [{ "scheme": "https", "host": "altitudevision.agency", "pathPrefix": "/annonces" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
@@ -39,7 +53,16 @@
       "expo-notifications",
       "expo-location",
       "expo-camera",
-      "expo-font"
+      "expo-font",
+      "expo-secure-store",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "altimmo-mobile",
+          "organization": "altitudevision"
+        }
+      ]
     ],
     "extra": {
       "eas": {

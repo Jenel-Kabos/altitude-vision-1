@@ -2,12 +2,10 @@
 
 // src/pages/ActiveUsersPage.jsx (NOUVEAU FICHIER)
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '@/lib/services/api';
 import toast from 'react-hot-toast';
 import confirm from '@/lib/utils/confirm';
-import { RotateCcw, Ban } from 'lucide-react'; 
-
-const BASE_API_URL = 'https://altitude-vision.onrender.com/api/admin/owners'; 
+import { RotateCcw, Ban } from 'lucide-react';
 
 const ActiveUsersPage = () => {
     const [activeUsers, setActiveUsers] = useState([]);
@@ -19,10 +17,7 @@ const ActiveUsersPage = () => {
         setLoading(true);
         setError(null);
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get(`${BASE_API_URL}/active-sessions`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const res = await api.get('/admin/owners/active-sessions');
             setActiveUsers(res.data.data.activeUsers);
         } catch (err) {
             setError(err.response?.data?.message || 'Erreur lors du chargement des sessions actives.');
@@ -46,11 +41,8 @@ const ActiveUsersPage = () => {
         if (!await confirm(`Êtes-vous sûr de vouloir BANNIR ${userName} ? Cette action invalide immédiatement tous ses tokens.`, { title: 'Bannir l\'utilisateur', danger: true })) return;
 
         try {
-            const token = localStorage.getItem('token');
             // Appel à la nouvelle route de bannissement
-            await axios.patch(`${BASE_API_URL}/${userId}/ban`, {}, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            await api.patch(`/admin/owners/${userId}/ban`, {});
 
             toast.success(`L'utilisateur ${userName} a été banni et déconnecté.`);
             

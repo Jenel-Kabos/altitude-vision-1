@@ -42,7 +42,7 @@ const EventCard = ({ event, index = 0 }) => {
           })
         : 'Date non définie';
 
-    const handleClick = () => router.push(`/mila-events/event/${displayEvent._id}`);
+    const handleClick = () => router.push(`/evenementiel/event/${displayEvent._id}`);
 
     return (
         <motion.div

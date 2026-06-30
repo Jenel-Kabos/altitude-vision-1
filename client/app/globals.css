@@ -166,9 +166,11 @@ img { max-width: 100%; display: block; }
 .section-inner { max-width: 1400px; margin-left: auto; margin-right: auto; width: 100%; }
 .leaflet-container { height: 300px; width: 100%; }
 
-input, textarea, select { color: #1a1a1a !important; }
+/* Inputs natifs du navigateur (ex: dashboard light) */
+input:not(.input-style), textarea:not(.input-style), select:not(.input-style) { color: #1a1a1a; }
+/* Inputs dark theme (classe explicite) */
 .input-style { color: var(--text) !important; }
-input::placeholder, textarea::placeholder { color: #9ca3af !important; opacity: 1; }
+input::placeholder, textarea::placeholder { color: #9ca3af; opacity: 1; }
 .input-style::placeholder { color: var(--faint) !important; }
-option { color: #1a1a1a !important; background-color: #ffffff; }
-input:disabled, textarea:disabled, select:disabled { color: #6b7280 !important; }
+option { color: #1a1a1a; background-color: #ffffff; }
+input:disabled, textarea:disabled, select:disabled { color: #6b7280; }

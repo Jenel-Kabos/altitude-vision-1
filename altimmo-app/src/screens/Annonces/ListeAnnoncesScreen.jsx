@@ -1,262 +1,473 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, FlatList,
-  TouchableOpacity, Image, RefreshControl,
-  ScrollView,
+  TouchableOpacity, RefreshControl,
+  ScrollView, ActivityIndicator, Dimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../services/api';
 import { getRecommendedProperties } from '../../services/annonceService';
 import { getActivePublicites } from '../../services/publiciteService';
+import { cache } from '../../services/cacheService';
+import { useDebounce } from '../../hooks/useDebounce';
 import { PROPERTY_TYPES_WITH_ALL } from '../../constants/propertyTypes';
-import { AMENITIES } from '../../constants/amenities';
 import {
   Screen, Card, PrixFCFA, RecommendedCarousel, SearchPanel,
   GreetingBar, AdCarousel,
 } from '../../components';
-import { colors, fonts, fontSize, spacing, radius } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { fonts, fontSize, spacing, radius } from '../../theme';
 import EmptyState from '../../components/ui/EmptyState';
-import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import IllustrationNoAnnonces from '../../components/illustrations/IllustrationNoAnnonces';
+import IllustrationNetworkError from '../../components/illustrations/IllustrationNetworkError';
+import SkeletonPropertyCard from '../../components/ui/SkeletonPropertyCard';
 
-const PLACEHOLDER_IMG =
-  'https://via.placeholder.com/600x450/F5F5F2/C8960C?text=Altimmo';
+const PLACEHOLDER_IMG = require('../../../assets/Logo_Altitude_transparent.png');
 
-const HERO_IMG =
-  'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1200&q=80';
+const { width: SCREEN_W } = Dimensions.get('window');
+// Largeur de card = écran − padding horizontal Screen (spacing.md × 2 = 40)
+const CARD_IMG_W = SCREEN_W - 2 * 20;
+const CARD_IMG_H = Math.round(CARD_IMG_W * (3 / 4));
+
+const PAGE_SIZE = 15;
 
 const DEFAULT_FILTERS = {
-  transaction:   'tous',
-  typeBien:      'tous',
-  priceRange:    [0, 500000000],
-  ville:         'Toutes',
+  transaction:    'tous',
+  typeBien:       'tous',
+  priceRange:     [0, 500000000],
+  ville:          'Toutes',
   arrondissement: 'Tous',
 };
 
-const QUICK_TYPES = PROPERTY_TYPES_WITH_ALL;
 
-const getAmenityIcon = (name) => {
-  const found = AMENITIES.find(a => a.value === name);
-  return found?.icon || 'checkmark-circle-outline';
+const buildQuery = (filters, page) => {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(PAGE_SIZE),
+    statusAdmin: 'Validée',
+  });
+  if (filters.transaction !== 'tous')
+    params.set('status', filters.transaction === 'location' ? 'Location' : 'Vente');
+  if (filters.typeBien !== 'tous')
+    params.set('type', filters.typeBien);
+  if (filters.ville !== 'Toutes')
+    params.set('city', filters.ville);
+  if (filters.arrondissement !== 'Tous')
+    params.set('arrondissement', filters.arrondissement);
+  if (filters.priceRange[0] > 0)
+    params.set('minPrice', String(filters.priceRange[0]));
+  if (filters.priceRange[1] < 500000000)
+    params.set('maxPrice', String(filters.priceRange[1]));
+  return params.toString();
 };
 
-export default function ListeAnnoncesScreen({ navigation }) {
-  const [annonces, setAnnonces]       = useState([]);
-  const [recommended, setRecommended] = useState([]);
-  const [pubs, setPubs]               = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [refreshing, setRefreshing]   = useState(false);
-  const [erreur, setErreur]           = useState('');
-  const [searchOpen, setSearchOpen]   = useState(false);
-  const [activeFilters, setActiveFilters] = useState(DEFAULT_FILTERS);
+const IMG_LAYOUT = { length: CARD_IMG_W, offset: 0, index: 0 };
+const getCardImgLayout = (_, i) => ({ ...IMG_LAYOUT, offset: CARD_IMG_W * i, index: i });
 
-  // Biens recommandés et publicités — une seule fois au mount
+const AUTO_SLIDE_MS = 3500;
+
+const AnnonceCard = React.memo(function AnnonceCard({ item, index, onPress, styles, c }) {
+  const isLocation     = item.status?.toLowerCase() === 'location';
+  const arrondissement = item.address?.arrondissement || '';
+  const city           = item.address?.city || 'Brazzaville';
+  const addressText    = arrondissement ? `${arrondissement} · ${city}` : city;
+  const bedrooms       = item.bedrooms  || 0;
+  const bathrooms      = item.bathrooms || 0;
+  const surface        = item.surface   || item.area || 0;
+  const hasStats       = bedrooms > 0 || bathrooms > 0 || surface > 0;
+  const typeLabel      = (item.type || '').toUpperCase();
+
+  const images = useMemo(
+    () => (item.images || item.photos || []).filter(Boolean),
+    [item.images, item.photos],
+  );
+  const hasMultiple = images.length > 1;
+
+  const [imgIdx, setImgIdx]       = useState(0);
+  const imgListRef                = useRef(null);
+  const imgIdxRef                 = useRef(0);
+  const timerRef                  = useRef(null);
+  const isUserSwipeRef            = useRef(false);
+
+  // ─── Auto-scroll ───
+  const stopAuto  = useCallback(() => clearInterval(timerRef.current), []);
+
+  const startAuto = useCallback(() => {
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      const next = (imgIdxRef.current + 1) % images.length;
+      imgIdxRef.current = next;
+      setImgIdx(next);
+      imgListRef.current?.scrollToOffset({ offset: CARD_IMG_W * next, animated: true });
+    }, AUTO_SLIDE_MS);
+  }, [images.length]);
+
   useEffect(() => {
-    getRecommendedProperties().then(setRecommended).catch(() => {});
-    getActivePublicites().then(setPubs).catch(() => {});
-  }, []);
+    if (!hasMultiple) return;
+    // Stagger par ligne de 3 cards pour éviter un défilement synchronisé
+    const delay = (index % 3) * 1100;
+    const t = setTimeout(startAuto, delay);
+    return () => { clearTimeout(t); stopAuto(); };
+  }, [hasMultiple, index, startAuto, stopAuto]);
 
-  const chargerAnnonces = async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const response = await api.get('/properties?limit=200&statusAdmin=Validée');
-      const data = response.data.data?.properties
-        || response.data.properties
-        || response.data.data
-        || [];
-      setAnnonces(data);
-      setErreur('');
-    } catch {
-      setErreur('Impossible de charger les annonces');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  // ─── Handlers scroll ───
+  const onScrollBeginDrag = useCallback(() => {
+    isUserSwipeRef.current = true;
+    stopAuto();
+  }, [stopAuto]);
+
+  const onMomentumScrollEnd = useCallback((e) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / CARD_IMG_W);
+    imgIdxRef.current = idx;
+    setImgIdx(idx);
+    if (isUserSwipeRef.current) {
+      isUserSwipeRef.current = false;
+      startAuto(); // relance après swipe utilisateur
     }
-  };
+  }, [startAuto]);
 
-  useFocusEffect(useCallback(() => { chargerAnnonces(); }, []));
+  const renderImg = useCallback(({ item: uri }) => (
+    <Image
+      source={{ uri }}
+      style={styles.image}
+      contentFit="cover"
+      cachePolicy="memory-disk"
+      transition={150}
+    />
+  ), [styles]);
 
-  const onRefresh = () => { setRefreshing(true); chargerAnnonces(true); };
+  const imgKeyExtractor = useCallback((_, i) => String(i), []);
 
-  const annoncesFiltrées = useMemo(() => annonces.filter((item) => {
-    const matchTransaction = activeFilters.transaction === 'tous'
-      || item.status?.toLowerCase() === activeFilters.transaction;
-    const matchType = activeFilters.typeBien === 'tous'
-      || item.type === activeFilters.typeBien;
-    const price = item.price || 0;
-    const matchPrice = price >= activeFilters.priceRange[0]
-      && price <= activeFilters.priceRange[1];
-    const matchVille = activeFilters.ville === 'Toutes'
-      || item.address?.city === activeFilters.ville;
-    const matchArrond = activeFilters.arrondissement === 'Tous'
-      || item.address?.arrondissement === activeFilters.arrondissement;
-    return matchTransaction && matchType && matchPrice && matchVille && matchArrond;
-  }), [annonces, activeFilters]);
-
-  const renderAnnonce = ({ item, index }) => {
-    const isLocation = item.status?.toLowerCase() === 'location';
-    const arrondissement = item.address?.arrondissement || '';
-    const city = item.address?.city || 'Brazzaville';
-    const addressText = arrondissement ? `${arrondissement} · ${city}` : city;
-    const reference = `AV·${index + 1}`;
-    const description = item.description || '';
-    const bedrooms  = item.bedrooms  || 0;
-    const bathrooms = item.bathrooms || 0;
-    const surface   = item.surface   || item.area || 0;
-    const hasStats  = bedrooms > 0 || bathrooms > 0 || surface > 0;
-    const amenities = item.amenities || [];
-    const visibleAmenities = amenities.slice(0, 3);
-    const extraCount = amenities.length - 3;
-
-    return (
+  return (
+    <Animated.View entering={FadeInDown.delay(Math.min(index * 50, 300)).duration(300)}>
       <TouchableOpacity
-        onPress={() => navigation.navigate('DetailAnnonce', { annonce: item })}
-        activeOpacity={0.85}
+        onPress={() => onPress(item)}
+        activeOpacity={0.87}
+        accessibilityLabel={`${item.title}, ${item.type || 'Bien'}, ${city}`}
+        accessibilityRole="button"
+        accessibilityHint="Appuyez pour voir les détails"
       >
         <Card>
+          {/* ─── Galerie images ─── */}
           <View style={styles.imageWrap}>
-            <Image
-              source={{ uri: item.images?.[0] || item.photos?.[0] || PLACEHOLDER_IMG }}
-              style={styles.image}
-              resizeMode="cover"
-            />
+            {images.length > 0 ? (
+              <FlatList
+                ref={imgListRef}
+                data={images}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                removeClippedSubviews={false}
+                onScrollBeginDrag={onScrollBeginDrag}
+                onMomentumScrollEnd={onMomentumScrollEnd}
+                renderItem={renderImg}
+                keyExtractor={imgKeyExtractor}
+                getItemLayout={getCardImgLayout}
+                initialNumToRender={1}
+                maxToRenderPerBatch={2}
+                windowSize={3}
+              />
+            ) : (
+              <Image
+                source={PLACEHOLDER_IMG}
+                style={styles.image}
+                contentFit="cover"
+              />
+            )}
+
             <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.7)']}
+              colors={['transparent', 'rgba(0,0,0,0.65)']}
               style={styles.priceGradient}
               pointerEvents="none"
             />
+
+            {/* Badge Location / Vente — haut gauche */}
             <View style={[styles.badge, isLocation ? styles.badgeLoc : styles.badgeVente]}>
               <Text style={[styles.badgeText, isLocation ? styles.badgeTextLoc : styles.badgeTextVente]}>
-                {isLocation ? 'LOCATION' : 'VENTE'}
+                {isLocation ? 'Location' : 'Vente'}
               </Text>
             </View>
+
+            {/* Compteur photos — haut droite (aucun conflit avec le prix) */}
+            {hasMultiple && (
+              <View style={styles.cardImgCount} pointerEvents="none">
+                <Ionicons name="images-outline" size={9} color="#FFFFFF" />
+                <Text style={styles.cardImgCountText}>{imgIdx + 1}/{images.length}</Text>
+              </View>
+            )}
+
+            {/* Prix — bas droite */}
             <View style={styles.priceOverlay} pointerEvents="none">
               <PrixFCFA montant={item.price} variant="onImage" compact />
             </View>
           </View>
 
+          {/* ─── Corps ─── */}
           <View style={styles.body}>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaText}>{(item.type || 'Bien').toUpperCase()}</Text>
-              <Text style={styles.metaText}>{reference}</Text>
-            </View>
-
+            {typeLabel ? (
+              <Text style={styles.metaText}>{typeLabel}</Text>
+            ) : null}
             <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+
+            <View style={styles.addressRow}>
+              <Ionicons name="location-outline" size={12} color={c.textMuted} />
+              <Text style={styles.location} numberOfLines={1}>{addressText}</Text>
+            </View>
 
             {hasStats && (
               <View style={styles.statsRow}>
                 {bedrooms > 0 && (
-                  <View style={styles.statChip}>
-                    <Text style={styles.statText}>{bedrooms} ch.</Text>
+                  <View style={styles.statItem}>
+                    <Ionicons name="bed-outline" size={13} color={c.textMuted} />
+                    <Text style={styles.statText}>{bedrooms}</Text>
                   </View>
                 )}
                 {bathrooms > 0 && (
-                  <View style={styles.statChip}>
-                    <Text style={styles.statText}>{bathrooms} SDB</Text>
+                  <View style={styles.statItem}>
+                    <Ionicons name="water-outline" size={13} color={c.textMuted} />
+                    <Text style={styles.statText}>{bathrooms}</Text>
                   </View>
                 )}
                 {surface > 0 && (
-                  <View style={styles.statChip}>
+                  <View style={styles.statItem}>
+                    <Ionicons name="resize-outline" size={13} color={c.textMuted} />
                     <Text style={styles.statText}>{surface} m²</Text>
                   </View>
                 )}
               </View>
             )}
-
-            {amenities.length > 0 && (
-              <View style={styles.amenitiesRow}>
-                {visibleAmenities.map((a, i) => (
-                  <View key={i} style={styles.amenityChip}>
-                    <Ionicons name={getAmenityIcon(a)} size={11} color={colors.blue} />
-                    <Text style={styles.amenityChipText}>{a}</Text>
-                  </View>
-                ))}
-                {extraCount > 0 && (
-                  <View style={styles.amenityChipMore}>
-                    <Text style={styles.amenityChipMoreText}>+{extraCount}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            <Text style={styles.location} numberOfLines={1}>{addressText}</Text>
-
-            {description.trim().length > 0 && (
-              <>
-                <View style={styles.divider} />
-                <Text style={styles.description} numberOfLines={2}>{description}</Text>
-              </>
-            )}
-
-            <View style={styles.footer}>
-              <Text style={styles.cta}>Voir →</Text>
-            </View>
           </View>
         </Card>
       </TouchableOpacity>
-    );
-  };
+    </Animated.View>
+  );
+}, (prev, next) => prev.item._id === next.item._id && prev.styles === next.styles);
 
-  if (loading) {
-    return (
-      <Screen>
-        <LoadingSpinner />
-      </Screen>
-    );
-  }
+export default function ListeAnnoncesScreen({ navigation }) {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const [annonces, setAnnonces]       = useState([]);
+  const [recommended, setRecommended] = useState([]);
+  const [pubs, setPubs]               = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing]   = useState(false);
+  const [erreur, setErreur]           = useState('');
+  const [searchOpen, setSearchOpen]   = useState(false);
+  const [activeFilters, setActiveFilters] = useState(DEFAULT_FILTERS);
+  const [page, setPage]               = useState(1);
+  const [hasMore, setHasMore]         = useState(true);
 
-  const ListHeader = (
+  // Résumé des filtres actifs pour le bouton
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (activeFilters.typeBien !== 'tous') n++;
+    if (activeFilters.transaction !== 'tous') n++;
+    if (activeFilters.ville !== 'Toutes') n++;
+    if (activeFilters.priceRange[0] > 0 || activeFilters.priceRange[1] < 500_000_000) n++;
+    return n;
+  }, [activeFilters]);
+
+  const filterSummary = useMemo(() => {
+    const parts = [];
+    if (activeFilters.typeBien !== 'tous') parts.push(activeFilters.typeBien);
+    if (activeFilters.transaction !== 'tous') parts.push(activeFilters.transaction === 'vente' ? 'Vente' : 'Location');
+    if (activeFilters.ville !== 'Toutes') parts.push(activeFilters.ville);
+    return parts.length > 0 ? parts.join(' · ') : 'Rechercher un bien';
+  }, [activeFilters]);
+
+  const activeFiltersRef = useRef(activeFilters);
+  activeFiltersRef.current = activeFilters;
+
+  // Debounce — évite de déclencher une requête à chaque chip/filtre cliqué
+  const debouncedFilters = useDebounce(activeFilters, 400);
+
+  useEffect(() => {
+    getRecommendedProperties().then(setRecommended).catch(() => {});
+    getActivePublicites().then(setPubs).catch(() => {});
+  }, []);
+
+  const chargerPage = useCallback(async (pageNum, filters, append = false) => {
+    const cacheKey = `properties:${buildQuery(filters, pageNum)}`;
+
+    // Cache hit — on évite un aller-retour réseau
+    if (!append) {
+      const hit = cache.get(cacheKey);
+      if (hit) {
+        setAnnonces(hit.items);
+        setHasMore(hit.hasMore);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    try {
+      const query = buildQuery(filters, pageNum);
+      const response = await api.get(`/properties?${query}`);
+      const raw = response.data.data?.properties
+        || response.data.properties
+        || response.data.data
+        || [];
+      const total = response.data.data?.total || response.data.total || raw.length;
+      const hasMoreData = pageNum * PAGE_SIZE < total;
+
+      // Mise en cache 5 minutes
+      if (!append) cache.set(cacheKey, { items: raw, hasMore: hasMoreData });
+
+      setAnnonces(prev => append ? [...prev, ...raw] : raw);
+      setHasMore(hasMoreData);
+      setErreur('');
+    } catch {
+      setErreur('Impossible de charger les annonces');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Recharge depuis la page 1 quand les filtres (debouncés) changent
+  useEffect(() => {
+    setPage(1);
+    setHasMore(true);
+    chargerPage(1, debouncedFilters, false);
+  }, [debouncedFilters, chargerPage]);
+
+  useFocusEffect(useCallback(() => {
+    // Ne refetch que si le cache est expiré — évite les requêtes inutiles
+    // à chaque retour sur l'écran
+    const cacheKey = `properties:${buildQuery(activeFiltersRef.current, 1)}`;
+    if (cache.get(cacheKey)) return;
+    chargerPage(1, activeFiltersRef.current, false);
+    setPage(1);
+  }, [chargerPage]));
+
+  const onRefresh = useCallback(() => {
+    cache.invalidate('properties:');
+    setRefreshing(true);
+    setPage(1);
+    setHasMore(true);
+    chargerPage(1, activeFilters, false);
+  }, [activeFilters, chargerPage]);
+
+  const onEndReached = useCallback(() => {
+    if (!hasMore || loadingMore || loading) return;
+    const nextPage = page + 1;
+    setPage(nextPage);
+    chargerPage(nextPage, activeFilters, true);
+  }, [hasMore, loadingMore, loading, page, activeFilters, chargerPage]);
+
+  const handlePressItem = useCallback((item) => {
+    navigation.navigate('DetailAnnonce', { annonce: item });
+  }, [navigation]);
+
+  const onSearchSubmit = useCallback((filters) => {
+    setActiveFilters(filters);
+    setSearchOpen(false);
+  }, []);
+
+  const renderItem = useCallback(({ item, index }) => (
+    <AnnonceCard item={item} index={index} onPress={handlePressItem} styles={styles} c={c} />
+  ), [handlePressItem, styles, c]);
+
+  const keyExtractor = useCallback((item) => item._id || item.id, []);
+
+  const ListFooter = useMemo(() => loadingMore ? (
+    <View style={styles.footerLoader}>
+      <ActivityIndicator size="small" color={c.gold} />
+    </View>
+  ) : null, [loadingMore, styles, c]);
+
+  // ─── Callbacks stables (AVANT tout return conditionnel) ───
+  const onPressRecommended = useCallback(
+    (item) => navigation.navigate('DetailAnnonce', { annonce: item }),
+    [navigation],
+  );
+  const onPressNotifications = useCallback(
+    () => navigation.navigate('Notifications'),
+    [navigation],
+  );
+  const onResetFilters = useCallback(() => setActiveFilters(DEFAULT_FILTERS), []);
+  const onToggleSearch = useCallback(() => setSearchOpen(s => !s), []);
+  const onCloseSearch  = useCallback(() => setSearchOpen(false), []);
+
+  // ─── ListHeader mémoïsé (AVANT le return conditionnel) ───
+  const ListHeader = useMemo(() => (
     <View>
-      <GreetingBar onPressNotifications={() => {}} />
+      <GreetingBar onPressNotifications={onPressNotifications} />
 
       {pubs.length > 0 ? (
         <AdCarousel items={pubs} />
       ) : (
         <View style={styles.hero}>
-          <Image
-            source={{ uri: HERO_IMG }}
-            style={StyleSheet.absoluteFillObject}
-            resizeMode="cover"
-          />
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.75)']}
+            colors={['#0A0A0A', '#1A1208', '#2D1E04']}
             style={StyleSheet.absoluteFillObject}
           />
-          <Text style={styles.heroTitle}>
-            Investir à Brazzaville en toute sérénité
-          </Text>
+          <Image
+            source={PLACEHOLDER_IMG}
+            style={styles.heroLogo}
+            contentFit="contain"
+            cachePolicy="memory"
+          />
+          <View style={styles.heroTextWrap}>
+            <Text style={styles.heroEyebrow}>BRAZZAVILLE · CONGO</Text>
+            <Text style={styles.heroTitle}>
+              Votre futur bien{'\n'}immobilier vous attend
+            </Text>
+          </View>
         </View>
       )}
 
       <View style={styles.searchZone}>
         <TouchableOpacity
-          style={styles.searchBtn}
-          onPress={() => setSearchOpen(s => !s)}
+          style={[styles.searchBtn, activeFilterCount > 0 && styles.searchBtnActive]}
+          onPress={onToggleSearch}
           activeOpacity={0.85}
+          accessibilityLabel={activeFilterCount > 0
+            ? `${activeFilterCount} filtre${activeFilterCount > 1 ? 's' : ''} actif${activeFilterCount > 1 ? 's' : ''} — modifier`
+            : 'Ouvrir la recherche'}
+          accessibilityRole="button"
         >
-          <Ionicons name="search" size={18} color={colors.gold} />
-          <Text style={styles.searchBtnText}>Rechercher un bien</Text>
           <Ionicons
-            name={searchOpen ? 'chevron-up' : 'chevron-down'}
-            size={18}
-            color={colors.white}
+            name="search"
+            size={17}
+            color={activeFilterCount > 0 ? c.gold : c.textSub}
           />
+          <Text style={styles.searchBtnText} numberOfLines={1}>
+            {filterSummary}
+          </Text>
+          {activeFilterCount > 0 ? (
+            <TouchableOpacity
+              onPress={onResetFilters}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Effacer tous les filtres"
+            >
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            </TouchableOpacity>
+          ) : (
+            <Ionicons name="options-outline" size={17} color={c.textSub} />
+          )}
         </TouchableOpacity>
-        {searchOpen && (
-          <View style={styles.panelWrap}>
-            <SearchPanel
-              visible={searchOpen}
-              onClose={() => setSearchOpen(false)}
-              initialFilters={activeFilters}
-              onSearch={(filters) => {
-                setActiveFilters(filters);
-                setSearchOpen(false);
-              }}
-            />
-          </View>
-        )}
       </View>
+
+      <SearchPanel
+        visible={searchOpen}
+        onClose={onCloseSearch}
+        initialFilters={activeFilters}
+        onSearch={onSearchSubmit}
+      />
 
       <ScrollView
         horizontal
@@ -264,7 +475,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
         style={styles.quickFilterRow}
         contentContainerStyle={styles.quickFilterContent}
       >
-        {QUICK_TYPES.map((item) => {
+        {PROPERTY_TYPES_WITH_ALL.map((item) => {
           const active = activeFilters.typeBien === item.value;
           return (
             <TouchableOpacity
@@ -277,7 +488,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
                 <Ionicons
                   name={item.icon}
                   size={14}
-                  color={active ? colors.black : colors.textSub}
+                  color={active ? '#0A0A0A' : c.textSub}
                 />
                 <Text style={[styles.quickChipText, active && styles.quickChipTextActive]}>
                   {item.label}
@@ -290,68 +501,114 @@ export default function ListeAnnoncesScreen({ navigation }) {
 
       {recommended.length > 0 && (
         <View style={styles.recoSection}>
-          <Text style={styles.recoTitle}>Biens recommandés</Text>
+          <Text style={styles.sectionTitle}>Biens recommandés</Text>
           <RecommendedCarousel
             properties={recommended}
-            onPressItem={(item) => navigation.navigate('DetailAnnonce', { annonce: item })}
+            onPressItem={onPressRecommended}
           />
         </View>
       )}
 
-      <Text style={styles.catalogTitle}>À découvrir</Text>
+      <Text style={[styles.sectionTitle, { marginTop: spacing.md }]}>À découvrir</Text>
     </View>
-  );
+  ), [
+    pubs, recommended, activeFilters, activeFilterCount, filterSummary, searchOpen,
+    styles, c,
+    onPressNotifications, onPressRecommended, onToggleSearch, onCloseSearch,
+    onResetFilters, onSearchSubmit,
+  ]);
+
+  // ─── Return conditionnel APRÈS tous les hooks ───
+  if (loading) {
+    return (
+      <Screen>
+        <View style={styles.skeletonList}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonPropertyCard key={i} />
+          ))}
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
-      {erreur ? (
+      {erreur && annonces.length === 0 ? (
         <EmptyState
-          icon="cloud-offline-outline"
+          illustration={IllustrationNetworkError}
           title="Erreur de chargement"
           subtitle={erreur}
           actionLabel="Réessayer"
-          onAction={chargerAnnonces}
+          onAction={() => chargerPage(1, activeFilters, false)}
         />
       ) : (
         <FlatList
-          data={annoncesFiltrées}
-          renderItem={renderAnnonce}
-          keyExtractor={item => item._id || item.id}
+          data={annonces}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
           contentContainerStyle={styles.list}
           ListHeaderComponent={ListHeader}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.gold}
-              colors={[colors.gold]}
-            />
-          }
+          ListFooterComponent={ListFooter}
           ListEmptyComponent={
             <EmptyState
-              icon="home-outline"
+              illustration={IllustrationNoAnnonces}
               title="Aucune annonce trouvée"
               subtitle="Essayez d'élargir vos critères de recherche."
             />
           }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={c.gold}
+              colors={[c.gold]}
+            />
+          }
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.4}
+          // ─── FlatList perf ───────────────────────────────────────
+          windowSize={5}
+          initialNumToRender={3}
+          maxToRenderPerBatch={5}
+          removeClippedSubviews={true}
+          updateCellsBatchingPeriod={50}
         />
       )}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   hero: {
     height: 230,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  heroLogo: {
+    position: 'absolute',
+    right: -20,
+    top: -10,
+    width: 160,
+    height: 160,
+    opacity: 0.12,
+  },
+  heroTextWrap: {
+    flex: 1,
     justifyContent: 'flex-end',
     padding: spacing.lg,
-    overflow: 'hidden',
+  },
+  heroEyebrow: {
+    fontFamily: fonts.body,
+    fontSize: 10,
+    letterSpacing: 2.5,
+    color: c.gold,
+    marginBottom: spacing.xs,
   },
   heroTitle: {
     fontFamily: fonts.displayItalic,
     fontSize: fontSize.lg,
-    color: colors.white,
-    paddingRight: spacing.lg,
+    color: '#F0EDE8',
+    lineHeight: 28,
   },
   searchZone: {
     paddingHorizontal: spacing.md,
@@ -361,17 +618,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.black,
+    backgroundColor: c.bgCard,
     borderRadius: radius.sm,
     padding: spacing.md,
+    borderWidth: 1,
+    borderColor: c.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  searchBtnActive: {
+    borderColor: c.borderGold,
+    backgroundColor: c.bgCard,
   },
   searchBtnText: {
     flex: 1,
     fontFamily: fonts.body,
     fontSize: fontSize.md,
-    color: colors.white,
+    color: c.text,
   },
-  panelWrap: { marginTop: spacing.sm },
+  filterBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: c.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  filterBadgeText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    color: '#0A0A0A',
+  },
 
   quickFilterRow: { marginTop: spacing.md },
   quickFilterContent: {
@@ -382,165 +663,140 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.md,
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   quickChipInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  quickChipActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  quickChipActive: { backgroundColor: c.gold, borderColor: c.gold },
   quickChipText: {
     fontFamily: fonts.bodyMedium,
     fontSize: fontSize.sm,
-    color: colors.textSub,
+    color: c.textSub,
   },
-  quickChipTextActive: { fontFamily: fonts.bodyBold, color: colors.black },
+  quickChipTextActive: { fontFamily: fonts.bodyBold, color: '#0A0A0A' },
 
   list: { paddingBottom: spacing.lg, gap: spacing.md },
+  skeletonList: { padding: spacing.md, gap: spacing.md },
 
   recoSection: { marginTop: spacing.lg, marginBottom: spacing.sm },
-  recoTitle: {
+  sectionTitle: {
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.md,
-    color: colors.text,
+    color: c.text,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
   },
-  catalogTitle: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.md,
-    color: colors.text,
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
+  footerLoader: {
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
   },
 
-  imageWrap: { width: '100%' },
+  // ─── Card image ───
+  imageWrap: {
+    width: CARD_IMG_W,
+    height: CARD_IMG_H,
+    overflow: 'hidden',
+  },
   image: {
-    width: '100%',
-    aspectRatio: 4 / 3,
-    backgroundColor: colors.bgCardAlt,
-    borderRadius: radius.sm,
+    width: CARD_IMG_W,
+    height: CARD_IMG_H,
+    backgroundColor: c.bgCardAlt,
   },
   priceGradient: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
-    height: '40%',
-    borderBottomLeftRadius: radius.sm,
-    borderBottomRightRadius: radius.sm,
+    height: CARD_IMG_H * 0.45,
+  },
+  // Compteur photos — haut droite, pas de conflit avec le prix en bas
+  cardImgCount: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  cardImgCountText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
   badge: {
     position: 'absolute',
-    top: spacing.md, right: spacing.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.sm,
+    top: spacing.sm, left: spacing.sm,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: radius.xs,
+    borderWidth: 1,
   },
-  badgeVente: { backgroundColor: colors.goldMuted },
-  badgeLoc:   { backgroundColor: colors.blueMuted },
+  badgeVente: {
+    backgroundColor: 'rgba(200,150,12,0.18)',
+    borderColor: 'rgba(200,150,12,0.4)',
+  },
+  badgeLoc: {
+    backgroundColor: 'rgba(74,144,217,0.18)',
+    borderColor: 'rgba(74,144,217,0.4)',
+  },
   badgeText: {
-    fontSize: 11,
-    letterSpacing: 1.5,
+    fontSize: 10,
     fontFamily: fonts.bodyBold,
-    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  badgeTextVente: { color: colors.goldDark },
-  badgeTextLoc:   { color: colors.blue },
+  badgeTextVente: { color: c.gold },
+  badgeTextLoc:   { color: c.blue },
   priceOverlay: {
     position: 'absolute',
-    bottom: spacing.md, left: spacing.md,
+    bottom: spacing.sm, right: spacing.sm,
   },
 
-  body: { padding: spacing.md },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
+  // ─── Card corps ───
+  body: {
+    padding: spacing.md,
+    gap: 5,
   },
   metaText: {
-    fontFamily: fonts.body,
-    fontSize: fontSize.sm,
-    color: colors.textMuted,
-    letterSpacing: 1,
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    color: c.gold,
+    letterSpacing: 1.5,
   },
   title: {
     fontFamily: fonts.display,
-    fontSize: fontSize.lg,
-    color: colors.text,
-    marginBottom: spacing.xs,
+    fontSize: fontSize.md,
+    color: c.text,
+    lineHeight: 22,
   },
-  statsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  statChip: {
-    backgroundColor: colors.goldMuted,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.xs,
-  },
-  statText: { color: colors.gold, fontSize: fontSize.xs, fontFamily: fonts.body },
-  amenitiesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  amenityChip: {
+  addressRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.blueMuted,
-    borderRadius: radius.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  amenityChipText: {
-    fontFamily: fonts.body,
-    fontSize: fontSize.xs,
-    color: colors.blue,
-  },
-  amenityChipMore: {
-    backgroundColor: colors.bgCardAlt,
-    borderRadius: radius.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  amenityChipMoreText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.xs,
-    color: colors.textMuted,
+    gap: 3,
   },
   location: {
     fontFamily: fonts.body,
-    fontSize: fontSize.sm,
-    color: colors.textMuted,
-    marginBottom: spacing.sm,
-  },
-  divider: {
-    width: 32, height: 1,
-    backgroundColor: colors.gold,
-    marginBottom: spacing.sm,
-  },
-  description: {
-    fontFamily: fonts.body,
-    fontSize: fontSize.sm,
-    color: colors.textSub,
-    lineHeight: 18,
-    marginBottom: spacing.sm,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: spacing.sm,
-  },
-  cta: {
-    color: colors.gold,
-    fontFamily: fonts.bodyBold,
     fontSize: fontSize.xs,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    color: c.textMuted,
+    flex: 1,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: 2,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: c.textMuted,
   },
 });

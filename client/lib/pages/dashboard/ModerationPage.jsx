@@ -1,7 +1,7 @@
 // src/pages/ModerationPage.jsx
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
-import axios from 'axios';
+import api from '@/lib/services/api';
 import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
 import toast from '@/lib/utils/toast';
 
@@ -14,18 +14,13 @@ const ModerationPage = () => {
   const [selectedPole, setSelectedPole] = useState('Tous');
   const [stats, setStats] = useState({ total: 0, Altimmo: 0, MilaEvents: 0, Altcom: 0 });
 
-  const API_URL = '/api/properties/status/pending'; // ✅ URL CORRIGÉE
-
   const poles = ['Tous', 'Altimmo', 'MilaEvents', 'Altcom'];
 
   // Récupération des propriétés en attente
   const fetchProperties = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.get('/properties/status/pending');
       
       const props = res.data.data.properties;
       setProperties(props);
@@ -64,12 +59,7 @@ const ModerationPage = () => {
   // Valider ou rejeter une propriété
   const handleModeration = async (id, action) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.patch(
-        `/api/properties/${id}/${action}`, // ✅ URL CORRIGÉE
-        {}, 
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await api.patch(`/properties/${id}/${action}`, {});
 
       // Supprimer la propriété de la liste
       setProperties(properties.filter((p) => p._id !== id));

@@ -1,25 +1,29 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {
+  useState, useEffect, useCallback, useMemo, memo,
+} from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, TextInput, Image, RefreshControl,
-  SafeAreaView,
+  StyleSheet, TextInput, RefreshControl,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../services/api';
-import { connectSocket, getSocket } from '../../services/socketService';
+import { connectSocket } from '../../services/socketService';
 import { useAuth } from '../../context/AuthContext';
-import { colors, typography, spacing } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { fonts, fontSize, spacing } from '../../theme';
 import EmptyState from '../../components/ui/EmptyState';
+import IllustrationNoMessages from '../../components/illustrations/IllustrationNoMessages';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Divider from '../../components/ui/Divider';
 
 const formatTime = (dateStr) => {
   if (!dateStr) return '';
-  const d = new Date(dateStr);
+  const d   = new Date(dateStr);
   const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  if (isToday) {
+  if (d.toDateString() === now.toDateString()) {
     return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   }
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
@@ -27,208 +31,284 @@ const formatTime = (dateStr) => {
 
 const STAFF_ROLES = ['Admin', 'Collaborateur'];
 
-export default function ConversationsScreen({ navigation }) {
-  const { user } = useAuth();
-  const isStaff = STAFF_ROLES.includes(user?.role);
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState('');
+// ─── Item de conversation ─────────────────────────────────────────────────────
 
-  const chargerConversations = async () => {
+const ConvItem = memo(function ConvItem({ item, currentUserId, onPress, styles }) {
+  const { name, subtitle, photo } = useMemo(() => {
+    if (item.isStaffInbox) {
+      const client = item.participants?.[0];
+      return {
+        name:     client?.name || client?.firstName || 'Client',
+        subtitle: item.relatedProperty?.title
+          ? `Bien : ${item.relatedProperty.title}`
+          : 'Demande de contact',
+        photo: client?.photo || null,
+      };
+    }
+    const other = item.participants?.find(p => p._id !== currentUserId);
+    return {
+      name:     other?.name || other?.firstName || 'Utilisateur',
+      subtitle: null,
+      photo:    other?.photo || null,
+    };
+  }, [item, currentUserId]);
+
+  const initial     = (name[0] || '?').toUpperCase();
+  const unread      = Number(item.unreadCount || 0);
+  const lastMessage = item.lastMessage || 'Nouvelle conversation';
+  const time        = formatTime(item.updatedAt);
+
+  return (
+    <TouchableOpacity
+      style={styles.conv}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`Conversation avec ${name}`}
+    >
+      {photo ? (
+        <Image
+          source={{ uri: photo }}
+          style={styles.avatar}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          accessible={false}
+        />
+      ) : (
+        <View style={[styles.avatar, styles.avatarFallback]}>
+          <Text style={styles.avatarInitial}>{initial}</Text>
+        </View>
+      )}
+
+      <View style={styles.right}>
+        <View style={styles.row1}>
+          <View style={styles.nameWrap}>
+            <Text
+              style={[styles.name, unread > 0 && styles.nameUnread]}
+              numberOfLines={1}
+            >
+              {name}
+            </Text>
+            {item.isStaffInbox && (
+              <View style={styles.staffBadge}>
+                <Text style={styles.staffBadgeText}>CLIENT</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.time}>{time}</Text>
+        </View>
+
+        {subtitle ? (
+          <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
+        ) : null}
+
+        <View style={styles.row2}>
+          <Text
+            style={[styles.lastMsg, unread > 0 && styles.lastMsgUnread]}
+            numberOfLines={1}
+          >
+            {lastMessage}
+          </Text>
+          {unread > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>
+                {unread > 99 ? '99+' : unread}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}, (prev, next) =>
+  prev.item._id         === next.item._id         &&
+  prev.item.unreadCount === next.item.unreadCount  &&
+  prev.item.updatedAt   === next.item.updatedAt    &&
+  prev.item.lastMessage === next.item.lastMessage  &&
+  prev.styles           === next.styles
+);
+
+// ─── Séparateur stable ───────────────────────────────────────────────────────
+
+const ConvSeparator = memo(function ConvSeparator({ style }) {
+  return <Divider style={style} />;
+});
+
+// ─── Écran ────────────────────────────────────────────────────────────────────
+
+export default function ConversationsScreen({ navigation }) {
+  const { user }           = useAuth();
+  const { themeColors: c } = useTheme();
+  const styles  = useMemo(() => makeStyles(c), [c]);
+  const isStaff = STAFF_ROLES.includes(user?.role);
+
+  const [conversations, setConversations] = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [refreshing,    setRefreshing]    = useState(false);
+  const [search,        setSearch]        = useState('');
+
+  // ─── Chargement ───
+  const chargerConversations = useCallback(async () => {
     try {
-      // Le staff voit la boîte partagée ; les clients voient leurs convs 1-à-1
       const endpoint = isStaff ? '/conversations/staff-inbox' : '/conversations';
       const res = await api.get(endpoint);
       setConversations(res.data?.data?.conversations || []);
-    } catch (error) {
-      console.log('Erreur conversations:', error.message);
+    } catch (err) {
+      console.log('Erreur conversations:', err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [isStaff]);
 
-  // Rechargement à chaque fois que l'écran redevient visible (retour depuis Chat)
-  useFocusEffect(useCallback(() => { chargerConversations(); }, []));
+  // Rechargement à chaque focus (retour depuis ChatScreen)
+  useFocusEffect(useCallback(() => {
+    chargerConversations();
+  }, [chargerConversations]));
 
+  // ─── Socket.IO + polling de rattrapage ───
   useEffect(() => {
-    // Socket.IO — mise à jour en temps réel des badges + lastMessage
-    const token = api.defaults?.headers?.common?.Authorization?.replace('Bearer ', '');
+    const token  = api.defaults?.headers?.common?.Authorization?.replace('Bearer ', '');
     const socket = connectSocket(token);
 
     const handleIncoming = ({ conversationId, message }) => {
       if (!conversationId || !message) return;
-      setConversations(prev => prev.map(conv => {
-        if (conv._id !== conversationId.toString()) return conv;
-        return {
+      setConversations(prev => prev.map(conv =>
+        conv._id !== conversationId.toString() ? conv : {
           ...conv,
           lastMessage: message.content,
-          updatedAt: message.createdAt,
+          updatedAt:   message.createdAt,
           unreadCount: (conv.unreadCount || 0) + 1,
-        };
-      }));
+        }
+      ));
     };
 
     socket.on('new-message', handleIncoming);
-    // Staff reçoit new-staff-message quand un client écrit dans la boîte partagée
-    if (isStaff) {
-      socket.on('new-staff-message', handleIncoming);
-    }
+    if (isStaff) socket.on('new-staff-message', handleIncoming);
 
-    // Fallback polling 30s — synchronise si le socket a été silencieux
-    const id = setInterval(chargerConversations, 30000);
+    // Polling de rattrapage 30s (réseau instable, arrière-plan)
+    const id = setInterval(chargerConversations, 30_000);
 
     return () => {
-      socket.off('new-message', handleIncoming);
+      socket.off('new-message',       handleIncoming);
       if (isStaff) socket.off('new-staff-message', handleIncoming);
       clearInterval(id);
     };
-  }, []);
+  }, [isStaff, chargerConversations]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    chargerConversations();
-  };
+  // ─── Données dérivées ───
+  const totalUnread = useMemo(
+    () => conversations.reduce((sum, conv) => sum + Number(conv.unreadCount || 0), 0),
+    [conversations],
+  );
 
-  const totalUnread = conversations.reduce((sum, c) => sum + Number(c.unreadCount || 0), 0);
-
-  // Données d'affichage selon le type de conversation
-  const getConvDisplay = (item) => {
-    if (item.isStaffInbox) {
-      // Staff voit : nom du client + bien concerné
-      const client = item.participants?.[0];
-      const name = client?.name || client?.firstName || 'Client';
-      const propertyTitle = item.relatedProperty?.title;
-      return {
-        name,
-        subtitle: propertyTitle ? `Bien : ${propertyTitle}` : 'Demande de contact',
-        photo: client?.photo || null,
-        contact: { _id: client?._id, name },
-      };
-    }
-    // Conv 1-à-1 : l'autre participant
-    const other = item.participants?.find(p => p._id !== user?._id);
-    return {
-      name: other?.name || other?.firstName || 'Utilisateur',
-      subtitle: null,
-      photo: other?.photo || null,
-      contact: other,
-    };
-  };
-
-  const filtered = conversations.filter(c => {
-    if (!search.trim()) return true;
-    const { name, subtitle } = getConvDisplay(c);
-    const last = (c.lastMessage || '').toLowerCase();
+  const filtered = useMemo(() => {
+    if (!search.trim()) return conversations;
     const q = search.trim().toLowerCase();
-    return name.toLowerCase().includes(q) || last.includes(q) || (subtitle || '').toLowerCase().includes(q);
-  });
+    return conversations.filter(conv => {
+      const last = (conv.lastMessage || '').toLowerCase();
+      const getName = () => {
+        if (conv.isStaffInbox) {
+          const cl = conv.participants?.[0];
+          return (cl?.name || cl?.firstName || '').toLowerCase();
+        }
+        const other = conv.participants?.find(p => p._id !== user?._id);
+        return (other?.name || other?.firstName || '').toLowerCase();
+      };
+      const sub = (conv.relatedProperty?.title || '').toLowerCase();
+      return getName().includes(q) || last.includes(q) || sub.includes(q);
+    });
+  }, [conversations, search, user]);
 
-  const renderItem = ({ item }) => {
-    const { name, subtitle, photo, contact } = getConvDisplay(item);
-    const initial = (name[0] || '?').toUpperCase();
-    const unread = Number(item.unreadCount || 0);
-    const lastMessage = item.lastMessage || 'Nouvelle conversation';
-    const time = formatTime(item.updatedAt);
+  // ─── Callbacks ───
+  const onRefresh    = useCallback(() => { setRefreshing(true); chargerConversations(); }, [chargerConversations]);
+  const onClearSearch= useCallback(() => setSearch(''), []);
+  const keyExtractor = useCallback((item) => item._id || item.id, []);
+
+  const renderItem = useCallback(({ item }) => {
+    const contact = item.isStaffInbox
+      ? item.participants?.[0]
+      : item.participants?.find(p => p._id !== user?._id);
 
     return (
-      <TouchableOpacity
-        style={styles.conv}
+      <ConvItem
+        item={item}
+        currentUserId={user?._id}
         onPress={() => navigation.navigate('Chat', { conversation: item, contact })}
-        activeOpacity={0.7}
-      >
-        {photo ? (
-          <Image source={{ uri: photo }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback]}>
-            <Text style={styles.avatarInitial}>{initial}</Text>
-          </View>
-        )}
-
-        <View style={styles.right}>
-          <View style={styles.row1}>
-            <View style={styles.nameWrap}>
-              <Text style={styles.name} numberOfLines={1}>{name}</Text>
-              {item.isStaffInbox && (
-                <View style={styles.staffBadge}>
-                  <Text style={styles.staffBadgeText}>CLIENT</Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.time}>{time}</Text>
-          </View>
-          {subtitle ? (
-            <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
-          ) : null}
-          <View style={styles.row2}>
-            <Text style={styles.lastMsg} numberOfLines={1}>{lastMessage}</Text>
-            {unread > 0 && (
-              <View style={styles.unreadBadge}>
-                <Text style={styles.unreadBadgeText}>{unread}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
+        styles={styles}
+      />
     );
-  };
+  }, [navigation, user, styles]);
+
+  const ItemSeparator = useCallback(
+    () => <ConvSeparator style={styles.itemSeparator} />,
+    [styles],
+  );
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={styles.safe} edges={['top']}>
         <LoadingSpinner />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* ─── Header ─── */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>{isStaff ? 'Boîte staff' : 'Messages'}</Text>
           {totalUnread > 0 && (
             <View style={styles.titleBadge}>
-              <Text style={styles.titleBadgeText}>{totalUnread}</Text>
+              <Text style={styles.titleBadgeText}>
+                {totalUnread > 99 ? '99+' : totalUnread}
+              </Text>
             </View>
           )}
         </View>
 
         <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={18} color={colors.primary} />
+          <Ionicons name="search-outline" size={18} color={c.gold} />
           <TextInput
             style={styles.searchInput}
             placeholder="Rechercher une conversation..."
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={c.textMuted}
             value={search}
             onChangeText={setSearch}
+            returnKeyType="search"
+            accessibilityLabel="Rechercher une conversation"
           />
           {search ? (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            <TouchableOpacity
+              onPress={onClearSearch}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Effacer la recherche"
+            >
+              <Ionicons name="close-circle" size={18} color={c.textMuted} />
             </TouchableOpacity>
           ) : null}
         </View>
       </View>
 
+      {/* ─── Liste ─── */}
       <FlatList
         data={filtered}
-        keyExtractor={item => item._id || item.id}
+        keyExtractor={keyExtractor}
         renderItem={renderItem}
-        ItemSeparatorComponent={() => (
-          <Divider style={styles.itemSeparator} />
-        )}
+        ItemSeparatorComponent={ItemSeparator}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+            tintColor={c.gold}
+            colors={[c.gold]}
           />
         }
         ListEmptyComponent={
           <EmptyState
-            icon="chatbubbles-outline"
+            illustration={IllustrationNoMessages}
             title="Aucune conversation"
             subtitle={isStaff
               ? 'Aucune demande client pour le moment.'
@@ -240,12 +320,15 @@ export default function ConversationsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const makeStyles = (c) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg },
 
   header: {
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
     padding: spacing.lg,
+    paddingBottom: spacing.md,
   },
   headerTop: {
     flexDirection: 'row',
@@ -254,11 +337,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   title: {
-    ...typography.h1,
-    color: colors.text,
+    fontFamily: fonts.display,
+    fontSize: fontSize.xxl,
+    color: c.text,
   },
   titleBadge: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.gold,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: 100,
@@ -266,31 +350,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   titleBadgeText: {
-    color: '#000',
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     fontSize: 12,
+    color: '#0A0A0A',
   },
 
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.card,
+    backgroundColor: c.bgCard,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: c.border,
   },
   searchInput: {
     flex: 1,
-    ...typography.body,
-    color: colors.text,
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: c.text,
     padding: 0,
   },
 
   conv: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: c.bg,
     padding: spacing.lg,
     gap: spacing.md,
   },
@@ -300,18 +387,16 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   avatarFallback: {
-    backgroundColor: colors.cardElevated,
+    backgroundColor: c.bgCardAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitial: {
-    color: colors.primary,
-    fontWeight: '700',
+    fontFamily: fonts.bodyBold,
     fontSize: 18,
+    color: c.gold,
   },
-  right: {
-    flex: 1,
-  },
+  right: { flex: 1 },
   row1: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -325,31 +410,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   name: {
-    ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: c.text,
     flexShrink: 1,
   },
+  nameUnread: {
+    fontFamily: fonts.bodyBold,
+  },
   staffBadge: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.gold,
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
   },
   staffBadgeText: {
-    color: '#000',
+    fontFamily: fonts.bodyBold,
     fontSize: 9,
-    fontWeight: '700',
+    color: '#0A0A0A',
     letterSpacing: 0.5,
   },
   subtitle: {
+    fontFamily: fonts.body,
     fontSize: 11,
-    color: colors.primary,
+    color: c.gold,
     marginBottom: 2,
   },
   time: {
-    color: colors.textMuted,
+    fontFamily: fonts.body,
     fontSize: 11,
+    color: c.textMuted,
     marginLeft: spacing.sm,
   },
   row2: {
@@ -358,12 +448,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   lastMsg: {
-    color: colors.textSecondary,
+    fontFamily: fonts.body,
     fontSize: 13,
+    color: c.textSub,
     flex: 1,
   },
+  lastMsgUnread: {
+    fontFamily: fonts.bodyBold,
+    color: c.text,
+  },
   unreadBadge: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.gold,
     minWidth: 20,
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
@@ -371,13 +466,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   unreadBadgeText: {
-    color: '#000',
+    fontFamily: fonts.bodyBold,
     fontSize: 11,
-    fontWeight: '700',
+    color: '#0A0A0A',
   },
 
   itemSeparator: {
-    marginLeft: 72,
+    marginLeft: 80,
     marginVertical: 0,
   },
 });

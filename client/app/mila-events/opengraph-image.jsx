@@ -30,7 +30,7 @@ export default function Image() {
           {/* Brand + pole tag row */}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'44px' }}>
             <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'44px', height:'44px', borderRadius:'10px', background:'linear-gradient(135deg,#A0671A,#C8872A)' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', width:'44px', height:'44px', borderRadius:'10px', background:'linear-gradient(135deg,#A0671A,#C8960C)' }}>
                 <span style={{ color:'#fff', fontSize:'16px', fontWeight:700 }}>AV</span>
               </div>
               <span style={{ color:'rgba(232,228,220,0.5)', fontSize:'13px', fontWeight:400, letterSpacing:'0.20em', textTransform:'uppercase' }}>ALTITUDE-VISION</span>

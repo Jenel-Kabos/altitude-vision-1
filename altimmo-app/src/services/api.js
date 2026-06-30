@@ -1,7 +1,13 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const API_URL = 'https://altitude-vision.onrender.com/api';
+
+const TOKEN_KEY = 'auth_token';
+
+export const saveToken  = (t) => SecureStore.setItemAsync(TOKEN_KEY, t);
+export const getToken   = ()  => SecureStore.getItemAsync(TOKEN_KEY);
+export const deleteToken = () => SecureStore.deleteItemAsync(TOKEN_KEY);
 
 const api = axios.create({
   baseURL: API_URL,
@@ -11,7 +17,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('token');
+    const token = await getToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
@@ -22,7 +28,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      await AsyncStorage.removeItem('token');
+      await deleteToken();
     }
     return Promise.reject(error);
   },

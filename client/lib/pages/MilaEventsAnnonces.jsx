@@ -16,7 +16,7 @@ import Image from 'next/image';
 // ─────────────────────────────────────────────────────────────
 const MILA_RED      = '#D42B2B';
 const MILA_RED_DARK = '#A01E1E';
-const MILA_GOLD     = '#C8872A';
+const MILA_GOLD     = '#C8960C';
 
 const EVENTS_PER_PAGE = 12;
 
@@ -55,7 +55,7 @@ const EventCardGrid = ({ event, index }) => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: index * 0.04 }}
             whileHover={{ y: -5 }}
-            onClick={() => router.push(`/mila-events/event/${event._id}`)}
+            onClick={() => router.push(`/evenementiel/event/${event._id}`)}
             className="group bg-white rounded-3xl border overflow-hidden cursor-pointer transition-all duration-500 hover:shadow-xl"
             style={{ borderColor: 'rgba(0,0,0,0.06)' }}
         >
@@ -71,7 +71,7 @@ const EventCardGrid = ({ event, index }) => {
                 {/* Badges */}
                 <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
                     <span className="text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg"
-                        style={{ background: `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})`, fontFamily: "'Outfit', sans-serif" }}>
+                        style={{ background: `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})`, fontFamily: "'DM Sans', sans-serif" }}>
                         {event.category || 'Événement'}
                     </span>
                     {event.videos?.length > 0 && (
@@ -95,22 +95,22 @@ const EventCardGrid = ({ event, index }) => {
             {/* Contenu */}
             <div className="p-5">
                 <h3 className="font-bold text-gray-900 mb-2 line-clamp-1 text-lg transition-colors group-hover:text-[#D42B2B]"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {event.name || event.title}
                 </h3>
                 <p className="text-sm text-gray-500 mb-4 line-clamp-2 leading-relaxed"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {event.description}
                 </p>
                 <div className="space-y-1.5 text-xs text-gray-400">
                     <div className="flex items-center gap-2">
                         <Calendar className="w-3.5 h-3.5 flex-shrink-0" style={{ color: MILA_RED }} />
-                        <span style={{ fontFamily: "'Outfit', sans-serif" }}>{date}</span>
+                        <span style={{ fontFamily: "'DM Sans', sans-serif" }}>{date}</span>
                     </div>
                     {event.location && (
                         <div className="flex items-center gap-2">
                             <MapPin className="w-3.5 h-3.5 flex-shrink-0" style={{ color: MILA_GOLD }} />
-                            <span className="line-clamp-1" style={{ fontFamily: "'Outfit', sans-serif" }}>{event.location}</span>
+                            <span className="line-clamp-1" style={{ fontFamily: "'DM Sans', sans-serif" }}>{event.location}</span>
                         </div>
                     )}
                 </div>
@@ -132,7 +132,7 @@ const EventCardList = ({ event, index }) => {
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: index * 0.04 }}
-            onClick={() => router.push(`/mila-events/event/${event._id}`)}
+            onClick={() => router.push(`/evenementiel/event/${event._id}`)}
             className="group bg-white rounded-3xl border overflow-hidden cursor-pointer transition-all duration-400 hover:shadow-lg flex flex-col sm:flex-row"
             style={{ borderColor: 'rgba(0,0,0,0.06)' }}
         >
@@ -145,7 +145,7 @@ const EventCardList = ({ event, index }) => {
                     onError={() => setImgSrc(MILA_FALLBACK)} />
                 <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black/40 to-transparent" />
                 <span className="absolute top-3 left-3 text-white text-xs font-bold px-3 py-1.5 rounded-full"
-                    style={{ background: `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})`, fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ background: `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})`, fontFamily: "'DM Sans', sans-serif" }}>
                     {event.category || 'Événement'}
                 </span>
             </div>
@@ -154,29 +154,29 @@ const EventCardList = ({ event, index }) => {
             <div className="flex-1 p-5 flex flex-col justify-between">
                 <div>
                     <h3 className="font-bold text-gray-900 text-xl mb-2 line-clamp-1 transition-colors group-hover:text-[#D42B2B]"
-                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        style={{ fontFamily: "'DM Sans', sans-serif" }}>
                         {event.name || event.title}
                     </h3>
                     <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed mb-4"
-                        style={{ fontFamily: "'Outfit', sans-serif" }}>
+                        style={{ fontFamily: "'DM Sans', sans-serif" }}>
                         {event.description}
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-4 text-xs text-gray-400">
                     <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5" style={{ color: MILA_RED }} />
-                        <span style={{ fontFamily: "'Outfit', sans-serif" }}>{date}</span>
+                        <span style={{ fontFamily: "'DM Sans', sans-serif" }}>{date}</span>
                     </div>
                     {event.location && (
                         <div className="flex items-center gap-1.5">
                             <MapPin className="w-3.5 h-3.5" style={{ color: MILA_GOLD }} />
-                            <span style={{ fontFamily: "'Outfit', sans-serif" }}>{event.location}</span>
+                            <span style={{ fontFamily: "'DM Sans', sans-serif" }}>{event.location}</span>
                         </div>
                     )}
                     {event.guests && (
                         <div className="flex items-center gap-1.5">
                             <Users className="w-3.5 h-3.5" style={{ color: MILA_RED }} />
-                            <span style={{ fontFamily: "'Outfit', sans-serif" }}>{event.guests} invités</span>
+                            <span style={{ fontFamily: "'DM Sans', sans-serif" }}>{event.guests} invités</span>
                         </div>
                     )}
                 </div>
@@ -204,7 +204,7 @@ const Pagination = ({ totalPages, currentPage, onPageChange }) => {
                         color:       p === currentPage ? 'white' : '#6B7280',
                         border:      `1px solid ${p === currentPage ? 'transparent' : '#E5E7EB'}`,
                         boxShadow:   p === currentPage ? `0 4px 12px ${MILA_RED}40` : 'none',
-                        fontFamily:  "'Outfit', sans-serif",
+                        fontFamily:  "'DM Sans', sans-serif",
                     }}>
                     {p}
                 </button>
@@ -280,13 +280,13 @@ const MilaEventsAnnonces = () => {
                     style={{ background: `${MILA_RED}12` }}>
                     <AlertCircle className="w-7 h-7" style={{ color: MILA_RED }} />
                 </div>
-                <h3 className="font-bold text-gray-900 text-lg mb-2" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                <h3 className="font-bold text-gray-900 text-lg mb-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     Erreur de chargement
                 </h3>
-                <p className="text-gray-500 text-sm mb-6" style={{ fontFamily: "'Outfit', sans-serif" }}>{error}</p>
+                <p className="text-gray-500 text-sm mb-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>{error}</p>
                 <button onClick={fetchEvents}
                     className="px-6 py-2.5 rounded-full font-semibold text-white text-sm"
-                    style={{ background: `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})`, fontFamily: "'Outfit', sans-serif" }}>
+                    style={{ background: `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})`, fontFamily: "'DM Sans', sans-serif" }}>
                     Réessayer
                 </button>
             </div>
@@ -294,7 +294,7 @@ const MilaEventsAnnonces = () => {
     );
 
     return (
-        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'Outfit', sans-serif" }}>
+        <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
             {/* ── Hero ─────────────────────────────── */}
             <div className="relative py-20 text-white overflow-hidden"
@@ -364,7 +364,7 @@ const MilaEventsAnnonces = () => {
                                 aria-label="Rechercher un événement ou un lieu"
                                 value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                                 className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none focus:bg-white transition-all placeholder-gray-400"
-                                style={{ fontFamily: "'Outfit', sans-serif" }}
+                                style={{ fontFamily: "'DM Sans', sans-serif" }}
                                 onFocus={e => { e.target.style.borderColor = MILA_RED; e.target.style.boxShadow = `0 0 0 3px ${MILA_RED}12`; }}
                                 onBlur={e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none'; }}
                             />
@@ -384,7 +384,7 @@ const MilaEventsAnnonces = () => {
                                     background:  showFilters ? `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})` : '#F9FAFB',
                                     color:       showFilters ? 'white' : '#374151',
                                     border:      `1px solid ${showFilters ? 'transparent' : '#E5E7EB'}`,
-                                    fontFamily:  "'Outfit', sans-serif",
+                                    fontFamily:  "'DM Sans', sans-serif",
                                 }}>
                                 <SlidersHorizontal className="w-4 h-4" />
                                 Filtres
@@ -418,7 +418,7 @@ const MilaEventsAnnonces = () => {
                                     {/* Catégories */}
                                     <div>
                                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             Catégorie
                                         </label>
                                         <div className="flex flex-wrap gap-2">
@@ -430,7 +430,7 @@ const MilaEventsAnnonces = () => {
                                                         color:       selectedCat === cat ? 'white' : '#6B7280',
                                                         border:      `1px solid ${selectedCat === cat ? 'transparent' : '#E5E7EB'}`,
                                                         boxShadow:   selectedCat === cat ? `0 4px 12px ${MILA_RED}30` : 'none',
-                                                        fontFamily:  "'Outfit', sans-serif",
+                                                        fontFamily:  "'DM Sans', sans-serif",
                                                     }}>
                                                     {cat}
                                                 </button>
@@ -441,12 +441,12 @@ const MilaEventsAnnonces = () => {
                                     {/* Tri */}
                                     <div>
                                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             Trier par
                                         </label>
                                         <select value={sortBy} onChange={e => setSortBy(e.target.value)}
                                             className="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-900 focus:outline-none transition-all"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}
+                                            style={{ fontFamily: "'DM Sans', sans-serif" }}
                                             onFocus={e => { e.target.style.borderColor = MILA_RED; }}
                                             onBlur={e => { e.target.style.borderColor = '#E5E7EB'; }}>
                                             <option value="date-desc">Date (Plus récent)</option>
@@ -461,7 +461,7 @@ const MilaEventsAnnonces = () => {
                                     <div className="flex justify-end mt-4">
                                         <button onClick={resetFilters}
                                             className="flex items-center gap-1.5 text-sm font-semibold text-gray-400 hover:text-gray-700 transition-colors"
-                                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             <X className="w-4 h-4" />
                                             Réinitialiser
                                         </button>
@@ -474,14 +474,14 @@ const MilaEventsAnnonces = () => {
 
                 {/* Compteur résultats */}
                 <div className="flex items-center justify-between mb-6 px-1">
-                    <p className="text-sm text-gray-500" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                    <p className="text-sm text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                         <span className="font-bold text-gray-900">{filteredEvents.length}</span>{' '}
                         événement{filteredEvents.length > 1 ? 's' : ''} trouvé{filteredEvents.length > 1 ? 's' : ''}
                     </p>
                     {hasFilters && (
                         <button onClick={resetFilters}
                             className="text-sm font-semibold transition-colors hover:opacity-80"
-                            style={{ color: MILA_RED, fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ color: MILA_RED, fontFamily: "'DM Sans', sans-serif" }}>
                             Voir tous les événements
                         </button>
                     )}
@@ -500,16 +500,16 @@ const MilaEventsAnnonces = () => {
                             <PartyPopper className="w-8 h-8 text-white" />
                         </div>
                         <h3 className="font-bold text-gray-800 text-xl mb-2"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             Aucun événement trouvé
                         </h3>
                         <p className="text-gray-500 text-sm mb-6"
-                            style={{ fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
                             Essayez de modifier vos critères de recherche
                         </p>
                         <button onClick={resetFilters}
                             className="px-6 py-2.5 rounded-full font-semibold text-white text-sm"
-                            style={{ background: `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})`, fontFamily: "'Outfit', sans-serif" }}>
+                            style={{ background: `linear-gradient(135deg, ${MILA_RED_DARK}, ${MILA_RED})`, fontFamily: "'DM Sans', sans-serif" }}>
                             Réinitialiser les filtres
                         </button>
                     </div>

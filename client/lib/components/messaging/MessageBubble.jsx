@@ -14,7 +14,7 @@ const C = {
     surface:   '#111418',
     surfaceHi: '#181D24',
     border:    'rgba(232,228,220,0.06)',
-    gold:      '#C8872A',
+    gold:      '#C8960C',
     goldLight: '#E5A84B',
     blue:      '#2E7BB5',
     text:      '#E8E4DC',
