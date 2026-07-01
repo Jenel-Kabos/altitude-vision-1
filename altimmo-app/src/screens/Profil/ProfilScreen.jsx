@@ -226,14 +226,21 @@ export default function ProfilScreen({ navigation }) {
           </Animated.View>
         )}
 
-        {/* ─── Favoris ───────────────────────────────────────── */}
+        {/* ─── Favoris & Transactions ────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(140).springify().damping(18)}>
-          <Text style={styles.sectionTitle}>Favoris</Text>
+          <Text style={styles.sectionTitle}>Activité</Text>
           <View style={styles.menuGroup}>
             <MenuRow
               icon="heart-outline"
               label="Mes favoris"
               onPress={() => navigation.navigate('Favoris')}
+              styles={styles} c={c}
+            />
+            <View style={styles.menuSep} />
+            <MenuRow
+              icon="swap-horizontal-outline"
+              label="Mes transactions"
+              onPress={() => navigation.navigate('Transactions')}
               styles={styles} c={c}
             />
           </View>

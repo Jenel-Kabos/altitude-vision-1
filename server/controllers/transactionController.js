@@ -108,3 +108,21 @@ exports.getAllTransactions = async (req, res) => {
         res.status(500).json({ status: 'error', message: error.message });
     }
 };
+
+// --- GET MY TRANSACTIONS (client) ---
+exports.getMyTransactions = async (req, res) => {
+    try {
+        const transactions = await Transaction.find({ client: req.user._id })
+            .populate('property', 'title images price type availability')
+            .populate('agent', 'name photo')
+            .sort({ transactionDate: -1 });
+
+        res.status(200).json({
+            status: 'success',
+            results: transactions.length,
+            data: { transactions },
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};

@@ -4,7 +4,10 @@ const authController = require('../controllers/authController');
 
 const router = express.Router();
 
-// All transaction routes are protected and for internal use only
+// Route accessible to any authenticated user — must be before the admin-only middleware
+router.get('/my', authController.protect, transactionController.getMyTransactions);
+
+// All routes below are for internal staff only
 router.use(authController.protect, authController.restrictTo('Admin', 'Collaborateur'));
 
 router.route('/')

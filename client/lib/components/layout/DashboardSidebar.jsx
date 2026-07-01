@@ -12,6 +12,7 @@ import {
   FaCalendarAlt,
   FaTools,
   FaSignOutAlt,
+  FaExchangeAlt,
 } from "react-icons/fa";
 
 const DashboardSidebar = () => {
@@ -95,6 +96,14 @@ const DashboardSidebar = () => {
             </Link>
           </>
         )}
+
+        {/* --- TRANSACTIONS (tous les utilisateurs connectés) --- */}
+        <Link
+          href="/dashboard/transactions"
+          className={navClass('/dashboard/transactions')}
+        >
+          <FaExchangeAlt /> Mes transactions
+        </Link>
 
         {/* --- LOGOUT --- */}
         <button
