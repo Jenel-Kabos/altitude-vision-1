@@ -255,7 +255,7 @@ const ManagePropertiesPage = () => {
               title={property.statusAdmin !== 'Validée' ? 'Pas encore validé — ne s\'affichera côté public qu\'une fois validé.' : ''}
               className={`mb-3 px-3 py-1 rounded-full text-xs font-medium transition ${
                 property.recommande
-                  ? 'bg-amber-500 text-white hover:bg-amber-600'
+                  ? 'bg-gold text-dark hover:bg-gold-light'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               } ${property.statusAdmin !== 'Validée' ? 'opacity-70' : ''}`}
             >

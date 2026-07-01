@@ -6,11 +6,13 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MotionImage = motion.create(Image);
-import { getPropertyById } from '../services/propertyService';
+import { getPropertyById, likeProperty, shareProperty } from '../services/propertyService';
+import { useAuth } from '../context/AuthContext';
 import {
   ArrowLeft, MapPin, Tag, Check, Bed, Bath,
   Sofa, UtensilsCrossed, Maximize2, MessageSquare,
   Phone, Clock, Scale, ChevronLeft, ChevronRight,
+  Heart, Eye, Share2, Percent,
 } from 'lucide-react';
 import CommentList from '../components/comments/CommentList';
 import Breadcrumb from '../components/Breadcrumb';
@@ -117,7 +119,7 @@ const STYLES = `
   }
   .pdp-eyebrow {
     font-family: var(--font-dm-sans), sans-serif;
-    font-size: clamp(0.58rem, 1.3vw, 0.62rem);
+    font-size: clamp(0.68rem, 1.3vw, 0.74rem);
     font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase;
     color: ${GOLD}; margin-bottom: 8px;
   }
@@ -176,8 +178,8 @@ const STYLES = `
     padding: clamp(3px, 0.5vw, 4px) clamp(8px, 1.5vw, 10px); border-radius: 1px;
     background: rgba(26,22,18,0.55); backdrop-filter: blur(6px);
     font-family: var(--font-dm-sans), sans-serif;
-    font-size: clamp(0.52rem, 1vw, 0.56rem); font-weight: 600; letter-spacing: 0.18em;
-    color: rgba(255,255,255,0.7); pointer-events: none;
+    font-size: clamp(0.64rem, 1vw, 0.68rem); font-weight: 600; letter-spacing: 0.18em;
+    color: rgba(255,255,255,0.90); pointer-events: none;
   }
   .pdp-img-price-badge {
     position: absolute;
@@ -270,41 +272,62 @@ const STYLES = `
     background: linear-gradient(90deg, rgba(200,150,12,0.28), transparent);
   }
 
-  /* ── STATS (caractéristiques) ── */
+  /* ── ENGAGEMENT BAR (vues / likes / partages) ── */
+  .pdp-engage-bar {
+    display: flex; align-items: center; gap: clamp(14px, 3vw, 22px);
+    margin-bottom: clamp(12px, 2.5vw, 18px);
+    padding: clamp(6px, 1.2vw, 8px) 0;
+    border-bottom: 1px solid rgba(200,150,12,0.1);
+  }
+  .pdp-engage-item {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: clamp(0.72rem, 1.4vw, 0.78rem); color: ${INK_SOFT};
+    font-family: var(--font-dm-sans), sans-serif;
+  }
+  .pdp-engage-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: clamp(0.72rem, 1.4vw, 0.78rem);
+    font-family: var(--font-dm-sans), sans-serif;
+    background: none; border: none; cursor: pointer;
+    padding: 4px 8px; border-radius: 4px;
+    transition: background 0.18s, color 0.18s;
+  }
+  .pdp-engage-btn:hover  { background: rgba(200,150,12,0.07); }
+  .pdp-engage-btn.liked  { color: #E53E3E; }
+  .pdp-engage-btn.shared { color: ${BLUE}; }
+  .pdp-engage-sep { width:1px; height:12px; background: rgba(200,150,12,0.18); flex-shrink:0; }
+
+  /* ── STATS (caractéristiques) — version compacte ── */
   .pdp-stats-grid {
     display: grid;
-    /* Mobile : 2 colonnes ; ≥ 480px : auto-fill */
-    grid-template-columns: repeat(2, 1fr);
-    gap: clamp(8px, 2vw, 12px);
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
   }
-  @media (min-width: 480px) {
-    .pdp-stats-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  @media (min-width: 560px) {
+    .pdp-stats-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
   }
 
   .pdp-stat {
-    display: flex; align-items: center; gap: clamp(8px, 1.5vw, 12px);
-    padding: clamp(10px, 2vw, 14px) clamp(10px, 2vw, 18px);
-    border: 1px solid rgba(200,150,12,0.14); border-radius: 2px;
-    background: ${CREAM}; transition: border-color 0.2s, box-shadow 0.2s;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(200,150,12,0.12); border-radius: 2px;
+    background: ${CREAM}; transition: border-color 0.2s;
   }
-  .pdp-stat:hover {
-    border-color: rgba(200,150,12,0.35);
-    box-shadow: 0 4px 16px rgba(200,150,12,0.08);
-  }
+  .pdp-stat:hover { border-color: rgba(200,150,12,0.30); }
   .pdp-stat-icon {
-    width: clamp(30px, 5vw, 38px); height: clamp(30px, 5vw, 38px);
+    width: 28px; height: 28px;
     display: flex; align-items: center; justify-content: center;
-    background: ${GOLD_PALE}; border: 1px solid rgba(200,150,12,0.15);
+    background: ${GOLD_PALE}; border: 1px solid rgba(200,150,12,0.14);
     border-radius: 1px; flex-shrink: 0;
   }
   .pdp-stat-val {
     font-family: var(--font-cormorant), serif;
-    font-size: clamp(1.1rem, 3vw, 1.4rem);
+    font-size: clamp(1rem, 2.5vw, 1.15rem);
     font-weight: 600; color: ${INK}; line-height: 1;
   }
   .pdp-stat-lbl {
-    font-size: clamp(0.60rem, 1.2vw, 0.68rem); font-weight: 500;
-    letter-spacing: 0.08em; color: ${INK_SOFT}; text-transform: uppercase; margin-top: 2px;
+    font-size: 0.60rem; font-weight: 500;
+    letter-spacing: 0.07em; color: ${INK_SOFT}; text-transform: uppercase; margin-top: 2px;
   }
 
   /* ── DESCRIPTION ── */
@@ -322,7 +345,7 @@ const STYLES = `
   }
   .pdp-row:last-child { border-bottom: none; }
   .pdp-row-label {
-    font-size: clamp(0.62rem, 1.3vw, 0.70rem); font-weight: 500;
+    font-size: clamp(0.68rem, 1.3vw, 0.74rem); font-weight: 500;
     letter-spacing: 0.1em; text-transform: uppercase;
     color: ${INK_SOFT}; flex-shrink: 0;
   }
@@ -338,7 +361,7 @@ const STYLES = `
     display: inline-flex; align-items: center; gap: 5px;
     padding: clamp(6px, 1.2vw, 7px) clamp(10px, 2vw, 14px);
     border: 1px solid rgba(200,150,12,0.2); border-radius: 1px;
-    font-size: clamp(0.62rem, 1.3vw, 0.68rem); font-weight: 500;
+    font-size: clamp(0.68rem, 1.3vw, 0.74rem); font-weight: 500;
     letter-spacing: 0.12em; text-transform: uppercase;
     color: ${INK_MID}; background: transparent;
     transition: border-color 0.2s, color 0.2s, background 0.2s;
@@ -359,9 +382,9 @@ const STYLES = `
   }
   .pdp-sidebar-price-label {
     font-family: var(--font-dm-sans), sans-serif;
-    font-size: clamp(0.52rem, 1.1vw, 0.56rem); font-weight: 600;
+    font-size: clamp(0.64rem, 1.1vw, 0.68rem); font-weight: 600;
     letter-spacing: 0.25em; text-transform: uppercase;
-    color: rgba(200,150,12,0.6); margin-bottom: 8px;
+    color: rgba(200,150,12,0.88); margin-bottom: 8px;
   }
   .pdp-sidebar-price-value {
     font-family: var(--font-cormorant), serif;
@@ -390,7 +413,7 @@ const STYLES = `
   .pdp-sidebar-sub {
     font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.76rem, 1.6vw, 0.78rem); line-height: 1.65;
-    color: rgba(255,255,255,0.42); margin-bottom: clamp(16px, 3vw, 22px);
+    color: rgba(255,255,255,0.70); margin-bottom: clamp(16px, 3vw, 22px);
   }
 
   /* CTA WhatsApp */
@@ -417,6 +440,34 @@ const STYLES = `
   }
   .pdp-cta-tel:hover { border-color: ${GOLD}; color: ${GOLD}; }
 
+  /* Commission */
+  .pdp-commission {
+    margin-top: clamp(12px, 2.5vw, 18px);
+    padding: clamp(10px, 2vw, 14px) clamp(12px, 2.5vw, 18px);
+    border-radius: 2px;
+    background: rgba(200,150,12,0.06);
+    border: 1px solid rgba(200,150,12,0.18);
+  }
+  .pdp-commission-title {
+    font-family: var(--font-dm-sans), sans-serif;
+    font-size: clamp(0.60rem, 1.1vw, 0.64rem); font-weight: 600;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: rgba(200,150,12,0.75); margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .pdp-commission-row {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  }
+  .pdp-commission-amount {
+    font-family: var(--font-cormorant), serif;
+    font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+    font-weight: 600; color: #fff; line-height: 1;
+  }
+  .pdp-commission-note {
+    font-size: clamp(0.60rem, 1.1vw, 0.64rem);
+    color: rgba(255,255,255,0.38); text-align: right;
+  }
+
   /* Reassurance items */
   .pdp-reassurance {
     margin-top: clamp(16px, 3vw, 24px);
@@ -435,7 +486,7 @@ const STYLES = `
   .pdp-reassurance-text {
     font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.74rem, 1.5vw, 0.78rem); line-height: 1.6;
-    color: rgba(255,255,255,0.36);
+    color: rgba(255,255,255,0.65);
   }
 
   /* ── BADGES ── */
@@ -487,7 +538,7 @@ const STYLES = `
     position: fixed; bottom: clamp(14px, 3vw, 24px); left: 50%; transform: translateX(-50%);
     font-family: var(--font-dm-sans), sans-serif;
     font-size: clamp(0.60rem, 1.2vw, 0.68rem); font-weight: 500; letter-spacing: 0.2em;
-    color: rgba(255,255,255,0.42);
+    color: rgba(255,255,255,0.70);
   }
   .pdp-lightbox-arrow {
     position: fixed; top: 50%; transform: translateY(-50%);
@@ -541,6 +592,7 @@ const DetailSkeleton = () => (
 const PropertyDetailPage = () => {
   injectStyles();
   const { propertyId }  = useParams();
+  const { user }        = useAuth();
   const [property,  setProperty]  = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState('');
@@ -548,6 +600,10 @@ const PropertyDetailPage = () => {
   const [lightbox,      setLightbox]      = useState(false);
   const [mainImgError,  setMainImgError]  = useState(false);
   const [lbImgError,    setLbImgError]    = useState(false);
+  const [localLikes,    setLocalLikes]    = useState(0);
+  const [localShares,   setLocalShares]   = useState(0);
+  const [liked,         setLiked]         = useState(false);
+  const [shared,        setShared]        = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -555,6 +611,11 @@ const PropertyDetailPage = () => {
         setLoading(true);
         const data = await getPropertyById(propertyId);
         setProperty(data);
+        setLocalLikes(data?.likes?.length || 0);
+        setLocalShares(data?.shares || 0);
+        if (user && data?.likes) {
+          setLiked(data.likes.some(id => id === user._id || id?._id === user._id));
+        }
       } catch {
         setError("Impossible de charger les détails de l'annonce.");
       } finally {
@@ -563,6 +624,24 @@ const PropertyDetailPage = () => {
     };
     load();
   }, [propertyId]);
+
+  const handleLike = async () => {
+    if (!user) return;
+    const next = !liked;
+    setLiked(next);
+    setLocalLikes(n => next ? n + 1 : Math.max(0, n - 1));
+    try { await likeProperty(propertyId); } catch { setLiked(!next); setLocalLikes(n => next ? Math.max(0, n - 1) : n + 1); }
+  };
+
+  const handleShare = async () => {
+    try { await navigator.clipboard.writeText(window.location.href); } catch {}
+    if (!shared) {
+      setShared(true);
+      setLocalShares(n => n + 1);
+      try { await shareProperty(propertyId); } catch {}
+      setTimeout(() => setShared(false), 3000);
+    }
+  };
 
   useEffect(() => {
     if (lightbox === false) return;
@@ -676,6 +755,31 @@ const PropertyDetailPage = () => {
             </div>
           </div>
         </motion.div>
+
+        {/* ── Barre engagement : vues · likes · partages ── */}
+        <div className="pdp-engage-bar">
+          <span className="pdp-engage-item" title="Nombre de vues">
+            <Eye size={13} style={{ color:GOLD }} /> {property.views || 0} vue{(property.views || 0) !== 1 ? 's' : ''}
+          </span>
+          <div className="pdp-engage-sep" />
+          <button
+            className={`pdp-engage-btn${liked ? ' liked' : ''}`}
+            onClick={handleLike}
+            title={user ? (liked ? 'Ne plus aimer' : 'J\'aimer ce bien') : 'Connectez-vous pour liker'}
+            style={{ color: liked ? '#E53E3E' : INK_SOFT }}>
+            <Heart size={13} fill={liked ? '#E53E3E' : 'none'} stroke={liked ? '#E53E3E' : INK_SOFT} />
+            {localLikes} j'aime
+          </button>
+          <div className="pdp-engage-sep" />
+          <button
+            className={`pdp-engage-btn${shared ? ' shared' : ''}`}
+            onClick={handleShare}
+            title="Copier le lien et partager"
+            style={{ color: shared ? BLUE : INK_SOFT }}>
+            <Share2 size={13} />
+            {shared ? 'Lien copié !' : `${localShares} partage${localShares !== 1 ? 's' : ''}`}
+          </button>
+        </div>
 
         {/* ── Galerie ── */}
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.08, duration:0.5, ease:[0.22,1,0.36,1] }}>
@@ -852,6 +956,33 @@ const PropertyDetailPage = () => {
                   )}
                 </div>
               </div>
+
+              {/* Commission agence */}
+              {(() => {
+                const rate       = property.commissionRate ?? 5;
+                const isLocation = property.status === 'location';
+                const amount     = isLocation
+                  ? property.price * rate
+                  : Math.round((property.price || 0) * rate / 100);
+                const label      = isLocation
+                  ? `${rate} mois de loyer`
+                  : `${rate}% du prix de vente`;
+                return (
+                  <div style={{ padding:'0 clamp(18px,4vw,28px) clamp(14px,3vw,20px)' }}>
+                    <div className="pdp-commission">
+                      <div className="pdp-commission-title">
+                        <Percent size={10} /> Honoraires agence
+                      </div>
+                      <div className="pdp-commission-row">
+                        <span className="pdp-commission-amount">
+                          {priceFormatter.format(amount)}
+                        </span>
+                        <span className="pdp-commission-note">{label}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Contact */}
               <div className="pdp-sidebar-body">

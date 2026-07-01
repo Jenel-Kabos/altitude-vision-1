@@ -110,9 +110,9 @@ const GLOBAL_CSS = `
   /* ─── Eyebrow ─── */
   .hp-eyebrow {
     display: flex; align-items: center; gap: 10px;
-    font-size: clamp(0.60rem, 1.6vw, 0.68rem);
-    letter-spacing: 0.24em; text-transform: uppercase;
-    color: var(--gold); font-weight: 500;
+    font-size: clamp(0.70rem, 1.6vw, 0.76rem);
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--gold); font-weight: 600;
     margin-bottom: clamp(10px, 2vw, 16px);
   }
   .hp-eyebrow-line { width: 18px; height: 1px; background: var(--gold); flex-shrink: 0; }
@@ -121,7 +121,7 @@ const GLOBAL_CSS = `
   .hp-h2 {
     font-family: 'Cormorant Garamond', serif;
     font-size: clamp(1.6rem, 5.5vw, 3.4rem);
-    font-weight: 300; line-height: 1.12;
+    font-weight: 400; line-height: 1.12;
     letter-spacing: -0.01em; color: var(--text);
     word-break: break-word;
   }
@@ -142,9 +142,9 @@ const GLOBAL_CSS = `
   }
   .hp-ticker-item {
     font-family: 'DM Sans', sans-serif;
-    font-size: clamp(0.60rem, 1.6vw, 0.70rem);
+    font-size: clamp(0.68rem, 1.6vw, 0.74rem);
     letter-spacing: 0.18em; text-transform: uppercase;
-    color: #0A0C0F; font-weight: 500;
+    color: #0A0C0F; font-weight: 600;
     padding: 0 clamp(16px, 3.5vw, 36px);
     flex-shrink: 0; display: inline-flex; align-items: center; gap: 12px;
   }
@@ -179,8 +179,8 @@ const GLOBAL_CSS = `
     margin-bottom: clamp(4px, 1vw, 8px);
   }
   .hp-stat-label {
-    font-size: clamp(0.60rem, 1.4vw, 0.72rem);
-    letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 400;
+    font-size: clamp(0.68rem, 1.4vw, 0.76rem);
+    letter-spacing: 0.12em; text-transform: uppercase; color: #4B5563; font-weight: 500;
   }
 
   /* ─── Pôles grid — 1 col mobile → 3 cols ≥768px ─── */
@@ -210,8 +210,8 @@ const GLOBAL_CSS = `
 
   .hp-pole-num {
     display: block; font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(0.70rem, 1.5vw, 0.85rem); font-weight: 300;
-    color: rgba(17,24,39,0.18); letter-spacing: 0.15em;
+    font-size: clamp(0.72rem, 1.5vw, 0.86rem); font-weight: 400;
+    color: rgba(17,24,39,0.35); letter-spacing: 0.15em;
     margin-bottom: clamp(14px, 2.5vw, 32px);
   }
   .hp-pole-icon-wrap {
@@ -226,19 +226,19 @@ const GLOBAL_CSS = `
     line-height: 1.08; color: var(--text); margin-bottom: 5px; word-break: break-word;
   }
   .hp-pole-tag {
-    font-size: clamp(0.60rem, 1.3vw, 0.68rem); letter-spacing: 0.22em;
-    text-transform: uppercase; font-weight: 400; margin-bottom: clamp(10px, 2vw, 16px);
+    font-size: clamp(0.68rem, 1.3vw, 0.74rem); letter-spacing: 0.20em;
+    text-transform: uppercase; font-weight: 500; margin-bottom: clamp(10px, 2vw, 16px);
   }
   .hp-pole-sep { height: 1px; background: var(--border); margin-bottom: clamp(10px, 2vw, 16px); }
   .hp-pole-desc {
-    font-size: clamp(0.82rem, 1.8vw, 0.86rem); color: #6B7280;
-    line-height: 1.72; font-weight: 300; margin-bottom: clamp(14px, 2.5vw, 26px);
+    font-size: clamp(0.85rem, 1.8vw, 0.9rem); color: #4B5563;
+    line-height: 1.72; font-weight: 400; margin-bottom: clamp(14px, 2.5vw, 26px);
     word-break: break-word;
   }
   .hp-pole-link {
     display: inline-flex; align-items: center; gap: 7px;
-    font-size: clamp(0.62rem, 1.3vw, 0.72rem); letter-spacing: 0.14em;
-    text-transform: uppercase; font-weight: 500;
+    font-size: clamp(0.72rem, 1.3vw, 0.78rem); letter-spacing: 0.14em;
+    text-transform: uppercase; font-weight: 600;
     opacity: 0; transform: translateY(8px); transition: 0.3s;
   }
 
@@ -258,11 +258,11 @@ const GLOBAL_CSS = `
   @media (min-width: 900px) { .hp-about-grid { grid-template-columns: 1fr 1fr; align-items: center; } }
 
   .hp-about-p {
-    font-size: clamp(0.875rem, 1.9vw, 0.92rem); line-height: 1.82; font-weight: 300; word-break: break-word;
+    font-size: clamp(0.9rem, 1.9vw, 0.95rem); line-height: 1.82; font-weight: 400; word-break: break-word;
   }
   .hp-contact-row {
     display: flex; align-items: center; gap: 10px;
-    font-size: clamp(0.78rem, 1.8vw, 0.82rem); color: #6B7280; font-weight: 300;
+    font-size: clamp(0.82rem, 1.8vw, 0.88rem); color: #4B5563; font-weight: 400;
     /* email peut être long sur 320px */
     overflow-wrap: break-word; word-break: break-all;
   }
@@ -278,16 +278,16 @@ const GLOBAL_CSS = `
     border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .hp-mini-name {
-    font-size: clamp(0.84rem, 1.9vw, 0.88rem); font-weight: 400; color: var(--text); margin-bottom: 2px;
+    font-size: clamp(0.86rem, 1.9vw, 0.92rem); font-weight: 500; color: var(--text); margin-bottom: 2px;
   }
   .hp-mini-sub {
-    font-size: clamp(0.60rem, 1.3vw, 0.65rem); letter-spacing: 0.12em;
-    text-transform: uppercase; color: #9CA3AF;
+    font-size: clamp(0.68rem, 1.3vw, 0.72rem); letter-spacing: 0.12em;
+    text-transform: uppercase; color: #6B7280;
   }
   .hp-mini-cta {
     display: flex; align-items: center; gap: 4px;
-    font-size: clamp(0.62rem, 1.3vw, 0.68rem); letter-spacing: 0.10em;
-    text-transform: uppercase; font-weight: 400; flex-shrink: 0; white-space: nowrap;
+    font-size: clamp(0.70rem, 1.3vw, 0.76rem); letter-spacing: 0.10em;
+    text-transform: uppercase; font-weight: 500; flex-shrink: 0; white-space: nowrap;
   }
 
   /* ─── Bouton primaire ─── */
@@ -296,7 +296,7 @@ const GLOBAL_CSS = `
     padding: clamp(11px, 2vw, 14px) clamp(20px, 3.5vw, 28px);
     border-radius: 40px; background: var(--gold); color: #0A0C0F;
     font-family: 'DM Sans', sans-serif;
-    font-size: clamp(0.70rem, 1.6vw, 0.75rem); font-weight: 600;
+    font-size: clamp(0.76rem, 1.6vw, 0.82rem); font-weight: 600;
     letter-spacing: 0.08em; text-transform: uppercase;
     transition: 0.22s; text-decoration: none; white-space: nowrap;
     /* Cible tactile WCAG min 44px */
@@ -319,7 +319,7 @@ const GLOBAL_CSS = `
     display: flex; align-items: center; gap: 6px;
     border-radius: 40px; cursor: pointer; transition: 0.25s;
     font-family: 'DM Sans', sans-serif;
-    font-size: clamp(0.70rem, 1.8vw, 0.78rem); font-weight: 400;
+    font-size: clamp(0.74rem, 1.8vw, 0.82rem); font-weight: 500;
     letter-spacing: 0.06em; text-transform: uppercase;
     padding: clamp(10px, 1.8vw, 12px) clamp(14px, 2.8vw, 22px);
     min-height: 44px; /* cible tactile */
@@ -332,12 +332,12 @@ const GLOBAL_CSS = `
   .hp-annonces-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .hp-annonces-title {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(1rem, 2.8vw, 1.2rem); font-weight: 400; color: var(--text); word-break: break-word;
+    font-size: clamp(1.05rem, 2.8vw, 1.25rem); font-weight: 500; color: var(--text); word-break: break-word;
   }
   .hp-see-all {
     display: flex; align-items: center; gap: 4px;
-    font-size: clamp(0.62rem, 1.5vw, 0.70rem); letter-spacing: 0.12em;
-    text-transform: uppercase; font-weight: 400; transition: 0.2s; white-space: nowrap; flex-shrink: 0;
+    font-size: clamp(0.70rem, 1.5vw, 0.76rem); letter-spacing: 0.12em;
+    text-transform: uppercase; font-weight: 500; transition: 0.2s; white-space: nowrap; flex-shrink: 0;
   }
 
   /* ─── Empty state ─── */
@@ -349,10 +349,10 @@ const GLOBAL_CSS = `
     display: flex; align-items: center; justify-content: center; margin: 0 auto clamp(12px, 2vw, 16px);
   }
   .hp-empty-title {
-    font-weight: 400; color: var(--text); font-size: clamp(0.88rem, 2vw, 1rem); margin-bottom: 6px;
+    font-weight: 500; color: var(--text); font-size: clamp(0.92rem, 2vw, 1.05rem); margin-bottom: 6px;
   }
   .hp-empty-sub {
-    font-size: clamp(0.78rem, 1.8vw, 0.84rem); color: #6B7280; font-weight: 300; word-break: break-word;
+    font-size: clamp(0.82rem, 1.8vw, 0.88rem); color: #4B5563; font-weight: 400; word-break: break-word;
   }
 `;
 
@@ -435,7 +435,7 @@ const HomePage = () => {
     <div className="hp-root">
       <style>{GLOBAL_CSS}</style>
       {/* ══ HERO ══ */}
-      <header style={{ position:'relative', height:'100svh', minHeight:'560px', overflow:'hidden' }}>
+      <header style={{ position:'relative', height:'100svh', minHeight:'620px', maxHeight:'860px', overflow:'hidden' }}>
         <HeroSlider />
       </header>
 
@@ -556,9 +556,9 @@ const HomePage = () => {
                         {item.num}
                       </div>
                       <div style={{
-                        fontSize:'clamp(0.60rem,1.2vw,0.68rem)',
+                        fontSize:'clamp(0.68rem,1.2vw,0.74rem)',
                         letterSpacing:'0.14em', textTransform:'uppercase',
-                        color:'#6B7280', fontWeight:400,
+                        color:'#4B5563', fontWeight:500,
                       }}>
                         {item.label}
                       </div>

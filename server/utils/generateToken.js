@@ -11,7 +11,7 @@ const jwt = require('jsonwebtoken');
 const generateToken = (userId, tokenVersion) => { // 🚨 MODIFIÉ : Ajout de tokenVersion
     if (!process.env.JWT_SECRET || !process.env.JWT_EXPIRES_IN) {
         throw new Error(
-            'Les variables d’environnement JWT_SECRET ou JWT_EXPIRES_IN doivent être définies dans le fichier .env'
+            'Les variables d'environnement JWT_SECRET ou JWT_EXPIRES_IN doivent être définies dans le fichier .env'
         );
     }
 

@@ -1,7 +1,8 @@
 const express = require('express');
 const portfolioController = require('../controllers/portfolioController');
 const authController = require('../controllers/authController');
-const reviewRouter = require('./reviewRoutes'); // Importation du routeur pour les avis
+const reviewRouter = require('./reviewRoutes');
+const writeWindowMiddleware = require('../middleware/writeWindowMiddleware');
 
 const router = express.Router();
 
@@ -19,6 +20,7 @@ router.route('/:id').get(portfolioController.getPortfolioItem);
 // --- Routes Protégées ---
 // Seuls les administrateurs et collaborateurs peuvent ajouter ou modifier le portfolio.
 router.use(authController.protect, authController.restrictTo('Admin', 'Collaborateur'));
+router.use(writeWindowMiddleware);
 
 router.route('/').post(portfolioController.createPortfolioItem);
 

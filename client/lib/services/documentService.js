@@ -1,5 +1,31 @@
 import api from './api';
 
+// ── /api/documents ────────────────────────────────────────────
+export const getAllDocuments = async (params = {}) => {
+  const res = await api.get('/documents', { params });
+  return res.data.data.documents;
+};
+
+export const getDocumentById = async (id) => {
+  const res = await api.get(`/documents/${id}`);
+  return res.data.data.document;
+};
+
+export const createDocument = async (data) => {
+  const res = await api.post('/documents', data);
+  return res.data.data.document;
+};
+
+export const updateDocument = async (id, data) => {
+  const res = await api.patch(`/documents/${id}`, data);
+  return res.data.data.document;
+};
+
+export const deleteDocument = async (id) => {
+  await api.delete(`/documents/${id}`);
+};
+
+// ── /api/gestion-docs ─────────────────────────────────────────
 export const getContratDocuments = async (contratId) => {
   const res = await api.get(`/gestion-docs/contrat/${contratId}`);
   return res.data.data;

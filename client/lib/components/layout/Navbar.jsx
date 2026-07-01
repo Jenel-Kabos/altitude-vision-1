@@ -78,7 +78,7 @@ const Navbar = () => {
                   </div>
                 </div>
               ) : (
-                <NavLink to="/login" className="bg-secondary text-white font-bold px-5 py-2 rounded-md hover:bg-amber-600 transition duration-300 ml-4">
+                <NavLink to="/login" className="bg-gold text-dark font-bold px-5 py-2 rounded-md hover:bg-gold-light transition duration-300 ml-4">
                   Connexion
                 </NavLink>
               )}
@@ -134,7 +134,7 @@ const Navbar = () => {
               </div>
             ) : (
               <div className="px-2">
-                 <NavLink to="/login" onClick={() => setMobileMenuOpen(false)} className="w-full block bg-secondary text-white text-center font-bold px-5 py-2 rounded-md hover:bg-amber-600 transition duration-300">
+                 <NavLink to="/login" onClick={() => setMobileMenuOpen(false)} className="w-full block bg-gold text-dark text-center font-bold px-5 py-2 rounded-md hover:bg-gold-light transition duration-300">
                   Connexion
                 </NavLink>
               </div>

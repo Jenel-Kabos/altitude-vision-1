@@ -160,8 +160,13 @@ const propertySchema = new mongoose.Schema(
     },
 
     isPublished: { type: Boolean, default: false },
-    hasSpecialCommission: { type: Boolean, default: false },
-    recommande: { type: Boolean, default: false },
+    hasSpecialCommission: { type: Boolean, default: false },
+    recommande: { type: Boolean, default: false },
+
+    views:          { type: Number, default: 0, min: 0 },
+    likes:          [{ type: mongoose.Schema.ObjectId, ref: "User" }],
+    shares:         { type: Number, default: 0, min: 0 },
+    commissionRate: { type: Number, default: 5, min: 0, max: 100 },
 
     /** 🔗 Propriétaire de la propriété */
     owner: {
@@ -177,7 +182,7 @@ const propertySchema = new mongoose.Schema(
       ref: 'User',
     },
 
-    /** 🛡️ Statut de modération par l’admin */
+    /** 🛡️ Statut de modération par l'admin */
     statusAdmin: {
       type: String,
       enum: ['En attente', 'Validée', 'Rejetée'],

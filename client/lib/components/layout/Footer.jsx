@@ -316,7 +316,7 @@ const Footer = () => (
       <p style={{
         fontFamily: "'DM Sans', sans-serif",
         fontSize: 'clamp(0.68rem, 1.1vw, 0.85rem)',
-        color: 'rgba(232,228,220,0.45)',
+        color: '#6B7280',
         fontWeight: 300,
         display: 'flex',
         alignItems: 'center',
@@ -324,7 +324,7 @@ const Footer = () => (
         margin: 0,
       }}>
         Fait avec <span style={{ color: '#D42B2B' }} aria-hidden="true">♥</span>
-        <span className="sr-only">amour</span> à Brazzaville
+        <span style={{ color: '#6B7280' }}>amour</span> à Brazzaville
       </p>
     </div>
   </footer>

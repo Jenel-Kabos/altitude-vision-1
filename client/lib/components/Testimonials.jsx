@@ -9,10 +9,10 @@ import { getAllTestimonials } from "../services/reviewService";
 import { useAuth } from '../context/AuthContext';
 
 const POLE_COLORS = {
-    Altimmo:    { dot: '#2E7BB5', border: 'rgba(46,123,181,0.18)',  text: '#2E7BB5' },
-    MilaEvents: { dot: '#D42B2B', border: 'rgba(212,43,43,0.18)',   text: '#D42B2B' },
-    Altcom:     { dot: '#C8960C', border: 'rgba(200,135,42,0.18)',  text: '#C8960C' },
-    default:    { dot: '#9CA3AF', border: 'rgba(156,163,175,0.18)', text: '#9CA3AF' },
+    Altimmo:    { dot: '#2E7BB5', border: 'rgba(46,123,181,0.15)',  text: '#2E7BB5' },
+    MilaEvents: { dot: '#D42B2B', border: 'rgba(212,43,43,0.15)',   text: '#D42B2B' },
+    Altcom:     { dot: '#C8960C', border: 'rgba(200,150,12,0.18)',  text: '#C8960C' },
+    default:    { dot: '#9CA3AF', border: 'rgba(156,163,175,0.15)', text: '#9CA3AF' },
 };
 const getPole = (pole) => POLE_COLORS[pole] || POLE_COLORS.default;
 
@@ -30,12 +30,8 @@ const TestimonialCard = ({ t, index }) => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.55, delay: index * 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="relative rounded-2xl p-6 flex flex-col gap-4 border group transition-all duration-500 hover:-translate-y-1"
-            style={{
-                background:   'rgba(17,20,24,0.8)',
-                borderColor:  pc.border,
-                boxShadow:    '0 1px 4px rgba(0,0,0,0.4)',
-            }}
+            className="relative bg-white rounded-2xl p-6 flex flex-col gap-4 border group transition-all duration-500 hover:-translate-y-1 hover:shadow-[var(--shadow-card-light,0_8px_32px_rgba(0,0,0,0.10))]"
+            style={{ borderColor: pc.border }}
         >
             {/* Ligne colorée — apparaît au hover */}
             <div
@@ -45,7 +41,7 @@ const TestimonialCard = ({ t, index }) => {
 
             {/* Guillemet décoratif */}
             <Quote
-                className="absolute top-5 right-5 opacity-[0.05]"
+                className="absolute top-5 right-5 opacity-[0.06]"
                 style={{ width: 36, height: 36, color: pc.dot }}
                 fill="currentColor"
             />
@@ -57,56 +53,38 @@ const TestimonialCard = ({ t, index }) => {
                         <Star
                             key={i}
                             size={13}
-                            style={{
-                                fill:  i < t.rating ? '#FBBF24' : 'transparent',
-                                color: i < t.rating ? '#FBBF24' : 'rgba(232,228,220,0.1)',
-                            }}
+                            className={i < t.rating ? 'fill-amber-400 text-amber-400' : 'fill-transparent text-gray-200'}
                         />
                     ))}
                 </div>
             )}
 
             {/* Citation */}
-            <blockquote
-                className="flex-1 relative z-10"
-                style={{
-                    fontFamily: "'Cormorant Garamond', Georgia, serif",
-                    fontSize:   'clamp(1rem, 1.3vw, 1.15rem)',
-                    fontStyle:  'italic',
-                    color:      'rgba(232,228,220,0.7)',
-                    lineHeight: 1.7,
-                }}
-            >
+            <blockquote className="flex-1 relative z-10 font-display-alt italic text-ink-mid leading-relaxed text-[clamp(0.95rem,1.3vw,1.1rem)]">
                 &ldquo;{t.comment}&rdquo;
             </blockquote>
 
             {/* Séparateur */}
-            <div className="h-px" style={{ background: 'rgba(232,228,220,0.07)' }} />
+            <div className="h-px bg-gray-100" />
 
             {/* Auteur */}
             <div className="flex items-center gap-3 relative z-10">
                 <Image
                     src={
                         t.author?.photo ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=1A1E24&color=C8960C&size=80`
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(t.author?.name || 'Client')}&background=F3F4F6&color=C8960C&size=80`
                     }
                     alt={t.author?.name || 'Client'}
                     width={36} height={36} unoptimized
-                    className="rounded-full object-cover flex-shrink-0"
-                    style={{ border: `2px solid ${pc.dot}40` }}
+                    className="rounded-full object-cover flex-shrink-0 ring-2 ring-white"
+                    style={{ boxShadow: `0 0 0 2px ${pc.dot}30` }}
                 />
                 <div className="min-w-0 flex-1">
-                    <p
-                        className="text-sm truncate leading-tight font-medium"
-                        style={{ fontFamily: "'DM Sans', sans-serif", color: '#E8E4DC' }}
-                    >
+                    <p className="text-sm font-semibold text-ink truncate leading-tight">
                         {t.author?.name || 'Client'}
                     </p>
                     {t.pole && (
-                        <span
-                            className="text-xs"
-                            style={{ color: pc.dot, fontFamily: "'DM Sans', sans-serif" }}
-                        >
+                        <span className="text-xs font-medium" style={{ color: pc.dot }}>
                             {t.pole}
                         </span>
                     )}
@@ -152,32 +130,21 @@ const Testimonials = () => {
     const handleLeaveReview = () =>
         router.push(user ? '/avis/nouveau' : '/login?from=/avis/nouveau');
 
-    // ── États chargement / erreur ──────────────
-
     if (isLoading) return (
-        <section className="py-16 flex justify-center items-center min-h-[200px]"
-            style={{ background: '#0D1117' }}>
-            <Loader2 className="w-7 h-7 animate-spin" style={{ color: '#C8960C' }} />
+        <section className="py-16 flex justify-center items-center min-h-[200px] bg-surface">
+            <Loader2 className="w-7 h-7 animate-spin text-gold" />
         </section>
     );
 
     if (error || !testimonials.length) return (
-        <section className="py-16 text-center px-6" style={{ background: '#0D1117' }}>
-            <Star className="w-8 h-8 mx-auto mb-3" style={{ color: 'rgba(232,228,220,0.15)' }} />
-            <p
-                className="text-sm mb-5"
-                style={{ color: 'rgba(232,228,220,0.4)', fontFamily: "'DM Sans', sans-serif" }}
-            >
+        <section className="py-16 text-center px-6 bg-surface">
+            <Star className="w-8 h-8 mx-auto mb-3 text-gray-200" />
+            <p className="text-sm text-ink-soft mb-5 font-body">
                 {error || "Aucun avis — soyez le premier à partager votre expérience !"}
             </p>
             <button
                 onClick={handleLeaveReview}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm"
-                style={{
-                    background: 'linear-gradient(135deg, #C8960C, #E5A84B)',
-                    color:      '#0A0C0F',
-                    fontFamily: "'DM Sans', sans-serif",
-                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm bg-gold hover:bg-gold-light text-dark transition-colors"
             >
                 <MessageSquarePlus className="w-4 h-4" />
                 Laisser un avis
@@ -186,18 +153,14 @@ const Testimonials = () => {
     );
 
     return (
-        <section className="py-16 sm:py-20 relative overflow-hidden" style={{ background: '#0D1117' }}>
+        <section className="py-16 sm:py-20 relative overflow-hidden bg-surface">
 
-            {/* Décorations */}
+            {/* Décorations subtiles */}
             <div className="absolute inset-0 pointer-events-none">
-                <div
-                    className="absolute top-0 left-0 right-0 h-px"
-                    style={{ background: 'linear-gradient(to right, transparent, rgba(200,135,42,0.15), transparent)' }}
-                />
-                <div
-                    className="absolute bottom-0 left-0 right-0 h-px"
-                    style={{ background: 'linear-gradient(to right, transparent, rgba(46,123,181,0.15), transparent)' }}
-                />
+                <div className="absolute top-0 left-0 right-0 h-px"
+                    style={{ background: 'linear-gradient(to right, transparent, rgba(200,150,12,0.12), transparent)' }} />
+                <div className="absolute bottom-0 left-0 right-0 h-px"
+                    style={{ background: 'linear-gradient(to right, transparent, rgba(46,123,181,0.12), transparent)' }} />
             </div>
 
             <div className="container mx-auto px-4 sm:px-6 max-w-7xl relative z-10">
@@ -211,27 +174,14 @@ const Testimonials = () => {
                         viewport={{ once: true }}
                         transition={{ duration: 0.6 }}
                     >
-                        <p
-                            className="text-xs font-bold uppercase tracking-widest mb-2"
-                            style={{ color: '#C8960C', fontFamily: "'DM Sans', sans-serif" }}
-                        >
+                        <p className="text-xs font-bold uppercase tracking-widest mb-2 text-gold font-body">
                             Témoignages
                         </p>
-                        <h2
-                            style={{
-                                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                fontSize:   'clamp(1.8rem, 3.5vw, 4rem)',
-                                fontWeight: 300,
-                                lineHeight: 1.1,
-                                color:      '#E8E4DC',
-                            }}
-                        >
+                        <h2 className="font-display-alt font-light text-ink text-[clamp(1.8rem,3.5vw,4rem)] leading-tight">
                             Ce que disent nos clients
                         </h2>
-                        <div
-                            className="h-px w-12 mt-3 rounded-full"
-                            style={{ background: 'linear-gradient(to right, #C8960C, #2E7BB5)' }}
-                        />
+                        <div className="h-px w-12 mt-3 rounded-full"
+                            style={{ background: 'linear-gradient(to right, #C8960C, #2E7BB5)' }} />
                     </motion.div>
 
                     {/* Contrôles */}
@@ -243,10 +193,7 @@ const Testimonials = () => {
                         transition={{ duration: 0.6, delay: 0.2 }}
                     >
                         {totalPages > 1 && (
-                            <span
-                                className="text-sm tabular-nums"
-                                style={{ color: 'rgba(232,228,220,0.3)', fontFamily: "'DM Sans', sans-serif" }}
-                            >
+                            <span className="text-sm tabular-nums text-ink-faint font-body">
                                 {String(page + 1).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
                             </span>
                         )}
@@ -256,18 +203,16 @@ const Testimonials = () => {
                                 <button
                                     onClick={prev}
                                     aria-label="Page précédente"
-                                    className="w-9 h-9 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-105"
-                                    style={{ borderColor: 'rgba(232,228,220,0.12)', background: 'rgba(232,228,220,0.04)' }}
+                                    className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center transition-all duration-200 hover:border-gray-300 hover:shadow-sm hover:scale-105"
                                 >
-                                    <ChevronLeft className="w-4 h-4" style={{ color: 'rgba(232,228,220,0.5)' }} />
+                                    <ChevronLeft className="w-4 h-4 text-ink-soft" />
                                 </button>
                                 <button
                                     onClick={next}
                                     aria-label="Page suivante"
-                                    className="w-9 h-9 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-105"
-                                    style={{ borderColor: 'rgba(232,228,220,0.12)', background: 'rgba(232,228,220,0.04)' }}
+                                    className="w-9 h-9 rounded-full border border-gray-200 bg-white flex items-center justify-center transition-all duration-200 hover:border-gray-300 hover:shadow-sm hover:scale-105"
                                 >
-                                    <ChevronRight className="w-4 h-4" style={{ color: 'rgba(232,228,220,0.5)' }} />
+                                    <ChevronRight className="w-4 h-4 text-ink-soft" />
                                 </button>
                             </div>
                         )}
@@ -276,13 +221,8 @@ const Testimonials = () => {
                             onClick={handleLeaveReview}
                             whileHover={{ scale: 1.04 }}
                             whileTap={{ scale: 0.97 }}
-                            className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm"
-                            style={{
-                                background: 'linear-gradient(135deg, #C8960C, #E5A84B)',
-                                boxShadow:  '0 4px 16px rgba(200,135,42,0.22)',
-                                fontFamily: "'DM Sans', sans-serif",
-                                color:      '#0A0C0F',
-                            }}
+                            className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm bg-gold hover:bg-gold-light text-dark transition-colors font-body"
+                            style={{ boxShadow: '0 4px 16px rgba(200,150,12,0.22)' }}
                         >
                             <MessageSquarePlus className="w-4 h-4" />
                             Laisser un avis
@@ -324,7 +264,7 @@ const Testimonials = () => {
                                     style={{
                                         width:           i === page ? '20px' : '6px',
                                         height:          '6px',
-                                        backgroundColor: i === page ? '#C8960C' : 'rgba(232,228,220,0.15)',
+                                        backgroundColor: i === page ? '#C8960C' : '#E5E7EB',
                                     }}
                                 />
                             ))}
@@ -335,12 +275,7 @@ const Testimonials = () => {
                         onClick={handleLeaveReview}
                         whileHover={{ scale: 1.04 }}
                         whileTap={{ scale: 0.97 }}
-                        className="sm:hidden inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm ml-auto"
-                        style={{
-                            background: 'linear-gradient(135deg, #C8960C, #E5A84B)',
-                            color:      '#0A0C0F',
-                            fontFamily: "'DM Sans', sans-serif",
-                        }}
+                        className="sm:hidden inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm bg-gold hover:bg-gold-light text-dark transition-colors font-body ml-auto"
                     >
                         <MessageSquarePlus className="w-4 h-4" />
                         Laisser un avis

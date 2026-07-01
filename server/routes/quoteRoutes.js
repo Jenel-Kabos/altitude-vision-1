@@ -3,6 +3,8 @@ const express = require('express');
 const quoteController = require('../controllers/quoteController');
 const authController = require('../controllers/authController');
 
+const writeWindowMiddleware = require('../middleware/writeWindowMiddleware');
+
 const router = express.Router();
 
 // ======================================================
@@ -17,6 +19,7 @@ router.post('/', quoteController.createQuoteRequest);
 // ======================================================
 router.use(authController.protect);
 router.use(authController.restrictTo('Admin', 'Collaborateur'));
+router.use(writeWindowMiddleware);
 
 // ======================================================
 // 📊 STATISTIQUES - Récupérer les stats des devis

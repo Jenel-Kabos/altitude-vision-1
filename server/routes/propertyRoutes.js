@@ -134,6 +134,9 @@ router.patch(
     propertyController.setRecommande
 );
 
+router.post('/:id/like',  authController.protect, propertyController.toggleLike);
+router.post('/:id/share', propertyController.incrementShare);
+
 
 // ============================================================
 // 4️⃣ ROUTES DYNAMIQUES PAR ID (EN DERNIER)

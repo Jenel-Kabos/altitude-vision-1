@@ -198,7 +198,7 @@ const MyPropertiesPage = () => {
               ))}
             </div>
             <div className="flex gap-2 mt-2">
-              <button onClick={() => handleEditClick(property)} className="bg-yellow-500 text-white px-3 py-1 rounded">Modifier</button>
+              <button onClick={() => handleEditClick(property)} className="bg-gold text-white px-3 py-1 rounded">Modifier</button>
               <button onClick={() => handleDelete(property._id)} className="bg-red-600 text-white px-3 py-1 rounded">Supprimer</button>
             </div>
           </div>

@@ -235,8 +235,11 @@ const getLatestProperties = (req, res, next) => {
  * @route GET /api/properties/:id
  */
 const getProperty = asyncHandler(async (req, res) => {
-  const property = await Property.findById(req.params.id)
-    .populate('owner', 'name email photo phone');
+  const property = await Property.findByIdAndUpdate(
+    req.params.id,
+    { $inc: { views: 1 } },
+    { new: true }
+  ).populate('owner', 'name email photo phone');
 
   if (!property) {
     res.status(404);
@@ -256,6 +259,42 @@ const getProperty = asyncHandler(async (req, res) => {
     status: 'success',
     data: { property },
   });
+});
+
+/**
+ * @description Liker / unliker un bien (toggle)
+ * @route POST /api/properties/:id/like
+ */
+const toggleLike = asyncHandler(async (req, res) => {
+  const property = await Property.findById(req.params.id);
+  if (!property) { res.status(404); throw new Error('Bien introuvable.'); }
+
+  const userId  = req.user._id;
+  const hasLiked = property.likes.some(id => id.toString() === userId.toString());
+  const update  = hasLiked
+    ? { $pull: { likes: userId } }
+    : { $addToSet: { likes: userId } };
+
+  const updated = await Property.findByIdAndUpdate(req.params.id, update, { new: true });
+  res.status(200).json({
+    status:  'success',
+    liked:   !hasLiked,
+    likes:   updated.likes.length,
+  });
+});
+
+/**
+ * @description Incrémenter le compteur de partages
+ * @route POST /api/properties/:id/share
+ */
+const incrementShare = asyncHandler(async (req, res) => {
+  const updated = await Property.findByIdAndUpdate(
+    req.params.id,
+    { $inc: { shares: 1 } },
+    { new: true }
+  );
+  if (!updated) { res.status(404); throw new Error('Bien introuvable.'); }
+  res.status(200).json({ status: 'success', shares: updated.shares });
 });
 
 /**
@@ -556,4 +595,6 @@ module.exports = {
   adminDeleteProperty,
   setRecommande,
   getRecommendedProperties,
+  toggleLike,
+  incrementShare,
 };

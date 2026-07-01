@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 
@@ -40,32 +40,29 @@ const getImageUrl = (imagePath) => {
 const PORTFOLIO_FALLBACK = 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop';
 
 const PortfolioCard = ({ item }) => {
-  const router = useRouter();
   const [imgError, setImgError] = useState(false);
   const imageUrl = imgError ? PORTFOLIO_FALLBACK : getImageUrl(item.images?.[0]);
 
-  // Formater la date du projet
   const formatDate = (date) => {
     if (!date) return null;
-    return new Date(date).toLocaleDateString('fr-FR', {
-      year: 'numeric',
-      month: 'long'
-    });
-  };
-
-  // Navigation vers la page de détails
-  const handleClick = () => {
-    router.push(`/altcom/portfolio/${item._id}`);
+    return new Date(date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
   };
 
   return (
-    <div className="relative group h-full"> {/* ✅ Ajout de relative et h-full */}
-      {/* ✅ Bouton Like en position absolue */}
+    <article className="relative group h-full">
+      {/* Lien étendu — couvre toute la carte pour clavier + lecteurs d'écran */}
+      <Link
+        href={`/altcom/portfolio/${item._id}`}
+        className="absolute inset-0 z-[1] rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold)] focus-visible:ring-offset-2"
+        aria-label={`Voir le projet : ${item.title}`}
+      />
+
+      {/* Bouton Like — au-dessus du lien étendu */}
       <div className="absolute top-4 left-4 z-10">
         <div className="bg-white/90 backdrop-blur-sm rounded-full p-1.5 shadow-lg hover:bg-white transition-all">
-          <LikeButton 
-            targetType="Portfolio" 
-            targetId={item._id} 
+          <LikeButton
+            targetType="Portfolio"
+            targetId={item._id}
             size="sm"
             showCount={false}
           />
@@ -73,11 +70,10 @@ const PortfolioCard = ({ item }) => {
       </div>
 
       <motion.div
-        onClick={handleClick}
         initial={{ scale: 1 }}
         whileHover={{ scale: 1.03 }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden cursor-pointer hover:shadow-xl hover:border-blue-200 hover:-translate-y-1 transition-all duration-300 h-full flex flex-col"
+        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+        className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:border-blue-200 hover:-translate-y-1 transition-all duration-300 h-full flex flex-col"
       >
       {/* Image */}
       <div className="relative h-56 overflow-hidden">
@@ -165,19 +161,19 @@ const PortfolioCard = ({ item }) => {
           </div>
         )}
 
-        {/* Lien externe si disponible */}
+        {/* Lien externe si disponible — z-10 pour passer au-dessus du stretched-link */}
         {item.link && (
-          <motion.button
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(item.link, '_blank', 'noopener,noreferrer');
-            }}
-            whileHover={{ x: 5 }}
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold text-sm mt-4"
+          <a
+            href={item.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="relative z-10 inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold text-sm mt-4 focus-visible:outline-none focus-visible:underline"
+            aria-label={`Visiter le site du projet ${item.title} (nouvel onglet)`}
           >
-            <ExternalLink className="w-4 h-4" />
+            <ExternalLink className="w-4 h-4" aria-hidden="true" />
             <span>Visiter le site</span>
-          </motion.button>
+          </a>
         )}
       </div>
 
@@ -189,8 +185,8 @@ const PortfolioCard = ({ item }) => {
           </p>
         </div>
       )}
-    </motion.div>
-    </div>
+      </motion.div>
+    </article>
   );
 };
 

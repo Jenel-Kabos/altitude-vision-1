@@ -1,4 +1,5 @@
 // server/utils/apiFeatures.js
+const logger = require('./logger');
 
 class APIFeatures {
     constructor(query, queryString) {

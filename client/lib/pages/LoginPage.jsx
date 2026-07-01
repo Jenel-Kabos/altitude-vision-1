@@ -48,11 +48,10 @@ const LoginPage = () => {
 
         // 🟢 Redirection APRES connexion réussie (action unique et sûre)
         const targetPath =
-          user.role === 'Admin'
-            ? '/dashboard'
-            : user.role === 'Propriétaire'
-            ? '/mes-biens'
-            : '/';
+          user.role === 'Admin'        ? '/dashboard'
+          : user.role === 'Collaborateur' ? '/dashboard'
+          : user.role === 'Proprietaire'  ? '/mes-biens'
+          : '/';
         router.replace(targetPath);
       } else {
         setError('Connexion réussie mais impossible de récupérer les informations utilisateur.');
@@ -151,7 +150,7 @@ const LoginPage = () => {
           {/* Bouton Google */}
           <button
             type="button"
-            onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+            onClick={() => signIn('google', { callbackUrl: '/auth/google-redirect' })}
             className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-lg py-3 px-4 hover:bg-gray-50 transition-colors font-medium text-gray-700 text-sm"
           >
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">

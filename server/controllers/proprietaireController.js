@@ -1,6 +1,25 @@
 const Proprietaire = require('../models/Proprietaire');
+const Document     = require('../models/Document');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+
+const saveIdentiteDocument = async ({ url, nom, type, personneId, personneNom, createdBy }) => {
+  try {
+    await Document.create({
+      type:      "Pièce d'identité",
+      status:    'Accepté',
+      refType:   'Proprietaire',
+      refId:     personneId,
+      refNom:    personneNom,
+      createdBy: createdBy || undefined,
+      content:   url,
+      notes:     `Pièce d'identité — ${personneNom} — ${nom || type || ''}`,
+      issueDate: new Date(),
+    });
+  } catch (e) {
+    console.error('⚠️ Document pièce identité non créé:', e.message);
+  }
+};
 
 // ── Upload helpers ─────────────────────────────────────────────
 
@@ -71,8 +90,9 @@ exports.getOne = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const data = { ...req.body };
+    let piece = null;
     if (req.file) {
-      const piece = await uploadPiece(req.file);
+      piece = await uploadPiece(req.file);
       data.pieceIdentite     = piece.url;
       data.pieceIdentiteType = piece.type;
       data.pieceIdentiteNom  = piece.nom;
@@ -80,6 +100,13 @@ exports.create = async (req, res) => {
     const biens = parseBiens(data.biensPropres);
     if (biens) data.biensPropres = biens;
     const p = await Proprietaire.create(data);
+    if (piece) {
+      await saveIdentiteDocument({
+        url: piece.url, nom: piece.nom, type: piece.type,
+        personneId: p._id, personneNom: `${p.prenom || ''} ${p.nom || ''}`.trim(),
+        createdBy: req.user?._id,
+      });
+    }
     res.status(201).json({ status: 'success', data: { proprietaire: p } });
     logAction({
       action: 'Propriétaire ajouté',
@@ -98,8 +125,9 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const data = { ...req.body };
+    let piece = null;
     if (req.file) {
-      const piece = await uploadPiece(req.file);
+      piece = await uploadPiece(req.file);
       data.pieceIdentite     = piece.url;
       data.pieceIdentiteType = piece.type;
       data.pieceIdentiteNom  = piece.nom;
@@ -110,6 +138,13 @@ exports.update = async (req, res) => {
       new: true, runValidators: true,
     });
     if (!p) return res.status(404).json({ status: 'error', message: 'Propriétaire introuvable' });
+    if (piece) {
+      await saveIdentiteDocument({
+        url: piece.url, nom: piece.nom, type: piece.type,
+        personneId: p._id, personneNom: `${p.prenom || ''} ${p.nom || ''}`.trim(),
+        createdBy: req.user?._id,
+      });
+    }
     res.json({ status: 'success', data: { proprietaire: p } });
     logAction({
       action: 'Propriétaire modifié',

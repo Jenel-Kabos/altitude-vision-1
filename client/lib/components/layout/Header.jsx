@@ -14,16 +14,17 @@ import { getTotalUnreadCount } from '../../services/unreadCountService';
 import UnreadMessagesBadge from '../messaging/UnreadMessagesBadge';
 
 const NAV_LINKS = [
-  { to: '/',            label: 'Accueil',     Icon: Home      },
-  { to: '/immobilier',     label: 'Altimmo',     Icon: Building  },
-  { to: '/evenementiel', label: 'Mila Events', Icon: null      },
-  { to: '/communication',      label: 'Altcom',      Icon: null      },
-  { to: '/actualites',  label: 'Actualités',  Icon: Newspaper },
-  { to: '/contact',     label: 'Contact',     Icon: Phone     },
+  { to: '/',                    label: 'Accueil',     Icon: Home      },
+  { to: '/immobilier',          label: 'Altimmo',     Icon: Building  },
+  { to: '/altimmo/application', label: 'App Altimmo', Icon: null      },
+  { to: '/evenementiel',        label: 'Mila Events', Icon: null      },
+  { to: '/communication',       label: 'Altcom',      Icon: null      },
+  { to: '/actualites',          label: 'Actualités',  Icon: Newspaper },
+  { to: '/contact',             label: 'Contact',     Icon: Phone     },
 ];
 
 const PROFILE_LINKS = [
-  { to: '/profile',  Icon: UserCircle,    label: 'Mon Profil',  color: '#2E7BB2' },
+  { to: '/profile',  Icon: UserCircle,    label: 'Mon Profil',  color: '#2E7BB5' },
   { to: '/favoris',  Icon: Heart,         label: 'Mes Favoris', color: '#C8960C' },
   { to: '/messages', Icon: MessageCircle, label: 'Messagerie',  color: '#C8960C' },
 ];

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from 'next-auth/react';
@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     UserPlus, User, Mail, Lock, Briefcase,
     AlertTriangle, Eye, EyeOff, Loader2, CheckCircle, FileText, Check,
+    ScrollText, ChevronDown, Shield,
 } from "lucide-react";
 import { contratHebergement } from "../data/contratHebergement";
 
@@ -65,6 +66,7 @@ const RegisterPage = () => {
     const [showConfirm, setShowConfirm] = useState(false);
     const [error,       setError]       = useState('');
     const [loading,     setLoading]     = useState(false);
+    const [contratLu,   setContratLu]   = useState(false);
     const [certifications, setCertifications] = useState({
         contratAccepte:       false,
         informationsVraies:   false,
@@ -86,8 +88,19 @@ const RegisterPage = () => {
     const set     = (k, v) => setForm(f => ({ ...f, [k]: v }));
     const toggleC = k => setCertifications(c => ({ ...c, [k]: !c[k] }));
 
+    const contractRef = useRef(null);
+
+    const handleContractScroll = useCallback(() => {
+        const el = contractRef.current;
+        if (!el) return;
+        const scrolled = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+        if (scrolled) setContratLu(true);
+    }, []);
+
     const isProprietaire = form.role === 'Proprietaire';
-    const toutAccepte    = isProprietaire ? Object.values(certifications).every(v => v === true) : true;
+    const toutAccepte    = isProprietaire
+        ? contratLu && Object.values(certifications).every(v => v === true)
+        : true;
 
     const handleSubmit = async e => {
         e.preventDefault();
@@ -199,7 +212,7 @@ const RegisterPage = () => {
 
                             {/* Nom */}
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">Nom complet</label>
+                                <label className="block text-[0.72rem] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Nom complet</label>
                                 <div className="relative">
                                     <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                     <input type="text" placeholder="Votre nom complet" value={form.name}
@@ -210,7 +223,7 @@ const RegisterPage = () => {
 
                             {/* Email */}
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">Adresse email</label>
+                                <label className="block text-[0.72rem] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Adresse email</label>
                                 <div className="relative">
                                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                     <input type="email" placeholder="exemple@email.com" value={form.email}
@@ -221,7 +234,7 @@ const RegisterPage = () => {
 
                             {/* Mot de passe */}
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">Mot de passe</label>
+                                <label className="block text-[0.72rem] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Mot de passe</label>
                                 <div className="relative">
                                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                     <input type={showPass ? 'text' : 'password'} placeholder="Minimum 8 caractères"
@@ -248,7 +261,7 @@ const RegisterPage = () => {
 
                             {/* Confirmation */}
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">Confirmer le mot de passe</label>
+                                <label className="block text-[0.72rem] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Confirmer le mot de passe</label>
                                 <div className="relative">
                                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                     <input type={showConfirm ? 'text' : 'password'}
@@ -275,7 +288,7 @@ const RegisterPage = () => {
 
                             {/* Rôle */}
                             <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">Je m'inscris en tant que</label>
+                                <label className="block text-[0.72rem] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Je m'inscris en tant que</label>
                                 <div className="relative">
                                     <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                     <select value={form.role} onChange={e => set('role', e.target.value)}
@@ -289,57 +302,150 @@ const RegisterPage = () => {
                                 </div>
                             </div>
 
-                            {/* ── Section Contrat (Proprietaire uniquement) ────── */}
+                            {/* ── Contrat de partenariat (Propriétaire uniquement) ── */}
                             <AnimatePresence>
                             {isProprietaire && (
                                 <motion.div
                                     initial={{ opacity:0, height:0 }}
                                     animate={{ opacity:1, height:'auto' }}
                                     exit={{ opacity:0, height:0 }}
-                                    transition={{ duration:0.3 }}
+                                    transition={{ duration:0.35 }}
                                     className="overflow-hidden">
-                                    <div className="rounded-2xl border border-gray-200 overflow-hidden">
+                                    <div className="rounded-2xl border overflow-hidden"
+                                        style={{ borderColor: BLUE + '30', boxShadow: `0 2px 12px ${BLUE}10` }}>
 
-                                        {/* Header */}
-                                        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-100"
-                                            style={{ background:`linear-gradient(135deg, ${BLUE_DARK}08, ${BLUE}06)` }}>
-                                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                                                style={{ background:`linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` }}>
-                                                <FileText className="w-3.5 h-3.5 text-white" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-gray-800 uppercase tracking-wider">Contrat et certifications</p>
-                                                <p className="text-xs text-gray-400">Obligatoire pour les Propriétaires</p>
+                                        {/* ── En-tête contrat ────────────────────────── */}
+                                        <div className="px-5 py-4"
+                                            style={{ background: `linear-gradient(135deg, ${BLUE_DARK}, ${BLUE})` }}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                                                    <ScrollText className="w-4.5 h-4.5 text-white" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-white font-bold text-sm tracking-wide">
+                                                        Contrat de Partenariat Propriétaire
+                                                    </p>
+                                                    <p className="text-white/70 text-xs mt-0.5">
+                                                        Altitude Vision — Altimmo · Version 1.0 · 2026
+                                                    </p>
+                                                </div>
+                                                <div className="ml-auto flex-shrink-0">
+                                                    {contratLu
+                                                        ? <span className="flex items-center gap-1 text-xs font-semibold text-green-300">
+                                                            <CheckCircle className="w-3.5 h-3.5" /> Lu
+                                                          </span>
+                                                        : <span className="flex items-center gap-1 text-xs text-white/60">
+                                                            <ChevronDown className="w-3.5 h-3.5 animate-bounce" /> Défiler
+                                                          </span>
+                                                    }
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* Contrat scrollable */}
-                                        <div className="overflow-y-auto bg-gray-50 p-4 text-xs text-gray-600 leading-relaxed whitespace-pre-wrap border-b border-gray-100"
-                                            style={{ maxHeight: '300px', fontFamily: 'monospace', fontSize: '0.7rem' }}>
-                                            {contratHebergement}
+                                        {/* ── Indicateur lecture ──────────────────────── */}
+                                        {!contratLu && (
+                                            <div className="px-5 py-2 flex items-center gap-2 text-xs font-medium"
+                                                style={{ background: '#FFF7ED', borderBottom: '1px solid #FED7AA', color: '#C2410C' }}>
+                                                <Shield className="w-3.5 h-3.5 flex-shrink-0" />
+                                                Faites défiler le contrat jusqu'en bas pour pouvoir cocher les cases
+                                            </div>
+                                        )}
+
+                                        {/* ── Corps du contrat scrollable ─────────────── */}
+                                        <div
+                                            ref={contractRef}
+                                            onScroll={handleContractScroll}
+                                            className="overflow-y-auto relative"
+                                            style={{
+                                                maxHeight: '340px',
+                                                background: '#FAFAFA',
+                                                borderBottom: '1px solid #E5E7EB',
+                                            }}>
+                                            <div className="p-5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                                                {/* Titre intégré */}
+                                                <div className="text-center mb-5 pb-4" style={{ borderBottom: '1px solid #E5E7EB' }}>
+                                                    <h3 className="font-bold text-gray-900 text-base mb-1">
+                                                        CONTRAT D'HÉBERGEMENT DE BIEN IMMOBILIER
+                                                    </h3>
+                                                    <p className="text-xs text-gray-500">Altitude Vision — Altimmo · Version 1.0 · 2026</p>
+                                                </div>
+                                                {/* Contenu article par article */}
+                                                {contratHebergement
+                                                    .split(/\n\n+/)
+                                                    .filter(Boolean)
+                                                    .map((block, i) => {
+                                                        const isTitle = /^(ENTRE LES SOUSSIGNÉS|IL A ÉTÉ CONVENU|ARTICLE \d+|CONTRAT)/i.test(block.trim());
+                                                        const isArticleHeader = /^ARTICLE \d+/i.test(block.trim());
+                                                        if (isArticleHeader) {
+                                                            const [header, ...rest] = block.split('\n');
+                                                            return (
+                                                                <div key={i} className="mb-4">
+                                                                    <p className="text-xs font-bold uppercase tracking-wider mb-1.5"
+                                                                        style={{ color: BLUE }}>
+                                                                        {header.trim()}
+                                                                    </p>
+                                                                    <p className="text-sm text-gray-700 leading-relaxed">
+                                                                        {rest.join('\n').trim()}
+                                                                    </p>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        if (isTitle) {
+                                                            return (
+                                                                <p key={i} className="text-xs font-bold text-gray-800 uppercase tracking-wide mb-3">
+                                                                    {block.trim()}
+                                                                </p>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <p key={i} className="text-sm text-gray-600 leading-relaxed mb-3 whitespace-pre-line">
+                                                                {block.trim()}
+                                                            </p>
+                                                        );
+                                                    })
+                                                }
+                                                {/* Fin du contrat */}
+                                                <div className="mt-5 pt-4 text-center" style={{ borderTop: '1px solid #E5E7EB' }}>
+                                                    <p className="text-xs text-gray-500 italic">
+                                                        Fait à Brazzaville — accepté électroniquement lors de l'inscription
+                                                    </p>
+                                                    <p className="text-xs font-semibold mt-1" style={{ color: BLUE }}>
+                                                        Altitude Vision — contact@altitudevision.agency
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
 
-                                        {/* Cases à cocher */}
-                                        <div className="p-4 space-y-3 bg-white">
-                                            {CERTIFICATIONS_LIST.map(({ key, label }) => (
-                                                <label key={key} className="flex items-start gap-3 cursor-pointer group">
-                                                    <div
-                                                        onClick={() => toggleC(key)}
-                                                        className="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all cursor-pointer"
-                                                        style={{
-                                                            borderColor:     certifications[key] ? BLUE : '#D1D5DB',
-                                                            backgroundColor: certifications[key] ? BLUE : 'transparent',
-                                                        }}>
-                                                        {certifications[key] && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                                                    </div>
-                                                    <span
-                                                        className="text-xs text-gray-600 leading-relaxed select-none"
-                                                        onClick={() => toggleC(key)}>
-                                                        {label} <span className="text-red-400">*</span>
-                                                    </span>
-                                                </label>
-                                            ))}
-                                            <p className="text-xs text-gray-400 pt-1">* Tous les champs sont obligatoires</p>
+                                        {/* ── Cases à cocher ─────────────────────────── */}
+                                        <div className="p-5 space-y-3 bg-white">
+                                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                                                Certifications requises
+                                            </p>
+                                            {CERTIFICATIONS_LIST.map(({ key, label }) => {
+                                                const disabled = !contratLu;
+                                                return (
+                                                    <label key={key}
+                                                        className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50'}`}
+                                                        style={{ border: '1px solid', borderColor: certifications[key] ? BLUE + '40' : '#E5E7EB' }}>
+                                                        <div
+                                                            onClick={() => !disabled && toggleC(key)}
+                                                            className="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all"
+                                                            style={{
+                                                                cursor:          disabled ? 'not-allowed' : 'pointer',
+                                                                borderColor:     certifications[key] ? BLUE : '#D1D5DB',
+                                                                backgroundColor: certifications[key] ? BLUE : 'transparent',
+                                                            }}>
+                                                            {certifications[key] && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                                        </div>
+                                                        <span
+                                                            className="text-sm text-gray-700 leading-relaxed select-none"
+                                                            onClick={() => !disabled && toggleC(key)}>
+                                                            {label} <span className="text-red-400">*</span>
+                                                        </span>
+                                                    </label>
+                                                );
+                                            })}
+                                            <p className="text-xs text-gray-500 pt-1">* Tous les champs sont obligatoires. Les cases se déverrouillent après lecture complète du contrat.</p>
                                         </div>
                                     </div>
                                 </motion.div>

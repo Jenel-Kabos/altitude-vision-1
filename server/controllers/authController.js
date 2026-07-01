@@ -5,6 +5,7 @@ const jwt       = require('jsonwebtoken');
 const { promisify } = require('util');
 const User                  = require('../models/User');
 const PendingRegistration   = require('../models/PendingRegistration');
+const Document              = require('../models/Document');
 const sendEmail = require('../utils/email');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 const logger = require('../utils/logger');
@@ -235,6 +236,22 @@ exports.verifyEmail = async (req, res) => {
                         format:        'pdf',
                     });
                     await User.findByIdAndUpdate(userId, { contratPdfUrl: uploadResult.secure_url });
+
+                    // ── Sauvegarde dans la collection Document ────────
+                    try {
+                        await Document.create({
+                            type:       'Contrat',
+                            status:     'Accepté',
+                            client:     userId,
+                            createdBy:  userId,
+                            issueDate:  acceptDate,
+                            notes:      `Contrat de partenariat propriétaire — Réf. ${ref} — signé le ${dateStr} à ${timeStr}`,
+                            content:    uploadResult.secure_url,
+                        });
+                        logger.info(`📄 [Auth] Contrat sauvegardé dans Documents pour ${userEmail}`);
+                    } catch (docErr) {
+                        logger.error('❌ [Auth] Erreur sauvegarde Document:', docErr.message);
+                    }
 
                     const attachment = {
                         filename:    `Contrat-Hebergement-${userName.replace(/\s+/g, '-')}.pdf`,

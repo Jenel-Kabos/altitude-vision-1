@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Calendar, MapPin, Users, ArrowRight, Video } from 'lucide-react';
 import LikeButton from './likes/LikeButton';
@@ -12,8 +12,6 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || '';
 const EVENT_FALLBACK = 'https://images.unsplash.com/photo-1540555700478-4be29ab4cb3d?q=80&w=600&h=400&fit=crop';
 
 const EventCard = ({ event, index = 0 }) => {
-    const router = useRouter();
-
     const displayEvent = {
         _id: event._id,
         title: event.name || event.title,
@@ -42,10 +40,8 @@ const EventCard = ({ event, index = 0 }) => {
           })
         : 'Date non définie';
 
-    const handleClick = () => router.push(`/evenementiel/event/${displayEvent._id}`);
-
     return (
-        <motion.div
+        <motion.article
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
@@ -66,15 +62,16 @@ const EventCard = ({ event, index = 0 }) => {
 
             {/* Badge vidéos */}
             {displayEvent.videos?.length > 0 && (
-                <div className="absolute top-4 right-4 z-10 bg-gradient-to-r from-red-600 to-pink-600 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
-                    <Video className="w-3.5 h-3.5" />
+                <div className="absolute top-4 right-4 z-10 bg-gradient-to-r from-red-600 to-pink-600 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg" aria-label={`${displayEvent.videos.length} vidéo(s)`}>
+                    <Video className="w-3.5 h-3.5" aria-hidden="true" />
                     {displayEvent.videos.length}
                 </div>
             )}
 
-            <div
-                onClick={handleClick}
-                className="bg-gradient-to-br from-white to-slate-50 rounded-3xl shadow-sm border border-gray-100 overflow-hidden cursor-pointer hover:shadow-xl hover:border-purple-200 transition-all duration-500 hover:-translate-y-1 h-full flex flex-col"
+            <Link
+                href={`/evenementiel/event/${displayEvent._id}`}
+                className="block bg-gradient-to-br from-white to-slate-50 rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:border-purple-200 transition-all duration-500 hover:-translate-y-1 h-full flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+                aria-label={`Voir l'événement : ${displayEvent.title}`}
             >
                 {/* Image */}
                 <div className="relative h-56 overflow-hidden">
@@ -141,8 +138,8 @@ const EventCard = ({ event, index = 0 }) => {
                         </span>
                     </div>
                 </div>
-            </div>
-        </motion.div>
+            </Link>
+        </motion.article>
     );
 };
 

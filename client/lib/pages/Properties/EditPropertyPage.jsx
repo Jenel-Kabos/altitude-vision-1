@@ -415,7 +415,7 @@ const EditPropertyPage = () => {
           <button 
             type="submit" 
             disabled={loading} 
-            className="w-full bg-secondary text-white font-bold py-3 px-6 rounded hover:bg-amber-600 transition duration-300 disabled:bg-gray-400"
+            className="w-full bg-gold text-dark font-bold py-3 px-6 rounded hover:bg-gold-light transition duration-300 disabled:bg-gray-400"
           >
             {loading ? 'Mise à jour...' : 'Enregistrer'}
           </button>

@@ -1,14 +1,38 @@
 const Locataire = require('../models/Locataire');
+const Document  = require('../models/Document');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 
 const uploadPiece = async (file) => {
   if (!file) return undefined;
   const result = await uploadToCloudinary(file.buffer, {
-    folder: 'altitude-vision/pieces-identite',
+    folder: 'altitude-vision/locataires/pieces-identite',
     resource_type: 'auto',
   });
-  return result.secure_url;
+  const ext = (file.originalname || '').split('.').pop().toLowerCase();
+  return {
+    url:  result.secure_url,
+    type: ext === 'pdf' ? 'pdf' : 'image',
+    nom:  file.originalname || '',
+  };
+};
+
+const saveIdentiteDocument = async ({ url, nom, personneId, personneNom, createdBy }) => {
+  try {
+    await Document.create({
+      type:      "Pièce d'identité",
+      status:    'Accepté',
+      refType:   'Locataire',
+      refId:     personneId,
+      refNom:    personneNom,
+      createdBy: createdBy || undefined,
+      content:   url,
+      notes:     `Pièce d'identité — ${personneNom} — ${nom || ''}`,
+      issueDate: new Date(),
+    });
+  } catch (e) {
+    console.error('⚠️ Document pièce identité non créé:', e.message);
+  }
 };
 
 exports.getAll = async (req, res) => {
@@ -33,8 +57,19 @@ exports.getOne = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const data = { ...req.body };
-    if (req.file) data.pieceIdentite = await uploadPiece(req.file);
+    let piece = null;
+    if (req.file) {
+      piece = await uploadPiece(req.file);
+      data.pieceIdentite = piece.url;
+    }
     const l = await Locataire.create(data);
+    if (piece) {
+      await saveIdentiteDocument({
+        url: piece.url, nom: piece.nom,
+        personneId: l._id, personneNom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
+        createdBy: req.user?._id,
+      });
+    }
     res.status(201).json({ status: 'success', data: { locataire: l } });
     logAction({
       action: 'Locataire ajouté',
@@ -53,9 +88,20 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const data = { ...req.body };
-    if (req.file) data.pieceIdentite = await uploadPiece(req.file);
+    let piece = null;
+    if (req.file) {
+      piece = await uploadPiece(req.file);
+      data.pieceIdentite = piece.url;
+    }
     const l = await Locataire.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true });
     if (!l) return res.status(404).json({ status: 'error', message: 'Locataire introuvable' });
+    if (piece) {
+      await saveIdentiteDocument({
+        url: piece.url, nom: piece.nom,
+        personneId: l._id, personneNom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
+        createdBy: req.user?._id,
+      });
+    }
     res.json({ status: 'success', data: { locataire: l } });
     logAction({
       action: 'Locataire modifié',

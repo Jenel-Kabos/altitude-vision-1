@@ -13,7 +13,7 @@ const documentSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ['Devis', 'Facture', 'Contrat', 'Etat des Lieux'],
+      enum: ['Devis', 'Facture', 'Contrat', 'Etat des Lieux', "Pièce d'identité"],
     },
     status: {
       type: String,
@@ -24,12 +24,21 @@ const documentSchema = new mongoose.Schema(
     client: {
       type: mongoose.Schema.ObjectId,
       ref: 'User',
-      required: true,
     },
     createdBy: {
       type: mongoose.Schema.ObjectId,
-      ref: 'User', // Collaborateur or Admin
-      required: true,
+      ref: 'User',
+    },
+    // Pour les pièces d'identité liées à un propriétaire ou locataire (hors User)
+    refType: {
+      type: String,
+      enum: ['Proprietaire', 'Locataire'],
+    },
+    refId: {
+      type: mongoose.Schema.ObjectId,
+    },
+    refNom: {
+      type: String,
     },
     relatedProperty: { // Link to a property for a rental contract, etc.
       type: mongoose.Schema.ObjectId,

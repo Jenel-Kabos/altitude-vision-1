@@ -21,16 +21,31 @@
   --red-dark:    #A01E1E;
   --green:       #16A34A;
 
-  /* ── Fonds ─ */
+  /* ── Fonds dark ─────────────────────────── */
   --dark:        #090B0E;
   --dark2:       #111318;
   --dark3:       #181C24;
 
-  /* ── Texte ── */
+  /* ── Fond clair (sections light) ─────────── */
+  --surface:     #F8F8F8;
+  --surface-card:#FFFFFF;
+  --surface-soft:#F3F4F6;
+
+  /* ── Texte dark ── */
   --text:        #F0EDE8;
   --muted:       rgba(240,237,232,0.52);
   --faint:       rgba(240,237,232,0.2);
   --border:      rgba(240,237,232,0.07);
+
+  /* ── Texte light ── */
+  --ink:         #111827;
+  --ink-mid:     #374151;
+  --ink-soft:    #6B7280;
+  --ink-faint:   #9CA3AF;
+  --border-light:rgba(0,0,0,0.08);
+
+  /* ── Rouge Mila Events ── */
+  --mila-red:    #D42B2B;
 
   /* ── Typographie ── */
   --font-display:       var(--font-cinzel), var(--font-cormorant), Georgia, serif;

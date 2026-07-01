@@ -219,20 +219,28 @@ const TH = ({ children }) => (
   <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide bg-gray-50">{children}</th>
 );
 
-const Actions = ({ onView, onEdit, onDelete, showEdit = true, showDelete = true }) => (
+const Actions = ({ onView, onEdit, onDelete, onAddBien, showEdit = true, showDelete = true }) => (
   <td className="px-4 py-3">
     <div className="flex items-center gap-1">
       {onView && (
         <button onClick={e => { e.stopPropagation(); onView(); }}
+          title="Voir le détail"
           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all"><Eye size={14}/></button>
       )}
       {showEdit && (
         <button onClick={e => { e.stopPropagation(); onEdit(); }}
+          title="Modifier"
           className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-all"><Pencil size={14}/></button>
       )}
       {showDelete && (
         <button onClick={e => { e.stopPropagation(); onDelete(); }}
+          title="Supprimer"
           className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
+      )}
+      {onAddBien && (
+        <button onClick={e => { e.stopPropagation(); onAddBien(); }}
+          title="Ajouter une propriété"
+          className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-500 transition-all"><Home size={14}/></button>
       )}
     </div>
   </td>
@@ -653,10 +661,17 @@ const initBienFromDB = (b) => ({
 
 const PIECE_ALLOWED_MIMES = ['image/jpeg','image/jpg','image/png','application/pdf'];
 
-const ProprietaireForm = ({ init = emptyProp, initBiens = [], onSave, onCancel, loading }) => {
+const ProprietaireForm = ({ init = emptyProp, initBiens = [], onSave, onCancel, loading, autoAddBien = false }) => {
   const [f, setF]         = useState(init);
-  const [biens, setBiens] = useState(initBiens.map(initBienFromDB));
-  const [expanded, setExpanded]     = useState(new Set(initBiens.length > 0 ? [0] : []));
+  const [biens, setBiens] = useState(() => {
+    const base = initBiens.map(initBienFromDB);
+    return autoAddBien ? [...base, { ...emptyBien }] : base;
+  });
+  const [expanded, setExpanded]     = useState(new Set(
+    autoAddBien
+      ? [initBiens.length]
+      : initBiens.length > 0 ? [0] : []
+  ));
   const [pieceError, setPieceError] = useState('');
 
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
@@ -1591,8 +1606,13 @@ const GestionLocativePage = () => {
   const [payForm,     setPayForm]     = useState({ montantRecu:'', datePaiement:'', modePaiement:'espèces', reference:'', notes:'' });
   const [payLoading,  setPayLoading]  = useState(false);
 
-  const [filterContrat, setFilterContrat] = useState('');
-  const [filterAnnee,   setFilterAnnee]   = useState(new Date().getFullYear());
+  const [filterContrat,       setFilterContrat]       = useState('');
+  const [filterAnnee,         setFilterAnnee]         = useState(new Date().getFullYear());
+  const [filterContratStatut, setFilterContratStatut] = useState('');
+  const [filterContratType,   setFilterContratType]   = useState('');
+  const [searchProp,          setSearchProp]          = useState('');
+  const [searchLoc,           setSearchLoc]           = useState('');
+  const [addBienForProp,      setAddBienForProp]      = useState(false);
 
   // ── Chargement ──────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -1834,6 +1854,7 @@ const GestionLocativePage = () => {
 
   const contratsActifs    = contrats.filter(c => c.statut==='actif').length;
   const contratsEnAttente = contrats.filter(c => c.statut==='en_attente').length;
+  const loyersMensuel     = contrats.filter(c => c.statut==='actif' && c.type==='location').reduce((s,c) => s+(c.montantLoyer||0), 0);
   const totalAttendu   = paiements.reduce((s,p) => s+(p.montantTotal||p.montant||0), 0);
   const totalEncaisse  = paiements.filter(p => p.statut==='payé').reduce((s,p) => s+(p.montantRecu||p.montant||0), 0);
   const totalImpaye    = paiements.filter(p => p.statut!=='payé').reduce((s,p) => s+(p.montantTotal||p.montant||0), 0);
@@ -1854,13 +1875,24 @@ const GestionLocativePage = () => {
               <p className="text-xs text-gray-400">Contrats · Propriétaires · Locataires · Paiements</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            {[['Actifs',contratsActifs,GREEN],['En attente',contratsEnAttente,GOLD],['Propriétaires',proprietaires.length,BLUE]].map(([l,v,c])=>(
+          <div className="flex items-center gap-4 flex-wrap">
+            {[
+              ['Contrats actifs', contratsActifs,            GREEN],
+              ['En attente',      contratsEnAttente,          GOLD],
+              ['Propriétaires',   proprietaires.length,       BLUE],
+              ['Locataires',      locataires.length,          '#7C3AED'],
+            ].map(([l,v,c])=>(
               <div key={l} className="text-center">
                 <p className="text-xl font-extrabold" style={{color:c}}>{v}</p>
                 <p className="text-xs text-gray-400">{l}</p>
               </div>
             ))}
+            {loyersMensuel > 0 && (
+              <div className="text-center border-l border-gray-100 pl-4">
+                <p className="text-sm font-extrabold" style={{color:GREEN}}>{Number(loyersMensuel).toLocaleString('fr-FR')}</p>
+                <p className="text-xs text-gray-400">FCFA/mois</p>
+              </div>
+            )}
             <button onClick={load} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-all"><RefreshCw size={16}/></button>
           </div>
         </div>
@@ -1891,19 +1923,38 @@ const GestionLocativePage = () => {
           {/* ─── CONTRATS ─── */}
           {tab === 'contrats' && (
             <div className="space-y-4">
-              {canAdd && (
-                <div className="flex justify-end">
-                  <Btn onClick={() => { setEditContrat(null); setContratModal(true); }}><Plus size={15}/> Nouveau Contrat</Btn>
+              <div className="flex flex-wrap gap-3 items-center justify-between">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Select value={filterContratType} onChange={e=>setFilterContratType(e.target.value)} style={{width:130}}>
+                    <option value="">Tous types</option>
+                    <option value="location">Location</option>
+                    <option value="vente">Vente</option>
+                  </Select>
+                  <Select value={filterContratStatut} onChange={e=>setFilterContratStatut(e.target.value)} style={{width:150}}>
+                    <option value="">Tous statuts</option>
+                    <option value="actif">Actif</option>
+                    <option value="en_attente">En attente</option>
+                    <option value="résilié">Résilié</option>
+                    <option value="expiré">Expiré</option>
+                  </Select>
                 </div>
-              )}
-              {contrats.length === 0
-                ? <p className="text-center text-gray-400 py-12 text-sm">Aucun contrat. Créez le premier.</p>
-                : (
+                {canAdd && (
+                  <Btn onClick={() => { setEditContrat(null); setContratModal(true); }}><Plus size={15}/> Nouveau Contrat</Btn>
+                )}
+              </div>
+              {(() => {
+                const filtered = contrats.filter(c =>
+                  (!filterContratType   || c.type   === filterContratType) &&
+                  (!filterContratStatut || c.statut === filterContratStatut)
+                );
+                return filtered.length === 0
+                  ? <p className="text-center text-gray-400 py-12 text-sm">{contrats.length === 0 ? 'Aucun contrat. Créez le premier.' : 'Aucun contrat correspond aux filtres.'}</p>
+                  : (
                   <div className="overflow-x-auto rounded-xl border border-gray-100">
                     <table className="w-full text-left">
-                      <thead><tr>{['Type','Bien / Adresse','Propriétaire','Locataire / Acheteur','Statut','Début',''].map(h=><TH key={h}>{h}</TH>)}</tr></thead>
+                      <thead><tr>{['Type','Bien / Adresse','Propriétaire','Locataire / Acheteur','Loyer/Prix','Statut','Début',''].map(h=><TH key={h}>{h}</TH>)}</tr></thead>
                       <tbody>
-                        {contrats.map(c => (
+                        {filtered.map(c => (
                           <TRow key={c._id}>
                             <TD><TypeBadge type={c.type}/></TD>
                             <TD bold>{c.bien?.title||c.adresseBien||'—'}</TD>
@@ -1911,6 +1962,13 @@ const GestionLocativePage = () => {
                             <TD>{c.type==='location'
                               ? (c.locataire?`${c.locataire.prenom} ${c.locataire.nom}`:'—')
                               : (c.acheteur?.nom?`${c.acheteur.prenom} ${c.acheteur.nom}`:'—')}</TD>
+                            <TD>
+                              {c.type==='location' && c.montantLoyer
+                                ? <span className="text-xs font-semibold" style={{color:BLUE}}>{Number(c.montantLoyer).toLocaleString('fr-FR')} FCFA</span>
+                                : c.type==='vente' && c.prixVente
+                                  ? <span className="text-xs font-semibold" style={{color:GREEN}}>{Number(c.prixVente).toLocaleString('fr-FR')} FCFA</span>
+                                  : <span className="text-gray-400">—</span>}
+                            </TD>
                             <TD><StatutBadge statut={c.statut}/></TD>
                             <TD>{c.dateEntree?new Date(c.dateEntree).toLocaleDateString('fr-FR'):c.dateSignatureCompromis?new Date(c.dateSignatureCompromis).toLocaleDateString('fr-FR'):'—'}</TD>
                             <Actions
@@ -1947,43 +2005,66 @@ const GestionLocativePage = () => {
                       </tbody>
                     </table>
                   </div>
-                )}
+                );
+              })()}
             </div>
           )}
 
           {/* ─── PROPRIÉTAIRES ─── */}
           {tab === 'proprietaires' && (
             <div className="space-y-4">
-              {canAdd && (
-                <div className="flex justify-end">
-                  <Btn onClick={() => { setEditProp(null); setPropModal(true); }}><Plus size={15}/> Nouveau Propriétaire</Btn>
-                </div>
-              )}
-              {proprietaires.length === 0
-                ? <p className="text-center text-gray-400 py-12 text-sm">Aucun propriétaire enregistré.</p>
-                : (
+              <div className="flex flex-wrap gap-3 items-center justify-between">
+                <Input
+                  value={searchProp}
+                  onChange={e => setSearchProp(e.target.value)}
+                  placeholder="Rechercher un propriétaire…"
+                  style={{maxWidth:280}}
+                />
+                {canAdd && (
+                  <Btn onClick={() => { setEditProp(null); setAddBienForProp(false); setPropModal(true); }}><Plus size={15}/> Nouveau Propriétaire</Btn>
+                )}
+              </div>
+              {(() => {
+                const q = searchProp.trim().toLowerCase();
+                const filtered = q
+                  ? proprietaires.filter(p =>
+                      `${p.prenom} ${p.nom}`.toLowerCase().includes(q) ||
+                      (p.telephone||'').includes(q) ||
+                      (p.email||'').toLowerCase().includes(q) ||
+                      (p.ville||'').toLowerCase().includes(q)
+                    )
+                  : proprietaires;
+                return filtered.length === 0
+                  ? <p className="text-center text-gray-400 py-12 text-sm">{proprietaires.length === 0 ? 'Aucun propriétaire enregistré.' : 'Aucun résultat.'}</p>
+                  : (
                   <div className="overflow-x-auto rounded-xl border border-gray-100">
                     <table className="w-full text-left">
                       <thead><tr>{['Nom complet','Téléphone','Email','Biens','Ville',''].map(h=><TH key={h}>{h}</TH>)}</tr></thead>
                       <tbody>
-                        {proprietaires.map(p => {
-                          const nbBiens = (p.biensPropres||[]).length + contrats.filter(c=>c.proprietaire?._id===p._id||c.proprietaire===p._id).length;
+                        {filtered.map(p => {
+                          const biensPropres = p.biensPropres||[];
+                          const dispBiens = biensPropres.filter(b => b.statut==='Disponible').length;
+                          const loueBiens = biensPropres.filter(b => b.statut==='Loué').length;
                           return (
                             <TRow key={p._id}>
                               <TD bold>{p.prenom} {p.nom}</TD>
                               <TD>{p.telephone}</TD>
                               <TD>{p.email||'—'}</TD>
                               <TD>
-                                <span className="font-bold" style={{color:BLUE}}>{(p.biensPropres||[]).length}</span>
-                                <span className="text-gray-400 text-xs ml-1">propre{(p.biensPropres||[]).length>1?'s':''}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold" style={{color:BLUE}}>{biensPropres.length}</span>
+                                  {loueBiens > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold" style={{color:BLUE,background:`${BLUE}12`}}>🏠 {loueBiens} loué{loueBiens>1?'s':''}</span>}
+                                  {dispBiens > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold" style={{color:GREEN,background:`${GREEN}12`}}>✓ {dispBiens} dispo</span>}
+                                </div>
                               </TD>
                               <TD>{p.ville||'—'}</TD>
                               <Actions
                                 showEdit={isAdmin}
                                 showDelete={isAdmin}
                                 onView={() => setViewProp(p)}
-                                onEdit={() => { setEditProp(p); setPropModal(true); }}
+                                onEdit={() => { setEditProp(p); setAddBienForProp(false); setPropModal(true); }}
                                 onDelete={() => setDeleteTarget({id:p._id, label:`${p.prenom} ${p.nom}`, type:'proprietaire'})}
+                                onAddBien={isAdmin ? () => { setEditProp(p); setAddBienForProp(true); setPropModal(true); } : undefined}
                               />
                             </TRow>
                           );
@@ -1991,26 +2072,43 @@ const GestionLocativePage = () => {
                       </tbody>
                     </table>
                   </div>
-                )}
+                );
+              })()}
             </div>
           )}
 
           {/* ─── LOCATAIRES ─── */}
           {tab === 'locataires' && (
             <div className="space-y-4">
-              {canAdd && (
-                <div className="flex justify-end">
+              <div className="flex flex-wrap gap-3 items-center justify-between">
+                <Input
+                  value={searchLoc}
+                  onChange={e => setSearchLoc(e.target.value)}
+                  placeholder="Rechercher un locataire…"
+                  style={{maxWidth:280}}
+                />
+                {canAdd && (
                   <Btn onClick={() => { setEditLoc(null); setLocModal(true); }}><Plus size={15}/> Nouveau Locataire</Btn>
-                </div>
-              )}
-              {locataires.length === 0
-                ? <p className="text-center text-gray-400 py-12 text-sm">Aucun locataire enregistré.</p>
-                : (
+                )}
+              </div>
+              {(() => {
+                const q = searchLoc.trim().toLowerCase();
+                const filtered = q
+                  ? locataires.filter(l =>
+                      `${l.prenom} ${l.nom}`.toLowerCase().includes(q) ||
+                      (l.telephone||'').includes(q) ||
+                      (l.email||'').toLowerCase().includes(q) ||
+                      (l.profession||'').toLowerCase().includes(q)
+                    )
+                  : locataires;
+                return filtered.length === 0
+                  ? <p className="text-center text-gray-400 py-12 text-sm">{locataires.length === 0 ? 'Aucun locataire enregistré.' : 'Aucun résultat.'}</p>
+                  : (
                   <div className="overflow-x-auto rounded-xl border border-gray-100">
                     <table className="w-full text-left">
                       <thead><tr>{['Nom complet','Téléphone','Email','Profession','Contrat actif',''].map(h=><TH key={h}>{h}</TH>)}</tr></thead>
                       <tbody>
-                        {locataires.map(l => {
+                        {filtered.map(l => {
                           const contrat = contrats.find(c=>(c.locataire?._id===l._id||c.locataire===l._id)&&c.statut==='actif');
                           return (
                             <TRow key={l._id}>
@@ -2033,7 +2131,8 @@ const GestionLocativePage = () => {
                       </tbody>
                     </table>
                   </div>
-                )}
+                );
+              })()}
             </div>
           )}
 
@@ -2180,7 +2279,9 @@ const GestionLocativePage = () => {
       )}
 
       {propModal && (
-        <Modal title={editProp?'Modifier le propriétaire':'Nouveau propriétaire'} onClose={() => {setPropModal(false);setEditProp(null);}} wide>
+        <Modal
+          title={addBienForProp ? `Ajouter une propriété — ${editProp?.prenom} ${editProp?.nom}` : editProp ? 'Modifier le propriétaire' : 'Nouveau propriétaire'}
+          onClose={() => {setPropModal(false);setEditProp(null);setAddBienForProp(false);}} wide>
           <ProprietaireForm
             init={editProp ? {
               nom:editProp.nom, prenom:editProp.prenom, email:editProp.email||'',
@@ -2192,8 +2293,9 @@ const GestionLocativePage = () => {
               _pieceIdentiteNom:  editProp.pieceIdentiteNom  || '',
             } : emptyProp}
             initBiens={editProp?.biensPropres||[]}
+            autoAddBien={addBienForProp}
             onSave={handleSaveProp}
-            onCancel={() => {setPropModal(false);setEditProp(null);}}
+            onCancel={() => {setPropModal(false);setEditProp(null);setAddBienForProp(false);}}
             loading={saving}
           />
         </Modal>

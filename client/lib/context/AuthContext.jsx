@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { useWriteWindow } from '../hooks/useWriteWindow';
 
 const DEFAULT_AUTH = {
     user: null,
@@ -17,6 +18,11 @@ const DEFAULT_AUTH = {
     canEdit:         false,
     canDelete:       false,
     canValidate:     false,
+    // Fenêtre d'écriture collaborateur (10 min)
+    registerWrite:   () => {},
+    canModify:       () => true,
+    timeLeft:        () => 0,
+    activeWrites:    {},
 };
 
 const AuthContext = createContext(undefined);
@@ -25,6 +31,9 @@ export const AuthProvider = ({ children }) => {
     const [user,          setUser]          = useState(null);
     const [loading,       setLoading]       = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
+
+    const isCollab = user?.role === 'Collaborateur';
+    const { registerWrite, canModify, timeLeft, activeWrites } = useWriteWindow(isCollab);
 
     // ── Initialisation depuis localStorage ───────────────────
     useEffect(() => {
@@ -143,7 +152,12 @@ export const AuthProvider = ({ children }) => {
         canEdit:         user?.role === 'Admin',
         canDelete:       user?.role === 'Admin',
         canValidate:     user?.role === 'Admin',
-    }), [user, loading, isInitialized, login, logout, updateUser]);
+        // Fenêtre d'écriture : 10 min après une création/modification
+        registerWrite,
+        canModify,
+        timeLeft,
+        activeWrites,
+    }), [user, loading, isInitialized, login, logout, updateUser, registerWrite, canModify, timeLeft, activeWrites]);
 
     return (
         <AuthContext.Provider value={value}>

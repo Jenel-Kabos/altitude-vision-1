@@ -6,7 +6,8 @@ import Link from "next/link";
 import {
   Home, Calendar, Briefcase, LogOut, BarChart3, Globe, Users,
   CheckCircle2, ShieldCheck, Mail, Menu, X, Star, Mountain, Building,
-  ClipboardList, BarChart2, Scale, Megaphone, MessageCircle,
+  ClipboardList, BarChart2, Scale, Megaphone, MessageCircle, FolderOpen,
+  Clock, PenLine,
 } from "lucide-react";
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -27,6 +28,7 @@ const NAV_SECTIONS = [
       { to: '/dashboard/gestion-locative',   end: false, Icon: Building, label: 'Gestion Locative', accent: BLUE, badge: 'contratsActifs' },
       { to: '/dashboard/events',      end: false, Icon: Calendar,     label: 'Mila Events',       accent: '#D42B2B' },
       { to: '/dashboard/altcom',      end: false, Icon: Briefcase,    label: 'Altcom',            accent: GOLD },
+      { to: '/dashboard/documents',   end: false, Icon: FolderOpen,   label: 'Documents',         accent: '#C8960C' },
     ],
   },
   {
@@ -62,10 +64,17 @@ const AdminDashboard = ({ children }) => {
   const router = useRouter();
   const pathname = usePathname();
   const isActive = (to, end = false) => end ? pathname === to : pathname.startsWith(to);
-  const { logout, user } = useAuth();
+  const { logout, user, isCollaborateur, activeWrites, timeLeft } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [contratsActifs, setContratsActifs] = useState(0);
   const [litiges,        setLitiges]        = useState(0);
+
+  const activeWriteCount = Object.keys(activeWrites).length;
+  // Plus petit temps restant parmi toutes les fenêtres actives
+  const minTimeLeft = activeWriteCount > 0
+    ? Math.min(...Object.keys(activeWrites).map(id => timeLeft(id)))
+    : 0;
+  const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
 
   useEffect(() => {
     api.get('/contrats?statut=actif')
@@ -140,6 +149,38 @@ const AdminDashboard = ({ children }) => {
                   style={{ fontFamily: "'DM Sans', sans-serif" }}>{user.name || 'Admin'}</p>
                 <p className="text-white/35 text-xs truncate"
                   style={{ fontFamily: "'DM Sans', sans-serif" }}>{user.role || 'Administrateur'}</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Fenêtre d'écriture collaborateur ─────────── */}
+          {isCollaborateur && (
+            <div className="mx-3 my-2 rounded-lg px-3 py-2.5"
+              style={{
+                background:   activeWriteCount > 0 ? 'rgba(200,150,12,0.12)' : 'rgba(255,255,255,0.04)',
+                border:       `1px solid ${activeWriteCount > 0 ? 'rgba(200,150,12,0.30)' : 'rgba(255,255,255,0.06)'}`,
+              }}>
+              <div className="flex items-center gap-2">
+                {activeWriteCount > 0
+                  ? <PenLine size={12} style={{ color: GOLD, flexShrink: 0 }} />
+                  : <Clock    size={12} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
+                }
+                <div className="min-w-0 flex-1">
+                  {activeWriteCount > 0 ? (
+                    <>
+                      <p style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'0.62rem', color: GOLD, fontWeight: 600, lineHeight: 1 }}>
+                        Fenêtre active — {fmtTime(minTimeLeft)}
+                      </p>
+                      <p style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'0.58rem', color:'rgba(255,255,255,0.35)', marginTop:'2px' }}>
+                        {activeWriteCount} ressource{activeWriteCount > 1 ? 's' : ''} modifiable{activeWriteCount > 1 ? 's' : ''}
+                      </p>
+                    </>
+                  ) : (
+                    <p style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'0.62rem', color:'rgba(255,255,255,0.30)', lineHeight: 1.3 }}>
+                      Mode lecture seule
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}

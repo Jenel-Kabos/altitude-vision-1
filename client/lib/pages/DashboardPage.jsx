@@ -28,7 +28,7 @@ const DashboardPage = () => {
                <h3 className="text-xl font-semibold mb-4">Actions rapides</h3>
                <Link 
                    to="/soumettre-propriete" 
-                   className="inline-block bg-secondary text-white font-bold py-3 px-6 rounded hover:bg-amber-600 transition duration-300"
+                   className="inline-block bg-gold text-dark font-bold py-3 px-6 rounded hover:bg-gold-light transition duration-300"
                >
                    + Proposer un nouveau bien
                </Link>

@@ -9,7 +9,7 @@ import {
     Search, Home, Building2, TrendingUp, Key,
     Handshake, MapPin, ChevronDown, Calculator,
     ShieldCheck, Clock, Award, CheckCircle,
-    Mail, X,
+    Mail, X, Monitor, Smartphone, Zap, Users,
 } from 'lucide-react';
 
 import HeroSliderAlt   from '../components/HeroSliderAlt';
@@ -83,7 +83,7 @@ const PAGE_CSS = `
 
   /* ══ EYEBROW ══ */
   .ai-eyebrow {
-    font-size: 0.64rem; font-weight: 700;
+    font-size: clamp(0.70rem, 1.4vw, 0.76rem); font-weight: 700;
     letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 12px;
     display: flex; align-items: center;
   }
@@ -92,7 +92,7 @@ const PAGE_CSS = `
   .ai-h2 {
     font-family: 'Cormorant Garamond', Georgia, serif;
     font-size: clamp(2rem, 5.5vw, 4.5rem);
-    font-weight: 300; line-height: 1.08; color: #111827;
+    font-weight: 400; line-height: 1.08; color: #111827;
   }
   .ai-h2--light { color: #fff; }
 
@@ -138,14 +138,14 @@ const PAGE_CSS = `
   }
   .ai-hero-link {
     display: inline-flex; align-items: center; gap: 5px;
-    color: rgba(255,255,255,0.55);
+    color: rgba(255,255,255,0.80);
     font-family: 'DM Sans', sans-serif;
-    font-size: 0.62rem; font-weight: 400;
+    font-size: 0.72rem; font-weight: 500;
     letter-spacing: 0.08em; text-transform: uppercase;
     text-decoration: none; transition: color 0.2s;
     white-space: nowrap;
   }
-  .ai-hero-link:hover { color: rgba(255,255,255,0.85); }
+  .ai-hero-link:hover { color: rgba(255,255,255,0.95); }
   /* Séparateur entre les 2 liens */
   .ai-hero-link-sep {
     width: 1px; height: 12px; background: rgba(255,255,255,0.15); flex-shrink: 0;
@@ -154,9 +154,9 @@ const PAGE_CSS = `
   /* ══ SEARCH PANEL ══ */
   /* .ai-search-panel : styles inline via portal fixed — voir composant SearchPanel */
   .ai-panel-label {
-    display: block; font-size: 0.56rem; font-weight: 600;
+    display: block; font-size: 0.72rem; font-weight: 600;
     letter-spacing: 0.15em; text-transform: uppercase;
-    color: rgba(255,255,255,0.35); margin-bottom: 5px;
+    color: rgba(255,255,255,0.72); margin-bottom: 5px;
   }
   .ai-panel-select {
     width: 100%; appearance: none;
@@ -200,7 +200,7 @@ const PAGE_CSS = `
     .ai-atout-item:last-child { border-right: none; }
   }
   .ai-atout-label {
-    color: rgba(255,255,255,0.65); font-size: 0.68rem; font-weight: 400;
+    color: rgba(255,255,255,0.85); font-size: 0.76rem; font-weight: 500;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
@@ -215,14 +215,14 @@ const PAGE_CSS = `
   .ai-about-h2 {
     font-family: 'Cormorant Garamond', Georgia, serif;
     font-size: clamp(2rem, 5.5vw, 4.5rem);
-    font-weight: 300; line-height: 1.08; color: #111827; margin-bottom: 18px;
+    font-weight: 400; line-height: 1.08; color: #111827; margin-bottom: 18px;
   }
   .ai-about-body {
-    font-size: clamp(0.90rem, 2vw, 1rem); color: #6B7280; line-height: 1.75; margin-bottom: 18px;
+    font-size: clamp(0.92rem, 2vw, 1.02rem); color: #4B5563; line-height: 1.78; margin-bottom: 18px; font-weight: 400;
   }
   .ai-about-check {
     display: flex; align-items: center; gap: 10px;
-    font-size: clamp(0.84rem, 2vw, 0.86rem); color: #374151;
+    font-size: clamp(0.86rem, 2vw, 0.90rem); color: #374151; font-weight: 400;
   }
 
   .ai-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -236,7 +236,7 @@ const PAGE_CSS = `
     font-size: clamp(2rem, 6vw, 4.5rem);
     font-weight: 300; line-height: 1; margin-bottom: 4px;
   }
-  .ai-stat-label { font-size: 0.68rem; color: #6B7280; font-weight: 400; letter-spacing: 0.08em; text-transform: uppercase; }
+  .ai-stat-label { font-size: 0.74rem; color: #4B5563; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
 
   /* ══ SERVICES ══ */
   .ai-services-section { padding: var(--py) 0; background: #F8F8F8; }
@@ -258,14 +258,14 @@ const PAGE_CSS = `
     .ai-service-accent { opacity: 1 !important; }
   }
   .ai-service-title {
-    font-size: clamp(0.98rem, 2.5vw, 1.05rem); font-weight: 500; color: #111827; margin-bottom: 7px;
+    font-size: clamp(1rem, 2.5vw, 1.08rem); font-weight: 600; color: #111827; margin-bottom: 7px;
   }
   .ai-service-desc {
-    font-size: clamp(0.83rem, 1.8vw, 0.85rem); color: #6B7280; line-height: 1.7; margin-bottom: 18px;
+    font-size: clamp(0.86rem, 1.8vw, 0.9rem); color: #4B5563; line-height: 1.7; margin-bottom: 18px; font-weight: 400;
   }
   .ai-service-cta {
     display: inline-flex; align-items: center; gap: 6px;
-    font-size: 0.72rem; font-weight: 500; transition: gap 0.2s;
+    font-size: 0.78rem; font-weight: 600; transition: gap 0.2s;
   }
 
   /* ══ BIENS ══ */
@@ -301,7 +301,7 @@ const PAGE_CSS = `
   /* ══ ESTIMATION ══ */
   .ai-estimation-section {
     padding: var(--py) 0; position: relative; overflow: hidden;
-    background: #F8F8F8;
+    background: linear-gradient(135deg, #0A0C0F 0%, #101828 60%, #0F1E35 100%);
   }
   .ai-estimation-grid {
     display: grid; grid-template-columns: 1fr;
@@ -311,14 +311,14 @@ const PAGE_CSS = `
   .ai-estimation-h2 {
     font-family: 'Cormorant Garamond', Georgia, serif;
     font-size: clamp(1.85rem, 4.5vw, 4.5rem);
-    font-weight: 700; line-height: 1.1; color: #111827; margin-bottom: 14px;
+    font-weight: 700; line-height: 1.1; color: rgba(255,255,255,0.95); margin-bottom: 14px;
   }
   .ai-estimation-body {
-    font-size: clamp(0.84rem, 1.8vw, 0.86rem); color: #6B7280; line-height: 1.75; margin-bottom: 22px;
+    font-size: clamp(0.84rem, 1.8vw, 0.86rem); color: rgba(255,255,255,0.58); line-height: 1.75; margin-bottom: 22px;
   }
   .ai-estimation-check {
     display: flex; align-items: center; gap: 9px;
-    font-size: clamp(0.82rem, 1.8vw, 0.83rem); color: #374151;
+    font-size: clamp(0.82rem, 1.8vw, 0.83rem); color: rgba(255,255,255,0.72);
   }
 
   /* ══ AVIS ══ */
@@ -347,6 +347,28 @@ const PAGE_CSS = `
   }
   @media (min-width: 560px) { .ai-reviews-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (min-width: 1024px) { .ai-reviews-grid { grid-template-columns: repeat(3, 1fr); } }
+
+  /* ══ APPLICATION PROMO ══ */
+  .ai-app-section {
+    padding: var(--py) 0;
+    background: linear-gradient(135deg, #0A0C0F 0%, #101828 60%, #0F1E35 100%);
+    position: relative; overflow: hidden;
+  }
+  .ai-app-features-grid {
+    display: grid; grid-template-columns: 1fr; gap: 14px;
+  }
+  @media (min-width: 560px) { .ai-app-features-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1024px) { .ai-app-features-grid { grid-template-columns: repeat(4, 1fr); } }
+  .ai-app-feature-card {
+    padding: clamp(20px, 3.5vw, 28px); border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: border-color 0.3s, background 0.3s;
+  }
+  .ai-app-feature-card:hover {
+    border-color: rgba(200,150,12,0.2);
+    background: rgba(255,255,255,0.06);
+  }
 
   /* ══ BTN ══ */
   .ai-btn-primary {
@@ -422,12 +444,12 @@ const SearchPanel = ({ onClose, onSearch, anchorRef, panelRef }) => {
                 zIndex: 9999,
             }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px' }}>
-                <span style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'0.64rem', fontWeight:600, letterSpacing:'0.14em', textTransform:'uppercase', color:'rgba(255,255,255,0.4)' }}>
+                <span style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'0.76rem', fontWeight:600, letterSpacing:'0.14em', textTransform:'uppercase', color:'rgba(255,255,255,0.82)' }}>
                     Rechercher un bien
                 </span>
                 <button onClick={onClose} aria-label="Fermer la recherche" style={{
                     padding:'5px', borderRadius:'6px', background:'rgba(255,255,255,0.05)',
-                    border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.35)', cursor:'pointer',
+                    border:'1px solid rgba(255,255,255,0.12)', color:'rgba(255,255,255,0.65)', cursor:'pointer',
                     display:'flex', alignItems:'center',
                 }}>
                     <X size={13} aria-hidden="true" />
@@ -678,6 +700,61 @@ const AltimmoPage = () => {
                 </div>
             </section>
 
+            {/* ══ APPLICATION ALTIMMO ═════════════════════════════════ */}
+            <section className="ai-app-section">
+                {/* Blobs décoratifs */}
+                <div style={{ position:'absolute', inset:0, pointerEvents:'none', overflow:'hidden' }}>
+                    <div style={{ position:'absolute', top:'-80px', right:'-80px', width:'340px', height:'340px', borderRadius:'50%', background:BLUE, opacity:0.07, filter:'blur(90px)' }} />
+                    <div style={{ position:'absolute', bottom:'-60px', left:'-60px', width:'280px', height:'280px', borderRadius:'50%', background:GOLD, opacity:0.06, filter:'blur(80px)' }} />
+                </div>
+                <div style={{ position:'absolute', top:0, left:0, right:0, height:'1px', background:`linear-gradient(to right,transparent,${BLUE}50,${GOLD}40,transparent)` }} />
+
+                <div className="ai-container" style={{ position:'relative', zIndex:10 }}>
+                    {/* En-tête */}
+                    <FadeIn>
+                        <div style={{ textAlign:'center', marginBottom:'clamp(32px,5.5vw,48px)' }}>
+                            <p className="ai-eyebrow" style={{ color:`rgba(200,150,12,0.7)`, justifyContent:'center' }}>Plateforme numérique</p>
+                            <h2 className="ai-h2 ai-h2--light" style={{ marginBottom:'14px' }}>
+                                L'Immobilier Brazzavillois<br />à Portée de Clic
+                            </h2>
+                            <p style={{ fontSize:'clamp(0.88rem,2vw,1rem)', color:'rgba(255,255,255,0.48)', maxWidth:'520px', margin:'0 auto', lineHeight:1.75 }}>
+                                Altimmo simplifie chaque étape de votre projet&nbsp;— recherche, comparaison, contact et suivi &mdash; depuis n'importe quel appareil.
+                            </p>
+                        </div>
+                    </FadeIn>
+
+                    {/* 4 cartes feature */}
+                    <div className="ai-app-features-grid">
+                        {[
+                            { Icon: Monitor,    title: 'Annonces vérifiées',    desc: 'Chaque bien est contrôlé par notre équipe avant publication.',                    color: BLUE },
+                            { Icon: Smartphone, title: 'Accessible partout',     desc: 'Consultez et gérez vos recherches depuis mobile, tablette ou desktop.',           color: GOLD },
+                            { Icon: Zap,        title: 'Réponse immédiate',      desc: 'Contactez directement un agent et obtenez une réponse sous 24h.',                 color: BLUE },
+                            { Icon: Users,      title: 'Réseau de confiance',    desc: 'Propriétaires et acquéreurs vérifiés pour des transactions entièrement sécurisées.', color: GOLD },
+                        ].map(({ Icon, title, desc, color }, i) => (
+                            <FadeIn key={i} delay={i * 0.08} y={20}>
+                                <div className="ai-app-feature-card">
+                                    <div style={{ width:'42px', height:'42px', borderRadius:'10px', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'14px', background:`${color}14`, border:`1px solid ${color}22` }}>
+                                        <Icon size={18} style={{ color }} />
+                                    </div>
+                                    <h3 style={{ fontSize:'clamp(0.92rem,2vw,1rem)', fontWeight:600, color:'#F0EDE8', marginBottom:'7px' }}>{title}</h3>
+                                    <p style={{ fontSize:'clamp(0.82rem,1.7vw,0.87rem)', color:'rgba(255,255,255,0.42)', lineHeight:1.72, fontWeight:400 }}>{desc}</p>
+                                </div>
+                            </FadeIn>
+                        ))}
+                    </div>
+
+                    {/* CTA */}
+                    <FadeIn delay={0.3}>
+                        <div style={{ textAlign:'center', marginTop:'clamp(32px,5vw,48px)' }}>
+                            <Link href="/altimmo/application" className="ai-btn-primary"
+                                style={{ background:`linear-gradient(135deg,${GOLD},#E5A84B)`, boxShadow:`0 4px 20px ${GOLD}40`, color:'#0A0C0F', fontWeight:700 }}>
+                                Découvrir l'application <ArrowRight size={14} />
+                            </Link>
+                        </div>
+                    </FadeIn>
+                </div>
+            </section>
+
             {/* ══ BIENS RÉCENTS ═══════════════════════════════════════ */}
             <section className="ai-properties-section">
                 <div className="ai-container">
@@ -735,7 +812,7 @@ const AltimmoPage = () => {
                             <div style={{ height:'2px', width:'36px', borderRadius:'2px', marginBottom:'16px', background:`linear-gradient(to right,${GOLD},${BLUE})` }} />
                             <p className="ai-estimation-body">
                                 Remplissez le formulaire. Notre équipe vous contacte sous{' '}
-                                <strong style={{ color:'rgba(255,255,255,0.82)' }}>24h</strong> avec une estimation personnalisée et sans engagement.
+                                <strong style={{ color:'#fff', fontWeight:600 }}>24h</strong> avec une estimation personnalisée et sans engagement.
                             </p>
                             <ul style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
                                 {[

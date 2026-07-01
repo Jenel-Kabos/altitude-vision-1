@@ -89,6 +89,7 @@ describe('protect', () => {
   it('appelle next() sans erreur et injecte req.user pour un token valide', async () => {
     const fakeUser = { _id: 'user123', tokenVersion: 0, status: 'Actif', isActive: true };
     User.findById.mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser) });
+    User.findByIdAndUpdate.mockResolvedValue(null); // lastActivityAt — non-blocking
     const req  = makeReq(makeToken());
     const res  = makeRes();
     const next = await runMiddleware(protect, req, res);

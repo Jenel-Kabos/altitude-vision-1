@@ -73,7 +73,7 @@ const InfoCard = ({ icon: Icon, label, value, href, color, delay }) => (
     </div>
     <div className="min-w-0 flex-1">
       <p className="text-xs font-semibold uppercase tracking-widest mb-0.5"
-        style={{ color: `${color}80`, fontFamily: "var(--font-dm-sans), sans-serif" }}>{label}</p>
+        style={{ color: `${color}CC`, fontFamily: "var(--font-dm-sans), sans-serif" }}>{label}</p>
       <p className="text-sm font-medium text-white truncate"
         style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}>{value}</p>
     </div>
@@ -178,7 +178,7 @@ const ContactPage = () => {
 
           <motion.p
             initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-            className="text-base text-gray-400 leading-relaxed max-w-xl mx-auto">
+            className="text-base text-gray-300 leading-relaxed max-w-xl mx-auto">
             Notre équipe est à votre écoute pour tout projet immobilier, événementiel ou de communication. Répondons ensemble à vos ambitions.
           </motion.p>
 
@@ -368,7 +368,7 @@ const ContactPage = () => {
               <span className="text-2xl">{icon}</span>
               <div>
                 <p className="text-sm font-bold" style={{ color, fontFamily: "var(--font-dm-sans), sans-serif" }}>{pole}</p>
-                <p className="text-xs text-gray-500" style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}>{desc}</p>
+                <p className="text-xs text-gray-600" style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}>{desc}</p>
               </div>
             </div>
           ))}

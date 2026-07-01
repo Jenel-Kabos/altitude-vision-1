@@ -112,9 +112,9 @@ const HERO_CSS = `
   /* ── Titre hero ── */
   .av-hero-title {
     font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(2.6rem, 7vw, 8rem);
-    font-weight: 300; line-height: 1.0;
-    letter-spacing: -0.02em; color: #fff;
+    font-size: clamp(2.2rem, 6vw, 8rem);
+    font-weight: 600; line-height: 1.06;
+    letter-spacing: -0.02em; color: #F5F2EE;
     margin-bottom: 16px;
     max-width: 900px; white-space: pre-line;
   }
@@ -122,8 +122,8 @@ const HERO_CSS = `
   /* ── Sous-titre hero ── */
   .av-hero-subtitle {
     font-family: 'DM Sans', sans-serif;
-    font-size: clamp(0.95rem, 2.5vw, 1.5rem);
-    font-weight: 300; color: rgba(255,255,255,0.85);
+    font-size: clamp(0.85rem, 1.4vw, 1.2rem);
+    font-weight: 300; color: rgba(245,242,238,0.72);
     max-width: 600px; line-height: 1.75;
     margin-bottom: 32px;
   }
@@ -194,21 +194,6 @@ const HERO_CSS = `
   @media (min-width: 768px) {
     .av-arrow-left  { left: 20px; }
     .av-arrow-right { right: 20px; }
-  }
-
-  /* ── Compteur ── */
-  .av-counter {
-    position: absolute; top: 20px;
-    right: 16px;
-    z-index: 20;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.72rem;          /* ↑ mobile lisible */
-    letter-spacing: 0.18em;
-    color: rgba(255,255,255,0.3);
-    user-select: none; pointer-events: none;
-  }
-  @media (min-width: 768px) {
-    .av-counter { font-size: 0.62rem; right: 24px; }
   }
 
   /* ── Indicateurs verticaux ── */
@@ -318,8 +303,8 @@ const HeroSlider = () => {
   };
 
   const textV = {
-    hidden:  { opacity: 0, y: 36 },
-    visible: (delay) => ({ opacity: 1, y: 0, transition: { duration: 0.75, delay, ease: [0.25, 0.46, 0.45, 0.94] } }),
+    hidden:  { opacity: 0, y: 20, filter: 'blur(3px)' },
+    visible: (delay) => ({ opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.65, delay, ease: [0.22, 1, 0.36, 1] } }),
   };
 
   const current = slides[currentIndex];
@@ -429,40 +414,45 @@ const HeroSlider = () => {
         <ChevronRight size={20} aria-hidden="true" />
       </button>
 
-      {/* ── Compteur ── */}
-      <div className="av-counter" aria-hidden="true">
-        {String(currentIndex + 1).padStart(2,'0')} / {String(slides.length).padStart(2,'0')}
-      </div>
-
       {/* ── Indicateurs verticaux ── */}
       <div className="av-dots-col">
-        <div style={{ width:'1px', height:'48px', background:'rgba(255,255,255,0.1)', overflow:'hidden' }}>
-          <motion.div style={{ width:'100%', background:current.accent, height:`${progress}%` }} />
+        <div
+          style={{ width:'1px', height:'44px', background:'rgba(255,255,255,0.1)', overflow:'hidden' }}
+          role="progressbar"
+          aria-valuenow={Math.round(progress)}
+          aria-valuemin={0} aria-valuemax={100}
+          aria-label="Progression de la diapositive"
+        >
+          <div style={{ width:'100%', background:current.accent, height:`${progress}%` }} />
         </div>
-        <div style={{ display:'flex', flexDirection:'column', gap:'7px' }} role="tablist" aria-label="Diapositives">
-          {slides.map((_, i) => (
-            <button key={i} onClick={() => goTo(i)} aria-label={`Slide ${i+1}`}
+        <div style={{ display:'flex', flexDirection:'column', gap:'6px' }} role="tablist" aria-label="Sélectionner une diapositive">
+          {slides.map((sl, i) => (
+            <button key={i} onClick={() => goTo(i)}
+              aria-label={`Aller à : ${sl.pole}`}
               role="tab" aria-selected={i === currentIndex}
               style={{
-                border:'none', cursor:'pointer', padding:0, borderRadius:'50%',
-                transition:'0.3s',
-                width: i === currentIndex ? '7px' : '5px',
-                height: i === currentIndex ? '7px' : '5px',
-                background: i === currentIndex ? current.accent : 'rgba(255,255,255,0.25)',
-                boxShadow: i === currentIndex ? `0 0 8px ${current.accent}` : 'none',
-                minWidth:'20px', minHeight:'20px',
+                border:'none', cursor:'pointer', padding:0, background:'transparent',
+                width:'28px', height:'24px',
                 display:'flex', alignItems:'center', justifyContent:'center',
               }}>
               <span style={{
-                width: i === currentIndex ? '7px' : '5px',
-                height: i === currentIndex ? '7px' : '5px',
-                borderRadius:'50%',
-                background: i === currentIndex ? current.accent : 'rgba(255,255,255,0.25)',
                 display:'block',
+                width: i === currentIndex ? '16px' : '4px',
+                height:'4px', borderRadius:'2px',
+                background: i === currentIndex ? current.accent : 'rgba(255,255,255,0.22)',
+                boxShadow: i === currentIndex ? `0 0 5px ${current.accent}80` : 'none',
+                transition:'all 0.4s ease',
               }} />
             </button>
           ))}
         </div>
+        <p style={{
+          fontFamily:"'DM Sans', sans-serif", fontSize:'0.52rem',
+          letterSpacing:'0.16em', color:'rgba(255,255,255,0.22)',
+          userSelect:'none', writingMode:'vertical-rl',
+        }} aria-hidden="true">
+          {String(currentIndex + 1).padStart(2,'0')} / {String(slides.length).padStart(2,'0')}
+        </p>
       </div>
 
       {/* ── Bandeau pôles ── */}

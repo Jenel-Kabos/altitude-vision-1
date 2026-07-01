@@ -102,7 +102,7 @@ const UserManagementPage = () => {
                   {user.isActive ? (
                     <button
                       onClick={() => handleAction(user._id, 'suspend')}
-                      className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm"
+                      className="bg-gold text-white px-2 py-1 rounded hover:bg-yellow-600 text-sm"
                     >
                       Suspendre
                     </button>

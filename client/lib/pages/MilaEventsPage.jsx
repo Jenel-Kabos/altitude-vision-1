@@ -112,11 +112,11 @@ const EventCard = ({ event, index }) => {
                     {d.description}
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '14px' }}>
-                    <div className="flex items-center gap-2" style={{ color: '#6B7280', fontSize: '0.75rem', fontFamily: "'DM Sans', sans-serif" }}>
+                    <div className="flex items-center gap-2" style={{ color: '#4B5563', fontSize: '0.82rem', fontFamily: "'DM Sans', sans-serif" }}>
                         <Calendar className="w-3.5 h-3.5 flex-shrink-0" style={{ color: RED }} />
                         {formattedDate}
                     </div>
-                    <div className="flex items-center gap-2" style={{ color: '#6B7280', fontSize: '0.75rem', fontFamily: "'DM Sans', sans-serif" }}>
+                    <div className="flex items-center gap-2" style={{ color: '#4B5563', fontSize: '0.82rem', fontFamily: "'DM Sans', sans-serif" }}>
                         <MapPin className="w-3.5 h-3.5 flex-shrink-0" style={{ color: RED }} />
                         <span className="line-clamp-1">{d.location}</span>
                     </div>
@@ -189,9 +189,9 @@ const QuoteModal = ({ serviceTitle, onClose, onFormSubmit }) => {
         outline: 'none',
     };
     const labelStyle = {
-        display: 'block', fontSize: '0.6rem', fontWeight: 700,
+        display: 'block', fontSize: '0.72rem', fontWeight: 700,
         letterSpacing: '0.15em', textTransform: 'uppercase',
-        color: 'rgba(232,228,220,0.35)', fontFamily: "'DM Sans', sans-serif", marginBottom: '6px',
+        color: 'rgba(232,228,220,0.75)', fontFamily: "'DM Sans', sans-serif", marginBottom: '6px',
     };
 
     const handleSubmit = async e => {
@@ -233,7 +233,7 @@ const QuoteModal = ({ serviceTitle, onClose, onFormSubmit }) => {
                             <h3 className="font-bold text-lg" style={{ color: '#E8E4DC', fontFamily: "'DM Sans', sans-serif" }}>
                                 Demander un Devis
                             </h3>
-                            <p className="text-xs" style={{ color: 'rgba(232,228,220,0.4)', fontFamily: "'DM Sans', sans-serif" }}>
+                            <p className="text-xs" style={{ color: 'rgba(232,228,220,0.70)', fontFamily: "'DM Sans', sans-serif" }}>
                                 Réponse sous 24h — Sans engagement
                             </p>
                         </div>
@@ -310,7 +310,7 @@ const QuoteModal = ({ serviceTitle, onClose, onFormSubmit }) => {
                         <textarea value={formData.description} onChange={set('description')} required rows={4}
                             maxLength={1000} placeholder="Décrivez votre projet..."
                             style={{ ...inputStyle, resize: 'none' }} />
-                        <p style={{ textAlign: 'right', fontSize: '0.72rem', color: 'rgba(232,228,220,0.25)', marginTop: '4px', fontFamily: "'DM Sans', sans-serif" }}>
+                        <p style={{ textAlign: 'right', fontSize: '0.72rem', color: 'rgba(232,228,220,0.60)', marginTop: '4px', fontFamily: "'DM Sans', sans-serif" }}>
                             {formData.description.length}/1000
                         </p>
                     </div>
@@ -430,7 +430,7 @@ const MilaEventsPage = () => {
 
             {/* ══ HERO ═════════════════════════════════════════════════ */}
             <header className="relative text-white overflow-hidden"
-                style={{ height: 'calc(100vh - 0px)', minHeight: '640px', maxHeight: '860px' }}>
+                style={{ height: '100svh', minHeight: '620px', maxHeight: '860px' }}>
                 <HeroSliderMila />
                 <div className="absolute bottom-0 left-0 right-0 z-10">
                     <div className="h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.07), transparent)' }} />
@@ -439,7 +439,7 @@ const MilaEventsPage = () => {
                         {ATOUTS.map(({ icon: Icon, label }, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
                                 <Icon style={{ width: '14px', height: '14px', color: RED_SOFT, flexShrink: 0 }} />
-                                <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.72rem' }}>{label}</span>
+                                <span style={{ color: 'rgba(255,255,255,0.88)', fontSize: '0.76rem' }}>{label}</span>
                             </div>
                         ))}
                     </div>
@@ -474,7 +474,7 @@ const MilaEventsPage = () => {
                                     'Décoration & scénographie personnalisées',
                                     'Présence garantie le jour J',
                                 ].map((item, i) => (
-                                    <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', color: '#6B7280' }}>
+                                    <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', color: '#374151' }}>
                                         <CheckCircle style={{ width: '14px', height: '14px', color: RED, flexShrink: 0 }} />
                                         {item}
                                     </li>
@@ -503,7 +503,7 @@ const MilaEventsPage = () => {
                                     <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(2rem,6vw,4rem)', fontWeight: 300, color, lineHeight: 1, marginBottom: '6px' }}>
                                         {value}
                                     </p>
-                                    <p style={{ fontSize: '0.68rem', color: '#6B7280', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                    <p style={{ fontSize: '0.74rem', color: '#4B5563', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500 }}>
                                         {label}
                                     </p>
                                 </motion.div>

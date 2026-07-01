@@ -30,7 +30,7 @@ const quickLinks = [
   },
   {
     to: "/admin/devis",
-    bgColor: "bg-yellow-500",
+    bgColor: "bg-gold",
     hoverColor: "hover:bg-yellow-600",
     Icon: FaBullhorn,
     title: "Voir les Devis",

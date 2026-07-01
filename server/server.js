@@ -11,7 +11,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 const logger = require('./utils/logger');
 
-logger.info("🔍 MONGO_URI chargé:", process.env.MONGO_URI ? "✅ OK" : "❌ UNDEFINED");
+logger.success("🔍 MONGO_URI chargé:", process.env.MONGO_URI ? "✅ OK" : "❌ UNDEFINED");
 
 // --- Importations principales ---
 const express = require("express");

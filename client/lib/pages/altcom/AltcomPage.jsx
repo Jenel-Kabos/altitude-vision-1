@@ -201,7 +201,7 @@ const AltcomPage = () => {
 
             {/* ══ HERO ═════════════════════════════════════════════════ */}
             <header className="relative text-white overflow-hidden"
-                style={{ height: 'calc(100vh - 0px)', minHeight: '640px', maxHeight: '860px' }}>
+                style={{ height: '100svh', minHeight: '620px', maxHeight: '860px' }}>
                 <HeroSliderAltcom onStartProject={() => setShowProject(true)} />
                 <div className="absolute bottom-0 left-0 right-0" style={{ zIndex: 10 }}>
                     <div className="h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.07), transparent)' }} />
@@ -210,7 +210,7 @@ const AltcomPage = () => {
                         {ATOUTS.map(({ icon: Icon, label, color }, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
                                 <Icon style={{ width: '14px', height: '14px', color, flexShrink: 0 }} />
-                                <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.72rem' }}>{label}</span>
+                                <span style={{ color: 'rgba(255,255,255,0.88)', fontSize: '0.76rem' }}>{label}</span>
                             </div>
                         ))}
                     </div>
@@ -225,7 +225,7 @@ const AltcomPage = () => {
                     <div className="lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
                         <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }}
                             viewport={{ once: true }} transition={{ duration: 0.7 }} className="mb-12 lg:mb-0">
-                            <p style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '12px', fontFamily: "'DM Sans', sans-serif" }}>
+                            <p style={{ fontSize: '0.76rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '12px', fontFamily: "'DM Sans', sans-serif" }}>
                                 Notre approche
                             </p>
                             <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 300, lineHeight: 1.08, color: '#111827', marginBottom: '16px' }}>
@@ -273,7 +273,7 @@ const AltcomPage = () => {
                                     <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 'clamp(2rem,6vw,4rem)', fontWeight: 300, color, lineHeight: 1, marginBottom: '6px' }}>
                                         {value}
                                     </p>
-                                    <p style={{ fontSize: '0.68rem', color: '#9CA3AF', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                    <p style={{ fontSize: '0.74rem', color: '#4B5563', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500 }}>
                                         {label}
                                     </p>
                                 </motion.div>
@@ -291,13 +291,13 @@ const AltcomPage = () => {
                     <motion.div className="text-center mb-12"
                         initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }} transition={{ duration: 0.6 }}>
-                        <p style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '10px', fontFamily: "'DM Sans', sans-serif" }}>
+                        <p style={{ fontSize: '0.76rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '10px', fontFamily: "'DM Sans', sans-serif" }}>
                             Nos Expertises
                         </p>
                         <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 300, lineHeight: 1.08, color: '#111827', marginBottom: '8px' }}>
                             Nos Services
                         </h2>
-                        <p style={{ fontSize: '0.85rem', color: '#9CA3AF', maxWidth: '480px', margin: '0 auto' }}>
+                        <p style={{ fontSize: '0.85rem', color: '#6B7280', maxWidth: '480px', margin: '0 auto' }}>
                             Des solutions sur mesure pour amplifier votre message et engager votre audience
                         </p>
                     </motion.div>
@@ -314,7 +314,7 @@ const AltcomPage = () => {
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10">
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-                            <p style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '8px', fontFamily: "'DM Sans', sans-serif" }}>
+                            <p style={{ fontSize: '0.76rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '8px', fontFamily: "'DM Sans', sans-serif" }}>
                                 Portfolio
                             </p>
                             <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 4rem)', fontWeight: 300, lineHeight: 1.1, color: '#111827' }}>
@@ -360,8 +360,8 @@ const AltcomPage = () => {
                                 style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})` }}>
                                 <Briefcase className="w-7 h-7 text-white" />
                             </div>
-                            <p style={{ fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>Aucune réalisation disponible</p>
-                            <p style={{ fontSize: '0.85rem', color: '#9CA3AF' }}>Nos premiers projets arrivent bientôt</p>
+                            <p style={{ fontWeight: 600, color: '#374151', marginBottom: '4px' }}>Aucune réalisation disponible</p>
+                            <p style={{ fontSize: '0.85rem', color: '#6B7280' }}>Nos premiers projets arrivent bientôt</p>
                         </div>
                     )}
                 </div>
@@ -374,7 +374,7 @@ const AltcomPage = () => {
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10">
                         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-                            <p style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '8px', fontFamily: "'DM Sans', sans-serif" }}>
+                            <p style={{ fontSize: '0.76rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '8px', fontFamily: "'DM Sans', sans-serif" }}>
                                 Témoignages
                             </p>
                             <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(1.8rem, 3.5vw, 4rem)', fontWeight: 300, lineHeight: 1.1, color: '#111827' }}>
@@ -386,7 +386,7 @@ const AltcomPage = () => {
                             style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})`, boxShadow: `0 4px 16px ${GOLD}4D`, fontFamily: "'DM Sans', sans-serif", border: 'none', cursor: 'pointer' }}>
                             <MessageSquarePlus className="w-4 h-4" />
                             Laisser un avis
-                            {!user && <span style={{ opacity: 0.5, fontSize: '0.64rem', fontWeight: 400 }}>(connexion)</span>}
+                            {!user && <span style={{ opacity: 0.70, fontSize: '0.70rem', fontWeight: 400 }}>(connexion)</span>}
                         </motion.button>
                     </div>
 
@@ -422,8 +422,8 @@ const AltcomPage = () => {
                         <div className="text-center py-14 rounded-2xl"
                             style={{ border: `1px dashed ${GOLD}28`, background: `${GOLD}06` }}>
                             <Star className="w-8 h-8 mx-auto mb-3" style={{ color: '#D1D5DB' }} />
-                            <p style={{ fontWeight: 600, color: '#6B7280', marginBottom: '4px' }}>Aucun avis pour le moment</p>
-                            <p style={{ fontSize: '0.85rem', color: '#9CA3AF' }}>Soyez le premier à partager votre expérience !</p>
+                            <p style={{ fontWeight: 600, color: '#374151', marginBottom: '4px' }}>Aucun avis pour le moment</p>
+                            <p style={{ fontSize: '0.85rem', color: '#6B7280' }}>Soyez le premier à partager votre expérience !</p>
                         </div>
                     )}
                 </div>
@@ -439,7 +439,7 @@ const AltcomPage = () => {
                             style={{ background: `linear-gradient(135deg, ${GOLD_DARK}, ${GOLD})` }}>
                             <Zap className="w-7 h-7 text-white" />
                         </div>
-                        <p style={{ fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '14px', fontFamily: "'DM Sans', sans-serif" }}>
+                        <p style={{ fontSize: '0.76rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: GOLD, marginBottom: '14px', fontFamily: "'DM Sans', sans-serif" }}>
                             Propulsez votre marque
                         </p>
                         <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 'clamp(2rem, 4vw, 4.5rem)', fontWeight: 300, lineHeight: 1.08, color: '#111827', marginBottom: '16px' }}>

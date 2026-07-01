@@ -40,15 +40,11 @@ const FacebookFeed = () => {
   };
 
   return (
-    <section
-      className="py-16 sm:py-20 relative"
-      style={{ background: '#0D1117' }}
-    >
+    <section className="py-16 sm:py-20 relative bg-surface">
+
       {/* Ligne séparation */}
-      <div
-        className="absolute top-0 left-0 right-0 h-px"
-        style={{ background: 'linear-gradient(to right, transparent, rgba(46,123,181,0.2), transparent)' }}
-      />
+      <div className="absolute top-0 left-0 right-0 h-px"
+        style={{ background: 'linear-gradient(to right, transparent, rgba(46,123,181,0.15), transparent)' }} />
 
       <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
 
@@ -60,46 +56,29 @@ const FacebookFeed = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <p
-              className="text-xs font-bold uppercase tracking-widest mb-2"
-              style={{ color: '#C8960C', fontFamily: "'DM Sans', sans-serif" }}
-            >
+            <p className="text-xs font-bold uppercase tracking-widest mb-2 text-gold font-body">
               Actualités
             </p>
-            <h2
-              className="mb-3"
-              style={{
-                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                fontSize:   'clamp(1.8rem, 4vw, 3.5rem)',
-                fontWeight: 300,
-                lineHeight: 1.12,
-                color:      '#E8E4DC',
-              }}
-            >
+            <h2 className="font-display-alt font-light text-ink text-[clamp(1.8rem,4vw,3.5rem)] leading-tight mb-3">
               Nos Dernières Publications
             </h2>
-            <div
-              className="h-px w-20 mx-auto rounded-full"
-              style={{ background: 'linear-gradient(to right, transparent, #C8960C, transparent)' }}
-            />
+            <div className="h-px w-20 mx-auto rounded-full"
+              style={{ background: 'linear-gradient(to right, transparent, #C8960C, transparent)' }} />
           </motion.div>
         </div>
 
         {/* Loading */}
         {isLoading && (
           <div className="flex justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#C8960C' }} />
+            <Loader2 className="w-8 h-8 animate-spin text-gold" />
           </div>
         )}
 
         {/* Erreur */}
         {!isLoading && hasError && (
-          <div
-            className="text-center py-12 rounded-2xl border border-dashed"
-            style={{ borderColor: 'rgba(232,228,220,0.08)', background: 'rgba(232,228,220,0.02)' }}
-          >
-            <AlertCircle className="w-8 h-8 mx-auto mb-3" style={{ color: 'rgba(232,228,220,0.2)' }} />
-            <p className="text-sm" style={{ color: 'rgba(232,228,220,0.3)', fontFamily: "'DM Sans', sans-serif" }}>
+          <div className="text-center py-12 rounded-2xl border border-dashed border-gray-200 bg-white">
+            <AlertCircle className="w-8 h-8 mx-auto mb-3 text-gray-300" />
+            <p className="text-sm text-ink-soft font-body">
               Publications temporairement indisponibles
             </p>
           </div>
@@ -110,18 +89,13 @@ const FacebookFeed = () => {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
               {posts.slice(0, 6).map((post, index) => (
-                <motion.div
+                <motion.article
                   key={post._id}
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.4, delay: index * 0.08 }}
-                  className="group overflow-hidden rounded-2xl border transition-all duration-300 hover:-translate-y-1"
-                  style={{
-                    background:   'rgba(17,20,24,0.8)',
-                    borderColor:  'rgba(232,228,220,0.06)',
-                    boxShadow:    '0 1px 4px rgba(0,0,0,0.4)',
-                  }}
+                  className="group overflow-hidden rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-gray-200"
                 >
                   {/* Image */}
                   {post.image && (
@@ -133,10 +107,7 @@ const FacebookFeed = () => {
                         sizes="(max-width: 768px) 100vw, 33vw"
                         className="object-cover group-hover:scale-105 transition-transform duration-500"
                       />
-                      <div
-                        className="absolute inset-0"
-                        style={{ background: 'linear-gradient(to top, rgba(10,12,15,0.5) 0%, transparent 60%)' }}
-                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                     </div>
                   )}
 
@@ -144,27 +115,18 @@ const FacebookFeed = () => {
                   <div className="p-5">
                     <div className="flex items-center gap-2 mb-3">
                       {/* Badge Facebook */}
-                      <div className="w-6 h-6 rounded-full bg-[#1877F2] flex items-center justify-center flex-shrink-0">
+                      <div className="w-6 h-6 rounded-full bg-[#1877F2] flex items-center justify-center flex-shrink-0" aria-hidden="true">
                         <span className="text-white text-xs font-bold">f</span>
                       </div>
-                      <span
-                        className="text-xs font-medium truncate"
-                        style={{ color: 'rgba(232,228,220,0.5)', fontFamily: "'DM Sans', sans-serif" }}
-                      >
+                      <span className="text-xs font-medium truncate text-ink-soft font-body">
                         {post.page_name}
                       </span>
-                      <span
-                        className="text-xs ml-auto whitespace-nowrap"
-                        style={{ color: 'rgba(232,228,220,0.28)', fontFamily: "'DM Sans', sans-serif" }}
-                      >
+                      <span className="text-xs ml-auto whitespace-nowrap text-ink-faint font-body">
                         {formatDate(post.date_publication)}
                       </span>
                     </div>
 
-                    <p
-                      className="text-sm leading-relaxed mb-4"
-                      style={{ color: 'rgba(232,228,220,0.65)', fontFamily: "'DM Sans', sans-serif" }}
-                    >
+                    <p className="text-sm leading-relaxed mb-4 text-ink-mid font-body">
                       {truncate(post.message)}
                     </p>
 
@@ -173,15 +135,15 @@ const FacebookFeed = () => {
                         href={post.permalink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs font-medium transition-colors"
-                        style={{ color: '#C8960C', fontFamily: "'DM Sans', sans-serif" }}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-gold hover:text-gold-dark transition-colors font-body"
+                        aria-label={`Voir la publication de ${post.page_name} sur Facebook`}
                       >
                         Voir sur Facebook
-                        <ExternalLink className="w-3 h-3" />
+                        <ExternalLink className="w-3 h-3" aria-hidden="true" />
                       </a>
                     )}
                   </div>
-                </motion.div>
+                </motion.article>
               ))}
             </div>
 
@@ -195,17 +157,11 @@ const FacebookFeed = () => {
             >
               <Link
                 href="/actualites"
-                className="inline-flex items-center gap-2 font-semibold px-8 py-3.5 rounded-full transition-all duration-300 hover:-translate-y-0.5"
-                style={{
-                  background:  'linear-gradient(135deg, #C8960C, #E5A84B)',
-                  color:       '#0A0C0F',
-                  boxShadow:   '0 4px 20px rgba(200,135,42,0.3)',
-                  fontFamily:  "'DM Sans', sans-serif",
-                  fontSize:    '0.85rem',
-                }}
+                className="inline-flex items-center gap-2 font-semibold px-8 py-3.5 rounded-full bg-gold hover:bg-gold-light text-dark transition-all duration-300 hover:-translate-y-0.5 font-body text-sm"
+                style={{ boxShadow: '0 4px 20px rgba(200,150,12,0.22)' }}
               >
                 Voir toutes les actualités
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4" aria-hidden="true" />
               </Link>
             </motion.div>
           </>
@@ -213,21 +169,12 @@ const FacebookFeed = () => {
 
         {/* Aucun post */}
         {!isLoading && !hasError && posts.length === 0 && (
-          <div
-            className="text-center py-16 rounded-2xl border border-dashed"
-            style={{ borderColor: 'rgba(200,135,42,0.14)', background: 'rgba(200,135,42,0.03)' }}
-          >
-            <Newspaper className="w-10 h-10 mx-auto mb-3" style={{ color: 'rgba(232,228,220,0.2)' }} />
-            <p
-              className="font-medium mb-1"
-              style={{ color: 'rgba(232,228,220,0.5)', fontFamily: "'DM Sans', sans-serif" }}
-            >
+          <div className="text-center py-16 rounded-2xl border border-dashed border-gold/20 bg-gold-subtle">
+            <Newspaper className="w-10 h-10 mx-auto mb-3 text-gold/30" />
+            <p className="font-medium text-ink-soft mb-1 font-body">
               Aucune actualité disponible
             </p>
-            <p
-              className="text-sm"
-              style={{ color: 'rgba(232,228,220,0.25)', fontFamily: "'DM Sans', sans-serif" }}
-            >
+            <p className="text-sm text-ink-faint font-body">
               Les publications apparaîtront ici automatiquement
             </p>
           </div>

@@ -4,6 +4,8 @@ const eventController = require('../controllers/eventController');
 const authController = require('../controllers/authController');
 const { upload, uploadToCloudinary } = require('../config/cloudinary');
 
+const writeWindowMiddleware = require('../middleware/writeWindowMiddleware');
+
 const router = express.Router();
 
 // ======================================================
@@ -17,6 +19,7 @@ router.get('/:id', eventController.getEvent);
 // ======================================================
 router.use(authController.protect);
 router.use(authController.restrictTo('Admin', 'Collaborateur'));
+router.use(writeWindowMiddleware);
 
 // ======================================================
 // 📤 UPLOAD D'IMAGES

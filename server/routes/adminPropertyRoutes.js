@@ -6,7 +6,7 @@ const userController = require('../controllers/userController');
 const authMiddleware = require('../middleware/authMiddleware');
 
 /* =============================================================
-   🧩 ACCÈS RÉSERVÉ À L’ADMINISTRATEUR
+   🧩 ACCÈS RÉSERVÉ À L'ADMINISTRATEUR
 ============================================================= */
 router.use(authMiddleware.protect);
 router.use(authMiddleware.restrictTo('Admin')); 

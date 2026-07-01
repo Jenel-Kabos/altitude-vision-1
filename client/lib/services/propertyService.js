@@ -113,6 +113,16 @@ export const deleteProperty = async (propertyId) => {
  * @param {Boolean} recommande - Nouvelle valeur
  * @returns {Promise<Object>} - Propriété mise à jour
  */
+export const likeProperty = async (propertyId) => {
+  const response = await api.post(`/properties/${propertyId}/like`);
+  return response.data;
+};
+
+export const shareProperty = async (propertyId) => {
+  const response = await api.post(`/properties/${propertyId}/share`);
+  return response.data;
+};
+
 export const toggleRecommande = async (propertyId, recommande) => {
   try {
     const response = await api.patch(`/properties/${propertyId}/recommande`, { recommande });
