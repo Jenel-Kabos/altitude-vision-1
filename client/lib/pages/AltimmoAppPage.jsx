@@ -2,6 +2,7 @@
 import React, { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   Search, Shield, Smartphone, MessageSquare, BarChart3, MapPin,
   CheckCircle, ArrowRight, Home, Building2, TrendingUp, Star,
@@ -229,8 +230,15 @@ const PhoneMockup = () => (
     {/* Screen */}
     <div style={{ background:'#F8F8F8', borderRadius:20, overflow:'hidden', minHeight:280 }}>
       {/* Header */}
-      <div style={{ background:'#fff', padding:'8px 10px', borderBottom:'1px solid #F3F4F6', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:'0.80rem', fontWeight:600, color:INK }}>Altimmo</span>
+      <div style={{ background:'#fff', padding:'6px 10px', borderBottom:'1px solid #F3F4F6', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <Image
+          src="/images/Logo_Altitude1.png"
+          alt="Altitude Vision"
+          width={72}
+          height={22}
+          style={{ objectFit:'contain', objectPosition:'left center' }}
+          unoptimized
+        />
         <Bell size={12} style={{ color:GRAY }} />
       </div>
       {/* Search */}
