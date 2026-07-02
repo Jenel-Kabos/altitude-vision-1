@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd server && npm run dev
 
 # Frontend (port 3000, Next.js App Router)
-cd client && npm run dev:next
+cd client && npm run dev
 ```
 
 ### Linting & Formatting
