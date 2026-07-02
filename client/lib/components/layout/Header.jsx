@@ -7,20 +7,26 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu, X, LayoutDashboard, Building, LogOut,
   UserCircle, Heart, MessageCircle, UserPlus,
-  LogIn, ChevronDown, Home, Phone, Newspaper, ArrowUpRight,
+  LogIn, ChevronDown, Home, Phone, Newspaper, ArrowUpRight, Smartphone,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getTotalUnreadCount } from '../../services/unreadCountService';
 import UnreadMessagesBadge from '../messaging/UnreadMessagesBadge';
+import NotificationBell from '../notifications/NotificationBell';
 
 const NAV_LINKS = [
-  { to: '/',                    label: 'Accueil',     Icon: Home      },
-  { to: '/immobilier',          label: 'Altimmo',     Icon: Building  },
-  { to: '/altimmo/application', label: 'App Altimmo', Icon: null      },
-  { to: '/evenementiel',        label: 'Mila Events', Icon: null      },
-  { to: '/communication',       label: 'Altcom',      Icon: null      },
-  { to: '/actualites',          label: 'Actualités',  Icon: Newspaper },
-  { to: '/contact',             label: 'Contact',     Icon: Phone     },
+  { to: '/',              label: 'Accueil',     Icon: Home      },
+  {
+    to: '/immobilier',    label: 'Altimmo',     Icon: Building,
+    children: [
+      { to: '/immobilier',          label: 'Altimmo',     Icon: Building, desc: 'Annonces & biens' },
+      { to: '/altimmo/application', label: 'App Altimmo', Icon: null,     desc: "Télécharger l'app" },
+    ],
+  },
+  { to: '/evenementiel',  label: 'Mila Events', Icon: null      },
+  { to: '/communication', label: 'Altcom',      Icon: null      },
+  { to: '/actualites',    label: 'Actualités',  Icon: Newspaper },
+  { to: '/contact',       label: 'Contact',     Icon: Phone     },
 ];
 
 const PROFILE_LINKS = [
@@ -118,6 +124,123 @@ const NavItem = ({ to, label, pathname, size = 'xl' }) => {
         transform: active ? 'scaleX(1)' : 'scaleX(0)', transformOrigin: 'left', transition: 'transform 0.3s ease',
       }} />
     </Link>
+  );
+};
+
+const NavDropdown = ({ item, pathname, size = 'xl' }) => {
+  const [open, setOpen] = useState(false);
+  const ref             = useRef(null);
+  const isLg            = size === 'lg';
+  const active          = item.children.some(c => isNavLinkActive(pathname, c.to));
+
+  useEffect(() => {
+    const fn = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '5px',
+          background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
+          fontFamily: "'DM Sans', sans-serif",
+          fontSize: isLg ? '0.72rem' : '0.78rem',
+          fontWeight: active ? 500 : 400,
+          letterSpacing: '0.09em', textTransform: 'uppercase',
+          color: active ? '#F0EDE8' : 'rgba(240,237,232,0.48)',
+          transition: 'color 0.2s ease', position: 'relative',
+        }}
+        className="header-nav-link"
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        {item.label}
+        <ChevronDown size={11} style={{
+          flexShrink: 0,
+          transition: 'transform 0.22s ease',
+          transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+          opacity: active ? 0.7 : 0.45,
+        }} />
+        <span style={{
+          position: 'absolute', bottom: 0, left: 0,
+          width: 'calc(100% - 16px)', height: '1px',
+          background: `linear-gradient(90deg, ${GOLD}, transparent)`,
+          transform: active ? 'scaleX(1)' : 'scaleX(0)',
+          transformOrigin: 'left', transition: 'transform 0.3s ease',
+        }} />
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 14px)', left: '50%',
+          transform: 'translateX(-50%)', minWidth: '210px',
+          borderRadius: '8px', border: '1px solid rgba(200,150,12,0.14)',
+          background: 'rgba(9,11,14,0.98)',
+          backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(240,237,232,0.04)',
+          overflow: 'hidden', animation: 'hdr-fadeSlide 0.16s ease', zIndex: 100,
+        }}>
+          <div style={{ padding: '6px' }}>
+            {item.children.map((child, idx) => {
+              const childActive = isNavLinkActive(pathname, child.to);
+              const ChildIcon   = child.Icon;
+              return (
+                <Link
+                  key={child.to}
+                  href={child.to}
+                  onClick={() => setOpen(false)}
+                  className="nav-dropdown-item"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '10px 12px', borderRadius: '6px',
+                    background: childActive ? 'rgba(200,150,12,0.08)' : 'transparent',
+                    border: `1px solid ${childActive ? 'rgba(200,150,12,0.14)' : 'transparent'}`,
+                    textDecoration: 'none', transition: 'background 0.15s, border-color 0.15s',
+                    marginBottom: idx < item.children.length - 1 ? '3px' : 0,
+                  }}
+                >
+                  <div style={{
+                    width: 30, height: 30, borderRadius: '7px',
+                    background: childActive ? 'rgba(200,150,12,0.15)' : 'rgba(240,237,232,0.05)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, transition: 'background 0.15s',
+                  }}>
+                    {ChildIcon
+                      ? <ChildIcon size={14} style={{ color: childActive ? GOLD : 'rgba(240,237,232,0.3)' }} />
+                      : <Smartphone size={14} style={{ color: childActive ? GOLD : 'rgba(240,237,232,0.3)' }} />
+                    }
+                  </div>
+                  <div>
+                    <p style={{
+                      fontFamily: "'DM Sans', sans-serif", fontSize: '0.78rem',
+                      fontWeight: childActive ? 500 : 400,
+                      color: childActive ? '#F0EDE8' : 'rgba(240,237,232,0.6)',
+                      margin: 0, lineHeight: 1.2,
+                    }}>
+                      {child.label}
+                    </p>
+                    {child.desc && (
+                      <p style={{
+                        fontFamily: "'DM Sans', sans-serif", fontSize: '0.65rem',
+                        color: 'rgba(240,237,232,0.26)', margin: '2px 0 0', lineHeight: 1,
+                      }}>
+                        {child.desc}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -251,13 +374,21 @@ const Header = () => {
 
         {isDesktop && (
           <nav style={{ display: 'flex', alignItems: 'center', gap: isXL ? '36px' : '22px' }}>
-            {NAV_LINKS.map(({ to, label }) => <NavItem key={to} to={to} label={label} pathname={pathname} size={bp} />)}
+            {NAV_LINKS.map((link) =>
+              link.children
+                ? <NavDropdown key={link.to} item={link} pathname={pathname} size={bp} />
+                : <NavItem key={link.to} to={link.to} label={link.label} pathname={pathname} size={bp} />
+            )}
           </nav>
         )}
 
         {isTablet && (
           <nav style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            {NAV_LINKS.map(({ to, label }) => <NavItem key={to} to={to} label={label} pathname={pathname} size="md" />)}
+            {NAV_LINKS.map((link) =>
+              link.children
+                ? <NavDropdown key={link.to} item={link} pathname={pathname} size="md" />
+                : <NavItem key={link.to} to={link.to} label={link.label} pathname={pathname} size="md" />
+            )}
           </nav>
         )}
 
@@ -278,6 +409,9 @@ const Header = () => {
                 <MessageCircle size={isTablet ? 16 : 18} />
                 <UnreadMessagesBadge count={unreadCount} className="absolute -top-0.5 -right-0.5" />
               </Link>
+              <div style={{ color: 'rgba(240,237,232,0.55)' }}>
+                <NotificationBell isAuthenticated={!!user} />
+              </div>
               <div ref={profileRef}>
                 <ProfileDropdown user={user} isTablet={isTablet} profileOpen={profileOpen} setProfile={setProfile} handleLogout={handleLogout} isAdmin={isAdmin} isOwner={isOwner} />
               </div>
@@ -319,11 +453,68 @@ const Header = () => {
         <>
           <div onClick={() => setMobile(false)} style={{ position: 'fixed', inset: 0, zIndex: 38, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', animation: 'hdr-fadeIn 0.2s ease', top: headerHeight }} />
           <div style={{ position: 'fixed', top: headerHeight, left: 0, right: 0, zIndex: 39, background: 'rgba(9,11,14,0.99)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', borderBottom: '1px solid rgba(240,237,232,0.06)', padding: isMobile ? '16px 12px 24px' : '20px 24px 28px', animation: 'hdr-slideDown 0.25s cubic-bezier(0.16,1,0.3,1)', maxHeight: `calc(100vh - ${headerHeightPx}px)`, overflowY: 'auto' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: '6px', marginBottom: '16px' }}>
-              {NAV_LINKS.map(({ to, label, Icon }) => {
-                const active = isNavLinkActive(pathname, to);
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
+              {NAV_LINKS.map(({ to, label, Icon, children }) => {
+                const active = isNavLinkActive(pathname, to) ||
+                  (children?.some(c => isNavLinkActive(pathname, c.to)));
+
+                if (children) {
+                  return (
+                    <div key={to}>
+                      <p style={{
+                        fontFamily: "'DM Sans', sans-serif", fontSize: '0.68rem',
+                        fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase',
+                        color: 'rgba(240,237,232,0.28)', margin: '6px 0 4px 2px',
+                      }}>
+                        {label}
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {children.map(child => {
+                          const childActive = isNavLinkActive(pathname, child.to);
+                          const ChildIcon   = child.Icon;
+                          return (
+                            <Link
+                              key={child.to}
+                              href={child.to}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '10px',
+                                padding: '12px 14px', borderRadius: '6px',
+                                color: childActive ? '#F0EDE8' : 'rgba(240,237,232,0.48)',
+                                background: childActive ? 'rgba(200,150,12,0.08)' : 'rgba(240,237,232,0.02)',
+                                border: `1px solid ${childActive ? 'rgba(200,150,12,0.18)' : 'rgba(240,237,232,0.05)'}`,
+                                fontSize: '0.82rem', fontWeight: childActive ? 500 : 300,
+                                letterSpacing: '0.04em', textDecoration: 'none',
+                                minHeight: '44px', transition: '0.2s',
+                              }}
+                            >
+                              {ChildIcon
+                                ? <ChildIcon size={14} style={{ color: childActive ? GOLD : 'rgba(240,237,232,0.22)', flexShrink: 0 }} />
+                                : <Smartphone size={14} style={{ color: childActive ? GOLD : 'rgba(240,237,232,0.22)', flexShrink: 0 }} />
+                              }
+                              {child.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
-                  <Link key={to} href={to} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '13px 14px', borderRadius: '4px', color: active ? '#F0EDE8' : 'rgba(240,237,232,0.48)', background: active ? `rgba(200,150,12,0.08)` : 'rgba(240,237,232,0.02)', border: `1px solid ${active ? 'rgba(200,150,12,0.18)' : 'rgba(240,237,232,0.05)'}`, fontSize: '0.82rem', fontWeight: active ? 500 : 300, letterSpacing: '0.04em', textDecoration: 'none', minHeight: '44px', transition: '0.2s' }}>
+                  <Link
+                    key={to}
+                    href={to}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '9px',
+                      padding: '13px 14px', borderRadius: '4px',
+                      color: active ? '#F0EDE8' : 'rgba(240,237,232,0.48)',
+                      background: active ? 'rgba(200,150,12,0.08)' : 'rgba(240,237,232,0.02)',
+                      border: `1px solid ${active ? 'rgba(200,150,12,0.18)' : 'rgba(240,237,232,0.05)'}`,
+                      fontSize: '0.82rem', fontWeight: active ? 500 : 300,
+                      letterSpacing: '0.04em', textDecoration: 'none',
+                      minHeight: '44px', transition: '0.2s',
+                    }}
+                  >
                     {Icon && <Icon size={14} style={{ color: active ? GOLD : 'rgba(240,237,232,0.22)', flexShrink: 0 }} />}
                     {label}
                   </Link>
@@ -388,6 +579,7 @@ const Header = () => {
         .header-wordmark:hover span:first-child { color: rgba(240,237,232,0.85) !important; }
         .dropdown-item:hover { background: rgba(240,237,232,0.05) !important; color: rgba(240,237,232,0.8) !important; }
         .dropdown-logout:hover { background: rgba(220,38,38,0.08) !important; color: rgba(220,38,38,0.9) !important; }
+        .nav-dropdown-item:hover { background: rgba(240,237,232,0.05) !important; border-color: rgba(240,237,232,0.07) !important; }
       `}</style>
     </>
   );

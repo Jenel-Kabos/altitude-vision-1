@@ -1,5 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Visite = require('../models/Visite');
+const User   = require('../models/User');
+const { notify, notifyStaff } = require('../services/notificationService');
 
 // ─────────────────────────────────────────────
 // POST /api/visites — client crée une demande
@@ -20,6 +22,14 @@ exports.createVisite = asyncHandler(async (req, res) => {
   });
 
   await visite.populate('property', 'title images address');
+
+  // Notifie le staff d'une nouvelle demande
+  notifyStaff({
+    type:  'visite_new',
+    title: 'Nouvelle demande de visite',
+    body:  `${req.user.name} souhaite visiter : ${visite.property?.title || 'un bien'}`,
+    data:  { screen: 'AdminVisites', params: { id: visite._id } },
+  }).catch(() => {});
 
   res.status(201).json({
     status: 'success',
@@ -72,6 +82,7 @@ exports.updateVisite = asyncHandler(async (req, res) => {
   }
 
   const { dateProposee, dateConfirmee, statut, notes } = req.body;
+  const previousStatut = visite.statut;
 
   if (dateProposee !== undefined) visite.dateProposee = dateProposee;
   if (dateConfirmee !== undefined) visite.dateConfirmee = dateConfirmee;
@@ -86,6 +97,25 @@ exports.updateVisite = asyncHandler(async (req, res) => {
   await visite.populate('client', 'name email');
   await visite.populate('traitePar', 'name');
 
+  // Notifie le client si le statut a changé
+  if (statut && statut !== previousStatut && visite.client) {
+    const STATUT_MESSAGES = {
+      'Confirmée':    { title: 'Visite confirmée ✅', body: `Votre visite de "${visite.property?.title}" a été confirmée${dateConfirmee ? ` le ${new Date(dateConfirmee).toLocaleDateString('fr-FR')}` : ''}.` },
+      'Refusée':      { title: 'Visite refusée',      body: `Votre demande de visite pour "${visite.property?.title}" n'a pas pu être acceptée.` },
+      'Replanifiée':  { title: 'Visite replanifiée 📅', body: `Votre visite de "${visite.property?.title}" a été replanifiée${dateProposee ? ` au ${new Date(dateProposee).toLocaleDateString('fr-FR')}` : ''}.` },
+      'Effectuée':    { title: 'Visite effectuée',    body: `Merci pour votre visite de "${visite.property?.title}". N'hésitez pas à nous contacter.` },
+    };
+    const msg = STATUT_MESSAGES[statut];
+    if (msg) {
+      notify(visite.client._id || visite.client, {
+        type:  'visite_status',
+        title: msg.title,
+        body:  msg.body,
+        data:  { screen: 'Visites', params: { id: visite._id } },
+      }).catch(() => {});
+    }
+  }
+
   res.status(200).json({
     status: 'success',
     data: { visite },
@@ -96,7 +126,8 @@ exports.updateVisite = asyncHandler(async (req, res) => {
 // PATCH /api/visites/:id/cancel — client annule
 // ─────────────────────────────────────────────
 exports.cancelVisite = asyncHandler(async (req, res) => {
-  const visite = await Visite.findById(req.params.id);
+  const visite = await Visite.findById(req.params.id)
+    .populate('property', 'title');
 
   if (!visite) {
     res.status(404);
@@ -115,6 +146,14 @@ exports.cancelVisite = asyncHandler(async (req, res) => {
 
   visite.statut = 'Annulée';
   await visite.save();
+
+  // Notifie le staff de l'annulation
+  notifyStaff({
+    type:  'visite_cancelled',
+    title: 'Visite annulée',
+    body:  `${req.user.name} a annulé sa demande de visite pour "${visite.property?.title || 'un bien'}".`,
+    data:  { screen: 'AdminVisites', params: { id: visite._id } },
+  }).catch(() => {});
 
   res.status(200).json({
     status: 'success',

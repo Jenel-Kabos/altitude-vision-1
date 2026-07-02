@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Platform,
+  ActivityIndicator, Platform, Alert, Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from 'react-native-maps';
 import Supercluster from 'supercluster';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import api from '../../services/api';
 import { cache } from '../../services/cacheService';
 import PrixFCFA from '../../components/PrixFCFA';
@@ -111,7 +112,9 @@ export default function CarteScreen({ navigation }) {
   const [annonces, setAnnonces] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [selected, setSelected] = useState(null);
-  const [clusters, setClusters] = useState([]);
+  const [clusters, setClusters]     = useState([]);
+  const [userLocation, setUserLocation] = useState(null);
+  const [locating, setLocating]         = useState(false);
 
   const mapRef = useRef(null);
   const scRef  = useRef(null);
@@ -177,15 +180,71 @@ export default function CarteScreen({ navigation }) {
     }, 400);
   }, []);
 
-  const handleDismiss    = useCallback(() => setSelected(null), []);
-  const handleCardPress  = useCallback(() => {
+  const handleDismiss   = useCallback(() => setSelected(null), []);
+  const handleCardPress = useCallback(() => {
     if (selected) navigation.navigate('DetailAnnonce', { annonce: selected });
   }, [selected, navigation]);
+
+  // ─── Localiser l'utilisateur ───
+  const locateUser = useCallback(async () => {
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission refusée',
+          "Veuillez autoriser l'accès à la localisation dans les paramètres de votre téléphone.",
+        );
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const { latitude, longitude } = loc.coords;
+      setUserLocation({ latitude, longitude });
+      mapRef.current?.animateToRegion(
+        { latitude, longitude, latitudeDelta: 0.025, longitudeDelta: 0.025 },
+        600,
+      );
+    } catch {
+      Alert.alert('Erreur', "Impossible d'obtenir votre position.");
+    } finally {
+      setLocating(false);
+    }
+  }, []);
+
+  // ─── Ouvrir l'itinéraire ───
+  const openDirections = useCallback(async (annonce) => {
+    const lat = annonce.address?.coordinates?.lat;
+    const lng = annonce.address?.coordinates?.lng;
+    if (!lat || !lng) {
+      Alert.alert('Coordonnées manquantes', "Ce bien n'a pas encore de position GPS.");
+      return;
+    }
+    const label = encodeURIComponent(annonce.title || 'Bien immobilier');
+
+    if (Platform.OS === 'ios') {
+      const googleInstalled = await Linking.canOpenURL('comgooglemaps://');
+      if (googleInstalled) {
+        Linking.openURL(`comgooglemaps://?daddr=${lat},${lng}&q=${label}&directionsmode=driving`);
+      } else {
+        Linking.openURL(`maps://?daddr=${lat},${lng}&q=${label}`);
+      }
+    } else {
+      Linking.openURL(
+        `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}&travelmode=driving`,
+      );
+    }
+  }, []);
 
   // Offset bas de la card : inset bas + hauteur de la tab bar
   const cardBottom = useMemo(
     () => insets.bottom + (Platform.OS === 'ios' ? 60 : 56),
     [insets.bottom],
+  );
+
+  // Position du bouton locate : au-dessus de la card si un bien est sélectionné
+  const locateBtnBottom = useMemo(
+    () => (selected ? cardBottom + 152 + 12 : cardBottom + 16),
+    [selected, cardBottom],
   );
 
   return (
@@ -270,16 +329,27 @@ export default function CarteScreen({ navigation }) {
         </View>
       </SafeAreaView>
 
+      {/* ─── Bouton "Me localiser" ───────────────────────── */}
+      <TouchableOpacity
+        style={[styles.locateBtn, { bottom: locateBtnBottom }]}
+        onPress={locateUser}
+        activeOpacity={0.85}
+        accessibilityLabel="Me localiser"
+      >
+        {locating
+          ? <ActivityIndicator size="small" color={c.gold} />
+          : <Ionicons name="locate-outline" size={22} color={c.gold} />
+        }
+      </TouchableOpacity>
+
       {/* ─── Card bien sélectionné ────────────────────────────── */}
       {selected && (
         <View style={[styles.selectedCard, { bottom: cardBottom }]}>
-          {/* Bouton fermer — en dehors du touchable de navigation */}
           <TouchableOpacity
             style={styles.closeCard}
             onPress={handleDismiss}
             hitSlop={10}
             accessibilityLabel="Fermer"
-            accessibilityRole="button"
           >
             <Ionicons name="close" size={14} color={c.textMuted} />
           </TouchableOpacity>
@@ -289,17 +359,13 @@ export default function CarteScreen({ navigation }) {
             onPress={handleCardPress}
             activeOpacity={0.9}
             accessibilityLabel={`Voir le détail : ${selected.title}`}
-            accessibilityRole="button"
           >
-            {/* Miniature */}
             <Image
               source={selected.images?.[0] ? { uri: selected.images[0] } : PLACEHOLDER_IMG}
               style={styles.selectedThumb}
               contentFit="cover"
               cachePolicy="memory-disk"
             />
-
-            {/* Infos */}
             <View style={styles.selectedInfo}>
               <Text style={styles.selectedType}>
                 {(selected.type || 'Bien').toUpperCase()}
@@ -314,11 +380,21 @@ export default function CarteScreen({ navigation }) {
               </View>
               <PrixFCFA montant={selected.price} />
             </View>
-
-            {/* Chevron */}
             <View style={styles.selectedArrow}>
               <Ionicons name="chevron-forward" size={18} color={c.gold} />
             </View>
+          </TouchableOpacity>
+
+          <View style={styles.cardDivider} />
+          <TouchableOpacity
+            style={styles.directionsBtn}
+            onPress={() => openDirections(selected)}
+            activeOpacity={0.85}
+            accessibilityLabel="Obtenir l'itinéraire"
+          >
+            <Ionicons name="navigate-outline" size={15} color="#FFFFFF" />
+            <Text style={styles.directionsBtnText}>Itinéraire vers ce bien</Text>
+            <Ionicons name="open-outline" size={13} color="rgba(255,255,255,0.6)" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
         </View>
       )}
@@ -514,5 +590,48 @@ const makeStyles = (c) => StyleSheet.create({
     backgroundColor: c.bgCardAlt,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // ─── Bouton "Me localiser" ───
+  locateBtn: {
+    position: 'absolute',
+    right: spacing.md,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: c.bgCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: c.borderGold,
+  },
+
+  // ─── Itinéraire ───
+  cardDivider: {
+    height: 1,
+    backgroundColor: c.border,
+    marginHorizontal: spacing.sm,
+  },
+  directionsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#185FA5',
+    margin: spacing.sm,
+    marginTop: 8,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+  },
+  directionsBtnText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: '#FFFFFF',
+    flex: 1,
   },
 });

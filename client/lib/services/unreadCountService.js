@@ -39,8 +39,19 @@ export const getTotalUnreadCount = async () => {
             }
         }
 
-        const total = internalMailsUnread + conversationsUnread;
-        
+        // 3. Notifications non lues
+        let notificationsUnread = 0;
+        try {
+            const notifResponse = await api.get('/notifications/count');
+            notificationsUnread = notifResponse.data.data.count || 0;
+        } catch (error) {
+            if (error.response?.status !== 401) {
+                console.error('❌ Erreur comptage notifications:', error.message);
+            }
+        }
+
+        const total = internalMailsUnread + conversationsUnread + notificationsUnread;
+
         return total;
     } catch (error) {
         console.error('❌ Erreur lors du comptage des messages non lus:', error);

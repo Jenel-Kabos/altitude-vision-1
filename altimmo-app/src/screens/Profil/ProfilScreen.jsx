@@ -336,6 +336,20 @@ export default function ProfilScreen({ navigation }) {
               onPress={() => Linking.openURL('mailto:contact@altitudevision.agency?subject=Signalement%20Altimmo')}
               styles={styles} c={c}
             />
+            <View style={styles.menuSep} />
+            <MenuRow
+              icon="shield-checkmark-outline"
+              label="Politique de confidentialité"
+              onPress={() => navigation.navigate('PolitiqueConfidentialite')}
+              styles={styles} c={c}
+            />
+            <View style={styles.menuSep} />
+            <MenuRow
+              icon="server-outline"
+              label="Gestion du cache"
+              onPress={() => navigation.navigate('CacheManagement')}
+              styles={styles} c={c}
+            />
           </View>
         </Animated.View>
 

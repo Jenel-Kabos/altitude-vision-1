@@ -1,9 +1,9 @@
 import "./globals.css";
 import { Cinzel, Cormorant_Garamond, DM_Sans } from 'next/font/google';
-import Script from 'next/script';
 import AppProviders from "./AppProviders";
 import ClientLayout from "./ClientLayout";
 import JsonLd from "@/lib/components/JsonLd";
+import GoogleAnalytics from "@/lib/components/GoogleAnalytics";
 import { buildMetadata, SITE_URL } from "@/lib/seo";
 
 const cinzel = Cinzel({
@@ -97,18 +97,7 @@ export default function RootLayout({ children }) {
             {children}
           </ClientLayout>
         </AppProviders>
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-17PK3B8NSQ"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-17PK3B8NSQ');
-          `}
-        </Script>
+        <GoogleAnalytics />
       </body>
     </html>
   );

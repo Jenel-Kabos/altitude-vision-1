@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const AltcomProject = require('../models/AltcomProject');
+const { notifyStaff } = require('../services/notificationService');
 
 /**
  * @description Créer un nouveau projet Altcom
@@ -58,8 +59,12 @@ exports.createProject = asyncHandler(async (req, res) => {
 
   console.log('✅ [Altcom] Projet créé avec succès:', project._id);
 
-  // TODO: Envoyer un email de notification à l'équipe Altcom
-  // TODO: Envoyer un email de confirmation au client
+  notifyStaff({
+    type:  'quote_received',
+    title: 'Nouveau projet Altcom 📣',
+    body:  `"${project.projectName}" soumis par ${project.contactName} — type: ${project.projectType}.`,
+    data:  { screen: 'AdminQuotes', params: { id: project._id } },
+  }).catch(() => {});
 
   res.status(201).json({
     status: 'success',

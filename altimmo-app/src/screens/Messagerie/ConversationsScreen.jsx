@@ -307,15 +307,40 @@ export default function ConversationsScreen({ navigation }) {
           />
         }
         ListEmptyComponent={
-          <EmptyState
-            illustration={IllustrationNoMessages}
-            title="Aucune conversation"
-            subtitle={isStaff
-              ? 'Aucune demande client pour le moment.'
-              : 'Contactez notre équipe depuis une annonce.'}
-          />
+          <View style={styles.emptyWrap}>
+            <IllustrationNoMessages />
+            <Text style={styles.emptyTitle}>Aucune conversation</Text>
+            <Text style={styles.emptySubtitle}>
+              {isStaff
+                ? 'Aucune demande client pour le moment.'
+                : 'Posez une question à notre équipe directement.'}
+            </Text>
+            {!isStaff && (
+              <TouchableOpacity
+                style={styles.emptyBtn}
+                onPress={() => navigation.navigate('Chatbot')}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="chatbubbles-outline" size={16} color="#0A0A0A" />
+                <Text style={styles.emptyBtnText}>Contacter l'agence</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         }
       />
+
+      {/* ─── FAB contacter l'agence ─── */}
+      {!isStaff && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => navigation.navigate('Chatbot')}
+          activeOpacity={0.85}
+          accessibilityLabel="Contacter l'agence"
+          accessibilityRole="button"
+        >
+          <Ionicons name="chatbubbles-outline" size={22} color="#0A0A0A" />
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
@@ -474,5 +499,55 @@ const makeStyles = (c) => StyleSheet.create({
   itemSeparator: {
     marginLeft: 80,
     marginVertical: 0,
+  },
+
+  // ─── FAB ───
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: c.gold,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+
+  // ─── Empty state ───
+  emptyWrap: {
+    alignItems: 'center',
+    paddingTop: 48,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+  },
+  emptyTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.xl,
+    color: c.text,
+    marginTop: spacing.md,
+  },
+  emptySubtitle: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: c.textMuted,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  emptyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: c.gold,
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+  },
+  emptyBtnText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: '#0A0A0A',
   },
 });

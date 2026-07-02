@@ -13,6 +13,7 @@ import {
   FaTools,
   FaSignOutAlt,
   FaExchangeAlt,
+  FaBell,
 } from "react-icons/fa";
 
 const DashboardSidebar = () => {
@@ -103,6 +104,14 @@ const DashboardSidebar = () => {
           className={navClass('/dashboard/transactions')}
         >
           <FaExchangeAlt /> Mes transactions
+        </Link>
+
+        {/* --- NOTIFICATIONS --- */}
+        <Link
+          href="/dashboard/notifications"
+          className={navClass('/dashboard/notifications')}
+        >
+          <FaBell /> Notifications
         </Link>
 
         {/* --- LOGOUT --- */}

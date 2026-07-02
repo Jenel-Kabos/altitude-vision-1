@@ -1,18 +1,48 @@
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useCallback, useMemo, memo, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  TouchableOpacity, RefreshControl,
+  TouchableOpacity, RefreshControl, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
-import { fonts, fontSize, spacing, radius } from '../../theme';
+import { fonts, fontSize, spacing } from '../../theme';
+import {
+  getNotifications,
+  markRead,
+  markAllRead,
+  clearRead,
+} from '../../services/notificationApiService';
+
+// ─── Config icônes par type ───────────────────────────────────────────────────
+
+const TYPE_CONFIG = {
+  new_message:           { icon: 'chatbubble',            color: '#3B82F6', label: 'Message'      },
+  new_staff_message:     { icon: 'chatbubbles',           color: '#3B82F6', label: 'Message'      },
+  visite_new:            { icon: 'home',                  color: '#10B981', label: 'Visite'       },
+  visite_status:         { icon: 'calendar',              color: '#10B981', label: 'Visite'       },
+  visite_cancelled:      { icon: 'calendar-clear',        color: '#EF4444', label: 'Visite'       },
+  transaction_created:   { icon: 'swap-horizontal',       color: '#F59E0B', label: 'Transaction'  },
+  transaction_finalized: { icon: 'checkmark-circle',      color: '#10B981', label: 'Transaction'  },
+  quote_received:        { icon: 'document-text',         color: '#8B5CF6', label: 'Devis'        },
+  quote_status:          { icon: 'document-text-outline', color: '#8B5CF6', label: 'Devis'        },
+  quote_response:        { icon: 'mail',                  color: '#8B5CF6', label: 'Devis'        },
+  payment_success:       { icon: 'cash',                  color: '#10B981', label: 'Paiement'     },
+  payment_failed:        { icon: 'alert-circle',          color: '#EF4444', label: 'Paiement'     },
+  contrat_new:           { icon: 'reader',                color: '#F59E0B', label: 'Contrat'      },
+  contrat_updated:       { icon: 'reader-outline',        color: '#F59E0B', label: 'Contrat'      },
+  loyer_paye:            { icon: 'wallet',                color: '#10B981', label: 'Loyer'        },
+  loyer_en_retard:       { icon: 'warning',               color: '#EF4444', label: 'Loyer'        },
+  account_verified:      { icon: 'shield-checkmark',      color: '#10B981', label: 'Compte'       },
+  account_suspended:     { icon: 'ban',                   color: '#EF4444', label: 'Compte'       },
+};
+
+const DEFAULT_CONFIG = { icon: 'notifications', color: '#C8960C', label: 'Notification' };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -23,164 +53,219 @@ const formatRelativeTime = (dateStr) => {
   const hours = Math.floor(diff / 3_600_000);
   const days  = Math.floor(diff / 86_400_000);
   if (mins  <  1) return "À l'instant";
-  if (mins  < 60) return `Il y a ${mins} min`;
-  if (hours < 24) return `Il y a ${hours}h`;
-  if (days  <  7) return `Il y a ${days}j`;
+  if (mins  < 60) return `${mins} min`;
+  if (hours < 24) return `${hours}h`;
+  if (days  <  7) return `${days}j`;
   return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 };
 
-const getInitials = (name = '') => {
-  const parts = name.trim().split(/\s+/);
-  return parts.slice(0, 2).map(p => p[0]?.toUpperCase() || '').join('') || '?';
-};
+// ─── Navigation helper ────────────────────────────────────────────────────────
 
-// ─── ConvRow ─────────────────────────────────────────────────────────────────
+function getNavTarget(notif) {
+  const { type, data = {} } = notif;
+  if (data?.screen) return { screen: data.screen, params: data.params };
 
-const ConvRow = memo(function ConvRow({ item, index, selfId, onPress, styles, c }) {
-  // Identifie le bon interlocuteur en excluant l'utilisateur courant
-  const contact = useMemo(
-    () => item.participants?.find(p => p?._id && p._id !== selfId) || {},
-    [item.participants, selfId],
-  );
-  const name     = contact.name || contact.firstName || 'Équipe Altitude Vision';
-  const isUnread = (item.unreadCount || 0) > 0;
-  const preview  = item.lastMessage || 'Nouvelle conversation';
-  const time     = formatRelativeTime(item.updatedAt || item.createdAt);
+  const MAP = {
+    new_message:           { screen: 'Messages' },
+    new_staff_message:     { screen: 'Messages' },
+    visite_new:            { screen: 'Visites'  },
+    visite_status:         { screen: 'Visites'  },
+    visite_cancelled:      { screen: 'Visites'  },
+    transaction_created:   { screen: 'Profil',  params: { screen: 'Transactions' } },
+    transaction_finalized: { screen: 'Profil',  params: { screen: 'Transactions' } },
+    payment_success:       { screen: 'Profil',  params: { screen: 'Transactions' } },
+    payment_failed:        { screen: 'Profil',  params: { screen: 'Transactions' } },
+  };
+  return MAP[type] || null;
+}
 
-  const handlePress = useCallback(
-    () => onPress(item, contact),
-    [item, contact, onPress],
-  );
+// ─── NotifRow ─────────────────────────────────────────────────────────────────
+
+const NotifRow = memo(function NotifRow({ item, index, onPress, onDelete, styles, c }) {
+  const cfg   = TYPE_CONFIG[item.type] || DEFAULT_CONFIG;
+  const time  = formatRelativeTime(item.createdAt);
 
   return (
-    <Animated.View entering={FadeInDown.delay(Math.min(index * 50, 300)).duration(280)}>
+    <Animated.View entering={FadeInDown.delay(Math.min(index * 40, 280)).duration(240)}>
       <TouchableOpacity
-        style={[styles.row, isUnread && styles.rowUnread]}
-        onPress={handlePress}
+        style={[styles.row, !item.read && styles.rowUnread]}
+        onPress={() => onPress(item)}
+        onLongPress={() => onDelete(item)}
         activeOpacity={0.75}
-        accessibilityLabel={`Message de ${name} : ${preview}`}
-        accessibilityRole="button"
-        accessibilityState={{ selected: isUnread }}
+        accessibilityLabel={item.title}
+        accessibilityHint="Appui long pour supprimer"
       >
-        {/* Avatar initiales */}
-        <View style={[styles.avatar, isUnread && styles.avatarUnread]}>
-          <Text style={styles.avatarText}>{getInitials(name)}</Text>
-          {isUnread && <View style={styles.unreadDot} />}
+        {/* Indicateur non-lu */}
+        {!item.read && <View style={styles.unreadBar} />}
+
+        {/* Icône */}
+        <View style={[styles.iconWrap, { backgroundColor: cfg.color + '18' }]}>
+          <Ionicons name={cfg.icon} size={20} color={cfg.color} />
         </View>
 
         {/* Contenu */}
         <View style={styles.content}>
           <View style={styles.rowTop}>
-            <Text
-              style={[styles.name, isUnread && styles.nameUnread]}
-              numberOfLines={1}
-            >
-              {name}
-            </Text>
+            <View style={[styles.typePill, { backgroundColor: cfg.color + '18' }]}>
+              <Text style={[styles.typePillText, { color: cfg.color }]}>{cfg.label}</Text>
+            </View>
             <Text style={styles.time}>{time}</Text>
           </View>
-          <Text
-            style={[styles.preview, isUnread && styles.previewUnread]}
-            numberOfLines={2}
-          >
-            {preview}
+          <Text style={[styles.notifTitle, !item.read && styles.notifTitleUnread]} numberOfLines={1}>
+            {item.title}
           </Text>
+          <Text style={styles.notifBody} numberOfLines={2}>{item.body}</Text>
         </View>
-
-        {/* Badge non-lus */}
-        {isUnread && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>
-              {item.unreadCount > 9 ? '9+' : item.unreadCount}
-            </Text>
-          </View>
-        )}
       </TouchableOpacity>
     </Animated.View>
   );
 }, (prev, next) =>
-  prev.item._id          === next.item._id          &&
-  prev.item.unreadCount  === next.item.unreadCount   &&
-  prev.item.lastMessage  === next.item.lastMessage   &&
-  prev.item.updatedAt    === next.item.updatedAt     &&
-  prev.styles            === next.styles
+  prev.item._id  === next.item._id  &&
+  prev.item.read === next.item.read &&
+  prev.styles    === next.styles
 );
 
-// ─── Séparateur ───────────────────────────────────────────────────────────────
-
-const RowSeparator = memo(function RowSeparator({ style }) {
-  return <View style={style} />;
-});
+const RowSeparator = memo(({ style }) => <View style={style} />);
 
 // ─── Écran ────────────────────────────────────────────────────────────────────
+
+const FILTERS = [
+  { key: 'all',    label: 'Toutes'  },
+  { key: 'unread', label: 'Non lues' },
+];
 
 export default function NotificationsScreen({ navigation }) {
   const { user }           = useAuth();
   const { themeColors: c } = useTheme();
   const styles  = useMemo(() => makeStyles(c), [c]);
-  const selfId  = user?._id;
 
-  const [conversations, setConversations] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount,   setUnreadCount]   = useState(0);
   const [loading,       setLoading]       = useState(true);
   const [refreshing,    setRefreshing]    = useState(false);
+  const [filter,        setFilter]        = useState('all');
+  const [page,          setPage]          = useState(1);
+  const [hasMore,       setHasMore]       = useState(true);
+  const loadingMore = useRef(false);
 
   // ─── Chargement ───
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+  const load = useCallback(async (reset = false) => {
+    const p = reset ? 1 : page;
+    if (!reset && loadingMore.current) return;
+    if (!reset) loadingMore.current = true;
+
     try {
-      const res = await api.get('/conversations');
-      const raw = res.data?.data?.conversations || res.data?.conversations || [];
-      // Conversations non lues en premier, puis par date décroissante
-      const sorted = [...raw].sort((a, b) => {
-        const unreadDiff = (b.unreadCount || 0) - (a.unreadCount || 0);
-        if (unreadDiff !== 0) return unreadDiff;
-        return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
-      });
-      setConversations(sorted);
+      const data = await getNotifications(p, filter);
+      const list = data?.notifications || [];
+      if (reset) {
+        setNotifications(list);
+        setPage(2);
+      } else {
+        setNotifications((prev) => [...prev, ...list]);
+        setPage((prev) => prev + 1);
+      }
+      setUnreadCount(data?.unreadCount ?? 0);
+      setHasMore(p < (data?.pagination?.pages ?? 1));
     } catch {
       // fail silently
     } finally {
       setLoading(false);
       setRefreshing(false);
+      loadingMore.current = false;
     }
-  }, []);
+  }, [filter, page]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    setPage(1);
+    load(true);
+  }, [filter])); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ─── Handlers ───
+  // ─── Actions ───
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     load(true);
   }, [load]);
 
-  const handleBack = useCallback(() => navigation.goBack(), [navigation]);
+  const onEndReached = useCallback(() => {
+    if (hasMore && !loadingMore.current) load(false);
+  }, [hasMore, load]);
 
-  const handlePress = useCallback((conv, contact) => {
+  const handlePress = useCallback(async (notif) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    navigation.navigate('Messages', {
-      screen:  'Chat',
-      params:  { conversation: conv, contact },
-    });
+
+    // Marquer lu localement immédiatement
+    if (!notif.read) {
+      setNotifications((prev) =>
+        prev.map((n) => n._id === notif._id ? { ...n, read: true } : n),
+      );
+      setUnreadCount((c) => Math.max(0, c - 1));
+      markRead(notif._id).catch(() => {});
+    }
+
+    // Navigation
+    const target = getNavTarget(notif);
+    if (target) {
+      navigation.navigate(target.screen, target.params);
+    }
   }, [navigation]);
 
-  const keyExtractor    = useCallback((item) => item._id, []);
-  const ItemSeparator   = useCallback(() => <RowSeparator style={styles.separator} />, [styles]);
+  const handleDelete = useCallback((notif) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert('Supprimer', 'Supprimer cette notification ?', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Supprimer',
+        style: 'destructive',
+        onPress: async () => {
+          setNotifications((prev) => prev.filter((n) => n._id !== notif._id));
+          if (!notif.read) setUnreadCount((c) => Math.max(0, c - 1));
+          import('../../services/notificationApiService')
+            .then(({ deleteNotification }) => deleteNotification(notif._id))
+            .catch(() => {});
+        },
+      },
+    ]);
+  }, []);
+
+  const handleMarkAllRead = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
+    markAllRead().catch(() => {});
+  }, []);
+
+  const handleClearRead = useCallback(() => {
+    Alert.alert('Nettoyer', 'Supprimer toutes les notifications lues ?', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Nettoyer',
+        style: 'destructive',
+        onPress: async () => {
+          setNotifications((prev) => prev.filter((n) => !n.read));
+          import('../../services/notificationApiService')
+            .then(({ clearRead }) => clearRead())
+            .catch(() => {});
+        },
+      },
+    ]);
+  }, []);
+
+  const keyExtractor   = useCallback((item) => item._id, []);
+  const ItemSeparator  = useCallback(() => <RowSeparator style={styles.separator} />, [styles]);
 
   const renderItem = useCallback(({ item, index }) => (
-    <ConvRow
+    <NotifRow
       item={item}
       index={index}
-      selfId={selfId}
       onPress={handlePress}
+      onDelete={handleDelete}
       styles={styles}
       c={c}
     />
-  ), [selfId, handlePress, styles, c]);
+  ), [handlePress, handleDelete, styles, c]);
 
-  const unreadTotal = useMemo(
-    () => conversations.reduce((s, cv) => s + (cv.unreadCount || 0), 0),
-    [conversations],
-  );
+  const hasRead = useMemo(() => notifications.some((n) => n.read), [notifications]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -188,11 +273,10 @@ export default function NotificationsScreen({ navigation }) {
       {/* ─── Header ─── */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={handleBack}
+          onPress={() => navigation.goBack()}
           style={styles.headerBtn}
           hitSlop={8}
           accessibilityLabel="Retour"
-          accessibilityRole="button"
         >
           <Ionicons name="arrow-back" size={22} color={c.text} />
         </TouchableOpacity>
@@ -200,38 +284,83 @@ export default function NotificationsScreen({ navigation }) {
         <View style={styles.headerCenter}>
           <Ionicons name="notifications-outline" size={18} color={c.gold} />
           <Text style={styles.headerTitle}>Notifications</Text>
-          {unreadTotal > 0 && (
+          {unreadCount > 0 && (
             <View style={styles.headerBadge}>
               <Text style={styles.headerBadgeText}>
-                {unreadTotal > 99 ? '99+' : unreadTotal}
+                {unreadCount > 99 ? '99+' : unreadCount}
               </Text>
             </View>
           )}
         </View>
 
-        {/* Spacer symétrique */}
-        <View style={styles.headerBtn} />
+        <View style={styles.headerActions}>
+          {unreadCount > 0 && (
+            <TouchableOpacity
+              onPress={handleMarkAllRead}
+              hitSlop={8}
+              accessibilityLabel="Tout marquer comme lu"
+            >
+              <Ionicons name="checkmark-done-outline" size={22} color={c.gold} />
+            </TouchableOpacity>
+          )}
+          {hasRead && (
+            <TouchableOpacity
+              onPress={handleClearRead}
+              hitSlop={8}
+              accessibilityLabel="Supprimer les lues"
+            >
+              <Ionicons name="trash-outline" size={20} color={c.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* ─── Filtres ─── */}
+      <View style={styles.filtersRow}>
+        {FILTERS.map((f) => (
+          <TouchableOpacity
+            key={f.key}
+            style={[styles.filterChip, filter === f.key && styles.filterChipActive]}
+            onPress={() => setFilter(f.key)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.filterChipText, filter === f.key && styles.filterChipTextActive]}>
+              {f.label}
+            </Text>
+            {f.key === 'unread' && unreadCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* ─── Contenu ─── */}
       {loading ? (
         <LoadingSpinner />
-      ) : conversations.length === 0 ? (
+      ) : notifications.length === 0 ? (
         <View style={styles.center}>
           <View style={styles.emptyIcon}>
             <Ionicons name="notifications-off-outline" size={36} color={c.gold} />
           </View>
-          <Text style={styles.emptyTitle}>Aucune notification</Text>
+          <Text style={styles.emptyTitle}>
+            {filter === 'unread' ? 'Aucune notification non lue' : 'Aucune notification'}
+          </Text>
           <Text style={styles.emptyText}>
-            Vos messages et alertes apparaîtront ici.
+            {filter === 'unread'
+              ? 'Vous êtes à jour !'
+              : 'Vos alertes de visites, transactions et messages apparaîtront ici.'}
           </Text>
         </View>
       ) : (
         <FlatList
-          data={conversations}
+          data={notifications}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
           ItemSeparatorComponent={ItemSeparator}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.3}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -263,8 +392,7 @@ const makeStyles = (c) => StyleSheet.create({
     backgroundColor: c.bgCard,
   },
   headerBtn: {
-    width: 40,
-    height: 40,
+    width: 40, height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -294,96 +422,140 @@ const makeStyles = (c) => StyleSheet.create({
     fontSize: 11,
     color: '#0A0A0A',
   },
+  headerActions: {
+    width: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+  },
+
+  // ─── Filtres ───
+  filtersRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    backgroundColor: c.bgCard,
+    borderBottomWidth: 1,
+    borderBottomColor: c.border,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: c.bgCardAlt,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  filterChipActive: {
+    backgroundColor: c.goldMuted,
+    borderColor: c.borderGold,
+  },
+  filterChipText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: c.textMuted,
+  },
+  filterChipTextActive: {
+    fontFamily: fonts.bodyBold,
+    color: c.gold,
+  },
+  filterBadge: {
+    backgroundColor: c.gold,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  filterBadgeText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 9,
+    color: '#0A0A0A',
+  },
 
   // ─── Liste ───
-  list: { paddingVertical: spacing.sm },
+  list: { paddingVertical: spacing.xs },
   separator: {
     height: 1,
     backgroundColor: c.border,
     marginLeft: 72,
   },
 
-  // ─── Ligne conversation ───
+  // ─── Ligne notification ───
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
+    paddingVertical: 14,
+    gap: 12,
     backgroundColor: c.bg,
   },
   rowUnread: { backgroundColor: c.bgCard },
 
-  // ─── Avatar ───
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: c.bgCardAlt,
+  unreadBar: {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    width: 3,
+    backgroundColor: c.gold,
+    borderRadius: 2,
+  },
+
+  // ─── Icône ───
+  iconWrap: {
+    width: 44, height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarUnread: { backgroundColor: c.goldMuted },
-  avatarText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.md,
-    color: c.goldDark,
-  },
-  unreadDot: {
-    position: 'absolute',
-    top: 1, right: 1,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: c.gold,
-    borderWidth: 2,
-    borderColor: c.bgCard,
+    flexShrink: 0,
+    marginTop: 2,
   },
 
   // ─── Contenu ───
-  content:  { flex: 1, gap: 3 },
+  content: { flex: 1, gap: 3 },
   rowTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 2,
   },
-  name: {
-    flex: 1,
-    fontFamily: fonts.body,
-    fontSize: fontSize.md,
-    color: c.textSub,
-    marginRight: spacing.sm,
+  typePill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  nameUnread: { fontFamily: fonts.bodyBold, color: c.text },
+  typePillText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 9,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
   time: {
     fontFamily: fonts.body,
     fontSize: 11,
     color: c.textMuted,
     flexShrink: 0,
   },
-  preview: {
+  notifTitle: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: c.textSub,
+  },
+  notifTitleUnread: {
+    fontFamily: fonts.bodyBold,
+    color: c.text,
+  },
+  notifBody: {
     fontFamily: fonts.body,
     fontSize: fontSize.sm,
     color: c.textMuted,
     lineHeight: 18,
-  },
-  previewUnread: { color: c.textSub },
-
-  // ─── Badge non-lus ───
-  badge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: c.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-    flexShrink: 0,
-  },
-  badgeText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 11,
-    color: '#0A0A0A',
   },
 
   // ─── État vide ───
@@ -395,8 +567,7 @@ const makeStyles = (c) => StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   emptyIcon: {
-    width: 72,
-    height: 72,
+    width: 72, height: 72,
     borderRadius: 36,
     backgroundColor: c.goldMuted,
     alignItems: 'center',

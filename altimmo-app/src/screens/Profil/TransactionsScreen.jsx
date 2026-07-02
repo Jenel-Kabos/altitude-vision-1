@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../context/ThemeContext';
 import { colors, fonts, fontSize, spacing, radius } from '../../theme';
 import { getMyTransactions } from '../../services/transactionService';
@@ -19,9 +20,19 @@ const dateStr = (d) =>
   new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
 
 const STATUS_CFG = {
-  'Réussie':  { icon: 'checkmark-circle', color: '#16A34A', bg: '#F0FDF4', label: 'Réussie'  },
-  'En cours': { icon: 'time-outline',     color: '#185FA5', bg: '#EFF6FF', label: 'En cours' },
-  'Annulée':  { icon: 'close-circle',     color: '#A32D2D', bg: '#FEF2F2', label: 'Annulée'  },
+  'Réussie':             { icon: 'checkmark-circle', color: '#16A34A', bg: '#F0FDF4', label: 'Réussie'             },
+  'En cours':            { icon: 'time-outline',     color: '#185FA5', bg: '#EFF6FF', label: 'En cours'            },
+  'Paiement en attente': { icon: 'alert-circle',     color: '#C8960C', bg: '#FFFBEB', label: 'Paiement en attente' },
+  'Annulée':             { icon: 'close-circle',     color: '#A32D2D', bg: '#FEF2F2', label: 'Annulée'             },
+  'Litigée':             { icon: 'warning',          color: '#A32D2D', bg: '#FEF2F2', label: 'Litigée'             },
+};
+
+const PAYMENT_LABELS = {
+  non_initié: { label: 'Paiement requis',    color: '#C8960C' },
+  en_attente: { label: 'Paiement en attente', color: '#2E7BB5' },
+  confirmé:   { label: 'Paiement confirmé',  color: '#16A34A' },
+  échoué:     { label: 'Paiement échoué',    color: '#D42B2B' },
+  remboursé:  { label: 'Remboursé',          color: '#64748B' },
 };
 
 const TYPE_CFG = {
@@ -30,10 +41,11 @@ const TYPE_CFG = {
 };
 
 const FILTERS = [
-  { key: 'all',      label: 'Toutes'    },
-  { key: 'En cours', label: 'En cours'  },
-  { key: 'Réussie',  label: 'Réussies'  },
-  { key: 'Annulée',  label: 'Annulées'  },
+  { key: 'all',                  label: 'Toutes'    },
+  { key: 'En cours',             label: 'En cours'  },
+  { key: 'Paiement en attente',  label: 'À finaliser'},
+  { key: 'Réussie',              label: 'Réussies'  },
+  { key: 'Annulée',              label: 'Annulées'  },
 ];
 
 // ─── KPI bar ─────────────────────────────────────────────────────────────────
@@ -65,8 +77,25 @@ function KpiBar({ transactions, styles, c }) {
 // ─── Transaction card ─────────────────────────────────────────────────────────
 
 function TxCard({ tx, index, styles, c }) {
-  const status = STATUS_CFG[tx.status] || STATUS_CFG['En cours'];
-  const type   = TYPE_CFG[tx.transactionType] || { label: tx.transactionType, color: '#64748B' };
+  const navigation = useNavigation();
+  const status   = STATUS_CFG[tx.status] || STATUS_CFG['En cours'];
+  const type     = TYPE_CFG[tx.transactionType] || { label: tx.transactionType, color: '#64748B' };
+  const payLabel = PAYMENT_LABELS[tx.paymentStatus] || PAYMENT_LABELS['non_initié'];
+
+  const goToPaiement = () => {
+    navigation.navigate('Profil', {
+      screen: 'Paiement',
+      params: {
+        transactionId: tx._id,
+        montant:       tx.finalAmount,
+        bien:          tx.property?.title || '',
+        type:          tx.transactionType === 'vente' ? 'Vente' : 'Location',
+        description:   `${tx.transactionType === 'vente' ? 'Achat' : 'Location'} — ${tx.property?.title || 'bien immobilier'}`,
+      },
+    });
+  };
+
+  const canPay = !['Annulée', 'Réussie'].includes(tx.status) && tx.paymentStatus !== 'confirmé';
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 60).duration(280).springify().damping(18)}>
@@ -97,26 +126,47 @@ function TxCard({ tx, index, styles, c }) {
           </View>
         </View>
 
+        {/* Statut paiement */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+          <Ionicons name="wallet-outline" size={13} color={payLabel.color} />
+          <Text style={{ fontFamily: fonts.body, fontSize: 12, color: payLabel.color }}>
+            {payLabel.label}
+          </Text>
+        </View>
+
         {/* Separator */}
         <View style={styles.cardSep} />
 
-        {/* Meta row */}
-        <View style={styles.metaRow}>
-          {tx.agent?.name && (
+        {/* Meta row + bouton payer */}
+        <View style={[styles.metaRow, { justifyContent: 'space-between' }]}>
+          <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', flex: 1 }}>
+            {tx.agent?.name && (
+              <View style={styles.metaItem}>
+                <Ionicons name="person-outline" size={12} color={colors.blue} />
+                <Text style={styles.metaText} numberOfLines={1}>{tx.agent.name}</Text>
+              </View>
+            )}
             <View style={styles.metaItem}>
-              <Ionicons name="person-outline" size={12} color={colors.blue} />
-              <Text style={styles.metaText} numberOfLines={1}>{tx.agent.name}</Text>
+              <Ionicons name="calendar-outline" size={12} color={colors.gold} />
+              <Text style={styles.metaText}>{dateStr(tx.transactionDate)}</Text>
             </View>
-          )}
-          <View style={styles.metaItem}>
-            <Ionicons name="calendar-outline" size={12} color={colors.gold} />
-            <Text style={styles.metaText}>{dateStr(tx.transactionDate)}</Text>
+            {tx.linkedInvoice && (
+              <View style={styles.metaItem}>
+                <Ionicons name="receipt-outline" size={12} color="#16A34A" />
+                <Text style={[styles.metaText, { color: '#16A34A' }]}>Facture</Text>
+              </View>
+            )}
           </View>
-          {tx.linkedInvoice && (
-            <View style={styles.metaItem}>
-              <Ionicons name="receipt-outline" size={12} color="#16A34A" />
-              <Text style={[styles.metaText, { color: '#16A34A' }]}>Facture</Text>
-            </View>
+          {canPay && (
+            <TouchableOpacity
+              onPress={goToPaiement}
+              style={{ backgroundColor: colors.gold, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              accessibilityRole="button"
+              accessibilityLabel="Payer ce dossier"
+            >
+              <Ionicons name="card-outline" size={14} color="#0A0A0A" />
+              <Text style={{ fontFamily: fonts.bodyBold, fontSize: 12, color: '#0A0A0A' }}>Payer</Text>
+            </TouchableOpacity>
           )}
         </View>
       </View>

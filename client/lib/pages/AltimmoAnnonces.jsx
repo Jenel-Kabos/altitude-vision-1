@@ -20,7 +20,10 @@ const DARK      = '#090B0E';
 const PROPERTIES_PER_PAGE = 12;
 
 const TRANSACTION_TYPES  = ['Tous', 'vente', 'location'];
-const PROPERTY_TYPES     = ['Tous', 'Appartement', 'Maison', 'Villa', 'Terrain', 'Bureau', 'Commerce'];
+const PROPERTY_TYPES = [
+  'Tous', 'Appartement', 'Appartement meublé', 'Maison',
+  'Villa', 'Studio', 'Terrain', 'Bureau', 'Commerce', 'Entrepôt',
+];
 const AVAILABILITY_STATUS = ['Tous', 'Disponible', 'Vendu', 'Loué'];
 const TRANSACTION_LABELS = { Tous: 'Tous', vente: 'Vente', location: 'Location' };
 

@@ -1,6 +1,7 @@
 // server/controllers/quoteController.js
 const QuoteRequest  = require('../models/QuoteRequest');
 const { sendEmail } = require('../config/email'); // ✅ Zoho OAuth2
+const { notify, notifyStaff } = require('../services/notificationService');
 
 // ======================================================
 // 📤 Créer une nouvelle demande de devis (PUBLIC)
@@ -80,6 +81,14 @@ exports.createQuoteRequest = async (req, res, next) => {
             // L'email échoue silencieusement — le devis est quand même enregistré
             console.error('❌ [Quote] Erreur envoi confirmation:', emailErr.message);
         }
+
+        // Notifie le staff d'un nouveau devis
+        notifyStaff({
+            type:  'quote_received',
+            title: 'Nouveau devis reçu',
+            body:  `${newQuote.name} a soumis une demande pour "${newQuote.service}" (${source}).`,
+            data:  { screen: 'AdminQuotes', params: { id: newQuote._id } },
+        }).catch(() => {});
 
         res.status(201).json({
             status:  'success',
@@ -161,6 +170,24 @@ exports.updateQuoteStatus = async (req, res) => {
         );
         if (!quote) return res.status(404).json({ status: 'fail', message: 'Devis introuvable.' });
 
+        // Notifie l'utilisateur lié si le statut change
+        if (status && quote.user) {
+            const STATUS_LABELS = {
+                'En cours':    'Votre demande est en cours de traitement.',
+                'Devis Envoyé': 'Votre devis a été préparé et vous sera envoyé.',
+                'Converti':    'Votre demande a été convertie en projet. Bienvenue !',
+            };
+            const msg = STATUS_LABELS[status];
+            if (msg) {
+                notify(quote.user, {
+                    type:  'quote_status',
+                    title: `Mise à jour de votre devis`,
+                    body:  msg,
+                    data:  { screen: 'Profile' },
+                }).catch(() => {});
+            }
+        }
+
         res.status(200).json({ status: 'success', message: 'Statut mis à jour.', data: { quote } });
     } catch (err) {
         console.error('❌ [Quote] updateQuoteStatus:', err);
@@ -231,6 +258,16 @@ exports.sendQuoteResponse = async (req, res) => {
 
         quote.status = 'Devis Envoyé';
         await quote.save();
+
+        // Push si l'utilisateur a un compte
+        if (quote.user) {
+            notify(quote.user, {
+                type:  'quote_response',
+                title: 'Votre devis est prêt 📄',
+                body:  `Votre devis pour "${quote.service}" a été chiffré à ${parseInt(quotedAmount).toLocaleString('fr-FR')} FCFA. Vérifiez votre email.`,
+                data:  { screen: 'Profile' },
+            }).catch(() => {});
+        }
 
         res.status(200).json({ status: 'success', message: 'Devis envoyé au client.', data: { quote } });
     } catch (err) {

@@ -750,22 +750,51 @@ export default function PublierBienScreen({ navigation, route }) {
           <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Rue (optionnel)</Text>
           {renderTextInput('rue', { placeholder: 'Ex : 24 Rue Mfoa' })}
 
-          <Button
-            label={locationLoading ? 'Récupération…' : 'Utiliser ma position'}
-            variant="outline"
-            fullWidth
-            icon="location-outline"
-            onPress={utiliserMaPosition}
-            loading={locationLoading}
-          />
-          {coords && (
-            <View style={styles.coordsRow}>
-              <Ionicons name="location" size={13} color={c.textSub} />
-              <Text style={styles.coordsText}>
-                {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
-              </Text>
+          {/* ─── Bloc GPS ─── */}
+          <View style={styles.gpsBlock}>
+            <View style={styles.gpsHeader}>
+              <View style={[styles.gpsIconWrap, coords && styles.gpsIconWrapOk]}>
+                <Ionicons
+                  name={coords ? 'location' : 'location-outline'}
+                  size={20}
+                  color={coords ? '#FFFFFF' : c.gold}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.gpsTitle}>Position GPS du bien</Text>
+                <Text style={styles.gpsSubtitle}>
+                  {coords
+                    ? `Capturée · ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`
+                    : 'Non capturée — le bien sera placé au centre de Brazzaville sur la carte'
+                  }
+                </Text>
+              </View>
             </View>
-          )}
+
+            {!coords && (
+              <View style={styles.gpsWarn}>
+                <Ionicons name="warning-outline" size={14} color="#B45309" />
+                <Text style={styles.gpsWarnText}>
+                  Rendez-vous physiquement au bien avant de taper ce bouton pour une localisation précise.
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.gpsBtn, coords && styles.gpsBtnOk]}
+              onPress={utiliserMaPosition}
+              disabled={locationLoading}
+              activeOpacity={0.8}
+            >
+              {locationLoading
+                ? <ActivityIndicator size="small" color={coords ? '#FFFFFF' : c.gold} />
+                : <Ionicons name="locate-outline" size={16} color={coords ? '#FFFFFF' : c.gold} />
+              }
+              <Text style={[styles.gpsBtnText, coords && styles.gpsBtnTextOk]}>
+                {locationLoading ? 'Localisation…' : coords ? 'Recapturer ma position' : 'Utiliser ma position GPS'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       );
     }
@@ -862,6 +891,22 @@ export default function PublierBienScreen({ navigation, route }) {
               <RecapRow label="Commodités" value={commodites.join(', ')} styles={styles} />
             </>
           )}
+
+          {/* Statut GPS */}
+          <View style={styles.recapDivider} />
+          <View style={[styles.recapRow, { alignItems: 'center' }]}>
+            <Text style={styles.recapLabel}>Localisation carte</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, justifyContent: 'flex-end' }}>
+              <Ionicons
+                name={coords ? 'checkmark-circle' : 'alert-circle-outline'}
+                size={14}
+                color={coords ? '#16A34A' : '#B45309'}
+              />
+              <Text style={[styles.recapValue, { color: coords ? '#16A34A' : '#B45309' }]}>
+                {coords ? 'GPS capturé ✓' : 'Non localisé — visible au centre BZV'}
+              </Text>
+            </View>
+          </View>
 
           <Text style={styles.recapWarn}>
             Vérifiez vos informations avant de publier
@@ -1274,6 +1319,79 @@ const makeStyles = (c) => StyleSheet.create({
     ...typography.caption,
     color: c.textSub,
     textAlign: 'center',
+  },
+  gpsBlock: {
+    backgroundColor: c.bgCard,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.border,
+    padding: spacing.md,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  gpsHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  gpsIconWrap: {
+    width: 40, height: 40, borderRadius: 10,
+    backgroundColor: c.goldMuted,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  gpsIconWrapOk: {
+    backgroundColor: '#16A34A',
+  },
+  gpsTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: c.text,
+    marginBottom: 2,
+  },
+  gpsSubtitle: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: c.textMuted,
+    lineHeight: 16,
+  },
+  gpsWarn: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: 'rgba(180,83,9,0.08)',
+    borderRadius: 8,
+    padding: 10,
+  },
+  gpsWarnText: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: '#B45309',
+    flex: 1,
+    lineHeight: 17,
+  },
+  gpsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: c.borderGold,
+    backgroundColor: c.goldMuted,
+    paddingVertical: 12,
+  },
+  gpsBtnOk: {
+    backgroundColor: '#16A34A',
+    borderColor: '#16A34A',
+  },
+  gpsBtnText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: c.gold,
+  },
+  gpsBtnTextOk: {
+    color: '#FFFFFF',
   },
 
   // ─── Step 6 : stepper +/- ───

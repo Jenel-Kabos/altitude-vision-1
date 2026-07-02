@@ -1,6 +1,7 @@
 import { createStackNavigator } from '@react-navigation/stack';
 import ConversationsScreen from '../../screens/Messagerie/ConversationsScreen';
-import ChatScreen from '../../screens/Messagerie/ChatScreen';
+import ChatScreen          from '../../screens/Messagerie/ChatScreen';
+import ChatbotScreen       from '../../screens/Messagerie/ChatbotScreen';
 
 const Stack = createStackNavigator();
 
@@ -8,7 +9,8 @@ export default function MessagerieStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Conversations" component={ConversationsScreen} />
-      <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen name="Chat"          component={ChatScreen} />
+      <Stack.Screen name="Chatbot"       component={ChatbotScreen} />
     </Stack.Navigator>
   );
 }

@@ -1,55 +1,57 @@
 const mongoose = require('mongoose');
+const { Schema } = mongoose;
+const ObjectId  = Schema.Types.ObjectId;
 
-const transactionSchema = new mongoose.Schema(
+const transactionSchema = new Schema(
   {
-    property: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'Property',
-      required: true,
-    },
-    client: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    agent: { // The collaborator who closed the deal
-      type: mongoose.Schema.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    finalAmount: {
-      type: Number,
-      required: [true, 'A transaction must have a final amount'],
-    },
+    property: { type: ObjectId, ref: 'Property', required: true },
+    client:   { type: ObjectId, ref: 'User',     required: true },
+    agent:    { type: ObjectId, ref: 'User',     required: true },
+
+    finalAmount: { type: Number, required: true, min: 0 },
     transactionType: {
-      type: String,
-      required: true,
-      enum: ['vente', 'location'],
+      type: String, enum: ['vente', 'location'], required: true,
     },
-    status: {
-      type: String,
-      required: true,
-      enum: ['En cours', 'Réussie', 'Annulée'],
-      default: 'En cours',
-    },
+
     commission: {
-        total: Number, // Total commission for the agency
-        ownerPayout: Number, // The 30% to be paid to the owner
+      taux:        { type: Number, default: 10 },
+      total:       { type: Number, default: 0 },
+      ownerPayout: { type: Number, default: 0 },
+      agencyNet:   { type: Number, default: 0 },
     },
-    linkedInvoice: { // A reference to the generated invoice
-        type: mongoose.Schema.ObjectId,
-        ref: 'Document',
+
+    status: {
+      type:    String,
+      enum:    ['En cours', 'Paiement en attente', 'Réussie', 'Annulée', 'Litigée'],
+      default: 'En cours',
+      index:   true,
     },
-    transactionDate: {
-      type: Date,
-      default: Date.now,
+
+    paymentStatus: {
+      type:    String,
+      enum:    ['non_initié', 'en_attente', 'confirmé', 'échoué', 'remboursé'],
+      default: 'non_initié',
     },
+    paymentMethod: {
+      type: String,
+      enum: ['cinetpay_mobile', 'cinetpay_carte', 'virement', 'especes', 'cheque', null],
+      default: null,
+    },
+
+    linkedInvoice: { type: ObjectId, ref: 'Document' },
+    paiements:     [{ type: ObjectId, ref: 'PaiementTransaction' }],
+
+    transactionDate: { type: Date, default: Date.now },
+    notes:           { type: String, maxlength: 1000 },
+
+    annulePar:    { type: ObjectId, ref: 'User' },
+    annuleAt:     { type: Date },
+    annuleRaison: { type: String, maxlength: 500 },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-const Transaction = mongoose.model('Transaction', transactionSchema);
+transactionSchema.index({ client: 1, status: 1 });
+transactionSchema.index({ property: 1 });
 
-module.exports = Transaction;
+module.exports = mongoose.model('Transaction', transactionSchema);

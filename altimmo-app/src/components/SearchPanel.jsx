@@ -64,7 +64,13 @@ function DropdownField({ label, value, displayValue, items, open, onToggle, onSe
         />
       </TouchableOpacity>
       {open && !disabled && (
-        <View style={styles.dropdownList}>
+        <ScrollView
+          style={styles.dropdownList}
+          nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
           {items.map((item) => {
             const isActive = value === item.value;
             return (
@@ -86,7 +92,7 @@ function DropdownField({ label, value, displayValue, items, open, onToggle, onSe
               </TouchableOpacity>
             );
           })}
-        </View>
+        </ScrollView>
       )}
     </>
   );
@@ -462,8 +468,7 @@ const makeStyles = (c) => StyleSheet.create({
     borderBottomLeftRadius: radius.xs,
     borderBottomRightRadius: radius.xs,
     backgroundColor: c.bgCard,
-    overflow: 'hidden',
-    maxHeight: 200,
+    maxHeight: 260,
   },
   dropdownItem: {
     flexDirection: 'row',

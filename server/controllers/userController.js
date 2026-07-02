@@ -178,6 +178,14 @@ exports.verifyOwner = async (req, res, next) => {
         );
         if (!user) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
         res.status(200).json({ status: 'success', message: '✅ Propriétaire vérifié avec succès.', data: { user } });
+        const { notify } = require('../services/notificationService');
+        notify({
+            recipient: user._id,
+            type:      'account_verified',
+            title:     'Compte vérifié ✅',
+            body:      'Votre compte propriétaire a été validé. Vous pouvez maintenant publier vos biens.',
+            data:      { screen: 'Profil' },
+        }).catch(() => {});
     } catch (error) {
         console.error('Erreur verifyOwner:', error);
         next(error);
@@ -197,6 +205,14 @@ exports.suspendUser = async (req, res, next) => {
 
         const updated = await User.findById(req.params.id).select('-password');
         res.status(200).json({ status: 'success', message: '⚠️ Compte suspendu avec succès.', data: { user: updated } });
+        const { notify: _notify1 } = require('../services/notificationService');
+        _notify1({
+            recipient: updated._id,
+            type:      'account_suspended',
+            title:     'Compte suspendu',
+            body:      'Votre compte a été suspendu. Contactez notre support pour plus d\'informations.',
+            data:      { screen: 'Profil' },
+        }).catch(() => {});
         logAction({
           action: 'Compte suspendu',
           description: `Compte de ${updated.name} suspendu`,
@@ -225,6 +241,14 @@ exports.activateUser = async (req, res, next) => {
 
         const updated = await User.findById(req.params.id).select('-password');
         res.status(200).json({ status: 'success', message: '✅ Compte réactivé avec succès.', data: { user: updated } });
+        const { notify: _notify2 } = require('../services/notificationService');
+        _notify2({
+            recipient: updated._id,
+            type:      'account_verified',
+            title:     'Compte réactivé ✅',
+            body:      'Votre compte est de nouveau actif. Bienvenue !',
+            data:      { screen: 'Profil' },
+        }).catch(() => {});
         logAction({
           action: 'Compte réactivé',
           description: `Compte de ${updated.name} réactivé`,

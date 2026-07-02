@@ -1,6 +1,7 @@
 const Contrat  = require('../models/Contrat');
 const Paiement = require('../models/Paiement');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+const { notify } = require('../services/notificationService');
 
 // Génère les paiements mensuels pour un bail location
 const generatePaiements = async (contratId, dateEntree, dateFinBail, montantLoyer) => {
@@ -73,6 +74,18 @@ exports.create = async (req, res) => {
     ]);
 
     res.status(201).json({ status: 'success', data: { contrat: populated } });
+
+    // Notifie locataire et propriétaire s'ils ont un userId
+    const notifBase = {
+      type:  'contrat_new',
+      title: 'Nouveau contrat 📄',
+      body:  `Un contrat de ${c.type || 'location'} pour "${populated.bien?.title || 'votre bien'}" a été établi.`,
+      data:  { screen: 'Profil' },
+    };
+    [populated.proprietaire?.userId, populated.locataire?.userId]
+      .filter(Boolean)
+      .forEach((uid) => notify({ recipient: uid, ...notifBase }).catch(() => {}));
+
     logAction({
       action: 'Contrat créé',
       description: `Contrat de ${c.type || 'location'} créé`,
@@ -98,6 +111,17 @@ exports.update = async (req, res) => {
 
     if (!c) return res.status(404).json({ status: 'error', message: 'Contrat introuvable' });
     res.json({ status: 'success', data: { contrat: c } });
+
+    [c.proprietaire?.userId, c.locataire?.userId]
+      .filter(Boolean)
+      .forEach((uid) => notify({
+        recipient: uid,
+        type:  'contrat_updated',
+        title: 'Contrat mis à jour',
+        body:  `Votre contrat pour "${c.bien?.title || 'votre bien'}" a été modifié.`,
+        data:  { screen: 'Profil' },
+      }).catch(() => {}));
+
     logAction({
       action: 'Contrat modifié',
       description: `Contrat #${c._id} mis à jour`,

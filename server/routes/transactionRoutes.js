@@ -1,21 +1,38 @@
 const express = require('express');
-const transactionController = require('../controllers/transactionController');
-const authController = require('../controllers/authController');
+const router  = express.Router();
+const auth    = require('../controllers/authController');
+const ctrl    = require('../controllers/transactionController');
+const pCtrl   = require('../controllers/paiementTransactionController');
+const { upload } = require('../config/cloudinary');
 
-const router = express.Router();
+const protect   = auth.protect;
+const staffOnly = [auth.protect, auth.restrictTo('Admin', 'Collaborateur')];
+const adminOnly = [auth.protect, auth.restrictTo('Admin')];
 
-// Route accessible to any authenticated user — must be before the admin-only middleware
-router.get('/my', authController.protect, transactionController.getMyTransactions);
+// Webhook public (pas d'auth)
+router.post('/webhook/cinetpay', pCtrl.webhookCinetpay);
 
-// All routes below are for internal staff only
-router.use(authController.protect, authController.restrictTo('Admin', 'Collaborateur'));
+// Stats (staff)
+router.get('/stats', staffOnly, ctrl.getStats);
 
-router.route('/')
-    .get(transactionController.getAllTransactions)
-    .post(transactionController.createTransaction);
+// Client : ses transactions
+router.get('/my', protect, ctrl.getMyTransactions);
 
-// Special route to finalize a transaction
-router.route('/:id/finalize')
-    .post(transactionController.finalizeTransaction);
+// Staff : toutes les transactions
+router.get('/',    staffOnly, ctrl.getAllTransactions);
+router.post('/',   staffOnly, ctrl.createTransaction);
+
+// Transaction unique
+router.get   ('/:id',          protect,   ctrl.getTransaction);
+router.post  ('/:id/finalize', staffOnly, ctrl.finalizeTransaction);
+router.patch ('/:id/cancel',   staffOnly, ctrl.cancelTransaction);
+router.patch ('/:id/notes',    staffOnly, ctrl.updateNotes);
+
+// Paiements
+router.get   ('/:id/paiements',                                        protect,   pCtrl.getPaiements);
+router.post  ('/:id/paiements/initier',                                protect,   pCtrl.initierCinetpay);
+router.post  ('/:id/paiements/virement', upload.single('preuve'),      protect,   pCtrl.soumettreVirement);
+router.post  ('/:id/paiements/especes',                                staffOnly, pCtrl.enregistrerEspecesCheque);
+router.patch ('/:txId/paiements/:pId/valider',                         adminOnly, pCtrl.validerVirement);
 
 module.exports = router;

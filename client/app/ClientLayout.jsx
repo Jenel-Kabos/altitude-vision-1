@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Header from '@/lib/components/layout/Header';
 import Footer from '@/lib/components/layout/Footer';
+import CookieBanner from '@/lib/components/CookieBanner';
 
 export default function ClientLayout({ children }) {
   const pathname = usePathname();
@@ -21,6 +22,7 @@ export default function ClientLayout({ children }) {
       {!noHeaderFooter && <Header />}
       <main id="main-content">{children}</main>
       {!noHeaderFooter && <Footer />}
+      <CookieBanner />
     </>
   );
 }

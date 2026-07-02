@@ -10,7 +10,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../../theme';
-import api from '../../services/api';
+import { initierCinetpay } from '../../services/transactionService';
 
 // ─── Modes de paiement ───────────────────────────────────────────────────────
 
@@ -41,6 +41,15 @@ const MODES = [
     bg: '#185FA5',
     iconColor: '#FFFFFF',
     channel: 'CREDIT_CARD',
+  },
+  {
+    id: 'virement',
+    label: 'Virement bancaire',
+    desc: 'RIB + preuve de virement',
+    icon: 'business-outline',
+    bg: '#1E3A5F',
+    iconColor: '#FFFFFF',
+    channel: null,
   },
 ];
 
@@ -100,11 +109,12 @@ const SummaryRow = memo(function SummaryRow({ label, value, styles, total = fals
 
 export default function PaiementScreen({ route, navigation }) {
   const {
-    montant     = 0,
-    description = 'Paiement',
-    bien        = '',
-    type        = '',
-    duree       = '',
+    transactionId = null,
+    montant       = 0,
+    description   = 'Paiement',
+    bien          = '',
+    type          = '',
+    duree         = '',
   } = route.params || {};
 
   const { themeColors: c } = useTheme();
@@ -125,20 +135,30 @@ export default function PaiementScreen({ route, navigation }) {
       Alert.alert('Mode requis', 'Veuillez choisir un mode de paiement.');
       return;
     }
+    if (!transactionId) {
+      Alert.alert('Erreur', 'Transaction introuvable. Retournez à votre dossier.');
+      return;
+    }
     setLoading(true);
     try {
-      const mode          = MODES.find(m => m.id === modeSelected);
-      const transactionId = `AV-${Date.now()}`;
-      const res = await api.post('/paiements/initier', {
-        montant,
-        description,
-        transactionId,
-        channels: mode.channel,
-        currency: 'XAF',
+      if (modeSelected === 'virement') {
+        navigation.navigate('Profil', {
+          screen: 'VirementScreen',
+          params: { transactionId, montant, bien },
+        });
+        return;
+      }
+
+      const data = await initierCinetpay(transactionId, {
+        methode:  modeSelected === 'card' ? 'cinetpay_carte' : 'cinetpay_mobile',
+        provider: modeSelected,
       });
-      const paymentUrl = res.data?.paymentUrl;
-      if (paymentUrl) {
-        await WebBrowser.openBrowserAsync(paymentUrl);
+
+      if (data?.paymentUrl) {
+        const result = await WebBrowser.openBrowserAsync(data.paymentUrl);
+        if (result.type === 'dismiss' || result.type === 'cancel') {
+          navigation.goBack();
+        }
       }
     } catch (err) {
       Alert.alert(
@@ -148,7 +168,7 @@ export default function PaiementScreen({ route, navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [modeSelected, montant, description]);
+  }, [modeSelected, transactionId, montant, bien, navigation]);
 
   const isDisabled = !modeSelected || loading;
 

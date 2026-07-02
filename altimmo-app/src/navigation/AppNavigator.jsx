@@ -9,6 +9,8 @@ import { fonts, fontSize } from '../theme';
 import AuthNavigator from './AuthNavigator';
 import TabNavigator from './TabNavigator';
 import OnboardingScreen from '../screens/Onboarding/OnboardingScreen';
+import { navigationRef, flushPendingNavigation } from '../services/navigationService';
+import { setupNotificationListeners } from '../services/notificationsService';
 
 const LOGO = require('../../assets/Logo_Altitude_transparent.png');
 
@@ -26,11 +28,14 @@ export default function AppNavigator() {
 
   const handleOnboardingDone  = useCallback(() => setOnboardingDone(true), []);
 
-  // Passer onLogin : marque l'onboarding comme terminé ET force le flow Auth
-  // (sans user, TabNavigator ne s'affiche pas — AuthNavigator prend le relais)
   const handleOnboardingLogin = useCallback(async () => {
     await AsyncStorage.setItem('onboarding_complete', '1');
     setOnboardingDone(true);
+  }, []);
+
+  // Listeners push : initialisés une seule fois au montage de l'app
+  useEffect(() => {
+    setupNotificationListeners();
   }, []);
 
   if (loading || onboardingDone === null) {
@@ -59,7 +64,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,

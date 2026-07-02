@@ -1,5 +1,6 @@
 const axios = require('axios');
 const Paiement = require('../models/Paiement');
+const { notify } = require('../services/notificationService');
 
 exports.initierPaiement = async (req, res) => {
   try {
@@ -51,7 +52,16 @@ exports.webhookCinetpay = async (req, res) => {
         { statut: 'payé', datePaiement: new Date(), montantRecu: amount },
       ).catch(() => {});
 
-      // TODO : envoyer notification push + email de confirmation
+      if (userId) {
+        const montantFmt = Number(amount).toLocaleString('fr-FR');
+        notify({
+          recipient: userId,
+          type:      'payment_success',
+          title:     'Paiement confirmé ✅',
+          body:      `Votre paiement de ${montantFmt} FCFA a bien été reçu.`,
+          data:      { screen: 'Transactions', params: { transactionId: transaction_id } },
+        }).catch(() => {});
+      }
       console.log(`✅ [CinetPay] Paiement accepté — ${amount} XAF — user: ${userId}`);
     }
 

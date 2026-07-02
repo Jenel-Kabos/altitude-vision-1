@@ -352,6 +352,12 @@ app.use('/api/export', require('./routes/exportRoutes'));
 // ⚖️ Litiges
 app.use('/api/litiges', require('./routes/litigeRoutes'));
 
+// 🚩 Signalements
+app.use('/api/signalements', require('./routes/signalementRoutes'));
+
+// 🔔 Notifications
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+
 // ============================================================
 // 🔍 ROUTES DE TEST
 // ============================================================

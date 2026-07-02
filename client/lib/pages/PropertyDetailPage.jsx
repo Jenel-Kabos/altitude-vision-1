@@ -12,7 +12,7 @@ import {
   ArrowLeft, MapPin, Tag, Check, Bed, Bath,
   Sofa, UtensilsCrossed, Maximize2, MessageSquare,
   Phone, Clock, Scale, ChevronLeft, ChevronRight,
-  Heart, Eye, Share2, Percent,
+  Heart, Eye, Share2, Percent, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import CommentList from '../components/comments/CommentList';
 import Breadcrumb from '../components/Breadcrumb';
@@ -336,6 +336,58 @@ const STYLES = `
     font-size: clamp(0.88rem, 2vw, 0.95rem);
     line-height: 1.82; color: ${INK_MID}; white-space: pre-wrap;
   }
+  .pdp-desc-collapsed {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+  }
+  .pdp-desc-expand-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-top: 8px; padding: 0;
+    background: none; border: none; cursor: pointer;
+    font-family: var(--font-dm-sans), sans-serif;
+    font-size: clamp(0.74rem, 1.5vw, 0.78rem);
+    font-weight: 600; color: ${GOLD};
+    transition: opacity 0.18s;
+  }
+  .pdp-desc-expand-btn:hover { opacity: 0.75; }
+
+  /* ── FRAIS & CONDITIONS ── */
+  .pdp-fees {
+    margin-top: clamp(12px, 2.5vw, 18px);
+    padding: clamp(10px, 2vw, 14px) clamp(12px, 2.5vw, 18px);
+    border-radius: 8px;
+    background: rgba(46,123,181,0.05);
+    border: 1px solid rgba(46,123,181,0.18);
+  }
+  .pdp-fees-title {
+    font-family: var(--font-dm-sans), sans-serif;
+    font-size: clamp(0.60rem, 1.1vw, 0.64rem); font-weight: 600;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: rgba(46,123,181,0.85); margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .pdp-fees-row {
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(46,123,181,0.1);
+  }
+  .pdp-fees-row:last-child { border-bottom: none; }
+  .pdp-fees-row-label {
+    font-family: var(--font-dm-sans), sans-serif;
+    font-size: clamp(0.70rem, 1.3vw, 0.74rem); color: ${INK_SOFT};
+    flex: 1;
+  }
+  .pdp-fees-row-value {
+    font-family: var(--font-cormorant), serif;
+    font-size: clamp(0.95rem, 2.2vw, 1.05rem); font-weight: 600; color: ${INK};
+  }
+  .pdp-fees-row-note {
+    font-size: clamp(0.58rem, 1vw, 0.62rem); color: ${INK_SOFT};
+    text-align: right; min-width: 70px;
+  }
 
   /* ── INFO ROWS ── */
   .pdp-row {
@@ -604,6 +656,7 @@ const PropertyDetailPage = () => {
   const [localShares,   setLocalShares]   = useState(0);
   const [liked,         setLiked]         = useState(false);
   const [shared,        setShared]        = useState(false);
+  const [descExpanded,  setDescExpanded]  = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -887,9 +940,15 @@ const PropertyDetailPage = () => {
             <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2, duration:0.5 }}
               className="pdp-card">
               <div className="pdp-card-title">Description</div>
-              <p className="pdp-desc">
+              <p className={`pdp-desc${descExpanded ? '' : ' pdp-desc-collapsed'}`}>
                 {property.description || 'Aucune description disponible pour ce bien.'}
               </p>
+              {property.description && property.description.length > 180 && (
+                <button className="pdp-desc-expand-btn" onClick={() => setDescExpanded(v => !v)}>
+                  {descExpanded ? 'Réduire' : 'Lire la suite'}
+                  {descExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                </button>
+              )}
             </motion.div>
 
             {/* Informations */}
@@ -983,6 +1042,32 @@ const PropertyDetailPage = () => {
                   </div>
                 );
               })()}
+
+              {/* Frais & conditions */}
+              <div style={{ padding: '0 clamp(18px,4vw,28px) clamp(6px,1.5vw,10px)' }}>
+                <div className="pdp-fees">
+                  <div className="pdp-fees-title">
+                    <svg viewBox="0 0 24 24" style={{ width:11, height:11, fill:'none', stroke:'rgba(46,123,181,0.85)', strokeWidth:2 }}>
+                      <path d="M9 14l6-6M9 9h.01M15 15h.01M3 12a9 9 0 1018 0A9 9 0 003 12z" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Frais &amp; conditions
+                  </div>
+                  {(property.status === 'location' || property.transactionType === 'location') && (
+                    <div className="pdp-fees-row">
+                      <span className="pdp-fees-row-label">Frais d'agence</span>
+                      <span className="pdp-fees-row-value">
+                        {priceFormatter.format(Math.round((property.price || 0) * 0.8))}
+                      </span>
+                      <span className="pdp-fees-row-note">80% du loyer</span>
+                    </div>
+                  )}
+                  <div className="pdp-fees-row">
+                    <span className="pdp-fees-row-label">Frais de visite</span>
+                    <span className="pdp-fees-row-value">5 000 FCFA</span>
+                    <span className="pdp-fees-row-note">à régler sur place</span>
+                  </div>
+                </div>
+              </div>
 
               {/* Contact */}
               <div className="pdp-sidebar-body">
