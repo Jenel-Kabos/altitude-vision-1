@@ -27,6 +27,8 @@ const RED   = '#D42B2B';
 const GREEN = '#16A34A';
 const FONT  = "'DM Sans', sans-serif";
 
+const COLLAB_ROLES = ['Collaborateur','Secretaire','GestionnaireImmobilier','CommunityManager','Communicant'];
+
 // ── Helpers ──────────────────────────────────────────────────
 
 const timeAgo = (dateStr) => {
@@ -78,7 +80,7 @@ const DashboardHome = () => {
         const isAdmin = user?.role === 'Admin';
         const [dashboardData, quotesData, eventsData, alertesData, usersData, logsData] = await Promise.all([
           getDashboardStats(),
-          getAllQuotes(),
+          getAllQuotes().catch(() => []),
           getAllEvents(),
           getAlertesPaiements().catch(() => null),
           getAllUsers().catch(() => []),
@@ -94,8 +96,8 @@ const DashboardHome = () => {
         if (Array.isArray(usersData) && usersData.length > 0) {
           setTeamStats({
             admins:        usersData.filter(u => u.role === 'Admin').length,
-            collaborateurs: usersData.filter(u => u.role === 'Collaborateur').length,
-            utilisateurs:  usersData.filter(u => !['Admin','Collaborateur'].includes(u.role)).length,
+            collaborateurs: usersData.filter(u => COLLAB_ROLES.includes(u.role)).length,
+            utilisateurs:  usersData.filter(u => !['Admin', ...COLLAB_ROLES].includes(u.role)).length,
           });
         }
         setActivity(dashboardData.activity  || null);
@@ -181,10 +183,10 @@ const DashboardHome = () => {
 
   return (
     <>
-      {user?.role === 'Collaborateur' && (
+      {COLLAB_ROLES.includes(user?.role) && (
         <div className="flex items-center gap-3 px-6 py-2.5 text-sm" style={{ background:'#EFF6FF', borderBottom:'1px solid #BFDBFE', fontFamily:FONT }}>
           <span>👤</span>
-          <p className="text-blue-700">Vous êtes connecté en tant que <strong>Collaborateur</strong> — Vous pouvez ajouter du contenu mais pas le modifier ou le supprimer.</p>
+          <p className="text-blue-700">Vous êtes connecté en tant que <strong>{user?.role}</strong> — Vous pouvez ajouter du contenu mais pas le modifier ou le supprimer.</p>
         </div>
       )}
     <div className="flex h-[calc(100vh-64px)] md:h-screen overflow-hidden" style={{ background:'#F8FAFC' }}>

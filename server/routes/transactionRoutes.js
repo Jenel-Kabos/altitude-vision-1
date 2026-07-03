@@ -4,9 +4,10 @@ const auth    = require('../controllers/authController');
 const ctrl    = require('../controllers/transactionController');
 const pCtrl   = require('../controllers/paiementTransactionController');
 const { upload } = require('../config/cloudinary');
+const { STAFF_DOC } = require('../utils/roles');
 
 const protect   = auth.protect;
-const staffOnly = [auth.protect, auth.restrictTo('Admin', 'Collaborateur')];
+const staffOnly = [auth.protect, auth.restrictTo(...STAFF_DOC)];
 const adminOnly = [auth.protect, auth.restrictTo('Admin')];
 
 // Webhook public (pas d'auth)

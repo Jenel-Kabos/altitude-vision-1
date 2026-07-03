@@ -2,6 +2,7 @@
 const express = require('express');
 const quoteController = require('../controllers/quoteController');
 const authController = require('../controllers/authController');
+const { STAFF_ALL } = require('../utils/roles');
 
 const writeWindowMiddleware = require('../middleware/writeWindowMiddleware');
 
@@ -18,7 +19,7 @@ router.post('/', quoteController.createQuoteRequest);
 // 🔒 PROTECTION - Routes suivantes réservées aux admins/collaborateurs
 // ======================================================
 router.use(authController.protect);
-router.use(authController.restrictTo('Admin', 'Collaborateur'));
+router.use(authController.restrictTo(...STAFF_ALL));
 router.use(writeWindowMiddleware);
 
 // ======================================================

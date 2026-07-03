@@ -4,8 +4,9 @@ const multer     = require('multer');
 const auth       = require('../controllers/authController');
 const ctrl       = require('../controllers/proprietaireController');
 const { upload } = require('../config/cloudinary');
+const { STAFF_IMMO } = require('../utils/roles');
 
-const protect    = [auth.protect, auth.restrictTo('Admin', 'Collaborateur')];
+const protect    = [auth.protect, auth.restrictTo(...STAFF_IMMO)];
 const adminOnly  = [auth.protect, auth.restrictTo('Admin')];
 const multiPics  = upload.array('photos', 20);
 

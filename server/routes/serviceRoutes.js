@@ -2,6 +2,7 @@ const express = require('express');
 const serviceController = require('../controllers/serviceController');
 const authController = require('../controllers/authController');
 const writeWindowMiddleware = require('../middleware/writeWindowMiddleware');
+const { STAFF_CM } = require('../utils/roles');
 
 const router = express.Router();
 
@@ -13,10 +14,10 @@ router.get('/:id', serviceController.getService);
 router.use(authController.protect); // Toutes les routes suivantes sont protégées
 
 // Création d'un service (Admin ou Collaborateur)
-router.post('/', authController.restrictTo('Admin', 'Collaborateur'), writeWindowMiddleware, serviceController.createService);
+router.post('/', authController.restrictTo(...STAFF_CM), writeWindowMiddleware, serviceController.createService);
 
 // Mise à jour d'un service (Admin ou Collaborateur)
-router.patch('/:id', authController.restrictTo('Admin', 'Collaborateur'), writeWindowMiddleware, serviceController.updateService);
+router.patch('/:id', authController.restrictTo(...STAFF_CM), writeWindowMiddleware, serviceController.updateService);
 
 // Suppression d'un service (uniquement Admin)
 router.delete('/:id', authController.restrictTo('Admin'), serviceController.deleteService);

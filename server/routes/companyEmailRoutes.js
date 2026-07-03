@@ -7,6 +7,7 @@ const companyEmailController = require('../controllers/companyEmailController');
 
 // ✅ IMPORT 2 : La sécurité unifiée (et pas l'ancien middleware)
 const authController = require('../controllers/authController');
+const { STAFF_ALL } = require('../utils/roles');
 
 // ======================================================
 // 🔒 PROTECTION GLOBALE
@@ -16,7 +17,7 @@ router.use(authController.protect);
 
 // Par défaut, accès Admin et Collaborateur (pour voir), 
 // mais on restreindra la suppression/création plus bas si nécessaire.
-router.use(authController.restrictTo('Admin', 'Collaborateur'));
+router.use(authController.restrictTo(...STAFF_ALL));
 
 
 // ======================================================

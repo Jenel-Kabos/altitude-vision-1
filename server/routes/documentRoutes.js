@@ -2,10 +2,11 @@ const express = require('express');
 const documentController = require('../controllers/documentController');
 const authController = require('../controllers/authController');
 const writeWindowMiddleware = require('../middleware/writeWindowMiddleware');
+const { STAFF_DOC } = require('../utils/roles');
 
 const router = express.Router();
 
-const protect   = [authController.protect, authController.restrictTo('Admin', 'Collaborateur')];
+const protect   = [authController.protect, authController.restrictTo(...STAFF_DOC)];
 const adminOnly = [authController.protect, authController.restrictTo('Admin')];
 
 // Lecture : Admin + Collaborateur
