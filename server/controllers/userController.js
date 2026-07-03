@@ -3,13 +3,9 @@ const User       = require('../models/User');
 const sendEmail  = require('../utils/email');
 const { destroyFromCloudinary, uploadToCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+const { COLLAB_ROLES, ROLE_LABELS } = require('../utils/roles');
 
 // ── Email de notification de changement de rôle ──────────────
-const ROLE_LABELS = {
-    Admin: 'Administrateur', Collaborateur: 'Collaborateur',
-    User: 'Utilisateur', Client: 'Client',
-    Proprietaire: 'Propriétaire', Prestataire: 'Prestataire',
-};
 
 const getRoleChangeEmailHTML = (nomComplet, ancienLabel, nouveauLabel, adminName, normalized) => `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
@@ -310,11 +306,10 @@ exports.deleteUser = async (req, res) => {
 exports.updateUserRole = async (req, res) => {
     try {
         const { role } = req.body;
-        const ROLE_MAP = { admin:'Admin', collaborateur:'Collaborateur', user:'User', Admin:'Admin', Collaborateur:'Collaborateur', User:'User' };
-        const normalized = ROLE_MAP[role];
-
+        const ALL_ASSIGNABLE = ['Admin', 'User', 'Client', 'Proprietaire', 'Prestataire', ...COLLAB_ROLES];
+        const normalized = ALL_ASSIGNABLE.find(r => r.toLowerCase() === String(role).toLowerCase()) || null;
         if (!normalized) {
-            return res.status(400).json({ status: 'fail', message: "Rôle invalide. Valeurs acceptées : Admin, Collaborateur, User." });
+            return res.status(400).json({ status: 'fail', message: `Rôle invalide. Valeurs acceptées : ${ALL_ASSIGNABLE.join(', ')}.` });
         }
         if (String(req.params.id) === String(req.user._id)) {
             return res.status(403).json({ status: 'fail', message: 'Vous ne pouvez pas modifier votre propre rôle.' });
@@ -444,10 +439,10 @@ exports.createByAdmin = async (req, res) => {
         if (!nom || !prenom || !email || !password) {
             return res.status(400).json({ status: 'fail', message: 'Prénom, nom, email et mot de passe sont requis.' });
         }
-        const ROLE_MAP = { admin:'Admin', collaborateur:'Collaborateur', Admin:'Admin', Collaborateur:'Collaborateur' };
-        const normalized = ROLE_MAP[role];
+        const ADMIN_CREATABLE = ['Admin', ...COLLAB_ROLES];
+        const normalized = ADMIN_CREATABLE.find(r => r.toLowerCase() === String(role).toLowerCase()) || null;
         if (!normalized) {
-            return res.status(400).json({ status: 'fail', message: 'Rôle invalide. Valeurs acceptées : Admin, Collaborateur.' });
+            return res.status(400).json({ status: 'fail', message: `Rôle invalide. Valeurs acceptées : ${ADMIN_CREATABLE.join(', ')}.` });
         }
         if (password.length < 8) {
             return res.status(400).json({ status: 'fail', message: 'Le mot de passe doit contenir au moins 8 caractères.' });
@@ -472,7 +467,7 @@ exports.createByAdmin = async (req, res) => {
 
         if (sendWelcomeEmail) {
             try {
-                const roleLabel = normalized === 'Admin' ? 'Administrateur' : 'Collaborateur';
+                const roleLabel = ROLE_LABELS[normalized] || normalized;
                 await sendEmail({
                     to:      email,
                     subject: 'Bienvenue sur Altitude Vision Dashboard',
