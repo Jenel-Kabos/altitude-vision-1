@@ -160,7 +160,11 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const title       = useMemo(() => annonce.title  || annonce.titre  || 'Bien immobilier', [annonce]);
   const description = useMemo(() => annonce.description || '', [annonce]);
   const typeLabel   = useMemo(() => annonce.type || '', [annonce]);
-  const isLocation  = useMemo(() => annonce.transactionType?.toLowerCase() === 'location' || annonce.status?.toLowerCase() === 'location', [annonce]);
+  const isLocation  = useMemo(() => {
+    const loc = 'location';
+    return [annonce.transactionType, annonce.status, annonce.category, annonce.type, annonce.listingType]
+      .some(v => v?.toLowerCase() === loc);
+  }, [annonce]);
 
   const addressText = useMemo(() => {
     const arr  = annonce.address?.arrondissement || annonce.location?.neighborhood || '';
