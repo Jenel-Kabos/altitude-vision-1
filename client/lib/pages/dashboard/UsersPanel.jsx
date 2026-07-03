@@ -20,13 +20,19 @@ const GRAY  = '#94A3B8';
 const FONT  = "'Outfit', sans-serif";
 
 // ── Helpers ───────────────────────────────────────────────────
+const COLLAB_ROLES = ['Collaborateur','Secretaire','GestionnaireImmobilier','CommunityManager','Communicant'];
+
 const ROLE_META = {
-  Admin:         { label: 'Admin',         color: RED,    bg: `${RED}15`,   emoji: '🔴' },
-  Collaborateur: { label: 'Collaborateur', color: GOLD,   bg: `${GOLD}15`,  emoji: '🟡' },
-  User:          { label: 'Utilisateur',   color: GRAY,   bg: `${GRAY}15`,  emoji: '⚪' },
-  Proprietaire:  { label: 'Propriétaire',  color: GREEN,  bg: `${GREEN}15`, emoji: '🏠' },
-  Client:        { label: 'Client',        color: '#7C3AED', bg:'#7C3AED15', emoji: '🧑' },
-  Prestataire:   { label: 'Prestataire',   color: '#0891B2', bg:'#0891B215', emoji: '🔧' },
+  Admin:                  { label: 'Admin',              color: RED,       bg: `${RED}15`,    emoji: '🔴' },
+  Collaborateur:          { label: 'Collaborateur',      color: GOLD,      bg: `${GOLD}15`,   emoji: '🟡' },
+  Secretaire:             { label: 'Secrétaire',         color: '#0891B2', bg: '#0891B215',   emoji: '📋' },
+  GestionnaireImmobilier: { label: 'Gestionnaire Immo', color: '#7C3AED', bg: '#7C3AED15',   emoji: '🏢' },
+  CommunityManager:       { label: 'Community Manager', color: '#059669', bg: '#05966915',   emoji: '📣' },
+  Communicant:            { label: 'Communicant',        color: '#DC2626', bg: '#DC262615',   emoji: '💬' },
+  User:                   { label: 'Utilisateur',        color: GRAY,      bg: `${GRAY}15`,   emoji: '⚪' },
+  Proprietaire:           { label: 'Propriétaire',       color: GREEN,     bg: `${GREEN}15`,  emoji: '🏠' },
+  Client:                 { label: 'Client',             color: '#7C3AED', bg: '#7C3AED15',   emoji: '🧑' },
+  Prestataire:            { label: 'Prestataire',        color: '#0891B2', bg: '#0891B215',   emoji: '🔧' },
 };
 
 const RoleBadge = ({ role }) => {
@@ -113,9 +119,13 @@ const ConfirmDialog = ({ user: target, onConfirm, onCancel }) => (
 
 // ── Edit Role Modal ───────────────────────────────────────────
 const EDITABLE_ROLES = [
-  { role:'Admin',         emoji:'🔴', desc:'Accès complet',           color:RED  },
-  { role:'Collaborateur', emoji:'🟡', desc:'Peut ajouter seulement',  color:GOLD },
-  { role:'User',          emoji:'⚪', desc:'Accès limité',            color:GRAY },
+  { role:'Admin',                  emoji:'🔴', desc:'Accès complet',         color: RED       },
+  { role:'Collaborateur',          emoji:'🟡', desc:'Accès général collab',  color: GOLD      },
+  { role:'Secretaire',             emoji:'📋', desc:'Documents & paiements', color: '#0891B2' },
+  { role:'GestionnaireImmobilier', emoji:'🏢', desc:'Biens & contrats',      color: '#7C3AED' },
+  { role:'CommunityManager',       emoji:'📣', desc:'Biens & événements',    color: '#059669' },
+  { role:'Communicant',            emoji:'💬', desc:'Messages & RDV',        color: '#DC2626' },
+  { role:'User',                   emoji:'⚪', desc:'Accès limité',          color: GRAY      },
 ];
 
 const EditRoleModal = ({ user: target, onConfirm, onCancel, loading }) => {
@@ -138,7 +148,7 @@ const EditRoleModal = ({ user: target, onConfirm, onCancel, loading }) => {
         <div className="mb-4"><RoleBadge role={target.role} /></div>
 
         <p className="text-xs font-semibold text-gray-600 mb-3" style={{ fontFamily:FONT }}>Nouveau rôle</p>
-        <div className="grid grid-cols-3 gap-2 mb-5">
+        <div className="grid grid-cols-2 gap-2 mb-5">
           {EDITABLE_ROLES.map(({ role, emoji, desc, color }) => (
             <button key={role} onClick={() => setSelected(role)}
               className="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center"
@@ -287,10 +297,14 @@ const CreateUserModal = ({ onConfirm, onCancel, loading }) => {
             <label className="block text-xs font-semibold text-gray-600 mb-2" style={{ fontFamily:FONT }}>
               Rôle <span className="text-red-400">*</span>
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {[
-                { role:'Admin',         emoji:'🔴', desc:'Accès complet',          color:RED  },
-                { role:'Collaborateur', emoji:'🟡', desc:'Peut ajouter seulement', color:GOLD },
+                { role:'Admin',                  emoji:'🔴', desc:'Accès complet',         color: RED       },
+                { role:'Collaborateur',          emoji:'🟡', desc:'Accès général',         color: GOLD      },
+                { role:'Secretaire',             emoji:'📋', desc:'Documents & paiements', color: '#0891B2' },
+                { role:'GestionnaireImmobilier', emoji:'🏢', desc:'Biens & contrats',      color: '#7C3AED' },
+                { role:'CommunityManager',       emoji:'📣', desc:'Biens & événements',    color: '#059669' },
+                { role:'Communicant',            emoji:'💬', desc:'Messages & RDV',        color: '#DC2626' },
               ].map(({ role, emoji, desc, color }) => (
                 <button key={role} type="button" onClick={() => set('role', role)}
                   className="flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all"
@@ -299,7 +313,9 @@ const CreateUserModal = ({ onConfirm, onCancel, loading }) => {
                     background:  form.role === role ? `${color}10` : 'white',
                   }}>
                   <span className="text-xl">{emoji}</span>
-                  <span className="text-xs font-bold" style={{ color: form.role===role?color:'#374151', fontFamily:FONT }}>{role}</span>
+                  <span className="text-xs font-bold" style={{ color: form.role===role?color:'#374151', fontFamily:FONT }}>
+                    {role === 'GestionnaireImmobilier' ? 'Gest. Immo' : role}
+                  </span>
                   <span className="text-xs text-gray-400" style={{ fontFamily:FONT }}>{desc}</span>
                 </button>
               ))}
@@ -552,6 +568,8 @@ const UsersPanel = () => {
     if (filterTab !== 'all') {
       if (filterTab === 'User') {
         list = list.filter(u => u.role === 'User' || u.role === 'Client');
+      } else if (filterTab === 'Collaborateur') {
+        list = list.filter(u => COLLAB_ROLES.includes(u.role));
       } else {
         list = list.filter(u => u.role === filterTab);
       }
@@ -641,13 +659,14 @@ const UsersPanel = () => {
   const stats = {
     total:         users.length,
     admins:        users.filter(u => u.role === 'Admin').length,
-    collaborateurs:users.filter(u => u.role === 'Collaborateur').length,
+    collaborateurs:users.filter(u => COLLAB_ROLES.includes(u.role)).length,
     users:         users.filter(u => u.role === 'User' || u.role === 'Client').length,
   };
 
   const countByTab = (tab) => {
     if (tab === 'all') return users.length;
     if (tab === 'User') return users.filter(u => u.role === 'User' || u.role === 'Client').length;
+    if (tab === 'Collaborateur') return users.filter(u => COLLAB_ROLES.includes(u.role)).length;
     return users.filter(u => u.role === tab).length;
   };
 
