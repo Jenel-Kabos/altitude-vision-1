@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "scheme": "altimmo",
     "orientation": "portrait",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/Logo_Altitude_transparent.png",
@@ -27,11 +27,7 @@
         "backgroundColor": "#0A0A0A"
       },
       "package": "com.altitudevision.altimmo",
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyDHgPyL-Oqu-gpHTg7HNnXDqrR3zPjfceo"
-        }
-      },
+
       "intentFilters": [
         {
           "action": "VIEW",

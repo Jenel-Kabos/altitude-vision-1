@@ -139,10 +139,8 @@ export default function ChatScreen({ route, navigation }) {
   useEffect(() => {
     fetchMessages();
 
-    const token  = api.defaults?.headers?.common?.Authorization?.replace('Bearer ', '');
-    const socket = connectSocket(token);
-
-    socket.emit('join-room', conversation._id);
+    let isMounted = true;
+    let socketRef = null;
 
     const handleNewMessage = (payload) => {
       const msg = payload?.message ?? payload;
@@ -161,15 +159,23 @@ export default function ChatScreen({ route, navigation }) {
       }
     };
 
-    socket.on('new-message', handleNewMessage);
-    socket.on('typing',      handleTyping);
+    connectSocket().then(socket => {
+      if (!isMounted) return;
+      socketRef = socket;
+      socket.emit('join-room', conversation._id);
+      socket.on('new-message', handleNewMessage);
+      socket.on('typing',      handleTyping);
+    });
 
-    // Polling de rattrapage si le socket est silencieux (réseau instable)
-    const fallback = setInterval(fetchMessages, 30_000);
+    // Polling uniquement si le socket est mort
+    const fallback = setInterval(() => {
+      if (!getSocket()?.connected) fetchMessages();
+    }, 30_000);
 
     return () => {
-      socket.off('new-message', handleNewMessage);
-      socket.off('typing',      handleTyping);
+      isMounted = false;
+      socketRef?.off('new-message', handleNewMessage);
+      socketRef?.off('typing',      handleTyping);
       clearInterval(fallback);
     };
   }, [conversation._id, user._id, fetchMessages]);

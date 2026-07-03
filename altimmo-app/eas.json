@@ -3,6 +3,29 @@
     "version": ">= 5.0.0"
   },
   "build": {
+    "development": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.1.100:5000/api",
+        "EXPO_PUBLIC_SOCKET_URL": "http://192.168.1.100:5000",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
+    },
+    "staging": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://altitude-vision-staging.onrender.com/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://altitude-vision-staging.onrender.com",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "android": {
@@ -15,6 +38,13 @@
     "production": {
       "android": {
         "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json"
       }
     }
   }

@@ -147,14 +147,6 @@ const checkPropertyOwnership = asyncHandler(async (req, res, next) => {
   const isAdmin = req.user.role === 'Admin';
   const isOwner = property.owner.toString() === req.user._id.toString();
 
-  console.log('🔍 [checkPropertyOwnership]', {
-    user: req.user._id,
-    property: property._id,
-    owner: property.owner,
-    isAdmin,
-    isOwner,
-  });
-
   if (isAdmin || isOwner) {
     req.property = property;
     return next();

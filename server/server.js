@@ -143,9 +143,14 @@ app.use(
   })
 );
 
-app.use(morgan("dev"));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+const compression       = require('compression');
+const mongoSanitize     = require('express-mongo-sanitize');
+
+app.use(compression());
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(mongoSanitize());
 
 // ============================================================
 // 🔓 CONFIGURATION CORS AMÉLIORÉE
@@ -422,18 +427,20 @@ initSocket(httpServer, {
   methods: ['GET', 'POST'],
 });
 
-httpServer.listen(PORT, () => {
-  logger.info('\n' + '='.repeat(60));
-  logger.success(`✅ Serveur Altitude-Vision lancé sur le port ${PORT}`);
-  logger.info(`🌍 Mode: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`🔗 API disponible sur: http://localhost:${PORT}/api`);
-  logger.info(`📸 Images disponibles sur: http://localhost:${PORT}/uploads`);
-  logger.info(`🔗 Frontend autorisé: ${process.env.FRONTEND_URL || 'localhost'}`);
-  logger.info(`📊 Health check: http://localhost:${PORT}/api/health`);
-  logger.info(`🪝  Webhook Zoho: http://localhost:${PORT}/api/webhooks/zoho-incoming`);
-  logger.info(`🔌 Socket.IO actif sur: ws://localhost:${PORT}`);
-  logger.info('='.repeat(60) + '\n');
-});
+if (process.env.NODE_ENV !== 'test') {
+  httpServer.listen(PORT, () => {
+    logger.info('\n' + '='.repeat(60));
+    logger.success(`✅ Serveur Altitude-Vision lancé sur le port ${PORT}`);
+    logger.info(`🌍 Mode: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`🔗 API disponible sur: http://localhost:${PORT}/api`);
+    logger.info(`📸 Images disponibles sur: http://localhost:${PORT}/uploads`);
+    logger.info(`🔗 Frontend autorisé: ${process.env.FRONTEND_URL || 'localhost'}`);
+    logger.info(`📊 Health check: http://localhost:${PORT}/api/health`);
+    logger.info(`🪝  Webhook Zoho: http://localhost:${PORT}/api/webhooks/zoho-incoming`);
+    logger.info(`🔌 Socket.IO actif sur: ws://localhost:${PORT}`);
+    logger.info('='.repeat(60) + '\n');
+  });
+}
 
 // ============================================================
 // 🛑 GRACEFUL SHUTDOWN

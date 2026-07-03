@@ -82,7 +82,7 @@ const AnnonceCard = React.memo(function AnnonceCard({ item, index, onPress, styl
   const typeLabel      = (item.type || '').toUpperCase();
 
   const images = useMemo(
-    () => (item.images || item.photos || []).filter(Boolean),
+    () => (item.images || item.photos || []).filter(Boolean).slice(0, 4),
     [item.images, item.photos],
   );
   const hasMultiple = images.length > 1;

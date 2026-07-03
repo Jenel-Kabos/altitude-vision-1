@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../services/api';
-import { connectSocket } from '../../services/socketService';
+import { connectSocket, getSocket } from '../../services/socketService';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts, fontSize, spacing } from '../../theme';
@@ -153,8 +153,8 @@ export default function ConversationsScreen({ navigation }) {
       const endpoint = isStaff ? '/conversations/staff-inbox' : '/conversations';
       const res = await api.get(endpoint);
       setConversations(res.data?.data?.conversations || []);
-    } catch (err) {
-      console.log('Erreur conversations:', err.message);
+    } catch {
+      // silencieux — l'utilisateur peut refresh manuellement
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -168,8 +168,8 @@ export default function ConversationsScreen({ navigation }) {
 
   // ─── Socket.IO + polling de rattrapage ───
   useEffect(() => {
-    const token  = api.defaults?.headers?.common?.Authorization?.replace('Bearer ', '');
-    const socket = connectSocket(token);
+    let isMounted = true;
+    let socketRef = null;
 
     const handleIncoming = ({ conversationId, message }) => {
       if (!conversationId || !message) return;
@@ -183,15 +183,22 @@ export default function ConversationsScreen({ navigation }) {
       ));
     };
 
-    socket.on('new-message', handleIncoming);
-    if (isStaff) socket.on('new-staff-message', handleIncoming);
+    connectSocket().then(socket => {
+      if (!isMounted) return;
+      socketRef = socket;
+      socket.on('new-message', handleIncoming);
+      if (isStaff) socket.on('new-staff-message', handleIncoming);
+    });
 
-    // Polling de rattrapage 30s (réseau instable, arrière-plan)
-    const id = setInterval(chargerConversations, 30_000);
+    // Polling uniquement si le socket est mort (réseau instable, arrière-plan)
+    const id = setInterval(() => {
+      if (!getSocket()?.connected) chargerConversations();
+    }, 30_000);
 
     return () => {
-      socket.off('new-message',       handleIncoming);
-      if (isStaff) socket.off('new-staff-message', handleIncoming);
+      isMounted = false;
+      socketRef?.off('new-message',       handleIncoming);
+      if (isStaff) socketRef?.off('new-staff-message', handleIncoming);
       clearInterval(id);
     };
   }, [isStaff, chargerConversations]);

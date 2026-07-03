@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import api, { saveToken, getToken, deleteToken } from '../services/api';
 import { enregistrerNotifications } from '../services/notificationsService';
+import { disconnectSocket } from '../services/socketService';
 
 const AuthContext = createContext({});
 
@@ -40,9 +41,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      console.log('Login attempt:', email);
       const response = await api.post('/auth/login', { email, password });
-      console.log('Login response:', response.data);
       const token = response.data.token;
       const user = response.data.data?.user || response.data.user;
       await saveToken(token);
@@ -78,6 +77,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     await deleteToken();
+    disconnectSocket();
     setToken(null);
     setUser(null);
   };
@@ -94,7 +94,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const role = user?.role?.toLowerCase();
+  const role = useMemo(() => user?.role?.toLowerCase(), [user?.role]);
 
   return (
     <AuthContext.Provider value={{
