@@ -79,9 +79,12 @@ const RegisterPage = () => {
     const auth   = useAuth();
 
     useEffect(() => {
-        if (auth.user) router.push(
-            auth.user.role === 'Admin'        ? '/admin'     :
-            auth.user.role === 'Proprietaire' ? '/mes-biens' : '/'
+        if (!auth.user) return;
+        const COLLAB_ROLES = ['Collaborateur','Secretaire','GestionnaireImmobilier','CommunityManager','Communicant'];
+        router.push(
+            auth.user.role === 'Admin'            ? '/dashboard' :
+            COLLAB_ROLES.includes(auth.user.role) ? '/dashboard' :
+            auth.user.role === 'Proprietaire'     ? '/mes-biens' : '/'
         );
     }, [router, auth.user]);
 

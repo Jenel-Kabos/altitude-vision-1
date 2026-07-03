@@ -5,12 +5,12 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
-const ROLE_ROUTES = {
-  Admin:         '/dashboard',
-  Collaborateur: '/dashboard',
-  Proprietaire:  '/mes-biens',
-  Prestataire:   '/',
-  Client:        '/',
+const COLLAB_ROLES = ['Collaborateur','Secretaire','GestionnaireImmobilier','CommunityManager','Communicant'];
+
+const getTargetPath = (role) => {
+  if (role === 'Admin' || COLLAB_ROLES.includes(role)) return '/dashboard';
+  if (role === 'Proprietaire') return '/mes-biens';
+  return '/';
 };
 
 export default function GoogleRedirectPage() {
@@ -26,7 +26,7 @@ export default function GoogleRedirectPage() {
     }
 
     const role = session?.user?.role;
-    const target = ROLE_ROUTES[role] ?? '/';
+    const target = getTargetPath(role);
     router.replace(target);
   }, [status, session, router]);
 

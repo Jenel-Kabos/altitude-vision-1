@@ -47,10 +47,11 @@ const LoginPage = () => {
         auth.login(user, token);
 
         // 🟢 Redirection APRES connexion réussie (action unique et sûre)
+        const COLLAB_ROLES = ['Collaborateur','Secretaire','GestionnaireImmobilier','CommunityManager','Communicant'];
         const targetPath =
-          user.role === 'Admin'        ? '/dashboard'
-          : user.role === 'Collaborateur' ? '/dashboard'
-          : user.role === 'Proprietaire'  ? '/mes-biens'
+          user.role === 'Admin'              ? '/dashboard'
+          : COLLAB_ROLES.includes(user.role) ? '/dashboard'
+          : user.role === 'Proprietaire'     ? '/mes-biens'
           : '/';
         router.replace(targetPath);
       } else {
