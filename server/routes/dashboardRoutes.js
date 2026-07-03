@@ -1,5 +1,6 @@
 // server/routes/dashboardRoutes.js
 const express = require('express');
+const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
 const router  = express.Router();
 
 const Property       = require('../models/Property');
@@ -9,7 +10,7 @@ const PortfolioItem  = require('../models/portfolioItemModel'); // ← import au
 const authController = require('../controllers/authController');
 
 router.use(authController.protect);
-router.use(authController.restrictTo('Admin', 'Collaborateur'));
+router.use(authController.restrictTo(...STAFF_ALL));
 
 /**
  * @DESC   Obtenir les statistiques du Dashboard

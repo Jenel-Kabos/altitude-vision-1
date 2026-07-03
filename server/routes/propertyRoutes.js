@@ -1,5 +1,6 @@
 // server/routes/propertyRoutes.js
 const express = require('express');
+const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
 const router = express.Router();
 
 // ✅ IMPORT 1 : Le contrôleur Auth (Sécurité unifiée)
@@ -78,7 +79,7 @@ router.get(
 router.post(
     '/mobile',
     authController.protect,
-    authController.restrictTo('Admin', 'Proprietaire', 'Collaborateur'),
+    authController.restrictTo(...STAFF_CM, 'Proprietaire'),
     createPropertyMobile
 );
 
@@ -90,7 +91,7 @@ router.post(
 router.post(
     '/',
     authController.protect,
-    authController.restrictTo('Admin', 'Proprietaire', 'Collaborateur'),
+    authController.restrictTo(...STAFF_CM, 'Proprietaire'),
     upload.array('images', 10),
     propertyController.createProperty
 );

@@ -1,4 +1,5 @@
 const express = require('express');
+const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
 const portfolioController = require('../controllers/portfolioController');
 const authController = require('../controllers/authController');
 const reviewRouter = require('./reviewRoutes');
@@ -19,7 +20,7 @@ router.route('/:id').get(portfolioController.getPortfolioItem);
 
 // --- Routes Protégées ---
 // Seuls les administrateurs et collaborateurs peuvent ajouter ou modifier le portfolio.
-router.use(authController.protect, authController.restrictTo('Admin', 'Collaborateur'));
+router.use(authController.protect, authController.restrictTo(...STAFF_CM));
 router.use(writeWindowMiddleware);
 
 router.route('/').post(portfolioController.createPortfolioItem);

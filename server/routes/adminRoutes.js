@@ -1,79 +1,65 @@
 /**
- * @fileoverview Routes API du tableau de bord Administrateur.
- * Toutes ces routes nécessitent une authentification et une autorisation
- * (rôle 'Admin' ou 'Collaborateur').
+ * @fileoverview Routes API du tableau de bord — accès différencié par rôle.
+ *
+ * Stats / activité   → tous les collaborateurs
+ * Propriétés (read)  → CM, GestionnaireImmobilier
+ * Propriétés (write) → Admin uniquement (modération)
+ * Utilisateurs       → Admin uniquement
  */
 
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
+const { STAFF_ALL, STAFF_CM, STAFF_IMMO } = require('../utils/roles');
 
-// =============================================================
-// 📦 Import des contrôleurs et middlewares
-// =============================================================
 const adminController = require('../controllers/adminController');
+const authController  = require('../controllers/authController');
 
-// ✅ CORRECTION : Utilisation du contrôleur d'auth unifié
-const authController = require('../controllers/authController');
-
-// =============================================================
-// 🛡️ ACCÈS RÉSERVÉ À L'ADMINISTRATEUR
-// =============================================================
-// Toutes les routes ci-dessous nécessitent d'être connecté
+// ── Authentification obligatoire ──────────────────────────────────
 router.use(authController.protect);
 
-// Seuls les Admins et Collaborateurs peuvent accéder
-router.use(authController.restrictTo('Admin', 'Collaborateur'));
+// ── Portée minimale : tous les collaborateurs ─────────────────────
+router.use(authController.restrictTo(...STAFF_ALL));
 
+// ── Admin uniquement (raccourci) ──────────────────────────────────
+const adminOnly = authController.restrictTo('Admin');
 
-// =============================================================
-// 📊 STATISTIQUES GLOBALES (Dashboard)
-// =============================================================
-router.get('/stats', adminController.getDashboardStats);
+// ── Rôles disponibles pour l'attribution ─────────────────────────
+const { ROLE_LABELS } = require('../utils/roles');
+router.get('/roles', (req, res) => {
+  const collabRoles = ['Secretaire', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant'];
+  res.json({
+    status: 'success',
+    data: {
+      collabRoles: collabRoles.map(r => ({ value: r, label: ROLE_LABELS[r] })),
+      allRoles: Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label })),
+    },
+  });
+});
+
+// ── Statistiques & activité (tous les collaborateurs) ────────────
+router.get('/stats',    adminController.getDashboardStats);
 router.get('/activity', adminController.getActivityReport);
 
+// ── Propriétés : lecture (CM + Gestionnaire) ─────────────────────
+router.get('/properties/status/pending', authController.restrictTo(...STAFF_CM, ...STAFF_IMMO), adminController.getPendingProperties);
+router.get('/properties',               authController.restrictTo(...STAFF_CM, ...STAFF_IMMO), adminController.getAllProperties);
 
-// =============================================================
-// 🏠 GESTION DES PROPRIÉTÉS / PUBLICATIONS
-// =============================================================
+// ── Propriétés : modération / suppression (Admin uniquement) ─────
+router.patch('/properties/:id/approve', adminOnly, adminController.approveProperty);
+router.patch('/properties/:id/reject',  adminOnly, adminController.rejectProperty);
+router.delete('/properties/:id',        adminOnly, adminController.deleteProperty);
 
-// 🔹 Obtenir uniquement les propriétés en attente
-router.get('/properties/status/pending', adminController.getPendingProperties);
+// ── Utilisateurs (Admin uniquement) ──────────────────────────────
+router.get('/owners/active-sessions', adminOnly, adminController.getConnectedUsers);
+router.get('/owners',                 adminOnly, adminController.getAllUsers);
+router.patch('/owners/:id/verify',    adminOnly, adminController.verifyOwner);
+router.patch('/owners/:id/suspend',   adminOnly, adminController.suspendUser);
+router.patch('/owners/:id/activate',  adminOnly, adminController.activateUser);
+router.patch('/owners/:id/ban',       adminOnly, adminController.banUser);
 
-// 🔹 Obtenir toutes les propriétés
-router.get('/properties', adminController.getAllProperties);
-
-// 🔹 Validation ou rejet d'une propriété
-router.patch('/properties/:id/approve', adminController.approveProperty);
-router.patch('/properties/:id/reject', adminController.rejectProperty);
-
-// 🔹 Suppression d'une propriété spécifique
-router.delete('/properties/:id', adminController.deleteProperty);
-
-
-// =============================================================
-// 👤 GESTION DES UTILISATEURS / PROPRIÉTAIRES
-// =============================================================
-
-// 🚨 CRITIQUE : Cette route doit être AVANT '/owners/:id'
-// Sinon "active-sessions" est pris pour un ID, ce qui plante le serveur.
-router.get('/owners/active-sessions', adminController.getConnectedUsers);
-
-// 🔹 Obtenir tous les utilisateurs
-router.get('/owners', adminController.getAllUsers);
-
-// 🔹 Actions spécifiques sur un utilisateur (Verify, Suspend, Ban...)
-router.patch('/owners/:id/verify', adminController.verifyOwner);
-router.patch('/owners/:id/suspend', adminController.suspendUser);
-router.patch('/owners/:id/activate', adminController.activateUser);
-router.patch('/owners/:id/ban', adminController.banUser);
-
-// 🔹 Gestion individuelle (CRUD générique sur l'ID)
 router.route('/owners/:id')
-  .get(adminController.getUser)      // Voir les détails
-  .patch(adminController.updateUser) // Modifier
-  .delete(adminController.deleteUser); // Supprimer
+  .get(   adminOnly, adminController.getUser)
+  .patch( adminOnly, adminController.updateUser)
+  .delete(adminOnly, adminController.deleteUser);
 
-// =============================================================
-// 🚀 EXPORT DU ROUTEUR
-// =============================================================
 module.exports = router;

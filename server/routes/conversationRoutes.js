@@ -1,5 +1,6 @@
 // server/routes/conversationRoutes.js
 const express = require('express');
+const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
 const router = express.Router();
 
 const authController = require('../controllers/authController');
@@ -22,7 +23,7 @@ router.use(authController.protect);
 // Compteur global de non-lus
 router.get('/count/unread', getUnreadCount);
 
-// Boîte partagée staff (Admin / Collaborateur uniquement)
+// Boîte partagée staff (Admin + tous sous-rôles collaborateurs)
 router.get('/staff-inbox', getStaffInbox);
 
 // ✅ Nouvelle route de création — routage staff/client automatique

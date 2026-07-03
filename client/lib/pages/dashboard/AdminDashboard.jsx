@@ -18,43 +18,50 @@ const BLUE = '#2E7BB5';
 // ─────────────────────────────────────────────────────────────
 // Config de navigation
 // ─────────────────────────────────────────────────────────────
+// Groupes de rôles collaborateurs (miroir de server/utils/roles.js)
+const COLLAB_ALL  = ['Admin', 'Collaborateur', 'Secretaire', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant'];
+const ROLES_DOC   = ['Admin', 'Secretaire', 'Collaborateur'];
+const ROLES_IMMO  = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
+const ROLES_CM    = ['Admin', 'CommunityManager', 'GestionnaireImmobilier', 'Collaborateur'];
+const ROLES_COMM  = COLLAB_ALL; // tous les collaborateurs
+
 const NAV_SECTIONS = [
   {
     label: null,
     links: [
-      { to: '/dashboard',             end: true, Icon: BarChart3,    label: 'Tableau de bord',   accent: BLUE },
-      { to: '/dashboard/properties',         end: false, Icon: Home,     label: 'Altimmo',          accent: BLUE },
-      { to: '/dashboard/visites',            end: false, Icon: Calendar, label: 'Rendez-vous',       accent: GOLD },
-      { to: '/dashboard/gestion-locative',   end: false, Icon: Building, label: 'Gestion Locative', accent: BLUE, badge: 'contratsActifs' },
-      { to: '/dashboard/events',      end: false, Icon: Calendar,     label: 'Mila Events',       accent: '#D42B2B' },
-      { to: '/dashboard/altcom',      end: false, Icon: Briefcase,    label: 'Altcom',            accent: GOLD },
-      { to: '/dashboard/documents',   end: false, Icon: FolderOpen,   label: 'Documents',         accent: '#C8960C' },
+      { to: '/dashboard',                    end: true,  Icon: BarChart3,    label: 'Tableau de bord',    accent: BLUE,      roles: COLLAB_ALL },
+      { to: '/dashboard/properties',         end: false, Icon: Home,         label: 'Altimmo',             accent: BLUE,      roles: ROLES_CM   },
+      { to: '/dashboard/visites',            end: false, Icon: Calendar,     label: 'Rendez-vous',         accent: GOLD,      roles: ROLES_COMM },
+      { to: '/dashboard/gestion-locative',   end: false, Icon: Building,     label: 'Gestion Locative',   accent: BLUE,      roles: ROLES_IMMO, badge: 'contratsActifs' },
+      { to: '/dashboard/events',             end: false, Icon: Calendar,     label: 'Mila Events',         accent: '#D42B2B', roles: ROLES_CM   },
+      { to: '/dashboard/altcom',             end: false, Icon: Briefcase,    label: 'Altcom',              accent: GOLD,      roles: ROLES_CM   },
+      { to: '/dashboard/documents',          end: false, Icon: FolderOpen,   label: 'Documents',           accent: '#C8960C', roles: ROLES_DOC  },
     ],
   },
   {
     label: 'Modération',
     links: [
-      { to: '/dashboard/moderation/properties', end: false, Icon: CheckCircle2, label: 'Modération Biens', accent: '#7C3AED' },
-      { to: '/dashboard/moderation/reviews',    end: false, Icon: Star,         label: 'Modération Avis',  accent: '#6366F1' },
+      { to: '/dashboard/moderation/properties', end: false, Icon: CheckCircle2, label: 'Modération Biens', accent: '#7C3AED', roles: ['Admin'] },
+      { to: '/dashboard/moderation/reviews',    end: false, Icon: Star,         label: 'Modération Avis',  accent: '#6366F1', roles: ['Admin'] },
     ],
   },
   {
     label: 'Administration',
     links: [
-      { to: '/dashboard/users',            end: false, Icon: Users,         label: 'Utilisateurs',      accent: '#0D9488', adminOnly: true },
-      { to: '/dashboard/active-sessions',  end: false, Icon: ShieldCheck,   label: 'Sessions Actives',  accent: '#DC2626', adminOnly: true },
-      { to: '/dashboard/historique',       end: false, Icon: ClipboardList, label: 'Historique',        accent: '#7C3AED', adminOnly: true },
-      { to: '/dashboard/export-marketing', end: false, Icon: BarChart2,     label: 'Export Marketing',  accent: GOLD,      adminOnly: true },
-      { to: '/dashboard/litiges',          end: false, Icon: Scale,         label: 'Litiges',            accent: '#DC2626', badge: 'litiges', adminOnly: true },
+      { to: '/dashboard/users',            end: false, Icon: Users,         label: 'Utilisateurs',       accent: '#0D9488', roles: ['Admin'] },
+      { to: '/dashboard/active-sessions',  end: false, Icon: ShieldCheck,   label: 'Sessions Actives',   accent: '#DC2626', roles: ['Admin'] },
+      { to: '/dashboard/historique',       end: false, Icon: ClipboardList, label: 'Historique',         accent: '#7C3AED', roles: ['Admin'] },
+      { to: '/dashboard/export-marketing', end: false, Icon: BarChart2,     label: 'Export Marketing',   accent: GOLD,      roles: ['Admin'] },
+      { to: '/dashboard/litiges',          end: false, Icon: Scale,         label: 'Litiges',             accent: '#DC2626', roles: ['Admin'], badge: 'litiges' },
     ],
   },
   {
     label: 'Communications',
     links: [
-      { to: '/dashboard/messages',       end: false, Icon: Mail,            label: 'Boîte de Réception', accent: GOLD },
-      { to: '/dashboard/conversations',  end: false, Icon: MessageCircle,   label: 'Messages clients',   accent: GOLD },
-      { to: '/dashboard/emails',         end: false, Icon: ShieldCheck,     label: 'Gestion des Emails', accent: '#F59E0B' },
-      { to: '/dashboard/publicites',     end: false, Icon: Megaphone,       label: 'Publicités',         accent: GOLD, adminOnly: true },
+      { to: '/dashboard/messages',       end: false, Icon: Mail,          label: 'Boîte de Réception',  accent: GOLD,      roles: ROLES_COMM },
+      { to: '/dashboard/conversations',  end: false, Icon: MessageCircle, label: 'Messages clients',    accent: GOLD,      roles: ROLES_COMM },
+      { to: '/dashboard/emails',         end: false, Icon: ShieldCheck,   label: 'Gestion des Emails',  accent: '#F59E0B', roles: ROLES_DOC  },
+      { to: '/dashboard/publicites',     end: false, Icon: Megaphone,     label: 'Publicités',          accent: GOLD,      roles: ['Admin']  },
     ],
   },
 ];
@@ -148,7 +155,13 @@ const AdminDashboard = ({ children }) => {
                 <p className="text-white text-xs font-semibold truncate"
                   style={{ fontFamily: "'DM Sans', sans-serif" }}>{user.name || 'Admin'}</p>
                 <p className="text-white/35 text-xs truncate"
-                  style={{ fontFamily: "'DM Sans', sans-serif" }}>{user.role || 'Administrateur'}</p>
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}>{
+                  {
+                    Admin: 'Administrateur', Collaborateur: 'Collaborateur',
+                    Secretaire: 'Secrétaire', GestionnaireImmobilier: 'Gest. Immobilier',
+                    CommunityManager: 'Community Manager', Communicant: 'Communicant',
+                  }[user.role] || user.role || 'Collaborateur'
+                }</p>
               </div>
             </div>
           )}
@@ -197,7 +210,7 @@ const AdminDashboard = ({ children }) => {
                   </p>
                 )}
                 {section.links
-                  .filter(link => !link.adminOnly || user?.role === 'Admin')
+                  .filter(link => !link.roles || link.roles.includes(user?.role))
                   .map(({ to, end, Icon, label, accent, badge }) => (
                   <Link key={to} href={to} onClick={close}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${

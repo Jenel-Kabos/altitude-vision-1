@@ -36,7 +36,7 @@ const userSchema = new mongoose.Schema(
         role: {
             type: String,
             // 'Proprietaire' sans accent pour compatibilité frontend
-            enum:    ['User', 'Client', 'Proprietaire', 'Collaborateur', 'Admin', 'Prestataire'],
+            enum:    ['User', 'Client', 'Proprietaire', 'Collaborateur', 'Secretaire', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant', 'Admin', 'Prestataire'],
             default: 'Client',
         },
 

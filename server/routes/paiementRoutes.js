@@ -1,10 +1,11 @@
 const express = require('express');
+const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
 const router  = express.Router();
 const auth    = require('../controllers/authController');
 const ctrl    = require('../controllers/paiementController');
 const cinetpay = require('../controllers/cinetpayController');
 
-const protect   = [auth.protect, auth.restrictTo('Admin', 'Collaborateur')];
+const protect   = [auth.protect, auth.restrictTo(...STAFF_DOC)];
 const adminOnly = [auth.protect, auth.restrictTo('Admin')];
 
 // CinetPay

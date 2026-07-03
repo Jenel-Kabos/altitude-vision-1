@@ -7,7 +7,14 @@ import { useAuth } from '@/lib/context/AuthContext';
 import AdminDashboard from "@/lib/pages/dashboard/AdminDashboard";
 import { Loader2 } from 'lucide-react';
 
-const ALLOWED_ROLES = ['Admin', 'Collaborateur'];
+const ALLOWED_ROLES = [
+  'Admin',
+  'Collaborateur',          // legacy
+  'Secretaire',
+  'GestionnaireImmobilier',
+  'CommunityManager',
+  'Communicant',
+];
 
 const REDIRECT_BY_ROLE = {
   Proprietaire: '/mes-biens',

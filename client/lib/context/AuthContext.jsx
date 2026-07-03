@@ -32,7 +32,8 @@ export const AuthProvider = ({ children }) => {
     const [loading,       setLoading]       = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
 
-    const isCollab = user?.role === 'Collaborateur';
+    const COLLAB_ROLES = ['Collaborateur', 'Secretaire', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant'];
+    const isCollab = COLLAB_ROLES.includes(user?.role);
     const { registerWrite, canModify, timeLeft, activeWrites } = useWriteWindow(isCollab);
 
     // ── Initialisation depuis localStorage ───────────────────
@@ -147,8 +148,8 @@ export const AuthProvider = ({ children }) => {
         logout,
         updateUser,
         isAdmin:         user?.role === 'Admin',
-        isCollaborateur: user?.role === 'Collaborateur',
-        canAdd:          ['Admin', 'Collaborateur'].includes(user?.role),
+        isCollaborateur: isCollab,
+        canAdd:          ['Admin', ...COLLAB_ROLES].includes(user?.role),
         canEdit:         user?.role === 'Admin',
         canDelete:       user?.role === 'Admin',
         canValidate:     user?.role === 'Admin',

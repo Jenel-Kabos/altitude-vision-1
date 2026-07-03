@@ -1,5 +1,6 @@
 // server/routes/altcomRoutes.js
 const express = require('express');
+const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
 const router = express.Router();
 
 // ✅ IMPORT 1 : Le Contrôleur logique
@@ -20,7 +21,7 @@ router.post('/projects', altcomController.createProject);
 // ============================================================
 // Toutes les routes ci-dessous nécessitent d'être connecté ET Admin
 router.use(authController.protect);
-router.use(authController.restrictTo('Admin'));
+router.use(authController.restrictTo(...STAFF_CM));
 
 // 📋 Liste des projets
 router.get('/projects', altcomController.getAllProjects);
