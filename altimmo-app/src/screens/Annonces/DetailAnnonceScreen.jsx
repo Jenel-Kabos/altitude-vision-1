@@ -139,6 +139,21 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   const galleryRef = useRef(null);
 
+  // Auto-slide toutes les 4 secondes (pause si vidéo en lecture)
+  useEffect(() => {
+    if (photos.length <= 1 || playingIndex !== null) return;
+    const timer = setInterval(() => {
+      setPhotoIndex(prev => {
+        const next = (prev + 1) % photos.length;
+        try {
+          galleryRef.current?.scrollToIndex({ index: next, animated: true });
+        } catch (_) {}
+        return next;
+      });
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [photos.length, playingIndex]);
+
   // ─── Données dérivées ───
   const photos      = useMemo(() => annonce.images || annonce.photos || [], [annonce]);
   const prix        = useMemo(() => annonce.price  || annonce.prix   || 0,  [annonce]);
@@ -317,7 +332,12 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const openBailModal  = useCallback(() => setBailModalVisible(true),  []);
   const closeBailModal = useCallback(() => setBailModalVisible(false), []);
 
-  const openSignalModal  = useCallback(() => { setSignalRaison(''); setSignalDetails(''); setSignalModalVisible(true); }, []);
+  const openSignalModal  = useCallback(() => {
+    if (!isLoggedIn) { navigation.navigate('Login'); return; }
+    setSignalRaison('');
+    setSignalDetails('');
+    setSignalModalVisible(true);
+  }, [isLoggedIn, navigation]);
   const closeSignalModal = useCallback(() => setSignalModalVisible(false), []);
 
   const soumettreSignalement = useCallback(async () => {
@@ -325,7 +345,6 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       Alert.alert('Motif requis', 'Veuillez sélectionner un motif de signalement.');
       return;
     }
-    if (!isLoggedIn) { navigation.navigate('Login'); return; }
     setSignalEnvoi(true);
     try {
       await api.post('/signalements', {
@@ -336,8 +355,13 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       setSignalModalVisible(false);
       Alert.alert('Signalement envoyé', 'Merci. Notre équipe va examiner cette annonce sous 24h.');
     } catch (err) {
-      const msg = err.response?.data?.message || "Impossible d'envoyer le signalement.";
-      Alert.alert('Erreur', msg);
+      if (err.response?.status === 409) {
+        setSignalModalVisible(false);
+        Alert.alert('Déjà signalé', 'Vous avez déjà signalé cette annonce. Notre équipe est déjà informée.');
+      } else {
+        const msg = err.response?.data?.message || "Impossible d'envoyer le signalement.";
+        Alert.alert('Erreur', msg);
+      }
     } finally {
       setSignalEnvoi(false);
     }
