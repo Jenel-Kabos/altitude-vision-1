@@ -2,7 +2,7 @@
   "expo": {
     "name": "Altimmo",
     "slug": "altimmo-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "scheme": "altimmo",
     "orientation": "portrait",
     "newArchEnabled": true,
@@ -27,6 +27,9 @@
         "backgroundColor": "#0A0A0A"
       },
       "package": "com.altitudevision.altimmo",
+      "versionCode": 2,
+      "targetSdkVersion": 34,
+      "compileSdkVersion": 34,
 
       "intentFilters": [
         {
@@ -40,7 +43,6 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_EXTERNAL_STORAGE"
       ]
