@@ -51,7 +51,7 @@ const buildQuery = (filters, page) => {
     statusAdmin: 'Validée',
   });
   if (filters.transaction !== 'tous')
-    params.set('status', filters.transaction === 'location' ? 'Location' : 'Vente');
+    params.set('status', filters.transaction); // lowercase: 'location' | 'vente' — correspond à l'enum MongoDB
   if (filters.typeBien !== 'tous')
     params.set('type', filters.typeBien);
   if (filters.ville !== 'Toutes')
@@ -59,9 +59,9 @@ const buildQuery = (filters, page) => {
   if (filters.arrondissement !== 'Tous')
     params.set('arrondissement', filters.arrondissement);
   if (filters.priceRange[0] > 0)
-    params.set('minPrice', String(filters.priceRange[0]));
+    params.set('price[gte]', String(filters.priceRange[0])); // APIFeatures convertit en { price: { $gte } }
   if (filters.priceRange[1] < 500000000)
-    params.set('maxPrice', String(filters.priceRange[1]));
+    params.set('price[lte]', String(filters.priceRange[1])); // APIFeatures convertit en { price: { $lte } }
   return params.toString();
 };
 

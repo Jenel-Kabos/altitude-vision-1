@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Modal, ScrollView,
+  Modal, ScrollView, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +23,16 @@ const TYPES_BIEN = PROPERTY_TYPES_WITH_ALL.map(t => t.value);
 
 export const PRICE_MIN  = 0;
 export const PRICE_MAX  = 500_000_000;
-const PRICE_STEP = 5_000_000;
+const PRICE_STEP = 500_000; // 500K pour granularité locations ET ventes
+
+// Presets budget pour sélection rapide
+const BUDGET_PRESETS = [
+  { label: '< 500K',    min: 0,             max: 500_000         },
+  { label: '< 5M',      min: 0,             max: 5_000_000       },
+  { label: '5M – 30M',  min: 5_000_000,     max: 30_000_000      },
+  { label: '30M – 100M',min: 30_000_000,    max: 100_000_000     },
+  { label: '> 100M',    min: 100_000_000,   max: PRICE_MAX       },
+];
 
 const DEFAULT_FILTERS = {
   transaction:    'tous',
@@ -33,11 +42,42 @@ const DEFAULT_FILTERS = {
   arrondissement: 'Tous',
 };
 
-function formatPriceShort(n) {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1).replace('.0', '')}Md`;
-  if (n >= 1_000_000)     return `${Math.round(n / 1_000_000)}M`;
-  if (n >= 1_000)         return `${Math.round(n / 1_000)}k`;
+// ─── Helpers budget ───────────────────────────────────────────────────────────
+
+/**
+ * Formate un montant en FCFA en notation courte avec K et M majuscules.
+ * Exemples : 500 000 → "500K" | 1 500 000 → "1.5M" | 50 000 000 → "50M"
+ */
+export function formatPriceShort(n) {
+  if (typeof n !== 'number' || isNaN(n)) return '0';
+  if (n >= 1_000_000_000) {
+    const v = n / 1_000_000_000;
+    return `${Number.isInteger(v) ? v : v.toFixed(1)}Md`;
+  }
+  if (n >= 1_000_000) {
+    const v = n / 1_000_000;
+    return `${Number.isInteger(v) ? v : v.toFixed(1)}M`;
+  }
+  if (n >= 1_000) {
+    const v = n / 1_000;
+    return `${Number.isInteger(v) ? v : Math.round(v)}K`;
+  }
   return n === 0 ? '0' : String(n);
+}
+
+/**
+ * Parse une saisie budget humaine : "500K" → 500000, "2.5M" → 2500000,
+ * "10000000" → 10000000. Retourne null si invalide.
+ */
+export function parseBudgetInput(text) {
+  if (!text || !text.trim()) return null;
+  const cleaned = text.trim().replace(/\s/g, '').replace(',', '.').toUpperCase();
+  const num = parseFloat(cleaned);
+  if (isNaN(num) || num < 0) return null;
+  if (cleaned.endsWith('MRD') || cleaned.endsWith('MD')) return Math.round(num * 1_000_000_000);
+  if (cleaned.endsWith('M'))  return Math.round(num * 1_000_000);
+  if (cleaned.endsWith('K'))  return Math.round(num * 1_000);
+  return Math.round(num);
 }
 
 // ─── Sous-composant dropdown ──────────────────────────────────────────────────
@@ -110,6 +150,10 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
   const [ville,       setVille]       = useState(initialFilters?.ville       ?? DEFAULT_FILTERS.ville);
   const [arrondissement, setArrondissement] = useState(initialFilters?.arrondissement ?? DEFAULT_FILTERS.arrondissement);
 
+  // Champs texte budget (affichage + saisie)
+  const [minInput, setMinInput] = useState('');
+  const [maxInput, setMaxInput] = useState('');
+
   // Un seul dropdown ouvert à la fois
   const [openDropdown, setOpenDropdown] = useState(null);
 
@@ -133,9 +177,39 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
   [arrondsList]);
 
   const [minPrice, maxPrice] = priceRange;
-
-  const priceLabel = `${formatPriceShort(minPrice)} — ${formatPriceShort(maxPrice)} FCFA`;
   const isPriceDefault = minPrice === PRICE_MIN && maxPrice === PRICE_MAX;
+
+  // Applique un preset budget
+  const applyPreset = useCallback((preset) => {
+    setPriceRange([preset.min, preset.max]);
+    setMinInput(preset.min === 0 ? '' : formatPriceShort(preset.min));
+    setMaxInput(preset.max >= PRICE_MAX ? '' : formatPriceShort(preset.max));
+  }, []);
+
+  // Valide et applique la saisie min
+  const commitMin = useCallback(() => {
+    const val = parseBudgetInput(minInput);
+    if (val === null && !minInput.trim()) {
+      setPriceRange([0, priceRange[1]]);
+    } else if (val !== null) {
+      const clamped = Math.min(val, priceRange[1]);
+      setPriceRange([clamped, priceRange[1]]);
+      setMinInput(clamped === 0 ? '' : formatPriceShort(clamped));
+    }
+  }, [minInput, priceRange]);
+
+  // Valide et applique la saisie max
+  const commitMax = useCallback(() => {
+    const val = parseBudgetInput(maxInput);
+    if (val === null && !maxInput.trim()) {
+      setPriceRange([priceRange[0], PRICE_MAX]);
+    } else if (val !== null) {
+      const clamped = Math.max(val, priceRange[0]);
+      const final   = Math.min(clamped, PRICE_MAX);
+      setPriceRange([priceRange[0], final]);
+      setMaxInput(final >= PRICE_MAX ? '' : formatPriceShort(final));
+    }
+  }, [maxInput, priceRange]);
 
   const handleVilleSelect = useCallback((v) => {
     setVille(v);
@@ -149,6 +223,8 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
     setPriceRange(DEFAULT_FILTERS.priceRange);
     setVille(DEFAULT_FILTERS.ville);
     setArrondissement(DEFAULT_FILTERS.arrondissement);
+    setMinInput('');
+    setMaxInput('');
     setOpenDropdown(null);
   }, []);
 
@@ -165,6 +241,11 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
     if (!isPriceDefault) n++;
     return n;
   }, [transaction, typeBien, ville, isPriceDefault]);
+
+  // Label affiché au-dessus du slider
+  const budgetLabel = isPriceDefault
+    ? 'Tous les budgets'
+    : `${minPrice === 0 ? '0' : formatPriceShort(minPrice)} — ${maxPrice >= PRICE_MAX ? '500M+' : formatPriceShort(maxPrice)} FCFA`;
 
   return (
     <Modal
@@ -282,27 +363,99 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
 
             {/* ─── Budget ─── */}
             <Text style={styles.label}>BUDGET</Text>
-            <View style={styles.priceRow}>
-              <Text style={[styles.priceText, isPriceDefault && styles.priceTextDefault]}>
-                {isPriceDefault ? 'Tous les budgets' : priceLabel}
-              </Text>
-              {!isPriceDefault && (
-                <TouchableOpacity
-                  onPress={() => setPriceRange([PRICE_MIN, PRICE_MAX])}
-                  hitSlop={8}
-                  accessibilityLabel="Réinitialiser le budget"
-                >
-                  <Ionicons name="close-circle" size={16} color={c.textMuted} />
-                </TouchableOpacity>
-              )}
+
+            {/* Presets rapides */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.presetRow}
+            >
+              {BUDGET_PRESETS.map((p) => {
+                const isActive = priceRange[0] === p.min && priceRange[1] === p.max;
+                return (
+                  <TouchableOpacity
+                    key={p.label}
+                    style={[styles.presetChip, isActive && styles.presetChipActive]}
+                    onPress={() => applyPreset(p)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.presetChipText, isActive && styles.presetChipTextActive]}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Saisie min / max avec parsing K et M */}
+            <View style={styles.budgetInputRow}>
+              <View style={styles.budgetInputGroup}>
+                <Text style={styles.budgetInputLabel}>Min</Text>
+                <View style={[styles.budgetInputBox, minInput && styles.budgetInputBoxActive]}>
+                  <TextInput
+                    style={[styles.budgetInputField, { color: c.text }]}
+                    placeholder="0"
+                    placeholderTextColor={c.textMuted}
+                    value={minInput}
+                    onChangeText={setMinInput}
+                    onBlur={commitMin}
+                    onSubmitEditing={commitMin}
+                    keyboardType="default"
+                    returnKeyType="done"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    accessibilityLabel="Budget minimum"
+                  />
+                  <Text style={styles.budgetInputSuffix}>FCFA</Text>
+                </View>
+              </View>
+
+              <View style={styles.budgetSepWrap}>
+                <View style={styles.budgetSepLine} />
+              </View>
+
+              <View style={styles.budgetInputGroup}>
+                <Text style={styles.budgetInputLabel}>Max</Text>
+                <View style={[styles.budgetInputBox, maxInput && styles.budgetInputBoxActive]}>
+                  <TextInput
+                    style={[styles.budgetInputField, { color: c.text }]}
+                    placeholder="500M"
+                    placeholderTextColor={c.textMuted}
+                    value={maxInput}
+                    onChangeText={setMaxInput}
+                    onBlur={commitMax}
+                    onSubmitEditing={commitMax}
+                    keyboardType="default"
+                    returnKeyType="done"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    accessibilityLabel="Budget maximum"
+                  />
+                  <Text style={styles.budgetInputSuffix}>FCFA</Text>
+                </View>
+              </View>
             </View>
+
+            {/* Hint K / M */}
+            <Text style={styles.budgetHint}>
+              Saisissez ex: 500K · 2.5M · 100000000
+            </Text>
+
+            {/* Slider visuel */}
             <View style={styles.sliderWrap}>
+              <Text style={[styles.priceLabel, isPriceDefault && styles.priceLabelDefault]}>
+                {budgetLabel}
+              </Text>
               <Slider
                 value={priceRange}
                 minimumValue={PRICE_MIN}
                 maximumValue={PRICE_MAX}
                 step={PRICE_STEP}
-                onValueChange={setPriceRange}
+                onValueChange={(vals) => {
+                  setPriceRange(vals);
+                  setMinInput(vals[0] === 0 ? '' : formatPriceShort(vals[0]));
+                  setMaxInput(vals[1] >= PRICE_MAX ? '' : formatPriceShort(vals[1]));
+                }}
                 minimumTrackTintColor={c.gold}
                 maximumTrackTintColor={c.border}
                 thumbTintColor={c.gold}
@@ -353,7 +506,7 @@ const makeStyles = (c) => StyleSheet.create({
     backgroundColor: c.bg,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '88%',
+    maxHeight: '92%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
@@ -492,24 +645,108 @@ const makeStyles = (c) => StyleSheet.create({
     fontFamily: fonts.bodyBold,
   },
 
-  // ─── Slider prix ───
-  priceRow: {
+  // ─── Budget — presets ───
+  presetRow: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  presetChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.bgCard,
+  },
+  presetChipActive: {
+    backgroundColor: c.gold,
+    borderColor: c.gold,
+  },
+  presetChipText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    color: c.text,
+  },
+  presetChipTextActive: {
+    color: '#0A0A0A',
+    fontFamily: fonts.bodyBold,
+  },
+
+  // ─── Budget — inputs min/max ───
+  budgetInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    marginTop: spacing.md,
+  },
+  budgetInputGroup: {
+    flex: 1,
+  },
+  budgetInputLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    color: c.textMuted,
+    letterSpacing: 0.8,
+    marginBottom: 5,
+  },
+  budgetInputBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: radius.xs,
+    backgroundColor: c.bgCard,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 9,
   },
-  priceText: {
+  budgetInputBoxActive: {
+    borderColor: c.gold,
+  },
+  budgetInputField: {
+    flex: 1,
+    fontFamily: fonts.bodyMedium,
+    fontSize: 14,
+    padding: 0,
+  },
+  budgetInputSuffix: {
+    fontFamily: fonts.body,
+    fontSize: 10,
+    color: c.textMuted,
+    marginLeft: 4,
+  },
+  budgetSepWrap: {
+    paddingBottom: 14,
+    alignItems: 'center',
+    width: 16,
+  },
+  budgetSepLine: {
+    width: 10,
+    height: 1.5,
+    backgroundColor: c.border,
+  },
+  budgetHint: {
+    fontFamily: fonts.body,
+    fontSize: 10,
+    color: c.textMuted,
+    marginTop: 6,
+    letterSpacing: 0.3,
+  },
+
+  // ─── Slider prix ───
+  sliderWrap: {
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.xs,
+  },
+  priceLabel: {
     fontFamily: fonts.bodyMedium,
     fontSize: fontSize.sm,
     color: c.text,
+    marginBottom: 4,
+    textAlign: 'center',
   },
-  priceTextDefault: {
+  priceLabelDefault: {
     color: c.textMuted,
     fontFamily: fonts.body,
-  },
-  sliderWrap: {
-    paddingHorizontal: spacing.xs,
   },
   sliderBounds: {
     flexDirection: 'row',
