@@ -139,12 +139,15 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   const galleryRef = useRef(null);
 
+  // ─── Données dérivées ───
+  const photos      = useMemo(() => annonce?.images || annonce?.photos || [], [annonce]);
+
   // Auto-slide toutes les 4 secondes (pause si vidéo en lecture)
   useEffect(() => {
-    if (photos.length <= 1 || playingIndex !== null) return;
+    if (!photos.length || photos.length <= 1 || playingIndex !== null) return;
     const timer = setInterval(() => {
       setPhotoIndex(prev => {
-        const next = (prev + 1) % photos.length;
+        const next = (prev + 1) % (photos?.length || 1);
         try {
           galleryRef.current?.scrollToIndex({ index: next, animated: true });
         } catch (_) {}
@@ -152,10 +155,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       });
     }, 4000);
     return () => clearInterval(timer);
-  }, [photos.length, playingIndex]);
-
-  // ─── Données dérivées ───
-  const photos      = useMemo(() => annonce.images || annonce.photos || [], [annonce]);
+  }, [photos?.length, playingIndex]);
   const prix        = useMemo(() => annonce.price  || annonce.prix   || 0,  [annonce]);
   const title       = useMemo(() => annonce.title  || annonce.titre  || 'Bien immobilier', [annonce]);
   const description = useMemo(() => annonce.description || '', [annonce]);
@@ -526,8 +526,8 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.featuresScroll}
               >
-                {featureItems.map((f) => (
-                  <FeatureChip key={f.key} {...f} styles={styles} c={c} />
+                {featureItems.map(({ key, ...rest }) => (
+                  <FeatureChip key={key} {...rest} styles={styles} c={c} />
                 ))}
               </ScrollView>
             </View>

@@ -178,8 +178,8 @@ const SectionCard = ({ section, c }) => {
             }}
             activeOpacity={item.email || item.tel ? 0.7 : 1}
           >
-            <Ionicons name={item.icon} size={16} color={colors.primary} />
-            <Text style={[styles.contactText, (item.email || item.tel) && styles.contactLink]}>
+            <Ionicons name={item.icon} size={16} color={colors.gold} />
+            <Text style={[styles.contactText, { color: c.textSub }, (item.email || item.tel) && styles.contactLink]}>
               {item.value}
             </Text>
           </TouchableOpacity>
@@ -189,7 +189,7 @@ const SectionCard = ({ section, c }) => {
           <View key={idx} style={styles.listContainer}>
             {item.items.map((bullet, i) => (
               <View key={i} style={styles.listRow}>
-                <Text style={[styles.bullet, { color: colors.primary }]}>•</Text>
+                <Text style={[styles.bullet, { color: colors.gold }]}>•</Text>
                 <Text style={[styles.listText, { color: c.text + 'CC' }]}>{bullet}</Text>
               </View>
             ))}
@@ -208,7 +208,7 @@ const SectionCard = ({ section, c }) => {
         );
       case 'table':
         return (
-          <View key={idx} style={[styles.table, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View key={idx} style={[styles.table, { backgroundColor: c.bgCard, borderColor: c.border }]}>
             {item.rows.map((row, i) => (
               <View key={i} style={[styles.tableRow, i > 0 && { borderTopWidth: 1, borderTopColor: c.border }]}>
                 <Text style={[styles.tableLabel, { color: c.text }]}>{row.label}</Text>
@@ -225,10 +225,10 @@ const SectionCard = ({ section, c }) => {
   };
 
   return (
-    <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+    <View style={[styles.card, { backgroundColor: c.bgCard, borderColor: c.border }]}>
       <TouchableOpacity style={styles.cardHeader} onPress={toggle} activeOpacity={0.8}>
         <View style={styles.iconWrap}>
-          <Ionicons name={section.icon} size={22} color={colors.primary} />
+          <Ionicons name={section.icon} size={22} color={colors.gold} />
         </View>
         <Text style={[styles.cardTitle, { color: c.text }]}>{section.title}</Text>
         <Ionicons
@@ -248,12 +248,12 @@ const SectionCard = ({ section, c }) => {
 
 export default function PolitiqueConfidentialiteScreen() {
   const navigation = useNavigation();
-  const { c } = useTheme();
+  const { themeColors: c } = useTheme();
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: c.bg }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: c.card, borderBottomColor: c.border }]}>
+      <View style={[styles.header, { backgroundColor: c.bgCard, borderBottomColor: c.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={c.text} />
         </TouchableOpacity>
@@ -284,14 +284,14 @@ export default function PolitiqueConfidentialiteScreen() {
         </View>
 
         {/* Contact CTA */}
-        <View style={[styles.ctaCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
-          <Ionicons name="mail-outline" size={28} color={colors.primary} />
+        <View style={[styles.ctaCard, { backgroundColor: colors.gold + '15', borderColor: colors.gold + '40' }]}>
+          <Ionicons name="mail-outline" size={28} color={colors.gold} />
           <Text style={[styles.ctaTitle, { color: c.text }]}>Une question sur vos données ?</Text>
           <Text style={[styles.ctaText, { color: c.text + 'AA' }]}>
             Notre équipe vous répond dans les 30 jours.
           </Text>
           <TouchableOpacity
-            style={[styles.ctaBtn, { backgroundColor: colors.primary }]}
+            style={[styles.ctaBtn, { backgroundColor: colors.gold }]}
             onPress={() => Linking.openURL('mailto:privacy@altitude-vision.com')}
           >
             <Ionicons name="mail" size={18} color="#fff" />
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   },
   container: { paddingBottom: 40 },
   hero: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.gold,
     padding: spacing.xl,
     alignItems: 'center',
   },
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.primary + '15',
+    backgroundColor: colors.gold + '15',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -382,8 +382,8 @@ const styles = StyleSheet.create({
   cardBody: { paddingHorizontal: spacing.md, paddingBottom: spacing.md, gap: 10 },
   bodyText: { fontFamily: fonts.regular, fontSize: fontSize.sm, lineHeight: 22 },
   contactRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  contactText: { fontFamily: fonts.regular, fontSize: fontSize.sm, color: '#666' },
-  contactLink: { color: colors.primary, textDecorationLine: 'underline' },
+  contactText: { fontFamily: fonts.regular, fontSize: fontSize.sm },
+  contactLink: { color: colors.gold, textDecorationLine: 'underline' },
   listContainer: { gap: 8 },
   listRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   bullet: { fontSize: 16, lineHeight: 22 },
@@ -391,8 +391,8 @@ const styles = StyleSheet.create({
   table: { borderRadius: radius.md, borderWidth: 1, overflow: 'hidden' },
   tableRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.sm },
   tableLabel: { fontFamily: fonts.medium, fontSize: fontSize.sm },
-  tableBadge: { backgroundColor: colors.primary + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
-  tableBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, color: colors.primary },
+  tableBadge: { backgroundColor: colors.gold + '20', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
+  tableBadgeText: { fontFamily: fonts.semiBold, fontSize: 11, color: colors.gold },
   ctaCard: {
     margin: spacing.md,
     marginTop: 0,

@@ -186,6 +186,16 @@ const getAllProperties = asyncHandler(async (req, res) => {
   // Toujours forcer availability, indépendamment du rôle et des query params client
   req.query.availability = 'Disponible';
 
+  // Remapper city/arrondissement → address.city / address.arrondissement (champs imbriqués MongoDB)
+  if (req.query.city) {
+    req.query['address.city'] = req.query.city;
+    delete req.query.city;
+  }
+  if (req.query.arrondissement) {
+    req.query['address.arrondissement'] = req.query.arrondissement;
+    delete req.query.arrondissement;
+  }
+
   const features = new APIFeatures(Property.find(), req.query)
     .filter()
     .sort()

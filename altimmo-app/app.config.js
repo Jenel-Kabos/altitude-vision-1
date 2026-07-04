@@ -1,15 +1,72 @@
-const appJson = require('./app.json');
-const expo = appJson.expo;
-
 module.exports = {
   expo: {
-    ...expo,
+    name: 'Altimmo',
+    slug: 'altimmo-app',
+    version: '1.0.1',
+    scheme: 'altimmo',
+    orientation: 'portrait',
+    newArchEnabled: true,
+    icon: './assets/icon.png',
+    splash: {
+      image: './assets/Logo_Altitude_transparent.png',
+      resizeMode: 'contain',
+      backgroundColor: '#0A0A0A',
+    },
+    ios: {
+      supportsTablet: false,
+      bundleIdentifier: 'com.altitudevision.altimmo',
+      associatedDomains: ['applinks:altitudevision.agency'],
+      infoPlist: {
+        NSCameraUsageDescription: 'Altitude Vision utilise la caméra pour photographier votre bien.',
+        NSPhotoLibraryUsageDescription: 'Altitude Vision accède à vos photos pour illustrer votre annonce.',
+      },
+    },
     android: {
-      ...expo.android,
+      adaptiveIcon: {
+        foregroundImage: './assets/adaptive-icon.png',
+        backgroundColor: '#0A0A0A',
+      },
+      package: 'com.altitudevision.altimmo',
+      versionCode: 2,
       config: {
         googleMaps: {
           apiKey: process.env.GOOGLE_MAPS_API_KEY,
         },
+      },
+      intentFilters: [
+        {
+          action: 'VIEW',
+          autoVerify: true,
+          data: [{ scheme: 'https', host: 'altitudevision.agency', pathPrefix: '/annonces' }],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
+      ],
+      permissions: [
+        'android.permission.ACCESS_COARSE_LOCATION',
+        'android.permission.ACCESS_FINE_LOCATION',
+        'android.permission.CAMERA',
+        'android.permission.READ_MEDIA_IMAGES',
+        'android.permission.READ_EXTERNAL_STORAGE',
+      ],
+    },
+    plugins: [
+      'expo-notifications',
+      'expo-location',
+      'expo-camera',
+      'expo-font',
+      'expo-secure-store',
+      [
+        '@sentry/react-native/expo',
+        {
+          url: 'https://sentry.io/',
+          project: 'altimmo-mobile',
+          organization: 'altitudevision',
+        },
+      ],
+    ],
+    extra: {
+      eas: {
+        projectId: '20e7342e-6723-404c-bd44-66ef60758a19',
       },
     },
   },

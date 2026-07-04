@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, Switch, Linking,
+  ScrollView, Alert, Switch, Linking, Share, Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -137,6 +137,24 @@ export default function ProfilScreen({ navigation }) {
     { value: 'system', label: 'Système', icon: 'phone-portrait-outline' },
     { value: 'dark',   label: 'Sombre',  icon: 'moon-outline' },
   ];
+
+  const STORE_URL_ANDROID = 'https://play.google.com/store/apps/details?id=com.altitudevision.altimmo';
+  const STORE_URL_IOS     = 'https://apps.apple.com/app/altimmo';
+
+  const handleUpdate = () => {
+    const url = Platform.OS === 'ios' ? STORE_URL_IOS : STORE_URL_ANDROID;
+    Linking.openURL(url);
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Découvre Altimmo, l'application immobilière du Congo Brazzaville 🏠\n${STORE_URL_ANDROID}`,
+        url: STORE_URL_ANDROID,
+        title: 'Altimmo — Immobilier Congo Brazzaville',
+      });
+    } catch (_) {}
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -334,6 +352,20 @@ export default function ProfilScreen({ navigation }) {
               icon="flag-outline"
               label="Signaler un problème"
               onPress={() => Linking.openURL('mailto:contact@altitudevision.agency?subject=Signalement%20Altimmo')}
+              styles={styles} c={c}
+            />
+            <View style={styles.menuSep} />
+            <MenuRow
+              icon="share-social-outline"
+              label="Partager l'application"
+              onPress={handleShare}
+              styles={styles} c={c}
+            />
+            <View style={styles.menuSep} />
+            <MenuRow
+              icon="cloud-download-outline"
+              label="Mettre à jour l'application"
+              onPress={handleUpdate}
               styles={styles} c={c}
             />
             <View style={styles.menuSep} />
