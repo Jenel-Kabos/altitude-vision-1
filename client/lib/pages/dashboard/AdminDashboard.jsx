@@ -22,7 +22,7 @@ const BLUE = '#2E7BB5';
 const COLLAB_ALL  = ['Admin', 'Collaborateur', 'Secretaire', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant'];
 const ROLES_DOC   = ['Admin', 'Secretaire', 'Collaborateur'];
 const ROLES_IMMO  = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
-const ROLES_CM    = ['Admin', 'CommunityManager', 'GestionnaireImmobilier', 'Collaborateur'];
+const ROLES_CM    = ['Admin', 'CommunityManager', 'Collaborateur'];
 const ROLES_COMM  = COLLAB_ALL; // tous les collaborateurs
 
 const NAV_SECTIONS = [

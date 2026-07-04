@@ -5,15 +5,16 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Calendar, Clock, CheckCircle2, XCircle, Home,
-  MessageSquare, Loader2, AlertTriangle,
+  MessageSquare, Loader2, AlertTriangle, PlayCircle,
 } from "lucide-react";
 import { getAllVisites, updateVisite } from "../../services/visiteService";
 
-const STATUTS = ["Tous", "En attente", "Confirmée", "Terminée", "Annulée"];
+const STATUTS = ["Tous", "En attente", "Confirmée", "En cours", "Terminée", "Annulée"];
 
 const STATUT_STYLE = {
   "En attente": { bg: "bg-yellow-100", text: "text-yellow-800", dot: "bg-yellow-400" },
-  "Confirmée":  { bg: "bg-green-100",  text: "text-green-800",  dot: "bg-green-500"  },
+  "Confirmée":  { bg: "bg-blue-100",   text: "text-blue-800",   dot: "bg-blue-500"   },
+  "En cours":   { bg: "bg-purple-100", text: "text-purple-800", dot: "bg-purple-500" },
   "Terminée":   { bg: "bg-gray-100",   text: "text-gray-600",   dot: "bg-gray-400"   },
   "Annulée":    { bg: "bg-red-100",    text: "text-red-700",    dot: "bg-red-500"    },
 };
@@ -24,6 +25,12 @@ const formatDate = (d) => {
     day: "2-digit", month: "long", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
+};
+
+const isVisiteImminente = (visite) => {
+  if (!visite.dateConfirmee || visite.statut !== 'Confirmée') return false;
+  const diff = new Date(visite.dateConfirmee) - Date.now();
+  return diff <= 30 * 60 * 1000;
 };
 
 const StatutBadge = ({ statut }) => {
@@ -37,12 +44,12 @@ const StatutBadge = ({ statut }) => {
 };
 
 const VisitesPage = () => {
-  const [visites, setVisites]       = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [filtre, setFiltre]         = useState("Tous");
-  const [notif, setNotif]           = useState(null);
-  const [proposeDates, setProposeDates] = useState({}); // { [id]: dateStr }
-  const [submitting, setSubmitting] = useState(null);   // id en cours
+  const [visites,      setVisites]      = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [filtre,       setFiltre]       = useState("Tous");
+  const [notif,        setNotif]        = useState(null);
+  const [proposeDates, setProposeDates] = useState({});
+  const [submitting,   setSubmitting]   = useState(null);
 
   const fetchVisites = async () => {
     try {
@@ -56,6 +63,11 @@ const VisitesPage = () => {
   };
 
   useEffect(() => { fetchVisites(); }, []);
+
+  useEffect(() => {
+    const interval = setInterval(fetchVisites, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const showNotif = (message, type = "success") => {
     setNotif({ message, type });
@@ -78,12 +90,11 @@ const VisitesPage = () => {
   const handleProposerDate = (id) => {
     const dateStr = proposeDates[id];
     if (!dateStr) return;
-    handleUpdate(id, { dateProposee: new Date(dateStr).toISOString(), statut: "Confirmée" });
+    handleUpdate(id, { dateConfirmee: new Date(dateStr).toISOString(), statut: "Confirmée" });
   };
 
-  const filtered = filtre === "Tous"
-    ? visites
-    : visites.filter(v => v.statut === filtre);
+  const filtered = filtre === "Tous" ? visites : visites.filter(v => v.statut === filtre);
+  const countByStatut = (s) => visites.filter(v => v.statut === s).length;
 
   if (loading) {
     return (
@@ -96,7 +107,6 @@ const VisitesPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 sm:p-8 font-sans">
 
-      {/* Notification */}
       {notif && (
         <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-xl shadow-xl text-white text-sm font-semibold transition-all ${
           notif.type === "error"
@@ -110,7 +120,7 @@ const VisitesPage = () => {
       <div className="max-w-5xl mx-auto">
 
         {/* Header */}
-        <div className="mb-8 flex items-center gap-4">
+        <div className="mb-6 flex items-center gap-4">
           <div className="p-3 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-2xl shadow-lg">
             <Calendar className="w-7 h-7 text-white" />
           </div>
@@ -122,23 +132,33 @@ const VisitesPage = () => {
           </div>
         </div>
 
-        {/* Filtres par statut */}
+        {/* Alerte visites imminentes */}
+        {visites.some(isVisiteImminente) && (
+          <div className="mb-5 flex items-start gap-3 p-4 rounded-2xl border border-orange-200 bg-orange-50">
+            <PlayCircle className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-orange-800">
+                {visites.filter(isVisiteImminente).length} visite(s) imminente(s) — marquez-les &quot;En cours&quot; !
+              </p>
+              <p className="text-xs text-orange-600 mt-0.5">
+                Les visites non démarrées dans les 30 minutes suivant l&apos;heure prévue seront annulées automatiquement.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Filtres */}
         <div className="flex flex-wrap gap-2 mb-6">
           {STATUTS.map(s => (
-            <button
-              key={s}
-              onClick={() => setFiltre(s)}
+            <button key={s} onClick={() => setFiltre(s)}
               className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all ${
                 filtre === s
                   ? "bg-blue-600 text-white border-blue-600 shadow-md"
                   : "bg-white text-gray-600 border-gray-200 hover:border-blue-400"
-              }`}
-            >
+              }`}>
               {s}
               {s !== "Tous" && (
-                <span className="ml-1.5 opacity-60">
-                  ({visites.filter(v => v.statut === s).length})
-                </span>
+                <span className="ml-1.5 opacity-60">({countByStatut(s)})</span>
               )}
             </button>
           ))}
@@ -153,20 +173,24 @@ const VisitesPage = () => {
         ) : (
           <div className="space-y-4">
             {filtered.map(visite => {
-              const bien = visite.property || {};
-              const client = visite.client || {};
-              const photo = bien.images?.[0] || null;
-              const titre = bien.title || "Bien immobilier";
-              const ville = bien.address?.city || "";
-              const arrond = bien.address?.arrondissement || "";
+              const bien    = visite.property || {};
+              const client  = visite.client   || {};
+              const photo   = bien.images?.[0] || null;
+              const titre   = bien.title       || "Bien immobilier";
+              const ville   = bien.address?.city           || "";
+              const arrond  = bien.address?.arrondissement || "";
               const adresse = [arrond, ville].filter(Boolean).join(", ");
-              const isBusy = submitting === visite._id;
+              const isBusy  = submitting === visite._id;
+              const imminent = isVisiteImminente(visite);
 
               return (
-                <div key={visite._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div key={visite._id}
+                  className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-all ${
+                    imminent ? 'border-orange-300 ring-2 ring-orange-100' : 'border-gray-100'
+                  }`}>
                   <div className="flex gap-4 p-5">
 
-                    {/* Photo bien */}
+                    {/* Photo */}
                     <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
                       {photo ? (
                         <Image src={photo} alt={titre} fill className="object-cover" sizes="80px" unoptimized />
@@ -181,21 +205,23 @@ const VisitesPage = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
                         <p className="font-bold text-gray-800 text-base leading-tight truncate">{titre}</p>
-                        <StatutBadge statut={visite.statut} />
+                        <div className="flex items-center gap-2">
+                          {imminent && (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 animate-pulse">
+                              ⚡ Imminent
+                            </span>
+                          )}
+                          <StatutBadge statut={visite.statut} />
+                        </div>
                       </div>
 
-                      {adresse && (
-                        <p className="text-gray-400 text-xs mb-1">{adresse}</p>
-                      )}
+                      {adresse && <p className="text-gray-400 text-xs mb-1">{adresse}</p>}
 
                       <p className="text-sm text-gray-600">
                         Client : <span className="font-semibold">{client.name || "—"}</span>
-                        {client.email && (
-                          <span className="text-gray-400 ml-1">({client.email})</span>
-                        )}
+                        {client.email && <span className="text-gray-400 ml-1">({client.email})</span>}
                       </p>
 
-                      {/* Dates */}
                       <div className="flex flex-wrap gap-3 mt-2">
                         {visite.dateProposee && (
                           <span className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">
@@ -204,19 +230,24 @@ const VisitesPage = () => {
                           </span>
                         )}
                         {visite.dateConfirmee && (
-                          <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
+                          <span className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full ${
+                            imminent ? 'bg-orange-100 text-orange-700' : 'bg-green-50 text-green-700'
+                          }`}>
                             <CheckCircle2 className="w-3 h-3" />
-                            Confirmée : {formatDate(visite.dateConfirmee)}
+                            Prévue : {formatDate(visite.dateConfirmee)}
                           </span>
                         )}
                       </div>
 
-                      {/* Lien conversation */}
+                      {visite.notes?.includes('[Annulation automatique') && (
+                        <p className="text-xs text-red-500 mt-1.5 italic">
+                          ⚠️ Annulée automatiquement — visite non démarrée à l&apos;heure
+                        </p>
+                      )}
+
                       {visite.conversation?._id && (
-                        <Link
-                          href={`/dashboard/messages?conversationId=${visite.conversation._id}`}
-                          className="inline-flex items-center gap-1.5 mt-2 text-xs text-blue-600 hover:underline"
-                        >
+                        <Link href={`/dashboard/messages?conversationId=${visite.conversation._id}`}
+                          className="inline-flex items-center gap-1.5 mt-2 text-xs text-blue-600 hover:underline">
                           <MessageSquare className="w-3.5 h-3.5" />
                           Voir la conversation
                         </Link>
@@ -224,43 +255,53 @@ const VisitesPage = () => {
                     </div>
                   </div>
 
-                  {/* Zone d'actions — visible seulement si pas Terminée/Annulée */}
+                  {/* Zone d'actions */}
                   {!["Terminée", "Annulée"].includes(visite.statut) && (
                     <div className="border-t border-gray-100 px-5 py-4 flex flex-wrap items-end gap-3">
 
-                      {/* Proposer une date */}
-                      <div className="flex items-center gap-2 flex-1 min-w-[240px]">
-                        <input
-                          type="datetime-local"
-                          value={proposeDates[visite._id] || ""}
-                          onChange={e => setProposeDates(prev => ({ ...prev, [visite._id]: e.target.value }))}
-                          className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        />
-                        <button
-                          onClick={() => handleProposerDate(visite._id)}
-                          disabled={!proposeDates[visite._id] || isBusy}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                        >
-                          {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
-                          Proposer
-                        </button>
-                      </div>
+                      {/* Proposer/confirmer une date (uniquement si pas encore En cours) */}
+                      {visite.statut !== 'En cours' && (
+                        <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+                          <input type="datetime-local"
+                            value={proposeDates[visite._id] || ""}
+                            onChange={e => setProposeDates(prev => ({ ...prev, [visite._id]: e.target.value }))}
+                            className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                          <button
+                            onClick={() => handleProposerDate(visite._id)}
+                            disabled={!proposeDates[visite._id] || isBusy}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
+                            {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
+                            Confirmer date
+                          </button>
+                        </div>
+                      )}
 
-                      {/* Actions rapides */}
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
+                        {visite.statut === 'Confirmée' && (
+                          <button
+                            onClick={() => handleUpdate(visite._id, { statut: 'En cours' })}
+                            disabled={isBusy}
+                            className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition shadow-sm">
+                            {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+                            En cours
+                          </button>
+                        )}
+
+                        {visite.statut === 'En cours' && (
+                          <button
+                            onClick={() => handleUpdate(visite._id, { statut: 'Terminée' })}
+                            disabled={isBusy}
+                            className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm">
+                            {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                            Terminée
+                          </button>
+                        )}
+
                         <button
-                          onClick={() => handleUpdate(visite._id, { statut: "Terminée" })}
+                          onClick={() => handleUpdate(visite._id, { statut: 'Annulée' })}
                           disabled={isBusy}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition"
-                        >
-                          <CheckCircle2 className="w-4 h-4 text-gray-500" />
-                          Terminée
-                        </button>
-                        <button
-                          onClick={() => handleUpdate(visite._id, { statut: "Annulée" })}
-                          disabled={isBusy}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-red-50 text-red-600 rounded-lg hover:bg-red-100 disabled:opacity-50 transition"
-                        >
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-red-50 text-red-600 rounded-lg hover:bg-red-100 disabled:opacity-50 transition">
                           <XCircle className="w-4 h-4" />
                           Annuler
                         </button>

@@ -15,7 +15,8 @@ import Image from 'next/image';
 const EVENTS_PER_PAGE = 8;
 
 const ManageEventsPage = () => {
-  const { canEdit, canDelete } = useAuth();
+  const { canEdit, canDelete, user } = useAuth();
+  const canAddEvent = ['Admin', 'CommunityManager', 'Collaborateur'].includes(user?.role);
   const [events, setEvents]             = useState([]);
   const [filteredEvents, setFiltered]   = useState([]);
   const [loading, setLoading]           = useState(true);
@@ -247,10 +248,12 @@ const ManageEventsPage = () => {
                 onChange={(e) => setSearchTerm(e.target.value)} aria-label="Rechercher un événement"
                 className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all" />
             </div>
-            <button onClick={handleAdd}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all hover:scale-105">
-              <Plus className="w-5 h-5" /> Ajouter
-            </button>
+            {canAddEvent && (
+              <button onClick={handleAdd}
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all hover:scale-105">
+                <Plus className="w-5 h-5" /> Ajouter
+              </button>
+            )}
           </div>
         </div>
 

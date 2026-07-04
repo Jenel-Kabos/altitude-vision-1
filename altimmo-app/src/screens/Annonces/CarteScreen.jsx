@@ -182,7 +182,7 @@ export default function CarteScreen({ navigation }) {
 
   const handleDismiss   = useCallback(() => setSelected(null), []);
   const handleCardPress = useCallback(() => {
-    if (selected) navigation.navigate('DetailAnnonce', { annonce: selected });
+    if (selected) navigation.navigate('Annonces', { screen: 'DetailAnnonce', params: { annonce: selected } });
   }, [selected, navigation]);
 
   // ─── Localiser l'utilisateur ───

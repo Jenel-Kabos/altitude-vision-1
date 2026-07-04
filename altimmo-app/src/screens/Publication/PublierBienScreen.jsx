@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, StyleSheet, Image, Alert,
@@ -83,6 +83,9 @@ export default function PublierBienScreen({ navigation, route }) {
   const [focused, setFocused] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [showManualGps,   setShowManualGps]   = useState(false);
+  const [manualLat,       setManualLat]       = useState('');
+  const [manualLng,       setManualLng]       = useState('');
 
   const scrollRef    = useRef(null);
   const stepperRef   = useRef(null);
@@ -269,6 +272,20 @@ export default function PublierBienScreen({ navigation, route }) {
       setLocationLoading(false);
     }
   };
+
+  const applyManualCoords = useCallback((lat, lng) => {
+    const latN = parseFloat(lat);
+    const lngN = parseFloat(lng);
+    if (
+      !isNaN(latN) && !isNaN(lngN) &&
+      latN >= -90  && latN <= 90   &&
+      lngN >= -180 && lngN <= 180
+    ) {
+      setCoords({ lat: latN, lng: lngN });
+    } else {
+      setCoords(null);
+    }
+  }, []);
 
   // ─── Publish ────────────────────────────────────────────────
   const handlePublish = async () => {
@@ -794,6 +811,63 @@ export default function PublierBienScreen({ navigation, route }) {
                 {locationLoading ? 'Localisation…' : coords ? 'Recapturer ma position' : 'Utiliser ma position GPS'}
               </Text>
             </TouchableOpacity>
+
+            {/* Toggle saisie manuelle */}
+            <TouchableOpacity
+              onPress={() => {
+                setShowManualGps(v => !v);
+                if (showManualGps) { setManualLat(''); setManualLng(''); }
+              }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'center', marginTop: 8 }}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={showManualGps ? 'locate-outline' : 'pencil-outline'}
+                size={13}
+                color={c.textMuted}
+              />
+              <Text style={{ fontFamily: fonts.body, fontSize: 11, color: c.textMuted }}>
+                {showManualGps
+                  ? 'Utiliser la géolocalisation auto'
+                  : 'Entrer les coordonnées manuellement'}
+              </Text>
+            </TouchableOpacity>
+
+            {showManualGps && (
+              <View style={{ gap: 8, marginTop: 8 }}>
+                <Text style={styles.gpsSubtitle}>
+                  Copier depuis Google Maps : appui long sur la carte → coordonnées
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.gpsSubtitle, { marginBottom: 4 }]}>Latitude</Text>
+                    <TextInput
+                      value={manualLat}
+                      onChangeText={v => { setManualLat(v); applyManualCoords(v, manualLng); }}
+                      placeholder="-4.26340"
+                      placeholderTextColor={c.textMuted}
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                      accessibilityLabel="Latitude"
+                      returnKeyType="next"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.gpsSubtitle, { marginBottom: 4 }]}>Longitude</Text>
+                    <TextInput
+                      value={manualLng}
+                      onChangeText={v => { setManualLng(v); applyManualCoords(manualLat, v); }}
+                      placeholder="15.24290"
+                      placeholderTextColor={c.textMuted}
+                      keyboardType="decimal-pad"
+                      style={styles.input}
+                      accessibilityLabel="Longitude"
+                      returnKeyType="done"
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         </View>
       );

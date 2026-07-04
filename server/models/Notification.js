@@ -24,6 +24,8 @@ const NOTIFICATION_TYPES = [
   'contrat_updated',      // locataire + propriétaire : contrat modifié
   'loyer_paye',           // propriétaire : loyer encaissé
   'loyer_en_retard',      // locataire : loyer en retard (alerte cron)
+  // ── Biens immobiliers ──
+  'new_property',         // tous les utilisateurs : nouveau bien validé et publié
   // ── Compte ──
   'account_verified',     // client : compte propriétaire validé par admin
   'account_suspended',    // utilisateur : compte suspendu

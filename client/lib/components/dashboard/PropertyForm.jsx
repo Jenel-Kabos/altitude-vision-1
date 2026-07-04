@@ -2,19 +2,11 @@
 
 import React, { useRef, useMemo, useEffect } from "react";
 import Image from 'next/image';
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import dynamic from 'next/dynamic';
+
+const MapLeaflet = dynamic(() => import('./MapLeaflet'), { ssr: false });
 import { VILLES, getArrondissementsFor } from "../../constants/locations";
 import { PROPERTY_TYPES } from "../../constants/propertyTypes";
-
-// Correction icônes Leaflet
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
 
 // ✅ Préfixe les URLs relatives avec l'URL du backend.
 // file.path retourne "uploads/events/photo.jpg" (sans slash ni domaine),
@@ -66,34 +58,6 @@ const PropertyForm = ({
     };
   }, [previewUrls]);
 
-  // Carte interactive
-  const LocationMarker = () => {
-    useMapEvents({
-      click(e) {
-        setFormData((prev) => ({
-          ...prev,
-          latitude: e.latlng.lat,
-          longitude: e.latlng.lng,
-        }));
-      },
-    });
-    return (
-      <Marker
-        position={[formData.latitude, formData.longitude]}
-        draggable
-        eventHandlers={{
-          dragend: (e) => {
-            const latlng = e.target.getLatLng();
-            setFormData((prev) => ({
-              ...prev,
-              latitude: latlng.lat,
-              longitude: latlng.lng,
-            }));
-          },
-        }}
-      />
-    );
-  };
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -582,14 +546,11 @@ const PropertyForm = ({
           Cliquez sur la carte ou déplacez le marqueur pour définir la position
         </p>
         <div className="h-64 rounded-lg overflow-hidden border-2 border-gray-300">
-          <MapContainer
-            center={[formData.latitude, formData.longitude]}
-            zoom={16}
-            style={{ height: "100%", width: "100%" }}
-          >
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <LocationMarker />
-          </MapContainer>
+          <MapLeaflet
+            latitude={formData.latitude}
+            longitude={formData.longitude}
+            onMove={(latlng) => setFormData(prev => ({ ...prev, latitude: latlng.lat, longitude: latlng.lng }))}
+          />
         </div>
         <div className="grid grid-cols-2 gap-3 mt-3">
           <div>

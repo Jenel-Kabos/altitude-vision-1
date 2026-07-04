@@ -11,6 +11,7 @@ import {
 import { getAllServices, deleteService } from '../../services/serviceService';
 import { getAllPortfolioItems, deletePortfolioItem } from '../../services/portfolioService';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import ServiceFormModal from '../../components/modals/ServiceFormModal';
 import PortfolioFormModal from '../../components/modals/PortfolioFormModal';
 import Image from 'next/image';
@@ -438,6 +439,7 @@ const Modal = ({ mode, type, item, onClose, onSuccess }) => {
 
 // ─── MAIN ────────────────────────────────────────────────────
 const ManageAltcomPage = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab]       = useState('services');
   const [services, setServices]         = useState([]);
   const [portfolio, setPortfolio]       = useState([]);
@@ -597,7 +599,7 @@ const ManageAltcomPage = () => {
               onFocus={e => { e.target.style.borderColor = GOLD; e.target.style.boxShadow = `0 0 0 3px ${GOLD}20`; }}
               onBlur={e  => { e.target.style.borderColor = '#E2E8F0'; e.target.style.boxShadow = 'none'; }} />
           </div>
-          {activeTab !== 'projects' && (
+          {activeTab !== 'projects' && ['Admin', 'CommunityManager', 'Collaborateur'].includes(user?.role) && (
             <button onClick={() => openModal('create')}
               className="flex items-center gap-2 px-6 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105"
               style={{ background: `linear-gradient(135deg,#A06820,${GOLD})`, boxShadow: `0 4px 16px ${GOLD}35`, fontFamily: "'DM Sans', sans-serif" }}>

@@ -26,7 +26,7 @@ const STAFF_DOC  = ['Admin', 'Secretaire', 'Collaborateur'];
 const STAFF_IMMO = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
 
 // Content publishing : biens Altimmo, événements, portfolios
-const STAFF_CM   = ['Admin', 'CommunityManager', 'GestionnaireImmobilier', 'Collaborateur'];
+const STAFF_CM   = ['Admin', 'CommunityManager', 'Collaborateur'];
 
 // Messages clients + confirmation RDV (tous les collaborateurs)
 const STAFF_COMM = STAFF_ALL;

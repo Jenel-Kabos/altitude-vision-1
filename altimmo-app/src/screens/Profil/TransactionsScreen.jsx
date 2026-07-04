@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../context/ThemeContext';
 import { colors, fonts, fontSize, spacing, radius } from '../../theme';
 import { getMyTransactions } from '../../services/transactionService';
@@ -217,6 +217,7 @@ export default function TransactionsScreen({ navigation }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const filtered = filter === 'all'
     ? transactions

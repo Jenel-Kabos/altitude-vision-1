@@ -23,6 +23,7 @@ export default function ProfilStack() {
       <Stack.Screen name="PublierBien"     component={PublierBienScreen} />
       <Stack.Screen name="Favoris"         component={FavorisScreen} />
       <Stack.Screen name="Transactions"    component={TransactionsScreen} />
+      <Stack.Screen name="PaiementCancel"  component={TransactionsScreen} />
       <Stack.Screen name="Paiement"        component={PaiementScreen} />
       <Stack.Screen name="VirementScreen"             component={VirementScreen} />
       <Stack.Screen name="PolitiqueConfidentialite"  component={PolitiqueConfidentialiteScreen} />

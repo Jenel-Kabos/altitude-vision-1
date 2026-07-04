@@ -117,6 +117,68 @@ cron.schedule('0 6 * * *', async () => {
 
 logger.info('⏰ [CRON] Vérification pénalités locatives activée (6h quotidien)');
 
+// ============================================================
+// 📅 CRON JOB — Annulation automatique des visites non démarrées
+// Toutes les 5 minutes : si dateConfirmee dépassée de > 30 min
+// et statut encore "Confirmée" → passage à "Annulée"
+// ============================================================
+const Visite = require('./models/Visite');
+const { notify } = require('./services/notificationService');
+
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    const delaiMs     = 30 * 60 * 1000;
+    const limiteTemps = new Date(Date.now() - delaiMs);
+
+    const visitesAnnuler = await Visite.find({
+      statut:        'Confirmée',
+      dateConfirmee: { $lt: limiteTemps },
+    })
+      .populate('property', 'title owner')
+      .populate('client',   '_id name');
+
+    if (visitesAnnuler.length === 0) return;
+
+    logger.info(`⏰ [CRON Visites] ${visitesAnnuler.length} visite(s) à annuler automatiquement`);
+
+    await Promise.all(visitesAnnuler.map(async (visite) => {
+      const titreWell = visite.property?.title || 'un bien';
+      const dateStr   = visite.dateConfirmee
+        ? new Date(visite.dateConfirmee).toLocaleString('fr-FR', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })
+        : '';
+
+      visite.statut = 'Annulée';
+      visite.notes  = (visite.notes ? visite.notes + '\n' : '') +
+        `[Annulation automatique le ${new Date().toLocaleString('fr-FR')} — visite non démarrée à l'heure prévue]`;
+      await visite.save();
+
+      if (visite.client?._id) {
+        notify(visite.client._id, {
+          type:  'visite_auto_cancelled',
+          title: 'Visite annulée automatiquement ❌',
+          body:  `Votre visite de "${titreWell}"${dateStr ? ` prévue le ${dateStr}` : ''} a été annulée car elle n'a pas été prise en charge à l'heure prévue. Contactez-nous pour reprogrammer.`,
+          data:  { screen: 'Visites' },
+        }).catch(() => {});
+      }
+
+      if (visite.property?.owner) {
+        notify(visite.property.owner, {
+          type:  'visite_auto_cancelled_owner',
+          title: 'Visite annulée automatiquement ❌',
+          body:  `Une visite de votre bien "${titreWell}"${dateStr ? ` prévue le ${dateStr}` : ''} a été annulée automatiquement car aucun collaborateur ne l'a prise en charge à l'heure prévue.`,
+          data:  { screen: 'OwnerVisites' },
+        }).catch(() => {});
+      }
+    }));
+
+    logger.success(`✅ [CRON Visites] ${visitesAnnuler.length} visite(s) annulée(s) — clients et propriétaires notifiés`);
+  } catch (err) {
+    logger.error('❌ [CRON Visites] Erreur annulation auto:', err.message);
+  }
+});
+
+logger.info('⏰ [CRON] Annulation automatique des visites activée (toutes les 5 minutes)');
+
 
 const app = express();
 

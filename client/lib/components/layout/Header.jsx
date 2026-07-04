@@ -178,14 +178,18 @@ const NavDropdown = ({ item, pathname, size = 'xl' }) => {
 
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 14px)', left: '50%',
-          transform: 'translateX(-50%)', minWidth: '210px',
-          borderRadius: '8px', border: '1px solid rgba(200,150,12,0.14)',
-          background: 'rgba(9,11,14,0.98)',
-          backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(240,237,232,0.04)',
-          overflow: 'hidden', animation: 'hdr-fadeSlide 0.16s ease', zIndex: 100,
+          position: 'absolute', top: '100%', left: '50%',
+          transform: 'translateX(-50%)',
+          paddingTop: '14px', zIndex: 100,
         }}>
+          <div style={{
+            minWidth: '210px',
+            borderRadius: '8px', border: '1px solid rgba(200,150,12,0.14)',
+            background: 'rgba(9,11,14,0.98)',
+            backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(240,237,232,0.04)',
+            overflow: 'hidden', animation: 'hdr-fadeSlide 0.16s ease',
+          }}>
           <div style={{ padding: '6px' }}>
             {item.children.map((child, idx) => {
               const childActive = isNavLinkActive(pathname, child.to);
@@ -237,6 +241,7 @@ const NavDropdown = ({ item, pathname, size = 'xl' }) => {
                 </Link>
               );
             })}
+          </div>
           </div>
         </div>
       )}

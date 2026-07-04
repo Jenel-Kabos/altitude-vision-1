@@ -89,7 +89,7 @@ const LOCAL_BUSINESS_SCHEMA = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="fr" className={`${cinzel.variable} ${cormorant.variable} ${dmSans.variable}`}>
+    <html lang="fr" data-scroll-behavior="smooth" className={`${cinzel.variable} ${cormorant.variable} ${dmSans.variable}`}>
       <body>
         <JsonLd schemas={[LOCAL_BUSINESS_SCHEMA]} />
         <AppProviders>

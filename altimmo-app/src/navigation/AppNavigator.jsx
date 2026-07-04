@@ -63,8 +63,26 @@ export default function AppNavigator() {
     );
   }
 
+  const linking = {
+    prefixes: ['altimmo://'],
+    config: {
+      screens: {
+        Main: {
+          screens: {
+            Profil: {
+              screens: {
+                Transactions:   'paiement/success',
+                PaiementCancel: 'paiement/cancel',
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+
   return (
-    <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation}>
+    <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} linking={linking}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,

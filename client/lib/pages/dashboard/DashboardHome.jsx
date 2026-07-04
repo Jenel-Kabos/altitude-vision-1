@@ -78,13 +78,17 @@ const DashboardHome = () => {
         setLoading(true);
         setError(null);
         const isAdmin = user?.role === 'Admin';
+        const STAFF_DOC_ROLES = ['Admin', 'Secretaire', 'Collaborateur'];
+        const canReadUsers   = isAdmin;
+        const canReadAlertes = STAFF_DOC_ROLES.includes(user?.role);
+
         const [dashboardData, quotesData, eventsData, alertesData, usersData, logsData] = await Promise.all([
           getDashboardStats(),
           getAllQuotes().catch(() => []),
           getAllEvents(),
-          getAlertesPaiements().catch(() => null),
-          getAllUsers().catch(() => []),
-          isAdmin ? getRecentActionLogs(8).catch(() => []) : Promise.resolve([]),
+          canReadAlertes ? getAlertesPaiements().catch(() => null) : Promise.resolve(null),
+          canReadUsers   ? getAllUsers().catch(() => [])            : Promise.resolve([]),
+          isAdmin        ? getRecentActionLogs(8).catch(() => [])  : Promise.resolve([]),
         ]);
         const dsStats = dashboardData.stats || { Altimmo: 0, MilaEvents: 0, Altcom: 0 };
         const events  = Array.isArray(eventsData) ? eventsData : [];

@@ -21,7 +21,17 @@ exports.createVisite = asyncHandler(async (req, res) => {
     statut: 'En attente',
   });
 
-  await visite.populate('property', 'title images address');
+  await visite.populate('property', 'title images address owner');
+
+  // Notifie le propriétaire du bien
+  if (visite.property?.owner) {
+    notify(visite.property.owner, {
+      type:  'visite_new',
+      title: 'Nouvelle demande de visite 🏠',
+      body:  `${req.user.name} souhaite visiter votre bien : ${visite.property?.title || 'un bien'}`,
+      data:  { screen: 'OwnerVisites' },
+    }).catch(() => {});
+  }
 
   // Notifie le staff d'une nouvelle demande
   notifyStaff({
@@ -100,10 +110,12 @@ exports.updateVisite = asyncHandler(async (req, res) => {
   // Notifie le client si le statut a changé
   if (statut && statut !== previousStatut && visite.client) {
     const STATUT_MESSAGES = {
-      'Confirmée':    { title: 'Visite confirmée ✅', body: `Votre visite de "${visite.property?.title}" a été confirmée${dateConfirmee ? ` le ${new Date(dateConfirmee).toLocaleDateString('fr-FR')}` : ''}.` },
-      'Refusée':      { title: 'Visite refusée',      body: `Votre demande de visite pour "${visite.property?.title}" n'a pas pu être acceptée.` },
-      'Replanifiée':  { title: 'Visite replanifiée 📅', body: `Votre visite de "${visite.property?.title}" a été replanifiée${dateProposee ? ` au ${new Date(dateProposee).toLocaleDateString('fr-FR')}` : ''}.` },
-      'Effectuée':    { title: 'Visite effectuée',    body: `Merci pour votre visite de "${visite.property?.title}". N'hésitez pas à nous contacter.` },
+      'Confirmée':   { title: 'Visite confirmée ✅',   body: `Votre visite de "${visite.property?.title}" a été confirmée${dateConfirmee ? ` le ${new Date(dateConfirmee).toLocaleDateString('fr-FR')}` : ''}.` },
+      'En cours':    { title: 'Visite en cours 🏃',    body: `Votre visite de "${visite.property?.title}" est maintenant en cours.` },
+      'Refusée':     { title: 'Visite refusée',         body: `Votre demande de visite pour "${visite.property?.title}" n'a pas pu être acceptée.` },
+      'Replanifiée': { title: 'Visite replanifiée 📅',  body: `Votre visite de "${visite.property?.title}" a été replanifiée${dateProposee ? ` au ${new Date(dateProposee).toLocaleDateString('fr-FR')}` : ''}.` },
+      'Terminée':    { title: 'Visite effectuée',       body: `Merci pour votre visite de "${visite.property?.title}". N'hésitez pas à nous contacter.` },
+      'Annulée':     { title: 'Visite annulée ❌',      body: `Votre visite de "${visite.property?.title}" a été annulée car elle n'a pas été prise en charge à l'heure prévue. Contactez-nous pour reprogrammer.` },
     };
     const msg = STATUT_MESSAGES[statut];
     if (msg) {
@@ -158,5 +170,30 @@ exports.cancelVisite = asyncHandler(async (req, res) => {
   res.status(200).json({
     status: 'success',
     data: { visite },
+  });
+});
+
+// ─────────────────────────────────────────────
+// GET /api/visites/owner — visites des biens du propriétaire
+// ─────────────────────────────────────────────
+exports.getOwnerVisites = asyncHandler(async (req, res) => {
+  const Property = require('../models/Property');
+
+  const properties = await Property.find({ owner: req.user.id }).select('_id title');
+  const propertyIds = properties.map(p => p._id);
+
+  if (propertyIds.length === 0) {
+    return res.status(200).json({ status: 'success', results: 0, data: { visites: [] } });
+  }
+
+  const visites = await Visite.find({ property: { $in: propertyIds } })
+    .populate('property', 'title images address')
+    .populate('client', 'name email phone')
+    .sort('-createdAt');
+
+  res.status(200).json({
+    status: 'success',
+    results: visites.length,
+    data: { visites },
   });
 });

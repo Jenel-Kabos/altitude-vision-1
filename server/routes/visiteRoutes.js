@@ -9,6 +9,7 @@ const {
   getAllVisites,
   updateVisite,
   cancelVisite,
+  getOwnerVisites,
 } = require('../controllers/visiteController');
 
 // 🔒 Toutes les routes nécessitent un token valide
@@ -18,6 +19,9 @@ router.use(protect);
 
 // Client : voir ses propres visites
 router.get('/my', getMyVisites);
+
+// Propriétaire : voir les visites sur ses biens
+router.get('/owner', restrictTo('Proprietaire', 'Admin'), getOwnerVisites);
 
 // Staff : voir toutes les visites
 router.get('/', restrictTo(...STAFF_COMM), getAllVisites);

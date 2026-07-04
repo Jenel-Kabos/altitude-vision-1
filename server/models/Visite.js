@@ -20,7 +20,7 @@ const visiteSchema = new mongoose.Schema({
   dateConfirmee: { type: Date, default: null },  // validée finale
   statut: {
     type: String,
-    enum: ['En attente', 'Confirmée', 'Terminée', 'Annulée'],
+    enum: ['En attente', 'Confirmée', 'En cours', 'Terminée', 'Annulée'],
     default: 'En attente',
   },
   notes: { type: String, default: '' },          // notes internes staff

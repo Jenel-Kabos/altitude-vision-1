@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, User, LogOut, Globe, ShieldCheck, Menu, X, Building, Mountain } from "lucide-react";
+import { Home, User, LogOut, Globe, ShieldCheck, Menu, X, Building, Mountain, Calendar } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useAuth } from '../../context/AuthContext';
 
@@ -12,9 +12,10 @@ const GOLD  = '#C8960C';
 const GREEN = '#16A34A';
 
 const NAV_LINKS = [
-  { to: '/mes-biens', end: true,  Icon: Building,    label: 'Mes Biens',  accent: BLUE  },
-  { to: '/profile',  end: false,  Icon: User,        label: 'Mon Profil', accent: GOLD  },
-  { to: '/securite', end: false,  Icon: ShieldCheck, label: 'Sécurité',   accent: GREEN },
+  { to: '/mes-biens',         end: true,  Icon: Building,    label: 'Mes Biens',   accent: BLUE  },
+  { to: '/mes-biens/visites', end: false, Icon: Calendar,    label: 'Mes Visites', accent: GOLD  },
+  { to: '/profile',           end: false, Icon: User,        label: 'Mon Profil',  accent: GOLD  },
+  { to: '/securite',          end: false, Icon: ShieldCheck, label: 'Sécurité',    accent: GREEN },
 ];
 
 const OwnerDashboard = ({ children }) => {

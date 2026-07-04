@@ -155,10 +155,12 @@ export default function PaiementScreen({ route, navigation }) {
       });
 
       if (data?.paymentUrl) {
-        const result = await WebBrowser.openBrowserAsync(data.paymentUrl);
-        if (result.type === 'dismiss' || result.type === 'cancel') {
-          navigation.goBack();
-        }
+        await WebBrowser.openBrowserAsync(data.paymentUrl);
+        Alert.alert(
+          'Vérification en cours',
+          'Votre paiement est en cours de traitement. Le statut sera mis à jour dans quelques instants.',
+          [{ text: 'Voir mes transactions', onPress: () => navigation.navigate('Profil', { screen: 'Transactions' }) }],
+        );
       }
     } catch (err) {
       Alert.alert(

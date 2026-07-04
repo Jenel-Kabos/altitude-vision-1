@@ -6,6 +6,7 @@ const APIFeatures = require('../utils/apiFeatures');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const logger = require('../utils/logger');
+const { notifyMany } = require('../services/notificationService');
 
 // ============================================================
 // 🛠️ UTILITAIRES
@@ -458,6 +459,33 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
     message: `Propriété ${newStatusAdmin.toLowerCase()}.`,
     data: { property: updatedProperty },
   });
+
+  // Broadcast "nouveau bien publié" à tous les utilisateurs actifs
+  if (newStatusAdmin === 'Validée') {
+    try {
+      const allUsers = await User.find({
+        status: { $nin: ['Suspendu', 'Banni'] },
+      }).select('_id').lean();
+
+      const propertyTitle = updatedProperty.title || 'Nouveau bien disponible';
+      const ville = updatedProperty.address?.city || '';
+      const prix  = updatedProperty.price
+        ? `${updatedProperty.price.toLocaleString('fr-FR')} FCFA`
+        : '';
+
+      notifyMany(
+        allUsers.map(u => u._id),
+        {
+          type:  'new_property',
+          title: '🏠 Nouveau bien disponible !',
+          body:  [propertyTitle, ville, prix].filter(Boolean).join(' · '),
+          data:  { screen: 'DetailAnnonce', params: { id: updatedProperty._id.toString() } },
+        },
+      ).catch(() => {});
+    } catch (err) {
+      logger.error('❌ [notify] Broadcast new_property échoué:', err.message);
+    }
+  }
 
   logAction({
     action: action === 'validate' ? 'Bien validé' : 'Bien rejeté',
