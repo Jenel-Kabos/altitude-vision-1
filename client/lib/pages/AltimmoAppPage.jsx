@@ -132,7 +132,7 @@ const MockupListings = () => (
               <p style={{ fontFamily:"'DM Sans',sans-serif", fontSize:'0.58rem', color:BLUE, fontWeight:700 }}>{c.price} FCFA</p>
               <div style={{ display:'flex', alignItems:'center', gap:3, marginTop:4 }}>
                 <MapPin size={8} style={{ color:GRAY }} />
-                <span style={{ fontSize:'0.52rem', color:GRAY }}>Brazzaville</span>
+                <span style={{ fontSize:'0.52rem', color:GRAY }}>Congo Brazzaville</span>
               </div>
             </div>
           </div>
@@ -272,7 +272,7 @@ const PhoneMockup = () => (
               <p style={{ fontSize:'0.56rem', color:item.c, fontWeight:700, marginTop:1 }}>{item.price}</p>
               <div style={{ display:'flex', alignItems:'center', gap:2, marginTop:2 }}>
                 <MapPin size={7} style={{ color:GRAY }} />
-                <span style={{ fontSize:'0.48rem', color:GRAY }}>Brazzaville</span>
+                <span style={{ fontSize:'0.48rem', color:GRAY }}>Congo Brazzaville</span>
                 <div style={{ marginLeft:'auto', display:'flex', gap:1 }}>
                   {[1,2,3,4,5].map(s => <Star key={s} size={7} fill={GOLD} style={{ color:GOLD }} />)}
                 </div>
@@ -344,7 +344,7 @@ export default function AltimmoAppPage() {
                   marginBottom:16,
                 }}>
                   L'immobilier<br />
-                  <span style={{ color:GOLD }}>Brazzaville</span><br />
+                  <span style={{ color:GOLD }}>Congo Brazzaville</span><br />
                   <span style={{ color:'rgba(255,255,255,0.55)', fontStyle:'italic' }}>simplifié.</span>
                 </h1>
               </Reveal>
@@ -352,7 +352,7 @@ export default function AltimmoAppPage() {
               <Reveal delay={0.12}>
                 <p style={{ fontSize:'clamp(0.95rem,2vw,1.12rem)', color:'rgba(255,255,255,0.60)', lineHeight:1.72,
                   maxWidth:580, margin:'0 auto 32px' }}>
-                  Altimmo est la plateforme immobilière d'Altitude-Vision dédiée à Brazzaville.
+                  Altimmo est la plateforme immobilière d'Altitude-Vision dédiée au Congo Brazzaville.
                   Recherchez, comparez et sécurisez vos transactions depuis n'importe quel appareil.
                 </p>
               </Reveal>
@@ -418,7 +418,7 @@ export default function AltimmoAppPage() {
               {
                 icon: Eye, color: '#DC2626',
                 title: 'Marché opaque',
-                body: "Avant Altimmo, trouver un bien à Brazzaville relevait du bouche-à-oreille. Les prix variaient du simple au double selon la source, sans aucune transparence.",
+                body: "Avant Altimmo, trouver un bien au Congo relevait du bouche-à-oreille. Les prix variaient du simple au double selon la source, sans aucune transparence.",
               },
               {
                 icon: Shield, color: BLUE,
@@ -428,7 +428,7 @@ export default function AltimmoAppPage() {
               {
                 icon: Zap, color: GOLD,
                 title: 'La solution aujourd\'hui',
-                body: "Altimmo permet à tout Congolais de rechercher, comparer et contacter un expert en moins de 5 minutes — depuis Brazzaville ou depuis l'étranger.",
+                body: "Altimmo permet à tout Congolais de rechercher, comparer et contacter un expert en moins de 5 minutes — depuis le Congo ou depuis l'étranger.",
               },
             ].map(({ icon: Icon, color, title, body }, i) => (
               <Reveal key={title} delay={i * 0.08}>
@@ -709,7 +709,7 @@ export default function AltimmoAppPage() {
               <span style={{ color:GOLD }}>vous attend.</span>
             </h2>
             <p style={{ fontSize:'clamp(0.90rem,2vw,1.05rem)', color:'rgba(255,255,255,0.55)', lineHeight:1.72, marginBottom:36 }}>
-              Rejoignez les centaines de familles qui ont trouvé leur logement à Brazzaville grâce à Altimmo. C'est gratuit, rapide et sécurisé.
+              Rejoignez les centaines de familles qui ont trouvé leur logement au Congo Brazzaville grâce à Altimmo. C'est gratuit, rapide et sécurisé.
             </p>
             <div style={{ display:'flex', gap:14, justifyContent:'center', flexWrap:'wrap' }}>
               <Link href="/altimmo/annonces" style={{

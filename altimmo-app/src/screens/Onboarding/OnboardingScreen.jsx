@@ -30,7 +30,7 @@ const SLIDES = [
     key: 'discover',
     eyebrow: 'DÉCOUVRIR',
     title: 'Les meilleurs biens\nimmobiliers du Congo',
-    subtitle: 'Appartements, villas, terrains — toutes les offres de Brazzaville réunies en un seul endroit.',
+    subtitle: 'Appartements, villas, terrains — toutes les offres du Congo Brazzaville réunies en un seul endroit.',
     bg: ['#0A0A0A', '#1C1408', '#2D1E04'],
     accent: '#C8960C',
     illustration: 'discover',

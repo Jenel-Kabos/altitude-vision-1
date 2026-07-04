@@ -50,7 +50,7 @@ const ATOUTS = [
     { icon: ShieldCheck, label: 'Transactions sécurisées',   color: BLUE },
     { icon: Clock,       label: 'Réponse sous 24h',          color: GOLD },
     { icon: Award,       label: 'Experts certifiés',         color: BLUE },
-    { icon: MapPin,      label: 'Ancrage local Brazzaville', color: GOLD },
+    { icon: MapPin,      label: 'Ancrage local Congo Brazzaville', color: GOLD },
 ];
 
 /* ─────────────────────────────────────────────────────────────
@@ -626,7 +626,7 @@ const AltimmoPage = () => {
                             <h2 className="ai-about-h2">L'Excellence au Service<br />de Vos Projets</h2>
                             <div style={{ height:'2px', width:'48px', borderRadius:'2px', marginBottom:'20px', background:`linear-gradient(to right,${BLUE},${GOLD})` }} />
                             <p className="ai-about-body">
-                                Forts d'une connaissance approfondie du marché immobilier de Brazzaville, nous offrons une approche personnalisée, alliant{' '}
+                                Forts d'une connaissance approfondie du marché immobilier du Congo Brazzaville, nous offrons une approche personnalisée, alliant{' '}
                                 <strong style={{ color:'#111827' }}>innovation</strong>,{' '}
                                 <strong style={{ color:'#111827' }}>expertise légale</strong> et{' '}
                                 <strong style={{ color:'#111827' }}>écoute attentive</strong>.
@@ -818,7 +818,7 @@ const AltimmoPage = () => {
                                 {[
                                     { icon:CheckCircle, text:'100% gratuit, sans engagement'      },
                                     { icon:Clock,       text:'Réponse garantie sous 24h'          },
-                                    { icon:ShieldCheck, text:'Expertise marché local Brazzaville' },
+                                    { icon:ShieldCheck, text:'Expertise marché local Congo Brazzaville' },
                                     { icon:Mail,        text:'Confirmation par email immédiate'   },
                                 ].map(({ icon:Icon, text },i) => (
                                     <li key={i} className="ai-estimation-check">

@@ -4,8 +4,8 @@ import AltimmoAnnonces from "@/lib/pages/AltimmoAnnonces";
 import JsonLd from "@/lib/components/JsonLd";
 
 export const metadata = buildMetadata({
-  title:       "Annonces immobilières à Brazzaville — Altimmo",
-  description: "Parcourez toutes les annonces immobilières d'Altimmo : appartements, maisons, villas à vendre ou à louer à Brazzaville, Congo.",
+  title:       "Annonces immobilières au Congo Brazzaville — Altimmo",
+  description: "Parcourez toutes les annonces immobilières d'Altimmo : appartements, maisons, villas à vendre ou à louer au Congo Brazzaville.",
   url:         "/altimmo/annonces",
 });
 

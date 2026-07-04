@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 
 export const size        = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-export const alt         = 'Altimmo — 200 familles logées à Brazzaville';
+export const alt         = 'Altimmo — 200 familles logées au Congo Brazzaville';
 
 export default function Image() {
   const BLUE = '#2E7BB5';
@@ -27,7 +27,7 @@ export default function Image() {
               <span style={{ color:'rgba(232,228,220,0.5)', fontSize:'13px', fontWeight:400, letterSpacing:'0.20em', textTransform:'uppercase' }}>ALTITUDE-VISION</span>
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:'8px', padding:'6px 16px', borderRadius:'40px', border:`1px solid rgba(46,123,181,0.25)`, background:'rgba(46,123,181,0.08)' }}>
-              <span style={{ color:BLUE, fontSize:'11px', letterSpacing:'0.20em', textTransform:'uppercase', fontWeight:500 }}>Immobilier — Brazzaville</span>
+              <span style={{ color:BLUE, fontSize:'11px', letterSpacing:'0.20em', textTransform:'uppercase', fontWeight:500 }}>Immobilier — Congo Brazzaville</span>
             </div>
           </div>
 
@@ -38,7 +38,7 @@ export default function Image() {
 
           <div style={{ display:'flex', flexDirection:'column', marginBottom:'20px' }}>
             <span style={{ color:'#E8E4DC', fontSize:'64px', fontWeight:300, lineHeight:1.08, letterSpacing:'-0.02em' }}>200 familles logées</span>
-            <span style={{ color:BLUE, fontSize:'64px', fontWeight:300, lineHeight:1.08, letterSpacing:'-0.02em' }}>à Brazzaville</span>
+            <span style={{ color:BLUE, fontSize:'64px', fontWeight:300, lineHeight:1.08, letterSpacing:'-0.02em' }}>au Congo Brazzaville</span>
           </div>
 
           <div style={{ display:'flex', height:'1px', width:'72px', background:`rgba(46,123,181,0.45)`, marginBottom:'18px' }} />

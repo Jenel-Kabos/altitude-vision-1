@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 
 export const size        = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-export const alt         = 'Altimmo — 200 familles logées à Brazzaville';
+export const alt         = 'Altimmo — 200 familles logées au Congo Brazzaville';
 
 export default function Image() {
   const BLUE = '#2E7BB5';
@@ -49,7 +49,7 @@ export default function Image() {
           {/* Main headline */}
           <div style={{ display:'flex', flexDirection:'column', marginBottom:'20px' }}>
             <span style={{ color:'#E8E4DC', fontSize:'64px', fontWeight:300, lineHeight:1.08, letterSpacing:'-0.02em' }}>200 familles logées</span>
-            <span style={{ color:BLUE, fontSize:'64px', fontWeight:300, lineHeight:1.08, letterSpacing:'-0.02em' }}>à Brazzaville</span>
+            <span style={{ color:BLUE, fontSize:'64px', fontWeight:300, lineHeight:1.08, letterSpacing:'-0.02em' }}>au Congo Brazzaville</span>
           </div>
 
           {/* Divider */}

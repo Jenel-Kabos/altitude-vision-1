@@ -9,17 +9,17 @@ const protect   = [auth.protect, auth.restrictTo(...STAFF_DOC)];
 const adminOnly = [auth.protect, auth.restrictTo('Admin')];
 
 // CinetPay
-router.post('/initier',           auth.protect,  cinetpay.initierPaiement);
-router.post('/webhook-cinetpay',                 cinetpay.webhookCinetpay);
+router.post('/initier',           auth.protect, cinetpay.initierPaiement);
+router.post('/webhook-cinetpay',               cinetpay.webhookCinetpay);
 
 // Routes spécifiques AVANT /:id pour éviter les conflits
-router.get( '/alertes',            protect,   ctrl.getAlertes);
-router.post('/calculer-penalites', adminOnly, ctrl.calculerPenalites);
+router.get( '/alertes',            protect, ctrl.getAlertes);
+router.post('/calculer-penalites', protect, ctrl.calculerPenalites);
 
-router.get('/',       protect,   ctrl.getAll);
-router.get('/:id',    protect,   ctrl.getOne);
-router.put('/:id',    adminOnly, ctrl.update);
-router.post('/:id/marquer-paye', adminOnly, ctrl.marquerPaye);
-router.delete('/:id', adminOnly, ctrl.delete);
+router.get('/',       protect, ctrl.getAll);
+router.get('/:id',    protect, ctrl.getOne);
+router.put('/:id',    protect, ctrl.update);
+router.post('/:id/marquer-paye', protect, ctrl.marquerPaye);
+router.delete('/:id', protect, ctrl.delete);
 
 module.exports = router;
