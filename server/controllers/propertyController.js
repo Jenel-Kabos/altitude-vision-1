@@ -180,21 +180,24 @@ const createProperty = asyncHandler(async (req, res, next) => {
 const getAllProperties = asyncHandler(async (req, res) => {
   const isAdmin = req.user && req.user.role === 'Admin';
 
-  if (!isAdmin) {
-    req.query.statusAdmin = 'Validée';
-  }
-  // Toujours forcer availability, indépendamment du rôle et des query params client
+  if (!isAdmin) req.query.statusAdmin = 'Validée';
   req.query.availability = 'Disponible';
+
+  // Forcer le pôle Altimmo pour les routes publiques (éviter biens MilaEvents/Altcom)
+  if (!isAdmin) req.query.pole = 'Altimmo';
 
   // Remapper city/arrondissement → address.city / address.arrondissement (champs imbriqués MongoDB)
   if (req.query.city) {
-    req.query['address.city'] = req.query.city;
+    req.query['address.city'] = { $regex: new RegExp(`^${req.query.city}$`, 'i') };
     delete req.query.city;
   }
   if (req.query.arrondissement) {
-    req.query['address.arrondissement'] = req.query.arrondissement;
+    req.query['address.arrondissement'] = { $regex: new RegExp(`^${req.query.arrondissement}$`, 'i') };
     delete req.query.arrondissement;
   }
+
+  // Compter le total pour la pagination infinie côté mobile
+  const countFeatures = new APIFeatures(Property.find(), { ...req.query }).filter();
 
   const features = new APIFeatures(Property.find(), req.query)
     .filter()
@@ -202,12 +205,16 @@ const getAllProperties = asyncHandler(async (req, res) => {
     .limitFields()
     .paginate();
 
-  const properties = await features.query;
+  const [properties, total] = await Promise.all([
+    features.query,
+    countFeatures.query.countDocuments(),
+  ]);
 
   res.status(200).json({
     status: 'success',
     results: properties.length,
-    data: { properties },
+    total,
+    data: { properties, total },
   });
 });
 

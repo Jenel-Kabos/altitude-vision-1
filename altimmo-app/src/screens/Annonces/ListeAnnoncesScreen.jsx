@@ -268,6 +268,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
     if (activeFilters.typeBien !== 'tous') n++;
     if (activeFilters.transaction !== 'tous') n++;
     if (activeFilters.ville !== 'Toutes') n++;
+    if (activeFilters.arrondissement !== 'Tous') n++;
     if (activeFilters.priceRange[0] > 0 || activeFilters.priceRange[1] < 500_000_000) n++;
     return n;
   }, [activeFilters]);

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Modal, ScrollView, TextInput,
@@ -156,6 +156,20 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
 
   // Un seul dropdown ouvert à la fois
   const [openDropdown, setOpenDropdown] = useState(null);
+
+  // Synchronise le panel avec les filtres actifs à chaque ouverture (ex: quick-chips)
+  useEffect(() => {
+    if (visible && initialFilters) {
+      setTransaction(initialFilters.transaction ?? DEFAULT_FILTERS.transaction);
+      setTypeBien(initialFilters.typeBien    ?? DEFAULT_FILTERS.typeBien);
+      setPriceRange(initialFilters.priceRange ?? DEFAULT_FILTERS.priceRange);
+      setVille(initialFilters.ville           ?? DEFAULT_FILTERS.ville);
+      setArrondissement(initialFilters.arrondissement ?? DEFAULT_FILTERS.arrondissement);
+      setMinInput('');
+      setMaxInput('');
+      setOpenDropdown(null);
+    }
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleDropdown = useCallback((name) => {
     setOpenDropdown(prev => prev === name ? null : name);
