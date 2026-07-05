@@ -64,25 +64,21 @@ api.interceptors.response.use(
   (error) => {
     if (error.response) {
       const { status, data } = error.response;
-      
-      console.error(`❌ Erreur ${status}:`, data?.message || error.message);
-      console.error("   URL:", error.config?.url);
-      console.error("   Méthode:", error.config?.method?.toUpperCase());
-      
-      if (data?.errors) {
-        console.error("   Détails des erreurs:", data.errors);
-      }
+      const requestUrl = error.config?.url || '';
+      const isSilentUrl = SILENT_URLS.some(u => requestUrl.includes(u));
 
-      // 🔒 Token expiré ou invalide (401) - Déconnexion automatique
+      // 🔒 Token expiré ou invalide (401)
       if (status === 401) {
-        const requestUrl = error.config?.url || '';
-        const isSilentUrl = SILENT_URLS.some(u => requestUrl.includes(u));
-
         if (isSilentUrl) {
-          // Polling/comptage : laisser le service gérer l'erreur — pas de redirect
+          // Polling/comptage : nettoyer silencieusement + signaler à AuthContext
+          if (typeof window !== 'undefined' && localStorage.getItem('token')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.dispatchEvent(new CustomEvent('altimmo:auth:expired'));
+          }
         } else if (!_autoLogoutPending && typeof window !== 'undefined') {
           _autoLogoutPending = true;
-          console.warn("🔒 Token invalide détecté (401) - Déconnexion automatique");
+          console.warn("🔒 Token invalide (401) — Déconnexion automatique");
 
           localStorage.removeItem('token');
           localStorage.removeItem('user');
@@ -92,29 +88,22 @@ api.interceptors.response.use(
             window.location.href = '/login';
           }
 
-          // Reset après navigation (au cas où l'utilisateur se reconnecte)
           setTimeout(() => { _autoLogoutPending = false; }, 5000);
         }
-      }
+      } else {
+        console.error(`❌ Erreur ${status}:`, data?.message || error.message);
+        console.error("   URL:", requestUrl);
+        console.error("   Méthode:", error.config?.method?.toUpperCase());
+        if (data?.errors) console.error("   Détails:", data.errors);
 
-      // ⛔ Accès interdit (403)
-      if (status === 403) {
-        console.warn("⛔ Accès refusé (403) - Permissions insuffisantes");
-      }
-
-      // 🔍 Ressource non trouvée (404)
-      if (status === 404) {
-        console.warn("🔍 Ressource non trouvée (404)");
-      }
-
-      // 💥 Erreur serveur (500+)
-      if (status >= 500) {
-        console.error("💥 Erreur serveur (500+):", data?.message || "Erreur interne");
-        if (data?.stack) {
-          console.error("   Stack:", data.stack);
+        if (status === 403) console.warn("⛔ Accès refusé (403)");
+        if (status === 404) console.warn("🔍 Ressource non trouvée (404)");
+        if (status >= 500) {
+          console.error("💥 Erreur serveur:", data?.message || "Erreur interne");
+          if (data?.stack) console.error("   Stack:", data.stack);
         }
       }
-      
+
     } else if (error.request) {
       console.error("🌐 Aucune réponse du serveur");
       console.error("   URL tentée:", error.config?.url);

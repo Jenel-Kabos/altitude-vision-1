@@ -67,6 +67,16 @@ export const AuthProvider = ({ children }) => {
         return () => { isMounted = false; };
     }, []);
 
+    // ── Expiration silencieuse du token (endpoints de polling) ───
+    useEffect(() => {
+        const handler = () => {
+            setUser(null);
+            setLoading(false);
+        };
+        window.addEventListener('altimmo:auth:expired', handler);
+        return () => window.removeEventListener('altimmo:auth:expired', handler);
+    }, []);
+
     // ── Login (connexion initiale ou après changement de mot de passe) ──
     // 🔧 Ne doit PAS être appelé après updateMe — utiliser updateUser à la place
     const login = useCallback((userData, token) => {
