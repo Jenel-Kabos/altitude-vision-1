@@ -14,7 +14,7 @@ import { getRecommendedProperties } from '../../services/annonceService';
 import { getActivePublicites } from '../../services/publiciteService';
 import { cache } from '../../services/cacheService';
 import { useDebounce } from '../../hooks/useDebounce';
-import { PROPERTY_TYPES_WITH_ALL } from '../../constants/propertyTypes';
+import { PROPERTY_TYPES_WITH_ALL, formatPriceShort, PRICE_MAX } from '../../constants/propertyTypes';
 import {
   Screen, Card, PrixFCFA, RecommendedCarousel, SearchPanel,
   GreetingBar, AdCarousel,
@@ -69,6 +69,20 @@ const IMG_LAYOUT = { length: CARD_IMG_W, offset: 0, index: 0 };
 const getCardImgLayout = (_, i) => ({ ...IMG_LAYOUT, offset: CARD_IMG_W * i, index: i });
 
 const AUTO_SLIDE_MS = 3500;
+
+
+// ── Chip filtre actif (suppression individuelle) ──────────────────────────────
+function ActiveChip({ label, onRemove, c, chipStyle, textStyle }) {
+  return (
+    <View style={chipStyle}>
+      <Text style={textStyle} numberOfLines={1}>{label}</Text>
+      <TouchableOpacity onPress={onRemove} hitSlop={8} accessibilityRole="button"
+        accessibilityLabel={`Supprimer le filtre ${label}`}>
+        <Ionicons name="close-circle" size={14} color={c.gold} />
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 const AnnonceCard = React.memo(function AnnonceCard({ item, index, onPress, styles, c }) {
   const isLocation     = item.status?.toLowerCase() === 'location';
@@ -470,6 +484,52 @@ export default function ListeAnnoncesScreen({ navigation }) {
         onSearch={onSearchSubmit}
       />
 
+      {/* ── Chips filtres actifs ── */}
+      {activeFilterCount > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.activeChipsRow}
+          contentContainerStyle={styles.activeChipsContent}
+        >
+          {activeFilters.transaction !== 'tous' && (
+            <ActiveChip
+              label={activeFilters.transaction === 'vente' ? 'Vente' : 'Location'}
+              onRemove={() => setActiveFilters(prev => ({ ...prev, transaction: 'tous' }))}
+              c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
+            />
+          )}
+          {activeFilters.typeBien !== 'tous' && (
+            <ActiveChip
+              label={activeFilters.typeBien}
+              onRemove={() => setActiveFilters(prev => ({ ...prev, typeBien: 'tous' }))}
+              c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
+            />
+          )}
+          {activeFilters.ville !== 'Toutes' && (
+            <ActiveChip
+              label={activeFilters.ville}
+              onRemove={() => setActiveFilters(prev => ({ ...prev, ville: 'Toutes', arrondissement: 'Tous' }))}
+              c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
+            />
+          )}
+          {activeFilters.arrondissement !== 'Tous' && (
+            <ActiveChip
+              label={activeFilters.arrondissement}
+              onRemove={() => setActiveFilters(prev => ({ ...prev, arrondissement: 'Tous' }))}
+              c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
+            />
+          )}
+          {(activeFilters.priceRange[0] > 0 || activeFilters.priceRange[1] < PRICE_MAX) && (
+            <ActiveChip
+              label={`${activeFilters.priceRange[0] > 0 ? formatPriceShort(activeFilters.priceRange[0]) : '0'} – ${activeFilters.priceRange[1] < PRICE_MAX ? formatPriceShort(activeFilters.priceRange[1]) : '∞'} FCFA`}
+              onRemove={() => setActiveFilters(prev => ({ ...prev, priceRange: [0, PRICE_MAX] }))}
+              c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
+            />
+          )}
+        </ScrollView>
+      )}
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -677,6 +737,30 @@ const makeStyles = (c) => StyleSheet.create({
   },
   quickChipTextActive: { fontFamily: fonts.bodyBold, color: '#0A0A0A' },
 
+  activeChipsRow: { marginTop: spacing.sm },
+  activeChipsContent: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  activeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: 'rgba(200,150,12,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(200,150,12,0.32)',
+    maxWidth: 180,
+  },
+  activeChipText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSize.xs,
+    color: '#A07A0A',
+    flexShrink: 1,
+  },
   list: { paddingBottom: spacing.lg, gap: spacing.md },
   skeletonList: { padding: spacing.md, gap: spacing.md },
 

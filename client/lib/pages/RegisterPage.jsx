@@ -145,7 +145,7 @@ const RegisterPage = () => {
         <div
             className="min-h-screen flex"
             style={{
-                backgroundImage: "linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.72) 52%), url('https://images.unsplash.com/photo-1643818657367-491080baeece?auto=format&fit=crop&w=1920&q=80')",
+                backgroundImage: "linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.72) 52%), url('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=80')",
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundAttachment: 'fixed',

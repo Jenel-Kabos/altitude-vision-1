@@ -17,3 +17,14 @@ export const PROPERTY_TYPES_WITH_ALL = [
   { value: 'tous', label: 'Tous', icon: 'apps-outline' },
   ...PROPERTY_TYPES,
 ];
+
+export const PRICE_MAX = 500_000_000;
+
+// Formate un montant FCFA en notation courte (K / M)
+export function formatPriceShort(n) {
+  if (!n || n === 0) return '0';
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)} Md`;
+  if (n >= 1_000_000)     return `${Number.isInteger(n / 1_000_000) ? n / 1_000_000 : (n / 1_000_000).toFixed(1)} M`;
+  if (n >= 1_000)         return `${Math.round(n / 1_000)} K`;
+  return String(n);
+}

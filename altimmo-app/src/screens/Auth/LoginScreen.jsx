@@ -96,7 +96,7 @@ export default function LoginScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         >
           {/* ─── Hero ─────────────────────────────────────────── */}
-          <ImmobilierHero title="Bon retour !" subtitle="Connectez-vous à votre espace" />
+          <ImmobilierHero title="Bon retour !" subtitle="Connectez-vous à votre espace" imageUri="https://images.unsplash.com/photo-1643818657367-491080baeece?auto=format&fit=crop&w=900&q=80" />
 
           {/* ─── Carte formulaire ─────────────────────────────── */}
           <Animated.View

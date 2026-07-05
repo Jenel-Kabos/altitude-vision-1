@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform, ScrollView,
+  StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -66,6 +66,115 @@ function PasswordField({ label, value, onChangeText, show, onToggleShow, placeho
   );
 }
 
+
+// ─── Modal contrat de partenariat ────────────────────────────────────────────
+function ContractModal({ visible, onClose, c, styles }) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
+        {/* Header */}
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Contrat d'hébergement</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={10} accessibilityRole="button"
+            accessibilityLabel="Fermer le contrat">
+            <View style={styles.modalCloseBtn}>
+              <Text style={styles.modalCloseTxt}>✕</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent}
+          showsVerticalScrollIndicator={false}>
+
+          <Text style={styles.modalMeta}>
+            Altitude Vision — Altimmo{'
+'}
+            Rue Mfoa n°24, Poto-Poto, Brazzaville{'
+'}
+            contact@altitudevision.agency
+          </Text>
+
+          <Text style={styles.modalSection}>ENTRE LES SOUSSIGNÉS</Text>
+          <Text style={styles.modalBody}>
+            <Text style={styles.modalBold}>ALTITUDE VISION (L'AGENCE)</Text>{' '}— Agence multidisciplinaire spécialisée dans l'immobilier au Congo, opérant la plateforme Altimmo.{'
+
+'}
+            <Text style={styles.modalBold}>LE PROPRIÉTAIRE (LE MANDANT)</Text>{' '}— Toute personne physique ou morale s'inscrivant sur la plateforme en tant que Propriétaire et acceptant les présentes conditions.
+          </Text>
+
+          {[
+            {
+              titre: 'Article 1 — OBJET DU CONTRAT',
+              corps: 'Le présent contrat définit les conditions dans lesquelles le Mandant confie à Altitude Vision le mandat de gérer la mise en location de son (ses) bien(s) immobilier(s) via la plateforme altitudevision.agency/altimmo.',
+            },
+            {
+              titre: 'Article 2 — DURÉE DU CONTRAT',
+              corps: 'Le présent contrat prend effet à la date d'acceptation en ligne par le Mandant et est conclu pour une durée indéterminée. Il peut être résilié par chacune des parties avec un préavis de 30 jours adressé par email.',
+            },
+            {
+              titre: 'Article 3 — OBLIGATIONS DE L'AGENCE',
+              corps: '• Publier les annonces du Mandant sur la plateforme Altimmo
+• Assurer la mise en relation avec les locataires potentiels
+• Percevoir la commission locataire et reverser la part du Mandant
+• Assurer le suivi des dossiers de location',
+            },
+            {
+              titre: 'Article 4 — OBLIGATIONS DU MANDANT',
+              corps: '• Fournir des informations exactes concernant son (ses) bien(s)
+• Être le propriétaire légal ou avoir mandat du propriétaire légal
+• Informer l'Agence de tout changement affectant la disponibilité du bien
+• Ne pas contourner l'Agence en concluant directement avec un locataire présenté',
+            },
+            {
+              titre: 'Article 5 — CONDITIONS DE RÉMUNÉRATION',
+              corps: '• L'Agence perçoit une commission équivalente à 80 % du premier loyer mensuel
+• Le Mandant reçoit 30 % de cette commission (soit ~24 % du loyer)
+
+Exemple : pour un loyer de 150 000 FCFA → votre gain : 36 000 FCFA',
+            },
+            {
+              titre: 'Article 6 — CONFIDENTIALITÉ',
+              corps: 'Les parties s'engagent à préserver la confidentialité des informations échangées dans le cadre du présent contrat. Les données personnelles sont traitées conformément à la réglementation en vigueur.',
+            },
+            {
+              titre: 'Article 7 — RÉSOLUTION DES LITIGES',
+              corps: 'En cas de litige, les parties s'engagent à rechercher une solution amiable. À défaut d'accord dans un délai de 30 jours, le différend sera soumis au tribunal compétent de Brazzaville, République du Congo.',
+            },
+            {
+              titre: 'Article 8 — DISPOSITIONS GÉNÉRALES',
+              corps: 'Le présent contrat est régi par le droit congolais. Toute modification doit faire l'objet d'un avenant écrit signé par les deux parties. La nullité d'une clause n'entraîne pas la nullité du contrat dans son ensemble.',
+            },
+          ].map((art, i) => (
+            <View key={i} style={styles.modalArticle}>
+              <Text style={styles.modalArtTitle}>{art.titre}</Text>
+              <Text style={styles.modalBody}>{art.corps}</Text>
+            </View>
+          ))}
+
+          <View style={styles.modalSignature}>
+            <Text style={styles.modalSection}>ACCEPTATION NUMÉRIQUE</Text>
+            <Text style={styles.modalBody}>
+              En cochant les cases d'engagement et en appuyant sur "S'inscrire", vous acceptez électroniquement les termes du présent contrat. Un exemplaire PDF vous sera envoyé par email après validation de votre compte.
+            </Text>
+          </View>
+        </ScrollView>
+
+        <View style={styles.modalFooter}>
+          <TouchableOpacity style={styles.modalCloseFullBtn} onPress={onClose}
+            activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Fermer le contrat">
+            <Text style={styles.modalCloseFullTxt}>J'ai lu le contrat — Fermer</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─── RegisterScreen ──────────────────────────────────────────────────────────
 export default function RegisterScreen({ navigation }) {
   const { register } = useAuth();
@@ -86,6 +195,7 @@ export default function RegisterScreen({ navigation }) {
   });
   const [loading, setLoading] = useState(false);
   const [erreur, setErreur]   = useState('');
+  const [contratOpen, setContratOpen] = useState(false);
 
   const emailRef    = useRef(null);
   const passRef     = useRef(null);
@@ -230,7 +340,7 @@ export default function RegisterScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         >
           {/* ─── Hero ──────────────────────────────────────────── */}
-          <ImmobilierHero title="Créer un compte" subtitle="Rejoignez la communauté Altimmo" />
+          <ImmobilierHero title="Créer un compte" subtitle="Rejoignez la communauté Altimmo" imageUri="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=900&q=80" />
 
           {/* ─── Carte formulaire ──────────────────────────────── */}
           <View style={styles.card}>
@@ -388,6 +498,26 @@ export default function RegisterScreen({ navigation }) {
                 <Text style={styles.stepSubheading}>
                   Lisez et acceptez chaque engagement pour finaliser votre inscription
                 </Text>
+
+                {/* Bouton dérouler le contrat */}
+                <TouchableOpacity
+                  style={styles.contratBtn}
+                  onPress={() => setContratOpen(true)}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Lire le contrat de partenariat"
+                >
+                  <Ionicons name="document-text-outline" size={18} color="#C8960C" />
+                  <Text style={styles.contratBtnText}>Lire le contrat de partenariat</Text>
+                  <Ionicons name="chevron-forward-outline" size={16} color="#C8960C" />
+                </TouchableOpacity>
+
+                <ContractModal
+                  visible={contratOpen}
+                  onClose={() => setContratOpen(false)}
+                  c={c}
+                  styles={styles}
+                />
 
                 <View style={styles.certsList}>
                   {CERTS.map(cert => (
@@ -726,6 +856,131 @@ const makeStyles = (c) => StyleSheet.create({
   loginLinkAccent: {
     fontFamily: 'DMSans-Bold',
     color: c.gold,
+  },
+
+  // ─── Bouton contrat ───
+  contratBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(200,150,12,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(200,150,12,0.3)',
+    borderRadius: radius.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  contratBtnText: {
+    flex: 1,
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSize.sm,
+    color: '#C8960C',
+  },
+
+  // ─── Modal contrat ───
+  modalRoot: {
+    flex: 1,
+    backgroundColor: c.bg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: c.border,
+    backgroundColor: c.bgCard,
+  },
+  modalTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+    color: c.text,
+  },
+  modalCloseBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: c.bgCardAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseTxt: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 13,
+    color: c.textMuted,
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalContent: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  modalMeta: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: c.textMuted,
+    lineHeight: 17,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  modalSection: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+    color: c.gold,
+    letterSpacing: 1.5,
+    marginBottom: spacing.sm,
+  },
+  modalArticle: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    backgroundColor: c.bgCard,
+    borderRadius: radius.xs,
+    borderLeftWidth: 3,
+    borderLeftColor: c.gold,
+  },
+  modalArtTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.sm,
+    color: c.text,
+    marginBottom: 6,
+  },
+  modalBody: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: c.textSub,
+    lineHeight: 20,
+  },
+  modalBold: {
+    fontFamily: fonts.bodyBold,
+    color: c.text,
+  },
+  modalSignature: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: 'rgba(200,150,12,0.06)',
+    borderRadius: radius.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(200,150,12,0.2)',
+  },
+  modalFooter: {
+    padding: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+    backgroundColor: c.bgCard,
+  },
+  modalCloseFullBtn: {
+    backgroundColor: c.gold,
+    borderRadius: radius.xs,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  modalCloseFullTxt: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+    color: '#0A0A0A',
   },
 
   // ─── Écran de confirmation ───

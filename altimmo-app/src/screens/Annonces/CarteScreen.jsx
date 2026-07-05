@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Platform, Alert, Linking,
+  ActivityIndicator, Platform, Alert, Linking, ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import api from '../../services/api';
 import { cache } from '../../services/cacheService';
+import { SearchPanel } from '../../components';
+import { formatPriceShort, PRICE_MAX } from '../../constants/propertyTypes';
 import PrixFCFA from '../../components/PrixFCFA';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../../theme';
@@ -38,6 +40,27 @@ const DARK_MAP_STYLE = [
   { featureType: 'transit',     elementType: 'geometry',        stylers: [{ color: '#2C2C2C' }] },
   { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#C8960C', opacity: 0.4 }] },
 ];
+
+// ─── Filtres par défaut ───────────────────────────────────────────────────────
+const DEFAULT_FILTERS = {
+  transaction:    'tous',
+  typeBien:       'tous',
+  priceRange:     [0, 500000000],
+  ville:          'Toutes',
+  arrondissement: 'Tous',
+};
+
+// ─── Construction de la query API depuis les filtres ─────────────────────────
+function buildQuery(filters) {
+  const params = new URLSearchParams({ limit: '200' });
+  if (filters.transaction !== 'tous')    params.set('status', filters.transaction);
+  if (filters.typeBien !== 'tous')       params.set('type', filters.typeBien);
+  if (filters.ville !== 'Toutes')        params.set('city', filters.ville);
+  if (filters.arrondissement !== 'Tous') params.set('arrondissement', filters.arrondissement);
+  if (filters.priceRange[0] > 0)         params.set('price[gte]', String(filters.priceRange[0]));
+  if (filters.priceRange[1] < 500000000) params.set('price[lte]', String(filters.priceRange[1]));
+  return params.toString();
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -101,6 +124,19 @@ const PricePin = memo(function PricePin({ price, status, isSelected, pinStyles }
   prev.pinStyles  === next.pinStyles
 );
 
+// ─── Chip filtre actif ────────────────────────────────────────────────────────
+function ActiveChip({ label, onRemove, c, styles }) {
+  return (
+    <View style={styles.activeChip}>
+      <Text style={styles.activeChipText} numberOfLines={1}>{label}</Text>
+      <TouchableOpacity onPress={onRemove} hitSlop={8} accessibilityRole="button"
+        accessibilityLabel={`Supprimer le filtre ${label}`}>
+        <Ionicons name="close-circle" size={14} color={c.gold} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 // ─── CarteScreen ──────────────────────────────────────────────────────────────
 
 export default function CarteScreen({ navigation }) {
@@ -109,22 +145,37 @@ export default function CarteScreen({ navigation }) {
   const pinStyles = useMemo(() => makePinStyles(c), [c]);
   const insets    = useSafeAreaInsets();
 
-  const [annonces, setAnnonces] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [selected, setSelected] = useState(null);
-  const [clusters, setClusters]     = useState([]);
+  const [annonces, setAnnonces]         = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [selected, setSelected]         = useState(null);
+  const [clusters, setClusters]         = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [locating, setLocating]         = useState(false);
+  const [activeFilters, setActiveFilters] = useState(DEFAULT_FILTERS);
+  const [filterOpen, setFilterOpen]     = useState(false);
 
   const mapRef = useRef(null);
   const scRef  = useRef(null);
 
-  // ─── Chargement avec cache ───
+  // ─── Compteur de filtres actifs ───
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (activeFilters.transaction !== 'tous')    n++;
+    if (activeFilters.typeBien !== 'tous')       n++;
+    if (activeFilters.ville !== 'Toutes')        n++;
+    if (activeFilters.arrondissement !== 'Tous') n++;
+    if (activeFilters.priceRange[0] > 0 || activeFilters.priceRange[1] < 500_000_000) n++;
+    return n;
+  }, [activeFilters]);
+
+  // ─── Chargement avec cache + filtres dynamiques ───
   useEffect(() => {
-    const KEY = 'carte:properties';
+    setLoading(true);
+    setSelected(null);
+    const KEY = `carte:${buildQuery(activeFilters)}`;
     const hit = cache.get(KEY);
     if (hit) { setAnnonces(hit); setLoading(false); return; }
-    api.get('/properties?limit=200&statusAdmin=Validée')
+    api.get(`/properties?${buildQuery(activeFilters)}`)
       .then(res => {
         const data = res.data.data?.properties || res.data.properties || res.data.data || [];
         const withCoords = data.filter(
@@ -135,7 +186,7 @@ export default function CarteScreen({ navigation }) {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [activeFilters]);
 
   // ─── Index Supercluster ───
   const updateClusters = useCallback((region) => {
@@ -145,7 +196,7 @@ export default function CarteScreen({ navigation }) {
   }, []);
 
   useEffect(() => {
-    if (annonces.length === 0) return;
+    if (annonces.length === 0) { setClusters([]); return; }
     const index = new Supercluster({ radius: 50, maxZoom: 16, minPoints: 2 });
     index.load(annonces.map(a => ({
       type: 'Feature',
@@ -184,6 +235,13 @@ export default function CarteScreen({ navigation }) {
   const handleCardPress = useCallback(() => {
     if (selected) navigation.navigate('Annonces', { screen: 'DetailAnnonce', params: { annonce: selected } });
   }, [selected, navigation]);
+
+  const onSearchSubmit = useCallback((filters) => {
+    setActiveFilters(filters);
+    setFilterOpen(false);
+  }, []);
+
+  const onResetFilters = useCallback(() => setActiveFilters(DEFAULT_FILTERS), []);
 
   // ─── Localiser l'utilisateur ───
   const locateUser = useCallback(async () => {
@@ -316,17 +374,102 @@ export default function CarteScreen({ navigation }) {
 
       {/* ─── Header flottant ─────────────────────────────────── */}
       <SafeAreaView edges={['top']} pointerEvents="box-none">
-        <View style={styles.header}>
-          <Ionicons name="map-outline" size={18} color={c.gold} />
-          <Text style={styles.headerTitle}>Carte des biens</Text>
-          {annonces.length > 0 && (
-            <View style={styles.countBadge}>
-              <Text style={styles.countText}>
-                {annonces.length} bien{annonces.length > 1 ? 's' : ''}
+        <View style={styles.header} pointerEvents="box-none">
+
+          {/* Ligne principale */}
+          <View style={styles.headerRow} pointerEvents="auto">
+            <Ionicons name="map-outline" size={18} color={c.gold} />
+            <Text style={styles.headerTitle}>Carte des biens</Text>
+            {annonces.length > 0 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countText}>
+                  {annonces.length} bien{annonces.length > 1 ? 's' : ''}
+                </Text>
+              </View>
+            )}
+
+            {/* Bouton Filtres */}
+            <TouchableOpacity
+              style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
+              onPress={() => setFilterOpen(v => !v)}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={activeFilterCount > 0
+                ? `${activeFilterCount} filtre${activeFilterCount > 1 ? 's' : ''} actif${activeFilterCount > 1 ? 's' : ''}`
+                : 'Filtrer les biens'}
+            >
+              <Ionicons name="options-outline" size={15}
+                color={activeFilterCount > 0 ? '#0A0A0A' : c.textSub} />
+              <Text style={[styles.filterBtnText, activeFilterCount > 0 && styles.filterBtnTextActive]}>
+                Filtres
               </Text>
-            </View>
+              {activeFilterCount > 0 && (
+                <View style={styles.filterBadge}>
+                  <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Chips filtres actifs */}
+          {activeFilterCount > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.chipsRow}
+              contentContainerStyle={styles.chipsContent}
+              pointerEvents="auto"
+            >
+              {activeFilters.transaction !== 'tous' && (
+                <ActiveChip
+                  label={activeFilters.transaction === 'vente' ? 'Vente' : 'Location'}
+                  onRemove={() => setActiveFilters(prev => ({ ...prev, transaction: 'tous' }))}
+                  c={c} styles={styles}
+                />
+              )}
+              {activeFilters.typeBien !== 'tous' && (
+                <ActiveChip
+                  label={activeFilters.typeBien}
+                  onRemove={() => setActiveFilters(prev => ({ ...prev, typeBien: 'tous' }))}
+                  c={c} styles={styles}
+                />
+              )}
+              {activeFilters.ville !== 'Toutes' && (
+                <ActiveChip
+                  label={activeFilters.ville}
+                  onRemove={() => setActiveFilters(prev => ({ ...prev, ville: 'Toutes', arrondissement: 'Tous' }))}
+                  c={c} styles={styles}
+                />
+              )}
+              {activeFilters.arrondissement !== 'Tous' && (
+                <ActiveChip
+                  label={activeFilters.arrondissement}
+                  onRemove={() => setActiveFilters(prev => ({ ...prev, arrondissement: 'Tous' }))}
+                  c={c} styles={styles}
+                />
+              )}
+              {(activeFilters.priceRange[0] > 0 || activeFilters.priceRange[1] < PRICE_MAX) && (
+                <ActiveChip
+                  label={`${activeFilters.priceRange[0] > 0 ? formatPriceShort(activeFilters.priceRange[0]) : '0'} – ${activeFilters.priceRange[1] < PRICE_MAX ? formatPriceShort(activeFilters.priceRange[1]) : '∞'} FCFA`}
+                  onRemove={() => setActiveFilters(prev => ({ ...prev, priceRange: [0, PRICE_MAX] }))}
+                  c={c} styles={styles}
+                />
+              )}
+              <TouchableOpacity onPress={onResetFilters} style={styles.resetChip}
+                accessibilityRole="button" accessibilityLabel="Effacer tous les filtres">
+                <Text style={styles.resetChipText}>Tout effacer</Text>
+              </TouchableOpacity>
+            </ScrollView>
           )}
         </View>
+
+        {/* SearchPanel — s'ouvre par-dessus la carte */}
+        <SearchPanel
+          visible={filterOpen}
+          onClose={() => setFilterOpen(false)}
+          initialFilters={activeFilters}
+          onSearch={onSearchSubmit}
+        />
       </SafeAreaView>
 
       {/* ─── Bouton "Me localiser" ───────────────────────── */}
@@ -466,19 +609,23 @@ const makeStyles = (c) => StyleSheet.create({
 
   // ─── Header ───
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
     margin: spacing.md,
+    marginBottom: 0,
     backgroundColor: c.bgCard,
     borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 8,
     elevation: 5,
+    overflow: 'hidden',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   headerTitle: {
     flex: 1,
@@ -496,6 +643,85 @@ const makeStyles = (c) => StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: 11,
     color: c.goldDark,
+  },
+
+  // ─── Bouton Filtres ───
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.xs,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.bgCardAlt,
+  },
+  filterBtnActive: {
+    backgroundColor: c.gold,
+    borderColor: c.gold,
+  },
+  filterBtnText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSize.sm,
+    color: c.textSub,
+  },
+  filterBtnTextActive: {
+    color: '#0A0A0A',
+  },
+  filterBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#0A0A0A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  filterBadgeText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    color: c.gold,
+  },
+
+  // ─── Chips filtres actifs ───
+  chipsRow: {
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+  },
+  chipsContent: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  activeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: 'rgba(200,150,12,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(200,150,12,0.32)',
+    maxWidth: 160,
+  },
+  activeChipText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSize.xs,
+    color: '#A07A0A',
+    flexShrink: 1,
+  },
+  resetChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
+  resetChipText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: c.textMuted,
+    textDecorationLine: 'underline',
   },
 
   // ─── Clusters ───

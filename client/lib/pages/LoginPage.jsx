@@ -80,7 +80,7 @@ const LoginPage = () => {
           Des biens vérifiés, des propriétaires sérieux.
         </p>
         <div className="space-y-4">
-          {['Annonces vérifiées et certifiées', 'Propriétaires et agences de confiance', 'Recherche avancée par quartier et budget'].map(item => (
+          {['Annonces vérifiées et certifiées', 'Propriétaires et locataires vérifiés', 'Recherche avancée par quartier et budget'].map(item => (
             <div key={item} className="flex items-center gap-3">
               <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
                    style={{ background: '#C8960C' }}>
