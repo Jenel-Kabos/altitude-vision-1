@@ -458,7 +458,7 @@ const SearchPanel = ({ onClose, onSearch, anchorRef, panelRef }) => {
             <div className="ai-panel-filters">
                 {[
                     { label:'Transaction', value:transaction, setter:setTransaction,               options:TRANSACTIONS.map(t=>({v:t.value,l:t.label})) },
-                    { label:'Type de bien', value:typeBien,   setter:setTypeBien,                  options:TYPES_BIENS.map(t=>({v:t,l:t})) },
+                    { label:'Type de bien', value:typeBien,   setter:setTypeBien,                  options:TYPES_BIENS.map(t=>({v:t.value??t,l:t.label??t})) },
                     { label:'Budget',       value:budgetIdx,  setter:(v)=>setBudgetIdx(Number(v)), options:BUDGETS.map((b,i)=>({v:i,l:b.label})) },
                 ].map(({ label, value, setter, options }) => (
                     <div key={label} style={{ position:'relative' }}>
