@@ -70,6 +70,7 @@ export const AuthProvider = ({ children }) => {
     // ── Expiration silencieuse du token (endpoints de polling) ───
     useEffect(() => {
         const handler = () => {
+            tokenExpiredRef.current = true;
             setUser(null);
             setLoading(false);
         };
@@ -126,9 +127,11 @@ export const AuthProvider = ({ children }) => {
 
     // ── Sync session Google → localStorage ───────────────────
     const { data: session } = useSession();
+    // Flag: empêche la re-sync Google OAuth après expiration silencieuse du token
+    const tokenExpiredRef = React.useRef(false);
 
     useEffect(() => {
-        if (session?.accessToken && !user) {
+        if (session?.accessToken && !user && !tokenExpiredRef.current) {
             const googleUser = {
                 _id:             session.user?.id,
                 name:            session.user?.name,
