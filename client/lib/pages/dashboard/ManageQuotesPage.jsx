@@ -21,7 +21,8 @@ const STATUS_CONFIG = {
   'Archivé':      { color: 'bg-gray-500',   icon: Archive,       label: 'Archivé'      },
 };
 
-const SOURCE_OPTIONS = ['Tous', 'Mila Events', 'Altcom', 'Autre'];
+const SOURCE_OPTIONS = ['Tous', 'MilaEvents', 'Altcom', 'Autre'];
+const SOURCE_LABELS  = { Tous: 'Toutes les sources', MilaEvents: 'Mila Events', Altcom: 'Altcom', Autre: 'Autre' };
 
 // ─── StatCard ────────────────────────────────────────────────
 const StatCard = ({ title, value, icon: Icon, color }) => {
@@ -46,7 +47,7 @@ const QuoteRow = ({ quote, onViewDetails, onSendResponse }) => {
     ? eventDate.toLocaleDateString('fr-FR', { year:'numeric', month:'short', day:'numeric' })
     : 'Date inconnue';
   const sourceLabel = quote.source || 'N/A';
-  const SourceIcon  = sourceLabel === 'Mila Events' ? Calendar : sourceLabel === 'Altcom' ? TrendingUp : Tag;
+  const SourceIcon  = sourceLabel === 'MilaEvents' ? Calendar : sourceLabel === 'Altcom' ? TrendingUp : Tag;
 
   return (
     <tr className="border-b hover:bg-gray-50 transition">
@@ -413,7 +414,7 @@ const ManageQuotesPage = () => {
             <Tag className="text-gray-500 w-5 h-5" />
             <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-              {SOURCE_OPTIONS.map(s => <option key={s} value={s}>{s === 'Tous' ? 'Toutes les sources' : s}</option>)}
+              {SOURCE_OPTIONS.map(s => <option key={s} value={s}>{SOURCE_LABELS[s] || s}</option>)}
             </select>
           </div>
         </div>

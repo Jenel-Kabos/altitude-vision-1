@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 import {
   Calendar, MapPin, Plus, Edit, Trash2, Search, X, Loader2, AlertTriangle,
-  Send, ArrowLeft, ArrowRight, Sparkles,
+  Send, ArrowLeft, ArrowRight, Sparkles, Inbox, Mail,
   Image as ImageIcon, Upload, Video, Users, Target, Lightbulb, Settings, TrendingUp, Film
 } from 'lucide-react';
 import { getAllEvents, getEventById, uploadEventImages, uploadEventVideos } from '../../services/eventService';
@@ -28,6 +28,10 @@ const ManageEventsPage = () => {
   const [notification, setNotif]        = useState({ show: false, message: '', type: 'success' });
   const [currentPage, setCurrentPage]   = useState(1);
   const [confirmState, setConfirm]      = useState({ isOpen: false, message: '', onConfirm: () => {} });
+  const [activeTab, setActiveTab]       = useState('events');
+  const [milaQuotes, setMilaQuotes]     = useState([]);
+  const [loadingQuotes, setLoadingQuotes] = useState(false);
+  const [milaQuotesError, setMilaQuotesError] = useState(null);
 
   useEffect(() => { fetchEvents(); }, []);
 
@@ -54,6 +58,24 @@ const ManageEventsPage = () => {
       setLoading(false);
     }
   };
+
+  const fetchMilaQuotes = async () => {
+    try {
+      setLoadingQuotes(true); setMilaQuotesError(null);
+      const response = await api.get('/quotes?source=MilaEvents&sort=-createdAt');
+      setMilaQuotes(response.data.data.quotes || []);
+    } catch {
+      setMilaQuotesError('Impossible de charger les demandes clients');
+    } finally {
+      setLoadingQuotes(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'demandes' && milaQuotes.length === 0 && !loadingQuotes) {
+      fetchMilaQuotes();
+    }
+  }, [activeTab]);
 
   const showNotification = (message, type = 'success') => {
     setNotif({ show: true, message, type });
@@ -239,66 +261,160 @@ const ManageEventsPage = () => {
           </div>
         </div>
 
-        {/* Barre */}
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-100 mb-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="relative flex-1 w-full md:max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input type="text" placeholder="Rechercher un événement…" value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)} aria-label="Rechercher un événement"
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all" />
-            </div>
-            {canAddEvent && (
-              <button onClick={handleAdd}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all hover:scale-105">
-                <Plus className="w-5 h-5" /> Ajouter
-              </button>
-            )}
-          </div>
+        {/* Onglets */}
+        <div className="flex gap-2 mb-6 bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-2 border border-gray-100">
+          <button onClick={() => setActiveTab('events')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all duration-200 ${
+              activeTab === 'events'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                : 'text-gray-600 hover:bg-indigo-50'
+            }`}>
+            <Calendar className="w-5 h-5" />
+            Événements ({events.length})
+          </button>
+          <button onClick={() => setActiveTab('demandes')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all duration-200 ${
+              activeTab === 'demandes'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                : 'text-gray-600 hover:bg-indigo-50'
+            }`}>
+            <Inbox className="w-5 h-5" />
+            Demandes clients ({milaQuotes.length})
+          </button>
         </div>
 
-        {/* Erreur */}
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-lg flex items-center gap-3">
-            <AlertTriangle className="text-red-500 w-6 h-6" />
-            <p className="text-red-700 font-medium">{error}</p>
-          </div>
-        )}
-
-        {/* Contenu */}
-        {currentEvents.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl shadow-xl border-2 border-dashed border-indigo-200 animate-slideUp">
-            <div className="flex justify-center mb-4">
-              <div className="p-4 bg-indigo-100 rounded-full text-indigo-600"><Calendar className="w-12 h-12" /></div>
+        {activeTab === 'events' ? (
+          <>
+            {/* Barre */}
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-100 mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="relative flex-1 w-full md:max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input type="text" placeholder="Rechercher un événement…" value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)} aria-label="Rechercher un événement"
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all" />
+                </div>
+                {canAddEvent && (
+                  <button onClick={handleAdd}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all hover:scale-105">
+                    <Plus className="w-5 h-5" /> Ajouter
+                  </button>
+                )}
+              </div>
             </div>
-            <p className="text-lg font-bold text-gray-700 mb-1">Aucun événement trouvé</p>
-            <p className="text-sm text-gray-500">Cliquez sur <span className="font-semibold text-indigo-600">Ajouter</span> pour créer le premier.</p>
-          </div>
+
+            {/* Erreur */}
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-lg flex items-center gap-3">
+                <AlertTriangle className="text-red-500 w-6 h-6" />
+                <p className="text-red-700 font-medium">{error}</p>
+              </div>
+            )}
+
+            {/* Contenu événements */}
+            {currentEvents.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-2xl shadow-xl border-2 border-dashed border-indigo-200 animate-slideUp">
+                <div className="flex justify-center mb-4">
+                  <div className="p-4 bg-indigo-100 rounded-full text-indigo-600"><Calendar className="w-12 h-12" /></div>
+                </div>
+                <p className="text-lg font-bold text-gray-700 mb-1">Aucun événement trouvé</p>
+                <p className="text-sm text-gray-500">Cliquez sur <span className="font-semibold text-indigo-600">Ajouter</span> pour créer le premier.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                  {currentEvents.map(event => <EventCard key={event._id} event={event} />)}
+                </div>
+                {totalPages > 1 && (
+                  <div className="flex justify-center items-center gap-2 mt-8">
+                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                      className="p-2 rounded-lg bg-white shadow disabled:opacity-50 hover:bg-indigo-50 transition">
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <button key={page} onClick={() => setCurrentPage(page)}
+                        className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                          page === currentPage
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-105'
+                            : 'bg-white text-gray-700 hover:bg-indigo-50'
+                        }`}>
+                        {page}
+                      </button>
+                    ))}
+                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                      className="p-2 rounded-lg bg-white shadow disabled:opacity-50 hover:bg-indigo-50 transition">
+                      <ArrowRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-              {currentEvents.map(event => <EventCard key={event._id} event={event} />)}
-            </div>
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center gap-2 mt-8">
-                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                  className="p-2 rounded-lg bg-white shadow disabled:opacity-50 hover:bg-indigo-50 transition">
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <button key={page} onClick={() => setCurrentPage(page)}
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                      page === currentPage
-                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-105'
-                        : 'bg-white text-gray-700 hover:bg-indigo-50'
-                    }`}>
-                    {page}
-                  </button>
-                ))}
-                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg bg-white shadow disabled:opacity-50 hover:bg-indigo-50 transition">
-                  <ArrowRight className="w-5 h-5" />
-                </button>
+            {/* Onglet Demandes clients Mila Events */}
+            {loadingQuotes ? (
+              <div className="flex justify-center py-20">
+                <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+              </div>
+            ) : milaQuotesError ? (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-center gap-3">
+                <AlertTriangle className="text-red-500 w-6 h-6" />
+                <p className="text-red-700 font-medium">{milaQuotesError}</p>
+                <button onClick={fetchMilaQuotes} className="ml-auto text-sm text-indigo-600 hover:underline">Réessayer</button>
+              </div>
+            ) : milaQuotes.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-2xl shadow-xl border-2 border-dashed border-indigo-200 animate-slideUp">
+                <div className="flex justify-center mb-4">
+                  <div className="p-4 bg-indigo-100 rounded-full text-indigo-600"><Inbox className="w-12 h-12" /></div>
+                </div>
+                <p className="text-lg font-bold text-gray-700 mb-1">Aucune demande reçue</p>
+                <p className="text-sm text-gray-500">Les demandes de devis Mila Events apparaîtront ici.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-xl overflow-hidden animate-slideUp">
+                <table className="w-full">
+                  <thead className="bg-gradient-to-r from-indigo-600 to-purple-600">
+                    <tr>
+                      {['Client', 'Service', 'Date événement', 'Invités', 'Budget', 'Statut', 'Reçu le'].map(h => (
+                        <th key={h} className="px-5 py-4 text-sm font-bold text-white text-left">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {milaQuotes.map(q => {
+                      const statusColors = {
+                        'Nouveau':      'bg-blue-100 text-blue-700',
+                        'En cours':     'bg-yellow-100 text-yellow-700',
+                        'Devis Envoyé': 'bg-purple-100 text-purple-700',
+                        'Converti':     'bg-green-100 text-green-700',
+                        'Archivé':      'bg-gray-100 text-gray-600',
+                      };
+                      return (
+                        <tr key={q._id} className="border-b hover:bg-indigo-50 transition">
+                          <td className="px-5 py-4">
+                            <p className="font-semibold text-gray-800">{q.name}</p>
+                            <p className="text-xs text-gray-500">{q.email}</p>
+                          </td>
+                          <td className="px-5 py-4 text-gray-700 text-sm">{q.service}</td>
+                          <td className="px-5 py-4 text-gray-600 text-sm">
+                            {q.date ? new Date(q.date).toLocaleDateString('fr-FR', { year:'numeric', month:'short', day:'numeric' }) : '—'}
+                          </td>
+                          <td className="px-5 py-4 text-gray-600 text-sm">{q.guests ?? '—'}</td>
+                          <td className="px-5 py-4 text-gray-600 text-sm">{q.budget || '—'}</td>
+                          <td className="px-5 py-4">
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusColors[q.status] || 'bg-gray-100 text-gray-600'}`}>
+                              {q.status || 'Nouveau'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-gray-500 text-xs">
+                            {new Date(q.createdAt).toLocaleDateString('fr-FR')}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </>
