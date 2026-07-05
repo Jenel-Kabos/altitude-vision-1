@@ -2,14 +2,14 @@ import axios from "axios";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://altitude-vision.onrender.com/api";
 
-// Endpoints de polling/comptage : échec silencieux, pas de redirect auto
+// Endpoints de polling/comptage : echec silencieux, pas de redirect auto
 const SILENT_URLS = [
-  '/internal-mails/count/unread',
-  '/notifications/count',
-  '/conversations/count/unread',
+  "/internal-mails/count/unread",
+  "/notifications/count",
+  "/conversations/count/unread",
 ];
 
-// Évite que plusieurs 401 simultanés déclenchent plusieurs redirects
+// Evite que plusieurs 401 simultanement declenchent plusieurs redirects
 let _autoLogoutPending = false;
 
 // Instance Axios principale
@@ -21,102 +21,71 @@ const api = axios.create({
   timeout: 90000, // 90 secondes pour l'upload de fichiers
 });
 
-// ⭐ CORRECTION CRITIQUE : Intercepteur de requête amélioré
 api.interceptors.request.use(
   (config) => {
-    // Récupérer le token à CHAQUE requête (pas de cache)
-    const token = typeof window !== 'undefined' ? localStorage.getItem("token") : null;
-    
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Gérer FormData correctement
     if (config.data instanceof FormData) {
-      delete config.headers['Content-Type'];
-      
-      // Log du contenu du FormData pour debug
-      if (config.data) {
-        let fileCount = 0;
-        for (let pair of config.data.entries()) {
-          if (pair[1] instanceof File) {
-            fileCount++;
-          } else {
-          }
-        }
-      }
-    } else {
+      delete config.headers["Content-Type"];
     }
 
     return config;
   },
   (error) => {
-    console.error("❌ Erreur dans l'intercepteur de requête:", error);
+    console.error("Erreur dans l'intercepteur de requete:", error);
     return Promise.reject(error);
   }
 );
 
-// ⭐ CORRECTION CRITIQUE : Intercepteur de réponse avec gestion 401
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
     if (error.response) {
       const { status, data } = error.response;
-      const requestUrl = error.config?.url || '';
+      const requestUrl = error.config?.url || "";
       const isSilentUrl = SILENT_URLS.some(u => requestUrl.includes(u));
 
-      // 🔒 Token expiré ou invalide (401)
+      // 🔒 Token expire ou invalide (401)
       if (status === 401) {
         if (isSilentUrl) {
-          // Polling/comptage : nettoyer silencieusement + signaler à AuthContext
-          if (typeof window !== 'undefined' && localStorage.getItem('token')) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.dispatchEvent(new CustomEvent('altimmo:auth:expired'));
+          // URLs de polling : nettoyer le token silencieusement + notifier AuthContext
+          // Pas de console.error, pas de redirect
+          if (typeof window !== "undefined" && localStorage.getItem("token")) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            window.dispatchEvent(new CustomEvent("altimmo:auth:expired"));
           }
-        } else if (!_autoLogoutPending && typeof window !== 'undefined') {
+        } else if (!_autoLogoutPending && typeof window !== "undefined") {
           _autoLogoutPending = true;
-          console.warn("🔒 Token invalide (401) — Déconnexion automatique");
-
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-
-          const AUTH_PAGES = ['/login', '/register', '/'];
+          console.warn("🔒 Token invalide (401) — Deconnexion automatique");
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          const AUTH_PAGES = ["/login", "/register", "/"];
           if (!AUTH_PAGES.includes(window.location.pathname)) {
-            window.location.href = '/login';
+            window.location.href = "/login";
           }
-
           setTimeout(() => { _autoLogoutPending = false; }, 5000);
         }
       } else {
-        console.error(`❌ Erreur ${status}:`, data?.message || error.message);
+        console.error(`Erreur ${status}:`, data?.message || error.message);
         console.error("   URL:", requestUrl);
-        console.error("   Méthode:", error.config?.method?.toUpperCase());
-        if (data?.errors) console.error("   Détails:", data.errors);
-
-        if (status === 403) console.warn("⛔ Accès refusé (403)");
-        if (status === 404) console.warn("🔍 Ressource non trouvée (404)");
+        console.error("   Methode:", error.config?.method?.toUpperCase());
+        if (data?.errors) console.error("   Details:", data.errors);
+        if (status === 403) console.warn("⛔ Acces refuse (403)");
+        if (status === 404) console.warn("🔍 Ressource non trouvee (404)");
         if (status >= 500) {
           console.error("💥 Erreur serveur:", data?.message || "Erreur interne");
           if (data?.stack) console.error("   Stack:", data.stack);
         }
       }
-
     } else if (error.request) {
-      console.error("🌐 Aucune réponse du serveur");
-      console.error("   URL tentée:", error.config?.url);
-      console.error("   Base URL:", BASE_URL);
-      console.error("   Message:", error.message);
-      console.error("   Code:", error.code);
-      
-      if (error.code === 'ECONNABORTED') {
-        console.error("⏱️ La requête a expiré (timeout)");
-      }
-      
+      console.error("🌐 Aucune reponse du serveur:", error.config?.url, error.code);
     } else {
-      console.error("⚙️ Erreur de configuration de la requête:", error.message);
+      console.error("⚙️ Erreur de configuration:", error.message);
     }
 
     return Promise.reject(error);
