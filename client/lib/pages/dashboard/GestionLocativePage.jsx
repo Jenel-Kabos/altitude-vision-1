@@ -506,7 +506,7 @@ const BienCard = ({ bien, index, expanded, onToggle, onChange, onRemove }) => {
                 </Field>
                 <Field label="Type de bien">
                   <Select value={bien.type} onChange={e=>set('type',e.target.value)}>
-                    {BIEN_TYPES.map(t=><option key={t}>{t}</option>)}
+                    {BIEN_TYPES.map(t=><option key={t.value ?? t} value={t.value ?? t}>{t.label ?? t}</option>)}
                   </Select>
                 </Field>
               </div>

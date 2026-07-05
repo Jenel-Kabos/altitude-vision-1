@@ -229,7 +229,7 @@ const PropertyForm = ({
         >
           <option value="">Sélectionner...</option>
           {PROPERTY_TYPES.map((t) => (
-            <option key={t} value={t}>{t}</option>
+            <option key={t.value ?? t} value={t.value ?? t}>{t.label ?? t}</option>
           ))}
         </select>
       </div>

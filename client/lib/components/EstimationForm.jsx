@@ -184,7 +184,7 @@ const EstimationForm = () => {
                                         <select value={form.typeBien} onChange={e => set('typeBien', e.target.value)}
                                             className={selectCls(errors.typeBien)} style={{ fontFamily: "'DM Sans', sans-serif" }}>
                                             <option value="" className="text-gray-900">Sélectionner...</option>
-                                            {TYPES_BIENS.map(t => <option key={t} value={t} className="text-gray-900">{t}</option>)}
+                                            {TYPES_BIENS.map(t => <option key={t.value ?? t} value={t.value ?? t} className="text-gray-900">{t.label ?? t}</option>)}
                                         </select>
                                     </Field>
 
