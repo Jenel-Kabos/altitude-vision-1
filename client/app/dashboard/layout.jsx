@@ -30,7 +30,9 @@ export default function DashboardLayout({ children }) {
   // Resolve role from either auth system (email/password or Google OAuth)
   const role = user?.role ?? session?.user?.role;
   const isLoading = authLoading || sessionStatus === 'loading';
-  const isAuthenticated = !!user || sessionStatus === 'authenticated';
+  // Utiliser uniquement user (JWT local) pour décider de l'accès
+  // sessionStatus 'authenticated' (Google OAuth) sans user local → redirection login
+  const isAuthenticated = !!user;
 
   useEffect(() => {
     if (isLoading) return;
