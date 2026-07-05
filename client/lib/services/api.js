@@ -2,6 +2,15 @@ import axios from "axios";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://altitude-vision.onrender.com/api";
 
+// Endpoints de polling/comptage : échec silencieux, pas de redirect auto
+const SILENT_URLS = [
+  '/internal-mails/count/unread',
+  '/notifications/count',
+  '/conversations/count/unread',
+];
+
+// Évite que plusieurs 401 simultanés déclenchent plusieurs redirects
+let _autoLogoutPending = false;
 
 // Instance Axios principale
 const api = axios.create({
@@ -66,17 +75,25 @@ api.interceptors.response.use(
 
       // 🔒 Token expiré ou invalide (401) - Déconnexion automatique
       if (status === 401) {
-        console.warn("🔒 Token invalide détecté (401) - Déconnexion automatique");
-        
-        // Nettoyer le localStorage
-        if (typeof window !== 'undefined') {
+        const requestUrl = error.config?.url || '';
+        const isSilentUrl = SILENT_URLS.some(u => requestUrl.includes(u));
+
+        if (isSilentUrl) {
+          // Polling/comptage : laisser le service gérer l'erreur — pas de redirect
+        } else if (!_autoLogoutPending && typeof window !== 'undefined') {
+          _autoLogoutPending = true;
+          console.warn("🔒 Token invalide détecté (401) - Déconnexion automatique");
+
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          
-          // Rediriger vers la page de connexion si on n'y est pas déjà
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+
+          const AUTH_PAGES = ['/login', '/register', '/'];
+          if (!AUTH_PAGES.includes(window.location.pathname)) {
             window.location.href = '/login';
           }
+
+          // Reset après navigation (au cas où l'utilisateur se reconnecte)
+          setTimeout(() => { _autoLogoutPending = false; }, 5000);
         }
       }
 
