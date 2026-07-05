@@ -180,38 +180,26 @@ const createProperty = asyncHandler(async (req, res, next) => {
 const getAllProperties = asyncHandler(async (req, res) => {
   const isAdmin = req.user && req.user.role === 'Admin';
 
-  // ── 1. Filtre de base passé directement à Property.find() ───────────────
-  //    Ces champs NE passent PAS par APIFeatures.filter() (JSON.stringify
-  //    détruit les objets RegExp et les opérateurs $-préfixés non-standards).
-  const baseFilter = { availability: 'Disponible' };
-  if (!isAdmin) {
-    baseFilter.statusAdmin = 'Validée';
-    baseFilter.pole        = 'Altimmo';
-  }
+  if (!isAdmin) req.query.statusAdmin = 'Validée';
+  req.query.availability = 'Disponible';
 
-  // ── 2. Champs d'adresse imbriqués → regex insensible à la casse ─────────
-  //    On les retire de req.query AVANT de construire APIFeatures.
-  const escape = (s) => s.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Forcer le pôle Altimmo pour les routes publiques (éviter biens MilaEvents/Altcom)
+  if (!isAdmin) req.query.pole = 'Altimmo';
+
+  // Remapper city/arrondissement → address.city / address.arrondissement (champs imbriqués MongoDB)
   if (req.query.city) {
-    baseFilter['address.city'] = { $regex: new RegExp(`^${escape(req.query.city)}$`, 'i') };
+    req.query['address.city'] = { $regex: new RegExp(`^${req.query.city}$`, 'i') };
     delete req.query.city;
   }
   if (req.query.arrondissement) {
-    baseFilter['address.arrondissement'] = { $regex: new RegExp(`^${escape(req.query.arrondissement)}$`, 'i') };
+    req.query['address.arrondissement'] = { $regex: new RegExp(`^${req.query.arrondissement}$`, 'i') };
     delete req.query.arrondissement;
   }
 
-  // ── 3. Retirer du req.query les champs déjà dans baseFilter ─────────────
-  //    (évite le double-filtrage si le client les envoie aussi)
-  delete req.query.statusAdmin;
-  delete req.query.availability;
-  delete req.query.pole;
+  // Compter le total pour la pagination infinie côté mobile
+  const countFeatures = new APIFeatures(Property.find(), { ...req.query }).filter();
 
-  // ── 4. APIFeatures gère : type, status, price[gte/lte], search, sort, page, limit
-  const queryForCount = { ...req.query };
-  const countFeatures = new APIFeatures(Property.find(baseFilter), queryForCount).filter();
-
-  const features = new APIFeatures(Property.find(baseFilter), req.query)
+  const features = new APIFeatures(Property.find(), req.query)
     .filter()
     .sort()
     .limitFields()
@@ -222,10 +210,8 @@ const getAllProperties = asyncHandler(async (req, res) => {
     countFeatures.query.countDocuments(),
   ]);
 
-  logger.info(`📦 [getAllProperties] total=${total} results=${properties.length} baseFilter=${JSON.stringify(Object.keys(baseFilter))}`);
-
   res.status(200).json({
-    status:  'success',
+    status: 'success',
     results: properties.length,
     total,
     data: { properties, total },

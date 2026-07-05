@@ -35,6 +35,35 @@ export const getAllProperties = async (options = {}) => {
  * @param {String} propertyId - ID de la propriété
  * @returns {Promise<Object>} - Objet propriété
  */
+/**
+ * Récupère les biens avec filtres complets (utilisé par PropertiesPage web)
+ * Paramètres : { search, transaction, type, city, arrondissement, minPrice, maxPrice, page, limit, sort }
+ */
+export const getPropertiesWithFilters = async (params = {}) => {
+  try {
+    const qs = new URLSearchParams();
+    if (params.search)                             qs.set('search', params.search.trim());
+    if (params.transaction && params.transaction !== 'tous') qs.set('status', params.transaction);
+    if (params.type        && params.type !== 'tous')        qs.set('type',   params.type);
+    if (params.city        && params.city !== 'Toutes')      qs.set('city',   params.city);
+    if (params.arrondissement && params.arrondissement !== 'Tous') qs.set('arrondissement', params.arrondissement);
+    if (params.minPrice > 0)                       qs.set('price[gte]', String(params.minPrice));
+    if (params.maxPrice && params.maxPrice < 500_000_000) qs.set('price[lte]', String(params.maxPrice));
+    qs.set('page',  String(params.page  || 1));
+    qs.set('limit', String(params.limit || 12));
+    if (params.sort) qs.set('sort', params.sort);
+
+    const response = await api.get(`/properties?${qs.toString()}`);
+    return {
+      properties: response.data?.data?.properties || [],
+      total:      response.data?.data?.total || response.data?.total || 0,
+    };
+  } catch (error) {
+    console.error('❌ [propertyService] getPropertiesWithFilters:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
 export const getPropertyById = async (propertyId) => {
   try {
     

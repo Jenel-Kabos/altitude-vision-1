@@ -3,17 +3,15 @@ import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import ImmobilierHero from '../../components/illustrations/ImmobilierHero';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Button, Card, Checkbox } from '../../components';
 import { fonts, fontSize, spacing, radius } from '../../theme';
-
-const LOGO = require('../../../assets/Logo_Altitude_transparent.png');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -232,19 +230,7 @@ export default function RegisterScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         >
           {/* ─── Hero ──────────────────────────────────────────── */}
-          <View style={styles.hero}>
-            <LinearGradient
-              colors={['#0A0A0A', '#1C1408', '#2D1E04']}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <Animated.View entering={FadeInDown.delay(0).springify().damping(18)} style={styles.logoWrap}>
-              <Image source={LOGO} style={styles.logo} contentFit="contain" cachePolicy="memory" accessible={false} />
-            </Animated.View>
-            <Animated.View entering={FadeInDown.delay(80).springify().damping(18)}>
-              <Text style={styles.heroTitle}>Créer un compte</Text>
-              <Text style={styles.heroSub}>Rejoignez la communauté Altimmo</Text>
-            </Animated.View>
-          </View>
+          <ImmobilierHero title="Créer un compte" subtitle="Rejoignez la communauté Altimmo" />
 
           {/* ─── Carte formulaire ──────────────────────────────── */}
           <View style={styles.card}>

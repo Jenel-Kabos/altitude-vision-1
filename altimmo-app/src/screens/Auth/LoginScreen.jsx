@@ -3,9 +3,8 @@ import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import ImmobilierHero from '../../components/illustrations/ImmobilierHero';
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -17,7 +16,6 @@ import { fonts, fontSize, spacing, radius } from '../../theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const LOGO           = require('../../../assets/Logo_Altitude_transparent.png');
 const ANDROID_CLIENT = '872164120879-o3j19vs2ro8l7pm93u3g1po8v10tgruv.apps.googleusercontent.com';
 const EMAIL_RE       = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -98,33 +96,7 @@ export default function LoginScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         >
           {/* ─── Hero ─────────────────────────────────────────── */}
-          <View style={styles.hero}>
-            <LinearGradient
-              colors={['#0A0A0A', '#1C1408', '#2D1E04']}
-              style={StyleSheet.absoluteFillObject}
-            />
-
-            <Animated.View
-              entering={FadeInDown.delay(0).springify().damping(18)}
-              style={styles.logoWrap}
-            >
-              <Image
-                source={LOGO}
-                style={styles.logo}
-                contentFit="contain"
-                cachePolicy="memory"
-                accessible={false}
-              />
-            </Animated.View>
-
-            <Animated.View
-              entering={FadeInDown.delay(80).springify().damping(18)}
-              style={styles.heroText}
-            >
-              <Text style={styles.heroTitle}>Bon retour !</Text>
-              <Text style={styles.heroSub}>Connectez-vous à votre espace</Text>
-            </Animated.View>
-          </View>
+          <ImmobilierHero title="Bon retour !" subtitle="Connectez-vous à votre espace" />
 
           {/* ─── Carte formulaire ─────────────────────────────── */}
           <Animated.View
