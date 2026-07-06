@@ -1208,27 +1208,29 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
 
   const handleGenerate = async (action) => {
     setGenerating(action);
+    const win = typeof window !== 'undefined' ? window.open('', '_blank') : null;
     try {
       let doc;
-      if (action === 'bail')           doc = await generateBail(contrat._id);
+      if (action === 'bail')             doc = await generateBail(contrat._id);
       else if (action === 'preavis_loc') doc = await generatePreavis(contrat._id, 'locataire');
       else if (action === 'preavis_pro') doc = await generatePreavis(contrat._id, 'proprietaire');
       if (doc) {
         setDocs(prev => [...prev, doc]);
-        window.open(doc.url, '_blank');
-      }
-    } catch (e) { alert('Erreur : ' + e.message); }
+        if (win) win.location.href = doc.url; else window.open(doc.url, '_blank');
+      } else if (win) win.close();
+    } catch (e) { if (win) win.close(); alert('Erreur : ' + e.message); }
     finally { setGenerating(''); }
   };
 
   const handleGenMed = async (paiementId) => {
     setGenerating('med');
+    const win = typeof window !== 'undefined' ? window.open('', '_blank') : null;
     try {
       const doc = await generateMiseEnDemeure(paiementId);
       setDocs(prev => [...prev, doc]);
-      window.open(doc.url, '_blank');
+      if (win) win.location.href = doc.url; else window.open(doc.url, '_blank');
       setMedModal(null);
-    } catch (e) { alert('Erreur : ' + e.message); }
+    } catch (e) { if (win) win.close(); alert('Erreur : ' + e.message); }
     finally { setGenerating(''); }
   };
 
@@ -1237,13 +1239,14 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
     const pieces = edlPieces.filter(p => p.nom.trim());
     if (pieces.length === 0) return;
     setGenerating('edl');
+    const win = typeof window !== 'undefined' ? window.open('', '_blank') : null;
     try {
       const doc = await generateEtatDesLieux(contrat._id, edlModal, pieces);
       setDocs(prev => [...prev, doc]);
       setEdls(prev => [...prev, { type: edlModal, pieces }]);
       setEdlModal(null);
-      window.open(doc.url, '_blank');
-    } catch (e) { alert('Erreur : ' + e.message); }
+      if (win) win.location.href = doc.url; else window.open(doc.url, '_blank');
+    } catch (e) { if (win) win.close(); alert('Erreur : ' + e.message); }
     finally { setGenerating(''); }
   };
 
@@ -1381,11 +1384,12 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
                       loading={generating === `q_${p._id}`}
                       onClick={async () => {
                         setGenerating(`q_${p._id}`);
+                        const win = typeof window !== 'undefined' ? window.open('', '_blank') : null;
                         try {
                           const doc = await generateQuittance(p._id);
                           setDocs(prev => [...prev, doc]);
-                          window.open(doc.url, '_blank');
-                        } catch (e) { alert(e.message); }
+                          if (win) win.location.href = doc.url; else window.open(doc.url, '_blank');
+                        } catch (e) { if (win) win.close(); alert(e.message); }
                         finally { setGenerating(''); }
                       }}>
                       🧾 {['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'][(p.mois||1)-1]} {p.annee}
@@ -1438,12 +1442,13 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
             {canDoc && edls.length >= 2 && (
               <Btn outline color={BLUE} onClick={async () => {
                 setGenerating('edl_compare');
+                const win = typeof window !== 'undefined' ? window.open('', '_blank') : null;
                 try {
                   const sortie = edls.find(e => e.type === 'sortie');
                   const doc    = await generateEtatDesLieux(contrat._id, 'sortie', sortie?.pieces || []);
                   setDocs(prev => [...prev, doc]);
-                  window.open(doc.url, '_blank');
-                } catch (e) { alert(e.message); }
+                  if (win) win.location.href = doc.url; else window.open(doc.url, '_blank');
+                } catch (e) { if (win) win.close(); alert(e.message); }
                 finally { setGenerating(''); }
               }} loading={generating === 'edl_compare'}>
                 📄 Générer le PDF comparatif (entrée vs sortie)

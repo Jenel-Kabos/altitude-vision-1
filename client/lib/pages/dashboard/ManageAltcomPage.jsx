@@ -437,6 +437,50 @@ const Modal = ({ mode, type, item, onClose, onSuccess }) => {
   return null;
 };
 
+// ─── AltcomQuotesTable ───────────────────────────────────────
+const ALTCOM_QUOTE_STATUS_COLORS = {
+  'Nouveau':      '#3B82F6',
+  'En cours':     '#D97706',
+  'Devis Envoyé': '#7C3AED',
+  'Converti':     '#16A34A',
+  'Archivé':      '#6B7280',
+};
+
+const AltcomQuotesTable = ({ data }) => (
+  <div className="bg-white rounded-xl shadow-md overflow-hidden">
+    <table className="w-full">
+      <thead style={{ background: 'linear-gradient(135deg, #4F46E5, #6366F1)' }}>
+        <tr>
+          {['Client', 'Service', 'Description', 'Statut', 'Reçu le'].map(h => (
+            <th key={h} className="px-6 py-4 text-sm font-bold text-white text-left">{h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((quote) => (
+          <tr key={quote._id} className="border-b hover:bg-gray-50 transition">
+            <td className="px-6 py-4">
+              <p className="font-semibold text-gray-800">{quote.name}</p>
+              <p className="text-xs text-gray-500">{quote.email}</p>
+            </td>
+            <td className="px-6 py-4 text-gray-700 text-sm">{quote.service}</td>
+            <td className="px-6 py-4 text-gray-600 text-sm max-w-xs truncate">{quote.description || '—'}</td>
+            <td className="px-6 py-4">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-white text-xs font-semibold"
+                style={{ background: ALTCOM_QUOTE_STATUS_COLORS[quote.status] || '#6B7280' }}>
+                {quote.status || 'Nouveau'}
+              </span>
+            </td>
+            <td className="px-6 py-4 text-gray-500 text-sm">
+              {new Date(quote.createdAt).toLocaleDateString('fr-FR')}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+
 // ─── MAIN ────────────────────────────────────────────────────
 const ManageAltcomPage = () => {
   const { user } = useAuth();
@@ -444,6 +488,7 @@ const ManageAltcomPage = () => {
   const [services, setServices]         = useState([]);
   const [portfolio, setPortfolio]       = useState([]);
   const [projects, setProjects]         = useState([]);
+  const [altcomQuotes, setAltcomQuotes] = useState([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState(null);
   const [searchTerm, setSearchTerm]     = useState('');
@@ -453,22 +498,24 @@ const ManageAltcomPage = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [confirm, setConfirm]           = useState(null); // { id, type }
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
-  const [stats, setStats]               = useState({ totalServices: 0, totalPortfolio: 0, totalProjects: 0, avgRating: 0 });
+  const [stats, setStats]               = useState({ totalServices: 0, totalPortfolio: 0, totalProjects: 0, totalQuotes: 0, avgRating: 0 });
 
   useEffect(() => { fetchAllData(); }, []);
-  useEffect(() => { calculateStats(); }, [services, portfolio, projects]);
+  useEffect(() => { calculateStats(); }, [services, portfolio, projects, altcomQuotes]);
 
   const fetchAllData = async () => {
     try {
       setLoading(true); setError(null);
-      const [sData, pData, prData] = await Promise.allSettled([
+      const [sData, pData, prData, qData] = await Promise.allSettled([
         getAllServices('Altcom'),
         getAllPortfolioItems('Altcom'),
         api.get('/altcom/projects'),
+        api.get('/quotes?source=Altcom&sort=-createdAt'),
       ]);
       if (sData.status === 'fulfilled')  setServices(sData.value || []);
       if (pData.status === 'fulfilled')  setPortfolio(pData.value || []);
       if (prData.status === 'fulfilled') setProjects(prData.value?.data?.data?.projects || []);
+      if (qData.status === 'fulfilled')  setAltcomQuotes(qData.value?.data?.data?.quotes || []);
     } catch {
       setError('Impossible de charger les données Altcom');
     } finally {
@@ -480,7 +527,7 @@ const ManageAltcomPage = () => {
     const avgRating = portfolio.length > 0
       ? (portfolio.reduce((s, i) => s + (i.averageRating || 0), 0) / portfolio.length).toFixed(1)
       : 0;
-    setStats({ totalServices: services.length, totalPortfolio: portfolio.length, totalProjects: projects.length, avgRating });
+    setStats({ totalServices: services.length, totalPortfolio: portfolio.length, totalProjects: projects.length, totalQuotes: altcomQuotes.length, avgRating });
   };
 
   const showNotif = (message, type = 'success') => {
@@ -516,12 +563,16 @@ const ManageAltcomPage = () => {
   const closeModal = () => { setShowModal(false); setSelectedItem(null); };
 
   const getFilteredData = () => {
-    let data = activeTab === 'services' ? services : activeTab === 'portfolio' ? portfolio : projects;
+    let data = activeTab === 'services'  ? services
+             : activeTab === 'portfolio' ? portfolio
+             : activeTab === 'projects'  ? projects
+             : altcomQuotes;
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
       data = data.filter(item =>
         item.title?.toLowerCase().includes(q) ||
         item.projectName?.toLowerCase().includes(q) ||
+        item.name?.toLowerCase().includes(q) ||
         item.description?.toLowerCase().includes(q) ||
         item.clientName?.toLowerCase().includes(q) ||
         item.client?.toLowerCase().includes(q) ||
@@ -573,18 +624,20 @@ const ManageAltcomPage = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Services"      value={stats.totalServices}  icon={FileText}   accent={GOLD} />
-        <StatCard title="Portfolio"     value={stats.totalPortfolio} icon={Sparkles}   accent={GOLD} />
-        <StatCard title="Projets Reçus" value={stats.totalProjects}  icon={TrendingUp} accent={BLUE} />
-        <StatCard title="Note Moyenne"  value={`${stats.avgRating}/5`} icon={Star}     accent="#D97706" />
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <StatCard title="Services"         value={stats.totalServices}  icon={FileText}   accent={GOLD} />
+        <StatCard title="Portfolio"        value={stats.totalPortfolio} icon={Sparkles}   accent={GOLD} />
+        <StatCard title="Projets Reçus"    value={stats.totalProjects}  icon={TrendingUp} accent={BLUE} />
+        <StatCard title="Demandes Reçues"  value={stats.totalQuotes}    icon={FileText}   accent="#6366F1" />
+        <StatCard title="Note Moyenne"     value={`${stats.avgRating}/5`} icon={Star}     accent="#D97706" />
       </div>
 
       {/* Onglets */}
       <div className="flex flex-wrap gap-2 p-2 bg-white rounded-xl shadow-md mb-6">
-        <TabButton active={activeTab === 'services'}  onClick={() => { setActiveTab('services');  setCurrentPage(1); }} icon={<FileText size={18} />}   label="Services"       accent={GOLD} />
-        <TabButton active={activeTab === 'portfolio'} onClick={() => { setActiveTab('portfolio'); setCurrentPage(1); }} icon={<Sparkles size={18} />}   label="Portfolio"      accent={GOLD} />
-        <TabButton active={activeTab === 'projects'}  onClick={() => { setActiveTab('projects');  setCurrentPage(1); }} icon={<TrendingUp size={18} />} label="Projets Reçus"  accent={BLUE} />
+        <TabButton active={activeTab === 'services'}  onClick={() => { setActiveTab('services');  setCurrentPage(1); }} icon={<FileText size={18} />}   label="Services"          accent={GOLD} />
+        <TabButton active={activeTab === 'portfolio'} onClick={() => { setActiveTab('portfolio'); setCurrentPage(1); }} icon={<Sparkles size={18} />}   label="Portfolio"         accent={GOLD} />
+        <TabButton active={activeTab === 'projects'}  onClick={() => { setActiveTab('projects');  setCurrentPage(1); }} icon={<TrendingUp size={18} />} label="Projets Reçus"     accent={BLUE} />
+        <TabButton active={activeTab === 'quotes'}    onClick={() => { setActiveTab('quotes');    setCurrentPage(1); }} icon={<FileText size={18} />}   label="Demandes Altcom"   accent="#6366F1" />
       </div>
 
       {/* Recherche + Ajouter */}
@@ -628,9 +681,10 @@ const ManageAltcomPage = () => {
         </div>
       ) : (
         <>
-          {activeTab === 'services'  && <ServicesTable  data={currentData} onEdit={openModal} onDelete={(id, t) => setConfirm({ id, type: t })} />}
-          {activeTab === 'portfolio' && <PortfolioTable data={currentData} onEdit={openModal} onDelete={(id, t) => setConfirm({ id, type: t })} onView={openModal} />}
-          {activeTab === 'projects'  && <ProjectsTable  data={currentData} onView={openModal} onStatusChange={handleStatusChange} onDelete={(id, t) => setConfirm({ id, type: t })} />}
+          {activeTab === 'services'  && <ServicesTable      data={currentData} onEdit={openModal} onDelete={(id, t) => setConfirm({ id, type: t })} />}
+          {activeTab === 'portfolio' && <PortfolioTable     data={currentData} onEdit={openModal} onDelete={(id, t) => setConfirm({ id, type: t })} onView={openModal} />}
+          {activeTab === 'projects'  && <ProjectsTable      data={currentData} onView={openModal} onStatusChange={handleStatusChange} onDelete={(id, t) => setConfirm({ id, type: t })} />}
+          {activeTab === 'quotes'    && <AltcomQuotesTable  data={currentData} />}
           {totalPages > 1 && <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />}
         </>
       )}
