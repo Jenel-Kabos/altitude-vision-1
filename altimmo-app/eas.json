@@ -32,6 +32,8 @@
         "buildType": "apk"
       },
       "env": {
+        "EXPO_PUBLIC_API_URL": "https://altitude-vision.onrender.com/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://altitude-vision.onrender.com",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
@@ -40,6 +42,8 @@
         "buildType": "app-bundle"
       },
       "env": {
+        "EXPO_PUBLIC_API_URL": "https://altitude-vision.onrender.com/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://altitude-vision.onrender.com",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }
