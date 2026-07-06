@@ -2235,11 +2235,13 @@ const GestionLocativePage = () => {
                                       )}
                                       {p.statut === 'payé' && canDoc && (
                                         <Btn small outline color={BLUE} onClick={async () => {
+                                          const win = typeof window !== 'undefined' ? window.open('', '_blank') : null;
                                           try {
                                             const doc = await generateQuittance(p._id);
                                             toast('Quittance générée');
-                                            window.open(doc.url, '_blank');
-                                          } catch { toast('Erreur génération quittance', 'error'); }
+                                            if (doc?.url) { if (win) win.location.href = doc.url; else window.open(doc.url, '_blank'); }
+                                            else if (win) win.close();
+                                          } catch { if (win) win.close(); toast('Erreur génération quittance', 'error'); }
                                         }}><Receipt size={12}/> Quittance</Btn>
                                       )}
                                     </div>

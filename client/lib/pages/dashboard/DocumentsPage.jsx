@@ -371,12 +371,15 @@ const DocRow = ({ doc, onEdit, onDelete }) => {
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {doc.content && doc.content.startsWith('http') && (
-            <a href={doc.content} target="_blank" rel="noopener noreferrer" title="Voir le fichier"
-              className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-orange-500 transition-colors">
-              <ExternalLink size={15} />
-            </a>
-          )}
+          {doc.content && doc.content.startsWith('http') && (() => {
+            console.log(`[DocumentsPage] doc #${doc.docNumber || doc._id?.slice(-4)} content URL:`, doc.content);
+            return (
+              <a href={doc.content} target="_blank" rel="noopener noreferrer" title="Voir le fichier"
+                className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-orange-500 transition-colors">
+                <ExternalLink size={15} />
+              </a>
+            );
+          })()}
           <button onClick={() => onEdit(doc)} title="Détail / Modifier"
             className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors">
             <Eye size={15} />
