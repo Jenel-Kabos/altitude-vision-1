@@ -153,7 +153,7 @@ const RegisterPage = () => {
         >
             {/* ─── Panneau gauche : appel à l'action ─── */}
             <div className="hidden lg:flex flex-col justify-center px-14 xl:px-20 lg:w-[46%] flex-shrink-0">
-                <img src="/Logo_Altitude_transparent.png" alt="Altimmo" className="w-16 h-16 object-contain mb-8" />
+                <img src="/images/Logo_Altitude1.png" alt="Altimmo" className="w-16 h-16 object-contain mb-8" />
                 <span className="text-sm font-semibold tracking-widest uppercase mb-4"
                       style={{ color: '#C8960C' }}>Altimmo — Altitude Vision</span>
                 <h1 className="text-white text-4xl xl:text-5xl font-bold mb-5 leading-tight"
@@ -182,7 +182,7 @@ const RegisterPage = () => {
 
                 {/* Logo mobile */}
                 <div className="lg:hidden flex items-center gap-3 px-6 pt-8 pb-4">
-                    <img src="/Logo_Altitude_transparent.png" alt="Altimmo" className="w-10 h-10 object-contain" />
+                    <img src="/images/Logo_Altitude1.png" alt="Altimmo" className="w-10 h-10 object-contain" />
                     <span className="text-white text-xl font-bold"
                           style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
                         Altimmo
