@@ -8,9 +8,11 @@ import {
     SlidersHorizontal, Building2, Tag, AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
-import { getAllProperties } from '../services/propertyService';
+import { getPropertiesWithFilters } from '../services/propertyService';
 import PropertyCard          from '../components/PropertyCard';
 import { PropertySkeletonGrid, PropertySkeletonList } from '../components/PropertySkeleton';
+import { VILLES, getArrondissementsFor } from '../constants/locations';
+import { PROPERTY_TYPES_WITH_ALL, TRANSACTIONS } from '../constants/propertyTypes';
 
 // ─────────────────────────────────────────────────────────────
 const GOLD      = '#C8960C';
@@ -19,13 +21,13 @@ const DARK      = '#090B0E';
 
 const PROPERTIES_PER_PAGE = 12;
 
-const TRANSACTION_TYPES  = ['Tous', 'vente', 'location'];
-const PROPERTY_TYPES = [
-  'Tous', 'Appartement', 'Appartement meublé', 'Maison',
-  'Villa', 'Studio', 'Terrain', 'Bureau', 'Commerce', 'Entrepôt',
-];
-const AVAILABILITY_STATUS = ['Tous', 'Disponible', 'Vendu', 'Loué'];
-const TRANSACTION_LABELS = { Tous: 'Tous', vente: 'Vente', location: 'Location' };
+const VILLES_WITH_ALL = ['Toutes', ...VILLES];
+
+const DEFAULT_FILTERS = {
+    search: '', status: 'tous', type: 'tous',
+    ville: 'Toutes', arrondissement: 'Tous',
+    price: { min: '', max: '' },
+};
 
 // ── Animation variants ────────────────────────────────────────
 const containerVariants = {
@@ -113,91 +115,117 @@ const AltimmoAnnonces = () => {
     const router = useRouter();
 
     const [properties,   setProperties]  = useState([]);
-    const [filtered,     setFiltered]    = useState([]);
+    const [total,        setTotal]       = useState(0);
+    const [totalAll,     setTotalAll]    = useState(0);
     const [loading,      setLoading]     = useState(true);
     const [error,        setError]       = useState(null);
     const [currentPage,  setPage]        = useState(1);
     const [showFilters,  setShowFilters] = useState(false);
     const [viewMode,     setViewMode]    = useState('grid');
 
-    const [searchTerm,  setSearch]     = useState(searchParams.get('search') || '');
-    const [selStatus,   setSelStatus]  = useState(searchParams.get('status') || 'Tous');
-    const [selType,     setSelType]    = useState(searchParams.get('type')   || 'Tous');
-    const [selAvail,    setSelAvail]   = useState(searchParams.get('avail')  || 'Tous');
-    const [sortBy,      setSortBy]     = useState('date-desc');
-    const [priceRange,  setPriceRange] = useState({
+    // ── État "draft" : ce que l'utilisateur modifie, pas encore appliqué ────
+    const [draftSearch, setDraftSearch] = useState(searchParams.get('search') || '');
+    const [draftStatus, setDraftStatus] = useState(searchParams.get('status') || 'tous');
+    const [draftType,   setDraftType]   = useState(searchParams.get('type')   || 'tous');
+    const [draftVille,  setDraftVille]  = useState(searchParams.get('ville')  || 'Toutes');
+    const [draftArr,    setDraftArr]    = useState(searchParams.get('arrondissement') || 'Tous');
+    const [draftPrice,  setDraftPrice]  = useState({
         min: searchParams.get('priceMin') || '',
         max: searchParams.get('priceMax') || '',
     });
+
+    // ── État "appliqué" : seul déclencheur du fetch, mis à jour par "Rechercher" ──
+    const [appliedFilters, setAppliedFilters] = useState({
+        search: draftSearch, status: draftStatus, type: draftType,
+        ville: draftVille, arrondissement: draftArr, price: draftPrice,
+    });
+
+    const handleVilleChange = (ville) => {
+        setDraftVille(ville);
+        setDraftArr('Tous');
+    };
+
+    // Nombre total de biens Altimmo disponibles, indépendamment des filtres (affiché dans le hero).
+    useEffect(() => {
+        getPropertiesWithFilters({ page: 1, limit: 1 })
+            .then(({ total: t }) => setTotalAll(t))
+            .catch(() => {});
+    }, []);
 
     const fetchProperties = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await getAllProperties({ pole: 'Altimmo' });
-            setProperties(data || []);
+            const { properties: data, total: t } = await getPropertiesWithFilters({
+                search:         appliedFilters.search,
+                transaction:    appliedFilters.status,
+                type:           appliedFilters.type,
+                city:           appliedFilters.ville,
+                arrondissement: appliedFilters.arrondissement,
+                minPrice:       Number(appliedFilters.price.min) || 0,
+                maxPrice:       Number(appliedFilters.price.max) || undefined,
+                page:           currentPage,
+                limit:          PROPERTIES_PER_PAGE,
+            });
+            setProperties(data);
+            setTotal(t);
         } catch {
             setError('Impossible de charger les annonces. Veuillez réessayer.');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [appliedFilters, currentPage]);
 
     useEffect(() => { fetchProperties(); }, [fetchProperties]);
 
+    // Revenir en page 1 quand les filtres appliqués changent (mais pas quand on change juste de page).
     useEffect(() => {
-        let f = [...properties];
-        if (searchTerm.trim()) {
-            const q = searchTerm.toLowerCase();
-            f = f.filter(p =>
-                [p.title, p.description, p.address?.city, p.address?.district, p.address?.street, p.type]
-                    .filter(Boolean).join(' ').toLowerCase().includes(q)
-            );
-        }
-        if (selStatus !== 'Tous') f = f.filter(p => p.status === selStatus);
-        if (selType   !== 'Tous') f = f.filter(p => p.type === selType);
-        if (selAvail  !== 'Tous') f = f.filter(p => p.availability === selAvail);
-        if (priceRange.min && !isNaN(priceRange.min))
-            f = f.filter(p => (p.price || 0) >= Number(priceRange.min));
-        if (priceRange.max && !isNaN(priceRange.max))
-            f = f.filter(p => (p.price || 0) <= Number(priceRange.max));
-        switch (sortBy) {
-            case 'date-asc':     f.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); break;
-            case 'price-asc':    f.sort((a, b) => (a.price || 0) - (b.price || 0)); break;
-            case 'price-desc':   f.sort((a, b) => (b.price || 0) - (a.price || 0)); break;
-            case 'surface-desc': f.sort((a, b) => (b.surface || 0) - (a.surface || 0)); break;
-            case 'surface-asc':  f.sort((a, b) => (a.surface || 0) - (b.surface || 0)); break;
-            default:             f.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
-        }
-        setFiltered(f);
         setPage(1);
-    }, [properties, searchTerm, selStatus, selType, selAvail, sortBy, priceRange]);
+    }, [appliedFilters]);
 
     useEffect(() => {
         const params = new URLSearchParams();
-        if (searchTerm)           params.set('search',   searchTerm);
-        if (selStatus !== 'Tous') params.set('status',   selStatus);
-        if (selType   !== 'Tous') params.set('type',     selType);
-        if (selAvail  !== 'Tous') params.set('avail',    selAvail);
-        if (priceRange.min)       params.set('priceMin', priceRange.min);
-        if (priceRange.max)       params.set('priceMax', priceRange.max);
+        if (appliedFilters.search)                     params.set('search',         appliedFilters.search);
+        if (appliedFilters.status !== 'tous')          params.set('status',         appliedFilters.status);
+        if (appliedFilters.type   !== 'tous')          params.set('type',           appliedFilters.type);
+        if (appliedFilters.ville  !== 'Toutes')        params.set('ville',          appliedFilters.ville);
+        if (appliedFilters.arrondissement !== 'Tous')  params.set('arrondissement', appliedFilters.arrondissement);
+        if (appliedFilters.price.min)                  params.set('priceMin',       appliedFilters.price.min);
+        if (appliedFilters.price.max)                  params.set('priceMax',       appliedFilters.price.max);
         const query = params.toString();
         router.replace(query ? `/altimmo/annonces?${query}` : '/altimmo/annonces');
-    }, [searchTerm, selStatus, selType, selAvail, priceRange, router]);
+    }, [appliedFilters, router]);
 
-    const resetFilters = () => {
-        setSearch(''); setSelStatus('Tous'); setSelType('Tous');
-        setSelAvail('Tous'); setSortBy('date-desc'); setPriceRange({ min: '', max: '' });
+    const handleSearch = () => {
+        setAppliedFilters({
+            search:         draftSearch,
+            status:         draftStatus,
+            type:           draftType,
+            ville:          draftVille,
+            arrondissement: draftArr,
+            price:          draftPrice,
+        });
     };
 
-    const hasFilters = searchTerm.trim() || selStatus !== 'Tous' || selType !== 'Tous' ||
-        selAvail !== 'Tous' || priceRange.min || priceRange.max;
+    const handleReset = () => {
+        setDraftSearch(DEFAULT_FILTERS.search);
+        setDraftStatus(DEFAULT_FILTERS.status);
+        setDraftType(DEFAULT_FILTERS.type);
+        setDraftVille(DEFAULT_FILTERS.ville);
+        setDraftArr(DEFAULT_FILTERS.arrondissement);
+        setDraftPrice(DEFAULT_FILTERS.price);
+        setAppliedFilters(DEFAULT_FILTERS);
+    };
 
-    const priceRangeInvalid = priceRange.min && priceRange.max &&
-        Number(priceRange.min) > Number(priceRange.max);
+    const hasFilters = appliedFilters.search.trim() || appliedFilters.status !== 'tous' ||
+        appliedFilters.type !== 'tous' || appliedFilters.ville !== 'Toutes' ||
+        appliedFilters.arrondissement !== 'Tous' || appliedFilters.price.min || appliedFilters.price.max;
 
-    const totalPages        = Math.ceil(filtered.length / PROPERTIES_PER_PAGE);
-    const currentProperties = filtered.slice((currentPage - 1) * PROPERTIES_PER_PAGE, currentPage * PROPERTIES_PER_PAGE);
+    const priceRangeInvalid = draftPrice.min && draftPrice.max &&
+        Number(draftPrice.min) > Number(draftPrice.max);
+
+    const totalPages        = Math.ceil(total / PROPERTIES_PER_PAGE);
+    const currentProperties = properties;
 
     const inputFocus = e => { e.target.style.borderColor = GOLD; e.target.style.boxShadow = `0 0 0 3px rgba(200,150,12,0.12)`; };
     const inputBlur  = e => { e.target.style.borderColor = 'rgba(200,150,12,0.18)'; e.target.style.boxShadow = 'none'; };
@@ -264,13 +292,13 @@ const AltimmoAnnonces = () => {
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 18px', border: '1px solid rgba(200,150,12,0.22)', background: 'rgba(200,150,12,0.06)', backdropFilter: 'blur(8px)', fontSize: '0.82rem', fontWeight: 600 }}>
                                 <Building2 size={14} color={GOLD} />
-                                <span style={{ color: GOLD }}>{properties.length}</span>
+                                <span style={{ color: GOLD }}>{totalAll}</span>
                                 <span style={{ color: 'rgba(240,237,232,0.6)' }}>Biens</span>
                             </div>
-                            {selStatus !== 'Tous' && (
+                            {appliedFilters.status !== 'tous' && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 18px', border: '1px solid rgba(200,150,12,0.22)', background: 'rgba(200,150,12,0.1)', fontSize: '0.82rem', fontWeight: 600, color: GOLD, textTransform: 'capitalize' }}>
                                     <Tag size={14} />
-                                    {TRANSACTION_LABELS[selStatus]}
+                                    {TRANSACTIONS.find(t => t.value === appliedFilters.status)?.label}
                                 </div>
                             )}
                         </div>
@@ -291,14 +319,15 @@ const AltimmoAnnonces = () => {
                                 type="text"
                                 placeholder="Rechercher un bien, une ville, un quartier..."
                                 aria-label="Rechercher un bien"
-                                value={searchTerm}
-                                onChange={e => setSearch(e.target.value)}
-                                style={{ ...inputStyle, paddingLeft: 36, paddingRight: searchTerm ? 36 : 14 }}
+                                value={draftSearch}
+                                onChange={e => setDraftSearch(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                                style={{ ...inputStyle, paddingLeft: 36, paddingRight: draftSearch ? 36 : 14 }}
                                 onFocus={inputFocus}
                                 onBlur={inputBlur}
                             />
-                            {searchTerm && (
-                                <button onClick={() => setSearch('')} aria-label="Effacer la recherche"
+                            {draftSearch && (
+                                <button onClick={() => setDraftSearch('')} aria-label="Effacer la recherche"
                                     style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}>
                                     <X size={13} color="#9A8A7A" />
                                 </button>
@@ -360,18 +389,18 @@ const AltimmoAnnonces = () => {
                                                 Transaction
                                             </label>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                                {TRANSACTION_TYPES.map(s => (
-                                                    <button key={s} onClick={() => setSelStatus(s)}
+                                                {TRANSACTIONS.map(({ value, label }) => (
+                                                    <button key={value} onClick={() => setDraftStatus(value)}
                                                         style={{
                                                             padding: '6px 14px', borderRadius: 0,
-                                                            background: selStatus === s ? GOLD : 'transparent',
-                                                            color:      selStatus === s ? '#0A0C0F' : '#6B5D52',
-                                                            border:     `1px solid ${selStatus === s ? GOLD : 'rgba(200,150,12,0.18)'}`,
+                                                            background: draftStatus === value ? GOLD : 'transparent',
+                                                            color:      draftStatus === value ? '#0A0C0F' : '#6B5D52',
+                                                            border:     `1px solid ${draftStatus === value ? GOLD : 'rgba(200,150,12,0.18)'}`,
                                                             fontFamily: "'DM Sans', sans-serif",
-                                                            fontSize: '0.78rem', fontWeight: selStatus === s ? 700 : 400,
+                                                            fontSize: '0.78rem', fontWeight: draftStatus === value ? 700 : 400,
                                                             cursor: 'pointer', transition: '0.2s',
                                                         }}>
-                                                        {TRANSACTION_LABELS[s]}
+                                                        {label}
                                                     </button>
                                                 ))}
                                             </div>
@@ -382,36 +411,34 @@ const AltimmoAnnonces = () => {
                                             <label htmlFor="filter-type" style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A8A7A', marginBottom: 10 }}>
                                                 Type de bien
                                             </label>
-                                            <select id="filter-type" value={selType} onChange={e => setSelType(e.target.value)}
+                                            <select id="filter-type" value={draftType} onChange={e => setDraftType(e.target.value)}
                                                 style={inputStyle} onFocus={inputFocus} onBlur={inputBlur}>
-                                                {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                                {PROPERTY_TYPES_WITH_ALL.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
                                             </select>
                                         </div>
 
-                                        {/* Disponibilité */}
+                                        {/* Ville */}
                                         <div>
-                                            <label htmlFor="filter-avail" style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A8A7A', marginBottom: 10 }}>
-                                                Disponibilité
+                                            <label htmlFor="filter-ville" style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A8A7A', marginBottom: 10 }}>
+                                                Ville
                                             </label>
-                                            <select id="filter-avail" value={selAvail} onChange={e => setSelAvail(e.target.value)}
+                                            <select id="filter-ville" value={draftVille} onChange={e => handleVilleChange(e.target.value)}
                                                 style={inputStyle} onFocus={inputFocus} onBlur={inputBlur}>
-                                                {AVAILABILITY_STATUS.map(a => <option key={a} value={a}>{a}</option>)}
+                                                {VILLES_WITH_ALL.map(v => <option key={v} value={v}>{v}</option>)}
                                             </select>
                                         </div>
 
-                                        {/* Tri */}
+                                        {/* Arrondissement */}
                                         <div>
-                                            <label htmlFor="filter-sort" style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A8A7A', marginBottom: 10 }}>
-                                                Trier par
+                                            <label htmlFor="filter-arr" style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A8A7A', marginBottom: 10 }}>
+                                                Arrondissement
                                             </label>
-                                            <select id="filter-sort" value={sortBy} onChange={e => setSortBy(e.target.value)}
-                                                style={inputStyle} onFocus={inputFocus} onBlur={inputBlur}>
-                                                <option value="date-desc">Plus récent</option>
-                                                <option value="date-asc">Plus ancien</option>
-                                                <option value="price-asc">Prix croissant</option>
-                                                <option value="price-desc">Prix décroissant</option>
-                                                <option value="surface-desc">Surface décroissante</option>
-                                                <option value="surface-asc">Surface croissante</option>
+                                            <select id="filter-arr" value={draftArr} onChange={e => setDraftArr(e.target.value)}
+                                                disabled={draftVille === 'Toutes'}
+                                                style={{ ...inputStyle, opacity: draftVille === 'Toutes' ? 0.5 : 1, cursor: draftVille === 'Toutes' ? 'not-allowed' : 'pointer' }}
+                                                onFocus={inputFocus} onBlur={inputBlur}>
+                                                <option value="Tous">Tous</option>
+                                                {getArrondissementsFor(draftVille).map(a => <option key={a} value={a}>{a}</option>)}
                                             </select>
                                         </div>
 
@@ -422,14 +449,14 @@ const AltimmoAnnonces = () => {
                                             </label>
                                             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                                 <input type="number" placeholder="Min" aria-label="Prix minimum (FCFA)"
-                                                    value={priceRange.min}
-                                                    onChange={e => setPriceRange(p => ({ ...p, min: e.target.value }))}
+                                                    value={draftPrice.min}
+                                                    onChange={e => setDraftPrice(p => ({ ...p, min: e.target.value }))}
                                                     style={{ ...inputStyle, borderColor: priceRangeInvalid ? '#DC2626' : 'rgba(200,150,12,0.18)' }}
                                                     onFocus={inputFocus} onBlur={inputBlur} />
                                                 <span style={{ color: '#9A8A7A', fontWeight: 700, flexShrink: 0 }} aria-hidden="true">—</span>
                                                 <input type="number" placeholder="Max" aria-label="Prix maximum (FCFA)"
-                                                    value={priceRange.max}
-                                                    onChange={e => setPriceRange(p => ({ ...p, max: e.target.value }))}
+                                                    value={draftPrice.max}
+                                                    onChange={e => setDraftPrice(p => ({ ...p, max: e.target.value }))}
                                                     style={{ ...inputStyle, borderColor: priceRangeInvalid ? '#DC2626' : 'rgba(200,150,12,0.18)' }}
                                                     onFocus={inputFocus} onBlur={inputBlur} />
                                             </div>
@@ -441,14 +468,28 @@ const AltimmoAnnonces = () => {
                                         </div>
                                     </div>
 
-                                    {hasFilters && (
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-                                            <button onClick={resetFilters}
-                                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', fontFamily: "'DM Sans', sans-serif", fontSize: '0.82rem', fontWeight: 600, color: '#9A8A7A', cursor: 'pointer' }}>
-                                                <X size={13} /> Réinitialiser les filtres
-                                            </button>
-                                        </div>
-                                    )}
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 20 }}>
+                                        <button onClick={handleReset}
+                                            style={{
+                                                padding: '10px 24px', background: 'transparent', color: '#6B5D52',
+                                                border: '1px solid rgba(200,150,12,0.3)', borderRadius: 0,
+                                                fontFamily: "'DM Sans', sans-serif", fontSize: '0.8rem', fontWeight: 600,
+                                                letterSpacing: '0.05em', textTransform: 'uppercase', cursor: 'pointer', minHeight: 44,
+                                            }}>
+                                            Réinitialiser
+                                        </button>
+                                        <button onClick={handleSearch}
+                                            disabled={priceRangeInvalid}
+                                            style={{
+                                                padding: '10px 32px', background: GOLD, color: '#0A0C0F',
+                                                border: 'none', borderRadius: 0,
+                                                fontFamily: "'DM Sans', sans-serif", fontSize: '0.8rem', fontWeight: 700,
+                                                letterSpacing: '0.05em', textTransform: 'uppercase', cursor: priceRangeInvalid ? 'not-allowed' : 'pointer',
+                                                opacity: priceRangeInvalid ? 0.5 : 1, minHeight: 44,
+                                            }}>
+                                            Rechercher
+                                        </button>
+                                    </div>
                                 </div>
                             </motion.div>
                         )}
@@ -458,16 +499,16 @@ const AltimmoAnnonces = () => {
                 {/* Compteur */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
                     <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.875rem', color: '#6B5D52' }}>
-                        <span style={{ fontWeight: 700, color: '#1A1612' }}>{filtered.length}</span>{' '}
-                        bien{filtered.length > 1 ? 's' : ''} trouvé{filtered.length > 1 ? 's' : ''}
-                        {selStatus !== 'Tous' && (
+                        <span style={{ fontWeight: 700, color: '#1A1612' }}>{total}</span>{' '}
+                        bien{total > 1 ? 's' : ''} trouvé{total > 1 ? 's' : ''}
+                        {appliedFilters.status !== 'tous' && (
                             <span style={{ marginLeft: 8, padding: '2px 10px', background: 'rgba(200,150,12,0.1)', color: GOLD, fontSize: '0.78rem', fontWeight: 700, textTransform: 'capitalize' }}>
-                                {TRANSACTION_LABELS[selStatus]}
+                                {TRANSACTIONS.find(t => t.value === appliedFilters.status)?.label}
                             </span>
                         )}
                     </p>
                     {hasFilters && (
-                        <button onClick={resetFilters}
+                        <button onClick={handleReset}
                             style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', fontFamily: "'DM Sans', sans-serif", fontSize: '0.82rem', fontWeight: 600, color: GOLD, cursor: 'pointer' }}>
                             <X size={13} /> Voir tous les biens
                         </button>
@@ -500,7 +541,7 @@ const AltimmoAnnonces = () => {
                             {hasFilters ? 'Essayez de modifier vos critères de recherche' : 'Aucun bien disponible pour le moment'}
                         </p>
                         {hasFilters && (
-                            <button onClick={resetFilters}
+                            <button onClick={handleReset}
                                 style={{ padding: '12px 28px', background: GOLD, color: '#0A0C0F', border: 'none', borderRadius: 0, fontFamily: "'DM Sans', sans-serif", fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', cursor: 'pointer', minHeight: 44 }}>
                                 Réinitialiser les filtres
                             </button>

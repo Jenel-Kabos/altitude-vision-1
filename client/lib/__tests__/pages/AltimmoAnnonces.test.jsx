@@ -21,14 +21,14 @@ vi.mock('framer-motion', () => ({
 
 // Mock des propriétés de test
 const FAKE_PROPERTIES = [
-  { _id: '1', title: 'Appartement T3', price: 500000, status: 'À vendre', type: 'Appartement', availability: 'Disponible', images: [], address: { city: 'Brazzaville' }, createdAt: new Date().toISOString() },
-  { _id: '2', title: 'Villa Moderne',  price: 200000, status: 'À vendre', type: 'Villa',        availability: 'Disponible', images: [], address: { city: 'Brazzaville' }, createdAt: new Date().toISOString() },
-  { _id: '3', title: 'Studio Centre',  price: 100000, status: 'En location', type: 'Appartement', availability: 'Loué',    images: [], address: { city: 'Brazzaville' }, createdAt: new Date().toISOString() },
+  { _id: '1', title: 'Appartement T3', price: 500000, status: 'vente',    type: 'Appartement', images: [], address: { city: 'Brazzaville', arrondissement: 'Bacongo' }, createdAt: new Date().toISOString() },
+  { _id: '2', title: 'Villa Moderne',  price: 200000, status: 'vente',    type: 'Villa',        images: [], address: { city: 'Brazzaville', arrondissement: 'Bacongo' }, createdAt: new Date().toISOString() },
+  { _id: '3', title: 'Studio Centre',  price: 100000, status: 'location', type: 'Appartement', images: [], address: { city: 'Brazzaville', arrondissement: 'Bacongo' }, createdAt: new Date().toISOString() },
 ];
 
 const { mockGetAll } = vi.hoisted(() => ({ mockGetAll: vi.fn() }));
 vi.mock('../../services/propertyService', () => ({
-  getAllProperties: (...args) => mockGetAll(...args),
+  getPropertiesWithFilters: (...args) => mockGetAll(...args),
 }));
 
 // Mock PropertyCard → affiche simplement le titre
@@ -46,7 +46,7 @@ import AltimmoAnnonces from '../../pages/AltimmoAnnonces';
 describe('AltimmoAnnonces — rendu initial', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAll.mockResolvedValue(FAKE_PROPERTIES);
+    mockGetAll.mockResolvedValue({ properties: FAKE_PROPERTIES, total: FAKE_PROPERTIES.length });
   });
 
   it('affiche les 3 annonces après chargement', async () => {
@@ -73,7 +73,7 @@ describe('AltimmoAnnonces — rendu initial', () => {
 describe('AltimmoAnnonces — validation prix', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAll.mockResolvedValue(FAKE_PROPERTIES);
+    mockGetAll.mockResolvedValue({ properties: FAKE_PROPERTIES, total: FAKE_PROPERTIES.length });
   });
 
   const openFilters = async () => {
@@ -122,7 +122,7 @@ describe('AltimmoAnnonces — validation prix', () => {
 describe('AltimmoAnnonces — URL de redirection (bug corrigé)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAll.mockResolvedValue(FAKE_PROPERTIES);
+    mockGetAll.mockResolvedValue({ properties: FAKE_PROPERTIES, total: FAKE_PROPERTIES.length });
   });
 
   it('remplace l\'URL avec /altimmo/annonces (et non /immobilier/annonces)', async () => {
@@ -140,62 +140,96 @@ describe('AltimmoAnnonces — URL de redirection (bug corrigé)', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-describe('AltimmoAnnonces — logique de filtre (pure)', () => {
-  // Test de la logique métier sans UI
-  const applyFilters = (properties, { searchTerm = '', status = 'Tous', type = 'Tous', avail = 'Tous', priceMin = '', priceMax = '' } = {}) => {
-    let f = [...properties];
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      f = f.filter(p =>
-        [p.title, p.type, p.address?.city].filter(Boolean).join(' ').toLowerCase().includes(q)
-      );
-    }
-    if (status !== 'Tous') f = f.filter(p => p.status === status);
-    if (type   !== 'Tous') f = f.filter(p => p.type === type);
-    if (avail  !== 'Tous') f = f.filter(p => p.availability === avail);
-    if (priceMin && !isNaN(priceMin)) f = f.filter(p => (p.price || 0) >= Number(priceMin));
-    if (priceMax && !isNaN(priceMax)) f = f.filter(p => (p.price || 0) <= Number(priceMax));
-    return f;
-  };
-
-  it('filtre par terme de recherche', () => {
-    const result = applyFilters(FAKE_PROPERTIES, { searchTerm: 'villa' });
-    expect(result).toHaveLength(1);
-    expect(result[0].title).toBe('Villa Moderne');
+// Le filtrage se fait désormais côté serveur (getPropertiesWithFilters) :
+// on vérifie que le composant envoie les bons paramètres de requête,
+// plutôt que de dupliquer la logique de filtrage en local.
+describe('AltimmoAnnonces — paramètres envoyés au serveur', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetAll.mockResolvedValue({ properties: FAKE_PROPERTIES, total: FAKE_PROPERTIES.length });
   });
 
-  it('filtre par statut', () => {
-    const result = applyFilters(FAKE_PROPERTIES, { status: 'En location' });
-    expect(result).toHaveLength(1);
-    expect(result[0].title).toBe('Studio Centre');
+  it('ne filtre par défaut sur aucun champ (transaction/type/ville/arrondissement = tous/toutes)', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(screen.getAllByTestId('property-card')).toHaveLength(3));
+
+    expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({
+      transaction:    'tous',
+      type:           'tous',
+      city:           'Toutes',
+      arrondissement: 'Tous',
+      page:           1,
+      limit:          12,
+    }));
   });
 
-  it('filtre par type de bien', () => {
-    const result = applyFilters(FAKE_PROPERTIES, { type: 'Appartement' });
-    expect(result).toHaveLength(2);
+  it('ne déclenche AUCUN appel API quand on clique sur un chip/select (draft seul)', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(screen.getAllByTestId('property-card')).toHaveLength(3));
+    mockGetAll.mockClear();
+
+    await userEvent.click(screen.getByRole('button', { name: /Filtres/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Vente' }));
+    await userEvent.selectOptions(screen.getByLabelText('Ville'), 'Brazzaville');
+
+    expect(mockGetAll).not.toHaveBeenCalled();
   });
 
-  it('filtre par fourchette de prix (min seulement)', () => {
-    const result = applyFilters(FAKE_PROPERTIES, { priceMin: '300000' });
-    expect(result).toHaveLength(1);
-    expect(result[0].price).toBe(500000);
+  it('envoie transaction=vente uniquement après avoir cliqué sur "Rechercher"', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(screen.getAllByTestId('property-card')).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: /Filtres/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Vente' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+    await waitFor(() => {
+      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ transaction: 'vente' }));
+    });
   });
 
-  it('filtre par fourchette de prix (min + max)', () => {
-    const result = applyFilters(FAKE_PROPERTIES, { priceMin: '150000', priceMax: '600000' });
-    expect(result).toHaveLength(2);
+  it('réinitialise l\'arrondissement à "Tous" quand la ville change (draft)', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(screen.getAllByTestId('property-card')).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: /Filtres/i }));
+
+    await userEvent.selectOptions(screen.getByLabelText('Ville'), 'Brazzaville');
+    await userEvent.selectOptions(screen.getByLabelText('Arrondissement'), 'Bacongo');
+    await userEvent.selectOptions(screen.getByLabelText('Ville'), 'Pointe-Noire');
+
+    expect(screen.getByLabelText('Arrondissement').value).toBe('Tous');
   });
 
-  it('retourne 0 résultats si aucun bien ne correspond', () => {
-    const result = applyFilters(FAKE_PROPERTIES, { searchTerm: 'inexistant' });
-    expect(result).toHaveLength(0);
+  it('"Réinitialiser" remet le draft ET les filtres appliqués aux valeurs par défaut', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(screen.getAllByTestId('property-card')).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: /Filtres/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Vente' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+    await waitFor(() => {
+      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ transaction: 'vente' }));
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }));
+
+    await waitFor(() => {
+      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ transaction: 'tous' }));
+    });
   });
 
-  it('retourne tout si aucun filtre actif', () => {
-    const result = applyFilters(FAKE_PROPERTIES);
-    expect(result).toHaveLength(3);
-  });
+  it('désactive le bouton "Rechercher" quand le prix min > max', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(screen.getAllByTestId('property-card')).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: /Filtres/i }));
 
+    await userEvent.type(screen.getByRole('spinbutton', { name: /Prix minimum/i }), '500000');
+    await userEvent.type(screen.getByRole('spinbutton', { name: /Prix maximum/i }), '100000');
+
+    expect(screen.getByRole('button', { name: 'Rechercher' })).toBeDisabled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+describe('AltimmoAnnonces — validation prix (logique pure)', () => {
   const priceRangeInvalid = (min, max) =>
     min && max && Number(min) > Number(max);
 
