@@ -127,15 +127,22 @@ Chemins : `altimmo-app/src/constants/*.js` (mobile) | `client/lib/constants/*.js
 - Compte EAS : jenelkabos25
 - Cloudinary upload : preset unsigned `lqwel6X6`, cloud `dop8vzm5z` (`uploadToCloudinary` dans `annonceService.js`)
 - Splash : `assets/Logo_Altitude_transparent.png` (config `app.json` ligne 11)
+- `GOOGLE_MAPS_API_KEY` : lu directement (sans préfixe `EXPO_PUBLIC_`) par `app.config.js` → `android.config.googleMaps.apiKey`, injecté au moment du build EAS (pas à runtime JS), donc secret via `eas secret:create`, pas dans `eas.json` en clair
+- Variables `EXPO_PUBLIC_*` réellement utilisées dans le code : `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_SOCKET_URL` (déjà présentes dans `eas.json` profils preview/production — vérifier avec `grep -rhoE "EXPO_PUBLIC_[A-Z_]+"` avant d'en ajouter d'autres)
+- `eas submit` (Play Store) nécessite un JSON de **compte de service** Google (`type: service_account`, `client_email` en `*.iam.gserviceaccount.com`) — **pas** un fichier `client_secret_*.apps.googleusercontent.com.json` (ça c'est un OAuth Client ID, différent, ne marche pas)
+- Si l'org Google Cloud a la contrainte `iam.disableServiceAccountKeyCreation` active (policy de sécurité 2024+), la création de clé JSON est bloquée sans admin org policy → solution de repli : `eas build -p android --profile production` (ne nécessite pas de clé) puis upload manuel du `.aab` sur la Play Console (pas besoin de `eas submit`)
 
 ## Bugs connus et solutions
 - Expo Go incompatible → utiliser EAS Build
-- `enableScreens(false)` dans index.js pour éviter NativeStack errors
+- `src/utils/disableScreens.js` doit appeler `enableScreens(true)` (pas `false` — un `false` casse les safe areas/navigation au build natif)
+- `metro.config.js` ne doit pas avoir de bloc `extraNodeModules` (source de bugs de résolution de modules)
 - ZOHO_FROM_EMAIL doit exister dans collection `emails` MongoDB avec `isActive: true`
 - git stash avant git pull si conflits
 - `npm install --legacy-peer-deps` pour altimmo-app/
 - Property.js a un encodage NBSP+CRLF qui rejette les Edit tool naïfs ; utiliser Python byte-replace si besoin
 - DB de dev locale = base par défaut `test` si `MONGO_URI` n'a pas de DB path ; prod Render a sa propre DB → un `node` local peut renvoyer `[]` alors que prod retourne des résultats
+- **Texte français en dur dans JSX (apostrophes)** : ne jamais mettre du texte contenant des apostrophes (l'Agence, d'accord, s'engage…) dans une string délimitée par des `'` simples — ça casse le parsing Babel/Metro (`Unexpected token`). Utiliser des template literals (backticks) pour tout bloc de texte français long. Idem pour `{'\n'}` : ne jamais laisser un retour à la ligne brut à l'intérieur des quotes (`Unterminated string constant`), toujours écrire `{'\n'}` sur une seule ligne.
+- Vu en prod (RegisterScreen.jsx, juil. 2026) : le texte du contrat de mandat (articles 1-8) avait ces deux bugs combinés, qui faisaient planter tout le build EAS Android (`Android Bundling failed`, `SyntaxError: Unterminated string constant`) sans jamais avoir été catché en local.
 
 ## Conventions de code
 - Tous les montants en FCFA

@@ -32,29 +32,29 @@ describe('LoginPage', () => {
 
   it('affiche le titre et les champs du formulaire', () => {
     render(<LoginPage />);
-    expect(screen.getByText('Connectez-vous')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Adresse Email')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Mot de passe')).toBeInTheDocument();
+    expect(screen.getByText('Bon retour')).toBeInTheDocument();
+    expect(screen.getByLabelText('Adresse email')).toBeInTheDocument();
+    expect(screen.getByLabelText('Mot de passe')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Se connecter/i })).toBeInTheDocument();
   });
 
   it('affiche un lien vers la page d\'inscription', () => {
     render(<LoginPage />);
-    expect(screen.getByRole('link', { name: /Inscrivez-vous/i })).toHaveAttribute('href', '/register');
+    expect(screen.getByRole('link', { name: /S.inscrire/i })).toHaveAttribute('href', '/register');
   });
 
   it('affiche un lien "Mot de passe oublié"', () => {
     render(<LoginPage />);
-    expect(screen.getByRole('link', { name: /Mot de passe oublié/i })).toHaveAttribute('href', '/forgot-password');
+    expect(screen.getByRole('link', { name: /Oublié/i })).toHaveAttribute('href', '/forgot-password');
   });
 
-  it('désactive le bouton et affiche "Connexion..." pendant le chargement', async () => {
+  it('désactive le bouton et affiche "Connexion en cours…" pendant le chargement', async () => {
     mockApiPost.mockImplementation(() => new Promise(() => {}));
     render(<LoginPage />);
-    await userEvent.type(screen.getByPlaceholderText('Adresse Email'), 'test@test.com');
-    await userEvent.type(screen.getByPlaceholderText('Mot de passe'), 'motdepasse');
+    await userEvent.type(screen.getByLabelText('Adresse email'), 'test@test.com');
+    await userEvent.type(screen.getByLabelText('Mot de passe'), 'motdepasse');
     await userEvent.click(screen.getByRole('button', { name: /Se connecter/i }));
-    expect(screen.getByRole('button', { name: /Connexion\.\.\./i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Connexion en cours/i })).toBeDisabled();
   });
 
   it('affiche le message d\'erreur retourné par l\'API', async () => {
@@ -62,8 +62,8 @@ describe('LoginPage', () => {
       response: { data: { message: 'Email ou mot de passe incorrect.' } },
     });
     render(<LoginPage />);
-    await userEvent.type(screen.getByPlaceholderText('Adresse Email'), 'wrong@test.com');
-    await userEvent.type(screen.getByPlaceholderText('Mot de passe'), 'mauvais');
+    await userEvent.type(screen.getByLabelText('Adresse email'), 'wrong@test.com');
+    await userEvent.type(screen.getByLabelText('Mot de passe'), 'mauvais');
     await userEvent.click(screen.getByRole('button', { name: /Se connecter/i }));
     await waitFor(() => {
       expect(screen.getByText('Email ou mot de passe incorrect.')).toBeInTheDocument();
@@ -75,8 +75,8 @@ describe('LoginPage', () => {
       data: { token: 'jwt-token', data: { user: { _id: '1', role: 'Client', email: 'test@test.com' } } },
     });
     render(<LoginPage />);
-    await userEvent.type(screen.getByPlaceholderText('Adresse Email'), 'test@test.com');
-    await userEvent.type(screen.getByPlaceholderText('Mot de passe'), 'motdepasse1');
+    await userEvent.type(screen.getByLabelText('Adresse email'), 'test@test.com');
+    await userEvent.type(screen.getByLabelText('Mot de passe'), 'motdepasse1');
     await userEvent.click(screen.getByRole('button', { name: /Se connecter/i }));
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith(expect.objectContaining({ role: 'Client' }), 'jwt-token');
@@ -89,8 +89,8 @@ describe('LoginPage', () => {
       data: { token: 'jwt-token', data: { user: { _id: '2', role: 'Admin', email: 'admin@test.com' } } },
     });
     render(<LoginPage />);
-    await userEvent.type(screen.getByPlaceholderText('Adresse Email'), 'admin@test.com');
-    await userEvent.type(screen.getByPlaceholderText('Mot de passe'), 'adminpass1');
+    await userEvent.type(screen.getByLabelText('Adresse email'), 'admin@test.com');
+    await userEvent.type(screen.getByLabelText('Mot de passe'), 'adminpass1');
     await userEvent.click(screen.getByRole('button', { name: /Se connecter/i }));
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/dashboard'));
   });

@@ -77,12 +77,12 @@ describe('RegisterPage — rôle Propriétaire', () => {
     const roleSelect = screen.queryByRole('combobox');
     if (roleSelect) {
       await userEvent.selectOptions(roleSelect, 'Proprietaire');
-      expect(await screen.findByText(/contrat d'hébergement/i)).toBeInTheDocument();
+      expect((await screen.findAllByText(/contrat d'hébergement/i)).length).toBeGreaterThan(0);
     } else {
       const btn = screen.getAllByRole('button').find(b => /Propriétaire/.test(b.textContent));
       if (btn) {
         await userEvent.click(btn);
-        expect(await screen.findByText(/contrat d'hébergement/i)).toBeInTheDocument();
+        expect((await screen.findAllByText(/contrat d'hébergement/i)).length).toBeGreaterThan(0);
       }
     }
   });

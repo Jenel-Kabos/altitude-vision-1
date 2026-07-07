@@ -92,62 +92,58 @@ function ContractModal({ visible, onClose, c, styles }) {
           showsVerticalScrollIndicator={false}>
 
           <Text style={styles.modalMeta}>
-            Altitude Vision — Altimmo{'
-'}
-            Rue Mfoa n°24, Poto-Poto, Brazzaville{'
-'}
+            Altitude Vision — Altimmo{'\n'}
+            Rue Mfoa n°24, Poto-Poto, Brazzaville{'\n'}
             contact@altitudevision.agency
           </Text>
 
           <Text style={styles.modalSection}>ENTRE LES SOUSSIGNÉS</Text>
           <Text style={styles.modalBody}>
-            <Text style={styles.modalBold}>ALTITUDE VISION (L'AGENCE)</Text>{' '}— Agence multidisciplinaire spécialisée dans l'immobilier au Congo, opérant la plateforme Altimmo.{'
-
-'}
+            <Text style={styles.modalBold}>ALTITUDE VISION (L'AGENCE)</Text>{' '}— Agence multidisciplinaire spécialisée dans l'immobilier au Congo, opérant la plateforme Altimmo.{'\n\n'}
             <Text style={styles.modalBold}>LE PROPRIÉTAIRE (LE MANDANT)</Text>{' '}— Toute personne physique ou morale s'inscrivant sur la plateforme en tant que Propriétaire et acceptant les présentes conditions.
           </Text>
 
           {[
             {
               titre: 'Article 1 — OBJET DU CONTRAT',
-              corps: 'Le présent contrat définit les conditions dans lesquelles le Mandant confie à Altitude Vision le mandat de gérer la mise en location de son (ses) bien(s) immobilier(s) via la plateforme altitudevision.agency/altimmo.',
+              corps: `Le présent contrat définit les conditions dans lesquelles le Mandant confie à Altitude Vision le mandat de gérer la mise en location de son (ses) bien(s) immobilier(s) via la plateforme altitudevision.agency/altimmo.`,
             },
             {
               titre: 'Article 2 — DURÉE DU CONTRAT',
-              corps: 'Le présent contrat prend effet à la date d'acceptation en ligne par le Mandant et est conclu pour une durée indéterminée. Il peut être résilié par chacune des parties avec un préavis de 30 jours adressé par email.',
+              corps: `Le présent contrat prend effet à la date d'acceptation en ligne par le Mandant et est conclu pour une durée indéterminée. Il peut être résilié par chacune des parties avec un préavis de 30 jours adressé par email.`,
             },
             {
-              titre: 'Article 3 — OBLIGATIONS DE L'AGENCE',
-              corps: '• Publier les annonces du Mandant sur la plateforme Altimmo
+              titre: `Article 3 — OBLIGATIONS DE L'AGENCE`,
+              corps: `• Publier les annonces du Mandant sur la plateforme Altimmo
 • Assurer la mise en relation avec les locataires potentiels
 • Percevoir la commission locataire et reverser la part du Mandant
-• Assurer le suivi des dossiers de location',
+• Assurer le suivi des dossiers de location`,
             },
             {
               titre: 'Article 4 — OBLIGATIONS DU MANDANT',
-              corps: '• Fournir des informations exactes concernant son (ses) bien(s)
+              corps: `• Fournir des informations exactes concernant son (ses) bien(s)
 • Être le propriétaire légal ou avoir mandat du propriétaire légal
 • Informer l'Agence de tout changement affectant la disponibilité du bien
-• Ne pas contourner l'Agence en concluant directement avec un locataire présenté',
+• Ne pas contourner l'Agence en concluant directement avec un locataire présenté`,
             },
             {
               titre: 'Article 5 — CONDITIONS DE RÉMUNÉRATION',
-              corps: '• L'Agence perçoit une commission équivalente à 80 % du premier loyer mensuel
+              corps: `• L'Agence perçoit une commission équivalente à 80 % du premier loyer mensuel
 • Le Mandant reçoit 30 % de cette commission (soit ~24 % du loyer)
 
-Exemple : pour un loyer de 150 000 FCFA → votre gain : 36 000 FCFA',
+Exemple : pour un loyer de 150 000 FCFA → votre gain : 36 000 FCFA`,
             },
             {
               titre: 'Article 6 — CONFIDENTIALITÉ',
-              corps: 'Les parties s'engagent à préserver la confidentialité des informations échangées dans le cadre du présent contrat. Les données personnelles sont traitées conformément à la réglementation en vigueur.',
+              corps: `Les parties s'engagent à préserver la confidentialité des informations échangées dans le cadre du présent contrat. Les données personnelles sont traitées conformément à la réglementation en vigueur.`,
             },
             {
               titre: 'Article 7 — RÉSOLUTION DES LITIGES',
-              corps: 'En cas de litige, les parties s'engagent à rechercher une solution amiable. À défaut d'accord dans un délai de 30 jours, le différend sera soumis au tribunal compétent de Brazzaville, République du Congo.',
+              corps: `En cas de litige, les parties s'engagent à rechercher une solution amiable. À défaut d'accord dans un délai de 30 jours, le différend sera soumis au tribunal compétent de Brazzaville, République du Congo.`,
             },
             {
               titre: 'Article 8 — DISPOSITIONS GÉNÉRALES',
-              corps: 'Le présent contrat est régi par le droit congolais. Toute modification doit faire l'objet d'un avenant écrit signé par les deux parties. La nullité d'une clause n'entraîne pas la nullité du contrat dans son ensemble.',
+              corps: `Le présent contrat est régi par le droit congolais. Toute modification doit faire l'objet d'un avenant écrit signé par les deux parties. La nullité d'une clause n'entraîne pas la nullité du contrat dans son ensemble.`,
             },
           ].map((art, i) => (
             <View key={i} style={styles.modalArticle}>
