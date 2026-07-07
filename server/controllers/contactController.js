@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const ContactMessage = require('../models/ContactMessage');
+const sendEmail = require('../utils/email');
 const logger = require('../utils/logger');
 
 /**
@@ -34,14 +35,37 @@ exports.createContactMessage = asyncHandler(async (req, res) => {
     email,
     subject,
     message,
+    phone: req.body.phone,
     ipAddress,
     userAgent,
   });
 
   logger.success('✅ [Contact] Message créé avec succès:', contactMessage._id);
 
-  // TODO: Envoyer un email de notification à l'équipe
-  // TODO: Envoyer un email de confirmation au client
+  // Email de notification à l'agence — best-effort : un échec d'envoi ne doit
+  // pas faire échouer la requête, le message est déjà persisté en base.
+  try {
+    await sendEmail({
+      email:   process.env.ZOHO_FROM_EMAIL || 'support@altitudevision.agency',
+      subject: `📩 Nouveau message de contact — ${name}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #1A5A8A, #2E7BB5); padding: 24px; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 20px;">📩 Nouveau message de contact</h1>
+          </div>
+          <div style="background: #ffffff; padding: 24px; border: 1px solid #e5e7eb; border-radius: 0 0 12px 12px;">
+            <p><strong>${name}</strong> (<a href="mailto:${email}">${email}</a>) a envoyé un message :</p>
+            <p style="color: #6b7280; font-size: 13px;"><strong>Sujet :</strong> ${subject}</p>
+            <blockquote style="border-left: 4px solid #2E7BB5; margin: 16px 0; padding: 8px 16px; color: #374151; background: #f8fafc;">
+              ${message}
+            </blockquote>
+          </div>
+        </div>
+      `,
+    });
+  } catch (err) {
+    logger.error('❌ [Contact] Échec de l\'email de notification (message conservé):', err.message);
+  }
 
   res.status(201).json({
     status: 'success',

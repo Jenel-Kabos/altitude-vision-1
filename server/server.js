@@ -340,6 +340,8 @@ const internalMailRoutes = require("./routes/internalMailRoutes");
 const companyEmailRoutes = require("./routes/companyEmailRoutes");
 const altcomRoutes = require('./routes/altcomRoutes');
 const contactRoutes = require('./routes/contactRoutes');
+const estimationRoutes = require('./routes/estimationRoutes');
+const devisRoutes = require('./routes/devisRoutes');
 const emailRoutes = require('./routes/emailRoutes');
 // ✅ NOUVEAU — Webhook Zoho (sans JWT)
 const webhookRoutes = require('./routes/webhookRoutes');
@@ -403,6 +405,8 @@ app.use("/api/webhooks", webhookRoutes);
 app.use("/api/likes", likeRoutes);
 app.use("/api/comments", commentRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/estimation', estimationRoutes);
+app.use('/api/devis', devisRoutes);
 
 // ✅ Sync Facebook
 app.use('/api/sync', require('./routes/sync'));

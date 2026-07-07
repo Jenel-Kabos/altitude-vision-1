@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from 'react';
-import { FaTimes, FaEnvelopeOpenText, FaPaperPlane } from 'react-icons/fa';
+import { FaTimes, FaEnvelopeOpenText, FaPaperPlane, FaSpinner } from 'react-icons/fa';
 import toast from '@/lib/utils/toast';
+import { sendContactMessage } from '../services/contactService';
 
 /**
  * Composant Modal générique pour toutes les demandes de contact (Devis, Partenariat, Infos).
@@ -21,6 +22,7 @@ const ContactModal = ({ intention, onClose, serviceTitle = null }) => {
     intention: intention, // Intention prédéfinie
     serviceTitle: serviceTitle, // Service prédéfini (peut être null)
   });
+  const [sending, setSending] = useState(false);
 
   // Gère la mise à jour des champs de formulaire
   const handleChange = (e) => {
@@ -31,22 +33,31 @@ const ContactModal = ({ intention, onClose, serviceTitle = null }) => {
   };
 
   // Gère la soumission du formulaire
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // --- SIMULATION D'ENVOI AU BACKEND ---
-    
-    // Ici, vous feriez un appel API (ex: fetch, axios) à votre endpoint de contact.
-    
-    let confirmationMessage;
-    if (serviceTitle) {
-      confirmationMessage = `✅ Votre demande de devis pour le service "${serviceTitle}" a bien été envoyée. Nous vous contacterons par email (${formData.email}) dans les 48h.`;
-    } else {
-      confirmationMessage = `✅ Votre message pour la catégorie "${intention}" a bien été reçu. Merci de nous avoir contactés !`;
+    setSending(true);
+
+    const subject = serviceTitle ? `Devis — ${serviceTitle}` : `Contact — ${intention}`;
+
+    try {
+      await sendContactMessage({
+        name:    formData.name,
+        email:   formData.email,
+        subject,
+        message: formData.message,
+      });
+
+      const confirmationMessage = serviceTitle
+        ? `✅ Votre demande de devis pour le service "${serviceTitle}" a bien été envoyée. Nous vous contacterons par email (${formData.email}) dans les 48h.`
+        : `✅ Votre message pour la catégorie "${intention}" a bien été reçu. Merci de nous avoir contactés !`;
+
+      toast.success(confirmationMessage);
+      onClose();
+    } catch {
+      toast.error("Erreur lors de l'envoi. Veuillez réessayer.");
+    } finally {
+      setSending(false);
     }
-    
-    toast.success(confirmationMessage);
-    onClose(); 
   };
   
   // Détermine le texte du bouton et du label pour le champ 'message'
@@ -127,12 +138,13 @@ const ContactModal = ({ intention, onClose, serviceTitle = null }) => {
             ></textarea>
           </div>
           
-          <button 
-            type="submit" 
-            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg transition duration-300 flex items-center justify-center space-x-2"
+          <button
+            type="submit"
+            disabled={sending}
+            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg transition duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <FaPaperPlane className="mr-2" />
-            <span>{buttonText}</span>
+            {sending ? <FaSpinner className="mr-2 animate-spin" /> : <FaPaperPlane className="mr-2" />}
+            <span>{sending ? 'Envoi...' : buttonText}</span>
           </button>
         </form>
       </div>

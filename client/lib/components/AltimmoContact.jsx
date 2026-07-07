@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Send, MessageSquare, Clock, CheckCircle } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, MessageSquare, Clock, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { sendContactMessage } from '../services/contactService';
 
 const BLUE = '#2E7BB5';
 const GOLD = '#C8960C';
@@ -49,7 +50,7 @@ const inputStyle = {
     transition: 'border-color 0.2s',
 };
 
-const Field = ({ label, id, type = 'text', required, isTextArea }) => (
+const Field = ({ label, id, type = 'text', required, isTextArea, value, onChange }) => (
     <div>
         <label
             htmlFor={id}
@@ -69,6 +70,7 @@ const Field = ({ label, id, type = 'text', required, isTextArea }) => (
         {isTextArea ? (
             <textarea
                 id={id} name={id} rows={4} required={required}
+                value={value} onChange={onChange}
                 placeholder="Décrivez votre projet immobilier…"
                 style={{ ...inputStyle, resize: 'none' }}
                 onFocus={e => { e.target.style.borderColor = `${BLUE}55`; }}
@@ -77,6 +79,7 @@ const Field = ({ label, id, type = 'text', required, isTextArea }) => (
         ) : (
             <input
                 type={type} id={id} name={id} required={required}
+                value={value} onChange={onChange}
                 placeholder={`Votre ${label.toLowerCase().replace(' *', '')}`}
                 style={inputStyle}
                 onFocus={e => { e.target.style.borderColor = `${BLUE}55`; }}
@@ -87,12 +90,28 @@ const Field = ({ label, id, type = 'text', required, isTextArea }) => (
 );
 
 const AltimmoContact = () => {
-    const [sent, setSent] = useState(false);
+    const [nom,        setNom]        = useState('');
+    const [telephone,  setTelephone]  = useState('');
+    const [email,      setEmail]      = useState('');
+    const [message,    setMessage]    = useState('');
+    const [sending,    setSending]    = useState(false);
+    const [sent,       setSent]       = useState(false);
+    const [error,      setError]      = useState(null);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        setSent(true);
-        setTimeout(() => setSent(false), 4000);
+        setSending(true);
+        setError(null);
+        try {
+            await sendContactMessage({ name: nom, email, subject: 'Contact Altimmo', message, phone: telephone });
+            setSent(true);
+            setNom(''); setEmail(''); setTelephone(''); setMessage('');
+            setTimeout(() => setSent(false), 4000);
+        } catch {
+            setError("Erreur lors de l'envoi. Réessayez.");
+        } finally {
+            setSending(false);
+        }
     };
 
     return (
@@ -171,15 +190,22 @@ const AltimmoContact = () => {
                             ) : (
                                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <Field label="Nom complet"   id="fullName" required />
-                                        <Field label="Téléphone"     id="phone"    type="tel" />
+                                        <Field label="Nom complet"   id="fullName" required value={nom}       onChange={e => setNom(e.target.value)} />
+                                        <Field label="Téléphone"     id="phone"    type="tel" value={telephone} onChange={e => setTelephone(e.target.value)} />
                                     </div>
-                                    <Field label="Adresse email" id="email"   type="email" required />
-                                    <Field label="Votre message" id="message" required isTextArea />
+                                    <Field label="Adresse email" id="email"   type="email" required value={email}   onChange={e => setEmail(e.target.value)} />
+                                    <Field label="Votre message" id="message" required isTextArea value={message} onChange={e => setMessage(e.target.value)} />
+
+                                    {error && (
+                                        <p style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#F87171', fontSize: '0.8rem', fontFamily: "'DM Sans', sans-serif" }}>
+                                            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
+                                        </p>
+                                    )}
 
                                     <motion.button
                                         type="submit"
-                                        whileHover={{ scale: 1.02 }}
+                                        disabled={sending}
+                                        whileHover={{ scale: sending ? 1 : 1.02 }}
                                         whileTap={{ scale: 0.98 }}
                                         style={{
                                             width: '100%',
@@ -193,13 +219,15 @@ const AltimmoContact = () => {
                                             textTransform: 'uppercase',
                                             color: '#fff',
                                             border: 'none',
-                                            cursor: 'pointer',
-                                            background: `linear-gradient(135deg, ${BLUE}, #1A5A8A)`,
-                                            boxShadow: `0 4px 20px ${BLUE}30`,
+                                            cursor: sending ? 'not-allowed' : 'pointer',
+                                            background: sending ? '#374151' : `linear-gradient(135deg, ${BLUE}, #1A5A8A)`,
+                                            boxShadow: sending ? 'none' : `0 4px 20px ${BLUE}30`,
                                         }}
                                     >
-                                        <Send className="w-4 h-4" />
-                                        Envoyer le message
+                                        {sending
+                                            ? <><Loader2 className="w-4 h-4 animate-spin" /> Envoi...</>
+                                            : <><Send className="w-4 h-4" /> Envoyer le message</>
+                                        }
                                     </motion.button>
 
                                     <p style={{ textAlign: 'center', fontSize: '0.72rem', color: 'rgba(232,228,220,0.28)', fontFamily: "'DM Sans', sans-serif" }}>

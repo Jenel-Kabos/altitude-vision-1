@@ -1,7 +1,11 @@
 // server/routes/estimationRoutes.js
-const express    = require('express');
-const router     = express.Router();
-const sendEmail  = require('../utils/email');
+const express       = require('express');
+const router        = express.Router();
+const sendEmail     = require('../utils/email');
+const Estimation    = require('../models/Estimation');
+const auth          = require('../controllers/authController');
+
+const staffOnly = [auth.protect, auth.restrictTo('Admin', 'Collaborateur')];
 
 // ── Template email interne (reçu par l'agence) ───────────────
 const getEstimationEmailTemplate = (data) => `
@@ -131,6 +135,13 @@ router.post('/', async (req, res) => {
     const agenceEmail = process.env.ZOHO_FROM_EMAIL || 'support@altitudevision.agency';
 
     try {
+        // 0️⃣ Persistance en base (avant les emails : la demande doit être
+        //    conservée même si l'envoi d'email échoue ensuite)
+        await Estimation.create({
+            typeBien, transaction, adresse, surface, chambres,
+            etat, disponibilite, description, nom, email, telephone,
+        });
+
         // 1️⃣ Email interne → agence
         await sendEmail({
             to:      agenceEmail,
@@ -159,6 +170,51 @@ router.post('/', async (req, res) => {
             status:  'error',
             message: 'Erreur lors de l\'envoi de votre demande. Veuillez réessayer.',
         });
+    }
+});
+
+// ── GET /api/estimation — liste toutes les demandes (Admin/Collaborateur) ────
+router.get('/', staffOnly, async (req, res) => {
+    try {
+        const estimations = await Estimation.find()
+            .populate('traitePar', 'name')
+            .sort('-createdAt');
+
+        res.status(200).json({
+            status:  'success',
+            results: estimations.length,
+            data:    { estimations },
+        });
+    } catch (err) {
+        console.error('❌ [Estimation] Erreur récupération liste:', err.message);
+        res.status(500).json({ status: 'error', message: 'Erreur lors de la récupération des demandes.' });
+    }
+});
+
+// ── PATCH /api/estimation/:id — met à jour statut + noteInterne (Admin/Collaborateur) ──
+router.patch('/:id', staffOnly, async (req, res) => {
+    try {
+        const { statut, noteInterne } = req.body;
+        const estimation = await Estimation.findById(req.params.id);
+
+        if (!estimation) {
+            return res.status(404).json({ status: 'fail', message: 'Demande d\'estimation introuvable.' });
+        }
+
+        if (statut !== undefined)      estimation.statut = statut;
+        if (noteInterne !== undefined) estimation.noteInterne = noteInterne;
+        estimation.traitePar = req.user.id;
+
+        await estimation.save();
+        await estimation.populate('traitePar', 'name');
+
+        res.status(200).json({
+            status: 'success',
+            data:   { estimation },
+        });
+    } catch (err) {
+        console.error('❌ [Estimation] Erreur mise à jour:', err.message);
+        res.status(500).json({ status: 'error', message: 'Erreur lors de la mise à jour de la demande.' });
     }
 });
 

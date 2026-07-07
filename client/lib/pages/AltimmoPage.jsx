@@ -464,7 +464,7 @@ const SearchPanel = ({ onClose, onSearch, anchorRef, panelRef }) => {
                     <div key={label} style={{ position:'relative' }}>
                         <label className="ai-panel-label">{label}</label>
                         <div style={{ position:'relative' }}>
-                            <select value={value} onChange={e=>setter(e.target.value)} className="ai-panel-select">
+                            <select value={value} onChange={e=>setter(e.target.value)} className="ai-panel-select input-style">
                                 {options.map(o=><option key={o.v} value={o.v} className="text-gray-900">{o.l}</option>)}
                             </select>
                             <ChevronDown style={{ position:'absolute', right:'9px', top:'50%', transform:'translateY(-50%)', width:'12px', height:'12px', color:'rgba(255,255,255,0.32)', pointerEvents:'none' }} />

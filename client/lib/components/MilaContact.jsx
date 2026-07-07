@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Send, MessageSquare, Clock, CheckCircle } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, MessageSquare, Clock, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { sendContactMessage } from '../services/contactService';
 
 const RED      = '#D42B2B';
 const RED_DARK = '#A01E1E';
@@ -61,13 +62,14 @@ const labelStyle = {
 };
 
 // ─── Champ formulaire ─────────────────────────────────────────
-const Field = ({ label, id, type = 'text', required, isTextArea }) => (
+const Field = ({ label, id, type = 'text', required, isTextArea, value, onChange }) => (
     <div>
         <label htmlFor={id} style={labelStyle}>
             {label}{required && <span style={{ color: RED, marginLeft: '4px' }}>*</span>}
         </label>
         {isTextArea ? (
             <textarea id={id} name={id} rows={4} required={required}
+                value={value} onChange={onChange}
                 style={{ ...inputStyle, resize: 'none' }}
                 onFocus={e => { e.target.style.borderColor = `${RED}88`; e.target.style.boxShadow = `0 0 0 3px ${RED}15`; }}
                 onBlur={e =>  { e.target.style.borderColor = 'rgba(232,228,220,0.1)'; e.target.style.boxShadow = 'none'; }}
@@ -75,6 +77,7 @@ const Field = ({ label, id, type = 'text', required, isTextArea }) => (
             />
         ) : (
             <input type={type} id={id} name={id} required={required}
+                value={value} onChange={onChange}
                 style={inputStyle}
                 onFocus={e => { e.target.style.borderColor = `${RED}88`; e.target.style.boxShadow = `0 0 0 3px ${RED}15`; }}
                 onBlur={e =>  { e.target.style.borderColor = 'rgba(232,228,220,0.1)'; e.target.style.boxShadow = 'none'; }}
@@ -86,12 +89,28 @@ const Field = ({ label, id, type = 'text', required, isTextArea }) => (
 
 // ─── Composant principal ──────────────────────────────────────
 const MilaContact = () => {
-    const [sent, setSent] = useState(false);
+    const [nom,        setNom]        = useState('');
+    const [telephone,  setTelephone]  = useState('');
+    const [email,      setEmail]      = useState('');
+    const [message,    setMessage]    = useState('');
+    const [sending,    setSending]    = useState(false);
+    const [sent,       setSent]       = useState(false);
+    const [error,      setError]      = useState(null);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        setSent(true);
-        setTimeout(() => setSent(false), 4000);
+        setSending(true);
+        setError(null);
+        try {
+            await sendContactMessage({ name: nom, email, subject: 'Contact Mila Events', message, phone: telephone });
+            setSent(true);
+            setNom(''); setEmail(''); setTelephone(''); setMessage('');
+            setTimeout(() => setSent(false), 4000);
+        } catch {
+            setError("Erreur lors de l'envoi. Réessayez.");
+        } finally {
+            setSending(false);
+        }
     };
 
     return (
@@ -148,17 +167,26 @@ const MilaContact = () => {
                             ) : (
                                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <Field label="Nom complet" id="fullName" required />
-                                        <Field label="Téléphone"   id="phone" type="tel" />
+                                        <Field label="Nom complet" id="fullName" required value={nom}       onChange={e => setNom(e.target.value)} />
+                                        <Field label="Téléphone"   id="phone" type="tel" value={telephone} onChange={e => setTelephone(e.target.value)} />
                                     </div>
-                                    <Field label="Adresse email" id="email"   type="email" required />
-                                    <Field label="Votre message" id="message" required isTextArea />
+                                    <Field label="Adresse email" id="email"   type="email" required value={email}   onChange={e => setEmail(e.target.value)} />
+                                    <Field label="Votre message" id="message" required isTextArea value={message} onChange={e => setMessage(e.target.value)} />
+
+                                    {error && (
+                                        <p style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#F87171', fontSize: '0.8rem', fontFamily: "'DM Sans', sans-serif" }}>
+                                            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
+                                        </p>
+                                    )}
 
                                     <motion.button type="submit"
-                                        whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '12px', fontWeight: 700, color: 'white', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', background: `linear-gradient(135deg, ${RED_DARK}, ${RED})`, boxShadow: `0 4px 20px ${RED}30`, fontFamily: "'DM Sans', sans-serif", border: 'none', cursor: 'pointer' }}>
-                                        <Send className="w-4 h-4" />
-                                        Envoyer le message
+                                        disabled={sending}
+                                        whileHover={{ scale: sending ? 1 : 1.02 }} whileTap={{ scale: 0.98 }}
+                                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '12px', fontWeight: 700, color: 'white', fontSize: '0.8rem', letterSpacing: '0.08em', textTransform: 'uppercase', background: sending ? '#374151' : `linear-gradient(135deg, ${RED_DARK}, ${RED})`, boxShadow: sending ? 'none' : `0 4px 20px ${RED}30`, fontFamily: "'DM Sans', sans-serif", border: 'none', cursor: sending ? 'not-allowed' : 'pointer' }}>
+                                        {sending
+                                            ? <><Loader2 className="w-4 h-4 animate-spin" /> Envoi...</>
+                                            : <><Send className="w-4 h-4" /> Envoyer le message</>
+                                        }
                                     </motion.button>
                                     <p style={{ textAlign: 'center', fontSize: '0.72rem', color: 'rgba(232,228,220,0.25)', fontFamily: "'DM Sans', sans-serif" }}>
                                         Réponse garantie sous 24h ouvrées

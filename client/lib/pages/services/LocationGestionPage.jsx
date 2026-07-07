@@ -8,6 +8,7 @@ import {
     FaFileInvoiceDollar, FaShieldAlt, FaHeadset, FaCheckCircle
 } from 'react-icons/fa';
 import { ArrowLeft, Sparkles, Calendar, Clock, TrendingUp } from 'lucide-react';
+import DevisModal from '../../components/DevisModal';
 
 const IMAGES = {
     hero:    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1400&q=85',
@@ -34,6 +35,8 @@ const Img = ({ src, alt, className = '' }) => {
 };
 
 const LocationGestionPage = () => {
+    const [showDevisModal, setShowDevisModal] = useState(false);
+
     const services = [
         { icon: FaUsers,           title: 'Recherche de Locataires', description: 'Sélection rigoureuse de locataires fiables avec vérification complète des dossiers' },
         { icon: FaFileInvoiceDollar, title: 'Gestion Financière',    description: 'Encaissement des loyers, suivi des charges et gestion comptable complète' },
@@ -63,11 +66,6 @@ const LocationGestionPage = () => {
             features: ['Solution personnalisée', 'Gestion de portefeuille', 'Conseiller dédié', 'Services à la carte', 'Reporting avancé'],
         },
     ];
-
-    const scrollToContact = (e) => {
-        e.preventDefault();
-        document.getElementById('contact-altimmo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
 
     return (
         <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -104,10 +102,10 @@ const LocationGestionPage = () => {
 
                     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }} className="flex flex-wrap gap-4">
-                        <Link href="/immobilier#contact-altimmo" onClick={scrollToContact}
+                        <button onClick={() => setShowDevisModal(true)}
                             className="inline-flex items-center gap-2 px-7 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-full transition-all hover:scale-105 shadow-xl">
                             <Sparkles className="w-4 h-4" /> Demander un devis
-                        </Link>
+                        </button>
                         <a href="#tarifs"
                             className="inline-flex items-center gap-2 px-7 py-3.5 bg-white/15 hover:bg-white/25 text-white font-semibold rounded-full border border-white/25 backdrop-blur-sm transition-all">
                             Voir les tarifs →
@@ -254,10 +252,10 @@ const LocationGestionPage = () => {
                                                 </li>
                                             ))}
                                         </ul>
-                                        <Link href="/immobilier#contact-altimmo" onClick={scrollToContact}
+                                        <button onClick={() => setShowDevisModal(true)}
                                             className={`block w-full py-2.5 text-center font-semibold rounded-full text-sm transition-all ${plan.featured ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}>
                                             Choisir
-                                        </Link>
+                                        </button>
                                     </motion.div>
                                 ))}
                             </div>
@@ -279,10 +277,10 @@ const LocationGestionPage = () => {
                             Contactez-nous pour découvrir comment nous pouvons vous aider
                         </p>
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-                            <Link href="/immobilier#contact-altimmo" onClick={scrollToContact}
+                            <button onClick={() => setShowDevisModal(true)}
                                 className="inline-flex items-center gap-3 px-8 py-4 bg-white text-emerald-600 font-semibold rounded-full shadow-2xl hover:shadow-white/30 transition-all">
                                 <Sparkles className="w-5 h-5" /> Demander un Devis Gratuit
-                            </Link>
+                            </button>
                         </motion.div>
                     </motion.div>
                 </div>
@@ -300,6 +298,8 @@ const LocationGestionPage = () => {
                     </p>
                 </div>
             </footer>
+
+            {showDevisModal && <DevisModal onClose={() => setShowDevisModal(false)} />}
         </div>
     );
 };

@@ -7,7 +7,7 @@ import {
   Home, Calendar, Briefcase, LogOut, BarChart3, Globe, Users,
   CheckCircle2, ShieldCheck, Mail, Menu, X, Star, Mountain, Building,
   ClipboardList, BarChart2, Scale, Megaphone, MessageCircle, FolderOpen,
-  Clock, PenLine,
+  Clock, PenLine, Calculator, FileText,
 } from "lucide-react";
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -32,6 +32,8 @@ const NAV_SECTIONS = [
       { to: '/dashboard',                    end: true,  Icon: BarChart3,    label: 'Tableau de bord',    accent: BLUE,      roles: COLLAB_ALL },
       { to: '/dashboard/properties',         end: false, Icon: Home,         label: 'Altimmo',             accent: BLUE,      roles: ROLES_CM   },
       { to: '/dashboard/visites',            end: false, Icon: Calendar,     label: 'Rendez-vous',         accent: GOLD,      roles: ROLES_COMM },
+      { to: '/dashboard/estimations',        end: false, Icon: Calculator,   label: 'Estimations',         accent: GOLD,      roles: ['Admin', 'Collaborateur'] },
+      { to: '/dashboard/devis',              end: false, Icon: FileText,     label: 'Devis locatif',       accent: GOLD,      roles: ['Admin', 'Collaborateur'] },
       { to: '/dashboard/gestion-locative',   end: false, Icon: Building,     label: 'Gestion Locative',   accent: BLUE,      roles: ROLES_IMMO, badge: 'contratsActifs' },
       { to: '/dashboard/events',             end: false, Icon: Calendar,     label: 'Mila Events',         accent: '#D42B2B', roles: ROLES_CM   },
       { to: '/dashboard/altcom',             end: false, Icon: Briefcase,    label: 'Altcom',              accent: GOLD,      roles: ROLES_CM   },
@@ -59,6 +61,7 @@ const NAV_SECTIONS = [
     label: 'Communications',
     links: [
       { to: '/dashboard/messages',       end: false, Icon: Mail,          label: 'Boîte de Réception',  accent: GOLD,      roles: ROLES_COMM },
+      { to: '/dashboard/contact-messages', end: false, Icon: Mail,        label: 'Messages contact',    accent: GOLD,      roles: ['Admin'] },
       { to: '/dashboard/conversations',  end: false, Icon: MessageCircle, label: 'Messages clients',    accent: GOLD,      roles: ROLES_COMM },
       { to: '/dashboard/emails',         end: false, Icon: ShieldCheck,   label: 'Gestion des Emails',  accent: '#F59E0B', roles: ROLES_DOC  },
       { to: '/dashboard/publicites',     end: false, Icon: Megaphone,     label: 'Publicités',          accent: GOLD,      roles: ['Admin']  },
