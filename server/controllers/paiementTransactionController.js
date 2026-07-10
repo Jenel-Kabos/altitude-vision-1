@@ -2,29 +2,26 @@ const axios               = require('axios');
 const crypto              = require('crypto');
 const Transaction         = require('../models/Transaction');
 const PaiementTransaction = require('../models/PaiementTransaction');
+const yabetooService      = require('../services/yabetooService');
 const { upload, uploadToCloudinary } = require('../config/cloudinary');
 const { notify, notifyStaff } = require('../services/notificationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 
-const CINETPAY_API_KEY = process.env.CINETPAY_API_KEY;
-const CINETPAY_SITE_ID = process.env.CINETPAY_SITE_ID;
 const CINETPAY_SECRET  = process.env.CINETPAY_SECRET;
 const BACKEND_URL      = process.env.BACKEND_URL || 'https://altitude-vision.onrender.com';
 
-const PROVIDER_LABEL = {
-  mtn:    'MTN Mobile Money',
-  airtel: 'Airtel Money',
-  orange: 'Orange Money',
-  carte:  'Carte bancaire',
-};
+const OPERATOR_LABEL = { AIRTEL: 'Airtel Money', MTN: 'MTN Mobile Money' };
 
 // POST /api/transactions/:id/paiements/initier
-exports.initierCinetpay = async (req, res) => {
+exports.initierPaiement = async (req, res) => {
   try {
-    const { methode, provider } = req.body;
+    const { phone, operator, firstName, lastName } = req.body;
 
-    if (!['cinetpay_mobile', 'cinetpay_carte'].includes(methode)) {
-      return res.status(400).json({ status: 'fail', message: 'methode invalide pour CinetPay.' });
+    if (!phone || !operator) {
+      return res.status(400).json({ status: 'fail', message: 'phone et operator sont requis.' });
+    }
+    if (!['AIRTEL', 'MTN'].includes(operator)) {
+      return res.status(400).json({ status: 'fail', message: 'operator doit être AIRTEL ou MTN.' });
     }
 
     const tx = await Transaction.findById(req.params.id).populate('property', 'title');
@@ -34,14 +31,14 @@ exports.initierCinetpay = async (req, res) => {
 
     const existing = await PaiementTransaction.findOne({
       transaction: tx._id,
-      statut:      'en_attente',
-      methode:     { $in: ['cinetpay_mobile', 'cinetpay_carte'] },
+      statut:      'En attente',
+      methode:     'yabetoo_momo',
     });
     if (existing) {
       return res.status(400).json({
         status: 'fail',
-        message: 'Un paiement CinetPay est déjà en attente pour ce dossier.',
-        data:    { paymentUrl: existing.paymentUrl },
+        message: 'Un paiement YabetooPay est déjà en attente pour ce dossier.',
+        data:    { intentId: existing.yabetooIntentId },
       });
     }
 
@@ -49,46 +46,141 @@ exports.initierCinetpay = async (req, res) => {
       transaction: tx._id,
       initiéPar:   req.user._id,
       montant:     tx.finalAmount,
-      methode,
-      provider:    PROVIDER_LABEL[provider] || provider || methode,
-      statut:      'en_attente',
+      methode:     'yabetoo_momo',
+      provider:    OPERATOR_LABEL[operator],
+      operateur:   operator,
+      telephone:   phone,
+      statut:      'En attente',
     });
 
-    const cinetpayTxId = `AV-TX-${tx._id}-${paiement._id}`;
+    const description = `${tx.transactionType === 'vente' ? 'Achat' : 'Location'} — ${tx.property?.title}`;
 
-    const response = await axios.post('https://api-checkout.cinetpay.com/v2/payment', {
-      apikey:         CINETPAY_API_KEY,
-      site_id:        CINETPAY_SITE_ID,
-      transaction_id: cinetpayTxId,
-      amount:         tx.finalAmount,
-      currency:       'XAF',
-      description:    `${tx.transactionType === 'vente' ? 'Achat' : 'Location'} — ${tx.property?.title}`,
-      return_url:     `altimmo://paiement/success?txId=${tx._id}`,
-      cancel_url:     `altimmo://paiement/cancel?txId=${tx._id}`,
-      notify_url:     `${BACKEND_URL}/api/transactions/webhook/cinetpay`,
-      channels:       methode === 'cinetpay_carte' ? 'CREDIT_CARD' : 'MOBILE_MONEY',
-      lang:           'fr',
-      metadata:       JSON.stringify({
+    const intent = await yabetooService.createIntent({
+      amount:   tx.finalAmount,
+      phone,
+      operator,
+      firstName,
+      lastName,
+      description,
+      metadata: {
         transactionId:         tx._id.toString(),
         paiementTransactionId: paiement._id.toString(),
         userId:                req.user._id.toString(),
-      }),
+      },
     });
 
-    const paymentUrl = response.data?.data?.payment_url;
-    if (!paymentUrl) throw new Error("CinetPay n'a pas retourné d'URL de paiement.");
+    const intentId = intent?.id || intent?.data?.id;
+    if (!intentId) throw new Error("YabetooPay n'a pas retourné d'identifiant d'intention.");
 
-    await PaiementTransaction.findByIdAndUpdate(paiement._id, { cinetpayTransactionId: cinetpayTxId, paymentUrl });
+    // Déclenche la notification push MoMo sur le téléphone du client
+    await yabetooService.confirmIntent(intentId);
+
+    await PaiementTransaction.findByIdAndUpdate(paiement._id, { yabetooIntentId: intentId });
     await Transaction.findByIdAndUpdate(tx._id, {
       paymentStatus: 'en_attente',
-      paymentMethod: methode,
+      paymentMethod: 'yabetoo_momo',
       $push: { paiements: paiement._id },
     });
 
-    res.json({ status: 'success', data: { paymentUrl, paiementId: paiement._id } });
+    res.json({ status: 'success', data: { intentId, statut: 'En attente' } });
   } catch (err) {
-    console.error('❌ [PaiementTx] initierCinetpay:', err.response?.data || err.message);
-    res.status(500).json({ status: 'error', message: "Erreur lors de l'initiation du paiement CinetPay." });
+    console.error('❌ [PaiementTx] initierPaiement (Yabetoo):', err.response?.data || err.message);
+    res.status(500).json({ status: 'error', message: "Erreur lors de l'initiation du paiement." });
+  }
+};
+
+// GET /api/transactions/:id/paiements/verifier/:intentId
+exports.verifierPaiement = async (req, res) => {
+  try {
+    const { intentId } = req.params;
+
+    const paiement = await PaiementTransaction.findOne({ yabetooIntentId: intentId });
+    if (!paiement) return res.status(404).json({ status: 'fail', message: 'Paiement introuvable.' });
+
+    const intent  = await yabetooService.getIntent(intentId);
+    const yStatus = intent?.status || intent?.data?.status;
+
+    let statut = paiement.statut;
+    if (yStatus === 'succeeded') statut = 'Payé';
+    else if (yStatus === 'failed') statut = 'Échoué';
+
+    if (statut !== paiement.statut) {
+      paiement.statut = statut;
+      if (statut === 'Payé') paiement.confirméAt = new Date();
+      await paiement.save();
+
+      await Transaction.findByIdAndUpdate(paiement.transaction, {
+        paymentStatus: statut === 'Payé' ? 'confirmé' : statut === 'Échoué' ? 'échoué' : 'en_attente',
+        ...(statut === 'Payé' && { status: 'Paiement en attente' }),
+      });
+    }
+
+    res.json({
+      status: 'success',
+      data: { statut, montant: paiement.montant, telephone: paiement.telephone, operateur: paiement.operateur },
+    });
+  } catch (err) {
+    console.error('❌ [PaiementTx] verifierPaiement:', err.response?.data || err.message);
+    res.status(500).json({ status: 'error', message: 'Erreur lors de la vérification du paiement.' });
+  }
+};
+
+// POST /api/transactions/paiements/webhook — pas d'auth JWT (webhook public)
+// Pas de vérification de signature en sandbox — à ajouter avant la mise en prod.
+exports.webhookYabetoo = async (req, res) => {
+  res.status(200).json({ received: true });
+
+  try {
+    const { type, data } = req.body;
+    const intentId = data?.id;
+    if (!intentId) return;
+
+    const statut = type === 'payment_intent.succeeded' ? 'Payé'
+                 : type === 'payment_intent.failed'    ? 'Échoué'
+                 : null;
+    if (!statut) return;
+
+    const paiement = await PaiementTransaction.findOneAndUpdate(
+      { yabetooIntentId: intentId },
+      { statut, ...(statut === 'Payé' && { confirméAt: new Date() }) },
+      { new: true },
+    );
+    if (!paiement) return;
+
+    const tx = await Transaction.findByIdAndUpdate(
+      paiement.transaction,
+      {
+        paymentStatus: statut === 'Payé' ? 'confirmé' : 'échoué',
+        ...(statut === 'Payé' && { status: 'Paiement en attente' }),
+      },
+      { new: true },
+    ).populate('property', 'title');
+    if (!tx) return;
+
+    if (statut === 'Payé') {
+      notify(tx.client, {
+        type:  'payment_success',
+        title: 'Paiement reçu ✅',
+        body:  `Votre paiement de ${Number(paiement.montant).toLocaleString('fr-FR')} FCFA pour "${tx.property?.title}" a été confirmé.`,
+        data:  { screen: 'Transactions', transactionId: paiement.transaction.toString() },
+      }).catch(() => {});
+
+      notifyStaff({
+        type:  'transaction_created',
+        title: 'Paiement YabetooPay confirmé 💰',
+        body:  `Paiement reçu pour "${tx.property?.title}". Finalisation requise.`,
+        data:  { screen: 'Transactions', transactionId: paiement.transaction.toString() },
+      }).catch(() => {});
+    } else {
+      notify(tx.client, {
+        type:  'payment_failed',
+        title: 'Paiement refusé ❌',
+        body:  `Le paiement pour "${tx.property?.title}" a échoué. Veuillez réessayer.`,
+        data:  { screen: 'Transactions', transactionId: paiement.transaction.toString() },
+      }).catch(() => {});
+    }
+  } catch (err) {
+    console.error('❌ [Webhook Yabetoo] Erreur traitement:', err.message);
   }
 };
 

@@ -45,8 +45,13 @@ export const getPaiements = async (transactionId) => {
   return res.data?.data?.paiements || [];
 };
 
-export const initierCinetpay = async (transactionId, { methode, provider }) => {
-  const res = await api.post(`/transactions/${transactionId}/paiements/initier`, { methode, provider });
+export const initierPaiement = async (transactionId, { phone, operator, firstName, lastName }) => {
+  const res = await api.post(`/transactions/${transactionId}/paiements/initier`, { phone, operator, firstName, lastName });
+  return res.data?.data;
+};
+
+export const verifierPaiement = async (transactionId, intentId) => {
+  const res = await api.get(`/transactions/${transactionId}/paiements/verifier/${intentId}`);
   return res.data?.data;
 };
 

@@ -37,7 +37,9 @@ const ContactModal = ({ intention, onClose, serviceTitle = null }) => {
     e.preventDefault();
     setSending(true);
 
-    const subject = serviceTitle ? `Devis — ${serviceTitle}` : `Contact — ${intention}`;
+    const subject = serviceTitle
+      ? (isQuoteRequest ? `Devis — ${serviceTitle}` : `${intention} — ${serviceTitle}`)
+      : `Contact — ${intention}`;
 
     try {
       await sendContactMessage({
@@ -48,7 +50,9 @@ const ContactModal = ({ intention, onClose, serviceTitle = null }) => {
       });
 
       const confirmationMessage = serviceTitle
-        ? `✅ Votre demande de devis pour le service "${serviceTitle}" a bien été envoyée. Nous vous contacterons par email (${formData.email}) dans les 48h.`
+        ? (isQuoteRequest
+            ? `✅ Votre demande de devis pour le service "${serviceTitle}" a bien été envoyée. Nous vous contacterons par email (${formData.email}) dans les 48h.`
+            : `✅ Votre message concernant "${serviceTitle}" a bien été envoyé. Nous vous contacterons par email (${formData.email}) sous 24h.`)
         : `✅ Votre message pour la catégorie "${intention}" a bien été reçu. Merci de nous avoir contactés !`;
 
       toast.success(confirmationMessage);

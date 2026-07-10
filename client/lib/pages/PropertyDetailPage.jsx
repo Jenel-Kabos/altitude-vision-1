@@ -1,21 +1,25 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MotionImage = motion.create(Image);
 import { getPropertyById, likeProperty, shareProperty } from '../services/propertyService';
+import api from '../services/api';
+import toast from '@/lib/utils/toast';
 import { useAuth } from '../context/AuthContext';
 import {
   ArrowLeft, MapPin, Tag, Check, Bed, Bath,
   Sofa, UtensilsCrossed, Maximize2, MessageSquare,
   Phone, Clock, Scale, ChevronLeft, ChevronRight,
   Heart, Eye, Share2, Percent, ChevronDown, ChevronUp,
+  MessageCircle, Calendar,
 } from 'lucide-react';
 import CommentList from '../components/comments/CommentList';
 import Breadcrumb from '../components/Breadcrumb';
+import ContactModal from '../components/ContactModal';
 
 // ─── Design tokens ─────────────────────────────────────────────
 const BLUE      = '#2E7BB5';
@@ -480,6 +484,19 @@ const STYLES = `
   }
   .pdp-cta-wa:hover { opacity: 0.9; transform: translateY(-1px); }
 
+  /* CTA principal (Planifier une visite) */
+  .pdp-cta-primary {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: clamp(13px, 2.5vw, 16px);
+    background: linear-gradient(135deg, #A06820, ${GOLD}); color: #fff;
+    font-family: var(--font-dm-sans), sans-serif;
+    font-size: clamp(0.76rem, 1.6vw, 0.82rem); font-weight: 600; letter-spacing: 0.06em;
+    border: none; cursor: pointer; border-radius: 1px;
+    transition: opacity 0.2s, transform 0.15s; text-decoration: none; margin-bottom: 10px;
+  }
+  .pdp-cta-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+  .pdp-cta-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
   /* CTA Téléphone */
   .pdp-cta-tel {
     display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -491,34 +508,6 @@ const STYLES = `
     transition: border-color 0.2s, color 0.2s; text-decoration: none;
   }
   .pdp-cta-tel:hover { border-color: ${GOLD}; color: ${GOLD}; }
-
-  /* Commission */
-  .pdp-commission {
-    margin-top: clamp(12px, 2.5vw, 18px);
-    padding: clamp(10px, 2vw, 14px) clamp(12px, 2.5vw, 18px);
-    border-radius: 2px;
-    background: rgba(200,150,12,0.06);
-    border: 1px solid rgba(200,150,12,0.18);
-  }
-  .pdp-commission-title {
-    font-family: var(--font-dm-sans), sans-serif;
-    font-size: clamp(0.60rem, 1.1vw, 0.64rem); font-weight: 600;
-    letter-spacing: 0.2em; text-transform: uppercase;
-    color: rgba(200,150,12,0.75); margin-bottom: 6px;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .pdp-commission-row {
-    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-  }
-  .pdp-commission-amount {
-    font-family: var(--font-cormorant), serif;
-    font-size: clamp(1.1rem, 2.5vw, 1.35rem);
-    font-weight: 600; color: #fff; line-height: 1;
-  }
-  .pdp-commission-note {
-    font-size: clamp(0.60rem, 1.1vw, 0.64rem);
-    color: rgba(255,255,255,0.38); text-align: right;
-  }
 
   /* Reassurance items */
   .pdp-reassurance {
@@ -644,6 +633,7 @@ const DetailSkeleton = () => (
 const PropertyDetailPage = () => {
   injectStyles();
   const { propertyId }  = useParams();
+  const router          = useRouter();
   const { user }        = useAuth();
   const [property,  setProperty]  = useState(null);
   const [loading,   setLoading]   = useState(true);
@@ -657,6 +647,8 @@ const PropertyDetailPage = () => {
   const [liked,         setLiked]         = useState(false);
   const [shared,        setShared]        = useState(false);
   const [descExpanded,  setDescExpanded]  = useState(false);
+  const [showContact,      setShowContact]      = useState(false);
+  const [planifierLoading, setPlanifierLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -693,6 +685,29 @@ const PropertyDetailPage = () => {
       setLocalShares(n => n + 1);
       try { await shareProperty(propertyId); } catch {}
       setTimeout(() => setShared(false), 3000);
+    }
+  };
+
+  const planifierVisite = async () => {
+    if (!user) {
+      router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
+    setPlanifierLoading(true);
+    try {
+      const convRes = await api.post('/conversations/start', {
+        propertyId: property._id,
+        message: `Je souhaite planifier une visite pour : ${property.title}`,
+      });
+      await api.post('/visites', {
+        propertyId: property._id,
+        conversationId: convRes.data?.data?.conversation?._id,
+      });
+      toast.success('Votre demande de visite a été envoyée ! Notre équipe vous contactera sous 24h.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur lors de la demande de visite.');
+    } finally {
+      setPlanifierLoading(false);
     }
   };
 
@@ -1016,58 +1031,36 @@ const PropertyDetailPage = () => {
                 </div>
               </div>
 
-              {/* Commission agence */}
+              {/* Honoraires d'agence — un seul bloc, formule vente/location unifiée */}
               {(() => {
-                const rate       = property.commissionRate ?? 5;
                 const isLocation = property.status === 'location';
+                const rate       = property.commissionRate ?? 5;
                 const amount     = isLocation
-                  ? property.price * rate
+                  ? Math.round((property.price || 0) * 0.8)
                   : Math.round((property.price || 0) * rate / 100);
-                const label      = isLocation
-                  ? `${rate} mois de loyer`
+                const note       = isLocation
+                  ? '80% du loyer mensuel'
                   : `${rate}% du prix de vente`;
                 return (
-                  <div style={{ padding:'0 clamp(18px,4vw,28px) clamp(14px,3vw,20px)' }}>
-                    <div className="pdp-commission">
-                      <div className="pdp-commission-title">
-                        <Percent size={10} /> Honoraires agence
+                  <div style={{ padding:'0 clamp(18px,4vw,28px) clamp(6px,1.5vw,10px)' }}>
+                    <div className="pdp-fees">
+                      <div className="pdp-fees-title">
+                        <Percent size={10} /> Honoraires d'agence
                       </div>
-                      <div className="pdp-commission-row">
-                        <span className="pdp-commission-amount">
-                          {priceFormatter.format(amount)}
-                        </span>
-                        <span className="pdp-commission-note">{label}</span>
+                      <div className="pdp-fees-row">
+                        <span className="pdp-fees-row-label" style={{ color:'rgba(255,255,255,0.55)' }}>Montant estimé</span>
+                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>{priceFormatter.format(amount)}</span>
+                        <span className="pdp-fees-row-note" style={{ color:'rgba(255,255,255,0.38)' }}>{note}</span>
+                      </div>
+                      <div className="pdp-fees-row">
+                        <span className="pdp-fees-row-label" style={{ color:'rgba(255,255,255,0.55)' }}>Frais de visite</span>
+                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>5 000 FCFA</span>
+                        <span className="pdp-fees-row-note" style={{ color:'rgba(255,255,255,0.38)' }}>à régler sur place</span>
                       </div>
                     </div>
                   </div>
                 );
               })()}
-
-              {/* Frais & conditions */}
-              <div style={{ padding: '0 clamp(18px,4vw,28px) clamp(6px,1.5vw,10px)' }}>
-                <div className="pdp-fees">
-                  <div className="pdp-fees-title">
-                    <svg viewBox="0 0 24 24" style={{ width:11, height:11, fill:'none', stroke:'rgba(46,123,181,0.85)', strokeWidth:2 }}>
-                      <path d="M9 14l6-6M9 9h.01M15 15h.01M3 12a9 9 0 1018 0A9 9 0 003 12z" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    Frais &amp; conditions
-                  </div>
-                  {(property.status === 'location' || property.transactionType === 'location') && (
-                    <div className="pdp-fees-row">
-                      <span className="pdp-fees-row-label">Frais d'agence</span>
-                      <span className="pdp-fees-row-value">
-                        {priceFormatter.format(Math.round((property.price || 0) * 0.8))}
-                      </span>
-                      <span className="pdp-fees-row-note">80% du loyer</span>
-                    </div>
-                  )}
-                  <div className="pdp-fees-row">
-                    <span className="pdp-fees-row-label">Frais de visite</span>
-                    <span className="pdp-fees-row-value">5 000 FCFA</span>
-                    <span className="pdp-fees-row-note">à régler sur place</span>
-                  </div>
-                </div>
-              </div>
 
               {/* Contact */}
               <div className="pdp-sidebar-body">
@@ -1076,15 +1069,20 @@ const PropertyDetailPage = () => {
                   Contactez notre agent pour organiser une visite.
                 </p>
 
-                <a
-                  href={`https://wa.me/242068002151?text=Bonjour, je suis intéressé par "${property.title || 'un bien'}" (ID: ${property._id})`}
-                  target="_blank" rel="noopener noreferrer"
+                <button
+                  onClick={() => setShowContact(true)}
                   className="pdp-cta-wa">
-                  <svg viewBox="0 0 24 24" style={{ width:15, height:15, fill:'#fff', flexShrink:0 }}>
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-                  </svg>
-                  Contacter sur WhatsApp
-                </a>
+                  <MessageCircle size={18} />
+                  Contacter l'agence
+                </button>
+
+                <button
+                  onClick={planifierVisite}
+                  disabled={planifierLoading}
+                  className="pdp-cta-primary">
+                  <Calendar size={18} />
+                  {planifierLoading ? 'Envoi...' : 'Planifier une visite'}
+                </button>
 
                 <a href="tel:+242068002151" className="pdp-cta-tel">
                   <Phone size={13} /> +242 06 800 21 51
@@ -1172,6 +1170,14 @@ const PropertyDetailPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {showContact && (
+        <ContactModal
+          intention="Informations Générales"
+          serviceTitle={`${property.title} (ID: ${property._id})`}
+          onClose={() => setShowContact(false)}
+        />
+      )}
     </div>
   );
 };

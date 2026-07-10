@@ -1,96 +1,58 @@
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, memo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, ActivityIndicator,
+  ScrollView, Alert, ActivityIndicator, TextInput,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { fonts, fontSize, spacing, radius } from '../../theme';
-import { initierCinetpay } from '../../services/transactionService';
+import { initierPaiement, verifierPaiement } from '../../services/transactionService';
 
-// ─── Modes de paiement ───────────────────────────────────────────────────────
+// ─── Opérateurs Mobile Money ──────────────────────────────────────────────────
 
-const MODES = [
-  {
-    id: 'mtn',
-    label: 'MTN Mobile Money',
-    desc: 'Paiement via votre compte MTN',
-    icon: 'phone-portrait-outline',
-    bg: '#FFCC00',
-    iconColor: '#0A0A0A',
-    channel: 'MOBILE_MONEY',
-  },
-  {
-    id: 'airtel',
-    label: 'Airtel Money',
-    desc: 'Paiement via votre compte Airtel',
-    icon: 'phone-portrait-outline',
-    bg: '#EF4444',
-    iconColor: '#FFFFFF',
-    channel: 'MOBILE_MONEY',
-  },
-  {
-    id: 'card',
-    label: 'Carte bancaire',
-    desc: 'Visa / Mastercard',
-    icon: 'card-outline',
-    bg: '#185FA5',
-    iconColor: '#FFFFFF',
-    channel: 'CREDIT_CARD',
-  },
-  {
-    id: 'virement',
-    label: 'Virement bancaire',
-    desc: 'RIB + preuve de virement',
-    icon: 'business-outline',
-    bg: '#1E3A5F',
-    iconColor: '#FFFFFF',
-    channel: null,
-  },
+const OPERATORS = [
+  { id: 'AIRTEL', label: 'Airtel Money', icon: 'phone-portrait-outline', bg: '#EF4444', iconColor: '#FFFFFF' },
+  { id: 'MTN',    label: 'MTN Mobile Money', icon: 'phone-portrait-outline', bg: '#FFCC00', iconColor: '#0A0A0A' },
 ];
+
+const POLL_INTERVAL_MS = 5000;
+const POLL_MAX_COUNT    = 36; // 36 × 5s = 3 minutes
 
 const fmt = (n) => Number(n || 0).toLocaleString('fr-FR');
 
-// ─── Carte de méthode de paiement ────────────────────────────────────────────
+// ─── Carte opérateur ──────────────────────────────────────────────────────────
 
-const ModeCard = memo(function ModeCard({ mode, index, selected, onSelect, styles, c }) {
+const OperatorCard = memo(function OperatorCard({ op, selected, onSelect, styles }) {
   const handlePress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSelect(mode.id);
-  }, [mode.id, onSelect]);
+    onSelect(op.id);
+  }, [op.id, onSelect]);
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 80).duration(280).springify().damping(18)}>
-      <TouchableOpacity
-        style={[styles.methodCard, selected && styles.methodCardSelected]}
-        onPress={handlePress}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel={mode.label}
-        accessibilityState={{ selected }}
-      >
-        <View style={[styles.methodIcon, { backgroundColor: mode.bg }]}>
-          <Ionicons name={mode.icon} size={22} color={mode.iconColor} />
-        </View>
-
-        <View style={styles.methodInfo}>
-          <Text style={[styles.methodLabel, selected && styles.methodLabelSelected]}>
-            {mode.label}
-          </Text>
-          <Text style={styles.methodDesc}>{mode.desc}</Text>
-        </View>
-
-        <View style={[styles.methodCheck, selected && styles.methodCheckSelected]}>
-          {selected && <Ionicons name="checkmark" size={14} color="#0A0A0A" />}
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
+    <TouchableOpacity
+      style={[styles.methodCard, selected && styles.methodCardSelected]}
+      onPress={handlePress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={op.label}
+      accessibilityState={{ selected }}
+    >
+      <View style={[styles.methodIcon, { backgroundColor: op.bg }]}>
+        <Ionicons name={op.icon} size={22} color={op.iconColor} />
+      </View>
+      <View style={styles.methodInfo}>
+        <Text style={[styles.methodLabel, selected && styles.methodLabelSelected]}>{op.label}</Text>
+      </View>
+      <View style={[styles.methodCheck, selected && styles.methodCheckSelected]}>
+        {selected && <Ionicons name="checkmark" size={14} color="#0A0A0A" />}
+      </View>
+    </TouchableOpacity>
   );
-}, (prev, next) => prev.selected === next.selected && prev.styles === next.styles);
+});
 
 // ─── Ligne récapitulatif ──────────────────────────────────────────────────────
 
@@ -118,21 +80,47 @@ export default function PaiementScreen({ route, navigation }) {
   } = route.params || {};
 
   const { themeColors: c } = useTheme();
-  const styles  = useMemo(() => makeStyles(c), [c]);
-  const insets  = useSafeAreaInsets();
+  const { user }  = useAuth();
+  const styles    = useMemo(() => makeStyles(c), [c]);
+  const insets    = useSafeAreaInsets();
 
-  const [modeSelected, setMode]   = useState(null);
-  const [loading,      setLoading] = useState(false);
+  const [phone,     setPhone]     = useState('');
+  const [operator,  setOperator]  = useState(null);
+  const [firstName, setFirstName] = useState('');
+  const [lastName,  setLastName]  = useState('');
+  const [loading,   setLoading]   = useState(false);
+
+  const [intentId,       setIntentId]       = useState(null);
+  const [pollingStatus,  setPollingStatus]  = useState('idle'); // idle | waiting | success | failed
+  const [pollingCount,   setPollingCount]   = useState(0);
 
   const montantFmt = useMemo(() => fmt(montant), [montant]);
 
-  // ─── Handlers ───
-  const handleBack   = useCallback(() => navigation.goBack(), [navigation]);
-  const handleSelect = useCallback((id) => setMode(id), []);
+  // Pré-remplit nom/prénom depuis le profil si disponible
+  useEffect(() => {
+    if (user?.name) {
+      const parts = user.name.trim().split(/\s+/);
+      setFirstName(parts[0] || '');
+      setLastName(parts.slice(1).join(' ') || '');
+    }
+  }, [user]);
 
-  const initierPaiement = useCallback(async () => {
-    if (!modeSelected) {
-      Alert.alert('Mode requis', 'Veuillez choisir un mode de paiement.');
+  // ─── Handlers ───
+  const handleBack     = useCallback(() => navigation.goBack(), [navigation]);
+  const handleOperator  = useCallback((id) => setOperator(id), []);
+  const handlePhone     = useCallback((v) => setPhone(v.replace(/[^0-9]/g, '').slice(0, 12)), []);
+
+  const lancerPaiement = useCallback(async () => {
+    if (phone.length !== 12) {
+      Alert.alert('Téléphone invalide', 'Entrez un numéro au format 242XXXXXXXXX (12 chiffres).');
+      return;
+    }
+    if (!operator) {
+      Alert.alert('Opérateur requis', 'Choisissez AIRTEL ou MTN.');
+      return;
+    }
+    if (!firstName.trim() || !lastName.trim()) {
+      Alert.alert('Identité requise', 'Renseignez votre nom et prénom.');
       return;
     }
     if (!transactionId) {
@@ -141,43 +129,67 @@ export default function PaiementScreen({ route, navigation }) {
     }
     setLoading(true);
     try {
-      if (modeSelected === 'virement') {
-        navigation.navigate('Profil', {
-          screen: 'VirementScreen',
-          params: { transactionId, montant, bien },
-        });
-        return;
-      }
-
-      const data = await initierCinetpay(transactionId, {
-        methode:  modeSelected === 'card' ? 'cinetpay_carte' : 'cinetpay_mobile',
-        provider: modeSelected,
-      });
-
-      if (data?.paymentUrl) {
-        await WebBrowser.openBrowserAsync(data.paymentUrl);
-        Alert.alert(
-          'Vérification en cours',
-          'Votre paiement est en cours de traitement. Le statut sera mis à jour dans quelques instants.',
-          [{ text: 'Voir mes transactions', onPress: () => navigation.navigate('Profil', { screen: 'Transactions' }) }],
-        );
-      }
+      const result = await initierPaiement(transactionId, { phone, operator, firstName, lastName });
+      setIntentId(result.intentId);
+      setPollingCount(0);
+      setPollingStatus('waiting');
     } catch (err) {
-      Alert.alert(
-        'Erreur de paiement',
-        err.response?.data?.message || "Impossible d'initier le paiement. Réessayez.",
-      );
+      Alert.alert('Erreur', err.response?.data?.message || "Impossible d'initier le paiement");
     } finally {
       setLoading(false);
     }
-  }, [modeSelected, transactionId, montant, bien, navigation]);
+  }, [phone, operator, firstName, lastName, transactionId]);
 
-  const isDisabled = !modeSelected || loading;
+  const annulerAttente = useCallback(() => {
+    setPollingStatus('idle');
+    setIntentId(null);
+    setPollingCount(0);
+  }, []);
+
+  const reessayer = useCallback(() => {
+    setPollingStatus('idle');
+    setIntentId(null);
+    setPollingCount(0);
+  }, []);
+
+  // ─── Polling du statut YabetooPay ───
+  useEffect(() => {
+    if (pollingStatus !== 'waiting' || !intentId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await verifierPaiement(transactionId, intentId);
+        if (res.statut === 'Payé') {
+          clearInterval(interval);
+          setPollingStatus('success');
+        } else if (res.statut === 'Échoué') {
+          clearInterval(interval);
+          setPollingStatus('failed');
+        } else {
+          setPollingCount((cnt) => {
+            if (cnt + 1 >= POLL_MAX_COUNT) {
+              clearInterval(interval);
+              setPollingStatus('failed');
+            }
+            return cnt + 1;
+          });
+        }
+      } catch {
+        // on ignore les erreurs réseau ponctuelles, le polling continue
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [pollingStatus, intentId, transactionId]);
+
+  const isFormDisabled = loading;
+  const tempsRestant   = Math.max(0, POLL_MAX_COUNT - pollingCount) * (POLL_INTERVAL_MS / 1000);
+  const minutes        = Math.floor(tempsRestant / 60);
+  const secondes        = String(tempsRestant % 60).padStart(2, '0');
 
   return (
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safeTop}>
-
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
@@ -196,92 +208,149 @@ export default function PaiementScreen({ route, navigation }) {
           </View>
 
           {/* ─── Hero montant ─── */}
-          <Animated.View
-            entering={FadeInDown.delay(0).duration(320).springify().damping(18)}
-            style={styles.hero}
-          >
+          <Animated.View entering={FadeInDown.delay(0).duration(320).springify().damping(18)} style={styles.hero}>
             <Text style={styles.heroLabel}>Montant à payer</Text>
             <Text style={styles.heroAmount}>{montantFmt} FCFA</Text>
-            {bien ? (
-              <Text style={styles.heroBien} numberOfLines={1}>{bien}</Text>
-            ) : null}
+            {bien ? <Text style={styles.heroBien} numberOfLines={1}>{bien}</Text> : null}
           </Animated.View>
 
-          {/* ─── Méthodes de paiement ─── */}
-          <Animated.View
-            entering={FadeInDown.delay(80).duration(300).springify().damping(18)}
-          >
-            <Text style={styles.sectionTitle}>Mode de paiement</Text>
-          </Animated.View>
+          {pollingStatus === 'idle' && (
+            <>
+              {/* ─── Formulaire ─── */}
+              <Animated.View entering={FadeInDown.delay(80).duration(300).springify().damping(18)}>
+                <Text style={styles.sectionTitle}>Opérateur Mobile Money</Text>
+              </Animated.View>
 
-          <View style={styles.methodsList}>
-            {MODES.map((m, i) => (
-              <ModeCard
-                key={m.id}
-                mode={m}
-                index={i}
-                selected={modeSelected === m.id}
-                onSelect={handleSelect}
-                styles={styles}
-                c={c}
+              <View style={styles.methodsList}>
+                {OPERATORS.map((op) => (
+                  <OperatorCard
+                    key={op.id}
+                    op={op}
+                    selected={operator === op.id}
+                    onSelect={handleOperator}
+                    styles={styles}
+                  />
+                ))}
+              </View>
+
+              <Text style={styles.sectionTitle}>Numéro de téléphone</Text>
+              <TextInput
+                style={styles.input}
+                value={phone}
+                onChangeText={handlePhone}
+                placeholder="242XXXXXXXXX"
+                placeholderTextColor={c.textMuted}
+                keyboardType="number-pad"
+                maxLength={12}
+                editable={!isFormDisabled}
               />
-            ))}
-          </View>
 
-          {/* ─── Récapitulatif ─── */}
-          <Animated.View
-            entering={FadeInDown.delay(320).duration(300).springify().damping(18)}
-          >
-            <Text style={styles.sectionTitle}>Récapitulatif</Text>
-            <View style={styles.summaryCard}>
-              {bien        && <SummaryRow label="Bien"   value={bien}        styles={styles} />}
-              {description && <SummaryRow label="Détail" value={description} styles={styles} />}
-              {type        && <SummaryRow label="Type"   value={type}        styles={styles} />}
-              {duree       && <SummaryRow label="Durée"  value={duree}       styles={styles} />}
-
-              <View style={styles.divider} />
-
-              <SummaryRow
-                label={`Total`}
-                value={`${montantFmt} FCFA`}
-                styles={styles}
-                total
+              <Text style={styles.sectionTitle}>Prénom</Text>
+              <TextInput
+                style={styles.input}
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholder="Votre prénom"
+                placeholderTextColor={c.textMuted}
+                editable={!isFormDisabled}
               />
-            </View>
-          </Animated.View>
 
-          {/* ─── Mention sécurité ─── */}
-          <Animated.View
-            entering={FadeInDown.delay(400).duration(280)}
-            style={styles.securityRow}
-          >
-            <Ionicons name="lock-closed-outline" size={13} color={c.textMuted} />
-            <Text style={styles.securityText}>Paiement sécurisé par CinetPay</Text>
-          </Animated.View>
+              <Text style={styles.sectionTitle}>Nom</Text>
+              <TextInput
+                style={styles.input}
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder="Votre nom"
+                placeholderTextColor={c.textMuted}
+                editable={!isFormDisabled}
+              />
+
+              {/* ─── Récapitulatif ─── */}
+              <Animated.View entering={FadeInDown.delay(320).duration(300).springify().damping(18)}>
+                <Text style={styles.sectionTitle}>Récapitulatif</Text>
+                <View style={styles.summaryCard}>
+                  {bien        && <SummaryRow label="Bien"   value={bien}        styles={styles} />}
+                  {description && <SummaryRow label="Détail" value={description} styles={styles} />}
+                  {type        && <SummaryRow label="Type"   value={type}        styles={styles} />}
+                  {duree       && <SummaryRow label="Durée"  value={duree}       styles={styles} />}
+                  <View style={styles.divider} />
+                  <SummaryRow label="Total" value={`${montantFmt} FCFA`} styles={styles} total />
+                </View>
+              </Animated.View>
+
+              <Animated.View entering={FadeInDown.delay(400).duration(280)} style={styles.securityRow}>
+                <Ionicons name="lock-closed-outline" size={13} color={c.textMuted} />
+                <Text style={styles.securityText}>Paiement sécurisé par YabetooPay</Text>
+              </Animated.View>
+            </>
+          )}
+
+          {pollingStatus === 'waiting' && (
+            <Animated.View entering={FadeInDown.duration(300)} style={styles.stateWrap}>
+              <ActivityIndicator size="large" color={c.gold} />
+              <Text style={styles.stateTitle}>En attente de confirmation…</Text>
+              <Text style={styles.stateText}>
+                Vérifiez votre téléphone et confirmez le paiement sur votre application{' '}
+                {operator === 'AIRTEL' ? 'Airtel' : 'MTN'} Mobile Money.
+              </Text>
+              <Text style={styles.stateCountdown}>{minutes}:{secondes}</Text>
+              <TouchableOpacity onPress={annulerAttente} style={styles.cancelBtn} activeOpacity={0.8}>
+                <Text style={styles.cancelBtnText}>Annuler</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+
+          {pollingStatus === 'success' && (
+            <Animated.View entering={FadeInDown.duration(300)} style={styles.stateWrap}>
+              <View style={[styles.resultIcon, { backgroundColor: '#16A34A22' }]}>
+                <Ionicons name="checkmark-circle" size={48} color="#16A34A" />
+              </View>
+              <Text style={styles.stateTitle}>Paiement confirmé !</Text>
+              <Text style={styles.stateText}>Votre paiement de {montantFmt} FCFA a bien été reçu.</Text>
+              <TouchableOpacity onPress={handleBack} style={styles.ctaBtn} activeOpacity={0.85}>
+                <Text style={styles.ctaText}>Retour</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+
+          {pollingStatus === 'failed' && (
+            <Animated.View entering={FadeInDown.duration(300)} style={styles.stateWrap}>
+              <View style={[styles.resultIcon, { backgroundColor: '#DC262622' }]}>
+                <Ionicons name="close-circle" size={48} color="#DC2626" />
+              </View>
+              <Text style={styles.stateTitle}>Paiement échoué ou expiré</Text>
+              <Text style={styles.stateText}>Le paiement n'a pas pu être confirmé. Vous pouvez réessayer.</Text>
+              <TouchableOpacity onPress={reessayer} style={styles.ctaBtn} activeOpacity={0.85}>
+                <Text style={styles.ctaText}>Réessayer</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
         </ScrollView>
       </SafeAreaView>
 
-      {/* ─── CTA fixe en bas ─── */}
-      <View style={[styles.ctaSafe, { paddingBottom: insets.bottom + spacing.sm }]}>
-        <TouchableOpacity
-          onPress={initierPaiement}
-          disabled={isDisabled}
-          activeOpacity={0.85}
-          style={[styles.ctaBtn, isDisabled && styles.ctaBtnDisabled]}
-          accessibilityRole="button"
-          accessibilityLabel={loading ? 'Initialisation en cours…' : `Payer ${montantFmt} FCFA`}
-          accessibilityState={{ disabled: isDisabled }}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#0A0A0A" />
-          ) : (
-            <>
-              <Ionicons name="shield-checkmark-outline" size={18} color="#0A0A0A" />
-              <Text style={styles.ctaText}>Payer {montantFmt} FCFA</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
+      {/* ─── CTA fixe en bas (formulaire uniquement) ─── */}
+      {pollingStatus === 'idle' && (
+        <View style={[styles.ctaSafe, { paddingBottom: insets.bottom + spacing.sm }]}>
+          <TouchableOpacity
+            onPress={lancerPaiement}
+            disabled={isFormDisabled}
+            activeOpacity={0.85}
+            style={[styles.ctaBtn, isFormDisabled && styles.ctaBtnDisabled]}
+            accessibilityRole="button"
+            accessibilityLabel={loading ? 'Initialisation en cours…' : `Payer ${montantFmt} FCFA`}
+            accessibilityState={{ disabled: isFormDisabled }}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#0A0A0A" />
+            ) : (
+              <>
+                <Ionicons name="shield-checkmark-outline" size={18} color="#0A0A0A" />
+                <Text style={styles.ctaText}>Payer {montantFmt} FCFA</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -347,7 +416,20 @@ const makeStyles = (c) => StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
-  // ─── Méthodes ───
+  // ─── Input texte ───
+  input: {
+    backgroundColor: c.bgCard,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: c.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    fontFamily: fonts.body,
+    fontSize: fontSize.md,
+    color: c.text,
+  },
+
+  // ─── Méthodes / opérateurs ───
   methodsList: { gap: spacing.sm },
   methodCard: {
     flexDirection: 'row',
@@ -379,12 +461,6 @@ const makeStyles = (c) => StyleSheet.create({
   methodLabelSelected: {
     fontFamily: fonts.bodyBold,
     color: c.goldDark,
-  },
-  methodDesc: {
-    fontFamily: fonts.body,
-    fontSize: fontSize.xs,
-    color: c.textMuted,
-    marginTop: 2,
   },
   methodCheck: {
     width: 24,
@@ -464,6 +540,53 @@ const makeStyles = (c) => StyleSheet.create({
     color: c.textMuted,
   },
 
+  // ─── États attente / succès / échec ───
+  stateWrap: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl * 2,
+    gap: spacing.sm,
+  },
+  resultIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  stateTitle: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.lg,
+    color: c.text,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
+  stateText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: c.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+    lineHeight: 20,
+  },
+  stateCountdown: {
+    fontFamily: fonts.display,
+    fontSize: 28,
+    color: c.gold,
+    marginTop: spacing.md,
+  },
+  cancelBtn: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  cancelBtnText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSize.sm,
+    color: c.textMuted,
+    textDecorationLine: 'underline',
+  },
+
   // ─── CTA ───
   ctaSafe: {
     position: 'absolute',
@@ -480,6 +603,7 @@ const makeStyles = (c) => StyleSheet.create({
     backgroundColor: c.gold,
     borderRadius: radius.md,
     paddingVertical: 15,
+    paddingHorizontal: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

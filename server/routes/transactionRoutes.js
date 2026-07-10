@@ -10,8 +10,9 @@ const protect   = auth.protect;
 const staffOnly = [auth.protect, auth.restrictTo(...STAFF_DOC)];
 const adminOnly = [auth.protect, auth.restrictTo('Admin')];
 
-// Webhook public (pas d'auth)
-router.post('/webhook/cinetpay', pCtrl.webhookCinetpay);
+// Webhooks publics (pas d'auth)
+router.post('/webhook/cinetpay', pCtrl.webhookCinetpay); // legacy — conservé, non utilisé par les nouveaux paiements
+router.post('/paiements/webhook', pCtrl.webhookYabetoo);
 
 // Stats (staff)
 router.get('/stats', staffOnly, ctrl.getStats);
@@ -31,7 +32,8 @@ router.patch ('/:id/notes',    staffOnly, ctrl.updateNotes);
 
 // Paiements
 router.get   ('/:id/paiements',                                        protect,   pCtrl.getPaiements);
-router.post  ('/:id/paiements/initier',                                protect,   pCtrl.initierCinetpay);
+router.post  ('/:id/paiements/initier',                                protect,   pCtrl.initierPaiement);
+router.get   ('/:id/paiements/verifier/:intentId',                     protect,   pCtrl.verifierPaiement);
 router.post  ('/:id/paiements/virement', upload.single('preuve'),      protect,   pCtrl.soumettreVirement);
 router.post  ('/:id/paiements/especes',                                staffOnly, pCtrl.enregistrerEspecesCheque);
 router.patch ('/:txId/paiements/:pId/valider',                         adminOnly, pCtrl.validerVirement);

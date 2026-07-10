@@ -34,7 +34,7 @@ const transactionSchema = new Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['cinetpay_mobile', 'cinetpay_carte', 'virement', 'especes', 'cheque', null],
+      enum: ['cinetpay_mobile', 'cinetpay_carte', 'yabetoo_momo', 'virement', 'especes', 'cheque', null],
       default: null,
     },
 

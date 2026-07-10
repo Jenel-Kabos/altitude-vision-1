@@ -10,20 +10,29 @@ const paiementTransactionSchema = new Schema(
     montant: { type: Number, required: true, min: 0 },
     methode: {
       type: String,
-      enum: ['cinetpay_mobile', 'cinetpay_carte', 'virement', 'especes', 'cheque'],
+      enum: ['cinetpay_mobile', 'cinetpay_carte', 'yabetoo_momo', 'virement', 'especes', 'cheque'],
       required: true,
     },
     provider: { type: String, maxlength: 80 },
 
+    // Statut : les valeurs historiques (en_attente/confirmé/échoué/remboursé) restent
+    // utilisées par virement/espèces/chèque ; YabetooPay utilise les nouvelles valeurs
+    // (En attente/Payé/Échoué/Annulé) — les deux jeux coexistent pour compatibilité.
     statut: {
       type:    String,
-      enum:    ['en_attente', 'confirmé', 'échoué', 'remboursé'],
+      enum:    ['en_attente', 'confirmé', 'échoué', 'remboursé', 'En attente', 'Payé', 'Échoué', 'Annulé'],
       default: 'en_attente',
     },
 
+    // Legacy CinetPay — conservés pour compatibilité des données existantes
     cinetpayTransactionId: { type: String, sparse: true, index: true },
     paymentUrl:            { type: String },
     cinetpayRaw:           { type: Schema.Types.Mixed },
+
+    // YabetooPay
+    yabetooIntentId: { type: String, sparse: true, index: true },
+    operateur:       { type: String, enum: ['AIRTEL', 'MTN'] },
+    telephone:       { type: String },
 
     referenceBancaire: { type: String, maxlength: 200 },
     preuvePaiement: {

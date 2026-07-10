@@ -6,7 +6,7 @@ import {
   ArrowLeft, User, Calendar, CheckCircle2,
   Clock, XCircle, TrendingUp, Receipt, RefreshCw, Loader2,
   CreditCard, Banknote, Landmark, FileText,
-  Check, X, Ban, AlertCircle,
+  Check, X, Ban, AlertCircle, Smartphone,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -34,14 +34,27 @@ const PAYMENT_STATUS_MAP = {
   confirmé:   { color: GREEN,     label: "Confirmé"    },
   échoué:     { color: RED,       label: "Échoué"      },
   remboursé:  { color: "#64748B", label: "Remboursé"   },
+  // Valeurs YabetooPay (statut au niveau du paiement, casse différente des anciennes)
+  "En attente": { color: GOLD,  label: "En attente" },
+  "Payé":       { color: GREEN, label: "Payé"        },
+  "Échoué":     { color: RED,   label: "Échoué"      },
+  "Annulé":     { color: "#64748B", label: "Annulé"  },
 };
 
 const PAYMENT_METHODE_ICON = {
   cinetpay_mobile: CreditCard,
   cinetpay_carte:  CreditCard,
+  yabetoo_momo:    Smartphone,
+  yabetoo_airtel:  Smartphone,
+  yabetoo_mtn:     Smartphone,
   virement:        Landmark,
   especes:         Banknote,
   cheque:          FileText,
+};
+
+const maskPhone = (tel) => {
+  if (!tel || tel.length < 5) return tel || '';
+  return `${tel.slice(0, 3)}***${tel.slice(-2)}`;
 };
 
 const fmt = (n) =>
@@ -189,8 +202,12 @@ function TransactionModal({ tx, onClose, onRefresh, isAdmin }) {
                     <PIcon size={18} color={ps.color} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontFamily: FONT, fontSize: 13, fontWeight: 600, color: "#1E293B", margin: 0 }}>{p.provider || p.methode}</p>
+                    <p style={{ fontFamily: FONT, fontSize: 13, fontWeight: 600, color: "#1E293B", margin: 0 }}>
+                      {p.provider || p.methode}
+                      {p.operateur && ` (${p.operateur})`}
+                    </p>
                     <p style={{ fontFamily: FONT, fontSize: 11, color: "#94A3B8", margin: "2px 0 0" }}>{fmt(p.montant)} — {dateStr(p.createdAt)}</p>
+                    {p.telephone && <p style={{ fontFamily: FONT, fontSize: 11, color: "#64748B", margin: "2px 0 0" }}>Tél : {maskPhone(p.telephone)}</p>}
                     {p.referenceBancaire && <p style={{ fontFamily: FONT, fontSize: 11, color: "#64748B", margin: "2px 0 0" }}>Réf : {p.referenceBancaire}</p>}
                     {p.preuvePaiement?.url && <a href={p.preuvePaiement.url} target="_blank" rel="noreferrer" style={{ fontFamily: FONT, fontSize: 11, color: BLUE }}>Voir justificatif</a>}
                   </div>
