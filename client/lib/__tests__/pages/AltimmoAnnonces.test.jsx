@@ -229,6 +229,54 @@ describe('AltimmoAnnonces — paramètres envoyés au serveur', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// Bug corrigé : un changement de filtre déclenchait 2 appels API
+// (un avec l'ancienne page, un avec page=1) au lieu d'un seul.
+describe('AltimmoAnnonces — pagination et fetch unique par changement', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // 25 résultats avec limit=12 → 3 pages, de quoi tester un clic manuel sur la page 2.
+    mockGetAll.mockResolvedValue({ properties: FAKE_PROPERTIES, total: 25 });
+  });
+
+  it('un seul appel API après un changement de filtre alors qu\'on est en page 2', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(screen.getAllByTestId('property-card')).toHaveLength(3));
+
+    // Se déplacer en page 2 via la pagination.
+    await userEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+    await waitFor(() => {
+      expect(mockGetAll).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }));
+    });
+
+    mockGetAll.mockClear();
+
+    // Changer un filtre pendant qu'on est en page 2 : doit revenir à la page 1
+    // avec UN SEUL appel réseau (pas un premier avec page=2 puis un second avec page=1).
+    await userEvent.click(screen.getByRole('button', { name: /Filtres/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Vente' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+    await waitFor(() => {
+      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ transaction: 'vente', page: 1 }));
+    });
+    expect(mockGetAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('un clic sur la page 3 déclenche un seul appel avec page=3', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(screen.getAllByTestId('property-card')).toHaveLength(3));
+    mockGetAll.mockClear();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Page 3' }));
+
+    await waitFor(() => {
+      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ page: 3 }));
+    });
+    expect(mockGetAll).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
 describe('AltimmoAnnonces — validation prix (logique pure)', () => {
   const priceRangeInvalid = (min, max) =>
     min && max && Number(min) > Number(max);

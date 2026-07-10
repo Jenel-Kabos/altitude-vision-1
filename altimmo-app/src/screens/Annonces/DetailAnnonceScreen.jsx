@@ -166,6 +166,14 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       .some(v => v?.toLowerCase() === loc);
   }, [annonce]);
 
+  // Honoraires saisis manuellement en base (Property.honoraires) si disponibles,
+  // sinon formule par défaut (cohérente avec le web — PropertyDetailPage.jsx)
+  const honoraires  = useMemo(() => {
+    if (annonce.honoraires != null) return annonce.honoraires;
+    return isLocation ? Math.round(prix * 0.8) : Math.round(prix * 0.1);
+  }, [annonce, isLocation, prix]);
+  const fraisVisite = useMemo(() => annonce.fraisVisite ?? 0, [annonce]);
+
   const addressText = useMemo(() => {
     const arr  = annonce.address?.arrondissement || annonce.location?.neighborhood || '';
     const city = annonce.address?.city           || annonce.location?.city          || annonce.city || '';
@@ -557,21 +565,21 @@ export default function DetailAnnonceScreen({ route, navigation }) {
           <Animated.View entering={FadeInDown.delay(80).duration(280)} style={styles.feesSection}>
             <Text style={styles.sectionLabel}>Frais & conditions</Text>
             <View style={styles.feesCard}>
-              {isLocation && (
-                <View style={styles.feesRow}>
-                  <View style={styles.feesRowLeft}>
-                    <View style={styles.feesIcon}>
-                      <Ionicons name="business-outline" size={15} color={c.gold} />
-                    </View>
-                    <View style={styles.feesRowText}>
-                      <Text style={styles.feesRowLabel}>Frais d'agence</Text>
-                      <Text style={styles.feesRowNote}>80% du loyer mensuel</Text>
-                    </View>
+              <View style={styles.feesRow}>
+                <View style={styles.feesRowLeft}>
+                  <View style={styles.feesIcon}>
+                    <Ionicons name="business-outline" size={15} color={c.gold} />
                   </View>
-                  <Text style={styles.feesRowValue}>{fmt(Math.round(prix * 0.8))} FCFA</Text>
+                  <View style={styles.feesRowText}>
+                    <Text style={styles.feesRowLabel}>Honoraires d'agence</Text>
+                    <Text style={styles.feesRowNote}>
+                      {isLocation ? '80% du loyer mensuel' : '10% du prix de vente'}
+                    </Text>
+                  </View>
                 </View>
-              )}
-              {isLocation && <View style={styles.feesSep} />}
+                <Text style={styles.feesRowValue}>{fmt(honoraires)} FCFA</Text>
+              </View>
+              <View style={styles.feesSep} />
               <View style={styles.feesRow}>
                 <View style={styles.feesRowLeft}>
                   <View style={[styles.feesIcon, { backgroundColor: 'rgba(46,123,181,0.12)' }]}>
@@ -579,10 +587,14 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                   </View>
                   <View style={styles.feesRowText}>
                     <Text style={styles.feesRowLabel}>Frais de visite</Text>
-                    <Text style={styles.feesRowNote}>Réglés le jour de la visite</Text>
+                    <Text style={styles.feesRowNote}>
+                      {fraisVisite > 0 ? 'Réglés le jour de la visite' : 'Offerts par l\'agence'}
+                    </Text>
                   </View>
                 </View>
-                <Text style={[styles.feesRowValue, { color: '#2E7BB5' }]}>5 000 FCFA</Text>
+                <Text style={[styles.feesRowValue, { color: '#2E7BB5' }]}>
+                  {fraisVisite > 0 ? `${fmt(fraisVisite)} FCFA` : 'Gratuite'}
+                </Text>
               </View>
             </View>
           </Animated.View>

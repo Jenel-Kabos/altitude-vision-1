@@ -1031,16 +1031,18 @@ const PropertyDetailPage = () => {
                 </div>
               </div>
 
-              {/* Honoraires d'agence — un seul bloc, formule vente/location unifiée */}
+              {/* Honoraires d'agence — valeurs stockées en base, formule uniquement en repli */}
               {(() => {
                 const isLocation = property.status === 'location';
-                const rate       = property.commissionRate ?? 5;
-                const amount     = isLocation
-                  ? Math.round((property.price || 0) * 0.8)
-                  : Math.round((property.price || 0) * rate / 100);
-                const note       = isLocation
+                const honoraires = property.honoraires ?? (
+                  isLocation
+                    ? Math.round((property.price || 0) * 0.8)
+                    : Math.round((property.price || 0) * 0.1)
+                );
+                const fraisVisite = property.fraisVisite ?? 0;
+                const note        = isLocation
                   ? '80% du loyer mensuel'
-                  : `${rate}% du prix de vente`;
+                  : '10% du prix de vente';
                 return (
                   <div style={{ padding:'0 clamp(18px,4vw,28px) clamp(6px,1.5vw,10px)' }}>
                     <div className="pdp-fees">
@@ -1049,13 +1051,17 @@ const PropertyDetailPage = () => {
                       </div>
                       <div className="pdp-fees-row">
                         <span className="pdp-fees-row-label" style={{ color:'rgba(255,255,255,0.55)' }}>Montant estimé</span>
-                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>{priceFormatter.format(amount)}</span>
+                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>{priceFormatter.format(honoraires)}</span>
                         <span className="pdp-fees-row-note" style={{ color:'rgba(255,255,255,0.38)' }}>{note}</span>
                       </div>
                       <div className="pdp-fees-row">
                         <span className="pdp-fees-row-label" style={{ color:'rgba(255,255,255,0.55)' }}>Frais de visite</span>
-                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>5 000 FCFA</span>
-                        <span className="pdp-fees-row-note" style={{ color:'rgba(255,255,255,0.38)' }}>à régler sur place</span>
+                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>
+                          {fraisVisite > 0 ? priceFormatter.format(fraisVisite) : 'Visite gratuite'}
+                        </span>
+                        {fraisVisite > 0 && (
+                          <span className="pdp-fees-row-note" style={{ color:'rgba(255,255,255,0.38)' }}>à régler sur place</span>
+                        )}
                       </div>
                     </div>
                   </div>

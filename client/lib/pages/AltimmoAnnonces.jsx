@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -152,7 +152,9 @@ const AltimmoAnnonces = () => {
             .catch(() => {});
     }, []);
 
-    const fetchProperties = useCallback(async () => {
+    // pageOverride permet de fetch avec la page 1 immédiatement lors d'un changement de
+    // filtre, sans attendre le second rendu déclenché par setPage(1) (voir effets ci-dessous).
+    const fetchProperties = useCallback(async (pageOverride) => {
         try {
             setLoading(true);
             setError(null);
@@ -164,7 +166,7 @@ const AltimmoAnnonces = () => {
                 arrondissement: appliedFilters.arrondissement,
                 minPrice:       Number(appliedFilters.price.min) || 0,
                 maxPrice:       Number(appliedFilters.price.max) || undefined,
-                page:           currentPage,
+                page:           pageOverride ?? currentPage,
                 limit:          PROPERTIES_PER_PAGE,
             });
             setProperties(data);
@@ -176,12 +178,44 @@ const AltimmoAnnonces = () => {
         }
     }, [appliedFilters, currentPage]);
 
-    useEffect(() => { fetchProperties(); }, [fetchProperties]);
+    const isFirstFiltersRun = useRef(true);
+    const isFirstPageRun    = useRef(true);
+    // Marque si le prochain changement de currentPage vient du reset automatique
+    // ci-dessous (déjà fetché avec page=1) plutôt que d'un clic pagination réel.
+    const skipNextPageFetch = useRef(false);
 
-    // Revenir en page 1 quand les filtres appliqués changent (mais pas quand on change juste de page).
+    // Quand les filtres appliqués changent : revenir à la page 1 ET fetch immédiatement
+    // avec page=1, en un seul appel réseau (au lieu d'un fetch avec l'ancienne page suivi
+    // d'un second fetch correct une fois le re-render avec page=1 effectué).
     useEffect(() => {
+        if (isFirstFiltersRun.current) {
+            isFirstFiltersRun.current = false;
+            fetchProperties(currentPage);
+            return;
+        }
+        // setPage(1) est un no-op si on est déjà en page 1 : dans ce cas l'effet de page
+        // ci-dessous ne se redéclenchera pas, donc on ne doit pas laisser skipNextPageFetch à true.
+        skipNextPageFetch.current = currentPage !== 1;
         setPage(1);
+        fetchProperties(1);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [appliedFilters]);
+
+    // Uniquement pour les changements manuels de page (clic sur la pagination).
+    // Ignoré au premier rendu (déjà géré ci-dessus) et quand le passage à la page 1
+    // vient du reset automatique déclenché par un changement de filtre (déjà fetché ci-dessus).
+    useEffect(() => {
+        if (isFirstPageRun.current) {
+            isFirstPageRun.current = false;
+            return;
+        }
+        if (skipNextPageFetch.current) {
+            skipNextPageFetch.current = false;
+            return;
+        }
+        fetchProperties();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPage]);
 
     useEffect(() => {
         const params = new URLSearchParams();

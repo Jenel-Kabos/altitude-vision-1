@@ -2,6 +2,8 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 const CSP = [
   "default-src 'self'",
   // Next.js hydration + Framer Motion require unsafe-inline; unsafe-eval for dev HMR; blob: for Web Workers / PDF libs
@@ -15,7 +17,8 @@ const CSP = [
   // Videos: Cloudinary hosted videos + blob: for local object URLs
   "media-src 'self' https://res.cloudinary.com https://*.cloudinary.com blob:",
   // API calls + Facebook feed data; blob: for fetch() responses; GA endpoints; Leaflet tile/geocoding requests; NextAuth Google OAuth
-  "connect-src 'self' blob: https://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://*.tile.openstreetmap.org https://nominatim.openstreetmap.org https://accounts.google.com https://oauth2.googleapis.com https://api.cloudinary.com https://res.cloudinary.com",
+  // http://localhost:5000 is added only outside production, to allow the local backend dev server
+  `connect-src 'self' blob: https://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://*.tile.openstreetmap.org https://nominatim.openstreetmap.org https://accounts.google.com https://oauth2.googleapis.com https://api.cloudinary.com https://res.cloudinary.com${isDev ? ' http://localhost:5000' : ''}`,
   // Web Workers (e.g. PDF.js, comlink) require blob: worker source
   "worker-src 'self' blob:",
   // child-src covers blob: workers in older browsers that don't support worker-src

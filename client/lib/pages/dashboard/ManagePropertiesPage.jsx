@@ -29,7 +29,8 @@ const ManagePropertiesPage = () => {
   const [confirmState, setConfirm]          = useState({ isOpen: false, message: '', onConfirm: () => {} });
 
   const emptyForm = {
-    title: "", description: "", price: "", pole: "Altimmo", status: "vente",
+    title: "", description: "", price: "", honoraires: "", fraisVisite: 0,
+    pole: "Altimmo", status: "vente",
     type: "Appartement", availability: "Disponible",
     address: { street: "", arrondissement: "", city: "Brazzaville" },
     surface: "", bedrooms: "", bathrooms: "", livingRooms: "",
@@ -86,6 +87,8 @@ const ManagePropertiesPage = () => {
       title:            property.title            || "",
       description:      property.description      || "",
       price:            property.price            || "",
+      honoraires:       property.honoraires        ?? "",
+      fraisVisite:      property.fraisVisite       ?? 0,
       pole:             property.pole             || "Altimmo",
       status:           property.status           || "vente",
       type:             property.type             || "Appartement",

@@ -58,8 +58,24 @@ const PropertyForm = ({
     };
   }, [previewUrls]);
 
+  // Empêche l'auto-calcul d'écraser une valeur déjà présente au chargement
+  // (édition d'un bien existant) ou saisie manuellement par l'admin.
+  const honorairesTouchedRef = useRef(
+    formData.honoraires !== null && formData.honoraires !== undefined && formData.honoraires !== ''
+  );
+
+  useEffect(() => {
+    if (honorairesTouchedRef.current) return;
+    if (!formData.price || !formData.status) return;
+    const rate = formData.status === 'location' ? 0.8 : 0.1;
+    const calculated = Math.round(Number(formData.price) * rate);
+    setFormData((prev) => ({ ...prev, honoraires: calculated }));
+  }, [formData.price, formData.status, setFormData]);
 
   const handleChange = (e) => {
+    if (e.target.name === 'honoraires') {
+      honorairesTouchedRef.current = true;
+    }
     setFormData((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
@@ -169,6 +185,40 @@ const PropertyForm = ({
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
           required
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Honoraires d'agence (FCFA) *</label>
+        <input
+          type="number"
+          name="honoraires"
+          value={formData.honoraires || ''}
+          onChange={handleChange}
+          placeholder="Calculé automatiquement"
+          aria-label="Honoraires d'agence en FCFA"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+        />
+        <p className="text-xs text-gray-500">
+          {formData.status === 'location'
+            ? 'Pré-rempli à 80% du loyer mensuel'
+            : 'Pré-rempli à 10% du prix de vente'}
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Frais de visite (FCFA)</label>
+        <input
+          type="number"
+          name="fraisVisite"
+          value={formData.fraisVisite ?? 0}
+          onChange={handleChange}
+          placeholder="0 = visite gratuite"
+          aria-label="Frais de visite en FCFA"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+        />
+        <p className="text-xs text-gray-500">
+          Laisser à 0 si la visite est gratuite
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

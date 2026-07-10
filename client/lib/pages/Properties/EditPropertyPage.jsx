@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { getPropertyById, updateProperty } from '../../services/propertyService';
@@ -18,6 +18,8 @@ const EditPropertyPage = () => {
     title: '',
     description: '',
     price: '',
+    honoraires: '',
+    fraisVisite: 0,
     pole: 'Altimmo',
     status: 'vente',
     type: 'Appartement',
@@ -42,15 +44,23 @@ const EditPropertyPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Empêche l'auto-calcul d'écraser les honoraires déjà saisis en base au chargement,
+  // ou modifiés manuellement par l'admin depuis.
+  const honorairesTouchedRef = useRef(false);
+
   useEffect(() => {
     const fetchProperty = async () => {
       try {
         const property = await getPropertyById(id);
-        
+
+        honorairesTouchedRef.current = property.honoraires !== null && property.honoraires !== undefined;
+
         setFormData({
           title: property.title || '',
           description: property.description || '',
           price: property.price || '',
+          honoraires: property.honoraires ?? '',
+          fraisVisite: property.fraisVisite ?? 0,
           pole: property.pole || 'Altimmo',
           status: property.status || 'vente',
           type: property.type || 'Appartement',
@@ -82,7 +92,20 @@ const EditPropertyPage = () => {
     fetchProperty();
   }, [id]);
 
+  // Calcul auto des honoraires au changement de price/status, sauf si déjà saisis
+  // manuellement (en base au chargement, ou modifiés depuis dans ce formulaire).
+  useEffect(() => {
+    if (honorairesTouchedRef.current) return;
+    if (!formData.price || !formData.status) return;
+    const rate = formData.status === 'location' ? 0.8 : 0.1;
+    const calculated = Math.round(Number(formData.price) * rate);
+    setFormData((prev) => ({ ...prev, honoraires: calculated }));
+  }, [formData.price, formData.status]);
+
   const handleChange = (e) => {
+    if (e.target.name === 'honoraires') {
+      honorairesTouchedRef.current = true;
+    }
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -218,6 +241,36 @@ const EditPropertyPage = () => {
               className="w-full p-3 border rounded-lg"
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Honoraires d'agence (FCFA) *</label>
+            <input
+              type="number"
+              name="honoraires"
+              value={formData.honoraires || ''}
+              onChange={handleChange}
+              placeholder="Calculé automatiquement"
+              className="w-full p-3 border rounded-lg"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {formData.status === 'location'
+                ? 'Pré-rempli à 80% du loyer mensuel'
+                : 'Pré-rempli à 10% du prix de vente'}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Frais de visite (FCFA)</label>
+            <input
+              type="number"
+              name="fraisVisite"
+              value={formData.fraisVisite ?? 0}
+              onChange={handleChange}
+              placeholder="0 = visite gratuite"
+              className="w-full p-3 border rounded-lg"
+            />
+            <p className="text-xs text-gray-500 mt-1">Laisser à 0 si la visite est gratuite</p>
           </div>
 
           <div>

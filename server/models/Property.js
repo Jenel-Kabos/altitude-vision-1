@@ -44,6 +44,15 @@ const propertySchema = new mongoose.Schema(
       required: [true, 'Un prix est requis pour la propriété'],
     },
 
+    honoraires: {
+      type: Number,
+      default: null, // null = pas encore saisi manuellement
+    },
+    fraisVisite: {
+      type: Number,
+      default: 0, // 0 = visite gratuite par défaut
+    },
+
     address: {
       street: { type: String, trim: true, default: '' },
       arrondissement: {
