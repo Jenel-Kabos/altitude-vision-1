@@ -16,7 +16,7 @@ import { fonts, fontSize, spacing, radius } from '../../theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const ANDROID_CLIENT = '872164120879-o3j19vs2ro8l7pm93u3g1po8v10tgruv.apps.googleusercontent.com';
+const ANDROID_CLIENT = '3869205293-5d0vk1p5vanhoocdk3d4hr442pg8li6q.apps.googleusercontent.com';
 const EMAIL_RE       = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen({ navigation }) {
