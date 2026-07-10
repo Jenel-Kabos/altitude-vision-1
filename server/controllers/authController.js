@@ -3,12 +3,30 @@ const crypto    = require('crypto');
 const bcrypt    = require('bcryptjs');
 const jwt       = require('jsonwebtoken');
 const { promisify } = require('util');
+const { OAuth2Client } = require('google-auth-library');
 const User                  = require('../models/User');
 const PendingRegistration   = require('../models/PendingRegistration');
 const Document              = require('../models/Document');
 const sendEmail = require('../utils/email');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 const logger = require('../utils/logger');
+
+// ======================================================
+// 🔐 VÉRIFICATION IDTOKEN GOOGLE (google-auth-library)
+// ======================================================
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+const verifyGoogleToken = async (idToken) => {
+    const ticket = await googleClient.verifyIdToken({
+        idToken,
+        audience: [
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_ID_ANDROID,
+            process.env.GOOGLE_CLIENT_ID_IOS,
+        ].filter(Boolean),
+    });
+    return ticket.getPayload(); // { sub, email, name, picture, email_verified }
+};
 
 // ======================================================
 // 🔑 UTILITAIRES JWT
@@ -655,52 +673,79 @@ exports.forgotPassword = async (req, res) => {
 };
 
 // ======================================================
-// 11. GOOGLE AUTH
+// 11. GOOGLE AUTH — vérifié via google-auth-library
 // Route: POST /api/auth/google
+// Le client (mobile ou web) doit envoyer le vrai idToken Google,
+// jamais des champs (email/name/googleId) reconstruits côté client.
 // ======================================================
-exports.googleAuth = async (req, res) => {
+exports.googleToken = async (req, res) => {
     try {
-        const { email, name, googleId, avatar } = req.body;
-
-        if (!email || !googleId) {
-            return res.status(400).json({ status: 'fail', message: 'email et googleId requis.' });
+        const { idToken } = req.body;
+        if (!idToken) {
+            return res.status(400).json({ status: 'fail', message: 'idToken requis.' });
         }
 
-        let user = await User.findOne({ $or: [{ googleId }, { email }] });
+        let payload;
+        try {
+            payload = await verifyGoogleToken(idToken);
+        } catch (err) {
+            logger.error('❌ [Auth] idToken Google invalide:', err.message);
+            return res.status(401).json({ status: 'fail', message: 'Token Google invalide.' });
+        }
 
-        if (user) {
-            if (!user.googleId) {
-                user.googleId      = googleId;
-                user.avatar        = avatar;
-                user.photo         = user.photo || avatar;
-                user.isVerified    = true;
-                user.isEmailVerified = true;
-                user.authProvider  = 'google';
-                await user.save({ validateBeforeSave: false });
+        if (payload.email_verified !== true) {
+            return res.status(401).json({ status: 'fail', message: 'Email Google non vérifié.' });
+        }
+
+        // L'email est authentifié par Google — un éventuel inscription en attente
+        // (PendingRegistration) pour ce même email est obsolète, on la nettoie.
+        const pending = await PendingRegistration.findOne({ email: payload.email });
+        if (pending) {
+            await PendingRegistration.deleteOne({ email: payload.email });
+        }
+
+        const existingUser = await User.findOne({ email: payload.email });
+
+        if (existingUser) {
+            if (!existingUser.googleId) {
+                // Compte existant (email/mot de passe) sans Google — on le lie
+                existingUser.googleId = payload.sub;
+                existingUser.isEmailVerified = true;
+                if (!existingUser.avatar && payload.picture) {
+                    existingUser.avatar = payload.picture;
+                }
+                existingUser.lastLoginAt = new Date();
+                await existingUser.save({ validateBeforeSave: false });
+                return createSendToken(existingUser, 200, res);
             }
-        } else {
-            const randomPwd = crypto.randomBytes(20).toString('hex');
-            user = await User.create({
-                name,
-                email,
-                googleId,
-                avatar,
-                photo:         avatar,
-                role:          'User',
-                isVerified:    true,
-                isEmailVerified: true,
-                authProvider:  'google',
-                password:        randomPwd,
-                passwordConfirm: randomPwd,
-            });
+
+            // Compte déjà lié à Google — connexion normale
+            existingUser.lastLoginAt = new Date();
+            await existingUser.save({ validateBeforeSave: false });
+            return createSendToken(existingUser, 200, res);
         }
 
-        user.lastLoginAt = new Date();
-        await user.save({ validateBeforeSave: false });
+        // Nouveau compte — googleId = payload.sub (identifiant Google stable, unique)
+        const randomPwd = crypto.randomBytes(32).toString('hex');
+        const newUser = await User.create({
+            name:            payload.name,
+            email:           payload.email,
+            googleId:        payload.sub,
+            avatar:          payload.picture,
+            photo:           payload.picture,
+            role:            'Client',
+            isVerified:      true,
+            isEmailVerified: true,
+            authProvider:    'google',
+            password:        randomPwd,
+            passwordConfirm: randomPwd,
+        });
+        newUser.lastLoginAt = new Date();
+        await newUser.save({ validateBeforeSave: false });
 
-        createSendToken(user, 200, res);
+        return createSendToken(newUser, 201, res);
     } catch (error) {
-        logger.error('❌ [Auth] Erreur googleAuth:', error);
+        logger.error('❌ [Auth] Erreur googleToken:', error);
         res.status(500).json({ status: 'error', message: error.message });
     }
 };

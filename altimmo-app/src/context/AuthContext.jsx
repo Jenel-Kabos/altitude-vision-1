@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { Alert } from 'react-native';
 import api, { saveToken, getToken, deleteToken } from '../services/api';
 import { enregistrerNotifications } from '../services/notificationsService';
 import { disconnectSocket } from '../services/socketService';
@@ -71,7 +72,28 @@ export const AuthProvider = ({ children }) => {
       enregistrerNotifications(user?._id).catch(() => {});
       return user;
     } catch (error) {
-      throw error;
+      const code = error?.code || error?.message || '';
+      if (
+        code.includes('SIGN_IN_CANCELLED') ||
+        code === 'ERR_CANCELED' ||
+        code.includes('cancel')
+      ) {
+        return; // Utilisateur a annulé — silencieux
+      }
+      if (code.includes('IN_PROGRESS')) {
+        return; // Déjà en cours — silencieux
+      }
+      if (code.includes('PLAY_SERVICES_NOT_AVAILABLE')) {
+        Alert.alert(
+          'Google Play Services requis',
+          'Veuillez mettre à jour Google Play Services sur votre appareil.'
+        );
+        return;
+      }
+      Alert.alert(
+        'Connexion Google échouée',
+        'Impossible de se connecter avec Google. Utilisez votre email et mot de passe.'
+      );
     }
   };
 

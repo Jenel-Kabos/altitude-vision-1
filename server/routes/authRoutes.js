@@ -2,7 +2,7 @@
 const express        = require('express');
 const router         = express.Router();
 const authController = require('../controllers/authController');
-const { signupLimiter, resendVerificationLimiter, loginLimiter } = require('../middleware/rateLimiters');
+const { signupLimiter, resendVerificationLimiter, loginLimiter, googleLimiter } = require('../middleware/rateLimiters');
 const { protect } = require('../middleware/authMiddleware');
 
 // ======================================================
@@ -18,8 +18,10 @@ router.post('/resend-verification',  resendVerificationLimiter, authController.r
 router.post('/login',                loginLimiter, authController.login);
 
 // Google OAuth
-router.post('/google',               authController.googleAuth);
-router.post('/google-token',         authController.googleGetToken);
+// /google : reçoit un vrai idToken Google, vérifié via google-auth-library (voir authController.googleToken)
+router.post('/google',               googleLimiter, authController.googleToken);
+// /google-token : pont interne NextAuth → JWT applicatif, protégé par secret partagé (x-nextauth-secret)
+router.post('/google-token',         googleLimiter, authController.googleGetToken);
 
 // ✅ Mot de passe oublié → envoie l'email avec le lien
 router.post('/forgot-password',      authController.forgotPassword);

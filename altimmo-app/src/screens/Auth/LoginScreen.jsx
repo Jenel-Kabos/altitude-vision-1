@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform, ScrollView,
+  StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import ImmobilierHero from '../../components/illustrations/ImmobilierHero';
@@ -37,30 +37,43 @@ export default function LoginScreen({ navigation }) {
     androidClientId: ANDROID_CLIENT,
   });
 
-  const handleGoogleLogin = useCallback(async (accessToken) => {
+  // Envoie le idToken Google brut au backend — c'est le backend qui vérifie
+  // son authenticité via google-auth-library (jamais de confiance aveugle
+  // dans des champs email/name reconstruits côté client).
+  const handleGoogleLogin = useCallback(async (idToken) => {
     setLoading(true);
     setErreur('');
     try {
-      const res      = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const userInfo = await res.json();
-      await loginWithGoogle({
-        email:    userInfo.email,
-        name:     userInfo.name,
-        googleId: userInfo.id,
-        avatar:   userInfo.picture,
-      });
-    } catch {
-      setErreur('Connexion Google échouée. Réessayez.');
+      await loginWithGoogle({ idToken });
+    } catch (err) {
+      Alert.alert('Erreur', err.response?.data?.message || 'Connexion Google échouée. Réessayez.');
     } finally {
       setLoading(false);
     }
   }, [loginWithGoogle]);
 
+  // expo-auth-session ne renvoie pas les mêmes codes d'erreur que
+  // @react-native-google-signin/google-signin (SIGN_IN_CANCELLED, etc.) —
+  // on gère ici les types réels de AuthSessionResult.
   useEffect(() => {
-    if (response?.type === 'success') {
-      handleGoogleLogin(response.authentication.accessToken);
+    if (!response) return;
+
+    switch (response.type) {
+      case 'success':
+        handleGoogleLogin(response.authentication?.idToken);
+        break;
+      case 'cancel':
+      case 'dismiss':
+        // L'utilisateur a annulé — rien à faire.
+        break;
+      case 'locked':
+        // Une demande de connexion est déjà en cours — on l'ignore.
+        break;
+      case 'error':
+        Alert.alert('Erreur', response.error?.message || 'La connexion Google a échoué.');
+        break;
+      default:
+        break;
     }
   }, [response, handleGoogleLogin]);
 

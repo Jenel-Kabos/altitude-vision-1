@@ -33,6 +33,7 @@
     "express-async-handler": "^1.2.0",
     "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^7.5.0",
+    "google-auth-library": "^10.9.0",
     "helmet": "^7.1.0",
     "imapflow": "^1.2.18",
     "jsonwebtoken": "^9.0.2",

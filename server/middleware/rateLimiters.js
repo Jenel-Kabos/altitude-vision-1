@@ -34,3 +34,15 @@ exports.loginLimiter = rateLimit({
   legacyHeaders: false,
   skipSuccessfulRequests: true, // ne pénalise pas les connexions réussies
 });
+
+// Protège /auth/google et /auth/google-token contre le brute-force / abus de vérification de tokens
+exports.googleLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: {
+    status: 'fail',
+    message: 'Trop de tentatives Google. Réessayez dans 15 minutes.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});

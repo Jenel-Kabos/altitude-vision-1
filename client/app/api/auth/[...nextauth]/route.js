@@ -12,18 +12,16 @@ const { handlers } = NextAuth({
   ],
 
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ account }) {
       if (account?.provider !== 'google') return true;
       try {
+        // Le backend vérifie lui-même l'idToken auprès de Google
+        // (google-auth-library) — on ne lui envoie plus de champs
+        // reconstruits côté client (email/name/googleId).
         const res = await fetch(`${API_URL}/auth/google`, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            email:    user.email,
-            name:     user.name,
-            googleId: account.providerAccountId,
-            avatar:   user.image,
-          }),
+          body:    JSON.stringify({ idToken: account.id_token }),
         });
         return res.ok;
       } catch {
