@@ -13,7 +13,7 @@ const CSP = [
   // Fonts are self-hosted via next/font — no external font CDN needed
   "font-src 'self'",
   // Images: local, Unsplash (hero), Cloudinary (uploads), Render (legacy), Facebook (feed), Leaflet tiles + marker icons
-  "img-src 'self' data: blob: https://images.unsplash.com https://altitude-vision.onrender.com https://res.cloudinary.com https://graph.facebook.com https://*.fbcdn.net https://platform-lookaside.fbsbx.com https://ui-avatars.com https://placehold.co https://illustrations.popsy.co https://*.googleusercontent.com https://*.tile.openstreetmap.org https://*.tile.openstreetmap.fr https://*.basemaps.cartocdn.com https://unpkg.com",
+  "img-src 'self' data: blob: https://images.unsplash.com https://altitude-vision.onrender.com https://res.cloudinary.com https://graph.facebook.com https://*.fbcdn.net https://platform-lookaside.fbsbx.com https://ui-avatars.com https://placehold.co https://illustrations.popsy.co https://*.googleusercontent.com https://*.tile.openstreetmap.org https://*.tile.openstreetmap.fr https://*.basemaps.cartocdn.com https://unpkg.com https://www.google.com https://www.google.cg https://*.google.com https://*.google.cg https://www.googletagmanager.com",
   // Videos: Cloudinary hosted videos + blob: for local object URLs
   "media-src 'self' https://res.cloudinary.com https://*.cloudinary.com blob:",
   // API calls + Facebook feed data; blob: for fetch() responses; GA endpoints; Leaflet tile/geocoding requests; NextAuth Google OAuth
