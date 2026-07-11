@@ -26,6 +26,14 @@ export default function GoogleRedirectPage() {
       return;
     }
 
+    if (!session) return;
+
+    // Nouveau compte → compléter le profil (téléphone, rôle, certifications)
+    if (session.user?.isNewUser) {
+      router.replace('/completer-profil');
+      return;
+    }
+
     const role = session?.user?.role;
     const target = getTargetPath(role);
     router.replace(target);

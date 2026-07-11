@@ -678,6 +678,28 @@ exports.forgotPassword = async (req, res) => {
 // Le client (mobile ou web) doit envoyer le vrai idToken Google,
 // jamais des champs (email/name/googleId) reconstruits côté client.
 // ======================================================
+// Réponse dédiée à /auth/google (contrairement à createSendToken, expose
+// isNewUser pour permettre à NextAuth de router vers /completer-profil).
+const sendGoogleAuthResponse = (user, statusCode, isNewUser, res) => {
+    const token = signToken(user._id, user.tokenVersion);
+    res.status(statusCode).json({
+        status: 'success',
+        token,
+        isNewUser,
+        data: {
+            user: {
+                _id:             user._id,
+                name:            user.name,
+                email:           user.email,
+                role:            user.role,
+                phone:           user.phone  || null,
+                photo:           user.photo  || null,
+                isEmailVerified: user.isEmailVerified,
+            },
+        },
+    });
+};
+
 exports.googleToken = async (req, res) => {
     try {
         const { idToken, role, phone } = req.body;
@@ -716,13 +738,13 @@ exports.googleToken = async (req, res) => {
                 }
                 existingUser.lastLoginAt = new Date();
                 await existingUser.save({ validateBeforeSave: false });
-                return createSendToken(existingUser, 200, res);
+                return sendGoogleAuthResponse(existingUser, 200, false, res);
             }
 
             // Compte déjà lié à Google — connexion normale
             existingUser.lastLoginAt = new Date();
             await existingUser.save({ validateBeforeSave: false });
-            return createSendToken(existingUser, 200, res);
+            return sendGoogleAuthResponse(existingUser, 200, false, res);
         }
 
         // Nouveau compte — googleId = payload.sub (identifiant Google stable, unique)
@@ -747,7 +769,7 @@ exports.googleToken = async (req, res) => {
         newUser.lastLoginAt = new Date();
         await newUser.save({ validateBeforeSave: false });
 
-        return createSendToken(newUser, 201, res);
+        return sendGoogleAuthResponse(newUser, 201, true, res);
     } catch (error) {
         logger.error('❌ [Auth] Erreur googleToken:', error);
         res.status(500).json({ status: 'error', message: error.message });

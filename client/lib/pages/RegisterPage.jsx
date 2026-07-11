@@ -215,7 +215,7 @@ const RegisterPage = () => {
                 {/* Bouton Google */}
                 <button
                     type="button"
-                    onClick={() => signIn('google', { callbackUrl: '/completer-profil' })}
+                    onClick={() => signIn('google', { callbackUrl: '/auth/google-redirect' })}
                     className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-2xl py-3 px-4 hover:bg-gray-50 transition-colors font-medium text-gray-700 text-sm mb-4"
                 >
                     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
