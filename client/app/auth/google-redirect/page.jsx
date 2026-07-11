@@ -10,7 +10,8 @@ const COLLAB_ROLES = ['Collaborateur','Secretaire','GestionnaireImmobilier','Com
 const getTargetPath = (role) => {
   if (role === 'Admin' || COLLAB_ROLES.includes(role)) return '/dashboard';
   if (role === 'Proprietaire') return '/mes-biens';
-  return '/';
+  // Client, User, undefined → accueil connecté
+  return '/altimmo/annonces';
 };
 
 export default function GoogleRedirectPage() {
@@ -29,6 +30,8 @@ export default function GoogleRedirectPage() {
     const target = getTargetPath(role);
     router.replace(target);
   }, [status, session, router]);
+
+  if (status === 'unauthenticated') return null;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

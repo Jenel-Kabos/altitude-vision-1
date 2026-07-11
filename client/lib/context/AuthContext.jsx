@@ -136,7 +136,7 @@ export const AuthProvider = ({ children }) => {
                 _id:             session.user?.id,
                 name:            session.user?.name,
                 email:           session.user?.email,
-                role:            session.user?.role || 'User',
+                role:            session.user?.role || 'Client',
                 photo:           session.user?.image || null,
                 isEmailVerified: true,
             };

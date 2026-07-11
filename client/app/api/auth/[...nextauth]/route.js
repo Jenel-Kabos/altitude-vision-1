@@ -43,7 +43,7 @@ const { handlers } = NextAuth({
           const data = await res.json();
           token.accessToken = data.token;
           token.userId      = data.userId;
-          token.role        = data.role;
+          token.role        = data.role || 'Client';
         } catch (e) {
           console.error('❌ [NextAuth] google-token error:', e);
         }
@@ -54,7 +54,7 @@ const { handlers } = NextAuth({
     async session({ session, token }) {
       session.accessToken  = token.accessToken;
       session.user.id      = token.userId;
-      session.user.role    = token.role;
+      session.user.role    = token.role || 'Client';
       return session;
     },
   },
