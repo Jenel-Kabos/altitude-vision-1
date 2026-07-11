@@ -680,7 +680,7 @@ exports.forgotPassword = async (req, res) => {
 // ======================================================
 exports.googleToken = async (req, res) => {
     try {
-        const { idToken } = req.body;
+        const { idToken, role, phone } = req.body;
         if (!idToken) {
             return res.status(400).json({ status: 'fail', message: 'idToken requis.' });
         }
@@ -726,6 +726,9 @@ exports.googleToken = async (req, res) => {
         }
 
         // Nouveau compte — googleId = payload.sub (identifiant Google stable, unique)
+        const ROLES_VALIDES = ['Client', 'Proprietaire'];
+        const roleAttribue = ROLES_VALIDES.includes(role) ? role : 'Client';
+
         const randomPwd = crypto.randomBytes(32).toString('hex');
         const newUser = await User.create({
             name:            payload.name,
@@ -733,7 +736,8 @@ exports.googleToken = async (req, res) => {
             googleId:        payload.sub,
             avatar:          payload.picture,
             photo:           payload.picture,
-            role:            'Client',
+            role:            roleAttribue,
+            phone:           phone || null,
             isVerified:      true,
             isEmailVerified: true,
             authProvider:    'google',

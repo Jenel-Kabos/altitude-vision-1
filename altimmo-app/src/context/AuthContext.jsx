@@ -62,16 +62,23 @@ export const AuthProvider = ({ children }) => {
 
   const loginWithGoogle = async (googlePayload) => {
     try {
-      const response = await api.post('/auth/google', googlePayload);
+      const response = await api.post('/auth/google', {
+        ...googlePayload, // contient idToken
+        role:  googlePayload.role || 'Client',
+        phone: googlePayload.phone || null,
+      });
       const token = response.data.token;
       const user  = response.data.data?.user || response.data.user;
       if (!token) throw new Error('Token manquant dans la réponse /auth/google');
+      console.log('🔍 Google login user:', JSON.stringify(user));
+      console.log('🔍 Google login token:', token ? '✅' : '❌');
       await saveToken(token);
       setToken(token);
       setUser(user);
       enregistrerNotifications(user?._id).catch(() => {});
       return user;
     } catch (error) {
+      console.log('❌ Google login error:', error.response?.data || error.message);
       const code = error?.code || error?.message || '';
       if (
         code.includes('SIGN_IN_CANCELLED') ||
