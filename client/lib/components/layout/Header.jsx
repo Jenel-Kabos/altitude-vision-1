@@ -324,11 +324,14 @@ const Header = () => {
   const [scrolled, setScrolled]   = useState(false);
   const [mobileOpen, setMobile]   = useState(false);
   const [profileOpen, setProfile] = useState(false);
+  const [mounted, setMounted]     = useState(false);
   const pathname                  = usePathname();
   const router                    = useRouter();
   const unreadCount               = useUnreadCount(pathname, !!user);
   const profileRef                = useRef(null);
   const bp                        = useBreakpoint();
+
+  useEffect(() => { setMounted(true); }, []);
 
   const isXL      = bp === 'xl';
   const isDesktop = bp === 'lg' || bp === 'xl';
@@ -398,7 +401,7 @@ const Header = () => {
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px' }}>
-          {!isMobile && user && (
+          {mounted && !isMobile && user && (
             <>
               {isAdmin && (
                 <Link href="/dashboard" className="header-ghost-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: isTablet ? '7px 12px' : '8px 16px', borderRadius: '4px', border: '1px solid rgba(240,237,232,0.1)', color: 'rgba(240,237,232,0.55)', fontSize: isTablet ? '0.66rem' : '0.72rem', fontWeight: 400, letterSpacing: '0.07em', textTransform: 'uppercase', textDecoration: 'none', whiteSpace: 'nowrap', minHeight: '44px' }}>
@@ -423,7 +426,7 @@ const Header = () => {
             </>
           )}
 
-          {!isMobile && !user && (
+          {mounted && !isMobile && !user && (
             <>
               <Link href="/immobilier" className="header-ghost-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: isTablet ? '8px 14px' : '9px 20px', borderRadius: '4px', border: '1px solid rgba(200,150,12,0.2)', color: `rgba(200,150,12,0.75)`, fontSize: isTablet ? '0.68rem' : isXL ? '0.76rem' : '0.72rem', fontWeight: 400, letterSpacing: '0.07em', textTransform: 'uppercase', textDecoration: 'none', whiteSpace: 'nowrap', minHeight: '44px' }}>
                 {!isTablet && <Building size={13} />}{!isTablet ? 'Publier un bien' : 'Publier'}
@@ -437,7 +440,7 @@ const Header = () => {
             </>
           )}
 
-          {isMobile && user && (
+          {mounted && isMobile && user && (
             <Link href="/messages" className="header-icon-btn" style={{ position: 'relative', padding: '10px', borderRadius: '4px', color: 'rgba(240,237,232,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', minWidth: '44px' }}>
               <MessageCircle size={18} />
               <UnreadMessagesBadge count={unreadCount} className="absolute -top-0.5 -right-0.5" />
@@ -527,7 +530,7 @@ const Header = () => {
               })}
             </div>
             <div style={{ height: '1px', background: 'rgba(240,237,232,0.06)', margin: '0 0 16px' }} />
-            {user ? (
+            {mounted && user ? (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', borderRadius: '4px', background: 'rgba(240,237,232,0.03)', border: '1px solid rgba(240,237,232,0.05)', marginBottom: '10px' }}>
                   <UserAvatar user={user} size={40} />
