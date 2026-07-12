@@ -7,6 +7,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import ImmobilierHero from '../../components/illustrations/ImmobilierHero';
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
@@ -21,6 +22,8 @@ const ANDROID_CLIENT = '3869205293-5d0vk1p5vanhoocdk3d4hr442pg8li6q.apps.googleu
 // (androidClientId seul ne suffit pas à obtenir l'audience id_token).
 const WEB_CLIENT      = '3869205293-ej9uld9a25m8i01o41e37pliaac4eumo.apps.googleusercontent.com';
 const EMAIL_RE        = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const redirectUri = makeRedirectUri({ scheme: 'altimmo' });
 
 export default function LoginScreen({ navigation }) {
   const { themeColors: c } = useTheme();
@@ -39,6 +42,7 @@ export default function LoginScreen({ navigation }) {
   const [request, response, promptAsync] = Google.useAuthRequest({
     androidClientId: ANDROID_CLIENT,
     webClientId:     WEB_CLIENT,
+    redirectUri,
   });
 
   // Envoie le idToken Google brut au backend — c'est le backend qui vérifie
@@ -234,7 +238,7 @@ export default function LoginScreen({ navigation }) {
             {/* ─── Google ─── */}
             <TouchableOpacity
               style={[styles.googleBtn, (!request || loading) && styles.googleBtnDisabled]}
-              onPress={() => promptAsync()}
+              onPress={() => promptAsync({ redirectUri })}
               disabled={!request || loading}
               activeOpacity={0.85}
               accessibilityRole="button"
