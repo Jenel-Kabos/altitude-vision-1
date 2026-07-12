@@ -1,19 +1,24 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Modal,
+  StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Modal, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import ImmobilierHero from '../../components/illustrations/ImmobilierHero';
-import { Ionicons } from '@expo/vector-icons';
+import { AntDesign, Ionicons } from '@expo/vector-icons';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Button, Card, Checkbox } from '../../components';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+WebBrowser.maybeCompleteAuthSession();
+
+const ANDROID_CLIENT = '3869205293-5d0vk1p5vanhoocdk3d4hr442pg8li6q.apps.googleusercontent.com';
+const EMAIL_RE       = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const ROLES = [
   { value: 'Client',       icon: 'person-outline', label: 'Client',       desc: 'Chercher et louer des biens' },
@@ -173,9 +178,38 @@ Exemple : pour un loyer de 150 000 FCFA → votre gain : 36 000 FCFA`,
 
 // ─── RegisterScreen ──────────────────────────────────────────────────────────
 export default function RegisterScreen({ navigation }) {
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId: ANDROID_CLIENT,
+  });
+
+  // Rôle par défaut 'Client' — CompleterProfilScreen permettra de choisir
+  // Propriétaire (+ téléphone + certifications) pour un nouveau compte ;
+  // AppNavigator y bascule automatiquement via needsProfileCompletion.
+  const handleGoogleLogin = useCallback(async (idToken) => {
+    try {
+      await loginWithGoogle({ idToken, role: 'Client' });
+    } catch (err) {
+      Alert.alert('Erreur', err.response?.data?.message || 'Connexion Google échouée. Réessayez.');
+    }
+  }, [loginWithGoogle]);
+
+  useEffect(() => {
+    if (!response) return;
+    switch (response.type) {
+      case 'success':
+        handleGoogleLogin(response.authentication?.idToken);
+        break;
+      case 'error':
+        Alert.alert('Erreur', response.error?.message || 'La connexion Google a échoué.');
+        break;
+      default:
+        break;
+    }
+  }, [response, handleGoogleLogin]);
 
   const [step, setStep] = useState(1);
   const [name, setName]               = useState('');
@@ -423,6 +457,26 @@ export default function RegisterScreen({ navigation }) {
                 ) : null}
 
                 <Button label="Suivant" onPress={goNext} variant="primary" style={styles.ctaBtn} />
+
+                {/* ─── Séparateur ─── */}
+                <View style={styles.separator}>
+                  <View style={styles.separatorLine} />
+                  <Text style={styles.separatorText}>ou continuer avec</Text>
+                  <View style={styles.separatorLine} />
+                </View>
+
+                {/* ─── Google ─── */}
+                <TouchableOpacity
+                  style={[styles.googleBtn, (!request) && styles.googleBtnDisabled]}
+                  onPress={() => promptAsync()}
+                  disabled={!request}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="S'inscrire avec Google"
+                >
+                  <AntDesign name="google" size={18} color="#EA4335" />
+                  <Text style={styles.googleBtnText}>S'inscrire avec Google</Text>
+                </TouchableOpacity>
               </Animated.View>
             )}
 
@@ -764,6 +818,46 @@ const makeStyles = (c) => StyleSheet.create({
   // ─── CTA btn ───
   ctaBtn: {
     marginTop: spacing.xs,
+  },
+
+  // ─── Séparateur ───
+  separator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: c.border,
+  },
+  separatorText: {
+    marginHorizontal: spacing.sm,
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: c.textMuted,
+  },
+
+  // ─── Bouton Google ───
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: c.border,
+    borderRadius: radius.xs,
+    backgroundColor: c.bgCard,
+    paddingVertical: spacing.sm,
+  },
+  googleBtnDisabled: {
+    opacity: 0.45,
+  },
+  googleBtnText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSize.md,
+    color: c.text,
   },
 
   // ─── Cartes rôle ───
