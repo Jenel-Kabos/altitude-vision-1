@@ -10,6 +10,9 @@ export const AuthProvider = ({ children }) => {
   const [user,    setUser]    = useState(null);
   const [token,   setToken]   = useState(null);
   const [loading, setLoading] = useState(true);
+  // true entre la création d'un nouveau compte Google et la soumission
+  // de CompleterProfilScreen (téléphone, rôle définitif, certifications)
+  const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
 
   useEffect(() => { loadStoredAuth(); }, []);
 
@@ -67,16 +70,18 @@ export const AuthProvider = ({ children }) => {
         role:  googlePayload.role || 'Client',
         phone: googlePayload.phone || null,
       });
-      const token = response.data.token;
-      const user  = response.data.data?.user || response.data.user;
+      const token     = response.data.token;
+      const user      = response.data.data?.user || response.data.user;
+      const isNewUser = response.data?.isNewUser ?? false;
       if (!token) throw new Error('Token manquant dans la réponse /auth/google');
       console.log('🔍 Google login user:', JSON.stringify(user));
       console.log('🔍 Google login token:', token ? '✅' : '❌');
       await saveToken(token);
       setToken(token);
       setUser(user);
+      if (isNewUser) setNeedsProfileCompletion(true);
       enregistrerNotifications(user?._id).catch(() => {});
-      return user;
+      return { user, isNewUser };
     } catch (error) {
       console.log('❌ Google login error:', error.response?.data || error.message);
       const code = error?.code || error?.message || '';
@@ -109,9 +114,17 @@ export const AuthProvider = ({ children }) => {
     disconnectSocket();
     setToken(null);
     setUser(null);
+    setNeedsProfileCompletion(false);
   };
 
   const updateUser = (data) => setUser((prev) => ({ ...prev, ...data }));
+
+  // Appelé par CompleterProfilScreen après un PATCH /users/complete-profile
+  // réussi — referme l'écran de complétion (AppNavigator bascule sur Main).
+  const markProfileCompleted = (updatedUser) => {
+    if (updatedUser) updateUser(updatedUser);
+    setNeedsProfileCompletion(false);
+  };
 
   const refreshSession = async (newToken, updatedUser) => {
     if (newToken) {
@@ -127,8 +140,8 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{
-      user, token, loading,
-      login, loginWithGoogle, register, logout, updateUser, refreshSession,
+      user, token, loading, needsProfileCompletion,
+      login, loginWithGoogle, register, logout, updateUser, refreshSession, markProfileCompleted,
       isAdmin:         role === 'admin',
       isCollaborateur: role === 'collaborateur',
       isProprietaire:  role === 'proprietaire',

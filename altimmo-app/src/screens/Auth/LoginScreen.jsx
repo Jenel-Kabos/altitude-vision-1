@@ -37,36 +37,24 @@ export default function LoginScreen({ navigation }) {
     androidClientId: ANDROID_CLIENT,
   });
 
-  // Demande le rôle avant l'appel Google — on ne sait pas encore si le
-  // compte existe déjà ; le backend ignore ce champ si le compte existe.
-  const choisirRole = useCallback(() => new Promise((resolve) => {
-    Alert.alert(
-      'Type de compte',
-      'Quel type de compte souhaitez-vous créer ?',
-      [
-        { text: 'Client', onPress: () => resolve('Client') },
-        { text: 'Propriétaire', onPress: () => resolve('Proprietaire') },
-      ],
-      { cancelable: false }
-    );
-  }), []);
-
   // Envoie le idToken Google brut au backend — c'est le backend qui vérifie
   // son authenticité via google-auth-library (jamais de confiance aveugle
   // dans des champs email/name reconstruits côté client).
+  // Rôle par défaut 'Client' — CompleterProfilScreen permet de choisir
+  // Propriétaire (+ téléphone + certifications) pour un nouveau compte ;
+  // AppNavigator y bascule automatiquement via needsProfileCompletion.
   const handleGoogleLogin = useCallback(async (idToken) => {
     setLoading(true);
     setErreur('');
     try {
-      const role = await choisirRole();
-      await loginWithGoogle({ idToken, role });
+      await loginWithGoogle({ idToken, role: 'Client' });
     } catch (err) {
       console.log('❌ handleGoogleLogin error:', err.message);
       Alert.alert('Erreur', err.response?.data?.message || 'Connexion Google échouée. Réessayez.');
     } finally {
       setLoading(false);
     }
-  }, [loginWithGoogle, choisirRole]);
+  }, [loginWithGoogle]);
 
   // expo-auth-session ne renvoie pas les mêmes codes d'erreur que
   // @react-native-google-signin/google-signin (SIGN_IN_CANCELLED, etc.) —

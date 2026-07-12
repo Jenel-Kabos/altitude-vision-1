@@ -13,6 +13,10 @@ const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
 const GOLD      = '#C8960C';
 
+// Regex Congo : accepte +242XXXXXXXXX ou 00242XXXXXXXXX ou 0XXXXXXXXX
+// ou XXXXXXXXX (9 chiffres) — format Airtel/MTN Congo
+const PHONE_REGEX = /^(\+242|00242|0)?[0-9]{9}$/;
+
 const CERTIFICATIONS_LIST = [
   { key: 'contratAccepte',       label: "J'ai lu et j'accepte intégralement le contrat d'hébergement d'Altitude Vision" },
   { key: 'informationsVraies',   label: 'Je certifie que toutes les informations fournies sont vraies, exactes et complètes' },
@@ -58,8 +62,19 @@ export default function CompleterProfil() {
   const toggleC = key  => setCertifications(c => ({ ...c, [key]: !c[key] }));
 
   const handleSubmit = async () => {
-    if (!form.prenom.trim() || !form.nom.trim() || !form.telephone.trim()) {
-      return setError('Prénom, nom et téléphone sont requis.');
+    const telClean = form.telephone.trim().replace(/\s/g, '');
+
+    if (!form.prenom.trim() || !form.nom.trim()) {
+      return setError('Prénom et nom sont requis.');
+    }
+    if (!telClean) {
+      return setError('Le numéro de téléphone est requis.');
+    }
+    if (!PHONE_REGEX.test(telClean)) {
+      return setError('Format invalide. Ex: +242066000000 ou 066000000');
+    }
+    if (isProprietaire && telClean.replace(/\D/g, '').length < 9) {
+      return setError('Numéro de téléphone invalide pour un compte Propriétaire.');
     }
     if (isProprietaire && !toutAccepte) {
       return setError('Veuillez cocher toutes les certifications.');
@@ -72,7 +87,7 @@ export default function CompleterProfil() {
       const res = await api.patch('/users/complete-profile', {
         prenom:    form.prenom.trim(),
         nom:       form.nom.trim(),
-        telephone: form.telephone.trim(),
+        telephone: telClean,
         role,
         ...(isProprietaire && { certifications }),
       });
@@ -173,8 +188,17 @@ export default function CompleterProfil() {
                 <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <input type="tel" placeholder="+242 06 XXX XX XX" value={form.telephone}
                   onChange={e => setForm(f => ({ ...f, telephone: e.target.value }))}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 text-sm focus:outline-none focus:border-blue-500 transition-all" />
+                  className={`w-full pl-10 pr-4 py-3 border rounded-2xl bg-gray-50 text-gray-900 text-sm focus:outline-none focus:border-blue-500 transition-all ${
+                    !form.telephone.trim()
+                      ? 'border-gray-200'
+                      : PHONE_REGEX.test(form.telephone.trim().replace(/\s/g, ''))
+                        ? 'border-green-500'
+                        : 'border-red-400'
+                  }`} />
               </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Format : +242 06 XXX XX XX ou 06 XXX XX XX
+              </p>
             </div>
 
             {/* Choix du rôle */}

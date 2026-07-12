@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { fonts, fontSize } from '../theme';
 import AuthNavigator from './AuthNavigator';
 import TabNavigator from './TabNavigator';
+import CompleterProfilScreen from '../screens/Auth/CompleterProfilScreen';
 import OnboardingScreen from '../screens/Onboarding/OnboardingScreen';
 import { navigationRef, flushPendingNavigation } from '../services/navigationService';
 import { setupNotificationListeners } from '../services/notificationsService';
@@ -17,7 +18,7 @@ const LOGO = require('../../assets/Logo_Altitude_transparent.png');
 const Stack = createStackNavigator();
 
 export default function AppNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, needsProfileCompletion } = useAuth();
   const [onboardingDone, setOnboardingDone] = useState(null);
 
   useEffect(() => {
@@ -89,7 +90,9 @@ export default function AppNavigator() {
           cardStyle: { backgroundColor: '#0A0A0A' },
         }}
       >
-        {user ? (
+        {user && needsProfileCompletion ? (
+          <Stack.Screen name="CompleterProfil" component={CompleterProfilScreen} />
+        ) : user ? (
           <Stack.Screen name="Main" component={TabNavigator} />
         ) : (
           <Stack.Screen name="Auth" component={AuthNavigator} />

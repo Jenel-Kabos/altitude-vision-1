@@ -499,12 +499,26 @@ exports.createByAdmin = async (req, res) => {
 // COMPLETE PROFILE (Google OAuth — après inscription)
 // PATCH /api/users/complete-profile
 // ======================================================
+// Regex Congo : accepte +242XXXXXXXXX ou 00242XXXXXXXXX ou 0XXXXXXXXX
+// ou XXXXXXXXX (9 chiffres) — format Airtel/MTN Congo
+const PHONE_REGEX = /^(\+242|00242|0)?[0-9]{9}$/;
+
 exports.completeProfile = async (req, res) => {
     try {
         const { prenom, nom, telephone, ville, role, certifications } = req.body;
+        const telClean = telephone?.trim().replace(/\s/g, '');
 
-        if (!prenom || !nom || !telephone) {
-            return res.status(400).json({ status: 'fail', message: 'Prénom, nom et téléphone requis.' });
+        if (!prenom || !nom) {
+            return res.status(400).json({ status: 'fail', message: 'Prénom et nom requis.' });
+        }
+        if (!telClean) {
+            return res.status(400).json({ status: 'fail', message: 'Téléphone requis.' });
+        }
+        if (!PHONE_REGEX.test(telClean)) {
+            return res.status(400).json({
+                status: 'fail',
+                message: 'Format téléphone invalide. Exemple: +242066000000',
+            });
         }
 
         const allowedRoles = ['Client', 'Proprietaire', 'Prestataire'];
@@ -520,7 +534,7 @@ exports.completeProfile = async (req, res) => {
         const now = new Date();
         const updates = {
             name:  `${prenom.trim()} ${nom.trim()}`,
-            phone: telephone.trim(),
+            phone: telClean,
             role:  newRole,
         };
 
