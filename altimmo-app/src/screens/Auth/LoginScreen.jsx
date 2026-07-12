@@ -6,24 +6,15 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import ImmobilierHero from '../../components/illustrations/ImmobilierHero';
 import { AntDesign, Ionicons } from '@expo/vector-icons';
-import * as Google from 'expo-auth-session/providers/google';
-import { makeRedirectUri } from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Button } from '../../components';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 
-WebBrowser.maybeCompleteAuthSession();
-
-const ANDROID_CLIENT = '3869205293-5d0vk1p5vanhoocdk3d4hr442pg8li6q.apps.googleusercontent.com';
-// Requis par expo-auth-session sur Android pour obtenir un idToken valide
-// (androidClientId seul ne suffit pas à obtenir l'audience id_token).
-const WEB_CLIENT      = '3869205293-ej9uld9a25m8i01o41e37pliaac4eumo.apps.googleusercontent.com';
-const EMAIL_RE        = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const redirectUri = makeRedirectUri({ scheme: 'altimmo' });
+const WEB_CLIENT = '3869205293-ej9uld9a25m8i01o41e37pliaac4eumo.apps.googleusercontent.com';
+const EMAIL_RE   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen({ navigation }) {
   const { themeColors: c } = useTheme();
@@ -39,55 +30,34 @@ export default function LoginScreen({ navigation }) {
 
   const { login, loginWithGoogle } = useAuth();
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: ANDROID_CLIENT,
-    webClientId:     WEB_CLIENT,
-    redirectUri,
-  });
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: WEB_CLIENT,
+      offlineAccess: false,
+    });
+  }, []);
 
-  // Envoie le idToken Google brut au backend — c'est le backend qui vérifie
-  // son authenticité via google-auth-library (jamais de confiance aveugle
-  // dans des champs email/name reconstruits côté client).
   // Rôle par défaut 'Client' — CompleterProfilScreen permet de choisir
   // Propriétaire (+ téléphone + certifications) pour un nouveau compte ;
   // AppNavigator y bascule automatiquement via needsProfileCompletion.
-  const handleGoogleLogin = useCallback(async (idToken) => {
-    setLoading(true);
-    setErreur('');
+  const handleGoogleSignIn = async () => {
     try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken || userInfo.idToken;
+      if (!idToken) throw new Error('Pas de idToken reçu');
       await loginWithGoogle({ idToken, role: 'Client' });
-    } catch (err) {
-      console.log('❌ handleGoogleLogin error:', err.message);
-      Alert.alert('Erreur', err.response?.data?.message || 'Connexion Google échouée. Réessayez.');
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) return;
+      if (error.code === statusCodes.IN_PROGRESS) return;
+      if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert('Erreur', 'Google Play Services requis.');
+        return;
+      }
+      Alert.alert('Erreur', 'Connexion Google échouée. Réessayez.');
+      console.log('Google Sign-In error:', error);
     }
-  }, [loginWithGoogle]);
-
-  // expo-auth-session ne renvoie pas les mêmes codes d'erreur que
-  // @react-native-google-signin/google-signin (SIGN_IN_CANCELLED, etc.) —
-  // on gère ici les types réels de AuthSessionResult.
-  useEffect(() => {
-    if (!response) return;
-
-    switch (response.type) {
-      case 'success':
-        handleGoogleLogin(response.authentication?.idToken);
-        break;
-      case 'cancel':
-      case 'dismiss':
-        // L'utilisateur a annulé — rien à faire.
-        break;
-      case 'locked':
-        // Une demande de connexion est déjà en cours — on l'ignore.
-        break;
-      case 'error':
-        Alert.alert('Erreur', response.error?.message || 'La connexion Google a échoué.');
-        break;
-      default:
-        break;
-    }
-  }, [response, handleGoogleLogin]);
+  };
 
   const handleLogin = useCallback(async () => {
     if (!email.trim() || !password) {
@@ -237,9 +207,9 @@ export default function LoginScreen({ navigation }) {
 
             {/* ─── Google ─── */}
             <TouchableOpacity
-              style={[styles.googleBtn, (!request || loading) && styles.googleBtnDisabled]}
-              onPress={() => promptAsync({ redirectUri })}
-              disabled={!request || loading}
+              style={[styles.googleBtn, loading && styles.googleBtnDisabled]}
+              onPress={() => handleGoogleSignIn()}
+              disabled={loading}
               activeOpacity={0.85}
               accessibilityRole="button"
               accessibilityLabel="Continuer avec Google"

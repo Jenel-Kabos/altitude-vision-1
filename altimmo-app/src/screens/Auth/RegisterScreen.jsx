@@ -7,24 +7,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import ImmobilierHero from '../../components/illustrations/ImmobilierHero';
 import { AntDesign, Ionicons } from '@expo/vector-icons';
-import * as Google from 'expo-auth-session/providers/google';
-import { makeRedirectUri } from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Button, Card, Checkbox } from '../../components';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 
-WebBrowser.maybeCompleteAuthSession();
-
-const ANDROID_CLIENT = '3869205293-5d0vk1p5vanhoocdk3d4hr442pg8li6q.apps.googleusercontent.com';
-// Requis par expo-auth-session sur Android pour obtenir un idToken valide
-// (androidClientId seul ne suffit pas à obtenir l'audience id_token).
-const WEB_CLIENT      = '3869205293-ej9uld9a25m8i01o41e37pliaac4eumo.apps.googleusercontent.com';
-const EMAIL_RE        = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const redirectUri = makeRedirectUri({ scheme: 'altimmo' });
+const WEB_CLIENT = '3869205293-ej9uld9a25m8i01o41e37pliaac4eumo.apps.googleusercontent.com';
+const EMAIL_RE   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const ROLES = [
   { value: 'Client',       icon: 'person-outline', label: 'Client',       desc: 'Chercher et louer des biens' },
@@ -188,36 +179,34 @@ export default function RegisterScreen({ navigation }) {
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: ANDROID_CLIENT,
-    webClientId:     WEB_CLIENT,
-    redirectUri,
-  });
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: WEB_CLIENT,
+      offlineAccess: false,
+    });
+  }, []);
 
   // Rôle par défaut 'Client' — CompleterProfilScreen permettra de choisir
   // Propriétaire (+ téléphone + certifications) pour un nouveau compte ;
   // AppNavigator y bascule automatiquement via needsProfileCompletion.
-  const handleGoogleLogin = useCallback(async (idToken) => {
+  const handleGoogleSignIn = async () => {
     try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken || userInfo.idToken;
+      if (!idToken) throw new Error('Pas de idToken reçu');
       await loginWithGoogle({ idToken, role: 'Client' });
-    } catch (err) {
-      Alert.alert('Erreur', err.response?.data?.message || 'Connexion Google échouée. Réessayez.');
+    } catch (error) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) return;
+      if (error.code === statusCodes.IN_PROGRESS) return;
+      if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert('Erreur', 'Google Play Services requis.');
+        return;
+      }
+      Alert.alert('Erreur', 'Connexion Google échouée. Réessayez.');
+      console.log('Google Sign-In error:', error);
     }
-  }, [loginWithGoogle]);
-
-  useEffect(() => {
-    if (!response) return;
-    switch (response.type) {
-      case 'success':
-        handleGoogleLogin(response.authentication?.idToken);
-        break;
-      case 'error':
-        Alert.alert('Erreur', response.error?.message || 'La connexion Google a échoué.');
-        break;
-      default:
-        break;
-    }
-  }, [response, handleGoogleLogin]);
+  };
 
   const [step, setStep] = useState(1);
   const [name, setName]               = useState('');
@@ -475,9 +464,8 @@ export default function RegisterScreen({ navigation }) {
 
                 {/* ─── Google ─── */}
                 <TouchableOpacity
-                  style={[styles.googleBtn, (!request) && styles.googleBtnDisabled]}
-                  onPress={() => promptAsync({ redirectUri })}
-                  disabled={!request}
+                  style={styles.googleBtn}
+                  onPress={() => handleGoogleSignIn()}
                   activeOpacity={0.85}
                   accessibilityRole="button"
                   accessibilityLabel="S'inscrire avec Google"
