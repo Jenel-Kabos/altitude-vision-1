@@ -364,7 +364,12 @@ const Header = () => {
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
 
-  const handleLogout = () => { logout(); setMobile(false); setProfile(false); router.replace('/login'); };
+  const handleLogout = async () => {
+    await logout();
+    setMobile(false);
+    setProfile(false);
+    router.replace('/login');
+  };
 
   return (
     <>

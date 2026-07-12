@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { useWriteWindow } from '../hooks/useWriteWindow';
 
 const DEFAULT_AUTH = {
@@ -98,10 +98,15 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     // ── Logout ────────────────────────────────────────────────
-    const logout = useCallback(() => {
+    // Vide le state local, révoque le cookie de session NextAuth (sinon
+    // le bloc de sync Google ci-dessous re-hydrate `user` juste après),
+    // et bloque cette re-sync via loggedOutRef.
+    const logout = useCallback(async () => {
         localStorage.removeItem('user');
         localStorage.removeItem('token');
         setUser(null);
+        loggedOutRef.current = true;
+        await signOut({ redirect: false });
     }, []);
 
     // ── updateUser : merge partiel des données ────────────────
@@ -129,8 +134,12 @@ export const AuthProvider = ({ children }) => {
     const { data: session } = useSession();
     // Flag: empêche la re-sync Google OAuth après expiration silencieuse du token
     const tokenExpiredRef = React.useRef(false);
+    // Flag: empêche la re-sync Google OAuth juste après un logout() volontaire
+    // (la session NextAuth met un instant à se fermer côté cookie)
+    const loggedOutRef = React.useRef(false);
 
     useEffect(() => {
+        if (loggedOutRef.current) return;
         if (session?.accessToken && !user && !tokenExpiredRef.current) {
             const googleUser = {
                 _id:             session.user?.id,
