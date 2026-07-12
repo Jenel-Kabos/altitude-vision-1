@@ -5,15 +5,24 @@ import React, {
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
   StyleSheet, KeyboardAvoidingView, Platform, Animated,
+  Modal, Pressable, ScrollView, Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { Video, ResizeMode, Audio } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
 import { connectSocket, getSocket } from '../../services/socketService';
-import { fonts, fontSize, spacing } from '../../theme';
+import { fonts, fontSize, spacing, radius } from '../../theme';
+
+const EMOJIS = [
+  '😊', '😂', '❤️', '👍', '🙏', '😍', '😭',
+  '🔥', '✅', '👋', '🎉', '💪', '😎', '🤝', '💯', '👏', '🙌', '😅', '🥰', '✨',
+];
 
 // ─── Helpers date ─────────────────────────────────────────────────────────────
 
@@ -66,6 +75,40 @@ const TypingDots = memo(function TypingDots({ bubbleStyle, dotStyle }) {
   );
 });
 
+// ─── Lecteur audio minimal (play/pause) ──────────────────────────────────────
+
+const AudioPlayer = memo(function AudioPlayer({ url, nom, styles }) {
+  const { themeColors: c } = useTheme();
+  const [sound,   setSound]   = useState(null);
+  const [playing, setPlaying] = useState(false);
+
+  const toggle = useCallback(async () => {
+    if (!sound) {
+      const { sound: s } = await Audio.Sound.createAsync({ uri: url });
+      setSound(s);
+      await s.playAsync();
+      setPlaying(true);
+      return;
+    }
+    if (playing) {
+      await sound.pauseAsync();
+      setPlaying(false);
+    } else {
+      await sound.playAsync();
+      setPlaying(true);
+    }
+  }, [sound, playing, url]);
+
+  useEffect(() => () => { sound?.unloadAsync(); }, [sound]);
+
+  return (
+    <TouchableOpacity onPress={toggle} style={styles.audioPlayer} activeOpacity={0.8}>
+      <Ionicons name={playing ? 'pause' : 'play'} size={20} color={c.gold} />
+      <Text style={styles.audioNom} numberOfLines={1}>{nom || 'Audio'}</Text>
+    </TouchableOpacity>
+  );
+});
+
 // ─── ChatScreen ───────────────────────────────────────────────────────────────
 
 export default function ChatScreen({ route, navigation }) {
@@ -78,6 +121,10 @@ export default function ChatScreen({ route, navigation }) {
   const [text,     setText]     = useState('');
   const [typing,   setTyping]   = useState(false);
   const [isOnline, setIsOnline] = useState(false);
+
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [selectedFile,   setSelectedFile]   = useState(null);
+  const [showEmoji,      setShowEmoji]      = useState(false);
 
   // ─── Header personnalisé ───
   const HeaderTitle = useCallback(() => (
@@ -180,11 +227,14 @@ export default function ChatScreen({ route, navigation }) {
     };
   }, [conversation._id, user._id, fetchMessages]);
 
-  // ─── Envoi optimiste ───
+  // ─── Envoi optimiste (texte et/ou pièce jointe) ───
   const sendMessage = useCallback(async () => {
     const content = text.trim();
-    if (!content) return;
+    if (!content && !selectedFile) return;
+
+    const fileToSend = selectedFile;
     setText('');
+    setSelectedFile(null);
 
     const tempMsg = {
       _id:       `temp-${Date.now()}`,
@@ -192,11 +242,31 @@ export default function ChatScreen({ route, navigation }) {
       sender:    user,
       createdAt: new Date().toISOString(),
       pending:   true,
+      // Aperçu local immédiat (URI locale) — remplacé par l'URL Cloudinary
+      // définitive dès que le serveur répond.
+      attachments: fileToSend
+        ? [{ type: fileToSend.kind, url: fileToSend.uri, nom: fileToSend.name }]
+        : undefined,
     };
     setMessages(prev => [tempMsg, ...prev]);
 
     try {
-      const res   = await api.post('/messages', { conversationId: conversation._id, content });
+      let res;
+      if (fileToSend) {
+        const fd = new FormData();
+        if (content) fd.append('content', content);
+        fd.append('conversationId', conversation._id);
+        fd.append('attachments', {
+          uri:  fileToSend.uri,
+          name: fileToSend.name || 'fichier',
+          type: fileToSend.mimeType || 'application/octet-stream',
+        });
+        res = await api.post('/messages', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      } else {
+        res = await api.post('/messages', { conversationId: conversation._id, content });
+      }
       const saved = res.data?.data?.message || res.data?.message;
       if (saved) {
         setMessages(prev => prev.map(m => m._id === tempMsg._id ? saved : m));
@@ -207,12 +277,49 @@ export default function ChatScreen({ route, navigation }) {
         prev.map(m => m._id === tempMsg._id ? { ...m, error: true } : m)
       );
     }
-  }, [text, user, conversation._id, contact]);
+  }, [text, selectedFile, user, conversation._id, contact]);
 
   const onTyping = useCallback((val) => {
     setText(val);
     getSocket()?.emit('typing', { conversationId: conversation._id, userId: user._id });
   }, [conversation._id, user._id]);
+
+  // ─── Sélection de pièces jointes ───
+  const pickImage = useCallback(async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (!result.canceled && result.assets?.[0]) {
+      const a = result.assets[0];
+      setSelectedFile({ uri: a.uri, name: a.fileName || 'image.jpg', mimeType: a.mimeType || 'image/jpeg', kind: 'image' });
+    }
+    setShowAttachMenu(false);
+  }, []);
+
+  const pickVideo = useCallback(async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], quality: 0.8 });
+    if (!result.canceled && result.assets?.[0]) {
+      const a = result.assets[0];
+      setSelectedFile({ uri: a.uri, name: a.fileName || 'video.mp4', mimeType: a.mimeType || 'video/mp4', kind: 'video' });
+    }
+    setShowAttachMenu(false);
+  }, []);
+
+  const pickAudio = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: 'audio/*' });
+    if (!result.canceled && result.assets?.[0]) {
+      const a = result.assets[0];
+      setSelectedFile({ uri: a.uri, name: a.name || 'audio', mimeType: a.mimeType || 'audio/mpeg', kind: 'audio' });
+    }
+    setShowAttachMenu(false);
+  }, []);
+
+  const pickDocument = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+    if (!result.canceled && result.assets?.[0]) {
+      const a = result.assets[0];
+      setSelectedFile({ uri: a.uri, name: a.name || 'fichier', mimeType: a.mimeType || 'application/octet-stream', kind: 'file' });
+    }
+    setShowAttachMenu(false);
+  }, []);
 
   const isMe = useCallback(
     (msg) => (msg.sender?._id || msg.sender) === user?._id,
@@ -220,6 +327,33 @@ export default function ChatScreen({ route, navigation }) {
   );
 
   const keyExtractor = useCallback((item, i) => item._id || String(i), []);
+
+  // ─── Rendu d'une pièce jointe dans une bulle ───
+  const renderAttachment = useCallback((att, i) => {
+    switch (att.type) {
+      case 'image':
+        return (
+          <Image key={i} source={{ uri: att.url }} style={styles.attachImage}
+            contentFit="cover" cachePolicy="memory-disk" />
+        );
+      case 'video':
+        return (
+          <Video key={i} source={{ uri: att.url }}
+            useNativeControls resizeMode={ResizeMode.CONTAIN}
+            style={styles.attachVideo} />
+        );
+      case 'audio':
+        return <AudioPlayer key={i} url={att.url} nom={att.nom} styles={styles} />;
+      default:
+        return (
+          <TouchableOpacity key={i} onPress={() => Linking.openURL(att.url)}
+            style={styles.attachFileRow} activeOpacity={0.8}>
+            <Ionicons name="document-attach-outline" size={16} color={c.gold} />
+            <Text style={styles.attachFileText} numberOfLines={1}>{att.nom || 'Fichier'}</Text>
+          </TouchableOpacity>
+        );
+    }
+  }, [styles, c]);
 
   // Indicateur de frappe mémorisé — évite unmount/remount à chaque render FlatList
   const typingHeader = useMemo(() => {
@@ -243,9 +377,12 @@ export default function ChatScreen({ route, navigation }) {
         )}
         <View style={mine ? styles.bubbleRowMe : styles.bubbleRowThem}>
           <View style={mine ? styles.bubbleMe : styles.bubbleThem}>
-            <Text style={mine ? styles.bubbleTextMe : styles.bubbleTextThem}>
-              {item.content}
-            </Text>
+            {item.attachments?.map((att, i) => renderAttachment(att, i))}
+            {!!item.content && (
+              <Text style={mine ? styles.bubbleTextMe : styles.bubbleTextThem}>
+                {item.content}
+              </Text>
+            )}
           </View>
         </View>
         <View style={[styles.metaRow, mine ? styles.metaRowMe : styles.metaRowThem]}>
@@ -264,7 +401,7 @@ export default function ChatScreen({ route, navigation }) {
         </View>
       </View>
     );
-  }, [isMe, messages, styles, c]);
+  }, [isMe, messages, styles, c, renderAttachment]);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -282,7 +419,51 @@ export default function ChatScreen({ route, navigation }) {
           ListHeaderComponent={typingHeader}
         />
 
+        {/* ─── Aperçu de la pièce jointe sélectionnée ─── */}
+        {selectedFile && (
+          <View style={styles.attachPreview}>
+            <Ionicons
+              name={
+                selectedFile.kind === 'image' ? 'image-outline'
+                : selectedFile.kind === 'video' ? 'videocam-outline'
+                : selectedFile.kind === 'audio' ? 'musical-notes-outline'
+                : 'document-outline'
+              }
+              size={16}
+              color={c.gold}
+            />
+            <Text style={styles.attachPreviewText} numberOfLines={1}>{selectedFile.name}</Text>
+            <TouchableOpacity onPress={() => setSelectedFile(null)} hitSlop={8}
+              accessibilityRole="button" accessibilityLabel="Retirer la pièce jointe">
+              <Ionicons name="close-circle" size={18} color={c.textMuted} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ─── Panneau emoji ─── */}
+        {showEmoji && (
+          <View style={styles.emojiPanel}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.emojiScroll}>
+              {EMOJIS.map(e => (
+                <TouchableOpacity key={e} onPress={() => setText(t => t + e)} hitSlop={4}>
+                  <Text style={styles.emojiChar}>{e}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         <View style={styles.inputBar}>
+          <TouchableOpacity
+            style={styles.plusBtn}
+            onPress={() => setShowAttachMenu(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Joindre un fichier"
+          >
+            <Ionicons name="add" size={22} color={c.gold} />
+          </TouchableOpacity>
+
           <TextInput
             style={styles.input}
             placeholder="Message..."
@@ -293,10 +474,21 @@ export default function ChatScreen({ route, navigation }) {
             maxLength={1000}
             accessibilityLabel="Écrire un message"
           />
+
           <TouchableOpacity
-            style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
+            style={styles.emojiBtn}
+            onPress={() => setShowEmoji(v => !v)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Emojis"
+          >
+            <Text style={styles.emojiBtnIcon}>😊</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.sendBtn, (!text.trim() && !selectedFile) && styles.sendBtnDisabled]}
             onPress={sendMessage}
-            disabled={!text.trim()}
+            disabled={!text.trim() && !selectedFile}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Envoyer le message"
@@ -305,6 +497,35 @@ export default function ChatScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* ─── Menu d'attachement ─── */}
+      <Modal
+        visible={showAttachMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAttachMenu(false)}
+      >
+        <Pressable style={styles.attachOverlay} onPress={() => setShowAttachMenu(false)}>
+          <Pressable style={styles.attachMenu} onPress={(e) => e.stopPropagation()}>
+            <TouchableOpacity style={styles.attachOption} onPress={pickImage} activeOpacity={0.7}>
+              <Text style={styles.attachOptionEmoji}>📷</Text>
+              <Text style={styles.attachOptionText}>Image</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.attachOption} onPress={pickVideo} activeOpacity={0.7}>
+              <Text style={styles.attachOptionEmoji}>🎥</Text>
+              <Text style={styles.attachOptionText}>Vidéo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.attachOption} onPress={pickAudio} activeOpacity={0.7}>
+              <Text style={styles.attachOptionEmoji}>🎵</Text>
+              <Text style={styles.attachOptionText}>Audio</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.attachOption} onPress={pickDocument} activeOpacity={0.7}>
+              <Text style={styles.attachOptionEmoji}>📎</Text>
+              <Text style={styles.attachOptionText}>Fichier</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -475,5 +696,129 @@ const makeStyles = (c) => StyleSheet.create({
   },
   sendBtnDisabled: {
     opacity: 0.45,
+  },
+
+  // ─── Bouton "+" et emoji ───
+  plusBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emojiBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emojiBtnIcon: {
+    fontSize: 20,
+  },
+
+  // ─── Aperçu pièce jointe sélectionnée ───
+  attachPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: c.bgCardAlt,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  attachPreviewText: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: c.text,
+  },
+
+  // ─── Menu d'attachement (modal) ───
+  attachOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  attachMenu: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: c.bgCard,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+  },
+  attachOption: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    minWidth: 64,
+  },
+  attachOptionEmoji: {
+    fontSize: 28,
+  },
+  attachOptionText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: c.textSub,
+  },
+
+  // ─── Panneau emoji ───
+  emojiPanel: {
+    backgroundColor: c.bgCard,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+    paddingVertical: spacing.xs,
+  },
+  emojiScroll: {
+    paddingHorizontal: spacing.sm,
+    gap: 2,
+  },
+  emojiChar: {
+    fontSize: 24,
+    padding: 4,
+  },
+
+  // ─── Pièces jointes dans les bulles ───
+  attachImage: {
+    width: 200,
+    height: 150,
+    borderRadius: radius.xs,
+    marginBottom: spacing.xs,
+  },
+  attachVideo: {
+    width: 200,
+    height: 150,
+    borderRadius: radius.xs,
+    marginBottom: spacing.xs,
+  },
+  attachFileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  attachFileText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: c.gold,
+    flexShrink: 1,
+  },
+  audioPlayer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    borderRadius: radius.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs,
+    minWidth: 160,
+  },
+  audioNom: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: c.text,
+    flexShrink: 1,
   },
 });

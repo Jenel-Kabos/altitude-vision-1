@@ -109,6 +109,24 @@ export const getStaffInbox = async () => {
 };
 
 /**
+ * @description Mes conversations avec l'équipe (côté client/propriétaire — jamais
+ * celles des autres utilisateurs, contrairement à getStaffInbox réservé au staff)
+ */
+export const getMyInbox = async () => {
+    const res = await api.get('/conversations/my-inbox');
+    return res.data?.data?.conversations || [];
+};
+
+/**
+ * @description Contacter l'équipe (créé ou récupère la conversation staff-inbox
+ * du client courant), avec un message initial optionnel
+ */
+export const startStaffConversation = async ({ message = '', propertyId = null } = {}) => {
+    const res = await api.post('/conversations/start', { message, propertyId });
+    return res.data?.data?.conversation;
+};
+
+/**
  * @description Charger les messages d'une conversation
  */
 export const getConversationMessages = async (conversationId) => {
@@ -121,5 +139,20 @@ export const getConversationMessages = async (conversationId) => {
  */
 export const sendStaffReply = async (conversationId, content) => {
     const res = await api.post('/messages', { conversationId, content });
+    return res.data?.data?.message;
+};
+
+/**
+ * @description Envoyer une réponse staff avec pièces jointes (images, vidéos, audio, fichiers)
+ */
+export const sendStaffReplyWithAttachments = async (conversationId, content, files) => {
+    const fd = new FormData();
+    if (content) fd.append('content', content);
+    fd.append('conversationId', conversationId);
+    files.forEach(f => fd.append('attachments', f));
+
+    const res = await api.post('/messages', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return res.data?.data?.message;
 };

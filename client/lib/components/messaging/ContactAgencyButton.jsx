@@ -5,16 +5,17 @@ import React, { useState } from 'react';
 import { MessageCircle, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { createOrGetConversation } from '../../services/conversationService';
+import { startStaffConversation } from '../../services/conversationService';
 import toast from '@/lib/utils/toast';
 
 /**
  * Bouton pour contacter l'agence depuis une annonce
  * @param {String} propertyId - ID de la propriété (optionnel)
- * @param {String} eventId - ID de l'événement (optionnel)
- * @param {String} adminId - ID de l'admin à contacter (par défaut cherche un admin)
+ * @param {String} eventId - ID de l'événement (optionnel — affecte uniquement le
+ *   message par défaut ; POST /conversations/start ne relie pas encore les
+ *   conversations à un Event, contrairement à relatedProperty)
  */
-const ContactAgencyButton = ({ propertyId = null, eventId = null, adminId = null }) => {
+const ContactAgencyButton = ({ propertyId = null, eventId = null }) => {
   const { user } = useAuth();
   const router = useRouter();
   const [showModal, setShowModal] = useState(false);
@@ -52,16 +53,12 @@ const ContactAgencyButton = ({ propertyId = null, eventId = null, adminId = null
     setIsLoading(true);
 
     try {
-      // Si pas d'adminId fourni, utiliser un ID par défaut ou faire une requête pour trouver un admin
-      // Pour simplifier, vous pouvez stocker l'ID d'un admin principal dans les variables d'environnement
-      const recipientId = adminId || process.env.NEXT_PUBLIC_ADMIN_ID || '60d5ec49f1b2c72b8c8e4f1a'; // Remplacer par un vrai ID
-
-      const conversation = await createOrGetConversation(
-        recipientId,
+      // Le backend route automatiquement vers la boîte staff partagée
+      // (isStaffInbox: true) — plus besoin de connaître l'ID d'un admin précis.
+      await startStaffConversation({
         message,
-        propertyId,
-        eventId
-      );
+        propertyId: propertyId || undefined,
+      });
 
       setShowModal(false);
       router.push('/messages');

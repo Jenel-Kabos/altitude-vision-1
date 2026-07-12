@@ -24,8 +24,8 @@ const messageSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: [true, 'Le contenu du message est requis'],
     maxlength: 5000,
+    default: '',
   },
   isRead: {
     type: Boolean,
@@ -38,16 +38,22 @@ const messageSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  attachments: [
-    {
-      filename: { type: String, required: true },
-      filepath: { type: String, required: true },
-      mimetype: { type: String },
-      size: { type: Number },
-    },
-  ],
+  attachments: [{
+    url:      { type: String, required: true },
+    type:     { type: String, enum: ['image', 'video', 'audio', 'file'], required: true },
+    nom:      { type: String },
+    size:     { type: Number },
+    duration: { type: Number }, // pour audio/vidéo, en secondes
+  }],
 }, {
   timestamps: true,
+});
+
+messageSchema.pre('save', function(next) {
+  if (!this.content && (!this.attachments || this.attachments.length === 0)) {
+    return next(new Error('Message vide : content ou attachments requis'));
+  }
+  next();
 });
 
 // Index pour performances

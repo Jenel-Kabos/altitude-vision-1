@@ -22,6 +22,8 @@ cloudinary.config({
 //    fileSize seul ne protège pas contre les attaques multi-fichiers.
 const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 const ALLOWED_VIDEO_MIMES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
+// Messages (messageRoutes.js) : enregistrements vocaux / pièces jointes audio
+const ALLOWED_AUDIO_MIMES = ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/wav', 'audio/webm', 'audio/x-m4a'];
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -30,7 +32,7 @@ const upload = multer({
     files:    15,                  // max 15 fichiers par requête (galerie immobilière)
   },
   fileFilter: (req, file, cb) => {
-    const allowed = [...ALLOWED_IMAGE_MIMES, ...ALLOWED_VIDEO_MIMES];
+    const allowed = [...ALLOWED_IMAGE_MIMES, ...ALLOWED_VIDEO_MIMES, ...ALLOWED_AUDIO_MIMES];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {

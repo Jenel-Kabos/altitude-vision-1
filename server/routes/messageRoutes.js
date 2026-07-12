@@ -5,7 +5,9 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
-const { uploadAttachments } = require('../middleware/uploadMiddleware');
+const { upload } = require('../config/cloudinary');
+
+const uploadAttachments = upload.array('attachments', 5);
 
 const {
     sendMessage,

@@ -15,11 +15,12 @@ import {
   Sofa, UtensilsCrossed, Maximize2, MessageSquare,
   Phone, Clock, Scale, ChevronLeft, ChevronRight,
   Heart, Eye, Share2, Percent, ChevronDown, ChevronUp,
-  MessageCircle, Calendar,
+  MessageCircle, Calendar, Flag,
 } from 'lucide-react';
 import CommentList from '../components/comments/CommentList';
 import Breadcrumb from '../components/Breadcrumb';
 import ContactModal from '../components/ContactModal';
+import SignalerAnnonceModal from '../components/SignalerAnnonceModal';
 
 // ─── Design tokens ─────────────────────────────────────────────
 const BLUE      = '#2E7BB5';
@@ -648,6 +649,7 @@ const PropertyDetailPage = () => {
   const [shared,        setShared]        = useState(false);
   const [descExpanded,  setDescExpanded]  = useState(false);
   const [showContact,      setShowContact]      = useState(false);
+  const [showSignaler,     setShowSignaler]     = useState(false);
   const [planifierLoading, setPlanifierLoading] = useState(false);
 
   useEffect(() => {
@@ -1094,6 +1096,14 @@ const PropertyDetailPage = () => {
                   <Phone size={13} /> +242 06 800 21 51
                 </a>
 
+                <button
+                  onClick={() => { if (!user) { router.push('/login'); return; } setShowSignaler(true); }}
+                  className="flex items-center gap-2 text-sm text-gray-400 hover:text-red-500 transition mt-4 w-full justify-center"
+                >
+                  <Flag size={14} />
+                  Signaler cette annonce
+                </button>
+
                 <div className="pdp-reassurance">
                   {[
                     { Icon: Clock,         text:'Réponse sous 24h garantie' },
@@ -1182,6 +1192,13 @@ const PropertyDetailPage = () => {
           intention="Informations Générales"
           serviceTitle={`${property.title} (ID: ${property._id})`}
           onClose={() => setShowContact(false)}
+        />
+      )}
+
+      {showSignaler && (
+        <SignalerAnnonceModal
+          propertyId={property._id}
+          onClose={() => setShowSignaler(false)}
         />
       )}
     </div>

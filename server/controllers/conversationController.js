@@ -399,6 +399,35 @@ exports.startConversation = async (req, res) => {
 };
 
 /**
+ * @description Ma(mes) conversation(s) staff-inbox — un client/propriétaire ne voit
+ * que SA propre conversation avec l'équipe, jamais celles des autres utilisateurs
+ * (contrairement à GET /staff-inbox qui liste tout, réservé au staff).
+ * @route GET /api/conversations/my-inbox
+ * @access Protected
+ */
+exports.getMyInbox = asyncHandler(async (req, res) => {
+  const conversations = await Conversation.find({
+    participants: req.user.id,
+    isStaffInbox: true,
+    isArchived: { $ne: true },
+  })
+    .populate('relatedProperty', 'title images')
+    .sort('-updatedAt');
+
+  const withUnread = conversations.map((conv) => {
+    const obj = conv.toObject();
+    obj.unreadCount = conv.unreadCount?.get(req.user.id) || 0;
+    return obj;
+  });
+
+  res.status(200).json({
+    status: 'success',
+    results: withUnread.length,
+    data: { conversations: withUnread },
+  });
+});
+
+/**
  * @description Boîte partagée du staff — toutes les conversations isStaffInbox
  * @route GET /api/conversations/staff-inbox
  * @access Protected (Admin / Collaborateur uniquement)

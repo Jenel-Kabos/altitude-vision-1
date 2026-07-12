@@ -1,18 +1,49 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { io } from "socket.io-client";
 import {
   MessageCircle, Send, Loader2, Home, User, AlertTriangle,
+  Paperclip, X,
 } from "lucide-react";
 import {
   getStaffInbox,
   getConversationMessages,
   sendStaffReply,
+  sendStaffReplyWithAttachments,
   markConversationAsRead,
 } from "../../services/conversationService";
 import { useAuth } from "../../context/AuthContext";
 
 const GOLD = "#C8960C";
+
+const EMOJIS = [
+  '😊', '😂', '❤️', '👍', '🙏', '😍', '😭',
+  '🔥', '✅', '👋', '🎉', '💪', '😎', '🤝', '💯', '👏',
+  '🙌', '😅', '🥰', '✨',
+];
+
+const renderAttachment = (att) => {
+  switch (att.type) {
+    case 'image':
+      return (
+        <img src={att.url} alt={att.nom}
+          className="max-w-xs rounded-lg cursor-pointer"
+          onClick={() => window.open(att.url, '_blank')} />
+      );
+    case 'video':
+      return <video src={att.url} controls className="max-w-xs rounded-lg" />;
+    case 'audio':
+      return <audio src={att.url} controls className="w-48" />;
+    default:
+      return (
+        <a href={att.url} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-1 text-blue-400 underline text-sm">
+          <Paperclip size={12} /> {att.nom || 'Fichier'}
+        </a>
+      );
+  }
+};
 
 const formatTime = (d) => {
   if (!d) return "";
@@ -34,7 +65,10 @@ const StaffInboxPage = () => {
   const [loadingMsgs, setLoadingMsgs]     = useState(false);
   const [sending, setSending]             = useState(false);
   const [notif, setNotif]                 = useState(null);
-  const bottomRef = useRef(null);
+  const [pendingFiles, setPendingFiles]   = useState([]);
+  const [showEmoji, setShowEmoji]         = useState(false);
+  const bottomRef    = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Charger la liste des conversations staff-inbox
   const fetchConversations = async () => {
@@ -49,6 +83,34 @@ const StaffInboxPage = () => {
   };
 
   useEffect(() => { fetchConversations(); }, []);
+
+  // Socket.IO temps réel — nouveaux messages clients sans recharger la page.
+  // AuthContext n'expose pas `token` (uniquement localStorage) : on le lit ici,
+  // comme le fait déjà services/api.js.
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!user?.id && !user?._id) return;
+    if (!token) return;
+
+    const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    const socket = io(SOCKET_URL, { auth: { token } });
+
+    socket.on('new-staff-message', ({ conversationId, message }) => {
+      setSelected(prevSelected => {
+        if (prevSelected?._id === conversationId) {
+          setMessages(prev => [...prev, message]);
+        }
+        return prevSelected;
+      });
+      setConversations(prev => prev.map(c =>
+        c._id === conversationId
+          ? { ...c, lastMessage: message.content || '📎 Fichier', updatedAt: new Date().toISOString() }
+          : c
+      ));
+    });
+
+    return () => socket.disconnect();
+  }, [user?.id, user?._id]);
 
   // Charger les messages d'une conversation sélectionnée
   const openConversation = async (conv) => {
@@ -77,27 +139,32 @@ const StaffInboxPage = () => {
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!input.trim() || !selected || sending) return;
+    if ((!input.trim() && pendingFiles.length === 0) || !selected || sending) return;
     setSending(true);
     try {
-      const msg = await sendStaffReply(selected._id, input.trim());
+      const msg = pendingFiles.length > 0
+        ? await sendStaffReplyWithAttachments(selected._id, input.trim(), pendingFiles)
+        : await sendStaffReply(selected._id, input.trim());
       if (msg) {
         setMessages(prev => [...prev, msg]);
       }
       // Mettre à jour lastMessage dans la liste
       setConversations(prev =>
         prev.map(c => c._id === selected._id
-          ? { ...c, lastMessage: input.trim(), updatedAt: new Date().toISOString() }
+          ? { ...c, lastMessage: input.trim() || '📎 Fichier', updatedAt: new Date().toISOString() }
           : c
         )
       );
       setInput("");
+      setPendingFiles([]);
     } catch (err) {
       showNotif(err?.response?.data?.message || "Erreur lors de l'envoi.", "error");
     } finally {
       setSending(false);
     }
   };
+
+  const removePendingFile = (idx) => setPendingFiles(prev => prev.filter((_, i) => i !== idx));
 
   const showNotif = (message, type = "success") => {
     setNotif({ message, type });
@@ -256,7 +323,14 @@ const StaffInboxPage = () => {
                               : "bg-white text-gray-800 shadow-sm rounded-bl-sm border border-gray-100"
                           }`}
                             style={isMine ? { background: `linear-gradient(135deg, #A06820, ${GOLD})` } : {}}>
-                            {msg.content}
+                            {msg.attachments?.length > 0 && (
+                              <div className="flex flex-col gap-1.5 mb-1.5">
+                                {msg.attachments.map((att, i) => (
+                                  <div key={i}>{renderAttachment(att)}</div>
+                                ))}
+                              </div>
+                            )}
+                            {!!msg.content && msg.content}
                           </div>
                           <p className={`text-xs text-gray-400 mt-1 ${isMine ? "text-right" : "text-left"}`}>
                             {isMine ? "Vous" : (msg.sender?.name || "Client")} · {formatTime(msg.createdAt)}
@@ -269,11 +343,68 @@ const StaffInboxPage = () => {
                 <div ref={bottomRef} />
               </div>
 
+              {/* Fichiers en attente d'envoi */}
+              {pendingFiles.length > 0 && (
+                <div className="px-4 pt-2.5 bg-white flex flex-wrap gap-2 flex-shrink-0">
+                  {pendingFiles.map((f, i) => (
+                    <div key={i} className="flex items-center gap-1.5 bg-gray-100 rounded-lg px-2.5 py-1.5 text-xs text-gray-600">
+                      <Paperclip size={12} className="flex-shrink-0" />
+                      <span className="truncate max-w-[140px]">{f.name}</span>
+                      <button type="button" onClick={() => removePendingFile(i)}
+                        className="text-gray-400 hover:text-red-500 transition-colors">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Zone de saisie */}
               <form
                 onSubmit={handleSend}
-                className="px-4 py-3 bg-white border-t border-gray-200 flex items-end gap-3 flex-shrink-0"
+                className="relative px-4 py-3 bg-white border-t border-gray-200 flex items-end gap-2 flex-shrink-0"
               >
+                {showEmoji && (
+                  <div className="absolute bottom-full left-4 mb-2 bg-white border border-gray-200 rounded-xl shadow-xl p-3 grid grid-cols-6 gap-1 z-20">
+                    {EMOJIS.map(e => (
+                      <button key={e} type="button"
+                        onClick={() => setInput(t => t + e)}
+                        className="text-xl p-1 rounded hover:bg-gray-100 transition-colors">
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,audio/*,application/pdf"
+                  ref={fileInputRef}
+                  onChange={e => {
+                    setPendingFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-shrink-0 p-2.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                  aria-label="Joindre un fichier"
+                >
+                  <Paperclip size={18} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowEmoji(v => !v)}
+                  className="flex-shrink-0 p-2.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors text-lg"
+                  aria-label="Emojis"
+                >
+                  😊
+                </button>
+
                 <textarea
                   value={input}
                   onChange={e => setInput(e.target.value)}
@@ -286,7 +417,7 @@ const StaffInboxPage = () => {
                 />
                 <button
                   type="submit"
-                  disabled={!input.trim() || sending}
+                  disabled={(!input.trim() && pendingFiles.length === 0) || sending}
                   className="flex-shrink-0 p-2.5 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
                   style={{ background: `linear-gradient(135deg, #A06820, ${GOLD})` }}
                 >

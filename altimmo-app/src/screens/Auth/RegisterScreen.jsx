@@ -203,8 +203,10 @@ export default function RegisterScreen({ navigation }) {
         Alert.alert('Erreur', 'Google Play Services requis.');
         return;
       }
-      Alert.alert('Erreur', 'Connexion Google échouée. Réessayez.');
-      console.log('Google Sign-In error:', error);
+      console.log('Google Sign-In error code:', error.code);
+      console.log('Google Sign-In error message:', error.message);
+      console.log('Google Sign-In error full:', JSON.stringify(error));
+      Alert.alert('Erreur', `Code: ${error.code}\n${error.message}`);
     }
   };
 

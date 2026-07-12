@@ -1,493 +1,468 @@
 "use client";
 
-// src/pages/MessagesPage.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { io } from "socket.io-client";
 import {
-    MessageCircle, Loader2, Plus, X, Search,
-    Send, ArrowLeft, MoreVertical, Archive,
-    CheckCheck, Clock, Inbox, ChevronRight,
-} from 'lucide-react';
-import ConversationList from '../components/messaging/ConversationList';
-import ChatWindow       from '../components/messaging/ChatWindow';
-import { getUserConversations, createOrGetConversation } from '../services/conversationService';
-import { useAuth } from '../context/AuthContext';
-import Image from 'next/image';
+  MessageCircle, Send, Loader2, Home, Paperclip, X,
+} from "lucide-react";
+import {
+  getMyInbox,
+  getConversationMessages,
+  sendStaffReply,
+  sendStaffReplyWithAttachments,
+  markConversationAsRead,
+  startStaffConversation,
+} from "../services/conversationService";
+import { useAuth } from "../context/AuthContext";
 
-// ── Design tokens ──────────────────────────────────────────────
-const C = {
-    bg:        '#0A0C0F',
-    surface:   '#111418',
-    surfaceHi: '#181D24',
-    border:    'rgba(232,228,220,0.06)',
-    borderHi:  'rgba(200,135,42,0.2)',
-    gold:      '#C8960C',
-    goldLight: '#E5A84B',
-    blue:      '#2E7BB5',
-    text:      '#E8E4DC',
-    textMuted: 'rgba(232,228,220,0.45)',
-    textFaint: 'rgba(232,228,220,0.2)',
+const GOLD = "#C8960C";
+const BLUE = "#2E7BB5";
+// L'équipe répond de façon anonymisée — jamais le nom du collaborateur
+const TEAM_LABEL = "Équipe Altitude Vision";
+
+const EMOJIS = [
+  '😊', '😂', '❤️', '👍', '🙏', '😍', '😭',
+  '🔥', '✅', '👋', '🎉', '💪', '😎', '🤝', '💯', '👏',
+  '🙌', '😅', '🥰', '✨',
+];
+
+const renderAttachment = (att) => {
+  switch (att.type) {
+    case 'image':
+      return (
+        <img src={att.url} alt={att.nom}
+          className="max-w-xs rounded-lg cursor-pointer"
+          onClick={() => window.open(att.url, '_blank')} />
+      );
+    case 'video':
+      return <video src={att.url} controls className="max-w-xs rounded-lg" />;
+    case 'audio':
+      return <audio src={att.url} controls className="w-48" />;
+    default:
+      return (
+        <a href={att.url} target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-1 text-blue-400 underline text-sm">
+          <Paperclip size={12} /> {att.nom || 'Fichier'}
+        </a>
+      );
+  }
 };
 
-// ── Avatar initiale ────────────────────────────────────────────
-const Avatar = ({ name = 'U', photo, size = 40, online = false }) => {
-    const [imgErr, setImgErr] = useState(false);
-    return (
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-            <div style={{
-                width: size, height: size, borderRadius: '50%',
-                overflow: 'hidden', flexShrink: 0,
-                background: photo && !imgErr ? 'transparent' : `linear-gradient(135deg, ${C.blue}, ${C.gold})`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: size * 0.38, fontWeight: 600, color: '#fff',
-                border: `2px solid ${C.border}`,
-            }}>
-                {photo && !imgErr
-                    ? <Image src={photo} alt={name} fill unoptimized onError={() => setImgErr(true)} className="object-cover" />
-                    : (name || 'U')[0].toUpperCase()
-                }
-            </div>
-            {online && (
-                <div style={{
-                    position: 'absolute', bottom: 1, right: 1,
-                    width: size * 0.28, height: size * 0.28,
-                    borderRadius: '50%', background: '#22C55E',
-                    border: `2px solid ${C.bg}`,
-                }} />
-            )}
-        </div>
-    );
+const formatTime = (d) => {
+  if (!d) return "";
+  const date = new Date(d);
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  return sameDay
+    ? date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 };
 
-// ── Skeleton conversation ──────────────────────────────────────
-const ConvSkeleton = () => (
-    <div style={{ display: 'flex', gap: 12, padding: '14px 20px', alignItems: 'center' }}>
-        <div style={{ width: 44, height: 44, borderRadius: '50%', background: C.surfaceHi, flexShrink: 0 }} />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ height: 12, borderRadius: 6, background: C.surfaceHi, width: '60%' }} />
-            <div style={{ height: 10, borderRadius: 6, background: C.surfaceHi, width: '80%' }} />
-        </div>
-    </div>
-);
+const STAFF_ROLES = ["Admin", "Collaborateur"];
 
-// ── Formatage heure ────────────────────────────────────────────
-const fmtTime = (d) => {
-    if (!d) return '';
-    const date = new Date(d);
-    const now  = new Date();
-    const diff = (now - date) / 1000;
-    if (diff < 60)       return 'maintenant';
-    if (diff < 3600)     return `${Math.floor(diff / 60)}min`;
-    if (diff < 86400)    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-    if (diff < 604800)   return date.toLocaleDateString('fr-FR', { weekday: 'short' });
-    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-};
-
-// ─────────────────────────────────────────────────────────────
 const MessagesPage = () => {
-    const { user }  = useAuth();
-    const [convs,   setConvs]    = useState([]);
-    const [selConv, setSelConv]  = useState(null);
-    const [loading, setLoading]  = useState(true);
-    const [unread,  setUnread]   = useState(0);
-    const [search,  setSearch]   = useState('');
-    const [modal,   setModal]    = useState(false);
-    const [mobile,  setMobile]   = useState(false); // true = affiche le chat sur mobile
+  const { user, isInitialized } = useAuth();
+  const router = useRouter();
+  const [conversations, setConversations] = useState([]);
+  const [selected, setSelected]           = useState(null);
+  const [messages, setMessages]           = useState([]);
+  const [input, setInput]                 = useState("");
+  const [loadingList, setLoadingList]     = useState(true);
+  const [loadingMsgs, setLoadingMsgs]     = useState(false);
+  const [sending, setSending]             = useState(false);
+  const [starting, setStarting]           = useState(false);
+  const [notif, setNotif]                 = useState(null);
+  const [pendingFiles, setPendingFiles]   = useState([]);
+  const [showEmoji, setShowEmoji]         = useState(false);
+  const bottomRef    = useRef(null);
+  const fileInputRef = useRef(null);
 
-    useEffect(() => { fetchConvs(); }, []);
+  // Le staff a sa propre boîte partagée (/dashboard/conversations) — pas cette page.
+  useEffect(() => {
+    if (isInitialized && user && STAFF_ROLES.includes(user.role)) {
+      router.replace('/dashboard/conversations');
+    }
+  }, [isInitialized, user, router]);
 
-    const fetchConvs = async () => {
-        try {
-            setLoading(true);
-            const data = await getUserConversations();
-            setConvs(data.conversations || []);
-            setUnread(data.totalUnread || 0);
-        } catch (e) { console.error(e); }
-        finally { setLoading(false); }
-    };
+  const fetchConversations = async () => {
+    try {
+      const data = await getMyInbox();
+      setConversations(data);
+      // Une seule conversation d'équipe en général — l'ouvrir directement
+      if (data.length > 0) {
+        setSelected(prev => prev || data[0]);
+      }
+    } catch {
+      showNotif("Impossible de charger vos messages.", "error");
+    } finally {
+      setLoadingList(false);
+    }
+  };
 
-    const selectConv = (conv) => {
-        setSelConv(conv);
-        setMobile(true);
-        setConvs(c => c.map(x => x._id === conv._id ? { ...x, unreadCount: 0 } : x));
-        setUnread(u => Math.max(0, u - (conv.unreadCount || 0)));
-    };
+  useEffect(() => { fetchConversations(); }, []);
 
-    const filtered = convs.filter(c => {
-        // ✅ CORRIGÉ : utilise && pour que les deux conditions soient vraies simultanément
-        const other = c.participants?.find(
-            p => p._id !== user?._id && p._id !== user?.id
+  useEffect(() => {
+    if (!selected) return;
+    (async () => {
+      setMessages([]);
+      setLoadingMsgs(true);
+      try {
+        const msgs = await getConversationMessages(selected._id);
+        setMessages(msgs);
+        await markConversationAsRead(selected._id);
+        setConversations(prev =>
+          prev.map(c => c._id === selected._id ? { ...c, unreadCount: 0 } : c)
         );
-        return !search || (other?.name || '').toLowerCase().includes(search.toLowerCase());
+      } catch {
+        showNotif("Impossible de charger les messages.", "error");
+      } finally {
+        setLoadingMsgs(false);
+      }
+    })();
+  }, [selected?._id]);
+
+  // Socket.IO temps réel — écoute 'new-message' (réponses du staff), pas
+  // 'new-staff-message' (réservé à la boîte partagée du staff).
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if ((!user?.id && !user?._id) || !token) return;
+
+    const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    const socket = io(SOCKET_URL, { auth: { token } });
+
+    socket.on('new-message', ({ conversationId, message }) => {
+      setSelected(prevSelected => {
+        if (prevSelected?._id === conversationId) {
+          setMessages(prev => [...prev, message]);
+        }
+        return prevSelected;
+      });
+      setConversations(prev => prev.map(c =>
+        c._id === conversationId
+          ? { ...c, lastMessage: message.content || '📎 Fichier', updatedAt: new Date().toISOString() }
+          : c
+      ));
     });
 
-    return (
-        <div style={{ minHeight: '100vh', background: C.bg, fontFamily: "var(--font-dm-sans), sans-serif", paddingTop: '72px' }}>
-            <style>{`
-                * { box-sizing: border-box; }
-                ::-webkit-scrollbar { width: 4px; }
-                ::-webkit-scrollbar-track { background: transparent; }
-                ::-webkit-scrollbar-thumb { background: rgba(200,135,42,0.2); border-radius: 4px; }
-                ::-webkit-scrollbar-thumb:hover { background: rgba(200,135,42,0.4); }
-                textarea:focus, input:focus { outline: none; }
-            `}</style>
+    return () => socket.disconnect();
+  }, [user?.id, user?._id]);
 
-            <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px', height: 'calc(100vh - 72px)' }}>
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-                {/* ── Titre page ── */}
-                <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
-                    style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                        <h1 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: 'clamp(1.6rem,3vw,2.2rem)', fontWeight: 700, color: C.text, margin: 0, lineHeight: 1.1 }}>
-                            Messagerie
-                        </h1>
-                        <p style={{ fontSize: '0.78rem', color: C.textMuted, margin: '4px 0 0', fontWeight: 300 }}>
-                            {unread > 0 ? `${unread} message${unread > 1 ? 's' : ''} non lu${unread > 1 ? 's' : ''}` : 'Tout est lu'}
-                        </p>
-                    </div>
-                    <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                        onClick={() => setModal(true)}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: 8,
-                            padding: '10px 20px', borderRadius: 40,
-                            background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-                            border: 'none', color: '#0A0C0F', fontSize: '0.82rem',
-                            fontWeight: 600, cursor: 'pointer', letterSpacing: '0.03em',
-                            boxShadow: `0 4px 20px ${C.gold}35`,
-                        }}>
-                        <Plus size={15} />
-                        Nouveau message
-                    </motion.button>
-                </motion.div>
+  const showNotif = (message, type = "success") => {
+    setNotif({ message, type });
+    setTimeout(() => setNotif(null), 4000);
+  };
 
-                {/* ── Layout principal ── */}
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'minmax(0, 360px) 1fr',
-                    gap: 0,
-                    height: 'calc(100vh - 180px)',
-                    borderRadius: 20,
-                    overflow: 'hidden',
-                    border: `1px solid ${C.border}`,
-                    background: C.surface,
-                }}>
+  // Crée (ou récupère) la conversation avec l'équipe, sans message initial —
+  // l'utilisateur écrit ensuite dans la zone de saisie normale.
+  const contacterAgence = async () => {
+    setStarting(true);
+    try {
+      const conv = await startStaffConversation();
+      if (conv) {
+        setConversations(prev => prev.some(c => c._id === conv._id) ? prev : [conv, ...prev]);
+        setSelected(conv);
+      }
+    } catch {
+      showNotif("Impossible de démarrer la conversation.", "error");
+    } finally {
+      setStarting(false);
+    }
+  };
 
-                    {/* ══ SIDEBAR CONVERSATIONS ══ */}
-                    <div style={{
-                        borderRight: `1px solid ${C.border}`,
-                        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-                        // Mobile: masqué si chat ouvert
-                        ...(mobile && selConv ? { display: 'none' } : {}),
-                    }}
-                        className="conv-sidebar">
-                        <style>{`
-                            @media (min-width: 768px) { .conv-sidebar { display: flex !important; } }
-                        `}</style>
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if ((!input.trim() && pendingFiles.length === 0) || !selected || sending) return;
+    setSending(true);
+    try {
+      const msg = pendingFiles.length > 0
+        ? await sendStaffReplyWithAttachments(selected._id, input.trim(), pendingFiles)
+        : await sendStaffReply(selected._id, input.trim());
+      if (msg) {
+        setMessages(prev => [...prev, msg]);
+      }
+      setConversations(prev =>
+        prev.map(c => c._id === selected._id
+          ? { ...c, lastMessage: input.trim() || '📎 Fichier', updatedAt: new Date().toISOString() }
+          : c
+        )
+      );
+      setInput("");
+      setPendingFiles([]);
+    } catch (err) {
+      showNotif(err?.response?.data?.message || "Erreur lors de l'envoi.", "error");
+    } finally {
+      setSending(false);
+    }
+  };
 
-                        {/* Barre recherche */}
-                        <div style={{ padding: '16px 16px 12px', borderBottom: `1px solid ${C.border}` }}>
-                            <div style={{ position: 'relative' }}>
-                                <Search size={14} style={{
-                                    position: 'absolute', left: 14, top: '50%',
-                                    transform: 'translateY(-50%)', color: C.textFaint,
-                                    pointerEvents: 'none',
-                                }} />
-                                <input type="text" placeholder="Rechercher..."
-                                    value={search} onChange={e => setSearch(e.target.value)}
-                                    style={{
-                                        width: '100%', padding: '10px 14px 10px 36px',
-                                        background: C.surfaceHi, border: `1px solid ${C.border}`,
-                                        borderRadius: 14, color: C.text, fontSize: '0.82rem',
-                                        fontFamily: "var(--font-dm-sans), sans-serif",
-                                        transition: 'border-color 0.2s',
-                                    }}
-                                    onFocus={e => e.target.style.borderColor = `${C.gold}50`}
-                                    onBlur={e => e.target.style.borderColor = C.border}
-                                />
-                            </div>
-                        </div>
+  const removePendingFile = (idx) => setPendingFiles(prev => prev.filter((_, i) => i !== idx));
 
-                        {/* Liste */}
-                        <div style={{ flex: 1, overflowY: 'auto' }}>
-                            {loading ? (
-                                Array.from({ length: 5 }).map((_, i) => (
-                                    <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                                        transition={{ delay: i * 0.05 }}>
-                                        <ConvSkeleton />
-                                    </motion.div>
-                                ))
-                            ) : filtered.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '48px 24px' }}>
-                                    <Inbox size={40} style={{ color: C.textFaint, margin: '0 auto 12px' }} />
-                                    <p style={{ color: C.textMuted, fontSize: '0.85rem', margin: 0 }}>
-                                        {search ? 'Aucun résultat' : 'Aucune conversation'}
-                                    </p>
-                                    {!search && (
-                                        <button onClick={() => setModal(true)}
-                                            style={{ marginTop: 16, padding: '8px 18px', borderRadius: 40, background: `${C.gold}15`, border: `1px solid ${C.gold}30`, color: C.gold, fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
-                                            Démarrer
-                                        </button>
-                                    )}
-                                </div>
-                            ) : (
-                                <AnimatePresence>
-                                    {filtered.map((conv, i) => {
-                                        // ✅ CORRIGÉ : utilise && pour identifier correctement l'autre participant
-                                        const other = conv.participants?.find(
-                                            p => (p._id || p) !== user?._id && (p._id || p) !== user?.id
-                                        );
-                                        const isActive = selConv?._id === conv._id;
-                                        return (
-                                            <motion.button key={conv._id}
-                                                initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: i * 0.04 }}
-                                                onClick={() => selectConv(conv)}
-                                                style={{
-                                                    width: '100%', display: 'flex', alignItems: 'center',
-                                                    gap: 12, padding: '14px 16px', border: 'none',
-                                                    background: isActive ? `${C.gold}10` : 'transparent',
-                                                    borderLeft: `3px solid ${isActive ? C.gold : 'transparent'}`,
-                                                    cursor: 'pointer', transition: 'all 0.2s', textAlign: 'left',
-                                                }}
-                                                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = C.surfaceHi; }}
-                                                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
+  const convDisplay = (conv) => ({
+    propertyTitle: conv?.relatedProperty?.title || null,
+  });
 
-                                                <Avatar name={other?.name} photo={other?.photo} size={44} online={false} />
+  return (
+    <div className="h-[calc(100vh-4rem)] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                                                        <span style={{ fontSize: '0.88rem', fontWeight: conv.unreadCount ? 600 : 400, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '65%' }}>
-                                                            {other?.name || 'Utilisateur'}
-                                                        </span>
-                                                        <span style={{ fontSize: '0.7rem', color: C.textFaint, flexShrink: 0 }}>
-                                                            {fmtTime(conv.lastMessage?.createdAt || conv.updatedAt)}
-                                                        </span>
-                                                    </div>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <p style={{ margin: 0, fontSize: '0.78rem', color: conv.unreadCount ? C.textMuted : C.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '75%', fontWeight: conv.unreadCount ? 500 : 300 }}>
-                                                            {conv.lastMessage?.content || 'Démarrer la conversation'}
-                                                        </p>
-                                                        {conv.unreadCount > 0 && (
-                                                            <span style={{ minWidth: 20, height: 20, borderRadius: 10, background: `linear-gradient(135deg,${C.gold},${C.goldLight})`, color: '#0A0C0F', fontSize: '0.65rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', flexShrink: 0 }}>
-                                                                {conv.unreadCount}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </motion.button>
-                                        );
-                                    })}
-                                </AnimatePresence>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ══ FENÊTRE CHAT ══ */}
-                    <div style={{
-                        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-                        background: C.bg,
-                        ...(mobile && !selConv ? { display: 'none' } : {}),
-                    }}
-                        className="chat-panel">
-                        <style>{`
-                            @media (min-width: 768px) { .chat-panel { display: flex !important; } }
-                        `}</style>
-
-                        {selConv ? (
-                            <>
-                                {/* Header chat */}
-                                <div style={{ padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 14, background: C.surface, flexShrink: 0 }}>
-                                    {/* Retour mobile */}
-                                    <button onClick={() => { setMobile(false); setSelConv(null); }}
-                                        className="back-btn"
-                                        style={{ display: 'none', background: 'none', border: 'none', color: C.textMuted, cursor: 'pointer', padding: 4 }}>
-                                        <ArrowLeft size={18} />
-                                    </button>
-                                    <style>{`@media (max-width:767px){ .back-btn { display:block !important; } }`}</style>
-
-                                    {(() => {
-                                        // ✅ CORRIGÉ : utilise && pour identifier correctement l'autre participant
-                                        const other = selConv.participants?.find(
-                                            p => (p._id || p) !== user?._id && (p._id || p) !== user?.id
-                                        );
-                                        return (
-                                            <>
-                                                <Avatar name={other?.name} photo={other?.photo} size={40} online />
-                                                <div style={{ flex: 1 }}>
-                                                    <p style={{ margin: 0, fontSize: '0.92rem', fontWeight: 600, color: C.text }}>
-                                                        {other?.name || 'Utilisateur'}
-                                                    </p>
-                                                    <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#22C55E', fontWeight: 400 }}>
-                                                        En ligne
-                                                    </p>
-                                                </div>
-                                            </>
-                                        );
-                                    })()}
-                                </div>
-
-                                {/* Composant ChatWindow existant */}
-                                <div style={{ flex: 1, overflow: 'hidden' }}>
-                                    <ChatWindow
-                                        conversation={selConv}
-                                        onBack={() => { setMobile(false); setSelConv(null); }}
-                                        onArchive={() => { setSelConv(null); setMobile(false); fetchConvs(); }}
-                                    />
-                                </div>
-                            </>
-                        ) : (
-                            /* Placeholder aucune conversation sélectionnée */
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, textAlign: 'center' }}>
-                                <div style={{ width: 80, height: 80, borderRadius: 24, background: `${C.gold}10`, border: `1px solid ${C.gold}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-                                    <MessageCircle size={36} style={{ color: C.gold, opacity: 0.6 }} />
-                                </div>
-                                <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: '1.5rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
-                                    Vos conversations
-                                </h3>
-                                <p style={{ color: C.textMuted, fontSize: '0.85rem', maxWidth: 280, lineHeight: 1.6, margin: '0 0 28px', fontWeight: 300 }}>
-                                    Sélectionnez une conversation ou démarrez-en une nouvelle avec l'équipe.
-                                </p>
-                                <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
-                                    onClick={() => setModal(true)}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 40, background: `linear-gradient(135deg,${C.gold},${C.goldLight})`, border: 'none', color: '#0A0C0F', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', boxShadow: `0 4px 20px ${C.gold}30` }}>
-                                    <Plus size={16} />
-                                    Démarrer une conversation
-                                </motion.button>
-                            </motion.div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* ══ MODAL NOUVELLE CONVERSATION ══ */}
-            <AnimatePresence>
-                {modal && (
-                    <NewConversationModal
-                        onClose={() => setModal(false)}
-                        onCreated={(conv) => {
-                            setModal(false);
-                            fetchConvs();
-                            setSelConv(conv);
-                            setMobile(true);
-                        }}
-                    />
-                )}
-            </AnimatePresence>
+      {notif && (
+        <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-xl shadow-xl text-white text-sm font-semibold ${
+          notif.type === "error"
+            ? "bg-gradient-to-r from-red-500 to-pink-600"
+            : "bg-gradient-to-r from-emerald-500 to-green-600"
+        }`}>
+          {notif.message}
         </div>
-    );
-};
+      )}
 
-// ─────────────────────────────────────────────────────────────
-const NewConversationModal = ({ onClose, onCreated }) => {
-    const [message,  setMessage]  = useState('');
-    const [loading,  setLoading]  = useState(false);
-    const [error,    setError]    = useState('');
-    const textRef = useRef(null);
+      {/* Header */}
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 bg-white flex-shrink-0">
+        <div className="p-2 rounded-xl" style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})` }}>
+          <MessageCircle className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h1 className="text-xl font-black text-gray-800">Mes messages</h1>
+          <p className="text-xs text-gray-400">Discutez directement avec {TEAM_LABEL}</p>
+        </div>
+      </div>
 
-    useEffect(() => { textRef.current?.focus(); }, []);
+      <div className="flex flex-1 overflow-hidden">
 
-    const handleSubmit = async e => {
-        e.preventDefault();
-        if (!message.trim()) return setError('Veuillez écrire un message.');
-        setLoading(true); setError('');
-        try {
-            const adminId = process.env.NEXT_PUBLIC_ADMIN_ID || '68f8edbad1e9333e12874f8c';
-            const conv    = await createOrGetConversation(adminId, message);
-            onCreated(conv);
-        } catch {
-            setError('Erreur lors de l\'envoi. Réessayez.');
-        } finally {
-            setLoading(false);
-        }
-    };
+        {/* ── Colonne gauche ── */}
+        <aside className="w-72 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col overflow-y-auto">
+          {loadingList ? (
+            <div className="flex-1 flex items-center justify-center">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
+              <MessageCircle className="w-10 h-10 text-gray-200" />
+              <p className="text-sm text-gray-500 font-medium">Aucune conversation pour le moment</p>
+              <button
+                onClick={contacterAgence}
+                disabled={starting}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50"
+                style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})` }}
+              >
+                {starting ? "Ouverture..." : "Contacter l'agence"}
+              </button>
+            </div>
+          ) : (
+            conversations.map(conv => {
+              const { propertyTitle } = convDisplay(conv);
+              const unread = conv.unreadCount || 0;
+              const isActive = selected?._id === conv._id;
 
-    return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', padding: '0 16px 0' }}
-            onClick={e => e.target === e.currentTarget && onClose()}>
+              return (
+                <button
+                  key={conv._id}
+                  onClick={() => setSelected(conv)}
+                  className={`w-full text-left px-4 py-3.5 border-b border-gray-100 transition-colors ${
+                    isActive ? "bg-blue-50 border-l-4 border-l-blue-400" : "hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
+                        style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})` }}>
+                        AV
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-gray-800 truncate">{TEAM_LABEL}</p>
+                        {propertyTitle && (
+                          <p className="text-xs text-gray-400 truncate flex items-center gap-1">
+                            <Home className="w-3 h-3 flex-shrink-0" />
+                            {propertyTitle}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className="text-xs text-gray-400">{formatTime(conv.updatedAt)}</span>
+                      {unread > 0 && (
+                        <span className="text-xs font-bold text-white px-1.5 py-0.5 rounded-full"
+                          style={{ background: GOLD }}>
+                          {unread}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {conv.lastMessage && (
+                    <p className="text-xs text-gray-400 mt-1.5 truncate pl-10">{conv.lastMessage}</p>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </aside>
 
-            <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                style={{ background: C.surface, borderRadius: '24px 24px 0 0', width: '100%', maxWidth: 560, border: `1px solid ${C.border}`, borderBottom: 'none', overflow: 'hidden', marginBottom: 0, paddingBottom: 'env(safe-area-inset-bottom)' }}>
-
-                {/* Poignée */}
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
-                    <div style={{ width: 36, height: 4, borderRadius: 2, background: C.border }} />
+        {/* ── Colonne droite : chat ── */}
+        <main className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+          {!selected ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
+              <MessageCircle className="w-12 h-12 text-gray-200" />
+              <p className="text-gray-400 font-medium">
+                {conversations.length === 0 ? "Contactez l'agence pour démarrer" : "Sélectionnez une conversation"}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="px-5 py-3.5 bg-white border-b border-gray-200 flex items-center gap-3 flex-shrink-0">
+                <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
+                  style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})` }}>
+                  AV
                 </div>
-
-                {/* Header modal */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 24px 16px' }}>
-                    <div>
-                        <h3 style={{ fontFamily: "var(--font-cormorant), serif", fontSize: '1.5rem', fontWeight: 700, color: C.text, margin: 0 }}>
-                            Nouveau message
-                        </h3>
-                        <p style={{ fontSize: '0.75rem', color: C.textMuted, margin: '4px 0 0', fontWeight: 300 }}>
-                            L'équipe Altitude Vision vous répondra rapidement
-                        </p>
-                    </div>
-                    <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 10, background: C.surfaceHi, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: C.textMuted }}>
-                        <X size={16} />
-                    </button>
+                <div>
+                  <p className="font-semibold text-sm text-gray-800">{TEAM_LABEL}</p>
+                  {convDisplay(selected).propertyTitle && (
+                    <p className="text-xs text-gray-400 flex items-center gap-1">
+                      <Home className="w-3 h-3" />
+                      {convDisplay(selected).propertyTitle}
+                    </p>
+                  )}
                 </div>
+              </div>
 
-                <form onSubmit={handleSubmit}>
-                    {/* Info bande */}
-                    <div style={{ margin: '0 24px 16px', padding: '12px 16px', borderRadius: 14, background: `${C.blue}12`, border: `1px solid ${C.blue}20`, display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: `linear-gradient(135deg,${C.blue},${C.gold})`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>AV</span>
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+                {loadingMsgs ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-sm text-gray-400">Écrivez votre premier message ci-dessous.</p>
+                  </div>
+                ) : (
+                  messages.map(msg => {
+                    const isMine = msg.sender?._id === user?._id || msg.sender?.toString() === user?._id;
+                    return (
+                      <div key={msg._id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                        {!isMine && (
+                          <div className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold mr-2 self-end"
+                            style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})` }}>
+                            AV
+                          </div>
+                        )}
+                        <div className="max-w-[68%]">
+                          <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                            isMine
+                              ? "text-white rounded-br-sm"
+                              : "bg-white text-gray-800 shadow-sm rounded-bl-sm border border-gray-100"
+                          }`}
+                            style={isMine ? { background: `linear-gradient(135deg, #1A5A8A, ${BLUE})` } : {}}>
+                            {msg.attachments?.length > 0 && (
+                              <div className="flex flex-col gap-1.5 mb-1.5">
+                                {msg.attachments.map((att, i) => (
+                                  <div key={i}>{renderAttachment(att)}</div>
+                                ))}
+                              </div>
+                            )}
+                            {!!msg.content && msg.content}
+                          </div>
+                          <p className={`text-xs text-gray-400 mt-1 ${isMine ? "text-right" : "text-left"}`}>
+                            {/* Anonymat de l'équipe : jamais le nom du collaborateur qui a répondu */}
+                            {isMine ? "Vous" : TEAM_LABEL} · {formatTime(msg.createdAt)}
+                          </p>
                         </div>
-                        <p style={{ margin: 0, fontSize: '0.78rem', color: C.textMuted, lineHeight: 1.5, fontWeight: 300 }}>
-                            Équipe <strong style={{ color: C.text, fontWeight: 600 }}>Altitude Vision</strong> — Réponse sous 24h
-                        </p>
-                    </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={bottomRef} />
+              </div>
 
-                    {/* Zone texte */}
-                    <div style={{ margin: '0 24px' }}>
-                        <textarea ref={textRef}
-                            value={message}
-                            onChange={e => { setMessage(e.target.value); setError(''); }}
-                            placeholder="Décrivez votre demande..."
-                            maxLength={2000} rows={5}
-                            style={{
-                                width: '100%', padding: '14px 16px',
-                                background: C.surfaceHi, border: `1px solid ${error ? '#EF4444' : C.border}`,
-                                borderRadius: 16, color: C.text, fontSize: '0.88rem',
-                                fontFamily: "var(--font-dm-sans), sans-serif", resize: 'none',
-                                lineHeight: 1.6, transition: 'border-color 0.2s',
-                            }}
-                            onFocus={e => e.target.style.borderColor = `${C.gold}50`}
-                            onBlur={e => e.target.style.borderColor = error ? '#EF4444' : C.border}
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                            {error
-                                ? <span style={{ fontSize: '0.75rem', color: '#EF4444' }}>{error}</span>
-                                : <span />
-                            }
-                            <span style={{ fontSize: '0.72rem', color: C.textFaint }}>{message.length}/2000</span>
-                        </div>
+              {pendingFiles.length > 0 && (
+                <div className="px-4 pt-2.5 bg-white flex flex-wrap gap-2 flex-shrink-0">
+                  {pendingFiles.map((f, i) => (
+                    <div key={i} className="flex items-center gap-1.5 bg-gray-100 rounded-lg px-2.5 py-1.5 text-xs text-gray-600">
+                      <Paperclip size={12} className="flex-shrink-0" />
+                      <span className="truncate max-w-[140px]">{f.name}</span>
+                      <button type="button" onClick={() => removePendingFile(i)}
+                        className="text-gray-400 hover:text-red-500 transition-colors">
+                        <X size={12} />
+                      </button>
                     </div>
+                  ))}
+                </div>
+              )}
 
-                    {/* Boutons */}
-                    <div style={{ display: 'flex', gap: 10, padding: '16px 24px 24px' }}>
-                        <button type="button" onClick={onClose}
-                            style={{ flex: 1, padding: '12px', borderRadius: 14, background: 'transparent', border: `1px solid ${C.border}`, color: C.textMuted, fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', fontFamily: "var(--font-dm-sans), sans-serif" }}>
-                            Annuler
-                        </button>
-                        <motion.button type="submit" disabled={loading || !message.trim()}
-                            whileHover={{ scale: (loading || !message.trim()) ? 1 : 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            style={{ flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 14, background: (loading || !message.trim()) ? C.surfaceHi : `linear-gradient(135deg,${C.gold},${C.goldLight})`, border: 'none', color: (loading || !message.trim()) ? C.textFaint : '#0A0C0F', fontSize: '0.85rem', fontWeight: 600, cursor: (loading || !message.trim()) ? 'not-allowed' : 'pointer', fontFamily: "var(--font-dm-sans), sans-serif", transition: 'all 0.2s', boxShadow: (loading || !message.trim()) ? 'none' : `0 4px 16px ${C.gold}30` }}>
-                            {loading
-                                ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Envoi...</>
-                                : <><Send size={16} /> Envoyer</>
-                            }
-                        </motion.button>
-                    </div>
-                </form>
-            </motion.div>
-        </motion.div>
-    );
+              <form
+                onSubmit={handleSend}
+                className="relative px-4 py-3 bg-white border-t border-gray-200 flex items-end gap-2 flex-shrink-0"
+              >
+                {showEmoji && (
+                  <div className="absolute bottom-full left-4 mb-2 bg-white border border-gray-200 rounded-xl shadow-xl p-3 grid grid-cols-6 gap-1 z-20">
+                    {EMOJIS.map(e => (
+                      <button key={e} type="button"
+                        onClick={() => setInput(t => t + e)}
+                        className="text-xl p-1 rounded hover:bg-gray-100 transition-colors">
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,audio/*,application/pdf"
+                  ref={fileInputRef}
+                  onChange={e => {
+                    setPendingFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-shrink-0 p-2.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                  aria-label="Joindre un fichier"
+                >
+                  <Paperclip size={18} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowEmoji(v => !v)}
+                  className="flex-shrink-0 p-2.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors text-lg"
+                  aria-label="Emojis"
+                >
+                  😊
+                </button>
+
+                <textarea
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(e); }
+                  }}
+                  placeholder="Écrivez à l'équipe…"
+                  rows={2}
+                  className="flex-1 resize-none text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                />
+                <button
+                  type="submit"
+                  disabled={(!input.trim() && pendingFiles.length === 0) || sending}
+                  className="flex-shrink-0 p-2.5 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
+                  style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})` }}
+                >
+                  {sending
+                    ? <Loader2 className="w-5 h-5 animate-spin" />
+                    : <Send className="w-5 h-5" />
+                  }
+                </button>
+              </form>
+            </>
+          )}
+        </main>
+      </div>
+    </div>
+  );
 };
 
 export default MessagesPage;

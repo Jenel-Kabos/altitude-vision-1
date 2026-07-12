@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const Signalement  = require('../models/Signalement');
+const { uploadToCloudinary } = require('../config/cloudinary');
 
 exports.creerSignalement = asyncHandler(async (req, res) => {
   const { propertyId, raison, details } = req.body;
@@ -15,11 +16,24 @@ exports.creerSignalement = asyncHandler(async (req, res) => {
     throw new Error('Vous avez déjà signalé cette annonce.');
   }
 
+  const preuves = [];
+  if (req.files?.length) {
+    for (const file of req.files) {
+      const result = await uploadToCloudinary(file.buffer, {
+        folder:        'altitude-vision/signalements',
+        public_id:     `signalement-${propertyId}-${Date.now()}`,
+        resource_type: file.mimetype.startsWith('image/') ? 'image' : 'raw',
+      });
+      preuves.push({ url: result.secure_url, nom: file.originalname, type: file.mimetype });
+    }
+  }
+
   const signalement = await Signalement.create({
     property:   propertyId,
     signalePar: req.user._id,
     raison,
     details: details?.slice(0, 500) || '',
+    preuves,
   });
 
   res.status(201).json({
@@ -40,7 +54,7 @@ exports.getAllSignalements = asyncHandler(async (req, res) => {
 
   const [signalements, total] = await Promise.all([
     Signalement.find(filter)
-      .populate('property',   'title address price')
+      .populate('property',   'title images address price')
       .populate('signalePar', 'name email')
       .populate('traitePar',  'name')
       .sort('-createdAt')

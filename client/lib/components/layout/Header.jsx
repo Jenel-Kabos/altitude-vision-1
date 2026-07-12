@@ -249,7 +249,7 @@ const NavDropdown = ({ item, pathname, size = 'xl' }) => {
   );
 };
 
-const ProfileDropdown = ({ user, isTablet, profileOpen, setProfile, handleLogout, isAdmin, isOwner }) => (
+const ProfileDropdown = ({ user, isTablet, profileOpen, setProfile, handleLogout, isAdmin, isOwner, msgUrl }) => (
   <div style={{ position: 'relative' }}>
     <button onClick={() => setProfile(!profileOpen)} className="header-profile-btn"
       aria-expanded={profileOpen} aria-haspopup="true"
@@ -302,7 +302,7 @@ const ProfileDropdown = ({ user, isTablet, profileOpen, setProfile, handleLogout
 
         <div style={{ padding: (isAdmin || isOwner) ? '0 8px' : '8px 8px 0' }}>
           {PROFILE_LINKS.map(({ to, Icon, label, color }) => (
-            <Link key={to} href={to} onClick={() => setProfile(false)} className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '4px', color: 'rgba(240,237,232,0.55)', fontSize: '0.8rem', fontWeight: 300, transition: '0.15s', textDecoration: 'none' }}>
+            <Link key={to} href={to === '/messages' ? msgUrl : to} onClick={() => setProfile(false)} className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '4px', color: 'rgba(240,237,232,0.55)', fontSize: '0.8rem', fontWeight: 300, transition: '0.15s', textDecoration: 'none' }}>
               <Icon size={14} style={{ color, flexShrink: 0 }} /> {label}
             </Link>
           ))}
@@ -344,6 +344,8 @@ const Header = () => {
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Collaborateur';
   const isOwner = user?.role === 'Proprietaire';
+  // Le staff a sa propre boîte partagée ; les autres utilisateurs ont leur messagerie perso
+  const msgUrl  = isAdmin ? '/dashboard/conversations' : '/messages';
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
@@ -418,7 +420,7 @@ const Header = () => {
                   <Building size={13} />{!isTablet && 'Mes Biens'}
                 </Link>
               )}
-              <Link href="/messages" className="header-icon-btn" style={{ position: 'relative', padding: '10px', borderRadius: '4px', color: 'rgba(240,237,232,0.45)', display: 'flex', border: '1px solid transparent', minHeight: '44px', minWidth: '44px', alignItems: 'center', justifyContent: 'center' }}>
+              <Link href={msgUrl} className="header-icon-btn" style={{ position: 'relative', padding: '10px', borderRadius: '4px', color: 'rgba(240,237,232,0.45)', display: 'flex', border: '1px solid transparent', minHeight: '44px', minWidth: '44px', alignItems: 'center', justifyContent: 'center' }}>
                 <MessageCircle size={isTablet ? 16 : 18} />
                 <UnreadMessagesBadge count={unreadCount} className="absolute -top-0.5 -right-0.5" />
               </Link>
@@ -426,7 +428,7 @@ const Header = () => {
                 <NotificationBell isAuthenticated={!!user} />
               </div>
               <div ref={profileRef}>
-                <ProfileDropdown user={user} isTablet={isTablet} profileOpen={profileOpen} setProfile={setProfile} handleLogout={handleLogout} isAdmin={isAdmin} isOwner={isOwner} />
+                <ProfileDropdown user={user} isTablet={isTablet} profileOpen={profileOpen} setProfile={setProfile} handleLogout={handleLogout} isAdmin={isAdmin} isOwner={isOwner} msgUrl={msgUrl} />
               </div>
             </>
           )}
@@ -446,7 +448,7 @@ const Header = () => {
           )}
 
           {mounted && isMobile && user && (
-            <Link href="/messages" className="header-icon-btn" style={{ position: 'relative', padding: '10px', borderRadius: '4px', color: 'rgba(240,237,232,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', minWidth: '44px' }}>
+            <Link href={msgUrl} className="header-icon-btn" style={{ position: 'relative', padding: '10px', borderRadius: '4px', color: 'rgba(240,237,232,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', minWidth: '44px' }}>
               <MessageCircle size={18} />
               <UnreadMessagesBadge count={unreadCount} className="absolute -top-0.5 -right-0.5" />
             </Link>
@@ -546,7 +548,7 @@ const Header = () => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px' }}>
                   {PROFILE_LINKS.map(({ to, Icon, label, color }) => (
-                    <Link key={to} href={to} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', borderRadius: '4px', background: 'rgba(240,237,232,0.02)', border: '1px solid rgba(240,237,232,0.05)', color: 'rgba(240,237,232,0.5)', fontSize: '0.82rem', fontWeight: 300, textDecoration: 'none', minHeight: '44px' }}>
+                    <Link key={to} href={to === '/messages' ? msgUrl : to} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', borderRadius: '4px', background: 'rgba(240,237,232,0.02)', border: '1px solid rgba(240,237,232,0.05)', color: 'rgba(240,237,232,0.5)', fontSize: '0.82rem', fontWeight: 300, textDecoration: 'none', minHeight: '44px' }}>
                       <Icon size={15} style={{ color, flexShrink: 0 }} />{label}
                     </Link>
                   ))}

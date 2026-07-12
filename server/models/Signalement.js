@@ -19,6 +19,12 @@ const signalementSchema = new mongoose.Schema(
       enum: ['prix_incorrect', 'annonce_expiree', 'photos_trompeuses', 'fraude', 'contenu_inapproprie', 'autre'],
     },
     details: { type: String, maxlength: 500, default: '' },
+    preuves: [{
+      url:       String,
+      nom:       String,
+      type:      String,
+      dateAjout: { type: Date, default: Date.now },
+    }],
     statut: {
       type: String,
       enum: ['en_attente', 'traite', 'rejete'],

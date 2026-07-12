@@ -6,7 +6,7 @@ const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
-const { cleanupUploadedFiles } = require('../middleware/uploadMiddleware');
+const { uploadToCloudinary } = require('../config/cloudinary');
 const { getIO, isUserOnline } = require('../socket');
 const { sendExpoPushNotification } = require('../utils/expoPush');
 const logger = require('../utils/logger');
@@ -17,22 +17,55 @@ const logger = require('../utils/logger');
  * @access Protected
  */
 exports.sendMessage = asyncHandler(async (req, res) => {
-    const { conversationId, receiverId, content } = req.body;
+    const { conversationId, receiverId, content, duration } = req.body;
     const uploadedFiles = req.files || [];
 
     // --- 1. Validation ---
-    if (!content || (!conversationId && !receiverId)) {
-        cleanupUploadedFiles(uploadedFiles);
+    if ((!content && !uploadedFiles.length) || (!conversationId && !receiverId)) {
         res.status(400);
-        throw new Error('Le contenu et soit conversationId ou receiverId sont requis.');
+        throw new Error('Le contenu ou une pièce jointe, et soit conversationId ou receiverId sont requis.');
     }
 
-    const attachmentsData = uploadedFiles.map(file => ({
-        filename: file.originalname,
-        filepath: file.path,
-        mimetype: file.mimetype,
-        size: file.size
-    }));
+    // --- 1bis. Upload des pièces jointes vers Cloudinary ---
+    // Extraction de durée : pas de ffprobe côté serveur (dépendance binaire lourde,
+    // hors scope pour un simple message). Le client peut mesurer la durée lui-même
+    // (mobile : sound.getStatusAsync()/video.getStatusAsync() d'expo-av ; web :
+    // l'évènement 'loadedmetadata' de <audio>/<video>) et l'envoyer en secondes
+    // dans le champ `duration` du FormData. Non implémenté côté ChatScreen.jsx /
+    // MessagesPage.jsx dans cette passe — seul le backend est prêt à la recevoir.
+    // Limite : un seul champ `duration` par requête, appliqué au premier
+    // attachment audio/vidéo — pas de mapping par fichier si plusieurs médias
+    // datés sont envoyés dans le même message.
+    let durationApplied = false;
+    const attachmentsData = [];
+    if (uploadedFiles.length) {
+        for (const file of uploadedFiles) {
+            const isVideo = file.mimetype.startsWith('video/');
+            const isAudio = file.mimetype.startsWith('audio/');
+            const isImage = file.mimetype.startsWith('image/');
+            // Cloudinary n'a pas de resource_type dédié à l'audio — 'video' couvre les deux.
+            const resourceType = (isVideo || isAudio) ? 'video' : isImage ? 'image' : 'raw';
+
+            const result = await uploadToCloudinary(file.buffer, {
+                folder:        'altitude-vision/messages',
+                resource_type: resourceType,
+            });
+
+            let attDuration;
+            if ((isVideo || isAudio) && duration && !durationApplied) {
+                attDuration = Number(duration) || undefined;
+                durationApplied = true;
+            }
+
+            attachmentsData.push({
+                url:      result.secure_url,
+                type:     isVideo ? 'video' : isAudio ? 'audio' : isImage ? 'image' : 'file',
+                nom:      file.originalname,
+                size:     file.size,
+                duration: attDuration,
+            });
+        }
+    }
 
     let targetUserId = null;
     let convDoc = null;
@@ -44,7 +77,6 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     } else if (conversationId) {
         convDoc = await Conversation.findById(conversationId);
         if (!convDoc) {
-            cleanupUploadedFiles(uploadedFiles);
             res.status(404);
             throw new Error('Conversation non trouvée.');
         }
@@ -68,7 +100,6 @@ exports.sendMessage = asyncHandler(async (req, res) => {
                 (p) => p.toString() !== req.user.id.toString()
             );
             if (!otherParticipantId) {
-                cleanupUploadedFiles(uploadedFiles);
                 res.status(404);
                 throw new Error('Destinataire non trouvé dans la conversation.');
             }
@@ -81,7 +112,6 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     if (targetUserId) {
         receiver = await User.findById(targetUserId);
         if (!receiver) {
-            cleanupUploadedFiles(uploadedFiles);
             res.status(404);
             throw new Error('Destinataire non trouvé.');
         }

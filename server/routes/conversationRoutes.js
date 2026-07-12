@@ -13,6 +13,7 @@ const {
   getUnreadCount,
   startConversation,        // ✅  NOUVEAU — remplace createOrGetConversation pour les nouveaux flux
   getStaffInbox,            // ✅  NOUVEAU — boîte partagée staff
+  getMyInbox,                // ✅  NOUVEAU — ma propre conversation staff-inbox (client)
 } = require('../controllers/conversationController');
 
 // 🔒 Toutes les routes nécessitent un token valide
@@ -25,6 +26,9 @@ router.get('/count/unread', getUnreadCount);
 
 // Boîte partagée staff (Admin + tous sous-rôles collaborateurs)
 router.get('/staff-inbox', getStaffInbox);
+
+// Ma propre conversation staff-inbox (côté client/propriétaire)
+router.get('/my-inbox', getMyInbox);
 
 // ✅ Nouvelle route de création — routage staff/client automatique
 router.post('/start', startConversation);
