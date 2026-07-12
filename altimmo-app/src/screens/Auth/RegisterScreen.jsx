@@ -18,7 +18,10 @@ import { fonts, fontSize, spacing, radius } from '../../theme';
 WebBrowser.maybeCompleteAuthSession();
 
 const ANDROID_CLIENT = '3869205293-5d0vk1p5vanhoocdk3d4hr442pg8li6q.apps.googleusercontent.com';
-const EMAIL_RE       = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Requis par expo-auth-session sur Android pour obtenir un idToken valide
+// (androidClientId seul ne suffit pas à obtenir l'audience id_token).
+const WEB_CLIENT      = '3869205293-ej9uld9a25m8i01o41e37pliaac4eumo.apps.googleusercontent.com';
+const EMAIL_RE        = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const ROLES = [
   { value: 'Client',       icon: 'person-outline', label: 'Client',       desc: 'Chercher et louer des biens' },
@@ -184,6 +187,7 @@ export default function RegisterScreen({ navigation }) {
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     androidClientId: ANDROID_CLIENT,
+    webClientId:     WEB_CLIENT,
   });
 
   // Rôle par défaut 'Client' — CompleterProfilScreen permettra de choisir
