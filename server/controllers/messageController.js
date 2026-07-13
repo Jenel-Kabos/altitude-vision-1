@@ -168,6 +168,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             for (const s of staff) {
                 getIO().to(s._id.toString()).emit('new-staff-message', { conversationId: convDoc._id, message });
             }
+            console.log('[NOTIF DEBUG] notifyStaff appelé, staff roles:', ['Admin','Collaborateur']);
             notifyStaff({
                 type: 'new_staff_message',
                 title: senderName,
@@ -178,6 +179,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             // Conv 1-à-1 ou staff → client : notifier le destinataire
             const recipientIdStr = targetUserId.toString();
             getIO().to(recipientIdStr).emit('new-message', { conversationId: convDoc._id, message });
+            console.log('[NOTIF DEBUG] notify appelé pour:', recipientIdStr);
             notify(recipientIdStr, {
                 type: 'new_message',
                 title: senderName,
