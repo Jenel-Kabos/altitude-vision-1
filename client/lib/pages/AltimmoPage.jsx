@@ -304,14 +304,26 @@ const PAGE_CSS = `
     background: #F8F8F5;
   }
   .ai-estim-card {
-    max-width: 480px;
+    max-width: 900px;
     margin: 0 auto;
     background: #fff;
     border-radius: 20px;
     overflow: hidden;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 380px;
     box-shadow: 0 8px 40px rgba(0,0,0,0.10),
                 0 2px 8px rgba(200,150,12,0.08);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  @media (max-width: 768px) {
+    .ai-estim-card {
+      grid-template-columns: 1fr;
+    }
+    .ai-estim-img-wrap {
+      height: 220px;
+      order: -1;
+    }
   }
   .ai-estim-card:hover {
     transform: translateY(-4px);
@@ -320,7 +332,11 @@ const PAGE_CSS = `
   }
   .ai-estim-img-wrap {
     position: relative;
-    height: 240px;
+    height: auto;
+    min-height: 300px;
+    border-radius: 0;
+    border-top-right-radius: 20px;
+    border-bottom-right-radius: 20px;
     overflow: hidden;
   }
   .ai-estim-img {
@@ -346,7 +362,10 @@ const PAGE_CSS = `
     backdrop-filter: blur(4px);
   }
   .ai-estim-body {
-    padding: 28px 28px 32px;
+    padding: 40px 36px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
   .ai-estim-eyebrow {
     font-size: 0.72rem;
@@ -885,22 +904,6 @@ const AltimmoPage = () => {
                     <FadeIn>
                         <div className="ai-estim-card">
 
-                            {/* Image en haut */}
-                            <div className="ai-estim-img-wrap">
-                                <Image
-                                    src="https://images.unsplash.com/photo-1560518883-ce09059eeffa"
-                                    alt="Estimation immobilière Congo Brazzaville"
-                                    fill
-                                    sizes="(max-width: 768px) 100vw, 480px"
-                                    style={{ objectFit: 'cover' }}
-                                    className="ai-estim-img"
-                                />
-                                {/* Badge flottant */}
-                                <div className="ai-estim-badge">
-                                    ✦ Gratuit & Sans engagement
-                                </div>
-                            </div>
-
                             {/* Corps de la card */}
                             <div className="ai-estim-body">
                                 <p className="ai-estim-eyebrow">Estimation immobilière</p>
@@ -931,6 +934,22 @@ const AltimmoPage = () => {
                                     Estimer mon bien gratuitement
                                     <ArrowRight size={18} />
                                 </Link>
+                            </div>
+
+                            {/* Image à droite */}
+                            <div className="ai-estim-img-wrap">
+                                <Image
+                                    src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=85"
+                                    alt="Villa de luxe Congo Brazzaville"
+                                    fill
+                                    sizes="(max-width: 768px) 100vw, 450px"
+                                    style={{ objectFit: 'cover' }}
+                                    className="ai-estim-img"
+                                />
+                                {/* Badge flottant */}
+                                <div className="ai-estim-badge">
+                                    ✦ Gratuit & Sans engagement
+                                </div>
                             </div>
                         </div>
                     </FadeIn>
