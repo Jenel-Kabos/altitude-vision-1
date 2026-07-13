@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { fonts, fontSize, spacing } from '../../theme';
+import api from '../../services/api';
 import {
   getNotifications,
   markRead,
@@ -19,6 +20,7 @@ import {
   clearRead,
 } from '../../services/notificationApiService';
 import { connectSocket, getSocket } from '../../services/socketService';
+import { getCurrentUserId } from '../../services/notificationsService';
 
 // ─── Config icônes par type ───────────────────────────────────────────────────
 
@@ -64,11 +66,18 @@ const formatRelativeTime = (dateStr) => {
 
 function getNavTarget(notif) {
   const { type, data = {} } = notif;
+
+  // 'Chat' est imbriqué dans MessagerieStack (onglet 'Messages') — naviguer
+  // directement vers 'Chat' depuis un autre onglet (Annonces) échoue, il faut
+  // passer par le tab parent avec les params imbriqués.
+  if (data?.screen === 'Chat') {
+    return { screen: 'Messages', params: { screen: 'Chat', params: data.params } };
+  }
   if (data?.screen) return { screen: data.screen, params: data.params };
 
   const MAP = {
-    new_message:           { screen: 'Messages' },
-    new_staff_message:     { screen: 'Messages' },
+    new_message:           { screen: 'Messages', params: { screen: 'Chat' } },
+    new_staff_message:     { screen: 'Messages', params: { screen: 'Chat' } },
     visite_new:            { screen: 'Visites'  },
     visite_status:         { screen: 'Visites'  },
     visite_cancelled:      { screen: 'Visites'  },
@@ -227,7 +236,32 @@ export default function NotificationsScreen({ navigation }) {
       markRead(notif._id).catch(() => {});
     }
 
-    // Navigation
+    // Enrichir la navigation pour les messages — data ne contient que
+    // conversationId, il faut charger la conversation complète (participants,
+    // relatedProperty) avant de naviguer vers ChatScreen.
+    const { type, data = {} } = notif;
+    if ((type === 'new_message' || type === 'new_staff_message') && data.conversationId) {
+      try {
+        const res = await api.get(`/conversations/${data.conversationId}`);
+        const conversation = res.data?.data?.conversation;
+        if (conversation) {
+          const currentUserId = await getCurrentUserId();
+          const contact = conversation.participants?.find(
+            (p) => p._id?.toString() !== currentUserId
+          ) || { name: 'Équipe Altitude Vision' };
+          navigation.navigate('Messages', {
+            screen: 'Chat',
+            params: { conversation, contact },
+          });
+          return;
+        }
+      } catch {}
+      // Fallback : ouvre la liste des conversations
+      navigation.navigate('Messages', {});
+      return;
+    }
+
+    // Autres types : navigation standard
     const target = getNavTarget(notif);
     if (target) {
       navigation.navigate(target.screen, target.params);

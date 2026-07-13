@@ -43,7 +43,7 @@ export const programmerNotificationLocale = async (titre, corps, delaySeconds = 
 // Pas de vérification de signature ici : on lit juste le payload pour trouver
 // "qui suis-je" côté client, la vérification d'authenticité reste au serveur.
 
-const getCurrentUserId = async () => {
+export const getCurrentUserId = async () => {
   try {
     const token = await getToken();
     if (!token) return null;
