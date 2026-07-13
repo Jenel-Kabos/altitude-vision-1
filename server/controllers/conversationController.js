@@ -7,6 +7,43 @@ const Conversation = require('../models/Conversation');
 const STAFF_ROLES = ['Admin', 'Collaborateur'];
 
 /**
+ * @description Récupérer une conversation par son ID (objet complet peuplé)
+ * @route GET /api/conversations/:conversationId
+ * @access Protected (participant ou staff)
+ */
+exports.getConversationById = asyncHandler(async (req, res) => {
+  const { conversationId } = req.params;
+
+  const conversation = await Conversation.findById(conversationId)
+    .populate('participants', 'name email photo role')
+    .populate('relatedProperty', 'title images address')
+    .lean();
+
+  if (!conversation) {
+    return res.status(404).json({
+      status: 'fail',
+      message: 'Conversation introuvable',
+    });
+  }
+
+  const isStaff = STAFF_ROLES.includes(req.user.role);
+  const isParticipant = conversation.participants
+    .some((p) => p._id.toString() === req.user.id);
+
+  if (!isStaff && !isParticipant) {
+    return res.status(403).json({
+      status: 'fail',
+      message: 'Accès refusé',
+    });
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: { conversation },
+  });
+});
+
+/**
  * @description Récupérer toutes les conversations de l'utilisateur
  * @route GET /api/conversations
  * @access Protected

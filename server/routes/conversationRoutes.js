@@ -5,6 +5,7 @@ const router = express.Router();
 
 const authController = require('../controllers/authController');
 const {
+  getConversationById,
   getConversations,
   getConversationMessages,
   markConversationAsRead,
@@ -42,6 +43,8 @@ router.post('/', createOrGetConversation);
 
 // ── Routes dynamiques ────────────────────────────────────────────────────────
 
+// AVANT /:conversationId/messages pour éviter tout conflit de route
+router.get('/:conversationId', getConversationById);
 router.get('/:conversationId/messages', getConversationMessages);
 router.patch('/:conversationId/mark-read', markConversationAsRead);
 router.delete('/:conversationId', deleteConversation);

@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import api from './api';
+import api, { getToken } from './api';
 import { navigate } from './navigationService';
 
 Notifications.setNotificationHandler({
@@ -39,13 +39,61 @@ export const programmerNotificationLocale = async (titre, corps, delaySeconds = 
   });
 };
 
+// ─── Identification de l'utilisateur courant (décodage JWT local) ────────────
+// Pas de vérification de signature ici : on lit juste le payload pour trouver
+// "qui suis-je" côté client, la vérification d'authenticité reste au serveur.
+
+const getCurrentUserId = async () => {
+  try {
+    const token = await getToken();
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.id || payload._id || payload.sub;
+  } catch {
+    return null;
+  }
+};
+
 // ─── Mapping type → écran de navigation ──────────────────────────────────────
 // data.screen peut déjà être fourni par le serveur ; ce fallback couvre les push Expo
 // qui n'ont pas de data.screen (push anciens, ou envoyés hors du nouveau système).
 
 const TYPE_TO_SCREEN = {
-  new_message:           (data) => ['Messages', { screen: 'Chat', params: data }],
-  new_staff_message:     (data) => ['Messages', { screen: 'Chat', params: data }],
+  new_message: async (data) => {
+    if (!data?.conversationId) return ['Messages', {}];
+    try {
+      const res = await api.get(`/conversations/${data.conversationId}`);
+      const conversation = res.data?.data?.conversation;
+      if (!conversation) return ['Messages', {}];
+      const currentUserId = await getCurrentUserId();
+      const contact = conversation.participants?.find(
+        (p) => p._id?.toString() !== currentUserId
+      ) || { name: 'Équipe Altitude Vision' };
+      return ['Messages', {
+        screen: 'Chat',
+        params: { conversation, contact },
+      }];
+    } catch {
+      return ['Messages', {}];
+    }
+  },
+  new_staff_message: async (data) => {
+    if (!data?.conversationId) return ['Messages', {}];
+    try {
+      const res = await api.get(`/conversations/${data.conversationId}`);
+      const conversation = res.data?.data?.conversation;
+      if (!conversation) return ['Messages', {}];
+      return ['Messages', {
+        screen: 'Chat',
+        params: {
+          conversation,
+          contact: { name: 'Équipe Altitude Vision' },
+        },
+      }];
+    } catch {
+      return ['Messages', {}];
+    }
+  },
   visite_new:            ()     => ['Visites'],
   visite_status:         ()     => ['Visites'],
   visite_cancelled:      ()     => ['Visites'],
@@ -64,18 +112,23 @@ const TYPE_TO_SCREEN = {
   account_suspended:     ()     => ['Profil'],
 };
 
-function resolveNavigation(data = {}) {
+async function resolveNavigation(data = {}) {
   const { type, screen, params } = data;
 
-  // Si le serveur a fourni un screen explicite, on l'utilise
+  // Le resolver dédié au type est prioritaire — il peut enrichir les params
+  // (ex: charger la conversation complète) avant de determiner l'écran.
+  // Sans ça, `data.screen` (fixé par le serveur, ex: 'Chat') court-circuiterait
+  // toujours ce resolver et repasserait des params insuffisants à ChatScreen.
+  const resolver = TYPE_TO_SCREEN[type];
+  if (resolver) {
+    const result = await resolver(data);
+    if (result) return result; // [screenName] ou [screenName, nestedParams]
+  }
+
+  // Fallback : screen explicite fourni par le serveur (types sans resolver dédié)
   if (screen) return [screen, params];
 
-  const resolver = TYPE_TO_SCREEN[type];
-  if (!resolver) return null;
-
-  const result = resolver(data);
-  if (!result) return null;
-  return result; // [screenName] ou [screenName, nestedParams]
+  return null;
 }
 
 // ─── Listeners à initialiser une seule fois au démarrage ─────────────────────
@@ -96,9 +149,9 @@ export function setupNotificationListeners() {
   });
 
   // Tap sur la notification — navigation vers l'écran concerné
-  _responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
+  _responseListener = Notifications.addNotificationResponseReceivedListener(async (response) => {
     const data = response.notification.request.content.data || {};
-    const target = resolveNavigation(data);
+    const target = await resolveNavigation(data);
     if (!target) return;
 
     const [screen, params] = target;

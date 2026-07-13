@@ -112,7 +112,7 @@ const AudioPlayer = memo(function AudioPlayer({ url, nom, styles }) {
 // ─── ChatScreen ───────────────────────────────────────────────────────────────
 
 export default function ChatScreen({ route, navigation }) {
-  const { conversation, contact }  = route.params;
+  const { conversation, contact } = route?.params ?? {};
   const { user }           = useAuth();
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -180,10 +180,11 @@ export default function ChatScreen({ route, navigation }) {
       const msgs = res.data?.data?.messages || res.data?.messages || [];
       setMessages(msgs.reverse());
     } catch {}
-  }, [conversation._id]);
+  }, [conversation?._id]);
 
   // ─── Socket.IO + polling de rattrapage ───
   useEffect(() => {
+    if (!conversation) return;
     fetchMessages();
 
     let isMounted = true;
@@ -225,7 +226,7 @@ export default function ChatScreen({ route, navigation }) {
       socketRef?.off('typing',      handleTyping);
       clearInterval(fallback);
     };
-  }, [conversation._id, user._id, fetchMessages]);
+  }, [conversation, conversation?._id, user._id, fetchMessages]);
 
   // ─── Envoi optimiste (texte et/ou pièce jointe) ───
   const sendMessage = useCallback(async () => {
@@ -277,12 +278,12 @@ export default function ChatScreen({ route, navigation }) {
         prev.map(m => m._id === tempMsg._id ? { ...m, error: true } : m)
       );
     }
-  }, [text, selectedFile, user, conversation._id, contact]);
+  }, [text, selectedFile, user, conversation?._id, contact]);
 
   const onTyping = useCallback((val) => {
     setText(val);
     getSocket()?.emit('typing', { conversationId: conversation._id, userId: user._id });
-  }, [conversation._id, user._id]);
+  }, [conversation?._id, user._id]);
 
   // ─── Sélection de pièces jointes ───
   const pickImage = useCallback(async () => {
@@ -402,6 +403,24 @@ export default function ChatScreen({ route, navigation }) {
       </View>
     );
   }, [isMe, messages, styles, c, renderAttachment]);
+
+  if (!conversation) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center',
+        alignItems: 'center', backgroundColor: c.bg }}>
+        <Ionicons name="chatbubble-outline" size={48}
+          color={c.textMuted} />
+        <Text style={{ color: c.textMuted, marginTop: 12 }}>
+          Conversation introuvable
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ marginTop: 16, padding: 12 }}>
+          <Text style={{ color: c.gold }}>Retour</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
