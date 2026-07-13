@@ -4,6 +4,7 @@ const router        = express.Router();
 const sendEmail     = require('../utils/email');
 const Estimation    = require('../models/Estimation');
 const auth          = require('../controllers/authController');
+const { notifyStaff } = require('../services/notificationService');
 
 const staffOnly = [auth.protect, auth.restrictTo('Admin', 'Collaborateur')];
 
@@ -141,6 +142,14 @@ router.post('/', async (req, res) => {
             typeBien, transaction, adresse, surface, chambres,
             etat, disponibilite, description, nom, email, telephone,
         });
+
+        // 0️⃣bis Notifier le staff (cloche/liste + push) — best-effort
+        notifyStaff({
+            type:  'estimation_received',
+            title: `Nouvelle demande d'estimation de ${nom}`,
+            body:  `${typeBien} à ${adresse}`,
+            data:  { screen: 'Estimations' },
+        }).catch(() => {});
 
         // 1️⃣ Email interne → agence
         await sendEmail({

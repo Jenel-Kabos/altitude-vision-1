@@ -7,8 +7,8 @@ const Message = require('../models/Message');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const { uploadToCloudinary } = require('../config/cloudinary');
-const { getIO, isUserOnline } = require('../socket');
-const { sendExpoPushNotification } = require('../utils/expoPush');
+const { getIO } = require('../socket');
+const { notify, notifyStaff } = require('../services/notificationService');
 const logger = require('../utils/logger');
 
 /**
@@ -155,33 +155,35 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     const preview = content.length > 100 ? content.slice(0, 100) + '…' : content;
     const senderName = req.user.name || 'Nouveau message';
 
-    // --- 5. Notification temps réel ---
+    // --- 5. Notification temps réel (chat UI) + persistante (cloche/liste) ---
+    // Les events 'new-message'/'new-staff-message' rafraîchissent le chat en direct
+    // (ChatScreen, StaffInboxPage, MessagesPage...) ; notify()/notifyStaff() créent
+    // en plus l'enregistrement Notification persistant (cloche, badge, push Expo
+    // si hors-ligne — géré en interne, pas besoin de dupliquer l'appel ici).
     try {
         if (isStaffInbox && !targetUserId) {
             // Client → staff : notifier tous les membres du staff
             const STAFF_ROLES = ['Admin', 'Collaborateur'];
-            const staff = await User.find({ role: { $in: STAFF_ROLES } }).select('_id pushToken');
+            const staff = await User.find({ role: { $in: STAFF_ROLES } }).select('_id');
             for (const s of staff) {
-                const sid = s._id.toString();
-                getIO().to(sid).emit('new-staff-message', { conversationId: convDoc._id, message });
-                if (!isUserOnline(sid) && s.pushToken) {
-                    await sendExpoPushNotification(s.pushToken, senderName, preview, {
-                        conversationId: convDoc._id.toString(), type: 'new_staff_message',
-                    });
-                }
+                getIO().to(s._id.toString()).emit('new-staff-message', { conversationId: convDoc._id, message });
             }
+            notifyStaff({
+                type: 'new_staff_message',
+                title: senderName,
+                body: preview,
+                data: { conversationId: convDoc._id.toString(), screen: 'Conversations' },
+            }).catch(() => {});
         } else if (targetUserId) {
             // Conv 1-à-1 ou staff → client : notifier le destinataire
             const recipientIdStr = targetUserId.toString();
             getIO().to(recipientIdStr).emit('new-message', { conversationId: convDoc._id, message });
-            if (!isUserOnline(recipientIdStr)) {
-                const r = await User.findById(recipientIdStr).select('pushToken');
-                if (r?.pushToken) {
-                    await sendExpoPushNotification(r.pushToken, senderName, preview, {
-                        conversationId: convDoc._id.toString(), type: 'new_message',
-                    });
-                }
-            }
+            notify(recipientIdStr, {
+                type: 'new_message',
+                title: senderName,
+                body: preview,
+                data: { conversationId: convDoc._id.toString(), screen: 'Chat' },
+            }).catch(() => {});
         }
     } catch {
         // Socket.IO non initialisé — dégradation silencieuse

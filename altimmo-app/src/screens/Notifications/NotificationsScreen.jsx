@@ -18,6 +18,7 @@ import {
   markAllRead,
   clearRead,
 } from '../../services/notificationApiService';
+import { connectSocket, getSocket } from '../../services/socketService';
 
 // ─── Config icônes par type ───────────────────────────────────────────────────
 
@@ -180,6 +181,29 @@ export default function NotificationsScreen({ navigation }) {
     setPage(1);
     load(true);
   }, [filter])); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Temps réel — pousse les nouvelles notifications sans attendre le focus ───
+  useEffect(() => {
+    let socket;
+    let cancelled = false;
+
+    connectSocket().then((s) => {
+      if (cancelled) return;
+      socket = s || getSocket();
+      socket?.on('notification', handleIncoming);
+    });
+
+    function handleIncoming(notif) {
+      if (filter === 'unread' && notif.read) return;
+      setNotifications((prev) => [notif, ...prev]);
+      if (!notif.read) setUnreadCount((c) => c + 1);
+    }
+
+    return () => {
+      cancelled = true;
+      socket?.off('notification', handleIncoming);
+    };
+  }, [filter]);
 
   // ─── Actions ───
   const onRefresh = useCallback(() => {

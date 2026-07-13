@@ -13,7 +13,7 @@ const NOTIFICATION_TYPES = [
   'transaction_created',  // client : une transaction le concernant a été ouverte
   'transaction_finalized',// client : transaction réussie (vente/location validée)
   // ── Devis ──
-  'quote_received',       // staff : nouveau devis soumis
+  'quote_received',       // staff : nouveau devis (Quote) soumis
   'quote_status',         // client : statut de son devis a changé
   'quote_response',       // client : devis chiffré envoyé
   // ── Paiements ──
@@ -25,10 +25,15 @@ const NOTIFICATION_TYPES = [
   'loyer_paye',           // propriétaire : loyer encaissé
   'loyer_en_retard',      // locataire : loyer en retard (alerte cron)
   // ── Biens immobiliers ──
-  'new_property',         // tous les utilisateurs : nouveau bien validé et publié
+  'new_property',                 // tous les utilisateurs : nouveau bien validé et publié
+  'property_pending_moderation',  // staff : nouveau bien mobile en attente de modération
   // ── Compte ──
   'account_verified',     // client : compte propriétaire validé par admin
   'account_suspended',    // utilisateur : compte suspendu
+  // ── Formulaires publics ──
+  'estimation_received',  // staff : nouvelle demande d'estimation
+  'devis_received',       // staff : nouvelle demande de devis (gestion locative — modèle Devis)
+  'contact_received',     // staff : nouveau message du formulaire de contact
 ];
 
 const notificationSchema = new mongoose.Schema(

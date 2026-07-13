@@ -31,10 +31,21 @@ const formatTime = (dateStr) => {
 
 const STAFF_ROLES = ['Admin', 'Collaborateur'];
 
+// Badge rôle — uniquement pertinent côté staff (item.isStaffInbox === true) ;
+// un client ne voit jamais ce badge dans ses propres conversations 1-à-1.
+const ROLE_COLORS = (c) => ({
+  'Proprietaire': { bg: c.goldMuted, text: c.goldDark, label: 'Propriétaire' },
+  'Client':       { bg: c.blueMuted, text: c.blue,     label: 'Client' },
+  'Prestataire':  { bg: '#EDE9FE',   text: '#6D28D9',  label: 'Prestataire' },
+});
+
 // ─── Item de conversation ─────────────────────────────────────────────────────
 
 const ConvItem = memo(function ConvItem({ item, currentUserId, onPress, styles }) {
-  const { name, subtitle, photo } = useMemo(() => {
+  const { themeColors: c } = useTheme();
+  const roleColors = useMemo(() => ROLE_COLORS(c), [c]);
+
+  const { name, subtitle, photo, role } = useMemo(() => {
     if (item.isStaffInbox) {
       const client = item.participants?.[0];
       return {
@@ -43,6 +54,7 @@ const ConvItem = memo(function ConvItem({ item, currentUserId, onPress, styles }
           ? `Bien : ${item.relatedProperty.title}`
           : 'Demande de contact',
         photo: client?.photo || null,
+        role:  client?.role || null,
       };
     }
     const other = item.participants?.find(p => p._id !== currentUserId);
@@ -50,6 +62,7 @@ const ConvItem = memo(function ConvItem({ item, currentUserId, onPress, styles }
       name:     other?.name || other?.firstName || 'Utilisateur',
       subtitle: null,
       photo:    other?.photo || null,
+      role:     null,
     };
   }, [item, currentUserId]);
 
@@ -89,14 +102,30 @@ const ConvItem = memo(function ConvItem({ item, currentUserId, onPress, styles }
             >
               {name}
             </Text>
-            {item.isStaffInbox && (
-              <View style={styles.staffBadge}>
-                <Text style={styles.staffBadgeText}>CLIENT</Text>
-              </View>
-            )}
           </View>
           <Text style={styles.time}>{time}</Text>
         </View>
+
+        {/* Badge rôle — uniquement dispo côté staff (item.isStaffInbox) */}
+        {role && roleColors[role] && (
+          <View style={{
+            backgroundColor: roleColors[role].bg,
+            borderRadius: 10,
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            alignSelf: 'flex-start',
+            marginTop: 2,
+            marginBottom: 2,
+          }}>
+            <Text style={{
+              fontSize: 10,
+              fontFamily: fonts.bodyBold,
+              color: roleColors[role].text,
+            }}>
+              {roleColors[role].label}
+            </Text>
+          </View>
+        )}
 
         {subtitle ? (
           <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
@@ -449,18 +478,6 @@ const makeStyles = (c) => StyleSheet.create({
   },
   nameUnread: {
     fontFamily: fonts.bodyBold,
-  },
-  staffBadge: {
-    backgroundColor: c.gold,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  staffBadgeText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 9,
-    color: '#0A0A0A',
-    letterSpacing: 0.5,
   },
   subtitle: {
     fontFamily: fonts.body,

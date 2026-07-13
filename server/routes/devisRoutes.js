@@ -4,6 +4,7 @@ const router     = express.Router();
 const sendEmail  = require('../utils/email');
 const Devis      = require('../models/Devis');
 const auth       = require('../controllers/authController');
+const { notifyStaff } = require('../services/notificationService');
 
 const staffOnly = [auth.protect, auth.restrictTo('Admin', 'Collaborateur')];
 
@@ -94,6 +95,14 @@ router.post('/', async (req, res) => {
         const devis = await Devis.create({
             nom, email, telephone, adresseBien, typeBien, surface, loyerSouhaite, nbBiens, message,
         });
+
+        // Notifier le staff (cloche/liste + push) — best-effort
+        notifyStaff({
+            type:  'devis_received',
+            title: `Nouvelle demande de devis de ${nom}`,
+            body:  `${typeBien} à ${adresseBien}`,
+            data:  { screen: 'Devis' },
+        }).catch(() => {});
 
         // Email de notification à l'agence — best-effort : un échec d'envoi ne
         // doit pas faire échouer la requête, le devis est déjà persisté en base.

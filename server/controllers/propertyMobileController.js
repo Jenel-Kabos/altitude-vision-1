@@ -1,4 +1,6 @@
 const Property = require('../models/Property');
+const User = require('../models/User');
+const { notify } = require('../services/notificationService');
 
 const createPropertyMobile = async (req, res) => {
   try {
@@ -64,6 +66,17 @@ const createPropertyMobile = async (req, res) => {
       latitude: latitude || -4.2661,
       longitude: longitude || 15.2832,
     });
+
+    // Notifier les Admin (modération réservée à ce rôle, cf. AdminDashboard
+    // NAV_SECTIONS "Modération Biens" → roles: ['Admin']) — best-effort
+    User.find({ role: 'Admin' }).select('_id').lean()
+      .then((admins) => Promise.allSettled(admins.map((a) => notify(a._id, {
+        type:  'property_pending_moderation',
+        title: `Nouveau bien à modérer : ${titre}`,
+        body:  `${ville || ''} ${arrondissement || ''}`.trim(),
+        data:  { screen: 'ModerationProperties', propertyId: property._id.toString() },
+      }))))
+      .catch(() => {});
 
     return res.status(201).json({
       status: 'success',

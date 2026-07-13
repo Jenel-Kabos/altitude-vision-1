@@ -17,7 +17,7 @@ exports.getConversations = asyncHandler(async (req, res) => {
     isArchived: { $ne: true },
     isStaffInbox: false, // les convs staff-inbox sont via GET /staff-inbox
   })
-    .populate('participants', 'name email photo')
+    .populate('participants', 'name email photo role')
     .sort({ updatedAt: -1 });
 
   const withUnread = conversations.map((conv) => {
@@ -347,8 +347,8 @@ exports.startConversation = async (req, res) => {
 
     // ── Premier message optionnel ─────────────────────────────────
     if (message?.trim()) {
-      const { getIO, isUserOnline } = require('../socket');
-      const { sendExpoPushNotification } = require('../utils/expoPush');
+      const { getIO } = require('../socket');
+      const { notify, notifyStaff } = require('../services/notificationService');
 
       const newMsg = await Message.create({
         sender: req.user.id,
@@ -360,29 +360,29 @@ exports.startConversation = async (req, res) => {
       conversation.lastMessage = message.trim();
       await conversation.save();
 
+      const preview = message.trim().slice(0, 100);
+
       if (isSenderStaff) {
-        // Notifier le destinataire direct
+        // Notifier le destinataire direct (chat UI + cloche/liste + push)
         try { getIO().to(recipientId.toString()).emit('new-message', { conversationId: conversation._id, message: newMsg }); } catch {}
-        if (!isUserOnline(recipientId.toString())) {
-          const r = await User.findById(recipientId).select('pushToken name');
-          if (r?.pushToken) {
-            await sendExpoPushNotification(r.pushToken, req.user.name || 'Message', message.trim().slice(0, 100), {
-              conversationId: conversation._id.toString(), type: 'new_message',
-            });
-          }
-        }
+        notify(recipientId, {
+          type: 'new_message',
+          title: req.user.name || 'Message',
+          body: preview,
+          data: { conversationId: conversation._id.toString(), screen: 'Chat' },
+        }).catch(() => {});
       } else {
-        // Notifier tout le staff en temps réel
-        const staff = await User.find({ role: { $in: STAFF_ROLES } }).select('_id pushToken');
+        // Notifier tout le staff en temps réel (chat UI + cloche/liste + push)
+        const staff = await User.find({ role: { $in: STAFF_ROLES } }).select('_id');
         for (const s of staff) {
-          const sid = s._id.toString();
-          try { getIO().to(sid).emit('new-staff-message', { conversationId: conversation._id, message: newMsg }); } catch {}
-          if (!isUserOnline(sid) && s.pushToken) {
-            await sendExpoPushNotification(s.pushToken, req.user.name || 'Nouveau message client', message.trim().slice(0, 100), {
-              conversationId: conversation._id.toString(), type: 'new_staff_message',
-            });
-          }
+          try { getIO().to(s._id.toString()).emit('new-staff-message', { conversationId: conversation._id, message: newMsg }); } catch {}
         }
+        notifyStaff({
+          type: 'new_staff_message',
+          title: req.user.name || 'Nouveau message client',
+          body: preview,
+          data: { conversationId: conversation._id.toString(), screen: 'Conversations' },
+        }).catch(() => {});
       }
     }
 

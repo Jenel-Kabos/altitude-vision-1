@@ -5,6 +5,7 @@ import {
   Bell, BellOff, CheckCheck, Trash2,
   Home, Calendar, ArrowLeftRight, MessageSquare,
   FileText, CreditCard, Shield, AlertCircle,
+  Calculator, Mail, CheckCircle2,
 } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { clearRead } from '../../services/notificationService';
@@ -28,6 +29,10 @@ const TYPE_CONFIG = {
   contrat_updated:       { Icon: FileText,       color: GOLD,      route: '/dashboard/gestion-locative' },
   account_verified:      { Icon: Shield,         color: '#10B981', route: '/dashboard'               },
   account_suspended:     { Icon: AlertCircle,    color: '#EF4444', route: '/dashboard'               },
+  estimation_received:        { Icon: Calculator,   color: GOLD,      route: '/dashboard/estimations' },
+  devis_received:              { Icon: FileText,     color: '#0D9488', route: '/dashboard/devis' },
+  contact_received:            { Icon: Mail,         color: GOLD,      route: '/dashboard/contact-messages' },
+  property_pending_moderation: { Icon: CheckCircle2, color: '#7C3AED', route: '/dashboard/moderation/properties' },
 };
 
 const DEFAULT_CONFIG = { Icon: Bell, color: GOLD, route: '/dashboard/notifications' };

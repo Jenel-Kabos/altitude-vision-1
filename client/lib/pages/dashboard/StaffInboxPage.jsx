@@ -17,6 +17,12 @@ import { useAuth } from "../../context/AuthContext";
 
 const GOLD = "#C8960C";
 
+const ROLE_BADGE = {
+  'Proprietaire': { label: 'Propriétaire', color: 'bg-amber-100 text-amber-800' },
+  'Client':       { label: 'Client',        color: 'bg-blue-100 text-blue-800' },
+  'Prestataire':  { label: 'Prestataire',   color: 'bg-purple-100 text-purple-800' },
+};
+
 const EMOJIS = [
   '😊', '😂', '❤️', '👍', '🙏', '😍', '😭',
   '🔥', '✅', '👋', '🎉', '💪', '😎', '🤝', '💯', '👏',
@@ -174,9 +180,12 @@ const StaffInboxPage = () => {
   // Données d'affichage d'une conversation
   const convDisplay = (conv) => {
     const client = conv.participants?.[0];
-    const clientName = client?.name || "Client";
-    const propertyTitle = conv.relatedProperty?.title || null;
-    return { clientName, propertyTitle, client };
+    return {
+      clientName: client?.name || 'Client',
+      clientRole: client?.role || 'Client',
+      propertyTitle: conv.relatedProperty?.title || null,
+      client,
+    };
   };
 
   return (
@@ -222,7 +231,7 @@ const StaffInboxPage = () => {
             </div>
           ) : (
             conversations.map(conv => {
-              const { clientName, propertyTitle } = convDisplay(conv);
+              const { clientName, clientRole, propertyTitle } = convDisplay(conv);
               const unread = conv.unreadCount || 0;
               const isActive = selected?._id === conv._id;
 
@@ -241,7 +250,14 @@ const StaffInboxPage = () => {
                         {clientName[0]?.toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold text-sm text-gray-800 truncate">{clientName}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-sm text-gray-800 truncate">{clientName}</span>
+                          {clientRole && ROLE_BADGE[clientRole] && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${ROLE_BADGE[clientRole].color}`}>
+                              {ROLE_BADGE[clientRole].label}
+                            </span>
+                          )}
+                        </div>
                         {propertyTitle && (
                           <p className="text-xs text-gray-400 truncate flex items-center gap-1">
                             <Home className="w-3 h-3 flex-shrink-0" />
@@ -285,7 +301,14 @@ const StaffInboxPage = () => {
                   {convDisplay(selected).clientName[0]?.toUpperCase()}
                 </div>
                 <div>
-                  <p className="font-semibold text-sm text-gray-800">{convDisplay(selected).clientName}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm text-gray-800">{convDisplay(selected).clientName}</span>
+                    {ROLE_BADGE[convDisplay(selected).clientRole] && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_BADGE[convDisplay(selected).clientRole].color}`}>
+                        {ROLE_BADGE[convDisplay(selected).clientRole].label}
+                      </span>
+                    )}
+                  </div>
                   {convDisplay(selected).propertyTitle && (
                     <p className="text-xs text-gray-400 flex items-center gap-1">
                       <Home className="w-3 h-3" />

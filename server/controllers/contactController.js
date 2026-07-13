@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const ContactMessage = require('../models/ContactMessage');
 const sendEmail = require('../utils/email');
 const logger = require('../utils/logger');
+const { notifyStaff } = require('../services/notificationService');
 
 /**
  * @description Créer un nouveau message de contact
@@ -41,6 +42,14 @@ exports.createContactMessage = asyncHandler(async (req, res) => {
   });
 
   logger.success('✅ [Contact] Message créé avec succès:', contactMessage._id);
+
+  // Notifier le staff (cloche/liste + push) — best-effort
+  notifyStaff({
+    type:  'contact_received',
+    title: `Nouveau message de contact de ${name}`,
+    body:  subject,
+    data:  { screen: 'ContactMessages' },
+  }).catch(() => {});
 
   // Email de notification à l'agence — best-effort : un échec d'envoi ne doit
   // pas faire échouer la requête, le message est déjà persisté en base.
