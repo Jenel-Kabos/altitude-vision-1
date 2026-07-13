@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     FaKey, FaHome, FaChartLine, FaCamera,
@@ -37,8 +36,6 @@ const Img = ({ src, alt, className = '' }) => {
 };
 
 const VenteDeBiensPage = () => {
-    const router = useRouter();
-
     const advantages = [
         { icon: FaChartLine, title: 'Évaluation Précise',    description: 'Analyse approfondie du marché pour déterminer le prix optimal de votre bien' },
         { icon: FaCamera,    title: 'Mise en Valeur',         description: 'Photos professionnelles et visites virtuelles pour attirer les acheteurs' },
@@ -54,14 +51,6 @@ const VenteDeBiensPage = () => {
         { number: '03', title: 'Visites & Négociation', description: 'Organisation des visites et négociation pour obtenir le meilleur prix' },
         { number: '04', title: 'Finalisation',          description: "Accompagnement jusqu'à la signature chez le notaire et remise des clés" },
     ];
-
-    const handleContactClick = (e) => {
-        e.preventDefault();
-        router.push('/immobilier');
-        setTimeout(() => {
-            document.getElementById('contact-altimmo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-    };
 
     return (
         <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -100,10 +89,10 @@ const VenteDeBiensPage = () => {
                     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }}
                         className="flex flex-wrap gap-4">
-                        <a href="#contact-altimmo" onClick={handleContactClick}
+                        <Link href="/altimmo/estimation"
                             className="inline-flex items-center gap-2 px-7 py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-full transition-all hover:scale-105 shadow-xl">
                             <Sparkles className="w-4 h-4" /> Estimation gratuite
-                        </a>
+                        </Link>
                         <a href="#processus"
                             className="inline-flex items-center gap-2 px-7 py-3.5 bg-white/15 hover:bg-white/25 text-white font-semibold rounded-full border border-white/25 backdrop-blur-sm transition-all">
                             Notre processus →
@@ -243,11 +232,10 @@ const VenteDeBiensPage = () => {
                         <p className="text-lg font-light mb-8 max-w-xl mx-auto text-white/85">
                             Contactez-nous dès aujourd'hui pour une estimation gratuite et sans engagement
                         </p>
-                        <motion.a href="#contact-altimmo" onClick={handleContactClick}
-                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
-                            className="inline-flex items-center gap-3 px-8 py-4 bg-white text-blue-600 font-semibold rounded-full shadow-2xl hover:shadow-white/30 transition-all">
+                        <Link href="/altimmo/estimation"
+                            className="inline-flex items-center gap-3 px-8 py-4 bg-white text-blue-600 font-semibold rounded-full shadow-2xl hover:shadow-white/30 hover:scale-105 active:scale-95 transition-all">
                             <Sparkles className="w-5 h-5" /> Demander une Estimation Gratuite
-                        </motion.a>
+                        </Link>
                     </motion.div>
                 </div>
             </section>

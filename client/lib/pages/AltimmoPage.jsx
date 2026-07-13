@@ -7,16 +7,15 @@ import Link from 'next/link';
 import {
     ArrowRight, Sparkles, MessageSquarePlus, Star,
     Search, Home, Building2, TrendingUp, Key,
-    Handshake, MapPin, ChevronDown, Calculator,
+    Handshake, MapPin, ChevronDown,
     ShieldCheck, Clock, Award, CheckCircle,
-    Mail, X, Monitor, Smartphone, Zap, Users,
+    X, Monitor, Smartphone, Zap, Users,
 } from 'lucide-react';
 
 import HeroSliderAlt   from '../components/HeroSliderAlt';
 import PropertyCard    from '../components/PropertyCard';
 import ReviewCard      from '../components/ReviewCard';
 import CtaCommission   from '../components/CtaCommission';
-import EstimationForm  from '../components/EstimationForm';
 import AltimmoContact  from '../components/AltimmoContact';
 
 import { getLatestPropertiesByPole } from '../services/propertyService';
@@ -794,7 +793,7 @@ const AltimmoPage = () => {
                 </div>
             </section>
 
-            {/* ══ ESTIMATION ══════════════════════════════════════════ */}
+            {/* ══ ESTIMATION (teaser → /altimmo/estimation) ══════════════ */}
             <section className="ai-estimation-section">
                 <div style={{ position:'absolute', inset:0, pointerEvents:'none' }}>
                     <div style={{ position:'absolute', top:0, left:'25%', width:'300px', height:'300px', borderRadius:'50%', filter:'blur(110px)', opacity:0.09, background:BLUE }} />
@@ -802,32 +801,23 @@ const AltimmoPage = () => {
                 </div>
                 <div style={{ position:'absolute', top:0, left:0, right:0, height:'1px', background:`linear-gradient(to right,transparent,${BLUE}38,transparent)` }} />
                 <div className="ai-container" style={{ position:'relative', zIndex:10 }}>
-                    <div className="ai-estimation-grid">
-                        <FadeIn x={-22}>
-                            <div style={{ width:'44px', height:'44px', borderRadius:'12px', background:`linear-gradient(135deg,${GOLD},#E5A84B)`, display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'18px' }}>
-                                <Calculator size={20} color="#fff" />
-                            </div>
-                            <p className="ai-eyebrow" style={{ color:GOLD }}>Estimation gratuite</p>
-                            <h2 className="ai-estimation-h2">Quelle est la valeur<br />de votre bien ?</h2>
-                            <div style={{ height:'2px', width:'36px', borderRadius:'2px', marginBottom:'16px', background:`linear-gradient(to right,${GOLD},${BLUE})` }} />
-                            <p className="ai-estimation-body">
-                                Remplissez le formulaire. Notre équipe vous contacte sous{' '}
-                                <strong style={{ color:'#fff', fontWeight:600 }}>24h</strong> avec une estimation personnalisée et sans engagement.
+                    <div style={{ textAlign:'center', padding:'60px 20px' }}>
+                        <FadeIn>
+                            <h2 className="ai-estimation-h2">
+                                Quelle est la valeur de votre bien ?
+                            </h2>
+                            <p className="ai-estimation-body" style={{ maxWidth:500, margin:'16px auto 32px' }}>
+                                Obtenez une estimation gratuite et personnalisée sous 24h, sans engagement.
                             </p>
-                            <ul style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
-                                {[
-                                    { icon:CheckCircle, text:'100% gratuit, sans engagement'      },
-                                    { icon:Clock,       text:'Réponse garantie sous 24h'          },
-                                    { icon:ShieldCheck, text:'Expertise marché local Congo Brazzaville' },
-                                    { icon:Mail,        text:'Confirmation par email immédiate'   },
-                                ].map(({ icon:Icon, text },i) => (
-                                    <li key={i} className="ai-estimation-check">
-                                        <Icon size={13} style={{ color:GOLD, flexShrink:0 }} /> {text}
-                                    </li>
-                                ))}
-                            </ul>
+                            <Link
+                                href="/altimmo/estimation"
+                                style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'14px 32px',
+                                    borderRadius:8, background:GOLD, color:'#fff', fontWeight:600,
+                                    textDecoration:'none', fontSize:'1rem' }}
+                            >
+                                Estimer mon bien gratuitement <ArrowRight size={16} />
+                            </Link>
                         </FadeIn>
-                        <FadeIn x={22} delay={0.1}><EstimationForm /></FadeIn>
                     </div>
                 </div>
             </section>
