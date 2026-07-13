@@ -42,10 +42,10 @@ const Field = ({ label, error, icon: Icon, required, children }) => (
 );
 
 const inputCls = (err) =>
-    `w-full px-4 py-3 rounded-xl text-sm border transition-all focus:outline-none bg-white/8 text-white placeholder-white/30 focus:border-[#2E7BB5]/60 ${err ? 'border-red-400' : 'border-white/12'}`;
+    `input-style w-full px-4 py-3 rounded-xl text-sm border transition-all focus:outline-none bg-white/8 text-white placeholder-white/30 focus:border-[#2E7BB5]/60 ${err ? 'border-red-400' : 'border-white/12'}`;
 
 const selectCls = (err) =>
-    `w-full px-4 py-3 rounded-xl text-sm border transition-all focus:outline-none bg-white/10 focus:bg-white/15 text-white ${err ? 'border-red-400' : 'border-white/12'}`;
+    `input-style w-full px-4 py-3 rounded-xl text-sm border transition-all focus:outline-none bg-white/10 focus:bg-white/15 text-white ${err ? 'border-red-400' : 'border-white/12'}`;
 
 // ─────────────────────────────────────────────────────────────
 const EstimationForm = () => {
