@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Zap, Search, Handshake, Clock, CheckCircle, Award } from 'lucide-react';
 
 import EstimationForm from '../components/EstimationForm';
 
@@ -11,9 +11,9 @@ const GOLD = '#C8960C';
 const DARK = '#0A0805'; // == rgba(10,8,5,x) utilisé dans l'overlay du hero — cohérent sur toute la page
 
 const STATS = [
-    { chiffre: '24h',   label: 'Délai de réponse' },
-    { chiffre: '100%',  label: 'Gratuit & sans engagement' },
-    { chiffre: '5 ans', label: 'Expertise locale Congo' },
+    { icon: Clock,       chiffre: '24h',   label: 'Délai de réponse' },
+    { icon: CheckCircle, chiffre: '100%',  label: 'Gratuit & sans engagement' },
+    { icon: Award,       chiffre: '5 ans', label: 'Expertise locale Congo' },
 ];
 
 const CAROUSEL_IMAGES = [
@@ -28,9 +28,9 @@ const CAROUSEL_CARD_W  = 280;
 const CAROUSEL_GAP     = 16;
 
 const PERKS = [
-    { icon: '🔍', titre: 'Analyse précise',  desc: 'Étude comparative des biens similaires dans votre quartier' },
-    { icon: '⚡', titre: 'Réponse rapide',   desc: 'Estimation personnalisée envoyée sous 24 heures' },
-    { icon: '🤝', titre: 'Expertise locale', desc: "5 ans d'expérience sur le marché congolais" },
+    { icon: Search,    titre: 'Analyse précise',  desc: 'Étude comparative des biens similaires dans votre quartier' },
+    { icon: Zap,       titre: 'Réponse rapide',   desc: 'Estimation personnalisée envoyée sous 24 heures' },
+    { icon: Handshake, titre: 'Expertise locale', desc: "5 ans d'expérience sur le marché congolais" },
 ];
 
 const FadeIn = ({ children, delay = 0, y = 20 }) => (
@@ -108,6 +108,9 @@ const PAGE_CSS = `
     display: flex; flex-wrap: wrap; justify-content: center;
     gap: clamp(32px, 8vw, 96px); text-align: center;
   }
+  .ep-stat-icon {
+    display: flex; justify-content: center; color: ${GOLD}; margin-bottom: 8px;
+  }
   .ep-stat-num {
     font-family: 'Cormorant Garamond', Georgia, serif;
     font-size: clamp(2.2rem, 5vw, 3rem); font-weight: 700; color: ${GOLD}; line-height: 1;
@@ -167,7 +170,6 @@ const PAGE_CSS = `
     text-align: center; padding: 32px 24px; border-radius: 16px;
     background: #F8F8F5;
   }
-  .ep-perk-icon { font-size: 2rem; margin-bottom: 14px; }
   .ep-perk-title {
     font-family: 'Cormorant Garamond', Georgia, serif;
     font-weight: 700; font-size: 1.2rem; color: #1A1612; margin: 0 0 8px;
@@ -223,8 +225,9 @@ const EstimationPage = () => {
                 <div className="ep-container">
                     <FadeIn>
                         <div className="ep-stats-grid">
-                            {STATS.map(({ chiffre, label }, i) => (
+                            {STATS.map(({ icon: Icon, chiffre, label }, i) => (
                                 <div key={i}>
+                                    <div className="ep-stat-icon"><Icon size={28} /></div>
                                     <p className="ep-stat-num">{chiffre}</p>
                                     <p className="ep-stat-label">{label}</p>
                                 </div>
@@ -288,10 +291,21 @@ const EstimationPage = () => {
             <section className="ep-perks-section">
                 <div className="ep-container">
                     <div className="ep-perks-grid">
-                        {PERKS.map(({ icon, titre, desc }, i) => (
+                        {PERKS.map(({ icon: Icon, titre, desc }, i) => (
                             <FadeIn key={i} delay={i * 0.08}>
                                 <div className="ep-perk-card">
-                                    <div className="ep-perk-icon">{icon}</div>
+                                    <div style={{
+                                        width: 52, height: 52,
+                                        borderRadius: '50%',
+                                        background: 'rgba(200,150,12,0.12)',
+                                        border: '1px solid rgba(200,150,12,0.25)',
+                                        display: 'flex', alignItems: 'center',
+                                        justifyContent: 'center',
+                                        margin: '0 auto 16px',
+                                        color: GOLD,
+                                    }}>
+                                        <Icon size={22} />
+                                    </div>
                                     <h3 className="ep-perk-title">{titre}</h3>
                                     <p className="ep-perk-desc">{desc}</p>
                                 </div>
