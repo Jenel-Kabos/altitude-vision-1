@@ -9,7 +9,7 @@ import {
     ArrowRight, Sparkles, MessageSquarePlus, Star,
     Search, Home, Building2, TrendingUp, Key,
     Handshake, MapPin, ChevronDown,
-    ShieldCheck, Clock, Award, CheckCircle,
+    ShieldCheck, Shield, Clock, Award, CheckCircle,
     X, Monitor, Smartphone, Zap, Users,
 } from 'lucide-react';
 
@@ -403,7 +403,6 @@ const PAGE_CSS = `
     font-weight: 600;
     color: #3D3830;
   }
-  .ai-estim-icon { font-size: 1rem; }
   .ai-estim-cta {
     display: flex;
     align-items: center;
@@ -919,12 +918,23 @@ const AltimmoPage = () => {
                                 {/* 3 points clés en ligne */}
                                 <div className="ai-estim-features">
                                     {[
-                                        { icon: '⚡', text: 'Réponse sous 24h' },
-                                        { icon: '📍', text: 'Expertise locale Congo' },
-                                        { icon: '🔒', text: 'Confidentiel' },
-                                    ].map(({ icon, text }) => (
+                                        { icon: Zap,    text: 'Réponse sous 24h' },
+                                        { icon: MapPin, text: 'Expertise locale Congo' },
+                                        { icon: Shield, text: 'Confidentiel' },
+                                    ].map(({ icon: Icon, text }) => (
                                         <div key={text} className="ai-estim-feature">
-                                            <span className="ai-estim-icon">{icon}</span>
+                                            <div style={{
+                                                width: 28, height: 28,
+                                                borderRadius: '50%',
+                                                background: 'rgba(200,150,12,0.12)',
+                                                border: '1px solid rgba(200,150,12,0.3)',
+                                                display: 'flex', alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: GOLD,
+                                                flexShrink: 0,
+                                            }}>
+                                                <Icon size={14} />
+                                            </div>
                                             <span>{text}</span>
                                         </div>
                                     ))}
