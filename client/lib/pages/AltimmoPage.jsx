@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
     ArrowRight, Sparkles, MessageSquarePlus, Star,
     Search, Home, Building2, TrendingUp, Key,
@@ -297,27 +298,112 @@ const PAGE_CSS = `
   .ai-skeleton-line { height: 12px; border-radius: 5px; background: #E5E7EB; }
   @keyframes aiSkeleton { 0%,100%{opacity:1} 50%{opacity:.4} }
 
-  /* ══ ESTIMATION ══ */
+  /* ══ ESTIMATION — card premium ══ */
   .ai-estimation-section {
-    padding: var(--py) 0; position: relative; overflow: hidden;
-    background: linear-gradient(135deg, #0A0C0F 0%, #101828 60%, #0F1E35 100%);
+    padding: 80px 0;
+    background: #F8F8F5;
   }
-  .ai-estimation-grid {
-    display: grid; grid-template-columns: 1fr;
-    gap: clamp(36px, 7vw, 60px); align-items: start;
+  .ai-estim-card {
+    max-width: 480px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.10),
+                0 2px 8px rgba(200,150,12,0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
-  @media (min-width: 1024px) { .ai-estimation-grid { grid-template-columns: 2fr 3fr; } }
-  .ai-estimation-h2 {
+  .ai-estim-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 60px rgba(0,0,0,0.13),
+                0 4px 16px rgba(200,150,12,0.12);
+  }
+  .ai-estim-img-wrap {
+    position: relative;
+    height: 240px;
+    overflow: hidden;
+  }
+  .ai-estim-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s ease;
+  }
+  .ai-estim-card:hover .ai-estim-img {
+    transform: scale(1.05);
+  }
+  .ai-estim-badge {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    background: rgba(200,150,12,0.92);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 6px 12px;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+  }
+  .ai-estim-body {
+    padding: 28px 28px 32px;
+  }
+  .ai-estim-eyebrow {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #C8960C;
+    margin: 0 0 10px;
+  }
+  .ai-estim-title {
     font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: clamp(1.85rem, 4.5vw, 4.5rem);
-    font-weight: 700; line-height: 1.1; color: rgba(255,255,255,0.95); margin-bottom: 14px;
+    font-size: clamp(1.6rem, 3vw, 2rem);
+    font-weight: 700;
+    color: #1A1612;
+    line-height: 1.2;
+    margin: 0 0 12px;
   }
-  .ai-estimation-body {
-    font-size: clamp(0.84rem, 1.8vw, 0.86rem); color: rgba(255,255,255,0.58); line-height: 1.75; margin-bottom: 22px;
+  .ai-estim-sub {
+    font-size: 0.9rem;
+    color: #6B6560;
+    line-height: 1.6;
+    margin: 0 0 20px;
   }
-  .ai-estimation-check {
-    display: flex; align-items: center; gap: 9px;
-    font-size: clamp(0.82rem, 1.8vw, 0.83rem); color: rgba(255,255,255,0.72);
+  .ai-estim-features {
+    display: flex;
+    gap: 16px;
+    margin: 0 0 24px;
+    flex-wrap: wrap;
+  }
+  .ai-estim-feature {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #3D3830;
+  }
+  .ai-estim-icon { font-size: 1rem; }
+  .ai-estim-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #C8960C, #A07010);
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .ai-estim-cta:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
   }
 
   /* ══ AVIS ══ */
@@ -795,30 +881,59 @@ const AltimmoPage = () => {
 
             {/* ══ ESTIMATION (teaser → /altimmo/estimation) ══════════════ */}
             <section className="ai-estimation-section">
-                <div style={{ position:'absolute', inset:0, pointerEvents:'none' }}>
-                    <div style={{ position:'absolute', top:0, left:'25%', width:'300px', height:'300px', borderRadius:'50%', filter:'blur(110px)', opacity:0.09, background:BLUE }} />
-                    <div style={{ position:'absolute', bottom:0, right:'25%', width:'300px', height:'300px', borderRadius:'50%', filter:'blur(110px)', opacity:0.07, background:GOLD }} />
-                </div>
-                <div style={{ position:'absolute', top:0, left:0, right:0, height:'1px', background:`linear-gradient(to right,transparent,${BLUE}38,transparent)` }} />
-                <div className="ai-container" style={{ position:'relative', zIndex:10 }}>
-                    <div style={{ textAlign:'center', padding:'60px 20px' }}>
-                        <FadeIn>
-                            <h2 className="ai-estimation-h2">
-                                Quelle est la valeur de votre bien ?
-                            </h2>
-                            <p className="ai-estimation-body" style={{ maxWidth:500, margin:'16px auto 32px' }}>
-                                Obtenez une estimation gratuite et personnalisée sous 24h, sans engagement.
-                            </p>
-                            <Link
-                                href="/altimmo/estimation"
-                                style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'14px 32px',
-                                    borderRadius:8, background:GOLD, color:'#fff', fontWeight:600,
-                                    textDecoration:'none', fontSize:'1rem' }}
-                            >
-                                Estimer mon bien gratuitement <ArrowRight size={16} />
-                            </Link>
-                        </FadeIn>
-                    </div>
+                <div className="ai-container">
+                    <FadeIn>
+                        <div className="ai-estim-card">
+
+                            {/* Image en haut */}
+                            <div className="ai-estim-img-wrap">
+                                <Image
+                                    src="https://images.unsplash.com/photo-1560518883-ce09059eeffa"
+                                    alt="Estimation immobilière Congo Brazzaville"
+                                    fill
+                                    sizes="(max-width: 768px) 100vw, 480px"
+                                    style={{ objectFit: 'cover' }}
+                                    className="ai-estim-img"
+                                />
+                                {/* Badge flottant */}
+                                <div className="ai-estim-badge">
+                                    ✦ Gratuit & Sans engagement
+                                </div>
+                            </div>
+
+                            {/* Corps de la card */}
+                            <div className="ai-estim-body">
+                                <p className="ai-estim-eyebrow">Estimation immobilière</p>
+                                <h2 className="ai-estim-title">
+                                    Quelle est la valeur<br />de votre bien ?
+                                </h2>
+                                <p className="ai-estim-sub">
+                                    Recevez une estimation personnalisée sous
+                                    <strong> 24h</strong>, établie par nos experts
+                                    locaux à Brazzaville.
+                                </p>
+
+                                {/* 3 points clés en ligne */}
+                                <div className="ai-estim-features">
+                                    {[
+                                        { icon: '⚡', text: 'Réponse sous 24h' },
+                                        { icon: '📍', text: 'Expertise locale Congo' },
+                                        { icon: '🔒', text: 'Confidentiel' },
+                                    ].map(({ icon, text }) => (
+                                        <div key={text} className="ai-estim-feature">
+                                            <span className="ai-estim-icon">{icon}</span>
+                                            <span>{text}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <Link href="/altimmo/estimation" className="ai-estim-cta">
+                                    Estimer mon bien gratuitement
+                                    <ArrowRight size={18} />
+                                </Link>
+                            </div>
+                        </div>
+                    </FadeIn>
                 </div>
             </section>
 
