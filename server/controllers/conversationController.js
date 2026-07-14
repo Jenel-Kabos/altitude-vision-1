@@ -3,8 +3,7 @@ const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
-
-const STAFF_ROLES = ['Admin', 'Collaborateur'];
+const { ALL_STAFF } = require('../utils/roles');
 
 /**
  * @description Récupérer une conversation par son ID (objet complet peuplé)
@@ -26,7 +25,7 @@ exports.getConversationById = asyncHandler(async (req, res) => {
     });
   }
 
-  const isStaff = STAFF_ROLES.includes(req.user.role);
+  const isStaff = ALL_STAFF.includes(req.user.role);
   const isParticipant = conversation.participants
     .some((p) => p._id.toString() === req.user.id);
 
@@ -325,7 +324,7 @@ exports.getUnreadCount = asyncHandler(async (req, res) => {
 exports.startConversation = async (req, res) => {
   try {
     const { recipientId, propertyId, message } = req.body;
-    const isSenderStaff = STAFF_ROLES.includes(req.user.role);
+    const isSenderStaff = ALL_STAFF.includes(req.user.role);
 
     // ── Blocage client → client ──────────────────────────────────
     if (!isSenderStaff && recipientId) {
@@ -333,7 +332,7 @@ exports.startConversation = async (req, res) => {
       if (!recipient) {
         return res.status(404).json({ status: 'fail', message: 'Destinataire introuvable.' });
       }
-      if (!STAFF_ROLES.includes(recipient.role)) {
+      if (!ALL_STAFF.includes(recipient.role)) {
         return res.status(403).json({
           status: 'fail',
           message: 'Vous ne pouvez contacter que notre équipe.',
@@ -410,7 +409,7 @@ exports.startConversation = async (req, res) => {
         }).catch(() => {});
       } else {
         // Notifier tout le staff en temps réel (chat UI + cloche/liste + push)
-        const staff = await User.find({ role: { $in: STAFF_ROLES } }).select('_id');
+        const staff = await User.find({ role: { $in: ALL_STAFF } }).select('_id');
         for (const s of staff) {
           try { getIO().to(s._id.toString()).emit('new-staff-message', { conversationId: conversation._id, message: newMsg }); } catch {}
         }
@@ -467,11 +466,11 @@ exports.getMyInbox = asyncHandler(async (req, res) => {
 /**
  * @description Boîte partagée du staff — toutes les conversations isStaffInbox
  * @route GET /api/conversations/staff-inbox
- * @access Protected (Admin / Collaborateur uniquement)
+ * @access Protected (tout rôle staff — ALL_STAFF)
  */
 exports.getStaffInbox = async (req, res) => {
   try {
-    if (!STAFF_ROLES.includes(req.user.role)) {
+    if (!ALL_STAFF.includes(req.user.role)) {
       return res.status(403).json({ status: 'fail', message: 'Accès réservé au staff.' });
     }
 

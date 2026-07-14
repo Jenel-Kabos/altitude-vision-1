@@ -9,6 +9,7 @@ const Conversation = require('../models/Conversation');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const { getIO } = require('../socket');
 const { notify, notifyStaff } = require('../services/notificationService');
+const { ALL_STAFF } = require('../utils/roles');
 const logger = require('../utils/logger');
 
 /**
@@ -163,12 +164,11 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     try {
         if (isStaffInbox && !targetUserId) {
             // Client → staff : notifier tous les membres du staff
-            const STAFF_ROLES = ['Admin', 'Collaborateur'];
-            const staff = await User.find({ role: { $in: STAFF_ROLES } }).select('_id');
+            const staff = await User.find({ role: { $in: ALL_STAFF } }).select('_id');
             for (const s of staff) {
                 getIO().to(s._id.toString()).emit('new-staff-message', { conversationId: convDoc._id, message });
             }
-            console.log('[NOTIF DEBUG] notifyStaff appelé, staff roles:', ['Admin','Collaborateur']);
+            console.log('[NOTIF DEBUG] notifyStaff appelé, staff roles:', ALL_STAFF);
             notifyStaff({
                 type: 'new_staff_message',
                 title: senderName,

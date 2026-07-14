@@ -10,6 +10,10 @@ const Document              = require('../models/Document');
 const sendEmail = require('../utils/email');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 const logger = require('../utils/logger');
+// Source unique de vérité pour protect/restrictTo (voir middleware/authMiddleware.js) —
+// réexportés ici pour les ~20 routes qui importent encore auth.protect/auth.restrictTo
+// depuis ce contrôleur, sans avoir à modifier chaque fichier de routes.
+const { protect: mwProtect, restrictTo: mwRestrictTo } = require('../middleware/authMiddleware');
 
 // ======================================================
 // 🔐 VÉRIFICATION IDTOKEN GOOGLE (google-auth-library)
@@ -457,60 +461,15 @@ exports.optionalAuth = async (req, res, next) => {
 // ======================================================
 // 6. PROTECT (Auth obligatoire)
 // ======================================================
-exports.protect = async (req, res, next) => {
-    try {
-        let token;
-        if (req.headers.authorization?.startsWith('Bearer')) {
-            token = req.headers.authorization.split(' ')[1];
-        }
-
-        if (!token) {
-            return res.status(401).json({ status: 'fail', message: 'Non connecté.' });
-        }
-
-        const decoded     = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
-        const currentUser = await User.findById(decoded.id);
-
-        if (!currentUser) {
-            return res.status(401).json({ status: 'fail', message: 'Utilisateur introuvable.' });
-        }
-
-        if (
-            currentUser.tokenVersion &&
-            decoded.tokenVersion !== undefined &&
-            currentUser.tokenVersion > decoded.tokenVersion
-        ) {
-            return res.status(401).json({
-                status:  'fail',
-                message: 'Session expirée ou révoquée. Veuillez vous reconnecter.',
-            });
-        }
-
-        if (currentUser.changedPasswordAfter(decoded.iat)) {
-            return res.status(401).json({
-                status:  'fail',
-                message: 'Mot de passe changé. Reconnectez-vous.',
-            });
-        }
-
-        await User.findByIdAndUpdate(currentUser._id, { lastActivityAt: new Date() });
-
-        req.user = currentUser;
-        next();
-    } catch {
-        res.status(401).json({ status: 'fail', message: 'Token invalide.' });
-    }
-};
+// Déléguée à middleware/authMiddleware.js — source unique de vérité, vérifie
+// en plus le statut du compte (Suspendu/Banni/isActive), absent de l'ancienne
+// implémentation locale qui a existé ici.
+exports.protect = mwProtect;
 
 // ======================================================
 // 7. RESTRICTION (Rôles)
 // ======================================================
-exports.restrictTo = (...roles) => (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-        return res.status(403).json({ status: 'fail', message: 'Permission refusée.' });
-    }
-    next();
-};
+exports.restrictTo = mwRestrictTo;
 
 // ======================================================
 // 8. MISE À JOUR MOT DE PASSE

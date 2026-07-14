@@ -3,6 +3,7 @@ const Property    = require('../models/Property');
 const Document    = require('../models/Document');
 const { notify, notifyStaff } = require('../services/notificationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+const { ALL_STAFF } = require('../utils/roles');
 
 const calcCommission = (finalAmount, tauxPercent = 10, hasSpecial = false) => {
   const total       = Math.round(finalAmount * (tauxPercent / 100));
@@ -109,7 +110,7 @@ exports.getTransaction = async (req, res) => {
     if (!tx) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
 
     const isOwner = tx.client._id.toString() === req.user._id.toString();
-    const isStaff = ['Admin', 'Collaborateur'].includes(req.user.role);
+    const isStaff = ALL_STAFF.includes(req.user.role);
     if (!isOwner && !isStaff) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
 
     res.json({ status: 'success', data: { transaction: tx } });

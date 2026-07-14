@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { protect, adminOnly } = require('../middleware/authMiddleware');
+const { protect, adminOnly, restrictTo } = require('../middleware/authMiddleware');
+const { ROLES_UNIVERSAL } = require('../utils/roles');
 const {
   createContactMessage,
   getAllContactMessages,
@@ -15,9 +16,9 @@ router.post('/', createContactMessage);
 
 // Routes protégées (Admin)
 router.get('/stats', protect, adminOnly, getContactStats);
-router.get('/', protect, adminOnly, getAllContactMessages);
+router.get('/', protect, restrictTo(...ROLES_UNIVERSAL), getAllContactMessages);
 router.get('/:id', protect, adminOnly, getContactMessageById);
-router.patch('/:id/status', protect, adminOnly, updateMessageStatus);
+router.patch('/:id/status', protect, restrictTo(...ROLES_UNIVERSAL), updateMessageStatus);
 router.delete('/:id', protect, adminOnly, deleteContactMessage);
 
 module.exports = router;

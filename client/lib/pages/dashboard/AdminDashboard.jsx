@@ -19,32 +19,35 @@ const BLUE = '#2E7BB5';
 // Config de navigation
 // ─────────────────────────────────────────────────────────────
 // Groupes de rôles collaborateurs (miroir de server/utils/roles.js)
-const COLLAB_ALL  = ['Admin', 'Collaborateur', 'Secretaire', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant'];
-const ROLES_DOC   = ['Admin', 'Secretaire', 'Collaborateur'];
-const ROLES_IMMO  = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
-const ROLES_CM    = ['Admin', 'CommunityManager', 'Collaborateur'];
-const ROLES_COMM  = COLLAB_ALL; // tous les collaborateurs
+const ALL_STAFF     = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'CommunityManager', 'Communicant'];
+const ROLES_ESTIM   = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'Communicant'];
+const ROLES_ALTIMMO = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
+const ROLES_CM      = ['Admin', 'Collaborateur', 'CommunityManager'];
+const ROLES_GL      = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire'];
+const ROLES_DOCS    = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire'];
+const ROLES_LITIGES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier'];
+const ROLES_MOD     = ['Admin', 'Collaborateur'];
 
 const NAV_SECTIONS = [
   {
     label: null,
     links: [
-      { to: '/dashboard',                    end: true,  Icon: BarChart3,    label: 'Tableau de bord',    accent: BLUE,      roles: COLLAB_ALL },
-      { to: '/dashboard/properties',         end: false, Icon: Home,         label: 'Altimmo',             accent: BLUE,      roles: ROLES_CM   },
-      { to: '/dashboard/visites',            end: false, Icon: Calendar,     label: 'Rendez-vous',         accent: GOLD,      roles: ROLES_COMM },
-      { to: '/dashboard/estimations',        end: false, Icon: Calculator,   label: 'Estimations',         accent: GOLD,      roles: ['Admin', 'Collaborateur'] },
-      { to: '/dashboard/devis',              end: false, Icon: FileText,     label: 'Devis locatif',       accent: GOLD,      roles: ['Admin', 'Collaborateur'] },
-      { to: '/dashboard/gestion-locative',   end: false, Icon: Building,     label: 'Gestion Locative',   accent: BLUE,      roles: ROLES_IMMO, badge: 'contratsActifs' },
+      { to: '/dashboard',                    end: true,  Icon: BarChart3,    label: 'Tableau de bord',    accent: BLUE,      roles: ALL_STAFF },
+      { to: '/dashboard/properties',         end: false, Icon: Home,         label: 'Altimmo',             accent: BLUE,      roles: ROLES_ALTIMMO },
+      { to: '/dashboard/visites',            end: false, Icon: Calendar,     label: 'Rendez-vous',         accent: GOLD,      roles: ALL_STAFF },
+      { to: '/dashboard/estimations',        end: false, Icon: Calculator,   label: 'Estimations',         accent: GOLD,      roles: ROLES_ESTIM },
+      { to: '/dashboard/devis',              end: false, Icon: FileText,     label: 'Devis locatif',       accent: GOLD,      roles: ROLES_ESTIM },
+      { to: '/dashboard/gestion-locative',   end: false, Icon: Building,     label: 'Gestion Locative',   accent: BLUE,      roles: ROLES_GL, badge: 'contratsActifs' },
       { to: '/dashboard/events',             end: false, Icon: Calendar,     label: 'Mila Events',         accent: '#D42B2B', roles: ROLES_CM   },
       { to: '/dashboard/altcom',             end: false, Icon: Briefcase,    label: 'Altcom',              accent: GOLD,      roles: ROLES_CM   },
-      { to: '/dashboard/documents',          end: false, Icon: FolderOpen,   label: 'Documents',           accent: '#C8960C', roles: ROLES_DOC  },
+      { to: '/dashboard/documents',          end: false, Icon: FolderOpen,   label: 'Documents',           accent: '#C8960C', roles: ROLES_DOCS },
     ],
   },
   {
     label: 'Modération',
     links: [
-      { to: '/dashboard/moderation/properties', end: false, Icon: CheckCircle2, label: 'Modération Biens', accent: '#7C3AED', roles: ['Admin'] },
-      { to: '/dashboard/moderation/reviews',    end: false, Icon: Star,         label: 'Modération Avis',  accent: '#6366F1', roles: ['Admin'] },
+      { to: '/dashboard/moderation/properties', end: false, Icon: CheckCircle2, label: 'Modération Biens', accent: '#7C3AED', roles: ROLES_MOD },
+      { to: '/dashboard/moderation/reviews',    end: false, Icon: Star,         label: 'Modération Avis',  accent: '#6366F1', roles: ROLES_MOD },
     ],
   },
   {
@@ -54,16 +57,16 @@ const NAV_SECTIONS = [
       { to: '/dashboard/active-sessions',  end: false, Icon: ShieldCheck,   label: 'Sessions Actives',   accent: '#DC2626', roles: ['Admin'] },
       { to: '/dashboard/historique',       end: false, Icon: ClipboardList, label: 'Historique',         accent: '#7C3AED', roles: ['Admin'] },
       { to: '/dashboard/export-marketing', end: false, Icon: BarChart2,     label: 'Export Marketing',   accent: GOLD,      roles: ['Admin'] },
-      { to: '/dashboard/litiges',          end: false, Icon: Scale,         label: 'Litiges',             accent: '#DC2626', roles: ['Admin'], badge: 'litiges' },
+      { to: '/dashboard/litiges',          end: false, Icon: Scale,         label: 'Litiges',             accent: '#DC2626', roles: ROLES_LITIGES, badge: 'litiges' },
     ],
   },
   {
     label: 'Communications',
     links: [
-      { to: '/dashboard/messages',       end: false, Icon: Mail,          label: 'Boîte de Réception',  accent: GOLD,      roles: ROLES_COMM },
-      { to: '/dashboard/contact-messages', end: false, Icon: Mail,        label: 'Messages contact',    accent: GOLD,      roles: ['Admin'] },
-      { to: '/dashboard/conversations',  end: false, Icon: MessageCircle, label: 'Messages clients',    accent: GOLD,      roles: ROLES_COMM },
-      { to: '/dashboard/emails',         end: false, Icon: ShieldCheck,   label: 'Gestion des Emails',  accent: '#F59E0B', roles: ROLES_DOC  },
+      { to: '/dashboard/messages',       end: false, Icon: Mail,          label: 'Boîte de Réception',  accent: GOLD,      roles: ALL_STAFF },
+      { to: '/dashboard/contact-messages', end: false, Icon: Mail,        label: 'Messages contact',    accent: GOLD,      roles: ALL_STAFF },
+      { to: '/dashboard/conversations',  end: false, Icon: MessageCircle, label: 'Messages clients',    accent: GOLD,      roles: ALL_STAFF },
+      { to: '/dashboard/emails',         end: false, Icon: ShieldCheck,   label: 'Gestion des Emails',  accent: '#F59E0B', roles: ROLES_DOCS },
       { to: '/dashboard/publicites',     end: false, Icon: Megaphone,     label: 'Publicités',          accent: GOLD,      roles: ['Admin']  },
     ],
   },

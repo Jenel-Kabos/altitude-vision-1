@@ -5,8 +5,9 @@ const sendEmail  = require('../utils/email');
 const Devis      = require('../models/Devis');
 const auth       = require('../controllers/authController');
 const { notifyStaff } = require('../services/notificationService');
+const { ROLES_ESTIMATION } = require('../utils/roles');
 
-const staffOnly = [auth.protect, auth.restrictTo('Admin', 'Collaborateur')];
+const staffOnly = [auth.protect, auth.restrictTo(...ROLES_ESTIMATION)];
 
 // ── Template email interne (reçu par l'agence) ───────────────
 const getDevisEmailTemplate = (data) => `

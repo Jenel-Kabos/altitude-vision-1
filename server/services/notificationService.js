@@ -15,6 +15,7 @@ const User         = require('../models/User');
 const Notification = require('../models/Notification');
 const { getIO, isUserOnline }         = require('../socket');
 const { sendExpoPushNotification }    = require('../utils/expoPush');
+const { ALL_STAFF }                   = require('../utils/roles');
 
 /**
  * Notifie un utilisateur unique.
@@ -66,14 +67,14 @@ async function notify(recipientId, { type, title, body, data = {} }) {
 }
 
 /**
- * Notifie tous les membres du staff (Admin + Collaborateur).
+ * Notifie tous les membres du staff (ALL_STAFF — Admin + tous les sous-rôles collaborateurs).
  *
  * @param {{ type: string, title: string, body: string, data?: object }} payload
  * @returns {Promise<void>}
  */
 async function notifyStaff({ type, title, body, data = {} }) {
   const staffMembers = await User.find({
-    role:     { $in: ['Admin', 'Collaborateur'] },
+    role:     { $in: ALL_STAFF },
     isActive: true,
     status:   { $nin: ['Suspendu', 'Banni'] },
   }).select('_id').lean();

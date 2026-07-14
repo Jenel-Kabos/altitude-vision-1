@@ -1,9 +1,10 @@
 // server/routes/conversationRoutes.js
 const express = require('express');
-const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
+const { ALL_STAFF } = require('../utils/roles');
 const router = express.Router();
 
 const authController = require('../controllers/authController');
+const { restrictTo } = require('../middleware/authMiddleware');
 const {
   getConversationById,
   getConversations,
@@ -26,7 +27,7 @@ router.use(authController.protect);
 router.get('/count/unread', getUnreadCount);
 
 // Boîte partagée staff (Admin + tous sous-rôles collaborateurs)
-router.get('/staff-inbox', getStaffInbox);
+router.get('/staff-inbox', restrictTo(...ALL_STAFF), getStaffInbox);
 
 // Ma propre conversation staff-inbox (côté client/propriétaire)
 router.get('/my-inbox', getMyInbox);

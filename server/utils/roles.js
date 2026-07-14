@@ -44,4 +44,69 @@ const ROLE_LABELS = {
   Prestataire:           'Prestataire',
 };
 
-module.exports = { COLLAB_ROLES, STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM, ROLE_LABELS };
+// ══════════════════════════════════════════════════════════════════════════
+// Groupes par périmètre métier (nommage ROLES_* — même source de rôles que
+// ci-dessus, regroupements additionnels pour estimation/devis/GL/litiges).
+// ══════════════════════════════════════════════════════════════════════════
+
+const ROLES = {
+  ADMIN:             'Admin',
+  COLLABORATEUR:     'Collaborateur',
+  GESTIONNAIRE_IMMO: 'GestionnaireImmobilier',
+  SECRETAIRE:        'Secretaire',
+  COMMUNITY_MANAGER: 'CommunityManager',
+  COMMUNICANT:       'Communicant',
+};
+
+const ALL_STAFF = Object.values(ROLES);
+
+// Universel — tous les rôles staff
+const ROLES_UNIVERSAL = ALL_STAFF;
+
+// Estimations + Devis
+const ROLES_ESTIMATION = [
+  'Admin', 'Collaborateur', 'GestionnaireImmobilier',
+  'Secretaire', 'Communicant',
+];
+
+// Altimmo (biens)
+const ROLES_ALTIMMO = [
+  'Admin', 'Collaborateur', 'GestionnaireImmobilier',
+  'CommunityManager',
+];
+
+// Mila Events + Altcom
+const ROLES_CM = [
+  'Admin', 'Collaborateur', 'CommunityManager',
+];
+
+// Gestion Locative (lecture + gestion)
+const ROLES_GL = [
+  'Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire',
+];
+
+// Paiements Gestion Locative
+const ROLES_PAIEMENTS = [
+  'Admin', 'Collaborateur', 'Secretaire',
+];
+
+// Documents
+const ROLES_DOCS = [
+  'Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire',
+];
+
+// Litiges (+ GestionnaireImmobilier)
+const ROLES_LITIGES = [
+  'Admin', 'Collaborateur', 'GestionnaireImmobilier',
+];
+
+// Modération
+const ROLES_MODERATION = ['Admin', 'Collaborateur'];
+
+module.exports = {
+  COLLAB_ROLES, STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM, ROLE_LABELS,
+  ROLES, ALL_STAFF, ROLES_UNIVERSAL,
+  ROLES_ESTIMATION, ROLES_ALTIMMO, ROLES_CM,
+  ROLES_GL, ROLES_PAIEMENTS, ROLES_DOCS,
+  ROLES_LITIGES, ROLES_MODERATION,
+};

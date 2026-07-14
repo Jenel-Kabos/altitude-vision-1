@@ -12,6 +12,7 @@
  */
 
 const WriteWindow = require('../models/WriteWindow');
+const { COLLAB_ROLES } = require('../utils/roles');
 
 const WRITE_METHODS  = ['POST', 'PUT', 'PATCH', 'DELETE'];
 const MUTATE_METHODS = ['PUT', 'PATCH', 'DELETE'];
@@ -28,8 +29,9 @@ const findResourceId = (obj, depth = 0) => {
 };
 
 const writeWindowMiddleware = async (req, res, next) => {
-  // Admin : toujours autorisé
-  if (!req.user || req.user.role !== 'Collaborateur') return next();
+  // Admin : toujours autorisé — restriction sur tous les sous-rôles collaborateurs
+  // (cohérent avec isCollaborateur côté frontend, cf. AuthContext.jsx)
+  if (!req.user || !COLLAB_ROLES.includes(req.user.role)) return next();
 
   const method     = req.method.toUpperCase();
   const resourceId = req.params.id;

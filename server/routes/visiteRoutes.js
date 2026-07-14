@@ -1,5 +1,5 @@
 const express = require('express');
-const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
+const { ROLES_UNIVERSAL } = require('../utils/roles');
 const router = express.Router();
 
 const { protect, restrictTo } = require('../middleware/authMiddleware');
@@ -24,7 +24,7 @@ router.get('/my', getMyVisites);
 router.get('/owner', restrictTo('Proprietaire', 'Admin'), getOwnerVisites);
 
 // Staff : voir toutes les visites
-router.get('/', restrictTo(...STAFF_COMM), getAllVisites);
+router.get('/', restrictTo(...ROLES_UNIVERSAL), getAllVisites);
 
 // Client : créer une demande de visite
 router.post('/', createVisite);
@@ -32,7 +32,7 @@ router.post('/', createVisite);
 // ── Routes dynamiques ────────────────────────────────────────────────────────
 
 // Staff : mettre à jour (dateProposee, dateConfirmee, statut, notes)
-router.patch('/:id', restrictTo(...STAFF_COMM), updateVisite);
+router.patch('/:id', restrictTo(...ROLES_UNIVERSAL), updateVisite);
 
 // Client : annuler sa propre visite
 router.patch('/:id/cancel', cancelVisite);
