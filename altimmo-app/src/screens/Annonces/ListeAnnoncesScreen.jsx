@@ -84,36 +84,6 @@ function ActiveChip({ label, onRemove, c, chipStyle, textStyle }) {
   );
 }
 
-const HeroCard = React.memo(function HeroCard({ totalBiens, onPressExplore, styles, c }) {
-  return (
-    <View style={styles.heroCard}>
-      {/* Fond sombre */}
-      <View style={styles.heroBackground} />
-      {/* Contenu */}
-      <View style={styles.heroInner}>
-        {/* Tag localisation */}
-        <View style={styles.heroTag}>
-          <View style={styles.heroTagDot} />
-          <Text style={styles.heroTagText}>Brazzaville · Congo</Text>
-        </View>
-        {/* Titre */}
-        <Text style={styles.heroCardTitle}>
-          L'immobilier{'\n'}
-          <Text style={styles.heroCardTitleItalic}>à votre mesure</Text>
-        </Text>
-        <Text style={styles.heroCardSub}>
-          {totalBiens || 0} biens disponibles
-        </Text>
-      </View>
-      {/* CTA */}
-      <TouchableOpacity style={styles.heroCardCta} onPress={onPressExplore}>
-        <Text style={styles.heroCardCtaText}>Explorer</Text>
-        <Ionicons name="arrow-forward" size={11} color={c.text} />
-      </TouchableOpacity>
-    </View>
-  );
-});
-
 const AnnonceCard = React.memo(function AnnonceCard({ item, index, onPress, styles, c }) {
   const isLocation     = item.status?.toLowerCase() === 'location';
   const arrondissement = item.address?.arrondissement || '';
@@ -297,9 +267,6 @@ export default function ListeAnnoncesScreen({ navigation }) {
   const [activeFilters, setActiveFilters] = useState(DEFAULT_FILTERS);
   const [page, setPage]               = useState(1);
   const [hasMore, setHasMore]         = useState(true);
-  const [totalBiens, setTotalBiens]   = useState(0);
-
-  const flatListRef = useRef(null);
 
   // Résumé des filtres actifs pour le bouton
   const activeFilterCount = useMemo(() => {
@@ -364,7 +331,6 @@ export default function ListeAnnoncesScreen({ navigation }) {
 
       setAnnonces(prev => append ? [...prev, ...raw] : raw);
       setHasMore(hasMoreData);
-      setTotalBiens(total);
       setErreur('');
     } catch {
       setErreur('Impossible de charger les annonces');
@@ -439,20 +405,14 @@ export default function ListeAnnoncesScreen({ navigation }) {
   const onResetFilters = useCallback(() => setActiveFilters(DEFAULT_FILTERS), []);
   const onToggleSearch = useCallback(() => setSearchOpen(s => !s), []);
   const onCloseSearch  = useCallback(() => setSearchOpen(false), []);
-  const onPressExplore = useCallback(
-    () => flatListRef.current?.scrollToOffset({ offset: 400 }),
-    [],
-  );
 
   // ─── ListHeader mémoïsé (AVANT le return conditionnel) ───
   const ListHeader = useMemo(() => (
     <View>
       <GreetingBar onPressNotifications={onPressNotifications} />
 
-      <HeroCard totalBiens={totalBiens} onPressExplore={onPressExplore} styles={styles} c={c} />
-
       {pubs.length > 0 ? (
-        <AdCarousel items={pubs} />
+        <AdCarousel items={pubs} tintColor={c.gold} />
       ) : (
         <View style={styles.hero}>
           <LinearGradient
@@ -606,9 +566,9 @@ export default function ListeAnnoncesScreen({ navigation }) {
     </View>
   ), [
     pubs, recommended, activeFilters, activeFilterCount, filterSummary, searchOpen,
-    styles, c, totalBiens,
+    styles, c,
     onPressNotifications, onPressRecommended, onToggleSearch, onCloseSearch,
-    onResetFilters, onSearchSubmit, onPressExplore,
+    onResetFilters, onSearchSubmit,
   ]);
 
   // ─── Return conditionnel APRÈS tous les hooks ───
@@ -636,7 +596,6 @@ export default function ListeAnnoncesScreen({ navigation }) {
         />
       ) : (
         <FlatList
-          ref={flatListRef}
           data={annonces}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
@@ -703,87 +662,6 @@ const makeStyles = (c) => StyleSheet.create({
     fontSize: fontSize.lg,
     color: '#F0EDE8',
     lineHeight: 28,
-  },
-
-  // ─── HeroCard (entre GreetingBar et AdCarousel) ───
-  heroCard: {
-    margin: spacing.md,
-    marginTop: 14,
-    borderRadius: 20,
-    backgroundColor: '#1A1510',
-    height: 160,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  heroBackground: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: '#1A1510',
-  },
-  heroInner: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    justifyContent: 'space-between',
-  },
-  heroTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(200,150,12,0.2)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(200,150,12,0.4)',
-    borderRadius: 100,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-  },
-  heroTagDot: {
-    width: 5, height: 5, borderRadius: 2.5,
-    backgroundColor: c.gold,
-  },
-  heroTagText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 9,
-    color: c.gold,
-    letterSpacing: 0.15,
-  },
-  heroCardTitle: {
-    fontFamily: fonts.display,
-    fontSize: 28,
-    color: '#FAFAF8',
-    lineHeight: 32,
-    letterSpacing: -0.5,
-  },
-  heroCardTitleItalic: {
-    fontFamily: fonts.displayItalic,
-    fontSize: 28,
-    color: c.gold,
-  },
-  heroCardSub: {
-    fontFamily: fonts.body,
-    fontSize: 10,
-    color: 'rgba(250,250,248,0.45)',
-    marginTop: 5,
-  },
-  heroCardCta: {
-    position: 'absolute',
-    bottom: 14,
-    right: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: c.gold,
-    borderRadius: 100,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  heroCardCtaText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 10,
-    color: '#1A1A1A',
-    letterSpacing: 0.06,
   },
 
   searchZone: {

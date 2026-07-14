@@ -10,3 +10,4 @@ export { default as RecommendedCarousel } from './RecommendedCarousel';
 export { default as SearchPanel } from './SearchPanel';
 export { default as AdCarousel } from './AdCarousel';
 export { default as GreetingBar } from './GreetingBar';
+export { default as PageHeader } from './PageHeader';

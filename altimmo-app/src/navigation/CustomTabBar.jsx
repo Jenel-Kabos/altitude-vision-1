@@ -38,6 +38,9 @@ function TabItem({ route, isFocused, tabWidth, onPress, onLongPress, options, c 
   const scale        = useSharedValue(isFocused ? 1.15 : 1);
   const labelOpacity = useSharedValue(isFocused ? 1 : 0);
   const labelY       = useSharedValue(isFocused ? 0 : 4);
+  // Scale au press — distinct de `scale` (qui réagit au focus), déclenché par
+  // onPressIn/onPressOut sur l'ensemble icône + label.
+  const pressScale    = useSharedValue(1);
 
   useEffect(() => {
     scale.value        = withSpring(isFocused ? 1.15 : 1,  { damping: 10, stiffness: 320 });
@@ -45,10 +48,21 @@ function TabItem({ route, isFocused, tabWidth, onPress, onLongPress, options, c 
     labelY.value       = withSpring(isFocused ? 0 : 4,     { damping: 14, stiffness: 280 });
   }, [isFocused]);
 
+  const handlePressIn = () => {
+    pressScale.value = withSpring(1.2, { damping: 8, stiffness: 400 });
+  };
+
+  const handlePressOut = () => {
+    pressScale.value = withSpring(1, { damping: 14, stiffness: 300 });
+  };
+
   const iconStyle  = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const labelStyle = useAnimatedStyle(() => ({
     opacity:   labelOpacity.value,
     transform: [{ translateY: labelY.value }],
+  }));
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pressScale.value }],
   }));
 
   const label = options.tabBarLabel ?? route.name;
@@ -77,18 +91,22 @@ function TabItem({ route, isFocused, tabWidth, onPress, onLongPress, options, c 
     <TouchableOpacity
       style={[styles.tab, { width: tabWidth }]}
       onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       onLongPress={onLongPress}
       activeOpacity={1}
       accessibilityRole="button"
       accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
       accessibilityState={{ selected: isFocused }}
     >
-      <Animated.View style={iconStyle}>
-        <RouteIcon routeName={route.name} focused={isFocused} color={color} size={22} />
+      <Animated.View style={[{ alignItems: 'center' }, pressStyle]}>
+        <Animated.View style={iconStyle}>
+          <RouteIcon routeName={route.name} focused={isFocused} color={color} size={22} />
+        </Animated.View>
+        <Animated.Text style={[styles.label, { color }, labelStyle]} numberOfLines={1}>
+          {label}
+        </Animated.Text>
       </Animated.View>
-      <Animated.Text style={[styles.label, { color }, labelStyle]} numberOfLines={1}>
-        {label}
-      </Animated.Text>
     </TouchableOpacity>
   );
 }

@@ -8,15 +8,24 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { fonts, fontSize, spacing } from '../theme';
 
 const SCREEN_W    = Dimensions.get('window').width;
-const HEIGHT      = 210;
+const HEIGHT      = 220;
 const INTERVAL_MS = 5000;
 const SEG_GAP     = 5;
 const SEG_H       = 2.5;
 const H_PADDING   = spacing.md;
+// Le carrousel est encadré comme une card (marginHorizontal: 16 sur wrap) —
+// slide/getItemLayout/onMomentumScrollEnd/segWidth doivent donc raisonner
+// sur cette largeur réduite, pas sur SCREEN_W (plein écran), sous peine de
+// débordement hors du cadre arrondi et de désynchronisation du swipe/pagination.
+const CARD_MARGIN = 16;
+const CARD_W      = SCREEN_W - CARD_MARGIN * 2;
+
+// Applique une opacité (0-1) à une couleur hex pleine (#RRGGBB) via suffixe alpha.
+const withAlpha = (hex, alpha) => `${hex}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`;
 
 // ─── Segment de progression (Stories-style) ──────────────────────────────────
 
-function ProgressSegment({ active, done, segWidth }) {
+function ProgressSegment({ active, done, segWidth, tintColor }) {
   const anim = useRef(new Animated.Value(done ? 1 : 0)).current;
 
   useEffect(() => {
@@ -46,8 +55,8 @@ function ProgressSegment({ active, done, segWidth }) {
   });
 
   return (
-    <View style={[segStyles.track, { width: segWidth }]}>
-      <Animated.View style={[segStyles.fill, { width: fillWidth }]} />
+    <View style={[segStyles.track, { width: segWidth, backgroundColor: withAlpha(tintColor, 0.3) }]}>
+      <Animated.View style={[segStyles.fill, { width: fillWidth, backgroundColor: tintColor }]} />
     </View>
   );
 }
@@ -56,19 +65,17 @@ const segStyles = StyleSheet.create({
   track: {
     height: SEG_H,
     borderRadius: SEG_H / 2,
-    backgroundColor: 'rgba(255,255,255,0.28)',
     overflow: 'hidden',
   },
   fill: {
     height: SEG_H,
-    backgroundColor: '#FFFFFF',
     borderRadius: SEG_H / 2,
   },
 });
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function AdCarousel({ items }) {
+export default function AdCarousel({ items, tintColor = '#FFFFFF' }) {
   const list = items || [];
 
   // ── Tous les hooks AVANT le early return ──
@@ -80,7 +87,7 @@ export default function AdCarousel({ items }) {
 
   const segWidth = useMemo(() => {
     const n = Math.max(list.length, 1);
-    return (SCREEN_W - 2 * H_PADDING - (n - 1) * SEG_GAP) / n;
+    return (CARD_W - 2 * H_PADDING - (n - 1) * SEG_GAP) / n;
   }, [list.length]);
 
   const stopAutoScroll = useCallback(() => {
@@ -91,7 +98,7 @@ export default function AdCarousel({ items }) {
   }, []);
 
   const scrollToIndex = useCallback((i) => {
-    listRef.current?.scrollToOffset({ offset: i * SCREEN_W, animated: true });
+    listRef.current?.scrollToOffset({ offset: i * CARD_W, animated: true });
     indexRef.current = i;
     setIndex(i);
   }, []);
@@ -125,7 +132,7 @@ export default function AdCarousel({ items }) {
   };
 
   const onMomentumScrollEnd = (e) => {
-    const newIdx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
+    const newIdx = Math.round(e.nativeEvent.contentOffset.x / CARD_W);
     if (newIdx !== indexRef.current) {
       indexRef.current = newIdx;
       setIndex(newIdx);
@@ -196,7 +203,7 @@ export default function AdCarousel({ items }) {
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
         removeClippedSubviews
-        getItemLayout={(_, i) => ({ length: SCREEN_W, offset: SCREEN_W * i, index: i })}
+        getItemLayout={(_, i) => ({ length: CARD_W, offset: CARD_W * i, index: i })}
         onScrollBeginDrag={onScrollBeginDrag}
         onScrollEndDrag={onScrollEndDrag}
         onMomentumScrollEnd={onMomentumScrollEnd}
@@ -211,6 +218,7 @@ export default function AdCarousel({ items }) {
               active={i === index}
               done={i < index}
               segWidth={segWidth}
+              tintColor={tintColor}
             />
           ))}
         </View>
@@ -222,7 +230,10 @@ export default function AdCarousel({ items }) {
           {list.map((_, i) => (
             <View
               key={i}
-              style={i === index ? styles.dotActive : styles.dotInactive}
+              style={[
+                i === index ? styles.dotActive : styles.dotInactive,
+                { backgroundColor: i === index ? tintColor : withAlpha(tintColor, 0.4) },
+              ]}
             />
           ))}
         </View>
@@ -236,11 +247,15 @@ export default function AdCarousel({ items }) {
 const styles = StyleSheet.create({
   wrap: {
     height: HEIGHT,
-    width: SCREEN_W,
+    marginHorizontal: CARD_MARGIN,
+    marginTop: 14,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   slide: {
-    width: SCREEN_W,
+    width: CARD_W,
     height: HEIGHT,
+    borderRadius: 20,
     overflow: 'hidden',
   },
   gradient: {
@@ -287,12 +302,10 @@ const styles = StyleSheet.create({
     width: 16,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#FFFFFF',
   },
   dotInactive: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.35)',
   },
 });

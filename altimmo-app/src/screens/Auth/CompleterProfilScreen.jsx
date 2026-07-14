@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Button, Checkbox } from '../../components';
+import PageHeader from '../../components/PageHeader';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 import api from '../../services/api';
 
@@ -145,6 +146,7 @@ export default function CompleterProfilScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <PageHeader title="Compléter mon profil" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.scroll}

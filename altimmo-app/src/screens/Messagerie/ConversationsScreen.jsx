@@ -18,6 +18,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import IllustrationNoMessages from '../../components/illustrations/IllustrationNoMessages';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Divider from '../../components/ui/Divider';
+import PageHeader from '../../components/PageHeader';
 
 const formatTime = (dateStr) => {
   if (!dateStr) return '';
@@ -232,12 +233,6 @@ export default function ConversationsScreen({ navigation }) {
     };
   }, [isStaff, chargerConversations]);
 
-  // ─── Données dérivées ───
-  const totalUnread = useMemo(
-    () => conversations.reduce((sum, conv) => sum + Number(conv.unreadCount || 0), 0),
-    [conversations],
-  );
-
   const filtered = useMemo(() => {
     if (!search.trim()) return conversations;
     const q = search.trim().toLowerCase();
@@ -291,19 +286,10 @@ export default function ConversationsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* ─── Header ─── */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.title}>{isStaff ? 'Boîte staff' : 'Messages'}</Text>
-          {totalUnread > 0 && (
-            <View style={styles.titleBadge}>
-              <Text style={styles.titleBadgeText}>
-                {totalUnread > 99 ? '99+' : totalUnread}
-              </Text>
-            </View>
-          )}
-        </View>
+      <PageHeader title={isStaff ? 'Boîte staff' : 'Messages'} />
 
+      {/* ─── Barre de recherche ─── */}
+      <View style={styles.header}>
         <View style={styles.searchBar}>
           <Ionicons name="search-outline" size={18} color={c.gold} />
           <TextInput
@@ -390,30 +376,6 @@ const makeStyles = (c) => StyleSheet.create({
     backgroundColor: c.bg,
     padding: spacing.lg,
     paddingBottom: spacing.md,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontFamily: fonts.display,
-    fontSize: fontSize.xxl,
-    color: c.text,
-  },
-  titleBadge: {
-    backgroundColor: c.gold,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 100,
-    minWidth: 24,
-    alignItems: 'center',
-  },
-  titleBadgeText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 12,
-    color: '#0A0A0A',
   },
 
   searchBar: {

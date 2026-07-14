@@ -10,6 +10,7 @@ import api from '../../services/api';
 import { cache } from '../../services/cacheService';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../../theme';
+import PageHeader from '../../components/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import IllustrationNoVisites from '../../components/illustrations/IllustrationNoVisites';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -217,29 +218,10 @@ export default function VisitesScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
 
-      {/* ─── Header ──────────────────────────────────────────── */}
-      <View style={styles.header}>
-        {navigation?.canGoBack?.() && (
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backBtn}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Retour"
-          >
-            <Ionicons name="arrow-back" size={22} color={c.text} />
-          </TouchableOpacity>
-        )}
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Mes visites</Text>
-          {visites.length > 0 && (
-            <View style={styles.headerCount}>
-              <Text style={styles.headerCountText}>{visites.length}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.headerSpacer} />
-      </View>
+      <PageHeader
+        title="Mes visites"
+        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+      />
 
       {/* ─── Tabs ────────────────────────────────────────────── */}
       <View style={styles.tabsWrap}>
@@ -305,44 +287,6 @@ export default function VisitesScreen({ navigation }) {
 
 const makeStyles = (c) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.bg },
-
-  // ─── Header ───
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-  },
-  backBtn: {
-    width: 30,
-    alignItems: 'flex-start',
-  },
-  headerCenter: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  headerTitle: {
-    fontFamily: fonts.display,
-    fontSize: fontSize.lg,
-    color: c.text,
-  },
-  headerCount: {
-    backgroundColor: c.goldMuted,
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  headerCountText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.xs,
-    color: c.gold,
-  },
-  headerSpacer: { width: 30 },
 
   // ─── Tabs ───
   tabsWrap: {

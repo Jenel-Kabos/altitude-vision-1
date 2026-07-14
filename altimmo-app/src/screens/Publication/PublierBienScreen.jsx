@@ -362,7 +362,10 @@ export default function PublierBienScreen({ navigation, route }) {
         isEditing
           ? "Votre publication a été mise à jour."
           : "Votre bien est en cours de validation par l'administrateur. Il sera publié après validation.",
-        [{ text: 'OK', onPress: () => navigation.goBack() }],
+        [{
+          text: 'OK',
+          onPress: () => isEditing ? navigation.goBack() : navigation.navigate('Annonces'),
+        }],
       );
     } catch (err) {
       Alert.alert('Erreur', err.message || 'Impossible de publier.');
@@ -1094,48 +1097,57 @@ export default function PublierBienScreen({ navigation, route }) {
           {renderStepContent()}
         </ScrollView>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Précédent"
-              variant="outline"
-              fullWidth
-              disabled={step === 1}
-              onPress={goBack}
-            />
-          </View>
-          <View style={{ width: spacing.md }} />
-          <View style={{ flex: 2 }}>
+        {/* Barre de navigation entre étapes */}
+        <View style={styles.navBar}>
+
+          {/* Bouton Précédent */}
+          {step > 1 && (
             <TouchableOpacity
-              onPress={isLastStep ? handlePublish : goNext}
-              disabled={submitting}
-              activeOpacity={0.85}
+              style={styles.btnPrev}
+              onPress={goBack}
+              activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel={isLastStep ? (isEditing ? 'Enregistrer' : 'Publier') : 'Suivant'}
-              accessibilityState={{ disabled: submitting }}
+              accessibilityLabel="Précédent"
             >
-              <LinearGradient
-                colors={['#C8960C', '#A07010']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[styles.ctaBtn, submitting && styles.ctaBtnDisabled]}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#0D0B08" size="small" />
-                ) : (
-                  <>
-                    <Text style={styles.ctaBtnText}>
-                      {isLastStep ? (isEditing ? 'Enregistrer' : 'Publier') : 'Suivant'}
-                    </Text>
-                    {!isLastStep && (
-                      <Ionicons name="arrow-forward" size={18} color="#0D0B08" />
-                    )}
-                  </>
-                )}
-              </LinearGradient>
+              <Ionicons name="chevron-back" size={18} color={c.gold} />
+              <Text style={styles.btnPrevText}>Précédent</Text>
             </TouchableOpacity>
-          </View>
+          )}
+
+          {/* Spacer si pas de bouton précédent */}
+          {step === 1 && <View style={{ flex: 1 }} />}
+
+          {/* Bouton Suivant / Publier */}
+          <TouchableOpacity
+            style={[
+              styles.btnNext,
+              isLastStep && styles.btnPublish,
+            ]}
+            onPress={isLastStep ? handlePublish : goNext}
+            activeOpacity={0.85}
+            disabled={submitting}
+            accessibilityRole="button"
+            accessibilityLabel={isLastStep ? (isEditing ? 'Enregistrer' : 'Publier') : 'Suivant'}
+            accessibilityState={{ disabled: submitting }}
+          >
+            {submitting ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Text style={styles.btnNextText}>
+                  {isLastStep
+                    ? (isEditing ? 'Enregistrer' : 'Publier')
+                    : 'Suivant'}
+                </Text>
+                {!isLastStep && (
+                  <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+                )}
+                {isLastStep && (
+                  <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                )}
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -1652,26 +1664,53 @@ const makeStyles = (c) => StyleSheet.create({
     marginTop: spacing.md,
   },
 
-  // ─── Footer ───
-  footer: {
+  // ─── Barre de navigation entre étapes ───
+  navBar: {
     flexDirection: 'row',
-    padding: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
     borderTopColor: c.border,
-    backgroundColor: c.bg,
+    backgroundColor: c.bgCard,
+    gap: 12,
   },
-  ctaBtn: {
+  btnPrev: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 13,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: c.borderGold,
+    backgroundColor: c.goldLight,
+    flex: 1,
+  },
+  btnPrevText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: c.gold,
+  },
+  btnNext: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: 6,
+    paddingVertical: 13,
+    paddingHorizontal: 18,
     borderRadius: 14,
-    minHeight: 52,
+    backgroundColor: c.gold,
+    flex: 2,
   },
-  ctaBtnDisabled: { opacity: 0.6 },
-  ctaBtnText: {
-    ...typography.body,
-    fontWeight: '700',
-    color: '#0D0B08',
+  btnPublish: {
+    backgroundColor: c.success,
+    flex: 2,
+  },
+  btnNextText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+    color: '#FFFFFF',
   },
 });

@@ -150,6 +150,14 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         const recipientIdStr = targetUserId.toString();
         const currentCount = convDoc.unreadCount?.get(recipientIdStr) || 0;
         convDoc.unreadCount.set(recipientIdStr, currentCount + 1);
+        // Staff → client sur une boîte partagée : l'équipe vient de répondre,
+        // on efface le signal "non-lu côté staff".
+        if (isStaffInbox) convDoc.unreadCount.set('staff', 0);
+    } else if (isStaffInbox) {
+        // Client → boîte staff partagée : pas de destinataire unique fixe,
+        // clé partagée 'staff' pour signaler un message client en attente.
+        const staffCount = convDoc.unreadCount?.get('staff') || 0;
+        convDoc.unreadCount.set('staff', staffCount + 1);
     }
     await convDoc.save();
 

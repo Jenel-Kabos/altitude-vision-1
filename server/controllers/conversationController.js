@@ -297,10 +297,22 @@ exports.deleteConversation = asyncHandler(async (req, res) => {
  * @access Protected
  */
 exports.getUnreadCount = asyncHandler(async (req, res) => {
-  const unreadCount = await Message.countDocuments({
+  let unreadCount = await Message.countDocuments({
     receiver: req.user.id,
     isRead: false,
   });
+
+  // Staff : ajoute les conversations de la boîte partagée où un message
+  // client attend une réponse (clé Map 'staff') — ces messages ont
+  // receiver: null et ne sont donc jamais comptés ci-dessus.
+  if (ALL_STAFF.includes(req.user.role)) {
+    const staffInboxUnread = await Conversation.countDocuments({
+      isStaffInbox: true,
+      isArchived: { $ne: true },
+      'unreadCount.staff': { $gt: 0 },
+    });
+    unreadCount += staffInboxUnread;
+  }
 
   res.status(200).json({
     status: 'success',
@@ -479,10 +491,16 @@ exports.getStaffInbox = async (req, res) => {
       .populate('relatedProperty', 'title images')
       .sort('-updatedAt');
 
+    const withUnread = conversations.map((conv) => {
+      const obj = conv.toObject();
+      obj.unreadCount = conv.unreadCount?.get('staff') || 0;
+      return obj;
+    });
+
     res.status(200).json({
       status: 'success',
-      results: conversations.length,
-      data: { conversations },
+      results: withUnread.length,
+      data: { conversations: withUnread },
     });
   } catch (error) {
     console.error('❌ [getStaffInbox]', error.message);

@@ -12,6 +12,7 @@ import api from '../../services/api';
 import { PrixFCFA } from '../../components';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../../theme';
+import PageHeader from '../../components/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import IllustrationNoFavoris from '../../components/illustrations/IllustrationNoFavoris';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -167,30 +168,10 @@ export default function FavorisScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
 
-      {/* ─── Header ──────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.headerBack}
-          hitSlop={8}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Retour"
-        >
-          <Ionicons name="arrow-back" size={22} color={c.text} />
-        </TouchableOpacity>
-
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Mes favoris</Text>
-          {properties.length > 0 && (
-            <View style={styles.headerCount}>
-              <Text style={styles.headerCountText}>{properties.length}</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={{ width: 30 }} />
-      </View>
+      <PageHeader
+        title="Mes favoris"
+        onBack={() => navigation.goBack()}
+      />
 
       {/* ─── Liste ───────────────────────────────────────────── */}
       <FlatList
@@ -221,42 +202,6 @@ export default function FavorisScreen({ navigation }) {
 
 const makeStyles = (c) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.bg },
-
-  // ─── Header ───
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: c.border,
-  },
-  headerBack: {
-    width: 30,
-    alignItems: 'flex-start',
-  },
-  headerCenter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  headerTitle: {
-    fontFamily: fonts.display,
-    fontSize: fontSize.lg,
-    color: c.text,
-  },
-  headerCount: {
-    backgroundColor: c.goldMuted,
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  headerCountText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.xs,
-    color: c.gold,
-  },
 
   // ─── Liste ───
   list: {
