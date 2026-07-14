@@ -7,7 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
-import { fonts, fontSize, spacing } from '../theme';
+import { fonts, fontSize } from '../theme';
 
 const getGreeting = () => {
   const h = new Date().getHours();
@@ -50,8 +50,6 @@ export default function GreetingBar({ onPressNotifications }) {
     fetchUnread();
   }, [fetchUnread]));
 
-  const badgeLabel = unreadCount > 99 ? '99+' : unreadCount > 0 ? String(unreadCount) : null;
-
   return (
     <View style={styles.row}>
       {hasPhoto ? (
@@ -68,23 +66,16 @@ export default function GreetingBar({ onPressNotifications }) {
       </View>
 
       <TouchableOpacity
-        style={styles.notifBtn}
         onPress={onPressNotifications}
         activeOpacity={0.7}
         hitSlop={6}
         accessibilityLabel={unreadCount > 0 ? `${unreadCount} notifications non lues` : 'Notifications'}
         accessibilityRole="button"
       >
-        <Ionicons
-          name={unreadCount > 0 ? 'notifications' : 'notifications-outline'}
-          size={22}
-          color={unreadCount > 0 ? c.gold : c.text}
-        />
-        {badgeLabel && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badgeLabel}</Text>
-          </View>
-        )}
+        <View style={styles.bellWrap}>
+          <Ionicons name="notifications-outline" size={20} color={c.textSub} />
+          {unreadCount > 0 && <View style={styles.bellDot} />}
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -93,29 +84,34 @@ export default function GreetingBar({ onPressNotifications }) {
 const makeStyles = (c) => StyleSheet.create({
   row: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+    paddingTop: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    backgroundColor: c.bgCard,
+    borderBottomWidth: 1,
+    borderBottomColor: c.border,
+    gap: 12,
   },
 
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: c.bgCardAlt,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: c.borderGold,
   },
   avatarPlaceholder: {
-    backgroundColor: c.goldMuted,
+    backgroundColor: c.goldLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   initiale: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.md,
-    color: c.goldDark,
+    fontFamily: fonts.display,
+    fontSize: 18,
+    color: c.gold,
   },
 
   textWrap: {
@@ -123,41 +119,35 @@ const makeStyles = (c) => StyleSheet.create({
   },
   hello: {
     fontFamily: fonts.body,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     color: c.textMuted,
   },
   prenom: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.md,
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
     color: c.text,
+    lineHeight: 24,
   },
 
-  notifBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  bellWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: c.bgCardAlt,
+    borderWidth: 1,
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badge: {
+  bellDot: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: c.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
+    top: 8,
+    right: 8,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: c.gold,
     borderWidth: 1.5,
-    borderColor: c.bgCardAlt,
-  },
-  badgeText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 9,
-    color: '#FFFFFF',
-    lineHeight: 12,
+    borderColor: c.bgCard,
   },
 });

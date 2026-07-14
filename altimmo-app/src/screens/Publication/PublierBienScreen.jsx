@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { typography, spacing, fonts, fontSize, radius } from '../../theme';
@@ -377,6 +378,7 @@ export default function PublierBienScreen({ navigation, route }) {
         style={[
           styles.input,
           opts.multiline && styles.inputMultiline,
+          !!form[name] && focused !== name && styles.inputFilled,
           focused === name && styles.inputFocused,
         ]}
         placeholder={opts.placeholder}
@@ -446,13 +448,13 @@ export default function PublierBienScreen({ navigation, route }) {
       return (
         <View>
           <Text style={styles.fieldLabel}>Type de bien</Text>
-          <View style={styles.grid2}>
+          <View style={styles.grid3}>
             {PROPERTY_TYPES.map(t => {
               const sel = form.type === t.value;
               return (
                 <TouchableOpacity
                   key={t.value}
-                  style={[styles.typeCard, sel && styles.cardSelected]}
+                  style={[styles.typeCard, sel && styles.typeCardSelected]}
                   onPress={() => setField('type', t.value)}
                   activeOpacity={0.85}
                   accessibilityRole="button"
@@ -461,10 +463,10 @@ export default function PublierBienScreen({ navigation, route }) {
                 >
                   <Ionicons
                     name={t.icon}
-                    size={28}
+                    size={24}
                     color={sel ? c.gold : c.textSub}
                   />
-                  <Text style={[styles.typeLabel, sel && { color: c.gold }]}>
+                  <Text style={[styles.typeLabel, sel && { color: c.gold }]} numberOfLines={2}>
                     {t.label}
                   </Text>
                 </TouchableOpacity>
@@ -474,13 +476,13 @@ export default function PublierBienScreen({ navigation, route }) {
           {errors.type ? <Text style={styles.errorText}>{errors.type}</Text> : null}
 
           <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Transaction</Text>
-          <View style={styles.grid2}>
+          <View style={styles.txToggle}>
             {TRANSACTIONS.map(t => {
               const sel = form.categorie === t.value;
               return (
                 <TouchableOpacity
                   key={t.value}
-                  style={[styles.txCard, sel && styles.cardSelected]}
+                  style={[styles.txPill, sel && styles.txPillActive]}
                   onPress={() => setField('categorie', t.value)}
                   activeOpacity={0.85}
                   accessibilityRole="button"
@@ -489,13 +491,12 @@ export default function PublierBienScreen({ navigation, route }) {
                 >
                   <Ionicons
                     name={t.icon}
-                    size={28}
-                    color={sel ? c.gold : c.textSub}
+                    size={16}
+                    color={sel ? '#0D0B08' : c.textSub}
                   />
-                  <Text style={[styles.typeLabel, sel && { color: c.gold }]}>
+                  <Text style={[styles.txPillText, sel && styles.txPillTextActive]}>
                     {t.value}
                   </Text>
-                  <Text style={styles.txDesc}>{t.desc}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -580,6 +581,7 @@ export default function PublierBienScreen({ navigation, route }) {
           <View style={styles.field}>
             <View style={[
               styles.priceWrap,
+              !!form.prix && focused !== 'prix' && styles.priceWrapFilled,
               focused === 'prix' && styles.inputFocused,
             ]}>
               <TextInput
@@ -1013,17 +1015,31 @@ export default function PublierBienScreen({ navigation, route }) {
             onPress={() => navigation.goBack()}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel="Fermer"
+            accessibilityLabel="Retour"
           >
-            <Ionicons name="close-outline" size={22} color={c.text} />
+            <Ionicons name="arrow-back" size={20} color={c.gold} />
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {isEditing ? `Modifier · ${STEPS[step - 1].title}` : STEPS[step - 1].title}
+            {isEditing ? 'Modifier le bien' : 'Publier un bien'}
           </Text>
-          <Text style={styles.headerStep}>{step}/{STEPS.length}</Text>
+          <View style={styles.headerStepPill}>
+            <Text style={styles.headerStepText}>{step}/{STEPS.length}</Text>
+          </View>
         </View>
 
-        {/* Stepper horizontal */}
+        {/* Progress bar */}
+        <View style={styles.progressTrack}>
+          <Animated.View style={[styles.progressFillWrap, { width: progressWidth }]}>
+            <LinearGradient
+              colors={['#C8960C', '#A07010']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.progressFill}
+            />
+          </Animated.View>
+        </View>
+
+        {/* Labels d'étapes (dessous la barre) */}
         <ScrollView
           ref={stepperRef}
           horizontal
@@ -1068,11 +1084,6 @@ export default function PublierBienScreen({ navigation, route }) {
           })}
         </ScrollView>
 
-        {/* Progress bar */}
-        <View style={styles.progressTrack}>
-          <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
-        </View>
-
         {/* Step content */}
         <ScrollView
           ref={scrollRef}
@@ -1096,14 +1107,34 @@ export default function PublierBienScreen({ navigation, route }) {
           </View>
           <View style={{ width: spacing.md }} />
           <View style={{ flex: 2 }}>
-            <Button
-              label={isLastStep ? (isEditing ? 'Enregistrer' : 'Publier') : 'Suivant'}
-              variant="primary"
-              fullWidth
-              loading={submitting}
+            <TouchableOpacity
               onPress={isLastStep ? handlePublish : goNext}
-              icon={isLastStep ? undefined : 'arrow-forward'}
-            />
+              disabled={submitting}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={isLastStep ? (isEditing ? 'Enregistrer' : 'Publier') : 'Suivant'}
+              accessibilityState={{ disabled: submitting }}
+            >
+              <LinearGradient
+                colors={['#C8960C', '#A07010']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.ctaBtn, submitting && styles.ctaBtnDisabled]}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#0D0B08" size="small" />
+                ) : (
+                  <>
+                    <Text style={styles.ctaBtnText}>
+                      {isLastStep ? (isEditing ? 'Enregistrer' : 'Publier') : 'Suivant'}
+                    </Text>
+                    {!isLastStep && (
+                      <Ionicons name="arrow-forward" size={18} color="#0D0B08" />
+                    )}
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -1133,7 +1164,9 @@ const makeStyles = (c) => StyleSheet.create({
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: c.bgCard,
+    backgroundColor: 'rgba(200,150,12,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(200,150,12,0.3)',
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: {
@@ -1142,12 +1175,20 @@ const makeStyles = (c) => StyleSheet.create({
     color: c.text,
     textAlign: 'center',
   },
-  headerStep: {
-    fontFamily: fonts.body,
-    color: c.textSub,
-    fontSize: fontSize.sm,
-    minWidth: 28,
-    textAlign: 'right',
+  headerStepPill: {
+    minWidth: 44,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 100,
+    backgroundColor: 'rgba(200,150,12,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(200,150,12,0.3)',
+    alignItems: 'center',
+  },
+  headerStepText: {
+    fontFamily: fonts.bodyBold,
+    color: c.gold,
+    fontSize: fontSize.xs,
   },
 
   // ─── Stepper ───
@@ -1193,9 +1234,12 @@ const makeStyles = (c) => StyleSheet.create({
     height: 3,
     backgroundColor: c.bgCard,
   },
-  progressFill: {
+  progressFillWrap: {
     height: 3,
-    backgroundColor: c.gold,
+  },
+  progressFill: {
+    flex: 1,
+    height: 3,
   },
 
   // ─── Step content ───
@@ -1213,7 +1257,7 @@ const makeStyles = (c) => StyleSheet.create({
     marginTop: spacing.sm,
   },
   input: {
-    backgroundColor: c.bgCard,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -1226,6 +1270,10 @@ const makeStyles = (c) => StyleSheet.create({
     minHeight: 100,
     textAlignVertical: 'top',
   },
+  inputFilled: {
+    backgroundColor: 'rgba(200,150,12,0.06)',
+    borderColor: 'rgba(200,150,12,0.35)',
+  },
   inputFocused: { borderColor: c.gold },
   errorText: {
     color: c.error,
@@ -1233,44 +1281,61 @@ const makeStyles = (c) => StyleSheet.create({
     marginTop: spacing.xs,
   },
 
-  // ─── Step 2 : type cards ───
-  grid2: {
+  // ─── Step 2 : type cards (grille 3 colonnes) ───
+  grid3: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
   typeCard: {
-    flexBasis: '48%',
+    flexBasis: '31%',
     flexGrow: 1,
-    backgroundColor: c.bgCard,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
     alignItems: 'center',
     gap: spacing.sm,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  cardSelected: { borderColor: c.gold },
+  typeCardSelected: {
+    backgroundColor: 'rgba(200,150,12,0.12)',
+    borderColor: c.gold,
+  },
   typeLabel: {
     ...typography.body,
     color: c.text,
     fontWeight: '600',
   },
-  txCard: {
-    flexBasis: '48%',
-    flexGrow: 1,
-    backgroundColor: c.bgCard,
-    borderRadius: 12,
-    padding: spacing.md,
-    alignItems: 'center',
-    gap: spacing.xs,
-    borderWidth: 2,
-    borderColor: 'transparent',
+  // ─── Toggle Vente/Location (pill) ───
+  txToggle: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 100,
+    padding: 4,
+    gap: 4,
   },
-  txDesc: {
-    ...typography.caption,
+  txPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 100,
+  },
+  txPillActive: {
+    backgroundColor: c.gold,
+  },
+  txPillText: {
+    ...typography.body,
+    fontWeight: '600',
     color: c.textSub,
-    textAlign: 'center',
+  },
+  txPillTextActive: {
+    color: '#0D0B08',
+    fontWeight: '700',
   },
 
   // ─── Step 3 : photos ───
@@ -1329,9 +1394,9 @@ const makeStyles = (c) => StyleSheet.create({
   photoEmpty: {
     width: 100, height: 100,
     borderRadius: 8,
-    backgroundColor: c.bgCard,
+    backgroundColor: 'rgba(200,150,12,0.04)',
     borderWidth: 1.5,
-    borderColor: c.border,
+    borderColor: 'rgba(200,150,12,0.4)',
     borderStyle: 'dashed',
     alignItems: 'center', justifyContent: 'center',
   },
@@ -1340,11 +1405,15 @@ const makeStyles = (c) => StyleSheet.create({
   priceWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: c.bgCard,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: c.border,
+  },
+  priceWrapFilled: {
+    backgroundColor: 'rgba(200,150,12,0.06)',
+    borderColor: 'rgba(200,150,12,0.35)',
   },
   priceInput: {
     flex: 1,
@@ -1476,7 +1545,7 @@ const makeStyles = (c) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: c.bgCard,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -1590,5 +1659,19 @@ const makeStyles = (c) => StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: c.border,
     backgroundColor: c.bg,
+  },
+  ctaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderRadius: 14,
+    minHeight: 52,
+  },
+  ctaBtnDisabled: { opacity: 0.6 },
+  ctaBtnText: {
+    ...typography.body,
+    fontWeight: '700',
+    color: '#0D0B08',
   },
 });

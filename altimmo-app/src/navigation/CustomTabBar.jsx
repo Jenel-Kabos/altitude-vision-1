@@ -54,6 +54,25 @@ function TabItem({ route, isFocused, tabWidth, onPress, onLongPress, options, c 
   const label = options.tabBarLabel ?? route.name;
   const color = isFocused ? c.gold : c.textMuted;
 
+  // Onglet central "Publier" — bouton surélevé, pas d'icône/label standard
+  if (route.name === 'Publier') {
+    return (
+      <TouchableOpacity
+        style={[styles.tab, styles.tabRaised, { width: tabWidth }]}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
+        accessibilityState={{ selected: isFocused }}
+      >
+        <View style={[styles.raisedBtn, { backgroundColor: c.gold, borderColor: c.bgCard }]}>
+          <Ionicons name="add" size={26} color="#FFFFFF" />
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity
       style={[styles.tab, { width: tabWidth }]}
@@ -169,9 +188,22 @@ const styles = StyleSheet.create({
     gap: 3,
     minHeight: 52,
   },
+  tabRaised: {
+    top: -14,
+  },
+  raisedBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+  },
   label: {
     fontFamily: fonts.bodyBold,
-    fontSize: 10,
-    letterSpacing: 0.2,
+    fontSize: 9,
+    letterSpacing: 0.04,
+    textTransform: 'uppercase',
+    marginTop: 2,
   },
 });

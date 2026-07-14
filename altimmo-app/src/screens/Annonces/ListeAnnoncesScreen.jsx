@@ -84,16 +84,48 @@ function ActiveChip({ label, onRemove, c, chipStyle, textStyle }) {
   );
 }
 
+const HeroCard = React.memo(function HeroCard({ totalBiens, onPressExplore, styles, c }) {
+  return (
+    <View style={styles.heroCard}>
+      {/* Fond sombre */}
+      <View style={styles.heroBackground} />
+      {/* Contenu */}
+      <View style={styles.heroInner}>
+        {/* Tag localisation */}
+        <View style={styles.heroTag}>
+          <View style={styles.heroTagDot} />
+          <Text style={styles.heroTagText}>Brazzaville · Congo</Text>
+        </View>
+        {/* Titre */}
+        <Text style={styles.heroCardTitle}>
+          L'immobilier{'\n'}
+          <Text style={styles.heroCardTitleItalic}>à votre mesure</Text>
+        </Text>
+        <Text style={styles.heroCardSub}>
+          {totalBiens || 0} biens disponibles
+        </Text>
+      </View>
+      {/* CTA */}
+      <TouchableOpacity style={styles.heroCardCta} onPress={onPressExplore}>
+        <Text style={styles.heroCardCtaText}>Explorer</Text>
+        <Ionicons name="arrow-forward" size={11} color={c.text} />
+      </TouchableOpacity>
+    </View>
+  );
+});
+
 const AnnonceCard = React.memo(function AnnonceCard({ item, index, onPress, styles, c }) {
   const isLocation     = item.status?.toLowerCase() === 'location';
   const arrondissement = item.address?.arrondissement || '';
   const city           = item.address?.city || 'Brazzaville';
   const addressText    = arrondissement ? `${arrondissement} · ${city}` : city;
-  const bedrooms       = item.bedrooms  || 0;
-  const bathrooms      = item.bathrooms || 0;
-  const surface        = item.surface   || item.area || 0;
-  const hasStats       = bedrooms > 0 || bathrooms > 0 || surface > 0;
   const typeLabel      = (item.type || '').toUpperCase();
+
+  const attrs = useMemo(() => [
+    { n: item.bedrooms,  l: 'Ch.' },
+    { n: item.bathrooms, l: 'SDB' },
+    { n: item.surface,   l: 'm²' },
+  ].filter(a => a.n != null && a.n !== 0), [item.bedrooms, item.bathrooms, item.surface]);
 
   const images = useMemo(
     () => (item.images || item.photos || []).filter(Boolean).slice(0, 4),
@@ -222,36 +254,26 @@ const AnnonceCard = React.memo(function AnnonceCard({ item, index, onPress, styl
 
           {/* ─── Corps ─── */}
           <View style={styles.body}>
-            {typeLabel ? (
-              <Text style={styles.metaText}>{typeLabel}</Text>
-            ) : null}
-            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+            <View style={styles.bodyMain}>
+              {typeLabel ? (
+                <Text style={styles.metaText}>{typeLabel}</Text>
+              ) : null}
+              <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
 
-            <View style={styles.addressRow}>
-              <Ionicons name="location-outline" size={12} color={c.textMuted} />
-              <Text style={styles.location} numberOfLines={1}>{addressText}</Text>
+              <View style={styles.addressRow}>
+                <Ionicons name="location-outline" size={12} color={c.textMuted} />
+                <Text style={styles.location} numberOfLines={1}>{addressText}</Text>
+              </View>
             </View>
 
-            {hasStats && (
-              <View style={styles.statsRow}>
-                {bedrooms > 0 && (
-                  <View style={styles.statItem}>
-                    <Ionicons name="bed-outline" size={13} color={c.textMuted} />
-                    <Text style={styles.statText}>{bedrooms}</Text>
+            {attrs.length > 0 && (
+              <View style={styles.cardAttrs}>
+                {attrs.map((a, i) => (
+                  <View key={i} style={styles.cardAttr}>
+                    <Text style={styles.cardAttrN}>{a.n}</Text>
+                    <Text style={styles.cardAttrL}>{a.l}</Text>
                   </View>
-                )}
-                {bathrooms > 0 && (
-                  <View style={styles.statItem}>
-                    <Ionicons name="water-outline" size={13} color={c.textMuted} />
-                    <Text style={styles.statText}>{bathrooms}</Text>
-                  </View>
-                )}
-                {surface > 0 && (
-                  <View style={styles.statItem}>
-                    <Ionicons name="resize-outline" size={13} color={c.textMuted} />
-                    <Text style={styles.statText}>{surface} m²</Text>
-                  </View>
-                )}
+                ))}
               </View>
             )}
           </View>
@@ -275,6 +297,9 @@ export default function ListeAnnoncesScreen({ navigation }) {
   const [activeFilters, setActiveFilters] = useState(DEFAULT_FILTERS);
   const [page, setPage]               = useState(1);
   const [hasMore, setHasMore]         = useState(true);
+  const [totalBiens, setTotalBiens]   = useState(0);
+
+  const flatListRef = useRef(null);
 
   // Résumé des filtres actifs pour le bouton
   const activeFilterCount = useMemo(() => {
@@ -339,6 +364,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
 
       setAnnonces(prev => append ? [...prev, ...raw] : raw);
       setHasMore(hasMoreData);
+      setTotalBiens(total);
       setErreur('');
     } catch {
       setErreur('Impossible de charger les annonces');
@@ -413,11 +439,17 @@ export default function ListeAnnoncesScreen({ navigation }) {
   const onResetFilters = useCallback(() => setActiveFilters(DEFAULT_FILTERS), []);
   const onToggleSearch = useCallback(() => setSearchOpen(s => !s), []);
   const onCloseSearch  = useCallback(() => setSearchOpen(false), []);
+  const onPressExplore = useCallback(
+    () => flatListRef.current?.scrollToOffset({ offset: 400 }),
+    [],
+  );
 
   // ─── ListHeader mémoïsé (AVANT le return conditionnel) ───
   const ListHeader = useMemo(() => (
     <View>
       <GreetingBar onPressNotifications={onPressNotifications} />
+
+      <HeroCard totalBiens={totalBiens} onPressExplore={onPressExplore} styles={styles} c={c} />
 
       {pubs.length > 0 ? (
         <AdCarousel items={pubs} />
@@ -574,9 +606,9 @@ export default function ListeAnnoncesScreen({ navigation }) {
     </View>
   ), [
     pubs, recommended, activeFilters, activeFilterCount, filterSummary, searchOpen,
-    styles, c,
+    styles, c, totalBiens,
     onPressNotifications, onPressRecommended, onToggleSearch, onCloseSearch,
-    onResetFilters, onSearchSubmit,
+    onResetFilters, onSearchSubmit, onPressExplore,
   ]);
 
   // ─── Return conditionnel APRÈS tous les hooks ───
@@ -604,6 +636,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
         />
       ) : (
         <FlatList
+          ref={flatListRef}
           data={annonces}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
@@ -671,6 +704,88 @@ const makeStyles = (c) => StyleSheet.create({
     color: '#F0EDE8',
     lineHeight: 28,
   },
+
+  // ─── HeroCard (entre GreetingBar et AdCarousel) ───
+  heroCard: {
+    margin: spacing.md,
+    marginTop: 14,
+    borderRadius: 20,
+    backgroundColor: '#1A1510',
+    height: 160,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  heroBackground: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#1A1510',
+  },
+  heroInner: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+  },
+  heroTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(200,150,12,0.2)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(200,150,12,0.4)',
+    borderRadius: 100,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  heroTagDot: {
+    width: 5, height: 5, borderRadius: 2.5,
+    backgroundColor: c.gold,
+  },
+  heroTagText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 9,
+    color: c.gold,
+    letterSpacing: 0.15,
+  },
+  heroCardTitle: {
+    fontFamily: fonts.display,
+    fontSize: 28,
+    color: '#FAFAF8',
+    lineHeight: 32,
+    letterSpacing: -0.5,
+  },
+  heroCardTitleItalic: {
+    fontFamily: fonts.displayItalic,
+    fontSize: 28,
+    color: c.gold,
+  },
+  heroCardSub: {
+    fontFamily: fonts.body,
+    fontSize: 10,
+    color: 'rgba(250,250,248,0.45)',
+    marginTop: 5,
+  },
+  heroCardCta: {
+    position: 'absolute',
+    bottom: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: c.gold,
+    borderRadius: 100,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  heroCardCtaText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 10,
+    color: '#1A1A1A',
+    letterSpacing: 0.06,
+  },
+
   searchZone: {
     paddingHorizontal: spacing.md,
     marginTop: -28,
@@ -766,9 +881,10 @@ const makeStyles = (c) => StyleSheet.create({
 
   recoSection: { marginTop: spacing.lg, marginBottom: spacing.sm },
   sectionTitle: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.md,
+    fontFamily: fonts.display,
+    fontSize: 22,
     color: c.text,
+    letterSpacing: -0.4,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
   },
@@ -842,7 +958,14 @@ const makeStyles = (c) => StyleSheet.create({
 
   // ─── Card corps ───
   body: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
     padding: spacing.md,
+    gap: spacing.sm,
+  },
+  bodyMain: {
+    flex: 1,
     gap: 5,
   },
   metaText: {
@@ -868,20 +991,26 @@ const makeStyles = (c) => StyleSheet.create({
     color: c.textMuted,
     flex: 1,
   },
-  statsRow: {
+  cardAttrs: {
     flexDirection: 'row',
+    gap: 10,
     alignItems: 'center',
-    gap: spacing.md,
-    marginTop: 2,
   },
-  statItem: {
-    flexDirection: 'row',
+  cardAttr: {
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 4,
+    gap: 1,
   },
-  statText: {
+  cardAttrN: {
+    fontSize: 13,
+    fontFamily: fonts.bodyBold,
+    color: c.text,
+  },
+  cardAttrL: {
+    fontSize: 8,
     fontFamily: fonts.body,
-    fontSize: fontSize.xs,
     color: c.textMuted,
+    letterSpacing: 0.06,
+    textTransform: 'uppercase',
   },
 });
