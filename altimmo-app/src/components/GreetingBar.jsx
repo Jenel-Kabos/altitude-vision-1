@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
+import { connectSocket } from '../services/socketService';
 import { fonts, fontSize } from '../theme';
 
 const getGreeting = () => {
@@ -31,8 +32,8 @@ export default function GreetingBar({ onPressNotifications }) {
 
   const fetchUnread = useCallback(async () => {
     try {
-      const res = await api.get('/conversations/count/unread');
-      setUnreadCount(res.data?.data?.unreadCount || 0);
+      const res = await api.get('/notifications/count');
+      setUnreadCount(res.data?.data?.count || 0);
     } catch {
       // silencieux — le badge reste à 0
     }
@@ -50,6 +51,32 @@ export default function GreetingBar({ onPressNotifications }) {
     fetchUnread();
   }, [fetchUnread]));
 
+  // Temps réel — incrémente le badge dès qu'une notification arrive
+  useEffect(() => {
+    let socket;
+    let cancelled = false;
+
+    connectSocket().then((s) => {
+      if (cancelled) return;
+      socket = s;
+      socket?.on('notification', handler);
+    });
+
+    function handler() {
+      setUnreadCount((c) => c + 1);
+    }
+
+    return () => {
+      cancelled = true;
+      socket?.off('notification', handler);
+    };
+  }, []);
+
+  const onPressBell = useCallback(() => {
+    onPressNotifications?.();
+    setUnreadCount(0);
+  }, [onPressNotifications]);
+
   return (
     <View style={styles.row}>
       {hasPhoto ? (
@@ -66,7 +93,7 @@ export default function GreetingBar({ onPressNotifications }) {
       </View>
 
       <TouchableOpacity
-        onPress={onPressNotifications}
+        onPress={onPressBell}
         activeOpacity={0.7}
         hitSlop={6}
         accessibilityLabel={unreadCount > 0 ? `${unreadCount} notifications non lues` : 'Notifications'}

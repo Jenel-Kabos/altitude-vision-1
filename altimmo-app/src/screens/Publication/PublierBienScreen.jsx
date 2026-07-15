@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
+import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -518,9 +519,15 @@ export default function PublierBienScreen({ navigation, route }) {
             {photos.map((p, idx) => (
               <View key={`${p.uri}-${idx}`} style={styles.photoCell}>
                 {isVideo(p.uri) ? (
-                  <View style={[styles.photoImg, styles.videoThumb]}>
-                    <Ionicons name="videocam-outline" size={28} color="rgba(255,255,255,0.6)" />
-                  </View>
+                  <Video
+                    source={{ uri: p.uri }}
+                    style={styles.photoImg}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay={false}
+                    useNativeControls={false}
+                    isLooping={false}
+                    isMuted
+                  />
                 ) : (
                   <Image source={{ uri: p.uri }} style={styles.photoImg} accessible={false} />
                 )}
@@ -1365,11 +1372,6 @@ const makeStyles = (c) => StyleSheet.create({
   photoImg: {
     width: 100, height: 100,
     borderRadius: 8,
-  },
-  videoThumb: {
-    backgroundColor: '#1a1a1a',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   playOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,

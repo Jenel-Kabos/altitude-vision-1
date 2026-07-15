@@ -607,6 +607,91 @@ const STYLES = `
     object-fit: cover; border-radius: 1px; cursor: pointer; flex-shrink: 0;
     transition: opacity 0.2s, outline 0.2s;
   }
+
+  /* ── MODAL RENDEZ-VOUS ── */
+  .pdp-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5); z-index: 1000;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .pdp-rdv-sheet {
+    background: #fff; border-radius: 24px 24px 0 0;
+    padding: 28px; width: 100%; max-width: 560px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .pdp-rdv-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+  }
+  .pdp-rdv-title {
+    font-family: var(--font-cormorant), serif;
+    font-size: 22px; font-weight: 700; color: ${INK};
+  }
+  .pdp-rdv-close {
+    background: none; border: none; font-size: 20px; cursor: pointer; color: #999;
+  }
+  .pdp-rdv-bien {
+    padding-bottom: 14px; margin-bottom: 14px;
+    border-bottom: 1px solid #F0F0EE;
+  }
+  .pdp-rdv-bien-nom { font-weight: 600; font-size: 15px; color: ${INK}; }
+  .pdp-rdv-bien-loc { font-size: 12px; color: #999; margin-top: 2px; }
+  .pdp-rdv-finances {
+    background: #FCEFD6; border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 16px;
+    border: 1px solid rgba(200,150,12,0.35);
+  }
+  .pdp-rdv-finance-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0; font-size: 13px; color: #666;
+  }
+  .pdp-rdv-finance-row strong { color: ${GOLD}; font-weight: 700; }
+  .pdp-rdv-gratuit { color: #3B6D11 !important; }
+  .pdp-rdv-form { display: flex; flex-direction: column; gap: 12px; }
+  .pdp-rdv-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pdp-rdv-field { display: flex; flex-direction: column; gap: 6px; }
+  .pdp-rdv-field label { font-size: 12px; font-weight: 600; color: #666; }
+  .pdp-rdv-field input, .pdp-rdv-field textarea {
+    border: 1px solid #F0F0EE; border-radius: 10px;
+    padding: 11px 13px; font-size: 14px; color: ${INK};
+    background: #FAFAF8; outline: none; font-family: inherit;
+  }
+  .pdp-rdv-field input:focus, .pdp-rdv-field textarea:focus {
+    border-color: ${GOLD};
+  }
+  .pdp-rdv-submit {
+    width: 100%; margin-top: 16px; padding: 14px;
+    background: ${GOLD}; color: #fff; border: none;
+    border-radius: 12px; font-size: 15px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+  }
+  .pdp-rdv-submit:hover { background: #A07A0A; }
+  .pdp-rdv-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  .pdp-rdv-success { text-align: center; padding: 20px 0; }
+  .pdp-rdv-success-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: #EAF3DE;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px; font-size: 28px; color: #3B6D11;
+  }
+  .pdp-rdv-success h3 {
+    font-family: var(--font-cormorant), serif;
+    font-size: 24px; margin-bottom: 8px; color: ${INK};
+  }
+  .pdp-rdv-success p { font-size: 14px; color: #666; margin-bottom: 16px; }
+  .pdp-rdv-recap {
+    background: #FAFAF8; border-radius: 12px;
+    padding: 14px; margin: 16px 0; text-align: left;
+    display: flex; flex-direction: column; gap: 8px;
+    font-size: 13px; color: ${INK};
+  }
+  .pdp-rdv-note { font-size: 12px; color: #999; }
+  .pdp-rdv-close-btn {
+    margin-top: 16px; padding: 12px 32px;
+    background: #F5F5F2; border: 1px solid #F0F0EE;
+    border-radius: 12px; font-size: 14px; font-weight: 600;
+    cursor: pointer; color: #666; font-family: inherit;
+  }
 `;
 
 let _stylesInjected = false;
@@ -650,7 +735,13 @@ const PropertyDetailPage = () => {
   const [descExpanded,  setDescExpanded]  = useState(false);
   const [showContact,      setShowContact]      = useState(false);
   const [showSignaler,     setShowSignaler]     = useState(false);
-  const [planifierLoading, setPlanifierLoading] = useState(false);
+  const [rdvModal,   setRdvModal]   = useState(false);
+  const [rdvDate,    setRdvDate]    = useState('');
+  const [rdvHeure,   setRdvHeure]   = useState('');
+  const [rdvTel,     setRdvTel]     = useState(user?.phone || '');
+  const [rdvMessage, setRdvMessage] = useState('');
+  const [rdvLoading, setRdvLoading] = useState(false);
+  const [rdvSuccess, setRdvSuccess] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -690,26 +781,43 @@ const PropertyDetailPage = () => {
     }
   };
 
-  const planifierVisite = async () => {
+  const openRdvModal = () => {
     if (!user) {
       router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname));
       return;
     }
-    setPlanifierLoading(true);
+    setRdvSuccess(false);
+    setRdvDate('');
+    setRdvHeure('');
+    setRdvTel(user?.phone || '');
+    setRdvMessage('');
+    setRdvModal(true);
+  };
+
+  const soumettreRdv = async () => {
+    if (!rdvDate || !rdvHeure || !rdvTel.trim()) {
+      toast.error("Veuillez remplir la date, l'heure et votre téléphone.");
+      return;
+    }
+    setRdvLoading(true);
     try {
       const convRes = await api.post('/conversations/start', {
         propertyId: property._id,
-        message: `Je souhaite planifier une visite pour : ${property.title}`,
+        message: `Demande de visite le ${new Date(rdvDate).toLocaleDateString('fr-FR')} à ${rdvHeure}. Tél: ${rdvTel}${rdvMessage ? '. ' + rdvMessage : ''}`,
       });
       await api.post('/visites', {
         propertyId: property._id,
         conversationId: convRes.data?.data?.conversation?._id,
+        datePreferee: new Date(rdvDate).toLocaleDateString('fr-FR'),
+        heurePreferee: rdvHeure,
+        telephone: rdvTel,
+        message: rdvMessage,
       });
-      toast.success('Votre demande de visite a été envoyée ! Notre équipe vous contactera sous 24h.');
+      setRdvSuccess(true);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Erreur lors de la demande de visite.');
+      toast.error(err.response?.data?.message || "Impossible d'envoyer la demande.");
     } finally {
-      setPlanifierLoading(false);
+      setRdvLoading(false);
     }
   };
 
@@ -1085,11 +1193,10 @@ const PropertyDetailPage = () => {
                 </button>
 
                 <button
-                  onClick={planifierVisite}
-                  disabled={planifierLoading}
+                  onClick={openRdvModal}
                   className="pdp-cta-primary">
                   <Calendar size={18} />
-                  {planifierLoading ? 'Envoi...' : 'Planifier une visite'}
+                  Planifier une visite
                 </button>
 
                 <a href="tel:+242068002151" className="pdp-cta-tel">
@@ -1200,6 +1307,106 @@ const PropertyDetailPage = () => {
           propertyId={property._id}
           onClose={() => setShowSignaler(false)}
         />
+      )}
+
+      {rdvModal && (
+        <div className="pdp-modal-overlay" onClick={() => setRdvModal(false)}>
+          <div className="pdp-rdv-sheet" onClick={e => e.stopPropagation()}>
+
+            {!rdvSuccess ? (
+              <>
+                <div className="pdp-rdv-header">
+                  <h3 className="pdp-rdv-title">Planifier une visite</h3>
+                  <button onClick={() => setRdvModal(false)} className="pdp-rdv-close">✕</button>
+                </div>
+
+                <div className="pdp-rdv-bien">
+                  <p className="pdp-rdv-bien-nom">{property.title}</p>
+                  <p className="pdp-rdv-bien-loc">
+                    {property.address?.arrondissement}, {property.address?.city}
+                  </p>
+                </div>
+
+                <div className="pdp-rdv-finances">
+                  <div className="pdp-rdv-finance-row">
+                    <span>Honoraires d'agence</span>
+                    <strong>
+                      {(property.honoraires ?? (
+                        property.status === 'location'
+                          ? Math.round((property.price || 0) * 0.8)
+                          : Math.round((property.price || 0) * 0.1)
+                      )).toLocaleString('fr-FR')} FCFA
+                    </strong>
+                  </div>
+                  <div className="pdp-rdv-finance-row">
+                    <span>Frais de visite</span>
+                    <strong className={!property.fraisVisite ? 'pdp-rdv-gratuit' : ''}>
+                      {property.fraisVisite
+                        ? property.fraisVisite.toLocaleString('fr-FR') + ' FCFA'
+                        : 'Gratuite'}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="pdp-rdv-form">
+                  <div className="pdp-rdv-row">
+                    <div className="pdp-rdv-field">
+                      <label>Date souhaitée *</label>
+                      <input type="date" value={rdvDate}
+                        onChange={e => setRdvDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]} />
+                    </div>
+                    <div className="pdp-rdv-field">
+                      <label>Heure souhaitée *</label>
+                      <input type="time" value={rdvHeure}
+                        onChange={e => setRdvHeure(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="pdp-rdv-field">
+                    <label>Téléphone *</label>
+                    <input type="tel" value={rdvTel}
+                      onChange={e => setRdvTel(e.target.value)}
+                      placeholder="+242 06 XXX XX XX" />
+                  </div>
+                  <div className="pdp-rdv-field">
+                    <label>Message (optionnel)</label>
+                    <textarea value={rdvMessage}
+                      onChange={e => setRdvMessage(e.target.value)}
+                      placeholder="Précisions sur la visite..."
+                      rows={3} />
+                  </div>
+                </div>
+
+                <button
+                  className="pdp-rdv-submit"
+                  onClick={soumettreRdv}
+                  disabled={rdvLoading}
+                >
+                  {rdvLoading ? 'Envoi...' : 'Confirmer la demande'}
+                </button>
+              </>
+            ) : (
+              <div className="pdp-rdv-success">
+                <div className="pdp-rdv-success-icon">✓</div>
+                <h3>Demande envoyée !</h3>
+                <p>Notre équipe vous contactera au <strong>{rdvTel}</strong> pour confirmer votre rendez-vous.</p>
+                <div className="pdp-rdv-recap">
+                  <div>📅 Date souhaitée : <strong>
+                    {new Date(rdvDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </strong></div>
+                  <div>🕐 Heure : <strong>{rdvHeure}</strong></div>
+                  <div>🏠 Bien : <strong>{property.title}</strong></div>
+                </div>
+                <p className="pdp-rdv-note">
+                  Vous recevrez une notification dès confirmation par notre équipe.
+                </p>
+                <button className="pdp-rdv-close-btn" onClick={() => setRdvModal(false)}>
+                  Fermer
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

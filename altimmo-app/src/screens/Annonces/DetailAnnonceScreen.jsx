@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   FlatList, Dimensions, Alert, Share,
   TextInput, Modal, ScrollView, Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -136,6 +137,13 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const [signalRaison, setSignalRaison]             = useState('');
   const [signalDetails, setSignalDetails]           = useState('');
   const [signalEnvoi, setSignalEnvoi]               = useState(false);
+  const [rdvModalVisible, setRdvModalVisible]       = useState(false);
+  const [rdvDate, setRdvDate]                       = useState('');
+  const [rdvHeure, setRdvHeure]                     = useState('');
+  const [rdvTelephone, setRdvTelephone]             = useState(user?.phone || '');
+  const [rdvMessage, setRdvMessage]                 = useState('');
+  const [rdvLoading, setRdvLoading]                 = useState(false);
+  const [rdvSuccess, setRdvSuccess]                 = useState(false);
 
   const galleryRef = useRef(null);
 
@@ -283,33 +291,46 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   const demanderVisite = useCallback(() => {
     if (!isLoggedIn) { navigation.navigate('Login'); return; }
-    Alert.alert(
-      'Demander une visite',
-      'Souhaitez-vous planifier une visite pour ce bien ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Confirmer',
-          onPress: async () => {
-            try {
-              const convRes = await api.post('/conversations/start', {
-                propertyId: annonce._id,
-                message: `Je souhaite visiter : ${title}`,
-              });
-              const conversation = convRes.data?.data?.conversation;
-              await api.post('/visites', { propertyId: annonce._id, conversationId: conversation?._id });
-              navigation.navigate('Messages', {
-                screen: 'Chat',
-                params: { conversation, contact: { _id: null, name: 'Équipe Altitude Vision' } },
-              });
-            } catch (err) {
-              Alert.alert('Erreur', err.response?.data?.message || "Impossible d'envoyer la demande.");
-            }
-          },
-        },
-      ],
-    );
-  }, [annonce._id, title, isLoggedIn, navigation]);
+    setRdvSuccess(false);
+    setRdvDate('');
+    setRdvHeure('');
+    setRdvTelephone(user?.phone || '');
+    setRdvMessage('');
+    setRdvModalVisible(true);
+  }, [isLoggedIn, navigation, user]);
+
+  const soumettreRdv = useCallback(async () => {
+    if (!rdvDate.trim() || !rdvHeure.trim() || !rdvTelephone.trim()) {
+      Alert.alert('Champs requis', "Veuillez remplir la date, l'heure et votre téléphone.");
+      return;
+    }
+    try {
+      setRdvLoading(true);
+      const convRes = await api.post('/conversations/start', {
+        propertyId: annonce._id,
+        message: `Demande de visite le ${rdvDate} à ${rdvHeure}. Tél: ${rdvTelephone}${rdvMessage ? '. ' + rdvMessage : ''}`,
+      });
+      const conversation = convRes.data?.data?.conversation;
+      await api.post('/visites', {
+        propertyId: annonce._id,
+        conversationId: conversation?._id,
+        datePreferee: rdvDate,
+        heurePreferee: rdvHeure,
+        telephone: rdvTelephone,
+        message: rdvMessage,
+      });
+      setRdvSuccess(true);
+    } catch (err) {
+      Alert.alert('Erreur', err.response?.data?.message || "Impossible d'envoyer la demande.");
+    } finally {
+      setRdvLoading(false);
+    }
+  }, [annonce._id, rdvDate, rdvHeure, rdvTelephone, rdvMessage]);
+
+  const closeRdvModal = useCallback(() => {
+    setRdvModalVisible(false);
+    setRdvSuccess(false);
+  }, []);
 
   const contacterAgent = useCallback(async () => {
     if (!isLoggedIn) { navigation.navigate('Login'); return; }
@@ -331,8 +352,15 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const onGalleryScroll = useCallback((e) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / width);
     setPhotoIndex(idx);
-    if (idx !== playingIndex) setPlayingIndex(null);
-  }, [playingIndex]);
+
+    // Autoplay si le slide actuel est une vidéo, sinon stoppe toute lecture
+    const currentMedia = photos[idx];
+    if (currentMedia && isVideoUrl(currentMedia)) {
+      setPlayingIndex(idx);
+    } else {
+      setPlayingIndex(null);
+    }
+  }, [photos]);
 
   const formatDate = useCallback((dateStr) => {
     if (!dateStr) return '';
@@ -948,6 +976,148 @@ export default function DetailAnnonceScreen({ route, navigation }) {
             </ScrollView>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      {/* ══════════════════════ MODAL RENDEZ-VOUS ══════════════════════ */}
+      <Modal
+        visible={rdvModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closeRdvModal}
+      >
+        <View style={styles.rdvOverlay}>
+          <View style={styles.rdvSheet}>
+            {rdvSuccess ? (
+              <View style={styles.rdvSuccessView}>
+                <View style={styles.rdvSuccessIcon}>
+                  <Ionicons name="checkmark-circle" size={56} color={c.success} />
+                </View>
+                <Text style={styles.rdvSuccessTitle}>Demande envoyée !</Text>
+                <Text style={styles.rdvSuccessDesc}>
+                  Notre équipe vous contactera au {rdvTelephone} pour confirmer votre rendez-vous.
+                </Text>
+
+                <View style={styles.rdvRecap}>
+                  <View style={styles.rdvRecapRow}>
+                    <Ionicons name="calendar-outline" size={16} color={c.gold} />
+                    <Text style={styles.rdvRecapText}>Date souhaitée : {rdvDate}</Text>
+                  </View>
+                  <View style={styles.rdvRecapRow}>
+                    <Ionicons name="time-outline" size={16} color={c.gold} />
+                    <Text style={styles.rdvRecapText}>Heure : {rdvHeure}</Text>
+                  </View>
+                  <View style={styles.rdvRecapRow}>
+                    <Ionicons name="home-outline" size={16} color={c.gold} />
+                    <Text style={styles.rdvRecapText} numberOfLines={1}>{title}</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.rdvSuccessNote}>
+                  Vous recevrez une notification dès confirmation par notre équipe.
+                </Text>
+
+                <TouchableOpacity style={styles.rdvCloseSuccessBtn} onPress={closeRdvModal}>
+                  <Text style={styles.rdvCloseSuccessText}>Fermer</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <View style={styles.rdvHeader}>
+                  <Text style={styles.rdvTitle}>Planifier une visite</Text>
+                  <TouchableOpacity onPress={closeRdvModal} hitSlop={12}>
+                    <Ionicons name="close" size={24} color={c.textMuted} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.rdvBienInfo}>
+                  <Text style={styles.rdvBienNom} numberOfLines={1}>{title}</Text>
+                  <Text style={styles.rdvBienLoc}>{addressText}</Text>
+                </View>
+
+                <View style={styles.rdvFinances}>
+                  <View style={styles.rdvFinanceRow}>
+                    <Text style={styles.rdvFinanceLabel}>Honoraires d'agence</Text>
+                    <Text style={styles.rdvFinanceValue}>{fmt(honoraires)} FCFA</Text>
+                  </View>
+                  <View style={styles.rdvFinanceRow}>
+                    <Text style={styles.rdvFinanceLabel}>Frais de visite</Text>
+                    <Text style={[styles.rdvFinanceValue, fraisVisite <= 0 && { color: c.success }]}>
+                      {fraisVisite > 0 ? `${fmt(fraisVisite)} FCFA` : 'Gratuite'}
+                    </Text>
+                  </View>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <Text style={styles.rdvFieldLabel}>
+                    Date souhaitée <Text style={{ color: c.gold }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={styles.rdvInput}
+                    placeholder="JJ/MM/AAAA"
+                    placeholderTextColor={c.textMuted}
+                    value={rdvDate}
+                    onChangeText={setRdvDate}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
+
+                  <Text style={styles.rdvFieldLabel}>
+                    Heure souhaitée <Text style={{ color: c.gold }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={styles.rdvInput}
+                    placeholder="HH:MM (ex: 10:00)"
+                    placeholderTextColor={c.textMuted}
+                    value={rdvHeure}
+                    onChangeText={setRdvHeure}
+                    keyboardType="numeric"
+                    maxLength={5}
+                  />
+
+                  <Text style={styles.rdvFieldLabel}>
+                    Téléphone <Text style={{ color: c.gold }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={styles.rdvInput}
+                    placeholder="+242 06 XXX XX XX"
+                    placeholderTextColor={c.textMuted}
+                    value={rdvTelephone}
+                    onChangeText={setRdvTelephone}
+                    keyboardType="phone-pad"
+                  />
+
+                  <Text style={styles.rdvFieldLabel}>Message (optionnel)</Text>
+                  <TextInput
+                    style={[styles.rdvInput, styles.rdvTextarea]}
+                    placeholder="Précisions sur la visite..."
+                    placeholderTextColor={c.textMuted}
+                    value={rdvMessage}
+                    onChangeText={setRdvMessage}
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                  />
+                </ScrollView>
+
+                <TouchableOpacity
+                  style={[styles.rdvSubmitBtn, rdvLoading && { opacity: 0.6 }]}
+                  onPress={soumettreRdv}
+                  disabled={rdvLoading}
+                  activeOpacity={0.85}
+                >
+                  {rdvLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="calendar-outline" size={18} color="#fff" />
+                      <Text style={styles.rdvSubmitText}>Confirmer la demande</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -1737,5 +1907,86 @@ const makeStyles = (c) => {
       textAlign: 'center',
       lineHeight: 16,
     },
+
+    // ── Modal rendez-vous ──
+    rdvOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    rdvSheet: {
+      backgroundColor: c.bgCard,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: PX,
+      maxHeight: '90%',
+    },
+    rdvHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    rdvTitle: { fontFamily: fonts.display, fontSize: 20, color: c.text },
+    rdvBienInfo: {
+      marginBottom: 14,
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    rdvBienNom: { fontFamily: fonts.bodyBold, fontSize: 15, color: c.text },
+    rdvBienLoc: { fontFamily: fonts.body, fontSize: 12, color: c.textMuted, marginTop: 2 },
+    rdvFinances: {
+      backgroundColor: c.goldLight,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: c.borderGold,
+    },
+    rdvFinanceRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 4,
+    },
+    rdvFinanceLabel: { fontFamily: fonts.body, fontSize: 12, color: c.textSub },
+    rdvFinanceValue: { fontFamily: fonts.bodyBold, fontSize: 13, color: c.gold },
+    rdvFieldLabel: { fontFamily: fonts.bodyBold, fontSize: 12, color: c.textSub, marginBottom: 6, marginTop: 12 },
+    rdvInput: {
+      backgroundColor: c.bgCardAlt,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 12,
+      padding: 13,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      color: c.text,
+    },
+    rdvTextarea: { height: 80, textAlignVertical: 'top' },
+    rdvSubmitBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: c.gold,
+      borderRadius: 14,
+      padding: 16,
+      marginTop: 16,
+    },
+    rdvSubmitText: { fontFamily: fonts.bodyBold, fontSize: 15, color: '#fff' },
+    rdvSuccessView: { alignItems: 'center', padding: 20 },
+    rdvSuccessIcon: { marginBottom: 16 },
+    rdvSuccessTitle: { fontFamily: fonts.display, fontSize: 24, color: c.text, marginBottom: 8 },
+    rdvSuccessDesc: { fontFamily: fonts.body, fontSize: 14, color: c.textSub, textAlign: 'center', marginBottom: 20 },
+    rdvRecap: { width: '100%', backgroundColor: c.bgCardAlt, borderRadius: 12, padding: 14, marginBottom: 16, gap: 10 },
+    rdvRecapRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    rdvRecapText: { fontFamily: fonts.body, fontSize: 13, color: c.text, flex: 1 },
+    rdvSuccessNote: { fontFamily: fonts.body, fontSize: 12, color: c.textMuted, textAlign: 'center', marginBottom: 20 },
+    rdvCloseSuccessBtn: {
+      backgroundColor: c.bgCardAlt,
+      borderRadius: 14,
+      paddingVertical: 13,
+      paddingHorizontal: 32,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    rdvCloseSuccessText: { fontFamily: fonts.bodyBold, fontSize: 14, color: c.textSub },
   });
 };

@@ -52,7 +52,11 @@ const DEFAULT_FILTERS = {
 
 // ─── Construction de la query API depuis les filtres ─────────────────────────
 function buildQuery(filters) {
-  const params = new URLSearchParams({ limit: '200' });
+  const params = new URLSearchParams({
+    limit: '200',
+    statusAdmin: 'Validée',
+    availability: 'Disponible',
+  });
   if (filters.transaction !== 'tous')    params.set('status', filters.transaction);
   if (filters.typeBien !== 'tous')       params.set('type', filters.typeBien);
   if (filters.ville !== 'Toutes')        params.set('city', filters.ville);
@@ -179,7 +183,8 @@ export default function CarteScreen({ navigation }) {
       .then(res => {
         const data = res.data.data?.properties || res.data.properties || res.data.data || [];
         const withCoords = data.filter(
-          p => p.address?.coordinates?.lat && p.address?.coordinates?.lng
+          p => (p.latitude || p.address?.coordinates?.lat) &&
+               (p.longitude || p.address?.coordinates?.lng)
         );
         cache.set(KEY, withCoords, 5 * 60 * 1000);
         setAnnonces(withCoords);
@@ -200,7 +205,13 @@ export default function CarteScreen({ navigation }) {
     const index = new Supercluster({ radius: 50, maxZoom: 16, minPoints: 2 });
     index.load(annonces.map(a => ({
       type: 'Feature',
-      geometry: { type: 'Point', coordinates: [a.address.coordinates.lng, a.address.coordinates.lat] },
+      geometry: {
+        type: 'Point',
+        coordinates: [
+          a.longitude || a.address?.coordinates?.lng,
+          a.latitude  || a.address?.coordinates?.lat,
+        ],
+      },
       properties: { annonce: a },
     })));
     scRef.current = index;
@@ -224,8 +235,8 @@ export default function CarteScreen({ navigation }) {
   const handleMarkerPress = useCallback((annonce) => {
     setSelected(annonce);
     mapRef.current?.animateToRegion({
-      latitude:       annonce.address.coordinates.lat - 0.008,
-      longitude:      annonce.address.coordinates.lng,
+      latitude:       (annonce.latitude || annonce.address?.coordinates?.lat) - 0.008,
+      longitude:      annonce.longitude || annonce.address?.coordinates?.lng,
       latitudeDelta:  0.04,
       longitudeDelta: 0.04,
     }, 400);
@@ -271,8 +282,8 @@ export default function CarteScreen({ navigation }) {
 
   // ─── Ouvrir l'itinéraire ───
   const openDirections = useCallback(async (annonce) => {
-    const lat = annonce.address?.coordinates?.lat;
-    const lng = annonce.address?.coordinates?.lng;
+    const lat = annonce.latitude || annonce.address?.coordinates?.lat;
+    const lng = annonce.longitude || annonce.address?.coordinates?.lng;
     if (!lat || !lng) {
       Alert.alert('Coordonnées manquantes', "Ce bien n'a pas encore de position GPS.");
       return;

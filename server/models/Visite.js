@@ -18,6 +18,10 @@ const visiteSchema = new mongoose.Schema({
   },
   dateProposee: { type: Date, default: null },   // proposée par le staff
   dateConfirmee: { type: Date, default: null },  // validée finale
+  datePreferee:  { type: String, default: '' },  // saisie libre du client (JJ/MM/AAAA)
+  heurePreferee: { type: String, default: '' },  // saisie libre du client (HH:MM)
+  telephone:     { type: String, default: '' },  // contact du client pour cette demande
+  message:       { type: String, default: '' },  // précisions du client
   statut: {
     type: String,
     enum: ['En attente', 'Confirmée', 'En cours', 'Terminée', 'Annulée'],

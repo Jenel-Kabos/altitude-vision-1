@@ -7,7 +7,7 @@ const { notify, notifyStaff } = require('../services/notificationService');
 // POST /api/visites — client crée une demande
 // ─────────────────────────────────────────────
 exports.createVisite = asyncHandler(async (req, res) => {
-  const { propertyId, conversationId } = req.body;
+  const { propertyId, conversationId, datePreferee, heurePreferee, telephone, message } = req.body;
 
   if (!propertyId) {
     res.status(400);
@@ -18,6 +18,10 @@ exports.createVisite = asyncHandler(async (req, res) => {
     property: propertyId,
     client: req.user.id,
     conversation: conversationId || null,
+    datePreferee:  datePreferee  || '',
+    heurePreferee: heurePreferee || '',
+    telephone:     telephone     || '',
+    message:       message       || '',
     statut: 'En attente',
   });
 
