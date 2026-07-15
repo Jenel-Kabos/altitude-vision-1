@@ -15,7 +15,7 @@ import {
   Sofa, UtensilsCrossed, Maximize2, MessageSquare,
   Phone, Clock, Scale, ChevronLeft, ChevronRight,
   Heart, Eye, Share2, Percent, ChevronDown, ChevronUp,
-  MessageCircle, Calendar, Flag,
+  MessageCircle, Calendar, Flag, Home, CheckCircle,
 } from 'lucide-react';
 import CommentList from '../components/comments/CommentList';
 import Breadcrumb from '../components/Breadcrumb';
@@ -669,28 +669,35 @@ const STYLES = `
   .pdp-rdv-submit:disabled { opacity: 0.6; cursor: not-allowed; }
   .pdp-rdv-success { text-align: center; padding: 20px 0; }
   .pdp-rdv-success-icon {
-    width: 64px; height: 64px; border-radius: 50%;
-    background: #EAF3DE;
+    width: 72px; height: 72px; border-radius: 50%;
+    background: linear-gradient(135deg, #EAF3DE, #D4E8C0);
+    border: 2px solid rgba(59,109,17,0.2);
     display: flex; align-items: center; justify-content: center;
-    margin: 0 auto 16px; font-size: 28px; color: #3B6D11;
+    margin: 0 auto 20px;
   }
   .pdp-rdv-success h3 {
     font-family: var(--font-cormorant), serif;
-    font-size: 24px; margin-bottom: 8px; color: ${INK};
+    font-size: 26px; font-weight: 700; margin-bottom: 8px; color: #1A1A1A;
   }
   .pdp-rdv-success p { font-size: 14px; color: #666; margin-bottom: 16px; }
   .pdp-rdv-recap {
-    background: #FAFAF8; border-radius: 12px;
-    padding: 14px; margin: 16px 0; text-align: left;
-    display: flex; flex-direction: column; gap: 8px;
-    font-size: 13px; color: ${INK};
+    background: #FAFAF8; border: 1px solid #F0F0EE; border-radius: 14px;
+    padding: 16px; margin: 16px 0; text-align: left;
+    display: flex; flex-direction: column; gap: 12px;
   }
+  .pdp-rdv-recap-row {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; color: #1A1A1A;
+  }
+  .pdp-rdv-recap-label { color: #666; font-size: 13px; min-width: 130px; }
+  .pdp-rdv-recap-value { font-weight: 600; color: #1A1A1A; }
   .pdp-rdv-note { font-size: 12px; color: #999; }
   .pdp-rdv-close-btn {
-    margin-top: 16px; padding: 12px 32px;
-    background: #F5F5F2; border: 1px solid #F0F0EE;
+    margin-top: 16px; padding: 13px 40px;
+    background: #FAFAF8; border: 1.5px solid #F0F0EE;
     border-radius: 12px; font-size: 14px; font-weight: 600;
-    cursor: pointer; color: #666; font-family: inherit;
+    color: #666; cursor: pointer; transition: all 0.2s;
+    font-family: inherit;
   }
 `;
 
@@ -1387,15 +1394,29 @@ const PropertyDetailPage = () => {
               </>
             ) : (
               <div className="pdp-rdv-success">
-                <div className="pdp-rdv-success-icon">✓</div>
+                <div className="pdp-rdv-success-icon">
+                  <CheckCircle size={32} strokeWidth={1.5} style={{ color: '#3B6D11' }} />
+                </div>
                 <h3>Demande envoyée !</h3>
                 <p>Notre équipe vous contactera au <strong>{rdvTel}</strong> pour confirmer votre rendez-vous.</p>
                 <div className="pdp-rdv-recap">
-                  <div>📅 Date souhaitée : <strong>
-                    {new Date(rdvDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                  </strong></div>
-                  <div>🕐 Heure : <strong>{rdvHeure}</strong></div>
-                  <div>🏠 Bien : <strong>{property.title}</strong></div>
+                  <div className="pdp-rdv-recap-row">
+                    <Calendar size={15} style={{ color: '#C8960C', flexShrink: 0 }} />
+                    <span className="pdp-rdv-recap-label">Date souhaitée</span>
+                    <span className="pdp-rdv-recap-value">
+                      {new Date(rdvDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </span>
+                  </div>
+                  <div className="pdp-rdv-recap-row">
+                    <Clock size={15} style={{ color: '#C8960C', flexShrink: 0 }} />
+                    <span className="pdp-rdv-recap-label">Heure</span>
+                    <span className="pdp-rdv-recap-value">{rdvHeure}</span>
+                  </div>
+                  <div className="pdp-rdv-recap-row">
+                    <Home size={15} style={{ color: '#C8960C', flexShrink: 0 }} />
+                    <span className="pdp-rdv-recap-label">Bien</span>
+                    <span className="pdp-rdv-recap-value">{property.title}</span>
+                  </div>
                 </div>
                 <p className="pdp-rdv-note">
                   Vous recevrez une notification dès confirmation par notre équipe.

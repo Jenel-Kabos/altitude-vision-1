@@ -71,7 +71,14 @@ exports.getMyVisites = asyncHandler(async (req, res) => {
 // ─────────────────────────────────────────────
 exports.getAllVisites = asyncHandler(async (req, res) => {
   const visites = await Visite.find()
-    .populate('property', 'title images address availability')
+    .populate({
+      path: 'property',
+      select: 'title images address availability honoraires fraisVisite price status owner latitude longitude',
+      populate: {
+        path: 'owner',
+        select: 'name phone email',
+      },
+    })
     .populate('client', 'name email phone')
     .populate('conversation')
     .populate('traitePar', 'name')

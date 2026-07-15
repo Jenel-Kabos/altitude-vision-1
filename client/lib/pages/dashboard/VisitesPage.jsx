@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   Calendar, Clock, CheckCircle2, XCircle, Home,
   MessageSquare, Loader2, AlertTriangle, PlayCircle,
+  User, Phone, Mail, MapPin, Map, CreditCard,
 } from "lucide-react";
 import { getAllVisites, updateVisite } from "../../services/visiteService";
 
@@ -106,6 +107,64 @@ const VisitesPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 sm:p-8 font-sans">
+      <style>{`
+        .vp-client-request, .vp-owner-section, .vp-address-section {
+          margin-top: 14px; padding: 14px; background: #FAFAF8;
+          border-radius: 12px; border: 1px solid #F0F0EE;
+        }
+        .vp-section-label {
+          font-size: 12px; font-weight: 700; color: #666;
+          letter-spacing: 0.08em; text-transform: uppercase;
+          display: flex; align-items: center; gap: 6px;
+          margin-bottom: 10px;
+        }
+        .vp-info-grid { display: flex; flex-direction: column; gap: 8px; }
+        .vp-info-row {
+          display: flex; align-items: center; gap: 8px;
+          font-size: 13px; color: #1A1A1A;
+        }
+        .vp-info-row span { color: #666; }
+        .vp-tel-link { color: #C8960C; font-weight: 600; text-decoration: none; }
+        .vp-tel-link:hover { text-decoration: underline; }
+        .vp-maps-btn {
+          display: inline-flex; align-items: center; gap: 5px;
+          padding: 5px 12px; border-radius: 8px;
+          background: #E6F1FB; color: #185FA5;
+          font-size: 12px; font-weight: 600;
+          text-decoration: none; margin-left: auto;
+        }
+        .vp-maps-btn:hover { background: #185FA5; color: #fff; }
+        .vp-message {
+          background: #F5F5F2; border-radius: 8px;
+          padding: 8px 10px; font-style: italic; color: #666 !important;
+        }
+        .vp-payment-banner {
+          margin: 0 20px 16px; padding: 16px;
+          background: linear-gradient(135deg, #FCEFD6, #FDF5E6);
+          border: 1px solid rgba(200,150,12,0.3); border-radius: 14px;
+          display: flex; gap: 12px; align-items: flex-start;
+        }
+        .vp-payment-banner > svg { color: #C8960C; flex-shrink: 0; margin-top: 2px; }
+        .vp-payment-content { flex: 1; }
+        .vp-payment-title { font-weight: 700; font-size: 14px; color: #1A1A1A; margin-bottom: 4px; }
+        .vp-payment-desc { font-size: 13px; color: #666; margin-bottom: 12px; }
+        .vp-payment-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .vp-pay-btn {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 9px 16px; border-radius: 10px;
+          background: #C8960C; color: #fff; font-size: 13px;
+          font-weight: 700; text-decoration: none;
+        }
+        .vp-pay-btn:hover { background: #A07A0A; }
+        .vp-agent-btn {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 9px 16px; border-radius: 10px;
+          background: #fff; border: 1.5px solid #F0F0EE;
+          color: #666; font-size: 13px; font-weight: 600;
+          text-decoration: none;
+        }
+        .vp-agent-btn:hover { border-color: #C8960C; color: #C8960C; }
+      `}</style>
 
       {notif && (
         <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-xl shadow-xl text-white text-sm font-semibold transition-all ${
@@ -252,8 +311,129 @@ const VisitesPage = () => {
                           Voir la conversation
                         </Link>
                       )}
+
+                      {/* Demande du client */}
+                      {(visite.datePreferee || visite.heurePreferee || visite.telephone || visite.message) && (
+                        <div className="vp-client-request">
+                          <h4 className="vp-section-label"><User className="w-3.5 h-3.5" /> Demande du client</h4>
+                          <div className="vp-info-grid">
+                            {visite.datePreferee && (
+                              <div className="vp-info-row">
+                                <Calendar className="w-3.5 h-3.5" />
+                                <span>Date souhaitée :</span>
+                                <strong>{visite.datePreferee}</strong>
+                              </div>
+                            )}
+                            {visite.heurePreferee && (
+                              <div className="vp-info-row">
+                                <Clock className="w-3.5 h-3.5" />
+                                <span>Heure souhaitée :</span>
+                                <strong>{visite.heurePreferee}</strong>
+                              </div>
+                            )}
+                            {visite.telephone && (
+                              <div className="vp-info-row">
+                                <Phone className="w-3.5 h-3.5" />
+                                <span>Téléphone client :</span>
+                                <a href={`tel:${visite.telephone}`} className="vp-tel-link">
+                                  <strong>{visite.telephone}</strong>
+                                </a>
+                              </div>
+                            )}
+                            {visite.message && (
+                              <div className="vp-info-row vp-message">
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>{visite.message}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Propriétaire du bien */}
+                      {bien.owner && (
+                        <div className="vp-owner-section">
+                          <h4 className="vp-section-label"><Home className="w-3.5 h-3.5" /> Propriétaire du bien</h4>
+                          <div className="vp-info-grid">
+                            <div className="vp-info-row">
+                              <User className="w-3.5 h-3.5" />
+                              <span>{bien.owner.name}</span>
+                            </div>
+                            {bien.owner.phone && (
+                              <div className="vp-info-row">
+                                <Phone className="w-3.5 h-3.5" />
+                                <a href={`tel:${bien.owner.phone}`} className="vp-tel-link">
+                                  {bien.owner.phone}
+                                </a>
+                              </div>
+                            )}
+                            {bien.owner.email && (
+                              <div className="vp-info-row">
+                                <Mail className="w-3.5 h-3.5" />
+                                <span>{bien.owner.email}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Adresse + géolocalisation du bien */}
+                      {bien.address && (
+                        <div className="vp-address-section">
+                          <h4 className="vp-section-label"><MapPin className="w-3.5 h-3.5" /> Adresse du bien</h4>
+                          <div className="vp-info-row">
+                            <span>{[bien.address.arrondissement, bien.address.city].filter(Boolean).join(', ')}</span>
+                            {(bien.latitude || bien.address?.coordinates?.lat) && (
+                              <a
+                                href={`https://www.google.com/maps?q=${
+                                  bien.latitude || bien.address.coordinates.lat
+                                },${
+                                  bien.longitude || bien.address.coordinates.lng
+                                }`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="vp-maps-btn"
+                              >
+                                <Map className="w-3.5 h-3.5" /> Voir sur la carte
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
+
+                  {/* Paiement des honoraires — visible une fois la visite confirmée */}
+                  {visite.statut === 'Confirmée' && (
+                    <div className="vp-payment-banner">
+                      <CreditCard className="w-5 h-5" />
+                      <div className="vp-payment-content">
+                        <p className="vp-payment-title">Paiement des honoraires requis</p>
+                        <p className="vp-payment-desc">
+                          Commission : <strong>
+                            {(bien.honoraires ?? (
+                              bien.status === 'location'
+                                ? Math.round((bien.price || 0) * 0.8)
+                                : Math.round((bien.price || 0) * 0.1)
+                            )).toLocaleString('fr-FR')} FCFA
+                          </strong>
+                          {bien.fraisVisite > 0 && (
+                            <> · Frais de visite : <strong>{bien.fraisVisite.toLocaleString('fr-FR')} FCFA</strong></>
+                          )}
+                        </p>
+                        <div className="vp-payment-actions">
+                          <a href="/dashboard/paiements" className="vp-pay-btn">
+                            <CreditCard className="w-3.5 h-3.5" />
+                            Payer en ligne
+                          </a>
+                          <a href="/contact" className="vp-agent-btn">
+                            <Phone className="w-3.5 h-3.5" />
+                            Contacter un agent
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Zone d'actions */}
                   {!["Terminée", "Annulée"].includes(visite.statut) && (
