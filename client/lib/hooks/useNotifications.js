@@ -9,6 +9,7 @@ import {
 } from '../services/notificationService';
 
 const POLL_MS = 30_000;
+const MAX_POLL_MS = 240_000;
 
 export function useNotifications(isAuthenticated = false) {
   const [notifications, setNotifications] = useState([]);
@@ -16,6 +17,8 @@ export function useNotifications(isAuthenticated = false) {
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState(null);
   const pollRef = useRef(null);
+  const pollFailuresRef = useRef(0);
+  const countRequestRef = useRef(false);
   const notificationsRef = useRef([]);
 
   useEffect(() => {
@@ -23,13 +26,20 @@ export function useNotifications(isAuthenticated = false) {
   }, [notifications]);
 
   const fetchCount = useCallback(async () => {
-    if (!isAuthenticated) return;
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    if (!isAuthenticated || countRequestRef.current) return null;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return null;
+    countRequestRef.current = true;
     try {
       setUnreadCount(await getUnreadCount());
       setError(null);
+      pollFailuresRef.current = 0;
+      return true;
     } catch {
       setError('Impossible de charger le compteur de notifications.');
+      pollFailuresRef.current += 1;
+      return false;
+    } finally {
+      countRequestRef.current = false;
     }
   }, [isAuthenticated]);
 
@@ -57,8 +67,17 @@ export function useNotifications(isAuthenticated = false) {
       setError(null);
       return;
     }
-    fetchCount();
-    pollRef.current = setInterval(fetchCount, POLL_MS);
+    let cancelled = false;
+    const nextDelay = () => Math.min(POLL_MS * (2 ** pollFailuresRef.current), MAX_POLL_MS);
+    const schedule = (delay) => {
+      pollRef.current = setTimeout(async () => {
+        await fetchCount();
+        if (!cancelled) schedule(nextDelay());
+      }, delay);
+    };
+    fetchCount().finally(() => {
+      if (!cancelled) schedule(nextDelay());
+    });
     const onVisibility = () => {
       if (document.visibilityState === 'visible') fetchCount();
     };
@@ -66,7 +85,8 @@ export function useNotifications(isAuthenticated = false) {
     const onNotificationsChanged = () => fetchCount();
     window.addEventListener('altitude:notifications:changed', onNotificationsChanged);
     return () => {
-      clearInterval(pollRef.current);
+      cancelled = true;
+      clearTimeout(pollRef.current);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('altitude:notifications:changed', onNotificationsChanged);
     };

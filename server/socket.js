@@ -2,6 +2,7 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
+const logger = require('./utils/logger');
 
 let _io = null;
 
@@ -47,7 +48,11 @@ const initSocket = (httpServer, corsOptions) => {
   });
 
   _io.on('connection', (socket) => {
-    console.log(`🔌 [Socket] Connecté: ${socket.userId}`);
+    logger.info('[Socket] Connecté', {
+      socketId: socket.id,
+      userId: socket.userId,
+      transport: socket.conn.transport.name,
+    });
 
     // Incrémenter le compteur (un utilisateur peut avoir plusieurs sockets)
     onlineUsers.set(socket.userId, (onlineUsers.get(socket.userId) || 0) + 1);
@@ -80,7 +85,7 @@ const initSocket = (httpServer, corsOptions) => {
       } else {
         onlineUsers.set(socket.userId, remaining);
       }
-      console.log(`🔌 [Socket] Déconnecté: ${socket.userId} (${reason})`);
+      logger.info('[Socket] Déconnecté', { socketId: socket.id, userId: socket.userId, reason });
     });
   });
 
