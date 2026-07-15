@@ -133,7 +133,7 @@ const TYPE_TO_SCREEN = {
   paiement_confirme:      ()     => ['Visites'],
   paiement_echoue:        ()     => ['Visites'],
   nouveau_signalement:    ()     => ['Annonces'],
-  visite_payee:           ()     => ['Visites'],
+  visite_payee:           ()     => ['Messages'],
 };
 
 async function resolveNavigation(data = {}) {

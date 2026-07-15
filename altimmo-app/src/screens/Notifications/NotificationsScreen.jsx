@@ -240,7 +240,8 @@ export default function NotificationsScreen({ navigation }) {
     // conversationId, il faut charger la conversation complète (participants,
     // relatedProperty) avant de naviguer vers ChatScreen.
     const { type, data = {} } = notif;
-    if ((type === 'new_message' || type === 'new_staff_message') && data.conversationId) {
+    const MESSAGE_TYPES = ['new_message', 'new_staff_message', 'message_staff'];
+    if (MESSAGE_TYPES.includes(type) && data.conversationId) {
       try {
         const res = await api.get(`/conversations/${data.conversationId}`);
         const conversation = res.data?.data?.conversation;

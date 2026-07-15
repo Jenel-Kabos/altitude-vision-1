@@ -9,8 +9,13 @@ import {
 } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { clearRead } from '../../services/notificationService';
+import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
 
 const GOLD = '#C8960C';
+
+const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'CommunityManager', 'Communicant'];
+const MESSAGE_TYPES = ['new_message', 'new_staff_message', 'message_staff'];
 
 const TYPE_CONFIG = {
   new_message:           { Icon: MessageSquare,  color: '#3B82F6', route: '/dashboard/conversations' },
@@ -60,6 +65,7 @@ function fmtTime(dateStr) {
 
 export default function NotificationBell({ isAuthenticated }) {
   const router  = useRouter();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const panelRef = useRef(null);
 
@@ -85,9 +91,25 @@ export default function NotificationBell({ isAuthenticated }) {
   const handleNotifClick = useCallback(async (notif) => {
     if (!notif.read) markRead(notif._id);
     setOpen(false);
+
+    if (MESSAGE_TYPES.includes(notif.type) && notif.data?.conversationId) {
+      try {
+        const res  = await api.get(`/conversations/${notif.data.conversationId}`);
+        const conv = res.data?.data?.conversation;
+        if (conv) {
+          if (STAFF_ROLES.includes(user?.role)) {
+            router.push('/dashboard/conversations');
+          } else {
+            router.push(`/messages?conversationId=${conv._id}`);
+          }
+          return;
+        }
+      } catch {}
+    }
+
     const cfg = TYPE_CONFIG[notif.type] || DEFAULT_CONFIG;
     router.push(cfg.route);
-  }, [markRead, router]);
+  }, [markRead, router, user]);
 
   const handleClearRead = useCallback(async () => {
     clearRead().catch(() => {});
