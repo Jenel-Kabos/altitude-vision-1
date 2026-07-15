@@ -48,17 +48,27 @@ const initSocket = (httpServer, corsOptions) => {
   });
 
   _io.on('connection', (socket) => {
-    logger.info('[Socket] Connecté', {
-      socketId: socket.id,
-      userId: socket.userId,
-      transport: socket.conn.transport.name,
-    });
-
     // Incrémenter le compteur (un utilisateur peut avoir plusieurs sockets)
     onlineUsers.set(socket.userId, (onlineUsers.get(socket.userId) || 0) + 1);
 
     // Room personnelle = userId (pour push ciblé depuis les controllers)
     socket.join(socket.userId);
+
+    const activeSocketsForUser = _io.sockets.adapter.rooms.get(socket.userId)?.size || 0;
+    logger.info('[Socket] Connecté', {
+      socketId: socket.id,
+      userId: socket.userId,
+      transport: socket.conn.transport.name,
+      activeSocketsForUser,
+    });
+
+    socket.conn.on('upgrade', () => {
+      logger.info('[Socket] Transport mis à niveau', {
+        socketId: socket.id,
+        userId: socket.userId,
+        transport: socket.conn.transport.name,
+      });
+    });
 
     // Rejoindre une room de conversation (optionnel, pour typing scoped)
     socket.on('join-room', (conversationId) => {
@@ -85,7 +95,12 @@ const initSocket = (httpServer, corsOptions) => {
       } else {
         onlineUsers.set(socket.userId, remaining);
       }
-      logger.info('[Socket] Déconnecté', { socketId: socket.id, userId: socket.userId, reason });
+      logger.info('[Socket] Déconnecté', {
+        socketId: socket.id,
+        userId: socket.userId,
+        reason,
+        remainingSocketsForUser: Math.max(0, remaining),
+      });
     });
   });
 
