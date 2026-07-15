@@ -7,7 +7,7 @@ import {
   Home, Calendar, Briefcase, LogOut, BarChart3, Globe, Users,
   CheckCircle2, ShieldCheck, Mail, Menu, X, Star, Mountain, Building,
   ClipboardList, BarChart2, Scale, Megaphone, MessageCircle, FolderOpen,
-  Clock, PenLine, Calculator, FileText,
+  Clock, PenLine, Calculator, FileText, CreditCard,
 } from "lucide-react";
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -38,6 +38,7 @@ const NAV_SECTIONS = [
       { to: '/dashboard/estimations',        end: false, Icon: Calculator,   label: 'Estimations',         accent: GOLD,      roles: ROLES_ESTIM },
       { to: '/dashboard/devis',              end: false, Icon: FileText,     label: 'Devis locatif',       accent: GOLD,      roles: ROLES_ESTIM },
       { to: '/dashboard/gestion-locative',   end: false, Icon: Building,     label: 'Gestion Locative',   accent: BLUE,      roles: ROLES_GL, badge: 'contratsActifs' },
+      { to: '/dashboard/paiements',          end: false, Icon: CreditCard,   label: 'Paiements visites',   accent: GOLD,      roles: ALL_STAFF },
       { to: '/dashboard/events',             end: false, Icon: Calendar,     label: 'Mila Events',         accent: '#D42B2B', roles: ROLES_CM   },
       { to: '/dashboard/altcom',             end: false, Icon: Briefcase,    label: 'Altcom',              accent: GOLD,      roles: ROLES_CM   },
       { to: '/dashboard/documents',          end: false, Icon: FolderOpen,   label: 'Documents',           accent: '#C8960C', roles: ROLES_DOCS },

@@ -28,6 +28,12 @@ const visiteSchema = new mongoose.Schema({
     default: 'En attente',
   },
   notes: { type: String, default: '' },          // notes internes staff
+  paiementStatus: {
+    type: String,
+    enum: ['non_requis', 'en_attente', 'payé', 'exempté'],
+    default: 'non_requis',
+  },
+  paiementRef: { type: String, default: null },  // référence YabetooPay intent ID
   traitePar: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

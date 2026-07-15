@@ -10,6 +10,11 @@ const {
   updateVisite,
   cancelVisite,
   getOwnerVisites,
+  updatePaiementVisite,
+  getAllPayments,
+  getMyPayments,
+  initierPaiementVisite,
+  verifierPaiementVisite,
 } = require('../controllers/visiteController');
 
 // 🔒 Toutes les routes nécessitent un token valide
@@ -23,6 +28,15 @@ router.get('/my', getMyVisites);
 // Propriétaire : voir les visites sur ses biens
 router.get('/owner', restrictTo('Proprietaire', 'Admin'), getOwnerVisites);
 
+// Staff : voir toutes les visites avec paiement requis
+router.get('/all-payments', restrictTo(...ROLES_UNIVERSAL), getAllPayments);
+
+// Client : voir ses propres visites avec paiement requis
+router.get('/my-payments', getMyPayments);
+
+// Client : vérifie le statut d'un paiement YabetooPay (polling)
+router.get('/paiement/verifier/:intentId', verifierPaiementVisite);
+
 // Staff : voir toutes les visites
 router.get('/', restrictTo(...ROLES_UNIVERSAL), getAllVisites);
 
@@ -31,8 +45,14 @@ router.post('/', createVisite);
 
 // ── Routes dynamiques ────────────────────────────────────────────────────────
 
+// Client : initie un paiement YabetooPay pour une visite
+router.post('/:id/paiement/initier', initierPaiementVisite);
+
 // Staff : mettre à jour (dateProposee, dateConfirmee, statut, notes)
 router.patch('/:id', restrictTo(...ROLES_UNIVERSAL), updateVisite);
+
+// Staff : mettre à jour le paiement (paiementStatus, paiementRef)
+router.patch('/:id/paiement', restrictTo(...ROLES_UNIVERSAL), updatePaiementVisite);
 
 // Client : annuler sa propre visite
 router.patch('/:id/cancel', cancelVisite);

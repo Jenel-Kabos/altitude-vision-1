@@ -8,6 +8,7 @@ import {
   Menu, X, LayoutDashboard, Building, LogOut,
   UserCircle, Heart, MessageCircle, UserPlus,
   LogIn, ChevronDown, Home, Phone, Newspaper, ArrowUpRight, Smartphone,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getTotalUnreadCount } from '../../services/unreadCountService';
@@ -30,10 +31,13 @@ const NAV_LINKS = [
 ];
 
 const PROFILE_LINKS = [
-  { to: '/profile',  Icon: UserCircle,    label: 'Mon Profil',  color: '#2E7BB5' },
-  { to: '/favoris',  Icon: Heart,         label: 'Mes Favoris', color: '#C8960C' },
-  { to: '/messages', Icon: MessageCircle, label: 'Messagerie',  color: '#C8960C' },
+  { to: '/profile',      Icon: UserCircle,    label: 'Mon Profil',    color: '#2E7BB5' },
+  { to: '/favoris',      Icon: Heart,         label: 'Mes Favoris',   color: '#C8960C' },
+  { to: '/messages',     Icon: MessageCircle, label: 'Messagerie',    color: '#C8960C' },
+  { to: '/mes-paiements', Icon: CreditCard,   label: 'Mes paiements', color: '#C8960C', clientOnly: true },
 ];
+
+const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'CommunityManager', 'Communicant'];
 
 const GOLD = '#C8960C';
 
@@ -249,7 +253,7 @@ const NavDropdown = ({ item, pathname, size = 'xl' }) => {
   );
 };
 
-const ProfileDropdown = ({ user, isTablet, profileOpen, setProfile, handleLogout, isAdmin, isOwner, msgUrl }) => (
+const ProfileDropdown = ({ user, isTablet, profileOpen, setProfile, handleLogout, isAdmin, isOwner, isStaff, msgUrl }) => (
   <div style={{ position: 'relative' }}>
     <button onClick={() => setProfile(!profileOpen)} className="header-profile-btn"
       aria-expanded={profileOpen} aria-haspopup="true"
@@ -301,7 +305,7 @@ const ProfileDropdown = ({ user, isTablet, profileOpen, setProfile, handleLogout
         )}
 
         <div style={{ padding: (isAdmin || isOwner) ? '0 8px' : '8px 8px 0' }}>
-          {PROFILE_LINKS.map(({ to, Icon, label, color }) => (
+          {PROFILE_LINKS.filter(link => !link.clientOnly || !isStaff).map(({ to, Icon, label, color }) => (
             <Link key={to} href={to === '/messages' ? msgUrl : to} onClick={() => setProfile(false)} className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '4px', color: 'rgba(240,237,232,0.55)', fontSize: '0.8rem', fontWeight: 300, transition: '0.15s', textDecoration: 'none' }}>
               <Icon size={14} style={{ color, flexShrink: 0 }} /> {label}
             </Link>
@@ -344,6 +348,7 @@ const Header = () => {
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Collaborateur';
   const isOwner = user?.role === 'Proprietaire';
+  const isStaff = STAFF_ROLES.includes(user?.role);
   // Le staff a sa propre boîte partagée ; les autres utilisateurs ont leur messagerie perso
   const msgUrl  = isAdmin ? '/dashboard/conversations' : '/messages';
 
@@ -428,7 +433,7 @@ const Header = () => {
                 <NotificationBell isAuthenticated={!!user} />
               </div>
               <div ref={profileRef}>
-                <ProfileDropdown user={user} isTablet={isTablet} profileOpen={profileOpen} setProfile={setProfile} handleLogout={handleLogout} isAdmin={isAdmin} isOwner={isOwner} msgUrl={msgUrl} />
+                <ProfileDropdown user={user} isTablet={isTablet} profileOpen={profileOpen} setProfile={setProfile} handleLogout={handleLogout} isAdmin={isAdmin} isOwner={isOwner} isStaff={isStaff} msgUrl={msgUrl} />
               </div>
             </>
           )}
@@ -546,8 +551,8 @@ const Header = () => {
                     <p style={{ fontSize: '0.72rem', color: 'rgba(240,237,232,0.3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</p>
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px' }}>
-                  {PROFILE_LINKS.map(({ to, Icon, label, color }) => (
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isStaff ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: '6px', marginBottom: '10px' }}>
+                  {PROFILE_LINKS.filter(link => !link.clientOnly || !isStaff).map(({ to, Icon, label, color }) => (
                     <Link key={to} href={to === '/messages' ? msgUrl : to} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', borderRadius: '4px', background: 'rgba(240,237,232,0.02)', border: '1px solid rgba(240,237,232,0.05)', color: 'rgba(240,237,232,0.5)', fontSize: '0.82rem', fontWeight: 300, textDecoration: 'none', minHeight: '44px' }}>
                       <Icon size={15} style={{ color, flexShrink: 0 }} />{label}
                     </Link>

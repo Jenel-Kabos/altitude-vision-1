@@ -1,7 +1,9 @@
 const asyncHandler = require('express-async-handler');
-const Visite = require('../models/Visite');
-const User   = require('../models/User');
+const Visite   = require('../models/Visite');
+const User     = require('../models/User');
+const Property = require('../models/Property');
 const { notify, notifyStaff } = require('../services/notificationService');
+const yabetooService = require('../services/yabetooService');
 
 // ─────────────────────────────────────────────
 // POST /api/visites — client crée une demande
@@ -110,6 +112,17 @@ exports.updateVisite = asyncHandler(async (req, res) => {
   if (statut !== undefined) visite.statut = statut;
   if (notes !== undefined) visite.notes = notes;
 
+  // Passage en "Confirmée" : détermine si des honoraires/frais de visite sont dus
+  if (statut === 'Confirmée') {
+    const prop = await Property.findById(visite.property).select('honoraires fraisVisite price status');
+    const montantDu = (prop?.honoraires ?? (
+      prop?.status === 'location'
+        ? Math.round((prop?.price || 0) * 0.8)
+        : Math.round((prop?.price || 0) * 0.1)
+    )) + (prop?.fraisVisite || 0);
+    if (montantDu > 0) visite.paiementStatus = 'en_attente';
+  }
+
   visite.traitePar = req.user.id;
 
   await visite.save();
@@ -188,8 +201,6 @@ exports.cancelVisite = asyncHandler(async (req, res) => {
 // GET /api/visites/owner — visites des biens du propriétaire
 // ─────────────────────────────────────────────
 exports.getOwnerVisites = asyncHandler(async (req, res) => {
-  const Property = require('../models/Property');
-
   const properties = await Property.find({ owner: req.user.id }).select('_id title');
   const propertyIds = properties.map(p => p._id);
 
@@ -206,5 +217,190 @@ exports.getOwnerVisites = asyncHandler(async (req, res) => {
     status: 'success',
     results: visites.length,
     data: { visites },
+  });
+});
+
+// ─────────────────────────────────────────────
+// PATCH /api/visites/:id/paiement — staff met à jour le paiement
+// ─────────────────────────────────────────────
+exports.updatePaiementVisite = asyncHandler(async (req, res) => {
+  const { paiementStatus, paiementRef } = req.body;
+
+  const visite = await Visite.findByIdAndUpdate(
+    req.params.id,
+    { paiementStatus, paiementRef },
+    { new: true, runValidators: true },
+  );
+
+  if (!visite) {
+    res.status(404);
+    throw new Error('Visite non trouvée.');
+  }
+
+  // Notifie le client si paiement confirmé
+  if (paiementStatus === 'payé') {
+    notify(visite.client._id || visite.client, {
+      type:  'visite_confirmee',
+      title: 'Paiement confirmé ✅',
+      body:  'Votre paiement a été reçu. Votre visite est validée.',
+      data:  { screen: 'Visites' },
+    }).catch(() => {});
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: { visite },
+  });
+});
+
+// ─────────────────────────────────────────────
+// GET /api/visites/all-payments — staff : toutes les visites avec paiement requis
+// ─────────────────────────────────────────────
+exports.getAllPayments = asyncHandler(async (req, res) => {
+  const visites = await Visite.find({ paiementStatus: { $ne: 'non_requis' } })
+    .populate('client', 'name email phone')
+    .populate({
+      path: 'property',
+      select: 'title images address price status honoraires fraisVisite owner',
+      populate: { path: 'owner', select: 'name phone email' },
+    })
+    .sort('-updatedAt');
+
+  res.status(200).json({
+    status: 'success',
+    results: visites.length,
+    data: { visites },
+  });
+});
+
+// ─────────────────────────────────────────────
+// GET /api/visites/my-payments — client : ses visites avec paiement requis
+// ─────────────────────────────────────────────
+exports.getMyPayments = asyncHandler(async (req, res) => {
+  const visites = await Visite.find({ client: req.user.id, paiementStatus: { $ne: 'non_requis' } })
+    .populate({
+      path: 'property',
+      select: 'title address price status honoraires fraisVisite images',
+    })
+    .sort('-updatedAt');
+
+  res.status(200).json({
+    status: 'success',
+    results: visites.length,
+    data: { visites },
+  });
+});
+
+// ─────────────────────────────────────────────
+// POST /api/visites/:id/paiement/initier — client initie un paiement YabetooPay
+// ─────────────────────────────────────────────
+exports.initierPaiementVisite = asyncHandler(async (req, res) => {
+  const { phone, operator } = req.body;
+
+  if (!phone || !operator) {
+    res.status(400);
+    throw new Error('phone et operator sont requis.');
+  }
+  if (!['AIRTEL', 'MTN'].includes(operator)) {
+    res.status(400);
+    throw new Error('operator doit être AIRTEL ou MTN.');
+  }
+
+  const visite = await Visite.findById(req.params.id)
+    .populate({ path: 'property', select: 'title price status honoraires fraisVisite' });
+
+  if (!visite) {
+    res.status(404);
+    throw new Error('Visite introuvable.');
+  }
+  if (visite.client.toString() !== req.user.id.toString()) {
+    res.status(403);
+    throw new Error('Accès refusé.');
+  }
+  if (visite.paiementStatus === 'payé') {
+    res.status(400);
+    throw new Error('Déjà payé.');
+  }
+
+  const prop = visite.property;
+  const honoraires = prop?.honoraires ?? (
+    prop?.status === 'location'
+      ? Math.round((prop?.price || 0) * 0.8)
+      : Math.round((prop?.price || 0) * 0.1)
+  );
+  const montant = honoraires + (prop?.fraisVisite || 0);
+
+  if (montant <= 0) {
+    res.status(400);
+    throw new Error('Aucun montant à payer.');
+  }
+
+  const intent = await yabetooService.createIntent({
+    amount:   montant,
+    phone,
+    operator,
+    firstName: req.user.name?.split(' ')[0] || '',
+    lastName:  req.user.name?.split(' ').slice(1).join(' ') || '',
+    description: `Honoraires visite — ${prop?.title || 'bien'}`,
+    metadata: { visiteId: visite._id.toString() },
+  });
+
+  const intentId = intent?.id || intent?.data?.id;
+  if (!intentId) {
+    res.status(500);
+    throw new Error("YabetooPay n'a pas retourné d'identifiant d'intention.");
+  }
+
+  // Déclenche la notification push MoMo sur le téléphone du client
+  await yabetooService.confirmIntent(intentId);
+
+  visite.paiementStatus = 'en_attente';
+  visite.paiementRef = intentId;
+  await visite.save();
+
+  res.status(200).json({
+    status: 'success',
+    data: { intentId, montant },
+  });
+});
+
+// ─────────────────────────────────────────────
+// GET /api/visites/paiement/verifier/:intentId — vérifie le statut d'un paiement YabetooPay
+// ─────────────────────────────────────────────
+exports.verifierPaiementVisite = asyncHandler(async (req, res) => {
+  const { intentId } = req.params;
+
+  const visite = await Visite.findOne({ paiementRef: intentId }).populate('property', 'title');
+  if (!visite) {
+    res.status(404);
+    throw new Error('Paiement introuvable.');
+  }
+  if (visite.client.toString() !== req.user.id.toString()) {
+    res.status(403);
+    throw new Error('Accès refusé.');
+  }
+
+  const intent  = await yabetooService.getIntent(intentId);
+  const yStatus = intent?.status || intent?.data?.status;
+
+  let statut = 'en_attente';
+  if (yStatus === 'succeeded') statut = 'payé';
+  else if (yStatus === 'failed') statut = 'échoué';
+
+  if (statut === 'payé' && visite.paiementStatus !== 'payé') {
+    visite.paiementStatus = 'payé';
+    await visite.save();
+
+    notify(visite.client, {
+      type:  'visite_confirmee',
+      title: 'Paiement confirmé ✅',
+      body:  `Votre paiement pour "${visite.property?.title || 'un bien'}" a été reçu.`,
+      data:  { screen: 'Visites' },
+    }).catch(() => {});
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: { statut },
   });
 });
