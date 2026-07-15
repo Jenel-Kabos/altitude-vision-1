@@ -13,6 +13,122 @@ const logger                = require('../utils/logger');
 let isPolling = false;
 let pollSequence = 0;
 const LOGOUT_TIMEOUT_MS = 5000;
+const FETCH_BATCH_SIZE = 10;
+
+const isImapConnectionError = (error) => [
+    'ETIMEOUT', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'NoConnection', 'EConnectionClosed',
+].includes(error?.code);
+
+const inBatches = (items, size) => {
+    const batches = [];
+    for (let index = 0; index < items.length; index += size) {
+        batches.push(items.slice(index, index + size));
+    }
+    return batches;
+};
+
+const runEmailStep = async (context, step, action) => {
+    const startedAt = Date.now();
+    logger.info('[IMAP] Étape démarrée', { ...context, step });
+    try {
+        const result = await action();
+        logger.info('[IMAP] Étape terminée', { ...context, step, durationMs: Date.now() - startedAt });
+        return result;
+    } catch (error) {
+        logger.error('[IMAP] Étape échouée', {
+            ...context, step, durationMs: Date.now() - startedAt, error: error.message, code: error.code,
+        });
+        throw error;
+    }
+};
+
+const processFetchedMessage = async (message, context) => {
+    logger.info('[IMAP] Email traitement démarré', context);
+    const parsed = await runEmailStep(context, 'parse_mime', () => simpleParser(message.source));
+
+    const fromAddress = parsed.from?.value?.[0]?.address || '';
+    const fromName = parsed.from?.value?.[0]?.name || fromAddress;
+    const toAddress = (parsed.to?.value?.[0]?.address || process.env.ZOHO_FROM_EMAIL).toLowerCase().trim();
+    const subject = parsed.subject || '(Sans objet)';
+    const textContent = parsed.text || '';
+    const htmlContent = parsed.html || '';
+    const messageId = parsed.messageId || `imap-uid-${message.uid}-${Date.now()}`;
+
+    const duplicateCheckStartedAt = Date.now();
+    logger.info('[IMAP] Étape démarrée', { ...context, step: 'duplicate_check' });
+    let existing;
+    try {
+        existing = await InternalMail.findOne({ zohoMessageId: messageId });
+    } catch (error) {
+        logger.error('[IMAP] Étape échouée', {
+            ...context, step: 'duplicate_check', durationMs: Date.now() - duplicateCheckStartedAt,
+            error: error.message, code: error.code,
+        });
+        throw error;
+    }
+    logger.info('[IMAP] Étape terminée', {
+        ...context, step: 'duplicate_check', isDuplicate: !!existing, durationMs: Date.now() - duplicateCheckStartedAt,
+    });
+    if (existing) {
+        logger.info('[IMAP] Doublon confirmé', { ...context, isDuplicate: true });
+        return { markSeen: true, status: 'duplicate' };
+    }
+
+    const attachmentDocs = [];
+    for (const att of (parsed.attachments || [])) {
+        if (!att.content || !att.filename) continue;
+        try {
+            const safeId = `${Date.now()}-${att.filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+            const result = await uploadToCloudinary(att.content, {
+                resource_type: 'auto',
+                folder: 'altitude-vision/email-attachments',
+                public_id: safeId,
+                quality: undefined,
+                fetch_format: undefined,
+                width: undefined,
+                crop: undefined,
+            });
+            attachmentDocs.push({
+                filename: att.filename,
+                url: result.secure_url,
+                mimetype: att.contentType || 'application/octet-stream',
+                size: att.size || att.content.length || 0,
+            });
+        } catch (error) {
+            logger.error('[IMAP] Pièce jointe non importée', { ...context, error: error.message });
+        }
+    }
+
+    let recipientUser = await runEmailStep(context, 'resolve_recipient', () => User.findOne({ email: toAddress }));
+    if (!recipientUser) {
+        recipientUser = await runEmailStep(context, 'resolve_fallback_recipient', () => User.findOne({ role: 'Admin', isActive: true }));
+    }
+    if (!recipientUser) {
+        // Aucun dossier de quarantaine IMAP n'existe dans le projet : ce rejet permanent est logué et acquitté.
+        logger.warn('[IMAP] Email rejeté sans destinataire', { ...context, outcome: 'permanent_rejection' });
+        return { markSeen: true, status: 'permanent_rejection' };
+    }
+
+    await runEmailStep(context, 'persist', () => InternalMail.create({
+        sender: undefined,
+        senderName: fromName,
+        senderEmail: fromAddress,
+        receiverEmail: toAddress,
+        receiver: recipientUser._id,
+        subject,
+        content: textContent || htmlContent || '(Contenu vide)',
+        priority: 'Normale',
+        isRead: false,
+        isDraft: false,
+        isDeleted: false,
+        isExternalMail: true,
+        zohoMessageId: messageId,
+        messageType: 'Email Externe',
+        attachments: attachmentDocs,
+    }));
+
+    return { markSeen: true, status: 'imported' };
+};
 
 const logoutWithDeadline = async (client) => {
     let timeoutId;
@@ -94,99 +210,41 @@ const pollZohoInbox = async () => {
         const uids = await client.search({ seen: false });
         logger.info('[IMAP] Emails non lus trouvés', { pollCycleId, mailCount: uids.length });
 
-        // 4. Traiter chaque email
-        phase = 'process';
-        for await (const message of client.fetch(uids, { source: true })) {
-            try {
-                    const parsed = await simpleParser(message.source);
+        // 4. FETCH est terminé avant toute commande IMAP suivante.
+        // ImapFlow interdit explicitement les commandes imbriquées dans son itérateur fetch().
+        let mailIndex = 0;
+        for (const uidBatch of inBatches(uids, FETCH_BATCH_SIZE)) {
+            if (connectionError) throw connectionError;
+            phase = 'fetch';
+            const fetchStartedAt = Date.now();
+            logger.info('[IMAP] Étape démarrée', { pollCycleId, step: 'fetch', uidCount: uidBatch.length });
+            const messages = await client.fetchAll(uidBatch, { uid: true, source: true }, { uid: true });
+            logger.info('[IMAP] Étape terminée', {
+                pollCycleId, step: 'fetch', uidCount: uidBatch.length, messageCount: messages.length,
+                durationMs: Date.now() - fetchStartedAt,
+            });
 
-                    const fromAddress = parsed.from?.value?.[0]?.address || '';
-                    const fromName    = parsed.from?.value?.[0]?.name    || fromAddress;
-                    const toAddress   = (parsed.to?.value?.[0]?.address  || process.env.ZOHO_FROM_EMAIL).toLowerCase().trim();
-                    const subject     = parsed.subject   || '(Sans objet)';
-                    const textContent = parsed.text      || '';
-                    const htmlContent = parsed.html      || '';
-                    const messageId   = parsed.messageId || `imap-uid-${message.uid}-${Date.now()}`;
-
-                    logger.info(`  📧 [IMAP] "${subject}" — de: ${fromAddress}`);
-
-                    // 5. Éviter les doublons
-                    const existing = await InternalMail.findOne({ zohoMessageId: messageId });
-                    if (existing) {
-                        logger.info(`  ℹ️  [IMAP] Doublon ignoré: ${messageId}`);
-                        stats.skipped++;
-                        await client.messageFlagsAdd({ uid: message.uid }, ['\\Seen']);
-                        continue;
-                    }
-
-                    // 5b. Uploader les pièces jointes vers Cloudinary
-                    const attachmentDocs = [];
-                    for (const att of (parsed.attachments || [])) {
-                        if (!att.content || !att.filename) continue;
-                        try {
-                            const safeId = `${Date.now()}-${att.filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-                            const result = await uploadToCloudinary(att.content, {
-                                resource_type: 'auto',
-                                folder:        'altitude-vision/email-attachments',
-                                public_id:     safeId,
-                                // Désactiver les transformations image sur les fichiers bruts
-                                quality:      undefined,
-                                fetch_format: undefined,
-                                width:        undefined,
-                                crop:         undefined,
-                            });
-                            attachmentDocs.push({
-                                filename: att.filename,
-                                url:      result.secure_url,
-                                mimetype: att.contentType || 'application/octet-stream',
-                                size:     att.size || att.content.length || 0,
-                            });
-                            logger.info(`  📎 [IMAP] PJ uploadée: ${att.filename}`);
-                        } catch (attErr) {
-                            logger.error(`  ⚠️ [IMAP] PJ non uploadée "${att.filename}":`, attErr.message);
-                        }
-                    }
-
-                    // 6. Trouver le destinataire interne
-                    let recipientUser = await User.findOne({ email: toAddress });
-                    if (!recipientUser) {
-                        logger.warn(`  ⚠️  [IMAP] ${toAddress} inconnu → recherche admin`);
-                        recipientUser = await User.findOne({ role: 'Admin', isActive: true });
-                    }
-                    if (!recipientUser) {
-                        logger.warn(`  ❌ [IMAP] Aucun destinataire — email ignoré`);
-                        stats.skipped++;
-                        continue;
-                    }
-
-                    // 7. Insérer en MongoDB
-                    await InternalMail.create({
-                        sender:         undefined,
-                        senderName:     fromName,
-                        senderEmail:    fromAddress,
-                        receiverEmail:  toAddress,
-                        receiver:       recipientUser._id,
-                        subject,
-                        content:        textContent || htmlContent || '(Contenu vide)',
-                        priority:       'Normale',
-                        isRead:         false,
-                        isDraft:        false,
-                        isDeleted:      false,
-                        isExternalMail: true,
-                        zohoMessageId:  messageId,
-                        messageType:    'Email Externe',
-                        attachments:    attachmentDocs,
-                    });
-
-                    // 8. Marquer comme lu dans Zoho
-                    await client.messageFlagsAdd({ uid: message.uid }, ['\\Seen']);
-
-                    logger.success(`  ✅ [IMAP] Importé pour ${recipientUser.email} : "${subject}"`);
-                    stats.imported++;
-
-                } catch (msgErr) {
-                    logger.error(`  ❌ [IMAP] Erreur message:`, msgErr.message);
+            phase = 'process';
+            const pendingSeen = [];
+            for (const message of messages) {
+                const context = { pollCycleId, mailIndex: ++mailIndex, uid: message.uid };
+                try {
+                    const outcome = await processFetchedMessage(message, context);
+                    if (outcome.status === 'imported') stats.imported++;
+                    if (outcome.status !== 'imported') stats.skipped++;
+                    if (outcome.markSeen) pendingSeen.push(context);
+                } catch (error) {
+                    if (isImapConnectionError(error) || connectionError) throw connectionError || error;
                     stats.errors++;
+                    logger.error('[IMAP] Erreur métier email', { ...context, error: error.message, code: error.code });
+                }
+            }
+
+            // Tous les FETCH du batch sont terminés ; STORE peut maintenant être envoyé sans deadlock.
+            phase = 'mark_seen';
+            for (const context of pendingSeen) {
+                if (connectionError) throw connectionError;
+                await runEmailStep(context, 'mark_seen', () => client.messageFlagsAdd(context.uid, ['\\Seen'], { uid: true }));
             }
         }
 
