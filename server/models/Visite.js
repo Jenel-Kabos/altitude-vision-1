@@ -39,6 +39,7 @@ const visiteSchema = new mongoose.Schema({
     ref: 'User',
     default: null,
   },
+  staffViewedAt: { type: Date, default: null, index: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Visite', visiteSchema);

@@ -36,6 +36,12 @@ router.get(
     authController.restrictTo('Admin'), 
     propertyController.getPendingProperties
 );
+router.get(
+    '/status/pending-count',
+    authController.protect,
+    authController.restrictTo('Admin', 'Collaborateur'),
+    propertyController.getPendingPropertiesCount
+);
 
 /**
  * @route GET /api/properties/my-properties

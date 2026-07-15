@@ -75,6 +75,7 @@ const PropertyModerationPage = () => {
         }));
       }
       setSelectedProperty(null);
+      window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
       toast.success(`Annonce ${action === 'validate' ? 'validée' : 'rejetée'} avec succès !`);
     } catch (err) {
       toast.error(err.response?.data?.message || "Une erreur est survenue.");

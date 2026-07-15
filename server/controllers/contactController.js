@@ -127,6 +127,11 @@ exports.getAllContactMessages = asyncHandler(async (req, res) => {
   });
 });
 
+exports.getUnreadCount = asyncHandler(async (_req, res) => {
+  const unreadCount = await ContactMessage.countDocuments({ status: 'Non lu' });
+  res.status(200).json({ status: 'success', data: { unreadCount } });
+});
+
 /**
  * @description Obtenir un message par ID (Admin)
  * @route GET /api/contact/:id

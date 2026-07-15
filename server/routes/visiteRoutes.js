@@ -7,6 +7,7 @@ const {
   createVisite,
   getMyVisites,
   getAllVisites,
+  getUnreadCount,
   updateVisite,
   cancelVisite,
   getOwnerVisites,
@@ -38,6 +39,7 @@ router.get('/my-payments', getMyPayments);
 router.get('/paiement/verifier/:intentId', verifierPaiementVisite);
 
 // Staff : voir toutes les visites
+router.get('/unread-count', restrictTo(...ROLES_UNIVERSAL), getUnreadCount);
 router.get('/', restrictTo(...ROLES_UNIVERSAL), getAllVisites);
 
 // Client : créer une demande de visite

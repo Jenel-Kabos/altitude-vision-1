@@ -3,6 +3,7 @@ const Litige   = require('../models/Litige');
 const User     = require('../models/User');
 const sendEmail = require('../utils/email');
 const { uploadToCloudinary } = require('../config/cloudinary');
+const { ROLES_LITIGES } = require('../utils/roles');
 
 const ADMIN_EMAIL = process.env.ZOHO_FROM_EMAIL || 'contact@altitudevision.agency';
 
@@ -122,11 +123,11 @@ exports.createLitige = async (req, res) => {
 // ======================================================
 exports.getLitiges = async (req, res) => {
   try {
-    const isAdmin = req.user?.role === 'Admin';
+    const isStaff = ROLES_LITIGES.includes(req.user?.role);
     const { statut, priorité, page = 1, limit = 20 } = req.query;
 
     const filter = {};
-    if (!isAdmin) {
+    if (!isStaff) {
       filter.$or = [
         { 'plaignant.userId': req.user._id },
         { 'accusé.userId':    req.user._id },
@@ -168,16 +169,33 @@ exports.getStats = async (req, res) => {
 };
 
 // ======================================================
-// 4. DÉTAIL  GET /api/litiges/:id
+// 4. COMPTEUR DES LITIGES NON CONSULTÉS PAR LE STAFF
+// ======================================================
+exports.getUnreadCount = async (req, res) => {
+  const unreadCount = await Litige.countDocuments({ staffViewedAt: null });
+  res.json({ status: 'success', data: { unreadCount } });
+};
+
+// ======================================================
+// 5. DÉTAIL  GET /api/litiges/:id
 // ======================================================
 exports.getLitige = async (req, res) => {
   try {
+    if (!require('mongoose').isValidObjectId(req.params.id)) {
+      return res.status(404).json({ status: 'fail', message: 'Litige introuvable.' });
+    }
+
     const litige = await Litige.findById(req.params.id).populate('bienConcerné', 'title images');
     if (!litige) return res.status(404).json({ status: 'fail', message: 'Litige introuvable.' });
 
-    const isAdmin = req.user?.role === 'Admin';
+    const isStaff = ROLES_LITIGES.includes(req.user?.role);
     const isPart  = litige.plaignant?.userId?.equals(req.user._id) || litige.accusé?.userId?.equals(req.user._id);
-    if (!isAdmin && !isPart) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+    if (!isStaff && !isPart) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+
+    if (isStaff && !litige.staffViewedAt) {
+      litige.staffViewedAt = new Date();
+      await litige.save();
+    }
 
     res.json({ status: 'success', data: { litige } });
   } catch (err) {
@@ -186,7 +204,7 @@ exports.getLitige = async (req, res) => {
 };
 
 // ======================================================
-// 5. CHANGER STATUT  PUT /api/litiges/:id/statut
+// 6. CHANGER STATUT  PUT /api/litiges/:id/statut
 // ======================================================
 exports.updateStatut = async (req, res) => {
   try {
@@ -222,7 +240,7 @@ exports.updateStatut = async (req, res) => {
 };
 
 // ======================================================
-// 6. AJOUTER MESSAGE  POST /api/litiges/:id/message
+// 7. AJOUTER MESSAGE  POST /api/litiges/:id/message
 // ======================================================
 exports.addMessage = async (req, res) => {
   try {
@@ -247,7 +265,7 @@ exports.addMessage = async (req, res) => {
 };
 
 // ======================================================
-// 7. RÉSOUDRE  POST /api/litiges/:id/resolution
+// 8. RÉSOUDRE  POST /api/litiges/:id/resolution
 // ======================================================
 exports.resolverLitige = async (req, res) => {
   try {

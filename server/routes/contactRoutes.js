@@ -9,6 +9,7 @@ const {
   updateMessageStatus,
   deleteContactMessage,
   getContactStats,
+  getUnreadCount,
 } = require('../controllers/contactController');
 
 // Routes publiques
@@ -16,6 +17,7 @@ router.post('/', createContactMessage);
 
 // Routes protégées (Admin)
 router.get('/stats', protect, adminOnly, getContactStats);
+router.get('/unread-count', protect, restrictTo(...ROLES_UNIVERSAL), getUnreadCount);
 router.get('/', protect, restrictTo(...ROLES_UNIVERSAL), getAllContactMessages);
 router.get('/:id', protect, adminOnly, getContactMessageById);
 router.patch('/:id/status', protect, restrictTo(...ROLES_UNIVERSAL), updateMessageStatus);

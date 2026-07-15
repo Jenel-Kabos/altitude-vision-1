@@ -122,6 +122,7 @@ const InternalMessagingPage = () => {
         await markAsRead(message._id);
         fetchMessages();
         fetchUnreadCount();
+        window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
       } catch (err) {
         console.error('Erreur mark as read:', err);
       }

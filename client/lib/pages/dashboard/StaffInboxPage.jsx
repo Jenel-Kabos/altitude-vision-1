@@ -127,6 +127,7 @@ const StaffInboxPage = () => {
       const msgs = await getConversationMessages(conv._id);
       setMessages(msgs);
       await markConversationAsRead(conv._id);
+      window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
       // Mettre à jour le badge non-lu localement
       setConversations(prev =>
         prev.map(c => c._id === conv._id ? { ...c, unreadCount: 0 } : c)

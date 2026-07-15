@@ -62,6 +62,10 @@ const litigeSchema = new mongoose.Schema({
     resolvedBy:     { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
 
+  // Consultation indépendante du statut métier : un litige peut rester ouvert
+  // sans devoir maintenir un badge staff.
+  staffViewedAt: { type: Date, default: null, index: true },
+
   dateOuverture:   { type: Date, default: Date.now },
   dateDerniereMaj: Date,
 }, { timestamps: true });

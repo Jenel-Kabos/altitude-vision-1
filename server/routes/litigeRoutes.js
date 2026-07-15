@@ -14,6 +14,7 @@ const uploadPreuves = upload.array('preuves', 5);
 router.post('/',         optionalAuth, uploadPreuves, ctrl.createLitige);
 router.get('/',          protect,                                    ctrl.getLitiges);
 router.get('/stats',     protect, restrictTo(...ROLES_LITIGES),       ctrl.getStats);
+router.get('/unread-count', protect, restrictTo(...ROLES_LITIGES),    ctrl.getUnreadCount);
 router.get('/:id',       protect,                                    ctrl.getLitige);
 router.put('/:id/statut',    protect, restrictTo(...ROLES_LITIGES),   ctrl.updateStatut);
 router.post('/:id/message',  protect,                                ctrl.addMessage);

@@ -6,6 +6,7 @@ const Estimation    = require('../models/Estimation');
 const auth          = require('../controllers/authController');
 const { notifyStaff } = require('../services/notificationService');
 const { ROLES_ESTIMATION } = require('../utils/roles');
+const { getUnreadEstimationCount } = require('../controllers/estimationController');
 
 const staffOnly = [auth.protect, auth.restrictTo(...ROLES_ESTIMATION)];
 
@@ -186,6 +187,7 @@ router.post('/', async (req, res) => {
 // ── GET /api/estimation — liste toutes les demandes (Admin/Collaborateur) ────
 router.get('/', staffOnly, async (req, res) => {
     try {
+        await Estimation.updateMany({ staffViewedAt: null }, { $set: { staffViewedAt: new Date() } });
         const estimations = await Estimation.find()
             .populate('traitePar', 'name')
             .sort('-createdAt');
@@ -200,6 +202,8 @@ router.get('/', staffOnly, async (req, res) => {
         res.status(500).json({ status: 'error', message: 'Erreur lors de la récupération des demandes.' });
     }
 });
+
+router.get('/unread-count', staffOnly, getUnreadEstimationCount);
 
 // ── PATCH /api/estimation/:id — met à jour statut + noteInterne (Admin/Collaborateur) ──
 router.patch('/:id', staffOnly, async (req, res) => {

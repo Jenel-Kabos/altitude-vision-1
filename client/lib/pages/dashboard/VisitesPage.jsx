@@ -56,6 +56,7 @@ const VisitesPage = () => {
     try {
       const data = await getAllVisites();
       setVisites(data);
+      window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
     } catch {
       showNotif("Erreur lors du chargement.", "error");
     } finally {
@@ -80,6 +81,7 @@ const VisitesPage = () => {
     try {
       const updated = await updateVisite(id, data);
       setVisites(prev => prev.map(v => v._id === id ? { ...v, ...updated } : v));
+      window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
       showNotif("Visite mise à jour.");
     } catch (err) {
       showNotif(err.response?.data?.message || "Erreur lors de la mise à jour.", "error");

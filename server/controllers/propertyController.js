@@ -252,6 +252,11 @@ const getPendingProperties = asyncHandler(async (req, res) => {
   });
 });
 
+const getPendingPropertiesCount = asyncHandler(async (_req, res) => {
+  const unreadCount = await Property.countDocuments({ statusAdmin: 'En attente' });
+  res.status(200).json({ status: 'success', data: { unreadCount } });
+});
+
 /**
  * @description Middleware pour les dernières propriétés
  */
@@ -664,6 +669,7 @@ module.exports = {
   createProperty,
   getAllProperties,
   getPendingProperties,
+  getPendingPropertiesCount,
   getLatestProperties,
   getProperty,
   getMyProperties,

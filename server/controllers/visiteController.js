@@ -72,6 +72,9 @@ exports.getMyVisites = asyncHandler(async (req, res) => {
 // GET /api/visites — toutes les visites (staff)
 // ─────────────────────────────────────────────
 exports.getAllVisites = asyncHandler(async (req, res) => {
+  // La liste staff est la vue détaillée disponible dans ce module : la
+  // consultation est distincte du statut « En attente » du rendez-vous.
+  await Visite.updateMany({ staffViewedAt: null }, { $set: { staffViewedAt: new Date() } });
   const visites = await Visite.find()
     .populate({
       path: 'property',
@@ -91,6 +94,11 @@ exports.getAllVisites = asyncHandler(async (req, res) => {
     results: visites.length,
     data: { visites },
   });
+});
+
+exports.getUnreadCount = asyncHandler(async (_req, res) => {
+  const unreadCount = await Visite.countDocuments({ staffViewedAt: null });
+  res.status(200).json({ status: 'success', data: { unreadCount } });
 });
 
 // ─────────────────────────────────────────────

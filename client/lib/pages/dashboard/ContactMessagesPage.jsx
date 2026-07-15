@@ -68,6 +68,7 @@ const ContactMessagesPage = () => {
       const res = await updateMessageStatus(id, status, responseNote);
       const updated = res.data?.message;
       setMessages(prev => prev.map(m => m._id === id ? { ...m, ...updated } : m));
+      window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
       showNotif("Message mis à jour.");
     } catch (err) {
       showNotif(err.response?.data?.message || "Erreur lors de la mise à jour.", "error");

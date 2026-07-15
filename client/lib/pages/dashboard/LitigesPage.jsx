@@ -5,7 +5,7 @@ import {
   Scale, AlertTriangle, CheckCircle, Clock, ChevronUp,
   X, MessageSquare, Loader2, RefreshCw, Flag,
 } from "lucide-react";
-import { getLitiges, getLitigeStats, updateLitigeStatut, addLitigeMessage, resolveLitige } from "../../services/litigeService";
+import { getLitiges, getLitige, getLitigeStats, updateLitigeStatut, addLitigeMessage, resolveLitige } from "../../services/litigeService";
 import { getAllSignalements, traiterSignalement } from "../../services/signalementService";
 
 const BLUE = '#2E7BB5';
@@ -444,6 +444,18 @@ const LitigesPage = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  const openLitige = async (summary) => {
+    try {
+      // Le détail serveur enregistre staffViewedAt ; ne pas masquer le badge
+      // tant que cette écriture n'a pas réussi.
+      const litige = await getLitige(summary._id);
+      setSelected({ ...litige, _type: 'litige' });
+      window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
+    } catch {
+      // Le détail local n'est pas ouvert : le compteur reste fidèle à la base.
+    }
+  };
+
   const ouverts   = stats['Ouvert']   || 0;
   const urgents   = litiges.filter(l => l.priorité === 'Urgente').length;
   const resolus   = stats['Résolu']   || 0;
@@ -567,7 +579,7 @@ const LitigesPage = () => {
                         Plaignant : {el.plaignant?.nom || '—'} — {relDate(el.dateOuverture)}
                       </p>
                     </div>
-                    <button onClick={() => setSelected(el)}
+                    <button onClick={() => openLitige(el)}
                       className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all text-white flex-shrink-0"
                       style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})` }}>
                       Voir détail

@@ -1,6 +1,6 @@
 "use client";
 // src/pages/AdminDashboard.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -9,9 +9,9 @@ import {
   ClipboardList, BarChart2, Scale, Megaphone, MessageCircle, FolderOpen,
   Clock, PenLine, Calculator, FileText, CreditCard,
 } from "lucide-react";
-import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import NotificationBell from '../../components/notifications/NotificationBell';
+import { useDashboardBadges } from '../../hooks/useDashboardBadges';
+import DashboardBadge from '../../components/dashboard/DashboardBadge';
 
 const GOLD = '#C8960C';
 const BLUE = '#2E7BB5';
@@ -35,10 +35,10 @@ const NAV_SECTIONS = [
     links: [
       { to: '/dashboard',                    end: true,  Icon: BarChart3,    label: 'Tableau de bord',    accent: BLUE,      roles: ALL_STAFF },
       { to: '/dashboard/properties',         end: false, Icon: Home,         label: 'Altimmo',             accent: BLUE,      roles: ROLES_ALTIMMO },
-      { to: '/dashboard/visites',            end: false, Icon: Calendar,     label: 'Rendez-vous',         accent: GOLD,      roles: ALL_STAFF },
-      { to: '/dashboard/estimations',        end: false, Icon: Calculator,   label: 'Estimations',         accent: GOLD,      roles: ROLES_ESTIM },
+      { to: '/dashboard/visites',            end: false, Icon: Calendar,     label: 'Rendez-vous',         accent: GOLD,      roles: ALL_STAFF, badge: 'visites' },
+      { to: '/dashboard/estimations',        end: false, Icon: Calculator,   label: 'Estimations',         accent: GOLD,      roles: ROLES_ESTIM, badge: 'estimations' },
       { to: '/dashboard/devis',              end: false, Icon: FileText,     label: 'Devis locatif',       accent: GOLD,      roles: ROLES_ESTIM },
-      { to: '/dashboard/gestion-locative',   end: false, Icon: Building,     label: 'Gestion Locative',   accent: BLUE,      roles: ROLES_GL, badge: 'contratsActifs' },
+      { to: '/dashboard/gestion-locative',   end: false, Icon: Building,     label: 'Gestion Locative',   accent: BLUE,      roles: ROLES_GL },
       { to: '/dashboard/paiements',          end: false, Icon: CreditCard,   label: 'Paiements visites',   accent: GOLD,      roles: ALL_STAFF },
       { to: '/dashboard/events',             end: false, Icon: Calendar,     label: 'Mila Events',         accent: '#D42B2B', roles: ROLES_CM   },
       { to: '/dashboard/altcom',             end: false, Icon: Briefcase,    label: 'Altcom',              accent: GOLD,      roles: ROLES_CM   },
@@ -48,7 +48,7 @@ const NAV_SECTIONS = [
   {
     label: 'Modération',
     links: [
-      { to: '/dashboard/moderation/properties', end: false, Icon: CheckCircle2, label: 'Modération Biens', accent: '#7C3AED', roles: ROLES_MOD },
+      { to: '/dashboard/moderation/properties', end: false, Icon: CheckCircle2, label: 'Modération Biens', accent: '#7C3AED', roles: ROLES_MOD, badge: 'moderation' },
       { to: '/dashboard/moderation/reviews',    end: false, Icon: Star,         label: 'Modération Avis',  accent: '#6366F1', roles: ROLES_MOD },
     ],
   },
@@ -65,9 +65,9 @@ const NAV_SECTIONS = [
   {
     label: 'Communications',
     links: [
-      { to: '/dashboard/messages',       end: false, Icon: Mail,          label: 'Boîte de Réception',  accent: GOLD,      roles: ALL_STAFF },
-      { to: '/dashboard/contact-messages', end: false, Icon: Mail,        label: 'Messages contact',    accent: GOLD,      roles: ALL_STAFF },
-      { to: '/dashboard/conversations',  end: false, Icon: MessageCircle, label: 'Messages clients',    accent: GOLD,      roles: ALL_STAFF },
+      { to: '/dashboard/messages',       end: false, Icon: Mail,          label: 'Boîte de Réception',  accent: GOLD,      roles: ALL_STAFF, badge: 'internalMails' },
+      { to: '/dashboard/contact-messages', end: false, Icon: Mail,        label: 'Messages contact',    accent: GOLD,      roles: ALL_STAFF, badge: 'contacts' },
+      { to: '/dashboard/conversations',  end: false, Icon: MessageCircle, label: 'Messages clients',    accent: GOLD,      roles: ALL_STAFF, badge: 'conversations' },
       { to: '/dashboard/emails',         end: false, Icon: ShieldCheck,   label: 'Gestion des Emails',  accent: '#F59E0B', roles: ROLES_DOCS },
       { to: '/dashboard/publicites',     end: false, Icon: Megaphone,     label: 'Publicités',          accent: GOLD,      roles: ['Admin']  },
     ],
@@ -81,9 +81,7 @@ const AdminDashboard = ({ children }) => {
   const isActive = (to, end = false) => end ? pathname === to : pathname.startsWith(to);
   const { logout, user, isCollaborateur, activeWrites, timeLeft } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [contratsActifs, setContratsActifs] = useState(0);
-  const [litiges,        setLitiges]        = useState(0);
-  const [isMobileView,   setIsMobileView]   = useState(false);
+  const { badges } = useDashboardBadges(!!user);
 
   const activeWriteCount = Object.keys(activeWrites).length;
   // Plus petit temps restant parmi toutes les fenêtres actives
@@ -91,23 +89,6 @@ const AdminDashboard = ({ children }) => {
     ? Math.min(...Object.keys(activeWrites).map(id => timeLeft(id)))
     : 0;
   const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
-
-  useEffect(() => {
-    api.get('/contrats?statut=actif')
-      .then(r => setContratsActifs(r.data?.results || 0))
-      .catch(() => {});
-    api.get('/litiges?statut=Ouvert&limit=1')
-      .then(r => setLitiges(r.data?.results || 0))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)');
-    const update = () => setIsMobileView(media.matches);
-    update();
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
 
   const handleLogout = () => {
     logout();
@@ -158,7 +139,6 @@ const AdminDashboard = ({ children }) => {
               aria-label="Fermer">
               <X size={18} />
             </button>
-            {!isMobileView && <div className="text-white/60"><NotificationBell isAuthenticated={!!user} /></div>}
           </div>
 
           {/* User info */}
@@ -244,19 +224,8 @@ const AdminDashboard = ({ children }) => {
                     }}>
                     <Icon size={15} style={{ color: isActive(to, end) ? accent : 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
                     <span>{label}</span>
-                    {badge === 'contratsActifs' && contratsActifs > 0 && (
-                      <span className="ml-auto text-xs font-bold px-1.5 py-0.5 rounded-full text-white"
-                        style={{ background: accent, fontSize: '0.65rem' }}>
-                        {contratsActifs}
-                      </span>
-                    )}
-                    {badge === 'litiges' && litiges > 0 && (
-                      <span className="ml-auto text-xs font-bold px-1.5 py-0.5 rounded-full text-white"
-                        style={{ background: '#DC2626', fontSize: '0.65rem' }}>
-                        {litiges}
-                      </span>
-                    )}
-                    {isActive(to, end) && !badge && (
+                    {badge && <DashboardBadge count={badges[badge]} />}
+                    {isActive(to, end) && !badges[badge] && (
                       <span className="ml-auto w-1 h-4 rounded-full flex-shrink-0"
                         style={{ backgroundColor: accent }} />
                     )}
@@ -299,9 +268,7 @@ const AdminDashboard = ({ children }) => {
             style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Dashboard Admin
           </span>
-          <div className="text-gray-700">
-            {isMobileView && <NotificationBell isAuthenticated={!!user} />}
-          </div>
+          <div className="w-10" aria-hidden="true" />
         </div>
 
         <div className="flex-1 p-4 md:p-6 overflow-y-auto">

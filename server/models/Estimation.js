@@ -22,6 +22,7 @@ const estimationSchema = new mongoose.Schema({
   },
   noteInterne:   { type: String, default: '' },
   traitePar:     { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  staffViewedAt: { type: Date, default: null, index: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Estimation', estimationSchema);

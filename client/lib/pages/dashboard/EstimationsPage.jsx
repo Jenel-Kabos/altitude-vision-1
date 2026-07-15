@@ -46,6 +46,7 @@ const EstimationsPage = () => {
     try {
       const data = await getAllEstimations();
       setEstimations(data);
+      window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
     } catch {
       showNotif("Erreur lors du chargement.", "error");
     } finally {
@@ -65,6 +66,7 @@ const EstimationsPage = () => {
     try {
       const updated = await updateEstimation(id, data);
       setEstimations(prev => prev.map(e => e._id === id ? { ...e, ...updated } : e));
+      window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
       showNotif("Demande mise à jour.");
     } catch (err) {
       showNotif(err.response?.data?.message || "Erreur lors de la mise à jour.", "error");
