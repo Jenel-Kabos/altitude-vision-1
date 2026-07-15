@@ -34,6 +34,18 @@ const NOTIFICATION_TYPES = [
   'estimation_received',  // staff : nouvelle demande d'estimation
   'devis_received',       // staff : nouvelle demande de devis (gestion locative — modèle Devis)
   'contact_received',     // staff : nouveau message du formulaire de contact
+  // ── Biens immobiliers (propriétaire) ──
+  'bien_valide',           // propriétaire : son bien a été validé
+  'bien_rejete',           // propriétaire : son bien a été rejeté
+  'visite_sur_mon_bien',   // propriétaire : visite demandée sur son bien
+  // ── Messagerie ──
+  'message_staff',         // client/propriétaire : le staff a répondu
+  // ── Paiements de visite ──
+  'paiement_confirme',     // client : paiement YabetooPay confirmé
+  'paiement_echoue',       // client : paiement YabetooPay échoué
+  'visite_payee',          // staff : client a payé les honoraires de visite
+  // ── Modération ──
+  'nouveau_signalement',   // admin : nouveau signalement reçu
 ];
 
 const notificationSchema = new mongoose.Schema(

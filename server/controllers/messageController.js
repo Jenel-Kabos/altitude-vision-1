@@ -189,7 +189,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             getIO().to(recipientIdStr).emit('new-message', { conversationId: convDoc._id, message });
             console.log('[NOTIF DEBUG] notify appelé pour:', recipientIdStr);
             notify(recipientIdStr, {
-                type: 'new_message',
+                type: isStaffInbox ? 'message_staff' : 'new_message',
                 title: senderName,
                 body: preview,
                 data: { conversationId: convDoc._id.toString(), screen: 'Chat' },

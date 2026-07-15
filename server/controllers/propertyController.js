@@ -6,7 +6,7 @@ const APIFeatures = require('../utils/apiFeatures');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const logger = require('../utils/logger');
-const { notifyMany } = require('../services/notificationService');
+const { notify, notifyMany } = require('../services/notificationService');
 
 // ============================================================
 // 🛠️ UTILITAIRES
@@ -490,6 +490,25 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
     message: `Propriété ${newStatusAdmin.toLowerCase()}.`,
     data: { property: updatedProperty },
   });
+
+  // Notifie le propriétaire du bien de la décision de modération
+  if (updatedProperty.owner) {
+    if (newStatusAdmin === 'Validée') {
+      notify(updatedProperty.owner, {
+        type:  'bien_valide',
+        title: '✅ Bien validé',
+        body:  `"${updatedProperty.title}" est maintenant visible sur la plateforme.`,
+        data:  { propertyId: updatedProperty._id.toString(), screen: 'Annonces' },
+      }).catch(() => {});
+    } else if (newStatusAdmin === 'Rejetée') {
+      notify(updatedProperty.owner, {
+        type:  'bien_rejete',
+        title: '❌ Bien non validé',
+        body:  `"${updatedProperty.title}" n'a pas été validé. Contactez-nous.`,
+        data:  { propertyId: updatedProperty._id.toString(), screen: 'Profil' },
+      }).catch(() => {});
+    }
+  }
 
   // Broadcast "nouveau bien publié" à tous les utilisateurs actifs
   if (newStatusAdmin === 'Validée') {

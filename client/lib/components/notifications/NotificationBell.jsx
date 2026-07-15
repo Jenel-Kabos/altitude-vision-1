@@ -5,7 +5,7 @@ import {
   Bell, BellOff, CheckCheck, Trash2,
   Home, Calendar, ArrowLeftRight, MessageSquare,
   FileText, CreditCard, Shield, AlertCircle,
-  Calculator, Mail, CheckCircle2,
+  Calculator, Mail, CheckCircle2, CheckCircle, XCircle, AlertTriangle,
 } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
 import { clearRead } from '../../services/notificationService';
@@ -33,6 +33,14 @@ const TYPE_CONFIG = {
   devis_received:              { Icon: FileText,     color: '#0D9488', route: '/dashboard/devis' },
   contact_received:            { Icon: Mail,         color: GOLD,      route: '/dashboard/contact-messages' },
   property_pending_moderation: { Icon: CheckCircle2, color: '#7C3AED', route: '/dashboard/moderation/properties' },
+  bien_valide:            { Icon: CheckCircle,   color: '#10B981', route: '/immobilier/annonces' },
+  bien_rejete:            { Icon: XCircle,       color: '#EF4444', route: '/profile'             },
+  visite_sur_mon_bien:    { Icon: Home,          color: GOLD,      route: '/mes-visites'          },
+  message_staff:          { Icon: MessageSquare, color: '#3B82F6', route: '/messages'             },
+  paiement_confirme:      { Icon: CheckCircle,   color: '#10B981', route: '/mes-paiements'        },
+  paiement_echoue:        { Icon: XCircle,       color: '#EF4444', route: '/mes-paiements'        },
+  nouveau_signalement:    { Icon: AlertTriangle, color: '#EF4444', route: '/dashboard/litiges'    },
+  visite_payee:           { Icon: CreditCard,    color: '#10B981', route: '/dashboard/paiements'  },
 };
 
 const DEFAULT_CONFIG = { Icon: Bell, color: GOLD, route: '/dashboard/notifications' };

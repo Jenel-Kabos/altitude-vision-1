@@ -11,7 +11,7 @@ import {
   CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getTotalUnreadCount } from '../../services/unreadCountService';
+import { getConversationsUnreadCount } from '../../services/unreadCountService';
 import UnreadMessagesBadge from '../messaging/UnreadMessagesBadge';
 import NotificationBell from '../notifications/NotificationBell';
 
@@ -49,7 +49,7 @@ const useUnreadCount = (pathname, isAuthenticated) => {
   const isOnMessagesPage  = pathname === '/messages';
   useEffect(() => {
     if (!isAuthenticated || isOnMessagesPage) { setCount(0); return; }
-    const load = async () => { try { setCount(await getTotalUnreadCount()); } catch { setCount(0); } };
+    const load = async () => { try { setCount(await getConversationsUnreadCount()); } catch { setCount(0); } };
     load();
     const id = setInterval(load, 30000);
     return () => clearInterval(id);

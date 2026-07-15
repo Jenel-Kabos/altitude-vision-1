@@ -110,6 +110,30 @@ const TYPE_TO_SCREEN = {
   loyer_en_retard:       ()     => null,
   account_verified:      ()     => ['Profil'],
   account_suspended:     ()     => ['Profil'],
+  bien_valide:            ()     => ['Annonces'],
+  bien_rejete:            ()     => ['Profil'],
+  visite_sur_mon_bien:    ()     => ['Visites'],
+  message_staff: async (data) => {
+    if (!data?.conversationId) return ['Messages', {}];
+    try {
+      const res = await api.get(`/conversations/${data.conversationId}`);
+      const conversation = res.data?.data?.conversation;
+      if (!conversation) return ['Messages', {}];
+      return ['Messages', {
+        screen: 'Chat',
+        params: {
+          conversation,
+          contact: { name: 'Équipe Altitude Vision' },
+        },
+      }];
+    } catch {
+      return ['Messages', {}];
+    }
+  },
+  paiement_confirme:      ()     => ['Visites'],
+  paiement_echoue:        ()     => ['Visites'],
+  nouveau_signalement:    ()     => ['Annonces'],
+  visite_payee:           ()     => ['Visites'],
 };
 
 async function resolveNavigation(data = {}) {

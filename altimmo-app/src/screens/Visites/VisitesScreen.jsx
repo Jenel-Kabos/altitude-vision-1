@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { cache } from '../../services/cacheService';
+import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 import PageHeader from '../../components/PageHeader';
@@ -133,8 +134,13 @@ const VisiteCard = React.memo(function VisiteCard({ item, onCancel, showCancel, 
 
 // ─── VisitesScreen ────────────────────────────────────────────────────────────
 export default function VisitesScreen({ navigation }) {
+  const { user } = useAuth();
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
+
+  const isProprietaire = user?.role === 'Proprietaire';
+  const endpoint = isProprietaire ? '/visites/owner' : '/visites/my';
+  const titre    = isProprietaire ? 'Visites de mes biens' : 'Mes visites';
 
   const [visites, setVisites]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -142,13 +148,13 @@ export default function VisitesScreen({ navigation }) {
   const [tab, setTab]             = useState('venir');
 
   const chargerVisites = useCallback(async (forceRefresh = false) => {
-    const KEY = 'visites:my';
+    const KEY = `visites:${endpoint}`;
     if (!forceRefresh) {
       const hit = cache.get(KEY);
       if (hit) { setVisites(hit); setLoading(false); return; }
     }
     try {
-      const res  = await api.get('/visites/my');
+      const res  = await api.get(endpoint);
       const data = res.data?.data?.visites || [];
       const list = Array.isArray(data) ? data : [];
       cache.set(KEY, list, 2 * 60 * 1000);
@@ -159,7 +165,7 @@ export default function VisitesScreen({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [endpoint]);
 
   useEffect(() => { chargerVisites(); }, [chargerVisites]);
 
@@ -199,11 +205,11 @@ export default function VisitesScreen({ navigation }) {
     <VisiteCard
       item={item}
       onCancel={() => annulerVisite(item)}
-      showCancel={tab === 'venir'}
+      showCancel={tab === 'venir' && !isProprietaire}
       styles={styles}
       c={c}
     />
-  ), [annulerVisite, tab, styles, c]);
+  ), [annulerVisite, tab, isProprietaire, styles, c]);
 
   const keyExtractor = useCallback((item) => item._id || item.id, []);
 
@@ -219,7 +225,7 @@ export default function VisitesScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
 
       <PageHeader
-        title="Mes visites"
+        title={titre}
         onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
       />
 

@@ -32,7 +32,7 @@ exports.createVisite = asyncHandler(async (req, res) => {
   // Notifie le propriétaire du bien
   if (visite.property?.owner) {
     notify(visite.property.owner, {
-      type:  'visite_new',
+      type:  'visite_sur_mon_bien',
       title: 'Nouvelle demande de visite 🏠',
       body:  `${req.user.name} souhaite visiter votre bien : ${visite.property?.title || 'un bien'}`,
       data:  { screen: 'OwnerVisites' },
@@ -392,9 +392,23 @@ exports.verifierPaiementVisite = asyncHandler(async (req, res) => {
     await visite.save();
 
     notify(visite.client, {
-      type:  'visite_confirmee',
-      title: 'Paiement confirmé ✅',
-      body:  `Votre paiement pour "${visite.property?.title || 'un bien'}" a été reçu.`,
+      type:  'paiement_confirme',
+      title: '✅ Paiement confirmé',
+      body:  'Vos honoraires ont bien été reçus. Votre visite est validée.',
+      data:  { screen: 'Visites' },
+    }).catch(() => {});
+
+    notifyStaff({
+      type:  'visite_payee',
+      title: '💳 Paiement reçu',
+      body:  `Honoraires reçus pour la visite de ${visite.property?.title || 'un bien'}.`,
+      data:  { visiteId: visite._id.toString(), screen: 'Paiements' },
+    }).catch(() => {});
+  } else if (statut === 'échoué') {
+    notify(visite.client, {
+      type:  'paiement_echoue',
+      title: '❌ Paiement échoué',
+      body:  "Votre paiement n'a pas abouti. Veuillez réessayer.",
       data:  { screen: 'Visites' },
     }).catch(() => {});
   }

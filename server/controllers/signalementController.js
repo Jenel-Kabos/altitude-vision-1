@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Signalement  = require('../models/Signalement');
 const { uploadToCloudinary } = require('../config/cloudinary');
+const { notifyStaff } = require('../services/notificationService');
 
 exports.creerSignalement = asyncHandler(async (req, res) => {
   const { propertyId, raison, details } = req.body;
@@ -35,6 +36,13 @@ exports.creerSignalement = asyncHandler(async (req, res) => {
     details: details?.slice(0, 500) || '',
     preuves,
   });
+
+  notifyStaff({
+    type:  'nouveau_signalement',
+    title: '🚨 Nouveau signalement',
+    body:  `Signalement reçu : ${raison}`,
+    data:  { screen: 'Litiges' },
+  }).catch(() => {});
 
   res.status(201).json({
     status: 'success',

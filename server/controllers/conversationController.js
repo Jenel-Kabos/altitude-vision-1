@@ -414,7 +414,7 @@ exports.startConversation = async (req, res) => {
         // Notifier le destinataire direct (chat UI + cloche/liste + push)
         try { getIO().to(recipientId.toString()).emit('new-message', { conversationId: conversation._id, message: newMsg }); } catch {}
         notify(recipientId, {
-          type: 'new_message',
+          type: 'message_staff',
           title: req.user.name || 'Message',
           body: preview,
           data: { conversationId: conversation._id.toString(), screen: 'Chat' },
