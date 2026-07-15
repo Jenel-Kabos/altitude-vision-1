@@ -61,6 +61,7 @@ export default function NotificationsPage() {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount,   setUnreadCount]   = useState(0);
     const [loading,       setLoading]       = useState(true);
+    const [error,         setError]         = useState(null);
     const [filter,        setFilter]        = useState('all');
     const [page,          setPage]          = useState(1);
     const [hasMore,       setHasMore]       = useState(false);
@@ -80,7 +81,10 @@ export default function NotificationsPage() {
             }
             setUnreadCount(data?.unreadCount ?? 0);
             setHasMore(p < (data?.pagination?.pages ?? 1));
-        } catch { /* fail silently */ }
+            setError(null);
+        } catch {
+            setError('Impossible de charger les notifications. Réessayez dans quelques instants.');
+        }
         finally { setLoading(false); }
     }, [filter, page]);
 
@@ -91,27 +95,47 @@ export default function NotificationsPage() {
 
     const handleMarkRead = async (notif) => {
         if (notif.read) return;
-        setNotifications((prev) => prev.map((n) => n._id === notif._id ? { ...n, read: true } : n));
-        setUnreadCount((c) => Math.max(0, c - 1));
-        markRead(notif._id).catch(() => {});
+        try {
+            await markRead(notif._id);
+            setNotifications((prev) => prev.map((n) => n._id === notif._id ? { ...n, read: true } : n));
+            setUnreadCount((c) => Math.max(0, c - 1));
+            window.dispatchEvent(new CustomEvent('altitude:notifications:changed'));
+        } catch {
+            setError('Impossible de marquer cette notification comme lue.');
+        }
     };
 
     const handleMarkAllRead = async () => {
-        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-        setUnreadCount(0);
-        markAllRead().catch(() => {});
+        try {
+            await markAllRead();
+            setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+            setUnreadCount(0);
+            window.dispatchEvent(new CustomEvent('altitude:notifications:changed'));
+        } catch {
+            setError('Impossible de marquer toutes les notifications comme lues.');
+        }
     };
 
     const handleDelete = async (id) => {
         const notif = notifications.find((n) => n._id === id);
-        setNotifications((prev) => prev.filter((n) => n._id !== id));
-        if (notif && !notif.read) setUnreadCount((c) => Math.max(0, c - 1));
-        deleteNotification(id).catch(() => {});
+        try {
+            await deleteNotification(id);
+            setNotifications((prev) => prev.filter((n) => n._id !== id));
+            if (notif && !notif.read) setUnreadCount((c) => Math.max(0, c - 1));
+            window.dispatchEvent(new CustomEvent('altitude:notifications:changed'));
+        } catch {
+            setError('Impossible de supprimer cette notification.');
+        }
     };
 
     const handleClearRead = async () => {
-        setNotifications((prev) => prev.filter((n) => !n.read));
-        clearRead().catch(() => {});
+        try {
+            await clearRead();
+            setNotifications((prev) => prev.filter((n) => !n.read));
+            window.dispatchEvent(new CustomEvent('altitude:notifications:changed'));
+        } catch {
+            setError('Impossible de supprimer les notifications lues.');
+        }
     };
 
     const hasRead = notifications.some((n) => n.read);
@@ -175,6 +199,10 @@ export default function NotificationsPage() {
                     </button>
                 ))}
             </div>
+
+            {error && (
+                <p role="alert" className="mb-4 text-sm text-red-600">{error}</p>
+            )}
 
             {/* ─── Liste ─── */}
             {loading ? (

@@ -1,4 +1,5 @@
 const asyncHandler  = require('express-async-handler');
+const mongoose      = require('mongoose');
 const Notification  = require('../models/Notification');
 
 const PAGE_SIZE = 20;
@@ -47,6 +48,11 @@ exports.getUnreadCount = asyncHandler(async (req, res) => {
 
 // PATCH /api/notifications/:id/read
 exports.markRead = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404);
+    throw new Error('Notification introuvable.');
+  }
+
   const notif = await Notification.findOneAndUpdate(
     { _id: req.params.id, recipient: req.user._id },
     { read: true },
@@ -73,6 +79,11 @@ exports.markAllRead = asyncHandler(async (req, res) => {
 
 // DELETE /api/notifications/:id
 exports.deleteNotification = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404);
+    throw new Error('Notification introuvable.');
+  }
+
   const notif = await Notification.findOneAndDelete({
     _id: req.params.id,
     recipient: req.user._id,

@@ -16,6 +16,28 @@ const GOLD = '#C8960C';
 
 const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'CommunityManager', 'Communicant'];
 const MESSAGE_TYPES = ['new_message', 'new_staff_message', 'message_staff'];
+const CLIENT_ROUTES = {
+  visite_status: '/mes-visites',
+  visite_cancelled: '/mes-visites',
+  visite_auto_cancelled: '/mes-visites',
+  visite_auto_cancelled_owner: '/mes-visites',
+  visite_confirmee: '/mes-visites',
+  transaction_created: '/mes-paiements',
+  transaction_finalized: '/mes-paiements',
+  payment_success: '/mes-paiements',
+  payment_failed: '/mes-paiements',
+  paiement_confirme: '/mes-paiements',
+  paiement_echoue: '/mes-paiements',
+  new_property: '/immobilier/annonces',
+  bien_valide: '/immobilier/annonces',
+  bien_rejete: '/profile',
+  quote_status: '/profile',
+  quote_response: '/profile',
+  contrat_new: '/profile',
+  contrat_updated: '/profile',
+  account_verified: '/profile',
+  account_suspended: '/profile',
+};
 
 const TYPE_CONFIG = {
   new_message:           { Icon: MessageSquare,  color: '#3B82F6', route: '/dashboard/conversations' },
@@ -23,6 +45,9 @@ const TYPE_CONFIG = {
   visite_new:            { Icon: Home,           color: GOLD,      route: '/dashboard/visites'       },
   visite_status:         { Icon: Calendar,       color: '#10B981', route: '/dashboard/visites'       },
   visite_cancelled:      { Icon: Calendar,       color: '#EF4444', route: '/dashboard/visites'       },
+  visite_auto_cancelled: { Icon: Calendar,       color: '#EF4444', route: '/mes-visites'              },
+  visite_auto_cancelled_owner: { Icon: Calendar, color: '#EF4444', route: '/mes-visites'              },
+  visite_confirmee:     { Icon: CreditCard,      color: '#10B981', route: '/mes-visites'              },
   transaction_created:   { Icon: ArrowLeftRight, color: GOLD,      route: '/dashboard/transactions'  },
   transaction_finalized: { Icon: ArrowLeftRight, color: '#10B981', route: '/dashboard/transactions'  },
   quote_received:        { Icon: FileText,       color: '#8B5CF6', route: '/dashboard/quotes'        },
@@ -48,7 +73,7 @@ const TYPE_CONFIG = {
   visite_payee:           { Icon: CreditCard,    color: '#10B981', route: '/dashboard/paiements'  },
 };
 
-const DEFAULT_CONFIG = { Icon: Bell, color: GOLD, route: '/dashboard/notifications' };
+const DEFAULT_CONFIG = { Icon: Bell, color: GOLD, route: '/profile' };
 
 function fmtTime(dateStr) {
   if (!dateStr) return '';
@@ -69,7 +94,7 @@ export default function NotificationBell({ isAuthenticated }) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef(null);
 
-  const { notifications, unreadCount, loading, fetchNotifications, markRead, markAllRead } =
+  const { notifications, unreadCount, loading, error, fetchNotifications, markRead, markAllRead } =
     useNotifications(isAuthenticated);
 
   const handleToggle = useCallback(() => {
@@ -89,7 +114,7 @@ export default function NotificationBell({ isAuthenticated }) {
   }, [open]);
 
   const handleNotifClick = useCallback(async (notif) => {
-    if (!notif.read) markRead(notif._id);
+    if (!notif.read && !(await markRead(notif._id))) return;
     setOpen(false);
 
     if (MESSAGE_TYPES.includes(notif.type) && notif.data?.conversationId) {
@@ -108,12 +133,20 @@ export default function NotificationBell({ isAuthenticated }) {
     }
 
     const cfg = TYPE_CONFIG[notif.type] || DEFAULT_CONFIG;
-    router.push(cfg.route);
+    const isStaff = STAFF_ROLES.includes(user?.role);
+    const fallbackRoute = isStaff
+      ? cfg.route
+      : CLIENT_ROUTES[notif.type] || (cfg.route.startsWith('/dashboard') ? '/profile' : cfg.route);
+    const destination = notif.link || notif.data?.webPath || fallbackRoute;
+    router.push(destination.startsWith('/') ? destination : fallbackRoute);
   }, [markRead, router, user]);
 
   const handleClearRead = useCallback(async () => {
-    clearRead().catch(() => {});
-    fetchNotifications();
+    try {
+      await clearRead();
+      window.dispatchEvent(new CustomEvent('altitude:notifications:changed'));
+      await fetchNotifications();
+    } catch {}
   }, [fetchNotifications]);
 
   if (!isAuthenticated) return null;
@@ -189,7 +222,11 @@ export default function NotificationBell({ isAuthenticated }) {
 
           {/* Liste */}
           <div style={{ overflowY: 'auto', flex: 1 }}>
-            {loading ? (
+            {error ? (
+              <p role="alert" style={{ padding: 24, textAlign: 'center', color: '#fca5a5', fontSize: 13, margin: 0 }}>
+                {error}
+              </p>
+            ) : loading ? (
               <p style={{ padding: 24, textAlign: 'center', color: '#6b7280', fontSize: 13, margin: 0 }}>
                 Chargement…
               </p>

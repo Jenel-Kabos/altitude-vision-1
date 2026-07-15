@@ -494,14 +494,14 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
   // Notifie le propriétaire du bien de la décision de modération
   if (updatedProperty.owner) {
     if (newStatusAdmin === 'Validée') {
-      notify(updatedProperty.owner, {
+      notify({ recipient: updatedProperty.owner,
         type:  'bien_valide',
         title: '✅ Bien validé',
         body:  `"${updatedProperty.title}" est maintenant visible sur la plateforme.`,
         data:  { propertyId: updatedProperty._id.toString(), screen: 'Annonces' },
       }).catch(() => {});
     } else if (newStatusAdmin === 'Rejetée') {
-      notify(updatedProperty.owner, {
+      notify({ recipient: updatedProperty.owner,
         type:  'bien_rejete',
         title: '❌ Bien non validé',
         body:  `"${updatedProperty.title}" n'a pas été validé. Contactez-nous.`,

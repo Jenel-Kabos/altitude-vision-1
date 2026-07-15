@@ -153,7 +153,7 @@ cron.schedule('*/5 * * * *', async () => {
       await visite.save();
 
       if (visite.client?._id) {
-        notify(visite.client._id, {
+        notify({ recipient: visite.client._id,
           type:  'visite_auto_cancelled',
           title: 'Visite annulée automatiquement ❌',
           body:  `Votre visite de "${titreWell}"${dateStr ? ` prévue le ${dateStr}` : ''} a été annulée car elle n'a pas été prise en charge à l'heure prévue. Contactez-nous pour reprogrammer.`,
@@ -162,7 +162,7 @@ cron.schedule('*/5 * * * *', async () => {
       }
 
       if (visite.property?.owner) {
-        notify(visite.property.owner, {
+        notify({ recipient: visite.property.owner,
           type:  'visite_auto_cancelled_owner',
           title: 'Visite annulée automatiquement ❌',
           body:  `Une visite de votre bien "${titreWell}"${dateStr ? ` prévue le ${dateStr}` : ''} a été annulée automatiquement car aucun collaborateur ne l'a prise en charge à l'heure prévue.`,

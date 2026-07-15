@@ -158,7 +158,7 @@ exports.webhookYabetoo = async (req, res) => {
     if (!tx) return;
 
     if (statut === 'Payé') {
-      notify(tx.client, {
+      notify({ recipient: tx.client,
         type:  'payment_success',
         title: 'Paiement reçu ✅',
         body:  `Votre paiement de ${Number(paiement.montant).toLocaleString('fr-FR')} FCFA pour "${tx.property?.title}" a été confirmé.`,
@@ -172,7 +172,7 @@ exports.webhookYabetoo = async (req, res) => {
         data:  { screen: 'Transactions', transactionId: paiement.transaction.toString() },
       }).catch(() => {});
     } else {
-      notify(tx.client, {
+      notify({ recipient: tx.client,
         type:  'payment_failed',
         title: 'Paiement refusé ❌',
         body:  `Le paiement pour "${tx.property?.title}" a échoué. Veuillez réessayer.`,
@@ -228,7 +228,7 @@ exports.webhookCinetpay = async (req, res) => {
     if (!tx) return;
 
     if (isSuccess && userId) {
-      notify(userId, {
+      notify({ recipient: userId,
         type:  'payment_success',
         title: 'Paiement reçu ✅',
         body:  `Votre paiement de ${Number(amount).toLocaleString('fr-FR')} FCFA pour "${tx.property?.title}" a été confirmé.`,
@@ -244,7 +244,7 @@ exports.webhookCinetpay = async (req, res) => {
     }
 
     if (isFailure && userId) {
-      notify(userId, {
+      notify({ recipient: userId,
         type:  'payment_failed',
         title: 'Paiement refusé ❌',
         body:  `Le paiement pour "${tx.property?.title}" a échoué. Veuillez réessayer.`,
@@ -340,7 +340,7 @@ exports.enregistrerEspecesCheque = async (req, res) => {
       $push:         { paiements: paiement._id },
     });
 
-    notify(tx.client, {
+    notify({ recipient: tx.client,
       type:  'payment_success',
       title: 'Paiement enregistré ✅',
       body:  `Votre paiement par ${methode === 'cheque' ? 'chèque' : 'espèces'} pour "${tx.property?.title}" a été enregistré.`,
@@ -383,7 +383,7 @@ exports.validerVirement = async (req, res) => {
       { new: true }
     ).populate('property', 'title');
 
-    notify(tx.client, {
+    notify({ recipient: tx.client,
       type:  isValid ? 'payment_success' : 'payment_failed',
       title: isValid ? 'Virement validé ✅' : 'Virement refusé ❌',
       body:  isValid

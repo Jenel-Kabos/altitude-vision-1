@@ -39,7 +39,7 @@ exports.createTransaction = async (req, res) => {
       { path: 'agent',    select: 'name' },
     ]);
 
-    notify(clientId, {
+    notify({ recipient: clientId,
       type:  'transaction_created',
       title: 'Dossier ouvert 📋',
       body:  `Un dossier de ${transactionType === 'vente' ? 'vente' : 'location'} a été ouvert pour "${transaction.property?.title}".`,
@@ -158,7 +158,7 @@ exports.finalizeTransaction = async (req, res) => {
     tx.linkedInvoice = invoice._id;
     await tx.save();
 
-    notify(tx.client, {
+    notify({ recipient: tx.client,
       type:  'transaction_finalized',
       title: 'Transaction finalisée 🎉',
       body:  `Félicitations ! Votre ${tx.transactionType} de "${tx.property.title}" est officiellement finalisée.`,
@@ -188,7 +188,7 @@ exports.cancelTransaction = async (req, res) => {
     tx.annuleRaison = raison || '';
     await tx.save();
 
-    notify(tx.client, {
+    notify({ recipient: tx.client,
       type:  'transaction_created',
       title: 'Dossier annulé',
       body:  `Votre dossier pour "${tx.property?.title}" a été annulé.${raison ? ` Raison : ${raison}` : ''}`,

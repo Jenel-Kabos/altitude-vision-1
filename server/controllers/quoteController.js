@@ -179,7 +179,7 @@ exports.updateQuoteStatus = async (req, res) => {
             };
             const msg = STATUS_LABELS[status];
             if (msg) {
-                notify(quote.user, {
+                notify({ recipient: quote.user,
                     type:  'quote_status',
                     title: `Mise à jour de votre devis`,
                     body:  msg,
@@ -261,7 +261,7 @@ exports.sendQuoteResponse = async (req, res) => {
 
         // Push si l'utilisateur a un compte
         if (quote.user) {
-            notify(quote.user, {
+            notify({ recipient: quote.user,
                 type:  'quote_response',
                 title: 'Votre devis est prêt 📄',
                 body:  `Votre devis pour "${quote.service}" a été chiffré à ${parseInt(quotedAmount).toLocaleString('fr-FR')} FCFA. Vérifiez votre email.`,

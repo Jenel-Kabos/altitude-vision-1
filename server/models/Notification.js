@@ -9,6 +9,9 @@ const NOTIFICATION_TYPES = [
   'visite_new',           // staff : nouveau client demande une visite
   'visite_status',        // client : sa visite a été confirmée/refusée/replanifiée
   'visite_cancelled',     // staff : un client a annulé une visite
+  'visite_auto_cancelled',       // client : visite annulée automatiquement
+  'visite_auto_cancelled_owner', // propriétaire : visite de son bien annulée automatiquement
+  'visite_confirmee',            // client : paiement de visite confirmé par le staff
   // ── Transactions ──
   'transaction_created',  // client : une transaction le concernant a été ouverte
   'transaction_finalized',// client : transaction réussie (vente/location validée)
@@ -56,6 +59,11 @@ const notificationSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    sender: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
     type: {
       type: String,
       enum: NOTIFICATION_TYPES,
@@ -63,6 +71,10 @@ const notificationSchema = new mongoose.Schema(
     },
     title: { type: String, required: true, maxlength: 100 },
     body:  { type: String, required: true, maxlength: 300 },
+    link: { type: String, default: null, maxlength: 500 },
+    entityType: { type: String, default: null, maxlength: 80 },
+    entityId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
     // Payload pour la navigation deep-link côté app mobile
     // ex: { screen: 'Transactions', params: { id: '...' } }
     data: { type: mongoose.Schema.Types.Mixed, default: {} },

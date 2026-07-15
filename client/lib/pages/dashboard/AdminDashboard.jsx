@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import NotificationBell from '../../components/notifications/NotificationBell';
 
 const GOLD = '#C8960C';
 const BLUE = '#2E7BB5';
@@ -82,6 +83,7 @@ const AdminDashboard = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [contratsActifs, setContratsActifs] = useState(0);
   const [litiges,        setLitiges]        = useState(0);
+  const [isMobileView,   setIsMobileView]   = useState(false);
 
   const activeWriteCount = Object.keys(activeWrites).length;
   // Plus petit temps restant parmi toutes les fenêtres actives
@@ -97,6 +99,14 @@ const AdminDashboard = ({ children }) => {
     api.get('/litiges?statut=Ouvert&limit=1')
       .then(r => setLitiges(r.data?.results || 0))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)');
+    const update = () => setIsMobileView(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
   }, []);
 
   const handleLogout = () => {
@@ -148,6 +158,7 @@ const AdminDashboard = ({ children }) => {
               aria-label="Fermer">
               <X size={18} />
             </button>
+            {!isMobileView && <div className="text-white/60"><NotificationBell isAuthenticated={!!user} /></div>}
           </div>
 
           {/* User info */}
@@ -288,7 +299,9 @@ const AdminDashboard = ({ children }) => {
             style={{ fontFamily: "'DM Sans', sans-serif" }}>
             Dashboard Admin
           </span>
-          <div className="w-8" />
+          <div className="text-gray-700">
+            {isMobileView && <NotificationBell isAuthenticated={!!user} />}
+          </div>
         </div>
 
         <div className="flex-1 p-4 md:p-6 overflow-y-auto">

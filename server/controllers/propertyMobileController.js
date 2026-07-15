@@ -70,10 +70,11 @@ const createPropertyMobile = async (req, res) => {
     // Notifier les Admin (modération réservée à ce rôle, cf. AdminDashboard
     // NAV_SECTIONS "Modération Biens" → roles: ['Admin']) — best-effort
     User.find({ role: 'Admin' }).select('_id').lean()
-      .then((admins) => Promise.allSettled(admins.map((a) => notify(a._id, {
+      .then((admins) => Promise.allSettled(admins.map((a) => notify({ recipient: a._id,
         type:  'property_pending_moderation',
         title: `Nouveau bien à modérer : ${titre}`,
         body:  `${ville || ''} ${arrondissement || ''}`.trim(),
+        link:  '/dashboard/moderation/properties',
         data:  { screen: 'ModerationProperties', propertyId: property._id.toString() },
       }))))
       .catch(() => {});

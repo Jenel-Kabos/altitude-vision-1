@@ -31,7 +31,7 @@ exports.createVisite = asyncHandler(async (req, res) => {
 
   // Notifie le propriétaire du bien
   if (visite.property?.owner) {
-    notify(visite.property.owner, {
+    notify({ recipient: visite.property.owner,
       type:  'visite_sur_mon_bien',
       title: 'Nouvelle demande de visite 🏠',
       body:  `${req.user.name} souhaite visiter votre bien : ${visite.property?.title || 'un bien'}`,
@@ -143,7 +143,7 @@ exports.updateVisite = asyncHandler(async (req, res) => {
     };
     const msg = STATUT_MESSAGES[statut];
     if (msg) {
-      notify(visite.client._id || visite.client, {
+      notify({ recipient: visite.client._id || visite.client,
         type:  'visite_status',
         title: msg.title,
         body:  msg.body,
@@ -239,7 +239,7 @@ exports.updatePaiementVisite = asyncHandler(async (req, res) => {
 
   // Notifie le client si paiement confirmé
   if (paiementStatus === 'payé') {
-    notify(visite.client._id || visite.client, {
+    notify({ recipient: visite.client._id || visite.client,
       type:  'visite_confirmee',
       title: 'Paiement confirmé ✅',
       body:  'Votre paiement a été reçu. Votre visite est validée.',
@@ -391,7 +391,7 @@ exports.verifierPaiementVisite = asyncHandler(async (req, res) => {
     visite.paiementStatus = 'payé';
     await visite.save();
 
-    notify(visite.client, {
+    notify({ recipient: visite.client,
       type:  'paiement_confirme',
       title: '✅ Paiement confirmé',
       body:  'Vos honoraires ont bien été reçus. Votre visite est validée.',
@@ -405,7 +405,7 @@ exports.verifierPaiementVisite = asyncHandler(async (req, res) => {
       data:  { visiteId: visite._id.toString(), screen: 'Paiements' },
     }).catch(() => {});
   } else if (statut === 'échoué') {
-    notify(visite.client, {
+    notify({ recipient: visite.client,
       type:  'paiement_echoue',
       title: '❌ Paiement échoué',
       body:  "Votre paiement n'a pas abouti. Veuillez réessayer.",

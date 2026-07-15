@@ -177,6 +177,11 @@ exports.markConversationAsRead = asyncHandler(async (req, res) => {
   // Synchroniser la Map unreadCount sur le doc Conversation
   if (convDoc) {
     await convDoc.resetUnread(req.user.id);
+    // Si c'est une conversation staff-inbox,
+    // remettre aussi la clé 'staff' à zéro
+    if (convDoc.isStaffInbox) {
+      await convDoc.resetUnread('staff');
+    }
   }
 
   res.status(200).json({
@@ -413,7 +418,7 @@ exports.startConversation = async (req, res) => {
       if (isSenderStaff) {
         // Notifier le destinataire direct (chat UI + cloche/liste + push)
         try { getIO().to(recipientId.toString()).emit('new-message', { conversationId: conversation._id, message: newMsg }); } catch {}
-        notify(recipientId, {
+        notify({ recipient: recipientId,
           type: 'message_staff',
           title: req.user.name || 'Message',
           body: preview,
