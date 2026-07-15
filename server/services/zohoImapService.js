@@ -10,18 +10,54 @@ const User                  = require('../models/User');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const logger                = require('../utils/logger');
 
+let isPolling = false;
+let pollSequence = 0;
+const LOGOUT_TIMEOUT_MS = 5000;
+
+const logoutWithDeadline = async (client) => {
+    let timeoutId;
+    try {
+        await Promise.race([
+            client.logout(),
+            new Promise((_, reject) => {
+                timeoutId = setTimeout(() => {
+                    const error = new Error(`Logout IMAP dépassé après ${LOGOUT_TIMEOUT_MS} ms`);
+                    error.code = 'IMAP_LOGOUT_TIMEOUT';
+                    reject(error);
+                }, LOGOUT_TIMEOUT_MS);
+            }),
+        ]);
+    } finally {
+        clearTimeout(timeoutId);
+    }
+};
+
 // ── Fonction principale ───────────────────────────────────────
 const pollZohoInbox = async () => {
-    logger.info('📬 [IMAP] Démarrage du polling Zoho...');
+    if (isPolling) {
+        logger.warn('[IMAP] Polling ignoré : cycle déjà en cours');
+        return { imported: 0, skipped: 0, errors: 0 };
+    }
+
+    isPolling = true;
+    const pollCycleId = ++pollSequence;
+    const startedAt = Date.now();
+    let phase = 'configuration';
+    let client;
+    let lock;
+    let connectionError = null;
+
+    logger.info('[IMAP] Polling démarré', { pollCycleId });
 
     if (!process.env.ZOHO_FROM_EMAIL || !process.env.ZOHO_IMAP_PASSWORD) {
         logger.warn('⚠️ [IMAP] ZOHO_FROM_EMAIL ou ZOHO_IMAP_PASSWORD non configurés — polling ignoré');
+        isPolling = false;
         return { imported: 0, skipped: 0, errors: 0 };
     }
 
     const stats = { imported: 0, skipped: 0, errors: 0 };
 
-    const client = new ImapFlow({
+    client = new ImapFlow({
         host:              'imap.zoho.com',
         port:              993,
         secure:            true,
@@ -38,27 +74,30 @@ const pollZohoInbox = async () => {
     // 'error' de l'EventEmitter. Sans listener, Node.js traite ça comme une
     // exception non gérée et crashe le processus.
     client.on('error', (err) => {
-        logger.error('❌ [IMAP] Erreur socket (absorbée):', err.message);
+        connectionError = err;
+        logger.error('[IMAP] Erreur socket', { pollCycleId, phase, error: err.message, code: err.code });
     });
 
     try {
         // 1. Connexion
+        phase = 'connect';
         await client.connect();
-        logger.success('✅ [IMAP] Connexion Zoho établie');
+        logger.success('[IMAP] Connecté', { pollCycleId });
 
         // 2. Ouvrir INBOX
-        const lock = await client.getMailboxLock('INBOX');
+        phase = 'mailbox';
+        lock = await client.getMailboxLock('INBOX');
+        logger.info('[IMAP] Mailbox ouverte', { pollCycleId, mailbox: 'INBOX' });
 
-        try {
-            // 3. Chercher les emails non lus
-            const uids = await client.search({ seen: false });
-            logger.info(`📨 [IMAP] ${uids.length} email(s) non lu(s) trouvé(s)`);
+        // 3. Chercher les emails non lus
+        phase = 'search';
+        const uids = await client.search({ seen: false });
+        logger.info('[IMAP] Emails non lus trouvés', { pollCycleId, mailCount: uids.length });
 
-            if (uids.length === 0) return stats;
-
-            // 4. Traiter chaque email
-            for await (const message of client.fetch(uids, { source: true })) {
-                try {
+        // 4. Traiter chaque email
+        phase = 'process';
+        for await (const message of client.fetch(uids, { source: true })) {
+            try {
                     const parsed = await simpleParser(message.source);
 
                     const fromAddress = parsed.from?.value?.[0]?.address || '';
@@ -148,27 +187,54 @@ const pollZohoInbox = async () => {
                 } catch (msgErr) {
                     logger.error(`  ❌ [IMAP] Erreur message:`, msgErr.message);
                     stats.errors++;
-                }
             }
-
-        } finally {
-            lock.release();
         }
-
-        await client.logout();
-        logger.info(`📬 [IMAP] Terminé — importés: ${stats.imported}, ignorés: ${stats.skipped}, erreurs: ${stats.errors}`);
-        return stats;
 
     } catch (error) {
         const isNetworkErr = ['ETIMEOUT', 'ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'].includes(error.code);
         if (isNetworkErr) {
-            logger.warn(`⚠️ [IMAP] Timeout/réseau (${error.code}) — polling ignoré, serveur intact`);
+            logger.warn('[IMAP] Échec réseau', { pollCycleId, phase, error: error.message, code: error.code });
         } else {
-            logger.error('❌ [IMAP] Erreur connexion:', error.message);
+            logger.error('[IMAP] Échec polling', { pollCycleId, phase, error: error.message, code: error.code });
         }
-        try { client.close(); } catch {}
-        return { ...stats, errors: stats.errors + 1 };
+        stats.errors++;
+    } finally {
+        try {
+            lock?.release();
+        } catch (error) {
+            logger.warn('[IMAP] Libération mailbox impossible', { pollCycleId, error: error.message });
+        }
+
+        if (client) {
+            try {
+                if (client.usable && !connectionError) {
+                    phase = 'logout';
+                    await logoutWithDeadline(client);
+                    logger.info('[IMAP] Connexion fermée', { pollCycleId });
+                } else {
+                    client.close();
+                    logger.info('[IMAP] Connexion invalide fermée', { pollCycleId });
+                }
+            } catch (error) {
+                // Une connexion déjà expirée ne doit pas déclencher une seconde commande IMAP.
+                logger.warn('[IMAP] Fermeture IMAP incomplète', { pollCycleId, error: error.message });
+                stats.errors++;
+                try { client.close(); } catch {}
+            }
+        }
+
+        isPolling = false;
+        logger.info('[IMAP] Polling terminé', {
+            pollCycleId,
+            phase,
+            imported: stats.imported,
+            skipped: stats.skipped,
+            errors: stats.errors,
+            durationMs: Date.now() - startedAt,
+        });
     }
+
+    return stats;
 };
 
 module.exports = { pollZohoInbox };
