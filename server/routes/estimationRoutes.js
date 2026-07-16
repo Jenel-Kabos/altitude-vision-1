@@ -6,9 +6,10 @@ const Estimation    = require('../models/Estimation');
 const auth          = require('../controllers/authController');
 const { notifyStaff } = require('../services/notificationService');
 const { ROLES_ESTIMATION } = require('../utils/roles');
-const { getUnreadEstimationCount } = require('../controllers/estimationController');
+const estimationController = require('../controllers/estimationController');
 
 const staffOnly = [auth.protect, auth.restrictTo(...ROLES_ESTIMATION)];
+const valuationManagers = [auth.protect, auth.restrictTo('Admin', 'Collaborateur')];
 
 // ── Template email interne (reçu par l'agence) ───────────────
 const getEstimationEmailTemplate = (data) => `
@@ -187,15 +188,20 @@ router.post('/', async (req, res) => {
 // ── GET /api/estimation — liste toutes les demandes (Admin/Collaborateur) ────
 router.get('/', staffOnly, async (req, res) => {
     try {
-        await Estimation.updateMany({ staffViewedAt: null }, { $set: { staffViewedAt: new Date() } });
+        const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
         const estimations = await Estimation.find()
             .populate('traitePar', 'name')
-            .sort('-createdAt');
+            .sort('-createdAt')
+            .skip((page - 1) * limit)
+            .limit(limit);
+        await Estimation.updateMany({ _id: { $in: estimations.map(item => item._id) }, staffViewedAt: null }, { $set: { staffViewedAt: new Date() } });
+        const total = await Estimation.countDocuments();
 
         res.status(200).json({
             status:  'success',
             results: estimations.length,
-            data:    { estimations },
+            data:    { estimations, pagination: { page, limit, total, pages: Math.ceil(total / limit) } },
         });
     } catch (err) {
         console.error('❌ [Estimation] Erreur récupération liste:', err.message);
@@ -203,33 +209,39 @@ router.get('/', staffOnly, async (req, res) => {
     }
 });
 
-router.get('/unread-count', staffOnly, getUnreadEstimationCount);
+router.get('/unread-count', staffOnly, estimationController.getUnreadEstimationCount);
+
+// Le laboratoire conserve les anciennes routes et isole ses règles métier dans le contrôleur/service.
+router.get('/reports/verify/:code', estimationController.verifyReport);
+router.get('/analytics/market-history', staffOnly, estimationController.getMarketHistory);
+router.get('/analytics/statistics', staffOnly, estimationController.getLaboratoryStatistics);
+router.post('/compare', staffOnly, estimationController.compareEstimations);
+router.get('/references', staffOnly, estimationController.listMarketReferences);
+router.post('/references', valuationManagers, estimationController.createMarketReference);
+router.patch('/references/:id', valuationManagers, estimationController.updateMarketReference);
+router.post('/references/:id/deactivate', valuationManagers, estimationController.deactivateMarketReference);
+router.get('/construction-costs', staffOnly, estimationController.listConstructionCosts);
+router.post('/construction-costs', valuationManagers, estimationController.createConstructionCost);
+router.patch('/construction-costs/:id', valuationManagers, estimationController.updateConstructionCost);
+router.get('/coefficients', staffOnly, estimationController.listCoefficients);
+router.post('/coefficients', valuationManagers, estimationController.createCoefficient);
+router.patch('/coefficients/:id', valuationManagers, estimationController.updateCoefficient);
+router.get('/:id/calculations', staffOnly, estimationController.getCalculations);
+router.get('/:id/expert-analysis', staffOnly, estimationController.getExpertAnalysis);
+router.get('/:id/internal-comparables', staffOnly, estimationController.searchInternalComparables);
+router.post('/:id/internal-comparables', staffOnly, estimationController.addInternalComparable);
+router.patch('/:id/comparables/:comparableId', staffOnly, estimationController.updateComparable);
+router.delete('/:id/comparables/:comparableId', staffOnly, estimationController.deleteComparable);
+router.post('/:id/comparables/score', staffOnly, estimationController.scoreComparable);
+router.post('/:id/calculate', staffOnly, estimationController.calculateEstimation);
+router.post('/:id/adjust-value', valuationManagers, estimationController.adjustExpertValue);
+router.post('/:id/validate', valuationManagers, estimationController.validateEstimation);
+router.post('/:id/publish', valuationManagers, estimationController.publishEstimation);
+router.get('/:id/report/html', staffOnly, estimationController.renderReportHtml);
+router.get('/:id/report/pdf', staffOnly, estimationController.downloadReportPdf);
+router.get('/:id', staffOnly, estimationController.getEstimation);
 
 // ── PATCH /api/estimation/:id — met à jour statut + noteInterne (Admin/Collaborateur) ──
-router.patch('/:id', staffOnly, async (req, res) => {
-    try {
-        const { statut, noteInterne } = req.body;
-        const estimation = await Estimation.findById(req.params.id);
-
-        if (!estimation) {
-            return res.status(404).json({ status: 'fail', message: 'Demande d\'estimation introuvable.' });
-        }
-
-        if (statut !== undefined)      estimation.statut = statut;
-        if (noteInterne !== undefined) estimation.noteInterne = noteInterne;
-        estimation.traitePar = req.user.id;
-
-        await estimation.save();
-        await estimation.populate('traitePar', 'name');
-
-        res.status(200).json({
-            status: 'success',
-            data:   { estimation },
-        });
-    } catch (err) {
-        console.error('❌ [Estimation] Erreur mise à jour:', err.message);
-        res.status(500).json({ status: 'error', message: 'Erreur lors de la mise à jour de la demande.' });
-    }
-});
+router.patch('/:id', staffOnly, estimationController.updateEstimation);
 
 module.exports = router;

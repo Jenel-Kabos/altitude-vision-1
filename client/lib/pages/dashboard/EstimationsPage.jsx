@@ -1,251 +1,61 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import {
-  Calculator, Mail, Home, MapPin, Maximize2, Loader2, AlertTriangle,
-  CheckCircle2, XCircle, PlayCircle, StickyNote,
-} from "lucide-react";
-import { getAllEstimations, updateEstimation } from "../../services/estimationService";
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Calculator, CheckCircle2, ClipboardCheck, FileText, Loader2, MapPin, PlayCircle, Save, SlidersHorizontal } from 'lucide-react';
+import { calculateEstimation, getAllEstimations, getEstimation, publishEstimation, updateEstimation, validateEstimation } from '../../services/estimationService';
+import ValuationAdministration from '../../components/dashboard/ValuationAdministration';
+import EstimationExpertTabs from '../../components/dashboard/EstimationExpertTabs';
+import ValuationPhaseBDashboard from '../../components/dashboard/ValuationPhaseBDashboard';
 
-const STATUTS = ["Tous", "En attente", "En cours", "Traitée", "Annulée"];
+const STATUTS = ['Tous', 'En attente', 'Informations incomplètes', 'En cours', 'Calcul automatique terminé', 'Révision expert', 'En attente de validation', 'Validée', 'Rapport publié', 'Traitée', 'Annulée'];
+const money = value => Number.isFinite(Number(value)) ? new Intl.NumberFormat('fr-CG', { style: 'currency', currency: 'XAF', maximumFractionDigits: 0 }).format(value) : '—';
+const date = value => value ? new Date(value).toLocaleDateString('fr-FR') : '—';
+const statusClass = status => ({ 'En attente': 'bg-amber-100 text-amber-800', 'En cours': 'bg-blue-100 text-blue-800', 'Calcul automatique terminé': 'bg-indigo-100 text-indigo-800', 'Révision expert': 'bg-violet-100 text-violet-800', 'En attente de validation': 'bg-orange-100 text-orange-800', 'Validée': 'bg-emerald-100 text-emerald-800', 'Rapport publié': 'bg-green-100 text-green-800', 'Annulée': 'bg-red-100 text-red-800' }[status] || 'bg-slate-100 text-slate-700');
 
-const STATUT_STYLE = {
-  "En attente": { bg: "bg-yellow-100", text: "text-yellow-800", dot: "bg-yellow-400" },
-  "En cours":   { bg: "bg-purple-100", text: "text-purple-800", dot: "bg-purple-500" },
-  "Traitée":    { bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500"  },
-  "Annulée":    { bg: "bg-red-100",    text: "text-red-700",    dot: "bg-red-500"    },
-};
+function Field({ label, children }) { return <label className="block text-xs font-semibold text-slate-600">{label}<div className="mt-1">{children}</div></label>; }
+const input = 'w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none';
 
-const formatDate = (d) => {
-  if (!d) return null;
-  return new Date(d).toLocaleString("fr-FR", {
-    day: "2-digit", month: "long", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
-};
+export default function EstimationsPage() {
+  const [estimations, setEstimations] = useState([]); const [selected, setSelected] = useState(null); const [filter, setFilter] = useState('Tous');
+  const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const [notice, setNotice] = useState(null);
+  const [simulation, setSimulation] = useState({ monthlyRent: '', annualCharges: '', annualNetIncome: '', capitalizationRate: '' });
+  const notify = (message, type = 'success') => { setNotice({ message, type }); setTimeout(() => setNotice(null), 4500); };
+  const refresh = async () => { try { const items = await getAllEstimations(); setEstimations(items); window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh')); } catch { notify('Impossible de charger les dossiers.', 'error'); } finally { setLoading(false); } };
+  useEffect(() => { refresh(); }, []);
+  const visible = useMemo(() => filter === 'Tous' ? estimations : estimations.filter(item => item.statut === filter), [estimations, filter]);
+  const counts = status => estimations.filter(item => item.statut === status).length;
+  const open = async id => { setBusy(true); try { setSelected(await getEstimation(id)); } catch { notify('Dossier introuvable.', 'error'); } finally { setBusy(false); } };
+  const sync = value => { setSelected(value); setEstimations(items => items.map(item => item._id === value._id ? { ...item, ...value } : item)); };
+  const update = async payload => { if (!selected) return; setBusy(true); try { const item = await updateEstimation(selected._id, payload); sync(item); notify('Dossier mis à jour.'); } catch (error) { notify(error.response?.data?.message || 'Mise à jour impossible.', 'error'); } finally { setBusy(false); } };
+  const calculate = async () => { if (!selected) return; setBusy(true); try { const data = await calculateEstimation(selected._id, Object.fromEntries(Object.entries(simulation).filter(([, value]) => value !== ''))); sync(data.estimation); setSelected(item => ({ ...item, currentCalculation: data.calculation })); notify('Calcul historisé : aucune grille n’a été écrasée.'); } catch (error) { notify(error.response?.data?.message || 'Calcul impossible : renseignez une référence interne.', 'error'); } finally { setBusy(false); } };
+  const validate = async () => { setBusy(true); try { const data = await validateEstimation(selected._id); sync(data.estimation); notify('Estimation validée.'); } catch (error) { notify(error.response?.data?.message || 'Validation refusée.', 'error'); } finally { setBusy(false); } };
+  const publish = async () => { setBusy(true); try { const data = await publishEstimation(selected._id); sync(data.estimation); notify('Rapport marqué comme publié.'); } catch (error) { notify(error.response?.data?.message || 'Publication impossible.', 'error'); } finally { setBusy(false); } };
+  const setNested = (group, key, value) => setSelected(item => ({ ...item, [group]: { ...(item[group] || {}), [key]: value } }));
 
-const StatutBadge = ({ statut }) => {
-  const s = STATUT_STYLE[statut] || STATUT_STYLE["En attente"];
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${s.bg} ${s.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-      {statut}
-    </span>
-  );
-};
-
-const EstimationsPage = () => {
-  const [estimations, setEstimations] = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [filtre,      setFiltre]      = useState("Tous");
-  const [notif,       setNotif]       = useState(null);
-  const [notes,       setNotes]       = useState({});
-  const [submitting,  setSubmitting]  = useState(null);
-
-  const fetchEstimations = async () => {
-    try {
-      const data = await getAllEstimations();
-      setEstimations(data);
-      window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
-    } catch {
-      showNotif("Erreur lors du chargement.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchEstimations(); }, []);
-
-  const showNotif = (message, type = "success") => {
-    setNotif({ message, type });
-    setTimeout(() => setNotif(null), 4000);
-  };
-
-  const handleUpdate = async (id, data) => {
-    setSubmitting(id);
-    try {
-      const updated = await updateEstimation(id, data);
-      setEstimations(prev => prev.map(e => e._id === id ? { ...e, ...updated } : e));
-      window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
-      showNotif("Demande mise à jour.");
-    } catch (err) {
-      showNotif(err.response?.data?.message || "Erreur lors de la mise à jour.", "error");
-    } finally {
-      setSubmitting(null);
-    }
-  };
-
-  const handleSaveNote = (id) => {
-    const noteInterne = notes[id];
-    if (noteInterne === undefined) return;
-    handleUpdate(id, { noteInterne });
-  };
-
-  const filtered = filtre === "Tous" ? estimations : estimations.filter(e => e.statut === filtre);
-  const countByStatut = (s) => estimations.filter(e => e.statut === s).length;
-
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 sm:p-8 font-sans">
-
-      {notif && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-xl shadow-xl text-white text-sm font-semibold transition-all ${
-          notif.type === "error"
-            ? "bg-gradient-to-r from-red-500 to-pink-600"
-            : "bg-gradient-to-r from-emerald-500 to-green-600"
-        }`}>
-          {notif.message}
-        </div>
-      )}
-
-      <div className="max-w-5xl mx-auto">
-
-        {/* Header */}
-        <div className="mb-6 flex items-center gap-4">
-          <div className="p-3 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-2xl shadow-lg">
-            <Calculator className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-black text-gray-800">Demandes d&apos;estimation</h1>
-            <p className="text-gray-500 text-sm mt-0.5">
-              {estimations.length} demande{estimations.length !== 1 ? "s" : ""} au total
-            </p>
-          </div>
-        </div>
-
-        {/* Filtres */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {STATUTS.map(s => (
-            <button key={s} onClick={() => setFiltre(s)}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all ${
-                filtre === s
-                  ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-blue-400"
-              }`}>
-              {s}
-              {s !== "Tous" && (
-                <span className="ml-1.5 opacity-60">({countByStatut(s)})</span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Liste */}
-        {filtered.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200">
-            <AlertTriangle className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <p className="font-semibold text-gray-500">Aucune demande {filtre !== "Tous" ? `"${filtre}"` : ""}</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filtered.map(estimation => {
-              const isBusy = submitting === estimation._id;
-              const noteValue = notes[estimation._id] ?? estimation.noteInterne ?? "";
-
-              return (
-                <div key={estimation._id}
-                  className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-                      <p className="font-bold text-gray-800 text-base leading-tight">
-                        {estimation.nom}
-                      </p>
-                      <StatutBadge statut={estimation.statut} />
-                    </div>
-
-                    <a href={`mailto:${estimation.email}`}
-                      className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-2">
-                      <Mail className="w-3.5 h-3.5" />
-                      {estimation.email}
-                    </a>
-
-                    <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-600">
-                      <span className="flex items-center gap-1 bg-gray-50 px-2.5 py-1 rounded-full">
-                        <Home className="w-3 h-3" />
-                        {estimation.typeBien} · {estimation.transaction === 'vente' ? 'Vente' : 'Location'}
-                      </span>
-                      <span className="flex items-center gap-1 bg-gray-50 px-2.5 py-1 rounded-full">
-                        <MapPin className="w-3 h-3" />
-                        {estimation.adresse}
-                      </span>
-                      <span className="flex items-center gap-1 bg-gray-50 px-2.5 py-1 rounded-full">
-                        <Maximize2 className="w-3 h-3" />
-                        {estimation.surface} m²
-                      </span>
-                    </div>
-
-                    <p className="text-gray-400 text-xs mt-2">
-                      Reçue le {formatDate(estimation.createdAt)}
-                      {estimation.traitePar?.name && <span> · Traitée par {estimation.traitePar.name}</span>}
-                    </p>
-                  </div>
-
-                  {/* Zone d'actions */}
-                  <div className="border-t border-gray-100 px-5 py-4 space-y-3">
-                    <div className="flex gap-2 flex-wrap">
-                      {estimation.statut === 'En attente' && (
-                        <button
-                          onClick={() => handleUpdate(estimation._id, { statut: 'En cours' })}
-                          disabled={isBusy}
-                          className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition shadow-sm">
-                          {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
-                          En cours
-                        </button>
-                      )}
-
-                      {estimation.statut !== 'Traitée' && estimation.statut !== 'Annulée' && (
-                        <button
-                          onClick={() => handleUpdate(estimation._id, { statut: 'Traitée' })}
-                          disabled={isBusy}
-                          className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm">
-                          {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                          Traitée
-                        </button>
-                      )}
-
-                      {estimation.statut !== 'Annulée' && (
-                        <button
-                          onClick={() => handleUpdate(estimation._id, { statut: 'Annulée' })}
-                          disabled={isBusy}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-red-50 text-red-600 rounded-lg hover:bg-red-100 disabled:opacity-50 transition">
-                          <XCircle className="w-4 h-4" />
-                          Annuler
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="flex items-start gap-2">
-                      <StickyNote className="w-4 h-4 text-gray-400 mt-2 flex-shrink-0" />
-                      <textarea
-                        rows={2}
-                        placeholder="Note interne (visible par l'équipe uniquement)..."
-                        value={noteValue}
-                        onChange={e => setNotes(prev => ({ ...prev, [estimation._id]: e.target.value }))}
-                        className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
-                      />
-                      <button
-                        onClick={() => handleSaveNote(estimation._id)}
-                        disabled={isBusy || notes[estimation._id] === undefined}
-                        className="px-3 py-1.5 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex-shrink-0">
-                        Enregistrer
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+  if (loading) return <div className="min-h-[60vh] grid place-items-center"><Loader2 className="h-10 w-10 animate-spin text-blue-600" /></div>;
+  return <div className="min-h-screen bg-slate-50 p-4 sm:p-7">
+    {notice && <div className={`fixed right-4 top-4 z-50 rounded-xl px-5 py-3 text-sm font-bold text-white shadow-xl ${notice.type === 'error' ? 'bg-red-600' : 'bg-emerald-600'}`}>{notice.message}</div>}
+    <header className="mb-6 flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 p-3 text-white"><Calculator /></div><div><h1 className="text-2xl font-black text-slate-900 sm:text-3xl">Laboratoire d&apos;expertise immobilière</h1><p className="text-sm text-slate-500">Avis de valeur interne — jamais une expertise judiciaire, notariale ou administrative.</p></div></div><div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">Références marché : données internes administrables uniquement</div></header>
+    <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4"><Metric label="Nouvelles" value={counts('En attente')} /><Metric label="En analyse" value={counts('En cours') + counts('Calcul automatique terminé') + counts('Révision expert')} /><Metric label="À valider" value={counts('En attente de validation')} /><Metric label="Publiées" value={counts('Rapport publié')} /></div>
+    <ValuationPhaseBDashboard estimations={estimations} notify={notify} />
+    <div className="mb-5 flex flex-wrap gap-2">{STATUTS.map(status => <button key={status} onClick={() => setFilter(status)} className={`rounded-full border px-3 py-1.5 text-xs font-bold ${filter === status ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{status}{status !== 'Tous' && ` (${counts(status)})`}</button>)}</div>
+    <div className="grid gap-5 xl:grid-cols-[minmax(300px,0.8fr)_minmax(0,1.6fr)]">
+      <section className="space-y-3">{visible.length ? visible.map(item => <button key={item._id} onClick={() => open(item._id)} className={`w-full rounded-2xl border p-4 text-left shadow-sm transition ${selected?._id === item._id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300'}`}><div className="flex items-start justify-between gap-2"><strong className="text-slate-900">{item.referenceBien || item.nom}</strong><span className={`rounded-full px-2 py-1 text-[11px] font-bold ${statusClass(item.statut)}`}>{item.statut}</span></div><p className="mt-1 text-sm text-slate-600">{item.typeBien} · {item.surface} m²</p><p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><MapPin className="h-3 w-3" />{item.location?.city || item.adresse}</p><p className="mt-2 text-xs text-slate-400">Demande du {date(item.createdAt)}</p></button>) : <Empty text="Aucun dossier pour ce filtre." />}</section>
+      <section className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm">{!selected ? <Empty text="Sélectionnez un dossier pour ouvrir sa fiche d’expertise." /> : <div className="p-4 sm:p-6"><div className="mb-5 flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-black text-slate-900">{selected.referenceBien || selected.nom}</h2><p className="text-sm text-slate-500">{selected.typeBien} · {selected.transaction === 'location' ? 'Location' : 'Vente'} · reçu le {date(selected.createdAt)}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${statusClass(selected.statut)}`}>{selected.statut}</span></div>
+        <div className="grid gap-4 md:grid-cols-2"><Panel title="Général et localisation"><div className="grid gap-3 sm:grid-cols-2"><Field label="Référence"><input className={input} value={selected.referenceBien || ''} onChange={e => setSelected({ ...selected, referenceBien: e.target.value })} /></Field><Field label="Usage"><input className={input} value={selected.usage || ''} onChange={e => setSelected({ ...selected, usage: e.target.value })} /></Field><Field label="Ville"><input className={input} value={selected.location?.city || ''} onChange={e => setNested('location', 'city', e.target.value)} placeholder="Ex. Brazzaville" /></Field><Field label="Quartier"><input className={input} value={selected.location?.neighborhood || ''} onChange={e => setNested('location', 'neighborhood', e.target.value)} /></Field></div><button onClick={() => update({ referenceBien: selected.referenceBien, usage: selected.usage, location: selected.location })} disabled={busy} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white"><Save className="h-3.5 w-3.5" />Enregistrer</button></Panel>
+          <Panel title="Terrain et construction"><div className="grid gap-3 sm:grid-cols-2"><Field label="Surface terrain m²"><input type="number" min="0" className={input} value={selected.land?.surface || ''} onChange={e => setNested('land', 'surface', e.target.value)} /></Field><Field label="Surface bâtie m²"><input type="number" min="0" className={input} value={selected.construction?.builtSurface || ''} onChange={e => setNested('construction', 'builtSurface', e.target.value)} /></Field><Field label="Vétusté (%)"><input type="number" min="0" max="100" className={input} value={selected.construction?.depreciationRate || ''} onChange={e => setNested('construction', 'depreciationRate', e.target.value)} /></Field><Field label="État"><input className={input} value={selected.construction?.condition || ''} onChange={e => setNested('construction', 'condition', e.target.value)} /></Field></div><button onClick={() => update({ land: selected.land, construction: selected.construction })} disabled={busy} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white"><Save className="h-3.5 w-3.5" />Enregistrer</button></Panel></div>
+        <Panel title="Simulateur temporaire"><p className="mb-3 text-xs text-slate-500">Ces hypothèses créent une nouvelle version de calcul et ne remplacent jamais un résultat validé.</p><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[['monthlyRent','Loyer mensuel'],['annualCharges','Charges annuelles'],['annualNetIncome','Revenu annuel net'],['capitalizationRate','Taux capitalisation (0–1)']].map(([key,label]) => <Field key={key} label={label}><input type="number" min="0" step="any" className={input} value={simulation[key]} onChange={e => setSimulation({ ...simulation, [key]: e.target.value })} /></Field>)}</div><button onClick={calculate} disabled={busy} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"><Calculator className="h-4 w-4" />Lancer le calcul</button></Panel>
+        <Calculation calculation={selected.currentCalculation} />
+        <div className="mt-4 flex flex-wrap gap-2"><button onClick={() => update({ statut: 'En cours' })} disabled={busy} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700"><PlayCircle className="h-4 w-4" />Analyse</button><button onClick={() => update({ statut: 'En attente de validation' })} disabled={busy} className="inline-flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-bold text-orange-700"><ClipboardCheck className="h-4 w-4" />Soumettre</button><button onClick={validate} disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white"><CheckCircle2 className="h-4 w-4" />Valider</button><button onClick={publish} disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white"><FileText className="h-4 w-4" />Publier</button></div>
+        <Panel title="Historique"><ol className="space-y-2">{(selected.workflowHistory || []).slice().reverse().map((entry, index) => <li key={`${entry.at}-${index}`} className="text-xs text-slate-600"><span className="font-bold">{entry.from || 'Création'} → {entry.to}</span> · {date(entry.at)} {entry.comment ? `— ${entry.comment}` : ''}</li>)}{!selected.workflowHistory?.length && <li className="text-xs text-slate-400">Historique créé à la première action de traitement.</li>}</ol></Panel>
+        <EstimationExpertTabs estimation={selected} onChange={sync} notify={notify} />
+      </div>}</section>
     </div>
-  );
-};
-
-export default EstimationsPage;
+    <ValuationAdministration notify={notify} />
+  </div>;
+}
+function Metric({ label, value }) { return <div className="rounded-xl border border-slate-200 bg-white p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-slate-900">{value}</p></div>; }
+function Panel({ title, children }) { return <section className="mt-4 rounded-xl border border-slate-200 p-4"><h3 className="mb-3 flex items-center gap-2 text-sm font-black text-slate-800"><SlidersHorizontal className="h-4 w-4 text-blue-600" />{title}</h3>{children}</section>; }
+function Empty({ text }) { return <div className="grid min-h-48 place-items-center p-8 text-center text-sm text-slate-500"><span><AlertTriangle className="mx-auto mb-2 h-7 w-7 text-slate-300" />{text}</span></div>; }
+function Calculation({ calculation }) { const result = calculation?.finalResult?.marketValue || calculation?.finalResult?.marketValue === 0 ? calculation.finalResult.marketValue : calculation?.finalResult?.marketValue; if (!calculation || !result) return <Panel title="Résultat"><p className="text-sm text-slate-500">Aucun calcul disponible. Ajoutez une référence interne active, puis lancez le calcul.</p></Panel>; return <Panel title={`Calcul v${calculation.version || '—'} · confiance ${calculation.confidenceScore ?? '—'}%`}><div className="grid grid-cols-3 gap-2 text-center"><Value label="Basse" value={result.low} /><Value label="Recommandée" value={result.recommended} strong /><Value label="Haute" value={result.high} /></div>{calculation.finalResult?.warnings?.map(warning => <p key={warning} className="mt-3 text-xs text-amber-700">⚠ {warning}</p>)}</Panel>; }
+function Value({ label, value, strong }) { return <div className={`rounded-lg p-2 ${strong ? 'bg-blue-50 text-blue-900' : 'bg-slate-50 text-slate-700'}`}><p className="text-[10px] font-bold uppercase">{label}</p><p className="mt-1 text-xs font-black">{money(value)}</p></div>; }
