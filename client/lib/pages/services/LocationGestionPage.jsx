@@ -91,13 +91,13 @@ const LocationGestionPage = () => {
                     <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1, duration: 0.7 }}
                         className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight max-w-2xl">
-                        Location & Gestion Immobilière
+                        Location & Gestion
                     </motion.h1>
 
                     <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3, duration: 0.7 }}
                         className="text-lg sm:text-xl font-light text-white/85 max-w-xl leading-relaxed mb-10">
-                        Confiez-nous la gestion de vos biens pour une tranquillité d'esprit et une rentabilité optimale. Nous nous occupons de tout, de A à Z.
+                        Confiez-nous la gestion de vos biens pour une tranquillité d'esprit optimale.
                     </motion.p>
 
                     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -115,13 +115,9 @@ const LocationGestionPage = () => {
 
                 {/* Stats */}
                 <div className="absolute bottom-0 left-0 right-0 bg-white/10 backdrop-blur-md border-t border-white/10">
-                    <div className="container mx-auto px-4 max-w-6xl grid grid-cols-3 divide-x divide-white/20">
-                        {[['300+', 'Biens gérés'], ['99%', 'Taux d\'occupation'], ['24h', 'Temps de réponse']].map(([v, l]) => (
-                            <div key={l} className="py-4 text-center text-white">
-                                <p className="text-2xl font-bold">{v}</p>
-                                <p className="text-xs text-white/60 mt-0.5">{l}</p>
-                            </div>
-                        ))}
+                    <div className="container mx-auto px-4 max-w-6xl py-4 text-center text-white">
+                        <p className="text-2xl font-bold">+80 biens gérés</p>
+                        <p className="text-xs text-white/70 mt-0.5">Une gestion locative suivie par l'équipe Altimmo</p>
                     </div>
                 </div>
             </section>
@@ -146,8 +142,8 @@ const LocationGestionPage = () => {
                             viewport={{ once: true }} transition={{ duration: 0.7 }} className="relative">
                             <Img src={IMAGES.about} alt="Gestion locative" className="w-full h-64 rounded-3xl" />
                             <div className="absolute -bottom-4 -left-4 bg-emerald-600 text-white rounded-2xl px-5 py-3 shadow-lg">
-                                <p className="font-bold text-lg">100%</p>
-                                <p className="text-xs text-emerald-100">Gestion déléguée</p>
+                                <p className="font-bold text-lg">Gestion clé en main</p>
+                                <p className="text-xs text-emerald-100">Un suivi clair et régulier</p>
                             </div>
                         </motion.div>
                     </div>
@@ -218,9 +214,8 @@ const LocationGestionPage = () => {
                             <Img src={IMAGES.pricing} alt="Nos tarifs" className="w-full h-[520px] rounded-3xl" />
                             <div className="absolute inset-0 rounded-3xl bg-gradient-to-t from-emerald-900/50 to-transparent" />
                             <div className="absolute bottom-6 left-6 right-6 bg-white/95 rounded-2xl p-5 shadow-xl">
-                                <p className="font-bold text-gray-900 text-sm mb-1">Satisfaction garantie</p>
-                                <p className="text-2xl font-bold text-emerald-600">98%</p>
-                                <p className="text-xs text-gray-500">de propriétaires satisfaits</p>
+                                <p className="font-bold text-gray-900 text-sm mb-1">Suivi locatif</p>
+                                <p className="text-xs text-gray-500">Des comptes rendus réguliers</p>
                             </div>
                         </motion.div>
 

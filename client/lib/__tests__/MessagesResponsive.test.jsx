@@ -40,6 +40,7 @@ describe('MessagesPage responsive — client et propriétaire', () => {
 
   test('affiche la liste en premier puis le chat seul et revient à la liste', async () => {
     render(<MessagesPage />);
+    expect(screen.getByRole('button', { name: 'Retour à mon espace' })).toBeInTheDocument();
     expect(await screen.findByText('BIEN TEST')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retour aux conversations' })).not.toBeInTheDocument();
 

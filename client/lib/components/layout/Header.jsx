@@ -8,7 +8,7 @@ import {
   Menu, X, LayoutDashboard, Building, LogOut,
   UserCircle, Heart, MessageCircle, UserPlus,
   LogIn, ChevronDown, Home, Phone, Newspaper, ArrowUpRight, Smartphone,
-  CreditCard,
+  CreditCard, Calendar,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getConversationsUnreadCount } from '../../services/unreadCountService';
@@ -296,9 +296,14 @@ const ProfileDropdown = ({ user, isTablet, profileOpen, setProfile, handleLogout
               </Link>
             )}
             {isOwner && (
-              <Link href="/mes-biens" onClick={() => setProfile(false)} className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '4px', color: 'rgba(240,237,232,0.6)', fontSize: '0.8rem', textDecoration: 'none', transition: '0.15s' }}>
-                <Building size={14} style={{ color: GOLD, flexShrink: 0 }} /> Mes Biens
-              </Link>
+              <>
+                <Link href="/mes-biens" onClick={() => setProfile(false)} className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '4px', color: 'rgba(240,237,232,0.6)', fontSize: '0.8rem', textDecoration: 'none', transition: '0.15s' }}>
+                  <Building size={14} style={{ color: GOLD, flexShrink: 0 }} /> Mes Biens
+                </Link>
+                <Link href="/mes-biens/visites" onClick={() => setProfile(false)} className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '4px', color: 'rgba(240,237,232,0.6)', fontSize: '0.8rem', textDecoration: 'none', transition: '0.15s' }}>
+                  <Calendar size={14} style={{ color: GOLD, flexShrink: 0 }} /> Rendez-vous
+                </Link>
+              </>
             )}
             <div style={{ height: '1px', background: 'rgba(240,237,232,0.05)', margin: '6px 0' }} />
           </div>
@@ -561,6 +566,7 @@ const Header = () => {
                   <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
                     {isAdmin && <Link href="/dashboard" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px 14px', borderRadius: '4px', border: '1px solid rgba(240,237,232,0.08)', color: 'rgba(240,237,232,0.5)', fontSize: '0.78rem', fontWeight: 300, textDecoration: 'none', minHeight: '44px' }}><LayoutDashboard size={14} /> Dashboard</Link>}
                     {isOwner && <Link href="/mes-biens" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px 14px', borderRadius: '4px', border: '1px solid rgba(240,237,232,0.08)', color: 'rgba(240,237,232,0.5)', fontSize: '0.78rem', fontWeight: 300, textDecoration: 'none', minHeight: '44px' }}><Building size={14} /> Mes Biens</Link>}
+                    {isOwner && <Link href="/mes-biens/visites" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px 14px', borderRadius: '4px', border: '1px solid rgba(240,237,232,0.08)', color: 'rgba(240,237,232,0.5)', fontSize: '0.78rem', fontWeight: 300, textDecoration: 'none', minHeight: '44px' }}><Calendar size={14} /> Rendez-vous</Link>}
                   </div>
                 )}
                 <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '12px 14px', borderRadius: '4px', color: 'rgba(220,38,38,0.8)', fontSize: '0.82rem', fontWeight: 300, background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.1)', cursor: 'pointer', minHeight: '44px' }}>

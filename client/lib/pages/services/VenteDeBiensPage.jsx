@@ -77,13 +77,13 @@ const VenteDeBiensPage = () => {
                     <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1, duration: 0.7 }}
                         className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight max-w-2xl">
-                        Vente de Biens Immobiliers
+                        Vente de Biens
                     </motion.h1>
 
                     <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3, duration: 0.7 }}
                         className="text-lg sm:text-xl font-light text-white/85 max-w-xl leading-relaxed mb-10">
-                        Nous vous accompagnons à chaque étape pour vendre votre propriété au meilleur prix, avec une expertise reconnue et un service personnalisé.
+                        Nous vous accompagnons à chaque étape pour vendre votre propriété au meilleur prix.
                     </motion.p>
 
                     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -102,13 +102,9 @@ const VenteDeBiensPage = () => {
 
                 {/* Stats flottantes */}
                 <div className="absolute bottom-0 left-0 right-0 bg-white/10 backdrop-blur-md border-t border-white/10">
-                    <div className="container mx-auto px-4 max-w-6xl grid grid-cols-3 divide-x divide-white/20">
-                        {[['500+', 'Biens vendus'], ['98%', 'Clients satisfaits'], ['15j', 'Délai moyen']].map(([v, l]) => (
-                            <div key={l} className="py-4 text-center text-white">
-                                <p className="text-2xl font-bold">{v}</p>
-                                <p className="text-xs text-white/60 mt-0.5">{l}</p>
-                            </div>
-                        ))}
+                    <div className="container mx-auto px-4 max-w-6xl py-4 text-center text-white">
+                        <p className="text-2xl font-bold">+120 ventes</p>
+                        <p className="text-xs text-white/70 mt-0.5">Un accompagnement à chaque étape de votre projet</p>
                     </div>
                 </div>
             </section>
@@ -124,8 +120,8 @@ const VenteDeBiensPage = () => {
                             <Img src={IMAGES.about} alt="Expertise vente" className="w-full h-96 rounded-3xl" />
                             {/* Badge flottant */}
                             <div className="absolute -bottom-6 -right-6 bg-white rounded-2xl shadow-xl p-5 border border-gray-100">
-                                <p className="text-3xl font-bold text-blue-600">15+</p>
-                                <p className="text-xs text-gray-500 mt-0.5">Années d'expertise</p>
+                                <p className="text-lg font-bold text-blue-600">Expertise locale</p>
+                                <p className="text-xs text-gray-500 mt-0.5">Un interlocuteur dédié</p>
                             </div>
                             <div className="absolute -top-4 -left-4 w-20 h-20 rounded-2xl bg-blue-600/10 border border-blue-200" />
                         </motion.div>
@@ -211,9 +207,8 @@ const VenteDeBiensPage = () => {
                             <Img src={IMAGES.process} alt="Notre processus" className="w-full h-[480px] rounded-3xl" />
                             <div className="absolute inset-0 rounded-3xl bg-gradient-to-t from-blue-900/40 to-transparent" />
                             <div className="absolute bottom-6 left-6 right-6 bg-white/95 backdrop-blur-sm rounded-2xl p-5 shadow-xl">
-                                <p className="font-bold text-gray-900 mb-1">Délai moyen de vente</p>
-                                <p className="text-3xl font-bold text-blue-600">15 jours</p>
-                                <p className="text-xs text-gray-500 mt-1">Grâce à notre réseau d'acheteurs qualifiés</p>
+                                <p className="font-bold text-gray-900 mb-1">Suivi personnalisé</p>
+                                <p className="text-sm text-gray-500">De l'estimation à la signature définitive</p>
                             </div>
                         </motion.div>
                     </div>

@@ -70,11 +70,6 @@ const ConseilInvestissementPage = () => {
         { number: '05', title: 'Suivi Long Terme',          description: 'Monitoring de la performance et conseils pour optimiser votre patrimoine' },
     ];
 
-    const scrollToContact = (e) => {
-        e.preventDefault();
-        document.getElementById('contact-altimmo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
-
     return (
         <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
 
@@ -99,22 +94,22 @@ const ConseilInvestissementPage = () => {
                     <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1, duration: 0.7 }}
                         className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight max-w-2xl">
-                        Conseil en Investissement Immobilier
+                        Conseil en Investissement
                     </motion.h1>
 
                     <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3, duration: 0.7 }}
                         className="text-lg sm:text-xl font-light text-white/85 max-w-xl leading-relaxed mb-10">
-                        Bénéficiez de notre expertise pour réaliser des investissements immobiliers judicieux et performants. Construisez votre patrimoine avec confiance.
+                        Bénéficiez de notre expertise pour des investissements judicieux et performants.
                     </motion.p>
 
                     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }} className="flex flex-wrap gap-4">
-                        <Link href="/immobilier#contact-altimmo" onClick={scrollToContact}
+                        <Link href="/immobilier#contact-altimmo"
                             className="inline-flex items-center gap-2 px-7 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-full transition-all hover:scale-105 shadow-xl">
                             <Sparkles className="w-4 h-4" /> Consultation gratuite
                         </Link>
-                        <a href="#stratégies"
+                        <a href="#strategies"
                             className="inline-flex items-center gap-2 px-7 py-3.5 bg-white/15 hover:bg-white/25 text-white font-semibold rounded-full border border-white/25 backdrop-blur-sm transition-all">
                             Nos stratégies →
                         </a>
@@ -122,13 +117,9 @@ const ConseilInvestissementPage = () => {
                 </div>
 
                 <div className="absolute bottom-0 left-0 right-0 bg-white/10 backdrop-blur-md border-t border-white/10">
-                    <div className="container mx-auto px-4 max-w-6xl grid grid-cols-3 divide-x divide-white/20">
-                        {[['500+', 'Investissements réalisés'], ['15+', "Années d'expérience"], ['98%', 'Clients satisfaits']].map(([v, l]) => (
-                            <div key={l} className="py-4 text-center text-white">
-                                <p className="text-2xl font-bold">{v}</p>
-                                <p className="text-xs text-white/60 mt-0.5">{l}</p>
-                            </div>
-                        ))}
+                    <div className="container mx-auto px-4 max-w-6xl py-4 text-center text-white">
+                        <p className="text-2xl font-bold">+50 projets</p>
+                        <p className="text-xs text-white/70 mt-0.5">Des stratégies adaptées à chaque profil d'investisseur</p>
                     </div>
                 </div>
             </section>
@@ -141,8 +132,8 @@ const ConseilInvestissementPage = () => {
                             viewport={{ once: true }} transition={{ duration: 0.7 }} className="relative">
                             <Img src={IMAGES.about} alt="Conseil investissement" className="w-full h-96 rounded-3xl" />
                             <div className="absolute -bottom-6 -right-6 bg-white rounded-2xl shadow-xl p-5 border border-gray-100">
-                                <p className="text-3xl font-bold text-indigo-600">8%</p>
-                                <p className="text-xs text-gray-500 mt-0.5">Rendement moyen obtenu</p>
+                                <p className="text-lg font-bold text-indigo-600">Analyse personnalisée</p>
+                                <p className="text-xs text-gray-500 mt-0.5">Objectifs, budget et horizon étudiés</p>
                             </div>
                             <div className="absolute -top-4 -left-4 w-20 h-20 rounded-2xl bg-indigo-600/10 border border-indigo-200" />
                         </motion.div>
@@ -193,7 +184,7 @@ const ConseilInvestissementPage = () => {
             </section>
 
             {/* ══ STRATÉGIES ═══════════════════════════════ */}
-            <section id="stratégies" className="py-20 bg-white">
+            <section id="strategies" className="py-20 bg-white">
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
                     <div className="text-center mb-12">
                         <p className="text-xs font-bold uppercase tracking-widest text-indigo-600 mb-3">Stratégies d'Investissement</p>
@@ -273,15 +264,9 @@ const ConseilInvestissementPage = () => {
                     <Img src={IMAGES.gallery[2]} alt="bg" className="w-full h-full opacity-10" />
                 </div>
                 <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-                        {[['15+', "Années d'Expérience"], ['500+', 'Investissements Réalisés'], ['98%', 'Clients Satisfaits']].map(([v, l], i) => (
-                            <motion.div key={i}
-                                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }} transition={{ duration: 0.6, delay: i * 0.1 }}>
-                                <div className="text-5xl font-bold mb-2">{v}</div>
-                                <div className="text-white/75">{l}</div>
-                            </motion.div>
-                        ))}
+                    <div className="text-center">
+                        <div className="text-5xl font-bold mb-2">+50 projets</div>
+                        <div className="text-white/75">Conseillés et accompagnés par Altimmo</div>
                     </div>
                 </div>
             </section>
@@ -296,7 +281,7 @@ const ConseilInvestissementPage = () => {
                             Rencontrons-nous pour discuter de vos projets et élaborer votre stratégie patrimoniale
                         </p>
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                            <Link href="/immobilier#contact-altimmo" onClick={scrollToContact}
+                            <Link href="/immobilier#contact-altimmo"
                                 className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-violet-500 text-white font-semibold rounded-full shadow-2xl hover:shadow-indigo-500/40 transition-all">
                                 <Sparkles className="w-5 h-5" /> Demander une Consultation Gratuite
                             </Link>

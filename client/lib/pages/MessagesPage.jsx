@@ -237,11 +237,16 @@ const MessagesPage = () => {
       )}
 
       {/* Header */}
-      <div className={`${selected ? 'hidden lg:flex' : 'flex'} items-center gap-3 px-4 sm:px-6 py-4 border-b border-gray-200 bg-white flex-shrink-0`}>
+      <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-6 py-3 sm:py-4 border-b border-gray-200 bg-white flex-shrink-0">
+        <BackButton
+          fallbackHref={user?.role === 'Proprietaire' ? '/mes-biens' : '/profile'}
+          label="Retour à mon espace"
+          className="flex-shrink-0 px-2 sm:px-3"
+        />
         <div className="p-2 rounded-xl" style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})` }}>
           <MessageCircle className="w-5 h-5 text-white" />
         </div>
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-black text-gray-800">Mes messages</h1>
           <p className="text-xs text-gray-400">Discutez directement avec {TEAM_LABEL}</p>
         </div>

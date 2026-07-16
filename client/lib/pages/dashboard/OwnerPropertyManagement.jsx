@@ -14,6 +14,8 @@ import {
 import PropertyForm from "../../components/dashboard/PropertyForm";
 import { getMyRentalManagement, requestRentalAction } from '../../services/gestionLocativeService';
 import Image from 'next/image';
+import Link from 'next/link';
+import { Calendar } from 'lucide-react';
 
 const BLUE = '#2E7BB5';
 const GOLD = '#C8960C';
@@ -413,11 +415,17 @@ const OwnerPropertyManagement = () => {
           </p>
         </div>
         {view === 'list' && (
-          <button onClick={() => setView("add")}
-            className="flex items-center gap-2 px-4 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105"
-            style={{ background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, boxShadow:`0 4px 16px ${BLUE}35`, fontFamily:"'DM Sans', sans-serif" }}>
-            <Plus size={16} /> Ajouter un bien
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Link href="/mes-biens/visites"
+              className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border border-amber-200 bg-amber-50 text-amber-800 transition hover:bg-amber-100">
+              <Calendar size={16} /> Rendez-vous
+            </Link>
+            <button onClick={() => setView("add")}
+              className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105"
+              style={{ background:`linear-gradient(135deg, #1A5A8A, ${BLUE})`, boxShadow:`0 4px 16px ${BLUE}35`, fontFamily:"'DM Sans', sans-serif" }}>
+              <Plus size={16} /> Ajouter un bien
+            </button>
+          </div>
         )}
       </div>
 
