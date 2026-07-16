@@ -2,17 +2,17 @@
 // ✅ multer@2.0.2 — CVE-2025-47944 & CVE-2025-47935 corrigés par la mise à jour
 // API multer.memoryStorage() identique en v1 et v2, aucun breaking change ici.
 
-const cloudinary    = require('cloudinary').v2;
-const multer        = require('multer');
-const { Readable }  = require('stream');
-const dotenv        = require('dotenv');
+const cloudinary = require("cloudinary").v2;
+const multer = require("multer");
+const { Readable } = require("stream");
+const dotenv = require("dotenv");
 
 dotenv.config();
 
 // ── 1. Connexion à Cloudinary ─────────────────────────────────
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
@@ -20,25 +20,56 @@ cloudinary.config({
 // ✅ limits.files ajouté : sans cette limite, un attaquant peut envoyer
 //    des centaines de fichiers dans une seule requête → saturation mémoire (DoS).
 //    fileSize seul ne protège pas contre les attaques multi-fichiers.
-const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-const ALLOWED_VIDEO_MIMES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
+const ALLOWED_IMAGE_MIMES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+];
+const ALLOWED_VIDEO_MIMES = [
+  "video/mp4",
+  "video/quicktime",
+  "video/x-msvideo",
+  "video/webm",
+];
 // Messages (messageRoutes.js) : enregistrements vocaux / pièces jointes audio
-const ALLOWED_AUDIO_MIMES = ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/wav', 'audio/webm', 'audio/x-m4a'];
+const ALLOWED_AUDIO_MIMES = [
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/aac",
+  "audio/wav",
+  "audio/webm",
+  "audio/x-m4a",
+];
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 100 * 1024 * 1024, // 100 Mo — couvre images et vidéos
-    files:    15,                  // max 15 fichiers par requête (galerie immobilière)
+    files: 15, // max 15 fichiers par requête (galerie immobilière)
   },
   fileFilter: (req, file, cb) => {
-    const allowed = [...ALLOWED_IMAGE_MIMES, ...ALLOWED_VIDEO_MIMES, ...ALLOWED_AUDIO_MIMES];
+    const allowed = [
+      ...ALLOWED_IMAGE_MIMES,
+      ...ALLOWED_VIDEO_MIMES,
+      ...ALLOWED_AUDIO_MIMES,
+    ];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error(`Format non supporté : ${file.mimetype}`), false);
     }
   },
+});
+const estimationUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024, files: 8 },
+  fileFilter: (_req, file, cb) =>
+    ["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(
+      file.mimetype,
+    )
+      ? cb(null, true)
+      : cb(new Error(`Format non autorisé : ${file.mimetype}`), false),
 });
 
 // ── 3. Upload vers Cloudinary (stream) ───────────────────────
@@ -49,19 +80,19 @@ const upload = multer({
 // Les options passées en paramètre (ex: depuis propertyController.js)
 // écrasent les defaults via le spread operator → comportement préservé.
 const CLOUDINARY_DEFAULTS = {
-  folder:        'altitude-vision',
-  resource_type: 'auto',   // détecte image ou vidéo automatiquement
-  quality:       'auto',   // compression intelligente
-  fetch_format:  'auto',   // WebP si le navigateur le supporte
-  width:         1200,     // redimensionne si > 1200px (ignoré par Cloudinary pour les vidéos)
-  crop:          'limit',  // ne touche pas les petites images
+  folder: "altitude-vision",
+  resource_type: "auto", // détecte image ou vidéo automatiquement
+  quality: "auto", // compression intelligente
+  fetch_format: "auto", // WebP si le navigateur le supporte
+  width: 1200, // redimensionne si > 1200px (ignoré par Cloudinary pour les vidéos)
+  crop: "limit", // ne touche pas les petites images
 };
 
 const uploadToCloudinary = (fileBuffer, options = {}) => {
   return new Promise((resolve, reject) => {
     const uploadOptions = {
       ...CLOUDINARY_DEFAULTS,
-      ...options,           // les options du contrôleur écrasent les defaults
+      ...options, // les options du contrôleur écrasent les defaults
     };
 
     const stream = cloudinary.uploader.upload_stream(
@@ -69,7 +100,7 @@ const uploadToCloudinary = (fileBuffer, options = {}) => {
       (error, result) => {
         if (error) return reject(error);
         resolve(result);
-      }
+      },
     );
 
     Readable.from(fileBuffer).pipe(stream);
@@ -83,17 +114,24 @@ const uploadToCloudinary = (fileBuffer, options = {}) => {
  * @param {string|null} url  URL Cloudinary (ex: https://res.cloudinary.com/...)
  */
 const destroyFromCloudinary = async (url) => {
-  if (!url || !url.includes('cloudinary.com')) return;
+  if (!url || !url.includes("cloudinary.com")) return;
   try {
-    const match    = url.match(/\/upload\/(?:v\d+\/)?(.+?)(\.[^.]+)?$/);
+    const match = url.match(/\/upload\/(?:v\d+\/)?(.+?)(\.[^.]+)?$/);
     const publicId = match?.[1];
     if (!publicId) return;
 
     const result = await cloudinary.uploader.destroy(publicId);
-    console.log(`🗑️  [Cloudinary] Suppression "${publicId}" → ${result.result}`);
+    console.log(
+      `🗑️  [Cloudinary] Suppression "${publicId}" → ${result.result}`,
+    );
   } catch (err) {
-    console.error('⚠️  [Cloudinary] Impossible de supprimer:', err.message);
+    console.error("⚠️  [Cloudinary] Impossible de supprimer:", err.message);
   }
 };
 
-module.exports = { upload, uploadToCloudinary, destroyFromCloudinary };
+module.exports = {
+  upload,
+  estimationUpload,
+  uploadToCloudinary,
+  destroyFromCloudinary,
+};
