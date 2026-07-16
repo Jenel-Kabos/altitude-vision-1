@@ -846,7 +846,7 @@ const PropertyDetailPage = () => {
       return;
     }
     if (!user) {
-      router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname));
+      router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
       return;
     }
     setRdvSuccess(false);

@@ -126,7 +126,7 @@ const SubmitPropertyPage = () => {
 
       const response = await addProperty(data);
       toast.success("Bien ajouté avec succès !");
-      router.push(`/propriete/${response._id}`);
+      router.push(`/immobilier/property/${response._id}`);
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Une erreur est survenue.';
       toast.error(errorMessage);

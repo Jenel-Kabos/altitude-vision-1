@@ -46,12 +46,18 @@ const AdminEventList = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Gérer les Événements</h1>
-        <Link
-          to="/admin/evenements/creer"
-          className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition duration-300 flex items-center"
+        <button
+          type="button"
+          disabled
+          aria-describedby="legacy-event-create-help"
+          title="La création d'événement est disponible depuis le tableau de bord principal."
+          className="bg-gray-200 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed flex items-center"
         >
-          <FaPlus className="mr-2" /> Créer un Événement
-        </Link>
+          <FaPlus className="mr-2" /> Création indisponible ici
+        </button>
+        <span id="legacy-event-create-help" className="sr-only">
+          Utilisez la page Événements du tableau de bord principal.
+        </span>
       </div>
 
       <div className="bg-white shadow-md rounded-lg overflow-x-auto">

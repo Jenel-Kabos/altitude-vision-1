@@ -14,6 +14,7 @@ import {
   markConversationAsRead,
 } from "../../services/conversationService";
 import { useAuth } from "../../context/AuthContext";
+import BackButton from "../../components/navigation/BackButton";
 
 const GOLD = "#C8960C";
 
@@ -75,6 +76,7 @@ const StaffInboxPage = () => {
   const [showEmoji, setShowEmoji]         = useState(false);
   const bottomRef    = useRef(null);
   const fileInputRef = useRef(null);
+  const listScrollRef = useRef(null);
 
   // Charger la liste des conversations staff-inbox
   const fetchConversations = async () => {
@@ -139,9 +141,16 @@ const StaffInboxPage = () => {
     }
   };
 
+  const closeConversation = () => {
+    setSelected(null);
+    requestAnimationFrame(() => {
+      if (listScrollRef.current) listScrollRef.current.scrollTop = listScrollRef.current.dataset.scrollTop || 0;
+    });
+  };
+
   // Scroller en bas à chaque mise à jour des messages
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [messages]);
 
   const handleSend = async (e) => {
@@ -190,7 +199,7 @@ const StaffInboxPage = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="h-[calc(100dvh-7.5rem)] md:h-[calc(100dvh-3rem)] min-h-[32rem] flex flex-col overflow-hidden" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* Notification */}
       {notif && (
@@ -204,7 +213,7 @@ const StaffInboxPage = () => {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 bg-white flex-shrink-0">
+      <div className={`${selected ? 'hidden lg:flex' : 'flex'} items-center gap-3 px-4 sm:px-6 py-4 border-b border-gray-200 bg-white flex-shrink-0`}>
         <div className="p-2 rounded-xl" style={{ background: `linear-gradient(135deg, #A06820, ${GOLD})` }}>
           <MessageCircle className="w-5 h-5 text-white" />
         </div>
@@ -217,10 +226,15 @@ const StaffInboxPage = () => {
       </div>
 
       {/* Body : liste + chat */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-w-0 overflow-hidden">
 
         {/* ── Colonne gauche : liste des conversations ── */}
-        <aside className="w-72 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col overflow-y-auto">
+        <aside
+          ref={listScrollRef}
+          onScroll={e => { e.currentTarget.dataset.scrollTop = String(e.currentTarget.scrollTop); }}
+          className={`${selected ? 'hidden lg:flex' : 'flex'} w-full lg:w-80 flex-shrink-0 border-r border-gray-200 bg-white flex-col overflow-y-auto`}
+          aria-label="Conversations clients"
+        >
           {loadingList ? (
             <div className="flex-1 flex items-center justify-center">
               <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
@@ -287,7 +301,7 @@ const StaffInboxPage = () => {
         </aside>
 
         {/* ── Colonne droite : zone de chat ── */}
-        <main className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+        <main className={`${selected ? 'flex' : 'hidden lg:flex'} min-w-0 flex-1 flex-col bg-gray-50 overflow-hidden`}>
           {!selected ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
               <MessageCircle className="w-12 h-12 text-gray-200" />
@@ -296,12 +310,18 @@ const StaffInboxPage = () => {
           ) : (
             <>
               {/* En-tête de la conversation */}
-              <div className="px-5 py-3.5 bg-white border-b border-gray-200 flex items-center gap-3 flex-shrink-0">
+              <div className="px-3 sm:px-5 py-2.5 sm:py-3.5 bg-white border-b border-gray-200 flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                <BackButton
+                  onBack={closeConversation}
+                  fallbackHref="/dashboard/conversations"
+                  label="Retour aux conversations"
+                  className="lg:hidden -ml-2 px-2"
+                />
                 <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
                   style={{ background: `linear-gradient(135deg, #A06820, ${GOLD})` }}>
                   {convDisplay(selected).clientName[0]?.toUpperCase()}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-sm text-gray-800">{convDisplay(selected).clientName}</span>
                     {ROLE_BADGE[convDisplay(selected).clientRole] && (
@@ -320,7 +340,7 @@ const StaffInboxPage = () => {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-5 py-4 space-y-3">
                 {loadingMsgs ? (
                   <div className="flex items-center justify-center h-full">
                     <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
@@ -340,7 +360,7 @@ const StaffInboxPage = () => {
                             <User className="w-3 h-3" />
                           </div>
                         )}
-                        <div className={`max-w-[68%]`}>
+                        <div className="max-w-[85%] sm:max-w-[68%] min-w-0">
                           <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
                             isMine
                               ? "text-white rounded-br-sm"
@@ -386,7 +406,7 @@ const StaffInboxPage = () => {
               {/* Zone de saisie */}
               <form
                 onSubmit={handleSend}
-                className="relative px-4 py-3 bg-white border-t border-gray-200 flex items-end gap-2 flex-shrink-0"
+                className="relative px-2 sm:px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white border-t border-gray-200 flex items-end gap-1 sm:gap-2 flex-shrink-0"
               >
                 {showEmoji && (
                   <div className="absolute bottom-full left-4 mb-2 bg-white border border-gray-200 rounded-xl shadow-xl p-3 grid grid-cols-6 gap-1 z-20">

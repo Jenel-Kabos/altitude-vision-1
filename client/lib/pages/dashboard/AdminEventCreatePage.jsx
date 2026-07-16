@@ -39,7 +39,7 @@ const AdminEventCreatePage = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setSuccess(true);
-      setTimeout(() => navigate('/admin/evenements'), 1500);
+      setTimeout(() => navigate('/dashboard/events'), 1500);
     } catch (err) {
       setError(err.response?.data?.message || 'Une erreur est survenue.');
       console.error(err);
@@ -52,7 +52,7 @@ const AdminEventCreatePage = () => {
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Créer un Nouvel Événement</h1>
-        <Link to="/admin/evenements" className="text-primary hover:underline">← Retour à la liste</Link>
+        <Link to="/dashboard/events" className="text-primary hover:underline">← Retour à la liste</Link>
       </div>
 
       <div className="bg-white p-8 rounded-lg shadow-md">

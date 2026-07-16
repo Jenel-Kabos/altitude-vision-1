@@ -49,12 +49,18 @@ const AdminProjectList = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-primary">Gestion du Portfolio (Altcom)</h1>
-        <button 
-          onClick={() => router.push('/admin/projets/creer')} 
-          className="bg-primary text-white font-bold py-2 px-4 rounded hover:bg-blue-800 transition"
+        <button
+          type="button"
+          disabled
+          aria-describedby="project-create-help"
+          title="Aucun formulaire de création de projet n'est encore relié à cette page."
+          className="bg-gray-200 text-gray-500 font-bold py-2 px-4 rounded cursor-not-allowed"
         >
-          + Ajouter un projet
+          Création bientôt disponible
         </button>
+        <span id="project-create-help" className="sr-only">
+          Aucun formulaire de création de projet n'est relié à cette page.
+        </span>
       </div>
       <div className="bg-white shadow-md rounded-lg overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -81,11 +87,13 @@ const AdminProjectList = () => {
                   <span className="font-bold">★ {project.rating.toFixed(1)}</span> ({project.numReviews})
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right space-x-4">
-                  <button 
-                    onClick={() => router.push(`/admin/projets/${project._id}/edit`)} 
-                    className="text-indigo-600 hover:text-indigo-900"
+                  <button
+                    type="button"
+                    disabled
+                    title="Aucun écran de modification de projet n'est relié à cette page."
+                    className="text-gray-400 cursor-not-allowed"
                   >
-                    Modifier
+                    Modification indisponible
                   </button>
                   <button onClick={() => deleteHandler(project._id)} className="text-red-600 hover:text-red-900">
                     Supprimer

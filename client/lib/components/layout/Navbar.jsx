@@ -70,7 +70,7 @@ const Navbar = () => {
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-100 scale-95 origin-top-right">
                     <NavLink to="/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Tableau de bord</NavLink>
                     {userInfo.role === 'Admin' && (
-                       <NavLink to="/admin/biens" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin</NavLink>
+                       <NavLink to="/dashboard/moderation/properties" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Administration</NavLink>
                     )}
                     <button onClick={logoutHandler} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                       Déconnexion
@@ -126,7 +126,7 @@ const Navbar = () => {
                 </div>
                 <NavLink to="/dashboard" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-100">Tableau de bord</NavLink>
                 {userInfo.role === 'Admin' && (
-                    <NavLink to="/admin/biens" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-100">Admin</NavLink>
+                    <NavLink to="/dashboard/moderation/properties" onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-100">Administration</NavLink>
                 )}
                 <button onClick={logoutHandler} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:bg-gray-100">
                   Déconnexion

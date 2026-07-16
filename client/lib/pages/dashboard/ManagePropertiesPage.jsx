@@ -314,18 +314,18 @@ const ManagePropertiesPage = () => {
 
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8 animate-slideUp flex items-center gap-4">
-          <div className="p-3 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl shadow-lg">
-            <Building2 className="w-8 h-8 text-white" />
+        <div className="mb-6 sm:mb-8 animate-slideUp flex items-center gap-3 sm:gap-4">
+          <div className="p-2.5 sm:p-3 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl shadow-lg flex-shrink-0">
+            <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
           </div>
-          <div>
-            <h1 className="text-4xl sm:text-5xl font-black bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">Gestion des Biens</h1>
-            <p className="text-lg text-gray-600 font-medium mt-1">Gérez le patrimoine immobilier de <span className="font-bold text-blue-600">Altimmo</span></p>
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl leading-tight font-black bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">Gestion des Biens</h1>
+            <p className="text-sm sm:text-lg text-gray-600 font-medium mt-1">Gérez le patrimoine immobilier de <span className="font-bold text-blue-600">Altimmo</span></p>
           </div>
         </div>
 
         {/* Barre */}
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-100 mb-6">
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-100 mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="relative flex-1 w-full md:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -335,7 +335,7 @@ const ManagePropertiesPage = () => {
             </div>
             {canAddProperty && (
               <button onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all hover:scale-105">
+                className="flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all hover:scale-105">
                 <PlusCircle className="w-5 h-5" /> Ajouter
               </button>
             )}
@@ -375,17 +375,17 @@ const ManagePropertiesPage = () => {
 
         {/* Modal Ajouter */}
         {showAddModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-10 max-h-[85vh] flex flex-col animate-slideUp">
-              <div className="p-6 border-b border-gray-200 sticky top-0 bg-white/95 z-20 rounded-t-2xl">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-2 sm:my-10 max-h-[calc(100dvh-1rem)] sm:max-h-[85vh] flex flex-col animate-slideUp">
+              <div className="p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white/95 z-20 rounded-t-2xl">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl text-white"><Sparkles className="w-6 h-6" /></div>
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Ajouter un nouveau bien</h2>
+                  <h2 className="pr-10 text-xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Ajouter un nouveau bien</h2>
                   <button onClick={resetForm} disabled={loadingSubmit}
                     className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"><X className="w-6 h-6" /></button>
                 </div>
               </div>
-              <div className="p-6 overflow-y-auto flex-grow">
+              <div className="p-3 sm:p-6 overflow-y-auto flex-grow">
                 <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit} />
               </div>
             </div>
@@ -394,17 +394,17 @@ const ManagePropertiesPage = () => {
 
         {/* Modal Modifier */}
         {showEditModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-10 max-h-[85vh] flex flex-col animate-slideUp">
-              <div className="p-6 border-b border-gray-200 sticky top-0 bg-white/95 z-20 rounded-t-2xl">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-2 sm:my-10 max-h-[calc(100dvh-1rem)] sm:max-h-[85vh] flex flex-col animate-slideUp">
+              <div className="p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white/95 z-20 rounded-t-2xl">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl text-white"><Edit className="w-6 h-6" /></div>
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Modifier le bien</h2>
+                  <h2 className="pr-10 text-xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Modifier le bien</h2>
                   <button onClick={resetForm} disabled={loadingSubmit}
                     className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"><X className="w-6 h-6" /></button>
                 </div>
               </div>
-              <div className="p-6 overflow-y-auto flex-grow">
+              <div className="p-3 sm:p-6 overflow-y-auto flex-grow">
                 <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
                   existingImages={existingImages} setExistingImages={setExistingImages} />
               </div>

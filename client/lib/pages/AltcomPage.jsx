@@ -687,10 +687,10 @@ const AltcomPage = () => {
           <p className="text-3xl font-extrabold text-gray-800 mb-3">Altcom</p>
           <p className="text-md text-gray-500">&copy; {new Date().getFullYear()} Tous droits réservés. | Communication d'Altitude.</p>
           <div className="mt-6 flex justify-center space-x-8 text-lg">
-            <a href="#" className="text-gray-500 hover:text-gray-900 transition duration-200">Services</a>
-            <a href="#" className="text-gray-500 hover:text-gray-900 transition duration-200">Portfolio</a>
-            <a href="#" className="text-gray-500 hover:text-gray-900 transition duration-200">Contact</a>
-            <a href="#" className="text-gray-500 hover:text-gray-900 transition duration-200">Mentions Légales</a>
+            <a href="/communication" className="text-gray-500 hover:text-gray-900 transition duration-200">Services Altcom</a>
+            <a href="#portfolio" className="text-gray-500 hover:text-gray-900 transition duration-200">Réalisations</a>
+            <a href="/contact" className="text-gray-500 hover:text-gray-900 transition duration-200">Contacter l'agence</a>
+            <a href="/mentions-legales" className="text-gray-500 hover:text-gray-900 transition duration-200">Mentions légales</a>
           </div>
         </div>
       </footer>

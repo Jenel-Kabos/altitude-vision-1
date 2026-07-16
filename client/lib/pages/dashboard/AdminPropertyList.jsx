@@ -198,7 +198,7 @@ const AdminPropertyList = () => {
           </div>
         </div>
 
-        <Link href="/soumettre-propriete"
+        <Link href="/dashboard/properties/add"
           className="flex items-center gap-2 px-4 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105 no-underline"
           style={{
             background: `linear-gradient(135deg, #1A5A8A, ${BLUE})`,
@@ -383,7 +383,7 @@ const AdminPropertyList = () => {
                 {/* Modifier */}
                 {canEdit && (
                   <Link
-                    href={`/propriete/${property._id}/edit`}
+                    href={`/properties/edit/${property._id}`}
                     className="p-2 rounded-xl transition-all hover:scale-105"
                     style={{ background: `${BLUE}12`, color: BLUE }}
                     title="Modifier">

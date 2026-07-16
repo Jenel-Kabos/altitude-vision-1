@@ -187,7 +187,7 @@ const EditPropertyPage = () => {
 
       await updateProperty(id, data);
       toast.success('Bien mis à jour avec succès !');
-      router.push(`/propriete/${id}`);
+      router.push(`/immobilier/property/${id}`);
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'La mise à jour a échoué.';
       setError(errorMessage);

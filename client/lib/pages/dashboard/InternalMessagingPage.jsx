@@ -34,6 +34,7 @@ import { getAllUsers } from '../../services/userService';
 import { useAuth } from '../../context/AuthContext';
 import toast from '@/lib/utils/toast';
 import confirmDialog from '@/lib/utils/confirm';
+import BackButton from '../../components/navigation/BackButton';
 
 const UPLOAD_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api').replace('/api', '');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -54,6 +55,7 @@ const InternalMessagingPage = () => {
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
   const [unreadCount, setUnreadCount] = useState(0);
   const [allUsers, setAllUsers] = useState([]);
+  const [mobilePane, setMobilePane] = useState('folders');
 
   // Charger la liste des utilisateurs une seule fois
   useEffect(() => {
@@ -117,6 +119,7 @@ const InternalMessagingPage = () => {
 
   const handleSelectMessage = async (message) => {
     setSelectedMessage(message);
+    setMobilePane('detail');
     if ((activeView === 'inbox' || activeView === 'unread') && !message.isRead) {
       try {
         await markAsRead(message._id);
@@ -241,7 +244,7 @@ const InternalMessagingPage = () => {
   );
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-[calc(100dvh-7.5rem)] md:h-[calc(100dvh-3rem)] min-h-[32rem] min-w-0 bg-gray-50 overflow-hidden">
       {/* Notification toast */}
       <AnimatePresence>
         {notification.show && (
@@ -259,7 +262,7 @@ const InternalMessagingPage = () => {
       </AnimatePresence>
 
       {/* ── Sidebar ── */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      <div className={`${mobilePane === 'folders' ? 'flex' : 'hidden'} lg:flex w-full lg:w-64 flex-shrink-0 bg-white border-r border-gray-200 flex-col`}>
         <div className="p-4 border-b">
           <button
             onClick={() => { setEditingDraft(null); setShowComposeModal(true); }}
@@ -285,7 +288,7 @@ const InternalMessagingPage = () => {
               label={label}
               badge={badge}
               active={activeView === id}
-              onClick={() => { setActiveView(id); setSelectedMessage(null); }}
+              onClick={() => { setActiveView(id); setSelectedMessage(null); setMobilePane('list'); }}
             />
           ))}
         </nav>
@@ -316,8 +319,14 @@ const InternalMessagingPage = () => {
       </div>
 
       {/* ── Liste des messages ── */}
-      <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
+      <div className={`${mobilePane === 'list' ? 'flex' : 'hidden'} lg:flex w-full lg:w-96 flex-shrink-0 bg-white border-r border-gray-200 flex-col`}>
         <div className="p-4 border-b">
+          <BackButton
+            onBack={() => setMobilePane('folders')}
+            fallbackHref="/dashboard/messages"
+            label="Retour aux dossiers"
+            className="lg:hidden mb-3 -ml-2"
+          />
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
@@ -359,17 +368,28 @@ const InternalMessagingPage = () => {
       </div>
 
       {/* ── Détail du message ── */}
-      <div className="flex-1 flex flex-col bg-gray-50">
+      <div className={`${mobilePane === 'detail' ? 'flex' : 'hidden'} lg:flex min-w-0 flex-1 flex-col bg-gray-50`}>
         {selectedMessage ? (
-          <MessageDetail
-            message={selectedMessage}
-            onToggleStar={handleToggleStar}
-            onDelete={handleDelete}
-            onRestore={activeView === 'trash' ? handleRestore : null}
-            uploadBaseUrl={UPLOAD_BASE_URL}
-            isTrash={activeView === 'trash'}
-            isDraft={activeView === 'drafts'}
-          />
+          <>
+            <div className="lg:hidden bg-white border-b px-2 py-2 flex-shrink-0">
+              <BackButton
+                onBack={() => setMobilePane('list')}
+                fallbackHref="/dashboard/messages"
+                label="Retour aux messages"
+              />
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <MessageDetail
+                message={selectedMessage}
+                onToggleStar={handleToggleStar}
+                onDelete={handleDelete}
+                onRestore={activeView === 'trash' ? handleRestore : null}
+                uploadBaseUrl={UPLOAD_BASE_URL}
+                isTrash={activeView === 'trash'}
+                isDraft={activeView === 'drafts'}
+              />
+            </div>
+          </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
             <Mail className="w-24 h-24 mb-4 text-gray-300" />

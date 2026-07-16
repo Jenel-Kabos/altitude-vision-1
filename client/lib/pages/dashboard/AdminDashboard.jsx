@@ -1,6 +1,6 @@
 "use client";
 // src/pages/AdminDashboard.jsx
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -74,6 +74,18 @@ const NAV_SECTIONS = [
   },
 ];
 
+const TOPBAR_TITLES = [
+  ['/dashboard/moderation', 'Modération'],
+  ['/dashboard/gestion-locative', 'Gestion Locative'],
+  ['/dashboard/conversations', 'Messages clients'],
+  ['/dashboard/messages', 'Boîte de Réception'],
+  ['/dashboard/properties', 'Gestion des biens'],
+  ['/dashboard/estimations', 'Estimations'],
+  ['/dashboard/visites', 'Visites'],
+  ['/dashboard/paiements', 'Paiements'],
+  ['/dashboard/litiges', 'Litiges'],
+];
+
 // ─────────────────────────────────────────────────────────────
 const AdminDashboard = ({ children }) => {
   const router = useRouter();
@@ -81,6 +93,10 @@ const AdminDashboard = ({ children }) => {
   const isActive = (to, end = false) => end ? pathname === to : pathname.startsWith(to);
   const { logout, user, isCollaborateur, activeWrites, timeLeft } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const menuButtonRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const sidebarRef = useRef(null);
   const { badges } = useDashboardBadges(!!user);
 
   const activeWriteCount = Object.keys(activeWrites).length;
@@ -97,21 +113,70 @@ const AdminDashboard = ({ children }) => {
 
   const close = () => setSidebarOpen(false);
 
+  const activePageTitle = TOPBAR_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1]
+    || NAV_SECTIONS.flatMap(section => section.links)
+      .find(link => isActive(link.to, link.end))?.label
+    || 'Tableau de bord';
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)');
+    const updateViewport = () => setIsMobileViewport(media.matches);
+    updateViewport();
+    media.addEventListener('change', updateViewport);
+    return () => media.removeEventListener('change', updateViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') close();
+      if (event.key === 'Tab' && sidebarRef.current) {
+        const focusable = [...sidebarRef.current.querySelectorAll('a[href], button:not([disabled])')];
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+      menuButtonRef.current?.focus();
+    };
+  }, [sidebarOpen]);
+
   return (
     <div className="flex min-h-screen" style={{ background: '#F1F5F9' }}>
 
       {/* Overlay mobile */}
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={close} />
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={close} aria-hidden="true" />
       )}
 
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside className={`
         w-64 flex flex-col justify-between
-        fixed md:sticky top-0 h-screen z-50 md:z-auto
+        fixed md:sticky top-0 h-[100dvh] z-50 md:z-auto
         transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-      `} style={{ background: '#0D1117', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+      `} style={{ background: '#0D1117', borderRight: '1px solid rgba(255,255,255,0.06)' }}
+        ref={sidebarRef}
+        id="dashboard-navigation"
+        aria-label="Navigation du tableau de bord"
+        aria-hidden={isMobileViewport && !sidebarOpen}
+        inert={isMobileViewport && !sidebarOpen ? '' : undefined}
+      >
 
         {/* Header sidebar */}
         <div>
@@ -135,8 +200,9 @@ const AdminDashboard = ({ children }) => {
               </div>
             </div>
             <button onClick={close}
-              className="md:hidden p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-all"
-              aria-label="Fermer">
+              ref={closeButtonRef}
+              className="md:hidden min-h-11 min-w-11 p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-all"
+              aria-label="Fermer le menu">
               <X size={18} />
             </button>
           </div>
@@ -198,7 +264,7 @@ const AdminDashboard = ({ children }) => {
 
           {/* Nav */}
           <nav className="px-3 py-3 space-y-0.5 overflow-y-auto"
-            style={{ maxHeight: 'calc(100vh - 220px)' }}>
+            style={{ maxHeight: 'calc(100dvh - 220px)' }}>
             {NAV_SECTIONS.map((section, si) => (
               <div key={si}>
                 {section.label && (
@@ -258,17 +324,20 @@ const AdminDashboard = ({ children }) => {
       <main className="flex-1 flex flex-col min-h-screen">
 
         {/* Topbar mobile */}
-        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
+        <div className="md:hidden grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2 bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
           <button onClick={() => setSidebarOpen(true)}
-            className="p-2 -ml-1 rounded-xl hover:bg-gray-100 text-gray-600 transition-all"
-            aria-label="Menu">
+            ref={menuButtonRef}
+            className="min-h-11 min-w-11 p-2 rounded-xl hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 text-gray-600 transition-all"
+            aria-label="Ouvrir le menu"
+            aria-controls="dashboard-navigation"
+            aria-expanded={sidebarOpen}>
             <Menu size={22} />
           </button>
-          <span className="text-sm font-bold text-gray-800"
+          <span className="min-w-0 truncate text-center text-sm font-bold text-gray-800"
             style={{ fontFamily: "'DM Sans', sans-serif" }}>
-            Dashboard Admin
+            {activePageTitle}
           </span>
-          <div className="w-10" aria-hidden="true" />
+          <div className="w-11" aria-hidden="true" />
         </div>
 
         <div className="flex-1 p-4 md:p-6 overflow-y-auto">

@@ -4,7 +4,8 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
-import { User, Mail, Phone, Shield, ArrowLeft, Settings } from 'lucide-react';
+import { User, Mail, Phone, Shield, Settings } from 'lucide-react';
+import BackButton from '../components/navigation/BackButton';
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
@@ -31,15 +32,11 @@ const ProfilePage = () => {
             <div className="container mx-auto max-w-lg relative z-10">
 
                 {/* Retour */}
-                <Link href="/"
-                    className="inline-flex items-center gap-2 mb-8 text-sm transition-all"
-                    style={{ color: '#9CA3AF', fontFamily: "'DM Sans', sans-serif" }}
-                    onMouseEnter={e => e.currentTarget.style.color = '#111827'}
-                    onMouseLeave={e => e.currentTarget.style.color = '#9CA3AF'}
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                    Retour à l'accueil
-                </Link>
+                <BackButton
+                    fallbackHref="/mon-compte"
+                    label="Retour à mon compte"
+                    className="mb-8"
+                />
 
                 {/* Card */}
                 <div style={{

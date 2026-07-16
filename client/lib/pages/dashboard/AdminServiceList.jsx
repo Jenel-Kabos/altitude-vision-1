@@ -137,15 +137,19 @@ const AdminServiceList = () => {
           </div>
         </div>
 
-        <button onClick={() => router.push('/admin/services/creer')}
-          className="flex items-center gap-2 px-4 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105"
+        <button type="button" disabled
+          aria-describedby="service-create-help"
+          title="Aucun formulaire de création de service n'est encore relié à cette page."
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl cursor-not-allowed"
           style={{
-            background: `linear-gradient(135deg, #A06820, ${GOLD})`,
-            boxShadow:  `0 4px 16px ${GOLD}35`,
+            background: '#E5E7EB', color: '#6B7280',
             fontFamily: "'DM Sans', sans-serif",
           }}>
-          <Plus size={16} /> Ajouter un service
+          <Plus size={16} /> Création bientôt disponible
         </button>
+        <span id="service-create-help" className="sr-only">
+          Aucun formulaire de création de service n'est relié à cette page.
+        </span>
       </div>
 
       {/* ── Notification ── */}
@@ -198,11 +202,18 @@ const AdminServiceList = () => {
               : 'Commencez par ajouter votre premier service.'}
           </p>
           {!search && (
-            <button onClick={() => router.push('/admin/services/creer')}
-              className="flex items-center gap-2 px-5 py-2.5 text-white text-sm font-semibold rounded-xl transition-all hover:scale-105"
-              style={{ background: `linear-gradient(135deg, #A06820, ${GOLD})`, fontFamily: "'DM Sans', sans-serif" }}>
-              <Plus size={16} /> Ajouter un service
-            </button>
+            <>
+              <button type="button" disabled
+                aria-describedby="service-empty-create-help"
+                title="Aucun formulaire de création de service n'est encore relié à cette page."
+                className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl cursor-not-allowed"
+                style={{ background: '#E5E7EB', color: '#6B7280', fontFamily: "'DM Sans', sans-serif" }}>
+                <Plus size={16} /> Création bientôt disponible
+              </button>
+              <span id="service-empty-create-help" className="sr-only">
+                Aucun formulaire de création de service n'est relié à cette page.
+              </span>
+            </>
           )}
         </div>
       ) : (
@@ -267,10 +278,11 @@ const AdminServiceList = () => {
               {/* Actions */}
               <div className="col-span-2 flex items-center justify-end gap-2">
                 <button
-                  onClick={() => router.push(`/admin/services/${service._id}/edit`)}
-                  className="p-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
-                  style={{ background: `${BLUE}12`, color: BLUE }}
-                  title="Modifier">
+                  type="button"
+                  disabled
+                  className="p-2 rounded-xl text-xs font-semibold cursor-not-allowed"
+                  style={{ background: '#E5E7EB', color: '#9CA3AF' }}
+                  title="Aucun écran de modification de service n'est relié à cette page.">
                   <Edit2 size={14} />
                 </button>
                 <button

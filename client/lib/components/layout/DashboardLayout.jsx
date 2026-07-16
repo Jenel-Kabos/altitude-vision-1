@@ -48,8 +48,8 @@ const DashboardLayout = ({ children }) => {
           </Link>
 
           <Link
-            href="/dashboard/services"
-            className={`flex items-center p-2 rounded hover:bg-gray-700 ${isActive('/dashboard/services')}`}
+            href="/dashboard/altcom"
+            className={`flex items-center p-2 rounded hover:bg-gray-700 ${isActive('/dashboard/altcom')}`}
           >
             <FaBriefcase className="mr-3" /> Services
           </Link>
