@@ -104,12 +104,15 @@ logger.info('⏰ [CRON] Polling IMAP Zoho activé (toutes les 5 minutes)');
 // 💸 CRON JOB — Pénalités de retard locatif (6h du matin)
 // ============================================================
 const { verifierPaiementsEnRetard } = require('./services/alerteService');
+const { runRentalFinancialAutomations } = require('./services/rentalFinancialAutomationService');
 
 cron.schedule('0 6 * * *', async () => {
   logger.info('⏰ [CRON] Vérification paiements en retard...');
   try {
     const result = await verifierPaiementsEnRetard();
     logger.success(`✅ [CRON] ${result.verifies} paiements vérifiés, ${result.penalites} pénalité(s) appliquée(s)`);
+    const alerts = await runRentalFinancialAutomations();
+    logger.success(`✅ [CRON] Alertes locatives : ${alerts.payments.notified} paiement(s), ${alerts.contracts.notified} contrat(s)`);
   } catch (err) {
     logger.error('❌ [CRON] Erreur vérification paiements:', err.message);
   }
@@ -307,6 +310,7 @@ const locataireRoutes        = require('./routes/locataireRoutes');
 const contratRoutes          = require('./routes/contratRoutes');
 const paiementRoutes         = require('./routes/paiementRoutes');
 const gestionDocumentRoutes  = require('./routes/gestionDocumentRoutes');
+const rentalManagementRoutes = require('./routes/rentalManagementRoutes');
 
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
@@ -328,6 +332,7 @@ app.use('/api/locataires',       locataireRoutes);
 app.use('/api/contrats',         contratRoutes);
 app.use('/api/paiements',        paiementRoutes);
 app.use('/api/gestion-docs',     gestionDocumentRoutes);
+app.use('/api/rental-management', rentalManagementRoutes);
 
 // 💼 Pôle Altcom
 app.use("/api/services", serviceRoutes);

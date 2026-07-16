@@ -244,3 +244,31 @@ describe('POST /api/properties/mobile — honoraires', () => {
     expect(Property.create).not.toHaveBeenCalled();
   });
 });
+
+describe('Rental management route security', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('401 — liste inaccessible sans authentification', async () => {
+    const res = await request(app).get('/api/rental-management');
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('403 — un propriétaire ne peut pas forcer une publication', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Proprietaire')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    const res = await request(app)
+      .post('/api/rental-management/507f191e810c19729de860ea/publish')
+      .set('Authorization', `Bearer ${makeToken('Proprietaire')}`)
+      .send({});
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('400 — ObjectId de dossier invalide contrôlé pour le staff', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    const res = await request(app)
+      .get('/api/rental-management/not-an-object-id')
+      .set('Authorization', `Bearer ${makeToken('Admin')}`);
+    expect(res.statusCode).toBe(400);
+  });
+});

@@ -14,6 +14,7 @@ import {
   getContrats,      createContrat,      updateContrat,      deleteContrat,
   getPaiements,     updatePaiement,     marquerPaiementPaye, calculerPenalites,
   addBienPhotos,
+  getRentalManagement, getRentalManagementStats, getRentalManagementDetail, runRentalAction,
 } from "../../services/gestionLocativeService";
 import {
   getContratDocuments, generateBail, generateQuittance, generateMiseEnDemeure,
@@ -1598,6 +1599,11 @@ const GestionLocativePage = () => {
   const [locataires,    setLocataires]    = useState([]);
   const [properties,    setProperties]    = useState([]);
   const [paiements,     setPaiements]     = useState([]);
+  const [rentals,       setRentals]       = useState([]);
+  const [rentalStats,   setRentalStats]   = useState({ total:0, vacant:0, available:0, occupied:0, published:0, maintenance:0, readyToRepublish:0, overduePayments:0, partialPayments:0, expiringContracts:0, expiredContracts:0, blockingInspections:0 });
+  const [rentalActionId,setRentalActionId]= useState(null);
+  const [rentalDetail, setRentalDetail] = useState(null);
+  const [rentalDetailLoading, setRentalDetailLoading] = useState(false);
 
   const [tab,     setTab]     = useState('contrats');
   const [loading, setLoading] = useState(true);
@@ -1631,14 +1637,18 @@ const GestionLocativePage = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, p, l, props] = await Promise.all([
+      const [c, p, l, props, rentalData, stats] = await Promise.all([
         getContrats(), getProprietaires(), getLocataires(),
         getAllProperties().catch(() => []),
+        getRentalManagement().catch(() => ({ rentals: [] })),
+        getRentalManagementStats().catch(() => ({ total:0, vacant:0, occupied:0, published:0, maintenance:0, readyToRepublish:0 })),
       ]);
       setContrats(Array.isArray(c)?c:[]);
       setProprietaires(Array.isArray(p)?p:[]);
       setLocataires(Array.isArray(l)?l:[]);
       setProperties(Array.isArray(props)?props:[]);
+      setRentals(Array.isArray(rentalData?.rentals)?rentalData.rentals:[]);
+      setRentalStats(stats || {});
     } catch {
       toast('Impossible de charger les données', 'error');
     } finally {
@@ -1851,8 +1861,31 @@ const GestionLocativePage = () => {
     } catch { toast('Erreur calcul pénalités', 'error'); }
   };
 
+  const handleRentalAction = async (rental, action) => {
+    setRentalActionId(`${rental._id}:${action}`);
+    try {
+      const result = await runRentalAction(rental._id, action, action === 'complete-maintenance' ? { controlValidated:true } : {});
+      setRentals(prev => prev.map(item => item._id === rental._id ? result.rental : item));
+      toast(action === 'publish' && result.rental.publicationStatus === 'en_attente_moderation'
+        ? 'Bien envoyé en modération' : 'Dossier locatif synchronisé');
+      setRentalStats(await getRentalManagementStats());
+    } catch (error) {
+      const readiness = error.response?.data?.publicationReadiness;
+      const missing = readiness?.missingFields?.join(', ');
+      toast(missing ? `Publication impossible : ${missing}` : (error.response?.data?.message || 'Synchronisation impossible'), 'error');
+    } finally { setRentalActionId(null); }
+  };
+
+  const openRentalDetail = async (rental) => {
+    setRentalDetailLoading(true);
+    try { setRentalDetail(await getRentalManagementDetail(rental._id)); }
+    catch (error) { toast(error.response?.data?.message || 'Détail indisponible', 'error'); }
+    finally { setRentalDetailLoading(false); }
+  };
+
   // ── Tabs ─────────────────────────────────────────────────────
   const TABS = [
+    { id:'biens',         label:'Biens gérés',   Icon:Building,  count:rentals.length },
     { id:'contrats',      label:'Contrats',     Icon:FileText,  count:contrats.length },
     { id:'proprietaires', label:'Propriétaires', Icon:Users,     count:proprietaires.length },
     { id:'locataires',    label:'Locataires',    Icon:Home,      count:locataires.length },
@@ -1885,15 +1918,21 @@ const GestionLocativePage = () => {
             </div>
             <div>
               <h1 className="text-lg font-bold text-gray-900">Gestion Locative</h1>
-              <p className="text-xs text-gray-400">Contrats · Propriétaires · Locataires · Paiements</p>
+              <p className="text-xs text-gray-400">Biens synchronisés · Contrats · Locataires · Paiements</p>
             </div>
           </div>
           <div className="flex items-center gap-4 flex-wrap">
             {[
+              ['Biens gérés',     rentalStats.total || 0,       BLUE],
+              ['Vacants',         rentalStats.vacant || 0,      GREEN],
+              ['Publiés',         rentalStats.published || 0,   '#7C3AED'],
+              ['Maintenance',     rentalStats.maintenance || 0, GOLD],
+              ['Impayés',         rentalStats.overduePayments || 0, RED],
+              ['Paiements partiels',rentalStats.partialPayments || 0, GOLD],
+              [`Contrats ≤ ${rentalStats.contractAlertWindowDays || 30}j`,rentalStats.expiringContracts || 0, '#7C3AED'],
+              ['Contrats expirés', rentalStats.expiredContracts || 0, RED],
+              ['Sorties bloquées',rentalStats.blockingInspections || 0, '#7C3AED'],
               ['Contrats actifs', contratsActifs,            GREEN],
-              ['En attente',      contratsEnAttente,          GOLD],
-              ['Propriétaires',   proprietaires.length,       BLUE],
-              ['Locataires',      locataires.length,          '#7C3AED'],
             ].map(([l,v,c])=>(
               <div key={l} className="text-center">
                 <p className="text-xl font-extrabold" style={{color:c}}>{v}</p>
@@ -1932,6 +1971,45 @@ const GestionLocativePage = () => {
         </div>
 
         <div className="p-5">
+
+          {/* ─── BIENS SOUS GESTION — Property reste la source de vérité ─── */}
+          {tab === 'biens' && (
+            <div className="space-y-4">
+              {rentals.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-200 py-12 text-center">
+                  <p className="text-sm font-semibold text-gray-600">Aucun Property activé en gestion locative</p>
+                  <p className="mt-1 text-xs text-gray-400">Les anciens biens intégrés aux fiches propriétaires restent lisibles mais doivent être rapprochés avant activation.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-100">
+                  <table className="w-full text-left">
+                    <thead><tr>{['Bien','Occupation','Publication','Disponibilité','Loyer','Paiement','Readiness','Actions'].map(h=><TH key={h}>{h}</TH>)}</tr></thead>
+                    <tbody>{rentals.map(rental => (
+                      <TRow key={rental._id}>
+                        <TD bold><div className="flex items-center gap-2">{rental.property?.images?.[0] && <img src={rental.property.images[0]} alt="" className="h-9 w-12 rounded object-cover"/>}<span>{rental.property?.title || 'Bien introuvable'}</span></div></TD>
+                        <TD><span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{rental.displayStatus}</span></TD>
+                        <TD>{rental.publicationStatus}</TD>
+                        <TD>{rental.availabilityStatus}</TD>
+                        <TD>{fmt(rental.monthlyRent || rental.property?.price)}</TD>
+                        <TD>{rental.paymentSummary?.overdueCount > 0 || rental.paymentSummary?.partialCount > 0 ? <span className="text-xs font-semibold text-red-600">{rental.paymentSummary.overdueCount || 0} impayé(s) · {rental.paymentSummary.partialCount || 0} partiel(s)</span> : <span className="text-xs text-gray-400">À jour</span>}</TD>
+                        <TD>{rental.publicationReadiness?.ready
+                          ? <span className="text-xs font-semibold text-green-600">Prêt</span>
+                          : <span className="text-xs text-amber-700" title={(rental.publicationReadiness?.missingFields || []).join(', ')}>{(rental.publicationReadiness?.missingFields || []).length} champ(s) manquant(s)</span>}</TD>
+                        <TD><div className="flex flex-wrap gap-1">
+                          <Btn small outline color={BLUE} loading={rentalDetailLoading} onClick={()=>openRentalDetail(rental)}>Ouvrir</Btn>
+                          {rental.allowedActions?.includes('publish') && <Btn small outline color={GREEN} loading={rentalActionId===`${rental._id}:publish`} onClick={()=>handleRentalAction(rental,'publish')}>Publier</Btn>}
+                          {rental.allowedActions?.includes('suspend_listing') && <Btn small outline color={GOLD} loading={rentalActionId===`${rental._id}:suspend-listing`} onClick={()=>handleRentalAction(rental,'suspend-listing')}>Suspendre</Btn>}
+                          {rental.allowedActions?.includes('start_maintenance') && <Btn small outline color={RED} loading={rentalActionId===`${rental._id}:maintenance`} onClick={()=>handleRentalAction(rental,'maintenance')}>Maintenance</Btn>}
+                          {rental.allowedActions?.includes('complete_maintenance') && <Btn small outline color={GREEN} loading={rentalActionId===`${rental._id}:complete-maintenance`} onClick={()=>handleRentalAction(rental,'complete-maintenance')}>Fin maintenance</Btn>}
+                          {rental.allowedActions?.includes('validate_exit') && <Btn small outline color={BLUE} loading={rentalActionId===`${rental._id}:validate-exit`} onClick={()=>handleRentalAction(rental,'validate-exit')}>Valider sortie</Btn>}
+                        </div></TD>
+                      </TRow>
+                    ))}</tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ─── CONTRATS ─── */}
           {tab === 'contrats' && (
@@ -2278,6 +2356,23 @@ const GestionLocativePage = () => {
       </div>
 
       {/* ─── Modaux ─── */}
+
+      {rentalDetail && (
+        <Modal title={`Dossier locatif — ${rentalDetail.property?.title || 'Bien'}`} onClose={()=>setRentalDetail(null)} wide>
+          <div className="space-y-5 text-sm">
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                ['Occupation', rentalDetail.displayStatus], ['Disponibilité', rentalDetail.availabilityStatus],
+                ['Publication', rentalDetail.publicationStatus], ['Loyer', fmt(rentalDetail.monthlyRent)],
+                ['Contrat', rentalDetail.activeLease?.statut || 'Aucun'], ['Locataire', rentalDetail.currentTenant ? `${rentalDetail.currentTenant.prenom || ''} ${rentalDetail.currentTenant.nom || ''}`.trim() : 'Aucun'],
+              ].map(([label,value])=><div key={label} className="rounded-xl border border-gray-100 bg-gray-50 p-3"><p className="text-xs text-gray-400">{label}</p><p className="mt-1 font-semibold text-gray-800">{value || '—'}</p></div>)}
+            </div>
+            <div><h3 className="font-bold text-gray-800">Readiness</h3>{rentalDetail.publicationReadiness?.ready ? <p className="mt-1 text-green-600">Prêt à publier</p> : <p className="mt-1 text-amber-700">Champs manquants : {(rentalDetail.publicationReadiness?.missingFields || []).join(', ') || 'évaluation requise'}</p>}</div>
+            <div><h3 className="font-bold text-gray-800">Demandes propriétaire</h3><div className="mt-2 space-y-2">{rentalDetail.actionRequests?.length ? rentalDetail.actionRequests.map(request=><div key={request._id} className="rounded-lg border border-gray-100 p-2"><span className="font-semibold">{request.type}</span> · {request.status}<p className="text-xs text-gray-500">{request.reason || 'Sans commentaire'}</p></div>) : <p className="text-gray-400">Aucune demande</p>}</div></div>
+            <div><h3 className="font-bold text-gray-800">Historique</h3><ol className="mt-2 space-y-2 border-l border-blue-200 pl-4">{[...(rentalDetail.workflowHistory || [])].reverse().map((entry,index)=><li key={`${entry.at}-${index}`}><p className="font-semibold text-gray-700">{entry.action}</p><p className="text-xs text-gray-400">{entry.at ? new Date(entry.at).toLocaleString('fr-FR') : ''} · {entry.source || 'api'}</p>{entry.comment && <p className="text-xs text-gray-500">{entry.comment}</p>}</li>)}</ol></div>
+          </div>
+        </Modal>
+      )}
 
       {contratModal && (
         <Modal title={editContrat?'Modifier le contrat':'Nouveau contrat'} onClose={() => {setContratModal(false);setEditContrat(null);}} wide>

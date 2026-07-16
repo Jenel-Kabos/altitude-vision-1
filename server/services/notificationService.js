@@ -26,6 +26,13 @@ const USER_LINKS = {
   paiement_confirme: '/mes-paiements', paiement_echoue: '/mes-paiements', payment_success: '/mes-paiements',
   payment_failed: '/mes-paiements', transaction_created: '/mes-paiements', transaction_finalized: '/mes-paiements',
   new_property: '/immobilier/annonces', bien_valide: '/immobilier/annonces', bien_rejete: '/profile',
+  rental_ready_to_publish: '/mes-biens', rental_listing_published: '/mes-biens',
+  rental_listing_suspended: '/mes-biens', rental_property_occupied: '/mes-biens',
+  rental_exit_scheduled: '/mes-biens', rental_maintenance: '/mes-biens',
+  rental_listing_submitted: '/mes-biens', rental_notice_started: '/mes-biens',
+  rental_inspection_required: '/mes-biens', rental_maintenance_started: '/mes-biens',
+  rental_maintenance_completed: '/mes-biens', rental_property_available: '/mes-biens',
+  rental_payment_overdue: '/mes-paiements', rental_contract_expiring: '/mes-biens',
   quote_status: '/profile', quote_response: '/profile', contrat_new: '/profile', contrat_updated: '/profile',
   account_verified: '/profile', account_suspended: '/profile', message_staff: '/messages', new_message: '/messages',
 };
@@ -35,6 +42,14 @@ const STAFF_LINKS = {
   visite_payee: '/dashboard/paiements', transaction_created: '/dashboard/transactions', quote_received: '/dashboard/quotes',
   estimation_received: '/dashboard/estimations', devis_received: '/dashboard/devis', contact_received: '/dashboard/contact-messages',
   property_pending_moderation: '/dashboard/moderation/properties', nouveau_signalement: '/dashboard/litiges',
+  rental_ready_to_publish: '/dashboard/gestion-locative', rental_listing_published: '/dashboard/gestion-locative',
+  rental_listing_suspended: '/dashboard/gestion-locative', rental_property_occupied: '/dashboard/gestion-locative',
+  rental_exit_scheduled: '/dashboard/gestion-locative', rental_maintenance: '/dashboard/gestion-locative',
+  rental_listing_submitted: '/dashboard/gestion-locative', rental_notice_started: '/dashboard/gestion-locative',
+  rental_inspection_required: '/dashboard/gestion-locative', rental_maintenance_started: '/dashboard/gestion-locative',
+  rental_maintenance_completed: '/dashboard/gestion-locative', rental_property_available: '/dashboard/gestion-locative',
+  rental_payment_overdue: '/dashboard/gestion-locative', rental_contract_expiring: '/dashboard/gestion-locative',
+  rental_owner_request: '/dashboard/gestion-locative',
 };
 
 const visitSocketEventFor = (type) => {
@@ -64,6 +79,7 @@ async function notify({
   // Compatibilité de données avec les producteurs et clients mobiles existants.
   body,
   data,
+  dedupeKey = null,
 } = {}) {
   if (!recipient) {
     throw new Error('Destinataire et contenu de notification requis.');
@@ -74,7 +90,9 @@ async function notify({
   const resolvedMetadata = metadata ?? data ?? {};
 
   // 1 — Persistance
-  const notif = await Notification.create({
+  let notif;
+  try {
+    notif = await Notification.create({
     recipient: id,
     sender,
     type,
@@ -85,7 +103,12 @@ async function notify({
     entityId,
     metadata: resolvedMetadata,
     data: resolvedMetadata,
-  });
+    dedupeKey,
+    });
+  } catch (error) {
+    if (error.code !== 11000 || !dedupeKey) throw error;
+    return Notification.findOne({ recipient: id, dedupeKey });
+  }
 
   // 2 — Temps réel Socket.IO (la room = userId, configurée dans socket.js)
   try {
@@ -108,6 +131,27 @@ async function notify({
       };
       getIO().to(id).emit(visitSocketEventFor(type), visitPayload);
       getIO().to(id).emit('visite:updated', visitPayload);
+    }
+    if (type?.startsWith('rental_')) {
+      const rentalPayload = {
+        rentalManagementId: resolvedMetadata?.rentalManagementId || entityId?.toString?.() || null,
+        propertyId: resolvedMetadata?.propertyId || null,
+        eventType: type,
+        updatedAt: notif.createdAt,
+      };
+      const socketEvent = type.includes('publication') || type.includes('listing')
+        ? 'rental:publication_changed'
+        : type.includes('maintenance')
+          ? 'rental:maintenance_changed'
+          : type.includes('contract')
+            ? 'rental:contract_alert'
+          : type.includes('payment')
+            ? 'rental:payment_alert'
+            : type.includes('inspection')
+              ? 'rental:inspection_required'
+              : 'rental:occupancy_changed';
+      getIO().to(id).emit(socketEvent, rentalPayload);
+      getIO().to(id).emit('rental:updated', rentalPayload);
     }
   } catch {
     // Socket non initialisé (tests unitaires, etc.) — on ignore

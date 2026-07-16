@@ -57,6 +57,7 @@ const propertySchema = new mongoose.Schema(
 
     address: {
       street: { type: String, trim: true, default: '' },
+      neighborhood: { type: String, trim: true, default: '' },
       arrondissement: {
         type: String,
         required: [true, "Veuillez fournir l'arrondissement"],
@@ -135,7 +136,7 @@ const propertySchema = new mongoose.Schema(
 
     availability: {
       type: String,
-      enum: ['Disponible', 'Vendu', 'Loué'],
+      enum: ['Disponible', 'Réservé', 'Loué', 'Indisponible', 'En maintenance', 'Retiré', 'Vendu'],
       default: 'Disponible',
     },
 

@@ -20,6 +20,13 @@ const etatDesLieuxSchema = new mongoose.Schema({
   date:        { type: Date, default: Date.now },
   pieces:      [pieceEdlSchema],
   documentUrl: { type: String },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  validatedByStaff: { type: Boolean, default: false },
+  validatedAt: Date,
+  validatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  degradationReported: { type: Boolean, default: false },
+  maintenanceRequired: { type: Boolean, default: false },
+  blockingReason: { type: String, trim: true, maxlength: 1000 },
 }, { _id: false });
 
 const contratSchema = new mongoose.Schema({

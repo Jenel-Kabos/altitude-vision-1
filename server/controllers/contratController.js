@@ -1,7 +1,27 @@
 const Contrat  = require('../models/Contrat');
 const Paiement = require('../models/Paiement');
+const Property = require('../models/Property');
+const RentalManagement = require('../models/RentalManagement');
+const rentalSync = require('../services/rentalListingSyncService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { notify } = require('../services/notificationService');
+
+const syncLeaseOccupation = async (contract, actor) => {
+  if (contract.type !== 'location' || !contract.bien) return;
+  const propertyId = contract.bien?._id || contract.bien;
+  const property = await Property.findById(propertyId).select('_id owner status price');
+  if (!property || property.status !== 'location') return;
+  const rental = await RentalManagement.findOneAndUpdate(
+    { property: property._id },
+    { $setOnInsert: { property: property._id, owner: property.owner, manager: actor }, $set: { monthlyRent: contract.montantLoyer ?? property.price } },
+    { new: true, upsert: true, runValidators: true },
+  );
+  if (contract.statut === 'actif') {
+    await rentalSync.markPropertyRented(rental._id, { leaseId: contract._id, tenantId: contract.locataire, actor, source: 'contract' });
+  } else if (['résilié', 'expiré'].includes(contract.statut) && rental.activeLease?.toString() === contract._id.toString()) {
+    await rentalSync.schedulePropertyExit(rental._id, { actor, source: 'contract' });
+  }
+};
 
 // Génère les paiements mensuels pour un bail location
 const generatePaiements = async (contratId, dateEntree, dateFinBail, montantLoyer) => {
@@ -65,6 +85,7 @@ exports.create = async (req, res) => {
 
     if (c.type === 'location') {
       await generatePaiements(c._id, c.dateEntree, c.dateFinBail, c.montantLoyer);
+      await syncLeaseOccupation(c, req.user.id);
     }
 
     const populated = await c.populate([
@@ -110,6 +131,7 @@ exports.update = async (req, res) => {
       .populate('bien',         'title address');
 
     if (!c) return res.status(404).json({ status: 'error', message: 'Contrat introuvable' });
+    await syncLeaseOccupation(c, req.user.id);
     res.json({ status: 'success', data: { contrat: c } });
 
     [c.proprietaire?.userId, c.locataire?.userId]
@@ -140,6 +162,16 @@ exports.delete = async (req, res) => {
   try {
     const c = await Contrat.findByIdAndDelete(req.params.id);
     if (!c) return res.status(404).json({ status: 'error', message: 'Contrat introuvable' });
+    if (c.type === 'location' && c.bien) {
+      const rental = await RentalManagement.findOne({ property: c.bien?._id || c.bien });
+      if (rental?.activeLease?.toString() === c._id.toString()) {
+        await rentalSync.schedulePropertyExit(rental._id, {
+          actor: req.user.id,
+          source: 'contract',
+          comment: 'Contrat supprimé : contrôle de sortie requis',
+        });
+      }
+    }
     // Supprimer les paiements associés
     await Paiement.deleteMany({ contrat: req.params.id });
     res.json({ status: 'success', message: 'Contrat et paiements supprimés' });

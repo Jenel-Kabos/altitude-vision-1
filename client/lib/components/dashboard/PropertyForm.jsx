@@ -307,6 +307,19 @@ const PropertyForm = ({
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Quartier *</label>
+            <input
+              name="neighborhood"
+              value={formData.address.neighborhood || ''}
+              onChange={handleAddressChange}
+              placeholder="Ex: Plateau des 15 ans"
+              aria-label="Quartier"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+              required
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Arrondissement *</label>
             <select
               name="arrondissement"

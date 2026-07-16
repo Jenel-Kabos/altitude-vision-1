@@ -128,6 +128,7 @@ const createProperty = asyncHandler(async (req, res, next) => {
 
   const finalAddress = {
     arrondissement: addressData.arrondissement || req.body['address[arrondissement]'],
+    neighborhood:   addressData.neighborhood || req.body['address[neighborhood]'],
     street:         addressData.street || req.body['address[street]'],
     city:           addressData.city || req.body['address[city]'] || 'Brazzaville'
   };
@@ -457,6 +458,7 @@ const updateProperty = asyncHandler(async (req, res) => {
 
   const addressFromFields = {
     street: req.body['address[street]'],
+    neighborhood: req.body['address[neighborhood]'],
     arrondissement: req.body['address[arrondissement]'],
     city: req.body['address[city]'],
   };
@@ -468,6 +470,7 @@ const updateProperty = asyncHandler(async (req, res) => {
       ...Object.fromEntries(Object.entries(addressFromFields).filter(([, value]) => value !== undefined)),
     };
     delete updateData['address[street]'];
+    delete updateData['address[neighborhood]'];
     delete updateData['address[arrondissement]'];
     delete updateData['address[city]'];
   }

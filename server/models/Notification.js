@@ -36,6 +36,21 @@ const NOTIFICATION_TYPES = [
   'contrat_updated',      // locataire + propriétaire : contrat modifié
   'loyer_paye',           // propriétaire : loyer encaissé
   'loyer_en_retard',      // locataire : loyer en retard (alerte cron)
+  'rental_ready_to_publish',
+  'rental_listing_submitted',
+  'rental_listing_published',
+  'rental_listing_suspended',
+  'rental_property_occupied',
+  'rental_notice_started',
+  'rental_exit_scheduled',
+  'rental_inspection_required',
+  'rental_maintenance',
+  'rental_maintenance_started',
+  'rental_maintenance_completed',
+  'rental_property_available',
+  'rental_payment_overdue',
+  'rental_contract_expiring',
+  'rental_owner_request',
   // ── Biens immobiliers ──
   'new_property',                 // tous les utilisateurs : nouveau bien validé et publié
   'property_pending_moderation',  // staff : nouveau bien mobile en attente de modération
@@ -87,6 +102,7 @@ const notificationSchema = new mongoose.Schema(
     // Payload pour la navigation deep-link côté app mobile
     // ex: { screen: 'Transactions', params: { id: '...' } }
     data: { type: mongoose.Schema.Types.Mixed, default: {} },
+    dedupeKey: { type: String, default: null, maxlength: 200 },
     read: { type: Boolean, default: false, index: true },
   },
   { timestamps: true },
@@ -95,6 +111,10 @@ const notificationSchema = new mongoose.Schema(
 // Index composite pour paginer rapidement les notifs d'un user
 notificationSchema.index({ recipient: 1, createdAt: -1 });
 notificationSchema.index({ recipient: 1, read: 1, createdAt: -1 });
+notificationSchema.index(
+  { recipient: 1, dedupeKey: 1 },
+  { unique: true, partialFilterExpression: { dedupeKey: { $type: 'string' } } },
+);
 
 // TTL : les notifications lues de plus de 90 jours sont supprimées auto
 notificationSchema.index(

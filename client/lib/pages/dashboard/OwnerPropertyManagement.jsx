@@ -12,6 +12,7 @@ import {
   deleteProperty, getPropertyById,
 } from "../../services/propertyService";
 import PropertyForm from "../../components/dashboard/PropertyForm";
+import { getMyRentalManagement, requestRentalAction } from '../../services/gestionLocativeService';
 import Image from 'next/image';
 
 const BLUE = '#2E7BB5';
@@ -35,7 +36,7 @@ const getImageUrl = (url) => {
 const emptyForm = () => ({
   title:'', description:'', price:'', pole:'Altimmo',
   status:'vente', availability:'Disponible', type:'Appartement',
-  address:{ street:'', arrondissement:'', city:'Brazzaville' },
+  address:{ street:'', neighborhood:'', arrondissement:'', city:'Brazzaville' },
   surface:'', bedrooms:'', bathrooms:'', amenities:'',
   livingRooms:'', kitchens:'', constructionType:'Non spécifié',
   cautionMultiplicateur:2, profilsLocataireRecherches:[], documentsRequis:[],
@@ -61,6 +62,7 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
           ...emptyForm(), ...p,
           address: {
             arrondissement: p.address?.arrondissement || '',
+            neighborhood:   p.address?.neighborhood   || '',
             street:         p.address?.street         || '',
             city:           p.address?.city           || 'Brazzaville',
           },
@@ -99,6 +101,7 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
       });
 
       fd.append("address[street]",         formData.address.street         || '');
+      fd.append("address[neighborhood]",   formData.address.neighborhood   || '');
       fd.append("address[arrondissement]", formData.address.arrondissement || '');
       fd.append("address[city]",           formData.address.city           || 'Brazzaville');
 
@@ -160,10 +163,11 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
 // ─────────────────────────────────────────────────────────────
 const ALTIMMO_FALLBACK = 'https://placehold.co/600x400/2E7BB5/FFFFFF?text=Altimmo';
 
-const PropertyCard = ({ property, onEdit, onDelete, onToggleAvailability }) => {
+const PropertyCard = ({ property, rental, onEdit, onDelete, onToggleAvailability, onRentalRequest }) => {
   const [imgSrc, setImgSrc] = useState(
     getImageUrl(property.images?.[0]) || ALTIMMO_FALLBACK
   );
+  const [plannedExitAt, setPlannedExitAt] = useState('');
   const nextAvailability = property.status === 'location'
     ? (property.availability === 'Disponible' ? 'Loué' : 'Disponible')
     : (property.availability === 'Disponible' ? 'Vendu' : 'Disponible');
@@ -242,11 +246,25 @@ const PropertyCard = ({ property, onEdit, onDelete, onToggleAvailability }) => {
           </div>
         )}
 
-        <button onClick={() => onToggleAvailability(property, nextAvailability)}
+        {!rental && <button onClick={() => onToggleAvailability(property, nextAvailability)}
           className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02] mb-2"
           style={{ background: property.availability==='Disponible' ? '#FEF3C7' : '#DCFCE7', color: property.availability==='Disponible' ? '#B45309' : '#15803D', fontFamily:"'DM Sans', sans-serif" }}>
           <CheckCircle2 size={13} /> {availabilityLabel}
-        </button>
+        </button>}
+
+        {rental && <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-xs text-gray-600">
+          <div className="flex flex-wrap gap-2 font-semibold"><span>{rental.displayStatus}</span><span>·</span><span>{rental.publicationStatus}</span></div>
+          {rental.activeLease && <p className="mt-1">Contrat : {rental.activeLease.statut} · fin {rental.activeLease.dateFinBail ? new Date(rental.activeLease.dateFinBail).toLocaleDateString('fr-FR') : 'non renseignée'}</p>}
+          {rental.paymentSummary && <p className="mt-1">Attendu : {Number(rental.paymentSummary.expected || 0).toLocaleString('fr-FR')} · Payé : {Number(rental.paymentSummary.paid || 0).toLocaleString('fr-FR')} · Solde : {Number(rental.paymentSummary.remaining || 0).toLocaleString('fr-FR')} FCFA</p>}
+          {rental.paymentSummary?.nextDueAt && <p className="mt-1">Prochaine échéance : {new Date(rental.paymentSummary.nextDueAt).toLocaleDateString('fr-FR')}</p>}
+          {(rental.paymentSummary?.overdueCount > 0 || rental.paymentSummary?.partialCount > 0) && <p className="mt-1 font-semibold text-red-600">{rental.paymentSummary.overdueCount || 0} impayé(s) · {rental.paymentSummary.partialCount || 0} partiel(s)</p>}
+          <div className="mt-2 flex flex-wrap gap-1">
+            {rental.allowedActions?.includes('request_publish') && <button onClick={()=>onRentalRequest(rental,'request-publish')} className="rounded bg-green-100 px-2 py-1 font-semibold text-green-700">Demander publication</button>}
+            {rental.allowedActions?.includes('request_suspension') && <button onClick={()=>onRentalRequest(rental,'request-suspension')} className="rounded bg-amber-100 px-2 py-1 font-semibold text-amber-700">Demander suspension</button>}
+            {rental.allowedActions?.includes('report_maintenance') && <button onClick={()=>onRentalRequest(rental,'report-maintenance')} className="rounded bg-red-100 px-2 py-1 font-semibold text-red-700">Signaler maintenance</button>}
+            {rental.allowedActions?.includes('declare_future_availability') && <div className="mt-1 flex w-full gap-1"><input type="date" min={new Date().toISOString().slice(0,10)} value={plannedExitAt} onChange={e=>setPlannedExitAt(e.target.value)} className="min-w-0 flex-1 rounded border border-gray-200 px-2 py-1"/><button disabled={!plannedExitAt} onClick={()=>onRentalRequest(rental,'declare-future-availability',{plannedAt:plannedExitAt})} className="rounded bg-blue-100 px-2 py-1 font-semibold text-blue-700 disabled:opacity-40">Déclarer sortie</button></div>}
+          </div>
+        </div>}
 
         <div className="flex gap-2">
           <button onClick={() => onEdit(property)}
@@ -254,11 +272,11 @@ const PropertyCard = ({ property, onEdit, onDelete, onToggleAvailability }) => {
             style={{ background:`${BLUE}15`, color:BLUE, fontFamily:"'DM Sans', sans-serif" }}>
             <Edit2 size={13} /> Modifier
           </button>
-          <button onClick={() => onDelete(property._id)}
+          {!rental && <button onClick={() => onDelete(property._id)}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
             style={{ background:'#FEE2E2', color:'#DC2626', fontFamily:"'DM Sans', sans-serif" }}>
             <Trash2 size={13} /> Supprimer
-          </button>
+          </button>}
         </div>
       </div>
     </div>
@@ -299,6 +317,7 @@ const ConfirmDialog = ({ message, onConfirm, onCancel }) => (
 const OwnerPropertyManagement = () => {
   const { user, loading: authLoading } = useAuth();
   const [properties, setProperties]   = useState([]);
+  const [rentals, setRentals]         = useState([]);
   const [loadingList, setLoadingList] = useState(false);
   const [view, setView]               = useState("list");   // list | add | edit
   const [editingId, setEditingId]     = useState(null);
@@ -308,8 +327,8 @@ const OwnerPropertyManagement = () => {
     if (!user) return;
     setLoadingList(true);
     try {
-      const res = await getMyProperties();
-      setProperties(res);
+      const [res, managed] = await Promise.all([getMyProperties(), getMyRentalManagement().catch(() => [])]);
+      setProperties(res); setRentals(Array.isArray(managed) ? managed : []);
     } catch {
       toast.error("Erreur lors du chargement des biens.");
     } finally {
@@ -350,6 +369,14 @@ const OwnerPropertyManagement = () => {
     } catch (err) {
       toast.error(err.response?.data?.message || "Erreur lors de la mise à jour de la disponibilité.");
     }
+  };
+
+  const handleRentalRequest = async (rental, action, extra = {}) => {
+    try {
+      const result = await requestRentalAction(rental._id, action, { reason: 'Demande depuis le dashboard propriétaire', ...extra });
+      setRentals(prev => prev.map(item => item._id === rental._id ? result.rental : item));
+      toast.success('Demande envoyée au gestionnaire.');
+    } catch (error) { toast.error(error.response?.data?.message || 'Demande impossible.'); }
   };
 
   const handleEdit   = (property) => { setEditingId(property._id); setView("edit"); };
@@ -469,9 +496,9 @@ const OwnerPropertyManagement = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {properties.map(p => (
-                <PropertyCard key={p._id} property={p}
+                <PropertyCard key={p._id} property={p} rental={rentals.find(r=>String(r.property?._id||r.property)===String(p._id))}
                   onEdit={handleEdit} onDelete={handleDelete}
-                  onToggleAvailability={handleToggleAvailability} />
+                  onToggleAvailability={handleToggleAvailability} onRentalRequest={handleRentalRequest} />
               ))}
             </div>
           )}

@@ -1,5 +1,35 @@
 import api from './api';
 
+// ── Dossiers locatifs synchronisés avec Property ─────────────
+export const getRentalManagement = async (params = {}) => {
+  const res = await api.get('/rental-management', { params });
+  return res.data.data;
+};
+export const getRentalManagementStats = async () => {
+  const res = await api.get('/rental-management/stats');
+  return res.data.data.stats;
+};
+export const getRentalManagementDetail = async (id) => {
+  const res = await api.get(`/rental-management/${id}`);
+  return res.data.data.rental;
+};
+export const enableRentalManagement = async (data) => {
+  const res = await api.post('/rental-management', data);
+  return res.data.data.rental;
+};
+export const runRentalAction = async (id, action, data = {}) => {
+  const res = await api.post(`/rental-management/${id}/${action}`, data);
+  return res.data.data;
+};
+export const getMyRentalManagement = async () => {
+  const res = await api.get('/rental-management/owner/my');
+  return res.data.data.rentals;
+};
+export const requestRentalAction = async (id, action, data = {}) => {
+  const res = await api.post(`/rental-management/${id}/owner/${action}`, data);
+  return res.data.data;
+};
+
 // ── Propriétaires ─────────────────────────────────────────────
 
 export const getProprietaires = async () => {

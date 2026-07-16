@@ -229,7 +229,7 @@ exports.generateEtatDesLieux = async (req, res) => {
     if (!c) return res.status(404).json({ status:'error', message:'Contrat introuvable' });
 
     // Sauvegarder l'état des lieux dans le contrat
-    const edlData = { type, date: new Date(), pieces };
+    const edlData = { type, date: new Date(), pieces, createdBy: req.user.id, validatedByStaff: false };
     await Contrat.findByIdAndUpdate(c._id, { $push: { etatsDesLieux: edlData } });
 
     // Recharger pour avoir les etatsDesLieux à jour (pour comparaison)

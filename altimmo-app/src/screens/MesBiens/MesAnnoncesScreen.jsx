@@ -34,7 +34,7 @@ const getModerationInfo = (statusAdmin) => {
 
 // ─── BienCard ─────────────────────────────────────────────────────────────────
 const BienCard = React.memo(function BienCard({
-  item, onEdit, onDelete, onToggleAvailability, onBail, styles, c,
+  item, onEdit, onDelete, onToggleAvailability, onRentalRequest, onBail, styles, c,
 }) {
   const isLocation = item.status?.toLowerCase() === 'location';
   const modInfo    = getModerationInfo(item.statusAdmin);
@@ -44,6 +44,7 @@ const BienCard = React.memo(function BienCard({
   const prix       = item.price ? Number(item.price).toLocaleString('fr-FR') : '—';
   const disponible = item.availability === 'Disponible';
   const imgUri     = item.images?.[0];
+  const rental     = item._rental;
 
   const toneColor = { success: c.success, error: c.error, warning: c.warning }[modInfo.tone];
   const toneBg    = {
@@ -106,6 +107,7 @@ const BienCard = React.memo(function BienCard({
         </View>
 
         <Text style={styles.prix}>{prix} FCFA{isLocation ? '/mois' : ''}</Text>
+        {rental && <View style={{ marginBottom: 8 }}><Text style={styles.bailResumeText}>Gestion locative · {rental.displayStatus} · {rental.publicationStatus}</Text><Text style={styles.bailResumeText}>Attendu {Number(rental.paymentSummary?.expected || 0).toLocaleString('fr-FR')} · Payé {Number(rental.paymentSummary?.paid || 0).toLocaleString('fr-FR')} · Solde {Number(rental.paymentSummary?.remaining || 0).toLocaleString('fr-FR')} FCFA</Text>{rental.activeLease?.dateFinBail && <Text style={styles.bailResumeText}>Fin contrat : {new Date(rental.activeLease.dateFinBail).toLocaleDateString('fr-FR')}</Text>}{(rental.paymentSummary?.overdueCount > 0 || rental.paymentSummary?.partialCount > 0) && <Text style={[styles.bailResumeText,{color:c.error}]}>{rental.paymentSummary.overdueCount || 0} impayé(s) · {rental.paymentSummary.partialCount || 0} partiel(s)</Text>}</View>}
 
         {/* Résumé bail */}
         {isLocation && (
@@ -122,7 +124,7 @@ const BienCard = React.memo(function BienCard({
 
         {/* ─── Actions ─── */}
         <View style={styles.actions}>
-          <TouchableOpacity
+          {!rental && <TouchableOpacity
             style={[styles.actionBtn, styles.actionEdit]}
             onPress={onEdit}
             activeOpacity={0.8}
@@ -131,9 +133,13 @@ const BienCard = React.memo(function BienCard({
           >
             <Ionicons name="create-outline" size={15} color={c.blue} />
             <Text style={[styles.actionText, { color: c.blue }]}>Modifier</Text>
-          </TouchableOpacity>
+          </TouchableOpacity>}
 
-          <TouchableOpacity
+          {rental?.allowedActions?.includes('request_publish') && <TouchableOpacity style={[styles.actionBtn, styles.actionDisp]} onPress={()=>onRentalRequest(rental,'request-publish')}><Text style={[styles.actionText,{color:'#0A0A0A'}]}>Demander publication</Text></TouchableOpacity>}
+          {rental?.allowedActions?.includes('request_suspension') && <TouchableOpacity style={[styles.actionBtn, styles.actionDisp]} onPress={()=>onRentalRequest(rental,'request-suspension')}><Text style={[styles.actionText,{color:'#0A0A0A'}]}>Demander suspension</Text></TouchableOpacity>}
+          {rental?.allowedActions?.includes('report_maintenance') && <TouchableOpacity style={[styles.actionBtn, styles.actionDelete]} onPress={()=>onRentalRequest(rental,'report-maintenance')}><Text style={[styles.actionText,{color:c.error}]}>Maintenance</Text></TouchableOpacity>}
+
+          {!rental && <TouchableOpacity
             style={[styles.actionBtn, styles.actionDisp]}
             onPress={onToggleAvailability}
             activeOpacity={0.8}
@@ -150,7 +156,7 @@ const BienCard = React.memo(function BienCard({
             <Text style={[styles.actionText, { color: '#0A0A0A' }]}>
               {disponible ? (isLocation ? 'Loué' : 'Vendu') : 'Libre'}
             </Text>
-          </TouchableOpacity>
+          </TouchableOpacity>}
 
           {isLocation && (
             <TouchableOpacity
@@ -181,6 +187,7 @@ const BienCard = React.memo(function BienCard({
 }, (prev, next) => prev.item._id === next.item._id &&
   prev.item.statusAdmin === next.item.statusAdmin &&
   prev.item.availability === next.item.availability &&
+  prev.item._rental?.updatedAt === next.item._rental?.updatedAt &&
   prev.styles === next.styles);
 
 // ─── MesAnnoncesScreen ────────────────────────────────────────────────────────
@@ -206,9 +213,13 @@ export default function MesAnnoncesScreen({ navigation }) {
   const charger = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res  = await api.get('/properties/my-properties');
-      const data = res.data?.data?.properties || res.data?.properties || [];
-      setBiens(data);
+      const [propertyRes, rentalRes] = await Promise.all([
+        api.get('/properties/my-properties'),
+        api.get('/rental-management/owner/my').catch(() => ({ data: { data: { rentals: [] } } })),
+      ]);
+      const data = propertyRes.data?.data?.properties || propertyRes.data?.properties || [];
+      const rentals = rentalRes.data?.data?.rentals || [];
+      setBiens(data.map(item => ({ ...item, _rental: rentals.find(rental => String(rental.property?._id || rental.property) === String(item._id)) })));
     } catch {
       setBiens([]);
     } finally {
@@ -263,6 +274,14 @@ export default function MesAnnoncesScreen({ navigation }) {
     }
   }, []);
 
+  const handleRentalRequest = useCallback(async (rental, action) => {
+    try {
+      await api.post(`/rental-management/${rental._id}/owner/${action}`, { reason: 'Demande depuis l’application mobile' });
+      Alert.alert('Demande envoyée', 'Le gestionnaire examinera votre demande.');
+      charger(true);
+    } catch (error) { Alert.alert('Erreur', error.response?.data?.message || 'Demande impossible.'); }
+  }, [charger]);
+
   const openLeaseModal = useCallback((item) =>
     setLeaseModal({
       property: item,
@@ -300,11 +319,12 @@ export default function MesAnnoncesScreen({ navigation }) {
       onEdit={() => handleEdit(item)}
       onDelete={() => handleDelete(item)}
       onToggleAvailability={() => handleToggleAvailability(item)}
+      onRentalRequest={handleRentalRequest}
       onBail={() => openLeaseModal(item)}
       styles={styles}
       c={c}
     />
-  ), [handleEdit, handleDelete, handleToggleAvailability, openLeaseModal, styles, c]);
+  ), [handleEdit, handleDelete, handleToggleAvailability, handleRentalRequest, openLeaseModal, styles, c]);
 
   const keyExtractor = useCallback((item) => item._id, []);
 

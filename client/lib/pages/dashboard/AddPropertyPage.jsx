@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { PlusCircle, Loader2, Home } from 'lucide-react';
 import { addProperty } from '../../services/propertyService';
+import { enableRentalManagement } from '../../services/gestionLocativeService';
 import PropertyForm from '../../components/dashboard/PropertyForm';
 
 const BLUE = '#2E7BB5';
@@ -22,7 +23,7 @@ const AddPropertyPage = () => {
     status:           'vente',
     type:             'Appartement',
     availability:     'Disponible',
-    address:          { street: '', arrondissement: '', city: 'Brazzaville' },
+    address:          { street: '', neighborhood: '', arrondissement: '', city: 'Brazzaville' },
     surface:          '',
     bedrooms:         '',
     bathrooms:        '',
@@ -37,6 +38,9 @@ const AddPropertyPage = () => {
 
   const [loading,  setLoading]  = useState(false);
   const [redirect, setRedirect] = useState(false);
+  const [rentalManagementEnabled, setRentalManagementEnabled] = useState(false);
+  const [publicationPolicy, setPublicationPolicy] = useState('manuelle');
+  const [publicationAuthorized, setPublicationAuthorized] = useState(false);
 
   // ── Soumission ──────────────────────────────────────────────
   const handleSubmit = async (e) => {
@@ -82,7 +86,16 @@ const AddPropertyPage = () => {
         coordinates: [parseFloat(longitude), parseFloat(latitude)],
       }));
 
-      await addProperty(data);
+      const created = await addProperty(data);
+      if (rentalManagementEnabled) {
+        if (formData.status !== 'location') throw new Error('La gestion locative nécessite un bien en location.');
+        await enableRentalManagement({
+          property: created._id,
+          monthlyRent: Number(formData.price),
+          publicationPolicy,
+          publicationAuthorized,
+        });
+      }
 
       toast.success('Bien ajouté avec succès !');
       setRedirect(true);
@@ -146,6 +159,28 @@ const AddPropertyPage = () => {
             onSubmit={handleSubmit}
             loading={loading}
           />
+
+          {formData.status === 'location' && (
+            <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50/50 p-4 text-sm">
+              <label className="flex items-center gap-3 font-semibold text-gray-800">
+                <input type="checkbox" checked={rentalManagementEnabled} onChange={e=>setRentalManagementEnabled(e.target.checked)}/>
+                Activer ce même bien en gestion locative
+              </label>
+              {rentalManagementEnabled && <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="text-xs font-semibold text-gray-600">Politique de publication
+                  <select className="mt-1 w-full rounded-lg border border-gray-200 bg-white p-2" value={publicationPolicy} onChange={e=>setPublicationPolicy(e.target.value)}>
+                    <option value="manuelle">Validation manuelle</option>
+                    <option value="automatique">Automatique après contrôles</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-xs font-semibold text-gray-600">
+                  <input type="checkbox" checked={publicationAuthorized} onChange={e=>setPublicationAuthorized(e.target.checked)}/>
+                  Publication autorisée par le propriétaire ou l’agence
+                </label>
+              </div>}
+              <p className="mt-2 text-xs text-gray-500">Aucune copie n’est créée : le dossier locatif référence ce Property.</p>
+            </div>
+          )}
 
           {/* Indicateur de chargement global si redirection en cours */}
           {redirect && (

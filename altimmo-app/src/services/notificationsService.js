@@ -143,6 +143,13 @@ const TYPE_TO_SCREEN = {
   paiement_echoue:        ()     => ['Visites'],
   nouveau_signalement:    ()     => ['Annonces'],
   visite_payee:           ()     => ['Messages'],
+  rental_payment_overdue: ()     => ['Profil', { screen: 'MesAnnonces' }],
+  rental_contract_expiring: ()   => ['Profil', { screen: 'MesAnnonces' }],
+  rental_listing_published: ()   => ['Profil', { screen: 'MesAnnonces' }],
+  rental_listing_suspended: ()   => ['Profil', { screen: 'MesAnnonces' }],
+  rental_property_occupied: ()   => ['Profil', { screen: 'MesAnnonces' }],
+  rental_maintenance_started: () => ['Profil', { screen: 'MesAnnonces' }],
+  rental_property_available: ()  => ['Profil', { screen: 'MesAnnonces' }],
 };
 
 async function resolveNavigation(data = {}) {

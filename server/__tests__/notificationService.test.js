@@ -1,4 +1,4 @@
-jest.mock('../models/Notification', () => ({ create: jest.fn() }));
+jest.mock('../models/Notification', () => ({ create: jest.fn(), findOne: jest.fn() }));
 jest.mock('../models/User', () => ({ findById: jest.fn() }));
 jest.mock('../socket', () => ({
   getIO: jest.fn(() => ({ to: jest.fn(() => ({ emit: jest.fn() })) })),
@@ -84,5 +84,31 @@ describe('notificationService.notify', () => {
       expect.objectContaining({ type: 'visite_rappel', visiteId: '507f1f77bcf86cd799439013', route: 'Visites' }),
     );
     expect(JSON.stringify(sendExpoPushNotification.mock.calls[0])).not.toMatch(/phone|address|commission|coordinates/i);
+  });
+
+  test('une collision de dedupeKey retourne la notification existante sans nouvel effet', async () => {
+    const duplicate = Object.assign(new Error('duplicate'), { code: 11000 });
+    Notification.create.mockRejectedValueOnce(duplicate);
+    Notification.findOne.mockResolvedValueOnce({ _id: 'existing' });
+    await expect(notify({
+      recipient: '507f1f77bcf86cd799439011', type: 'rental_property_available',
+      title: 'Disponible', body: 'Bien disponible', dedupeKey: 'rental:test:available:1',
+    })).resolves.toEqual({ _id: 'existing' });
+    expect(Notification.findOne).toHaveBeenCalledWith({ recipient: '507f1f77bcf86cd799439011', dedupeKey: 'rental:test:available:1' });
+  });
+
+  test('émet un payload Socket locatif minimal sans données privées', async () => {
+    const emit = jest.fn();
+    socket.getIO.mockReturnValue({ to: jest.fn(() => ({ emit })) });
+    await notify({
+      recipient: '507f1f77bcf86cd799439011', type: 'rental_maintenance_started',
+      title: 'Maintenance', body: 'Maintenance démarrée', entityId: '507f1f77bcf86cd799439014',
+      data: { rentalManagementId: '507f1f77bcf86cd799439014', propertyId: '507f191e810c19729de860ea' },
+    });
+    expect(emit).toHaveBeenCalledWith('rental:maintenance_changed', {
+      rentalManagementId: '507f1f77bcf86cd799439014', propertyId: '507f191e810c19729de860ea',
+      eventType: 'rental_maintenance_started', updatedAt: expect.any(Date),
+    });
+    expect(JSON.stringify(emit.mock.calls)).not.toMatch(/tenant|phone|document|payment/i);
   });
 });
