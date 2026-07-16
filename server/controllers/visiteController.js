@@ -4,27 +4,104 @@ const User     = require('../models/User');
 const Property = require('../models/Property');
 const { notify, notifyStaff } = require('../services/notificationService');
 const yabetooService = require('../services/yabetooService');
+const mongoose = require('mongoose');
+const {
+  STATUS, LABELS, LEGACY_TO_STATUS, normalizeStatus, canTransition,
+  appendHistory, resetReminderStates, serializeVisite,
+} = require('../services/visiteWorkflowService');
+
+const sourceOf = (req) => req.get('x-altimmo-client') === 'mobile' ? 'mobile' : 'web';
+const assertObjectId = (id, res) => {
+  if (!mongoose.isValidObjectId(id)) {
+    res.status(400);
+    throw new Error('Identifiant de rendez-vous invalide.');
+  }
+};
+const buildRequestedStart = (body) => {
+  if (body.requestedDate) return new Date(body.requestedDate);
+  if (!body.datePreferee) return null;
+  let datePart = body.datePreferee;
+  const french = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(datePart);
+  if (french) datePart = `${french[3]}-${french[2]}-${french[1]}`;
+  const value = /^\d{4}-\d{2}-\d{2}$/.test(datePart)
+    ? `${datePart}T${body.heurePreferee || '00:00'}:00+01:00`
+    : datePart;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
 
 // ─────────────────────────────────────────────
 // POST /api/visites — client crée une demande
 // ─────────────────────────────────────────────
 exports.createVisite = asyncHandler(async (req, res) => {
-  const { propertyId, conversationId, datePreferee, heurePreferee, telephone, message } = req.body;
+  const { propertyId, conversationId, datePreferee, heurePreferee, telephone, message,
+    whatsapp, preferredContactMethod, visitorCount, clientContactConsent } = req.body;
 
   if (!propertyId) {
     res.status(400);
     throw new Error('propertyId est requis.');
   }
 
+  if (!mongoose.isValidObjectId(propertyId)) {
+    res.status(400);
+    throw new Error('propertyId invalide.');
+  }
+  const property = await Property.findById(propertyId).populate('owner', 'name phone');
+  if (!property) {
+    res.status(404);
+    throw new Error('Bien introuvable.');
+  }
+  const requestedStart = buildRequestedStart(req.body);
+  if (!requestedStart || requestedStart <= new Date()) {
+    res.status(400);
+    throw new Error('Choisissez une date et une heure futures valides.');
+  }
+  if (!clientContactConsent) {
+    res.status(400);
+    throw new Error('Le consentement de contact est requis pour organiser la visite.');
+  }
+  const duplicate = await Visite.exists({
+    property: propertyId, client: req.user.id,
+    $or: [
+      { status: { $in: [STATUS.REQUESTED, STATUS.AWAITING_CONFIRMATION, STATUS.CONFIRMED, STATUS.RESCHEDULED] } },
+      { status: null, statut: { $in: ['En attente', 'Confirmée', 'Replanifiée'] } },
+    ],
+    requestedDate: { $gte: new Date(requestedStart.getTime() - 30 * 60 * 1000), $lte: new Date(requestedStart.getTime() + 30 * 60 * 1000) },
+  });
+  if (duplicate) {
+    res.status(409);
+    throw new Error('Une demande similaire existe déjà pour ce créneau.');
+  }
+  const address = property.address || {};
   const visite = await Visite.create({
-    property: propertyId,
+    property: propertyId, owner: property.owner?._id || property.owner,
     client: req.user.id,
     conversation: conversationId || null,
     datePreferee:  datePreferee  || '',
     heurePreferee: heurePreferee || '',
     telephone:     telephone     || '',
     message:       message       || '',
+    requestedDate: requestedStart,
+    requestedTime: heurePreferee || '',
+    clientNameSnapshot: req.user.name || '',
+    clientPhoneSnapshot: telephone || req.user.phone || '',
+    clientWhatsAppSnapshot: whatsapp || '',
+    preferredContactMethod: preferredContactMethod || '',
+    visitorCount: visitorCount || 1,
+    clientContactConsent: true,
+    ownerNameSnapshot: property.owner?.name || '',
+    ownerPhoneSnapshot: property.owner?.phone || '',
+    propertySnapshot: {
+      title: property.title || '', reference: property.reference || property.ref || '',
+      type: property.type || property.propertyType || '', city: address.city || '',
+      arrondissement: address.arrondissement || '', quartier: address.neighborhood || address.quartier || '',
+      image: property.images?.[0] || '', price: property.price ?? null,
+      transaction: property.status || property.transaction || '', link: `/altimmo/property/${property._id}`,
+    },
+    clientNotes: message || '',
+    status: STATUS.REQUESTED,
     statut: 'En attente',
+    workflowHistory: [{ from: '', to: STATUS.REQUESTED, action: 'create', actor: req.user.id, role: 'client', source: sourceOf(req) }],
   });
 
   await visite.populate('property', 'title images address owner');
@@ -34,8 +111,9 @@ exports.createVisite = asyncHandler(async (req, res) => {
     notify({ recipient: visite.property.owner,
       type:  'visite_sur_mon_bien',
       title: 'Nouvelle demande de visite 🏠',
-      body:  `${req.user.name} souhaite visiter votre bien : ${visite.property?.title || 'un bien'}`,
-      data:  { screen: 'OwnerVisites' },
+      body:  `Une demande de visite est en attente d’organisation pour : ${visite.property?.title || 'un bien'}.`,
+      entityType: 'Visite', entityId: visite._id,
+      data:  { screen: 'OwnerVisites', visiteId: visite._id.toString(), route: 'Visites' },
     }).catch(() => {});
   }
 
@@ -44,12 +122,13 @@ exports.createVisite = asyncHandler(async (req, res) => {
     type:  'visite_new',
     title: 'Nouvelle demande de visite',
     body:  `${req.user.name} souhaite visiter : ${visite.property?.title || 'un bien'}`,
-    data:  { screen: 'AdminVisites', params: { id: visite._id } },
+    entityType: 'Visite', entityId: visite._id,
+    data:  { screen: 'AdminVisites', params: { id: visite._id }, visiteId: visite._id.toString(), route: 'Visites' },
   }).catch(() => {});
 
   res.status(201).json({
     status: 'success',
-    data: { visite },
+    data: { visite: serializeVisite(visite, 'client') },
   });
 });
 
@@ -64,7 +143,7 @@ exports.getMyVisites = asyncHandler(async (req, res) => {
   res.status(200).json({
     status: 'success',
     results: visites.length,
-    data: { visites },
+    data: { visites: visites.map((visite) => serializeVisite(visite, 'client')) },
   });
 });
 
@@ -92,7 +171,7 @@ exports.getAllVisites = asyncHandler(async (req, res) => {
   res.status(200).json({
     status: 'success',
     results: visites.length,
-    data: { visites },
+    data: { visites: visites.map((visite) => serializeVisite(visite, 'staff')) },
   });
 });
 
@@ -105,6 +184,7 @@ exports.getUnreadCount = asyncHandler(async (_req, res) => {
 // PATCH /api/visites/:id — staff met à jour
 // ─────────────────────────────────────────────
 exports.updateVisite = asyncHandler(async (req, res) => {
+  assertObjectId(req.params.id, res);
   const visite = await Visite.findById(req.params.id);
 
   if (!visite) {
@@ -112,35 +192,80 @@ exports.updateVisite = asyncHandler(async (req, res) => {
     throw new Error('Visite non trouvée.');
   }
 
-  const { dateProposee, dateConfirmee, statut, notes } = req.body;
-  const previousStatut = visite.statut;
+  const { dateProposee, dateConfirmee, statut, status, notes, scheduledStartAt,
+    scheduledEndAt, meetingAddressSnapshot, coordinatesSnapshot, assignedAgent,
+    visitFeeAmount, visitFeeCurrency, agencyCommissionType, agencyCommissionValue,
+    commissionNotes } = req.body;
+  const previousStatus = normalizeStatus(visite.status, visite.statut);
+  const nextStatus = status || LEGACY_TO_STATUS[statut] || previousStatus;
+
+  if (nextStatus !== previousStatus && !canTransition(previousStatus, nextStatus)) {
+    res.status(409);
+    throw new Error(`Transition interdite : ${LABELS[previousStatus]} → ${LABELS[nextStatus] || nextStatus}.`);
+  }
 
   if (dateProposee !== undefined) visite.dateProposee = dateProposee;
   if (dateConfirmee !== undefined) visite.dateConfirmee = dateConfirmee;
-  if (statut !== undefined) visite.statut = statut;
-  if (notes !== undefined) visite.notes = notes;
-
-  // Passage en "Confirmée" : détermine si des honoraires/frais de visite sont dus
-  if (statut === 'Confirmée') {
-    const prop = await Property.findById(visite.property).select('honoraires fraisVisite price status');
-    const montantDu = (prop?.honoraires ?? (
-      prop?.status === 'location'
-        ? Math.round((prop?.price || 0) * 0.8)
-        : Math.round((prop?.price || 0) * 0.1)
-    )) + (prop?.fraisVisite || 0);
-    if (montantDu > 0) visite.paiementStatus = 'en_attente';
+  if (scheduledStartAt !== undefined || dateConfirmee !== undefined) visite.scheduledStartAt = scheduledStartAt || dateConfirmee;
+  if (scheduledEndAt !== undefined) visite.scheduledEndAt = scheduledEndAt;
+  if (scheduledStartAt !== undefined || scheduledEndAt !== undefined || nextStatus === STATUS.RESCHEDULED) {
+    resetReminderStates(visite);
+    if (nextStatus === STATUS.RESCHEDULED) visite.rescheduledAt = new Date();
   }
+  if (notes !== undefined) visite.notes = notes;
+  if (notes !== undefined) visite.staffNotes = notes;
+  if (meetingAddressSnapshot !== undefined) visite.meetingAddressSnapshot = meetingAddressSnapshot;
+  if (coordinatesSnapshot !== undefined) visite.coordinatesSnapshot = coordinatesSnapshot;
+  if (assignedAgent !== undefined) visite.assignedAgent = assignedAgent || null;
+  if (visitFeeAmount !== undefined) visite.visitFeeAmount = visitFeeAmount === '' ? null : visitFeeAmount;
+  if (visitFeeCurrency !== undefined) visite.visitFeeCurrency = visitFeeCurrency;
+  if (agencyCommissionType !== undefined) visite.agencyCommissionType = agencyCommissionType;
+  if (agencyCommissionValue !== undefined) visite.agencyCommissionValue = agencyCommissionValue === '' ? null : agencyCommissionValue;
+  if (commissionNotes !== undefined) visite.commissionNotes = commissionNotes;
+
+  // Une confirmation ou reprogrammation exige un créneau complet et sans conflit.
+  if (nextStatus === STATUS.CONFIRMED && (previousStatus !== STATUS.CONFIRMED || scheduledStartAt !== undefined || scheduledEndAt !== undefined)) {
+    const start = new Date(visite.scheduledStartAt || visite.dateConfirmee);
+    const end = new Date(visite.scheduledEndAt);
+    if (!start.getTime() || !end.getTime() || end <= start || !visite.meetingAddressSnapshot) {
+      res.status(400);
+      throw new Error('Date, heure de fin et point de rendez-vous sont requis pour confirmer.');
+    }
+    const conflict = await Visite.exists({
+      _id: { $ne: visite._id },
+      $and: [
+        { $or: [
+          { status: { $in: [STATUS.CONFIRMED, STATUS.IN_PROGRESS] } },
+          { status: null, statut: { $in: ['Confirmée', 'En cours'] } },
+        ] },
+        { $or: [
+          { property: visite.property, scheduledStartAt: { $lt: end }, scheduledEndAt: { $gt: start } },
+          ...(visite.assignedAgent ? [{ assignedAgent: visite.assignedAgent, scheduledStartAt: { $lt: end }, scheduledEndAt: { $gt: start } }] : []),
+        ] },
+      ],
+    });
+    if (conflict) {
+      res.status(409);
+      throw new Error('Ce créneau est en conflit avec un autre rendez-vous confirmé.');
+    }
+    visite.confirmedAt = new Date();
+    visite.confirmedBy = req.user.id;
+    visite.ownerViewedAt = null;
+    if (visite.visitFeeAmount > 0) visite.paiementStatus = 'en_attente';
+  }
+
+  if (nextStatus !== previousStatus) appendHistory(visite, { to: nextStatus, action: 'staff_update', actor: req.user.id, role: 'staff', comment: notes || '', source: sourceOf(req) });
 
   visite.traitePar = req.user.id;
 
   await visite.save();
 
-  await visite.populate('property', 'title images address');
+  await visite.populate('property', 'title images address owner');
   await visite.populate('client', 'name email');
   await visite.populate('traitePar', 'name');
 
   // Notifie le client si le statut a changé
-  if (statut && statut !== previousStatut && visite.client) {
+  if (nextStatus !== previousStatus && visite.client) {
     const STATUT_MESSAGES = {
       'Confirmée':   { title: 'Visite confirmée ✅',   body: `Votre visite de "${visite.property?.title}" a été confirmée${dateConfirmee ? ` le ${new Date(dateConfirmee).toLocaleDateString('fr-FR')}` : ''}.` },
       'En cours':    { title: 'Visite en cours 🏃',    body: `Votre visite de "${visite.property?.title}" est maintenant en cours.` },
@@ -149,20 +274,42 @@ exports.updateVisite = asyncHandler(async (req, res) => {
       'Terminée':    { title: 'Visite effectuée',       body: `Merci pour votre visite de "${visite.property?.title}". N'hésitez pas à nous contacter.` },
       'Annulée':     { title: 'Visite annulée ❌',      body: `Votre visite de "${visite.property?.title}" a été annulée car elle n'a pas été prise en charge à l'heure prévue. Contactez-nous pour reprogrammer.` },
     };
-    const msg = STATUT_MESSAGES[statut];
+    const msg = STATUT_MESSAGES[visite.statut];
     if (msg) {
       notify({ recipient: visite.client._id || visite.client,
         type:  'visite_status',
         title: msg.title,
         body:  msg.body,
-        data:  { screen: 'Visites', params: { id: visite._id } },
+        entityType: 'Visite', entityId: visite._id,
+        data:  { screen: 'Visites', params: { id: visite._id }, visiteId: visite._id.toString(), route: 'Visites' },
       }).catch(() => {});
+    }
+    if (visite.property?.owner) {
+      notify({
+        recipient: visite.property.owner,
+        type: nextStatus === STATUS.CONFIRMED ? 'visite_confirmee' : 'visite_status',
+        title: 'Rendez-vous de visite mis à jour',
+        body: `${visite.property?.title || 'Un bien'} : ${LABELS[nextStatus]}.`,
+        link: '/mes-biens/visites', entityType: 'Visite', entityId: visite._id,
+        data: { screen: 'Visites', visiteId: visite._id.toString(), route: 'Visites' },
+      }).catch(() => {});
+    }
+    if (visite.assignedAgent && nextStatus === STATUS.CONFIRMED) {
+      const agentId = visite.assignedAgent._id || visite.assignedAgent;
+      if (String(agentId) !== String(visite.client?._id || visite.client) && String(agentId) !== String(visite.property?.owner || '')) {
+        notify({
+          recipient: agentId, type: 'visite_confirmee', title: 'Rendez-vous de visite assigné',
+          body: `Un rendez-vous confirmé vous a été assigné pour ${visite.property?.title || 'un bien'}.`,
+          entityType: 'Visite', entityId: visite._id,
+          data: { screen: 'Visites', visiteId: visite._id.toString(), route: 'Visites' },
+        }).catch(() => {});
+      }
     }
   }
 
   res.status(200).json({
     status: 'success',
-    data: { visite },
+    data: { visite: serializeVisite(visite, 'staff') },
   });
 });
 
@@ -170,6 +317,7 @@ exports.updateVisite = asyncHandler(async (req, res) => {
 // PATCH /api/visites/:id/cancel — client annule
 // ─────────────────────────────────────────────
 exports.cancelVisite = asyncHandler(async (req, res) => {
+  assertObjectId(req.params.id, res);
   const visite = await Visite.findById(req.params.id)
     .populate('property', 'title');
 
@@ -183,12 +331,16 @@ exports.cancelVisite = asyncHandler(async (req, res) => {
     throw new Error('Accès refusé : vous ne pouvez annuler que vos propres demandes.');
   }
 
-  if (visite.statut === 'Annulée') {
+  const currentStatus = normalizeStatus(visite.status, visite.statut);
+  if (!canTransition(currentStatus, STATUS.CANCELLED_CLIENT)) {
     res.status(400);
     throw new Error('Cette visite est déjà annulée.');
   }
 
-  visite.statut = 'Annulée';
+  visite.cancelledAt = new Date();
+  visite.cancellationActor = 'client';
+  visite.cancellationReason = String(req.body?.reason || '').slice(0, 1000);
+  appendHistory(visite, { to: STATUS.CANCELLED_CLIENT, action: 'cancel', actor: req.user.id, role: 'client', comment: visite.cancellationReason, source: sourceOf(req) });
   await visite.save();
 
   // Notifie le staff de l'annulation
@@ -196,12 +348,13 @@ exports.cancelVisite = asyncHandler(async (req, res) => {
     type:  'visite_cancelled',
     title: 'Visite annulée',
     body:  `${req.user.name} a annulé sa demande de visite pour "${visite.property?.title || 'un bien'}".`,
-    data:  { screen: 'AdminVisites', params: { id: visite._id } },
+    entityType: 'Visite', entityId: visite._id,
+    data:  { screen: 'AdminVisites', params: { id: visite._id }, visiteId: visite._id.toString(), route: 'Visites' },
   }).catch(() => {});
 
   res.status(200).json({
     status: 'success',
-    data: { visite },
+    data: { visite: serializeVisite(visite, 'client') },
   });
 });
 
@@ -216,16 +369,75 @@ exports.getOwnerVisites = asyncHandler(async (req, res) => {
     return res.status(200).json({ status: 'success', results: 0, data: { visites: [] } });
   }
 
+  await Visite.updateMany({
+    property: { $in: propertyIds }, ownerViewedAt: null,
+    $or: [
+      { status: { $in: [STATUS.CONFIRMED, STATUS.RESCHEDULED] } },
+      { status: null, statut: { $in: ['Confirmée', 'Replanifiée'] } },
+    ],
+  }, { $set: { ownerViewedAt: new Date() } });
   const visites = await Visite.find({ property: { $in: propertyIds } })
     .populate('property', 'title images address')
-    .populate('client', 'name email phone')
+    .populate('client', 'name')
     .sort('-createdAt');
 
   res.status(200).json({
     status: 'success',
     results: visites.length,
-    data: { visites },
+    data: { visites: visites.map((visite) => serializeVisite(visite, 'owner')) },
   });
+});
+
+exports.getOwnerUnreadCount = asyncHandler(async (req, res) => {
+  const properties = await Property.find({ owner: req.user.id }).distinct('_id');
+  const unreadCount = await Visite.countDocuments({
+    property: { $in: properties }, ownerViewedAt: null,
+    $or: [
+      { status: { $in: [STATUS.CONFIRMED, STATUS.RESCHEDULED] } },
+      { status: null, statut: { $in: ['Confirmée', 'Replanifiée'] } },
+    ],
+  });
+  res.status(200).json({ status: 'success', data: { unreadCount } });
+});
+
+exports.ownerAction = asyncHandler(async (req, res) => {
+  assertObjectId(req.params.id, res);
+  const properties = await Property.find({ owner: req.user.id }).distinct('_id');
+  const visite = await Visite.findOne({ _id: req.params.id, property: { $in: properties } });
+  if (!visite) {
+    res.status(404);
+    throw new Error('Rendez-vous introuvable.');
+  }
+  const current = normalizeStatus(visite.status, visite.statut);
+  if (req.params.action === 'report-incident') {
+    const comment = String(req.body?.comment || req.body?.reason || '').trim().slice(0, 1000);
+    if (!comment) {
+      res.status(400);
+      throw new Error('Décrivez brièvement l’incident.');
+    }
+    visite.workflowHistory.push({ from: current, to: current, action: 'report_incident', actor: req.user.id, role: 'owner', comment, source: sourceOf(req), at: new Date() });
+    visite.ownerNotes = visite.ownerNotes ? `${visite.ownerNotes}\n${comment}` : comment;
+    await visite.save();
+    notifyStaff({ type: 'visite_incident', title: 'Incident pendant un rendez-vous de visite', body: 'Un propriétaire a signalé un incident. Consultez le dossier.', data: { screen: 'AdminVisites', params: { id: visite._id } } }).catch(() => {});
+    return res.status(200).json({ status: 'success', data: { visite: serializeVisite(visite, 'owner') } });
+  }
+  const targets = { start: STATUS.IN_PROGRESS, complete: STATUS.COMPLETED, 'client-absent': STATUS.CLIENT_ABSENT, 'request-cancellation': STATUS.OWNER_CANCELLATION_REQUESTED };
+  const target = targets[req.params.action];
+  if (!target || !canTransition(current, target)) {
+    res.status(409);
+    throw new Error('Action propriétaire non autorisée dans cet état.');
+  }
+  if (target === STATUS.IN_PROGRESS) visite.startedAt = new Date();
+  if (target === STATUS.COMPLETED) visite.completedAt = new Date();
+  if (target === STATUS.OWNER_CANCELLATION_REQUESTED) {
+    visite.cancellationRequestedAt = new Date();
+    visite.cancellationRequestedBy = req.user.id;
+    visite.cancellationRequestReason = String(req.body?.reason || '').slice(0, 1000);
+  }
+  appendHistory(visite, { to: target, action: req.params.action, actor: req.user.id, role: 'owner', comment: req.body?.reason || req.body?.comment || '', source: sourceOf(req) });
+  await visite.save();
+  notifyStaff({ type: target === STATUS.OWNER_CANCELLATION_REQUESTED ? 'visite_annulation_demandee' : 'visite_status', title: 'Rendez-vous de visite mis à jour', body: `Le propriétaire a signalé : ${LABELS[target]}.`, data: { screen: 'AdminVisites', params: { id: visite._id } } }).catch(() => {});
+  res.status(200).json({ status: 'success', data: { visite: serializeVisite(visite, 'owner') } });
 });
 
 // ─────────────────────────────────────────────

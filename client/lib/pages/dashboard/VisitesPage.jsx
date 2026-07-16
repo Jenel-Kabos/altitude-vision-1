@@ -50,6 +50,8 @@ const VisitesPage = () => {
   const [filtre,       setFiltre]       = useState("Tous");
   const [notif,        setNotif]        = useState(null);
   const [proposeDates, setProposeDates] = useState({});
+  const [endDates, setEndDates] = useState({});
+  const [meetingAddresses, setMeetingAddresses] = useState({});
   const [submitting,   setSubmitting]   = useState(null);
 
   const fetchVisites = async () => {
@@ -65,6 +67,11 @@ const VisitesPage = () => {
   };
 
   useEffect(() => { fetchVisites(); }, []);
+
+  useEffect(() => {
+    window.addEventListener('altitude:visites:changed', fetchVisites);
+    return () => window.removeEventListener('altitude:visites:changed', fetchVisites);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(fetchVisites, 2 * 60 * 1000);
@@ -93,7 +100,16 @@ const VisitesPage = () => {
   const handleProposerDate = (id) => {
     const dateStr = proposeDates[id];
     if (!dateStr) return;
-    handleUpdate(id, { dateConfirmee: new Date(dateStr).toISOString(), statut: "Confirmée" });
+    if (!endDates[id] || !meetingAddresses[id]?.trim()) {
+      showNotif("L’heure de fin et le point de rendez-vous sont requis.", "error");
+      return;
+    }
+    handleUpdate(id, {
+      scheduledStartAt: new Date(dateStr).toISOString(),
+      scheduledEndAt: new Date(endDates[id]).toISOString(),
+      meetingAddressSnapshot: meetingAddresses[id].trim(),
+      status: "confirmee",
+    });
   };
 
   const filtered = filtre === "Tous" ? visites : visites.filter(v => v.statut === filtre);
@@ -412,16 +428,8 @@ const VisitesPage = () => {
                       <div className="vp-payment-content">
                         <p className="vp-payment-title">Paiement des honoraires requis</p>
                         <p className="vp-payment-desc">
-                          Commission : <strong>
-                            {(bien.honoraires ?? (
-                              bien.status === 'location'
-                                ? Math.round((bien.price || 0) * 0.8)
-                                : Math.round((bien.price || 0) * 0.1)
-                            )).toLocaleString('fr-FR')} FCFA
-                          </strong>
-                          {bien.fraisVisite > 0 && (
-                            <> · Frais de visite : <strong>{bien.fraisVisite.toLocaleString('fr-FR')} FCFA</strong></>
-                          )}
+                          {visite.agencyCommissionValue != null ? <>Commission validée : <strong>{visite.agencyCommissionValue.toLocaleString('fr-FR')} {visite.visitFeeCurrency || 'XAF'}</strong></> : 'Commission non renseignée'}
+                          {visite.visitFeeAmount > 0 && <> · Frais de visite : <strong>{visite.visitFeeAmount.toLocaleString('fr-FR')} {visite.visitFeeCurrency || 'XAF'}</strong></>}
                         </p>
                         <div className="vp-payment-actions">
                           <a href="/dashboard/paiements" className="vp-pay-btn">
@@ -443,15 +451,23 @@ const VisitesPage = () => {
 
                       {/* Proposer/confirmer une date (uniquement si pas encore En cours) */}
                       {visite.statut !== 'En cours' && (
-                        <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+                        <div className="grid sm:grid-cols-3 gap-2 flex-1 min-w-[240px]">
                           <input type="datetime-local"
                             value={proposeDates[visite._id] || ""}
                             onChange={e => setProposeDates(prev => ({ ...prev, [visite._id]: e.target.value }))}
                             className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
                           />
+                          <input type="datetime-local" aria-label="Heure de fin"
+                            value={endDates[visite._id] || ""}
+                            onChange={e => setEndDates(prev => ({ ...prev, [visite._id]: e.target.value }))}
+                            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5" />
+                          <input type="text" aria-label="Point de rendez-vous" placeholder="Point de rendez-vous"
+                            value={meetingAddresses[visite._id] || ""}
+                            onChange={e => setMeetingAddresses(prev => ({ ...prev, [visite._id]: e.target.value }))}
+                            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5" />
                           <button
                             onClick={() => handleProposerDate(visite._id)}
-                            disabled={!proposeDates[visite._id] || isBusy}
+                            disabled={!proposeDates[visite._id] || !endDates[visite._id] || !meetingAddresses[visite._id] || isBusy}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
                             {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
                             Confirmer date
@@ -462,7 +478,7 @@ const VisitesPage = () => {
                       <div className="flex gap-2 flex-wrap">
                         {visite.statut === 'Confirmée' && (
                           <button
-                            onClick={() => handleUpdate(visite._id, { statut: 'En cours' })}
+                            onClick={() => handleUpdate(visite._id, { status: 'en_cours' })}
                             disabled={isBusy}
                             className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition shadow-sm">
                             {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
@@ -472,7 +488,7 @@ const VisitesPage = () => {
 
                         {visite.statut === 'En cours' && (
                           <button
-                            onClick={() => handleUpdate(visite._id, { statut: 'Terminée' })}
+                            onClick={() => handleUpdate(visite._id, { status: 'terminee' })}
                             disabled={isBusy}
                             className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm">
                             {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
@@ -481,7 +497,7 @@ const VisitesPage = () => {
                         )}
 
                         <button
-                          onClick={() => handleUpdate(visite._id, { statut: 'Annulée' })}
+                          onClick={() => handleUpdate(visite._id, { status: 'annulee_staff' })}
                           disabled={isBusy}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-red-50 text-red-600 rounded-lg hover:bg-red-100 disabled:opacity-50 transition">
                           <XCircle className="w-4 h-4" />

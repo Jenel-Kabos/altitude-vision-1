@@ -6,7 +6,7 @@ import {
   Calendar, Loader2, AlertCircle, Clock, CheckCircle2,
   XCircle, RefreshCw, User, Phone, Mail, Home, MapPin, PlayCircle,
 } from 'lucide-react';
-import { getOwnerVisites } from '../../services/visiteService';
+import { getOwnerVisites, updateOwnerVisite } from '../../services/visiteService';
 
 const BLUE  = '#2E7BB5';
 const GOLD  = '#C8960C';
@@ -21,6 +21,14 @@ const STATUT_CONFIG = {
   'En cours':   { color: '#7C3AED', bg: '#7C3AED15', icon: PlayCircle,   label: 'En cours'  },
   'Annulée':    { color: RED,       bg: `${RED}15`,   icon: XCircle,      label: 'Annulée'   },
   'Terminée':   { color: GRAY,  bg: `${GRAY}15`,  icon: CheckCircle2, label: 'Terminée'   },
+  demandee: { color: GOLD, bg: `${GOLD}15`, icon: Clock, label: 'Demandée' },
+  en_attente_confirmation: { color: GOLD, bg: `${GOLD}15`, icon: Clock, label: 'À confirmer' },
+  confirmee: { color: GREEN, bg: `${GREEN}15`, icon: CheckCircle2, label: 'Confirmée' },
+  reprogrammee: { color: BLUE, bg: `${BLUE}15`, icon: Calendar, label: 'Reprogrammée' },
+  en_cours: { color: '#7C3AED', bg: '#7C3AED15', icon: PlayCircle, label: 'En cours' },
+  terminee: { color: GRAY, bg: `${GRAY}15`, icon: CheckCircle2, label: 'Terminée' },
+  client_absent: { color: RED, bg: `${RED}15`, icon: AlertCircle, label: 'Client absent' },
+  demande_annulation_proprietaire: { color: RED, bg: `${RED}15`, icon: Clock, label: 'Annulation demandée' },
 };
 
 const StatutBadge = ({ statut }) => {
@@ -47,6 +55,7 @@ const OwnerVisitesPage = () => {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
   const [filter,  setFilter]  = useState('all');
+  const [acting, setActing] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,24 +70,54 @@ const OwnerVisitesPage = () => {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    window.addEventListener('altitude:visites:changed', load);
+    return () => window.removeEventListener('altitude:visites:changed', load);
+  }, [load]);
 
-  const filtered = filter === 'all' ? visites : visites.filter(v => v.statut === filter);
+  const act = async (visite, action, promptMessage) => {
+    const reason = promptMessage ? window.prompt(promptMessage) : '';
+    if (promptMessage && reason === null) return;
+    setActing(visite._id);
+    try {
+      const updated = await updateOwnerVisite(visite._id, action, { reason });
+      setVisites((current) => current.map((item) => item._id === visite._id ? updated : item));
+    } catch (err) {
+      setError(err.response?.data?.message || 'Action impossible dans cet état.');
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const statusOf = (v) => v.status || v.statut;
+  const categoryOf = (v) => {
+    const status = statusOf(v);
+    if (['demandee', 'en_attente_confirmation', 'En attente'].includes(status)) return 'demandee';
+    if (['confirmee', 'reprogrammee', 'Confirmée', 'Replanifiée'].includes(status)) return 'confirmee';
+    if (['en_cours', 'En cours'].includes(status)) return 'en_cours';
+    if (['terminee', 'client_absent', 'proprietaire_absent', 'Terminée'].includes(status)) return 'terminee';
+    if (String(status).startsWith('annulee') || ['Annulée', 'refusee', 'expiree'].includes(status)) return 'annulee_staff';
+    return 'demandee';
+  };
+  const filtered = filter === 'all' ? visites : visites.filter(v => categoryOf(v) === filter);
 
   const counts = {
     all:          visites.length,
-    'En attente': visites.filter(v => v.statut === 'En attente').length,
-    'Confirmée':  visites.filter(v => v.statut === 'Confirmée').length,
-    'Annulée':    visites.filter(v => v.statut === 'Annulée').length,
-    'Terminée':   visites.filter(v => v.statut === 'Terminée').length,
+    demandee: visites.filter(v => categoryOf(v) === 'demandee').length,
+    confirmee: visites.filter(v => categoryOf(v) === 'confirmee').length,
+    en_cours: visites.filter(v => categoryOf(v) === 'en_cours').length,
+    terminee: visites.filter(v => categoryOf(v) === 'terminee').length,
+    annulee_staff: visites.filter(v => categoryOf(v) === 'annulee_staff').length,
   };
 
   const TABS = [
     { id: 'all',        label: 'Toutes'     },
-    { id: 'En attente', label: 'En attente' },
-    { id: 'Confirmée',  label: 'Confirmées' },
-    { id: 'Annulée',    label: 'Annulées'   },
-    { id: 'Terminée',   label: 'Terminées'  },
+    { id: 'demandee', label: 'En attente' },
+    { id: 'confirmee', label: 'Confirmées' },
+    { id: 'en_cours', label: 'En cours' },
+    { id: 'terminee', label: 'Terminées' },
+    { id: 'annulee_staff', label: 'Annulées' },
   ];
 
   if (loading) return (
@@ -129,13 +168,13 @@ const OwnerVisitesPage = () => {
       </div>
 
       {/* Alerte visites en attente */}
-      {counts['En attente'] > 0 && (
+      {counts.demandee > 0 && (
         <div className="flex items-start gap-3 p-4 rounded-xl border"
           style={{ background: `${GOLD}10`, borderColor: `${GOLD}40` }}>
           <Clock size={18} style={{ color: GOLD, flexShrink: 0, marginTop: 1 }} />
           <div style={{ fontFamily: FONT }}>
             <p className="text-sm font-semibold" style={{ color: '#92400E' }}>
-              {counts['En attente']} visite{counts['En attente'] > 1 ? 's' : ''} en attente de confirmation
+              {counts.demandee} visite{counts.demandee > 1 ? 's' : ''} en attente de confirmation
             </p>
             <p className="text-xs text-amber-700 mt-0.5">
               Le staff va contacter les visiteurs pour confirmer les dates.
@@ -209,7 +248,7 @@ const OwnerVisitesPage = () => {
                       </p>
                     </div>
                   </div>
-                  <StatutBadge statut={visite.statut} />
+                  <StatutBadge statut={visite.status || visite.statut} />
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-gray-50 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -225,19 +264,11 @@ const OwnerVisitesPage = () => {
                           {visite.client?.name || 'Inconnu'}
                         </span>
                       </div>
-                      {visite.client?.email && (
-                        <div className="flex items-center gap-2">
-                          <Mail size={13} style={{ color: GRAY }} />
-                          <span className="text-xs text-gray-500" style={{ fontFamily: FONT }}>
-                            {visite.client.email}
-                          </span>
-                        </div>
-                      )}
-                      {visite.client?.phone && (
+                      {visite.telephone && (
                         <div className="flex items-center gap-2">
                           <Phone size={13} style={{ color: GRAY }} />
                           <span className="text-xs text-gray-500" style={{ fontFamily: FONT }}>
-                            {visite.client.phone}
+                            {visite.telephone}
                           </span>
                         </div>
                       )}
@@ -261,13 +292,13 @@ const OwnerVisitesPage = () => {
                           </div>
                         </div>
                       )}
-                      {visite.dateConfirmee && (
+                      {(visite.scheduledStartAt || visite.dateConfirmee) && (
                         <div className="flex items-start gap-2">
                           <CheckCircle2 size={13} style={{ color: GREEN, marginTop: 2 }} />
                           <div>
                             <p className="text-xs text-gray-400" style={{ fontFamily: FONT }}>Date confirmée</p>
                             <p className="text-sm font-semibold text-gray-700 capitalize" style={{ fontFamily: FONT }}>
-                              {formatDate(visite.dateConfirmee)}
+                              {formatDate(visite.scheduledStartAt || visite.dateConfirmee)}
                             </p>
                           </div>
                         </div>
@@ -287,6 +318,15 @@ const OwnerVisitesPage = () => {
                       Note du gestionnaire
                     </p>
                     <p className="text-sm text-gray-700" style={{ fontFamily: FONT }}>{visite.notes}</p>
+                  </div>
+                )}
+                {visite.allowedActions?.length > 0 && (
+                  <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
+                    {visite.allowedActions.includes('start') && <button disabled={acting === visite._id} onClick={() => act(visite, 'start')} className="px-3 py-2 rounded-lg bg-purple-600 text-white text-xs font-bold">Visite commencée</button>}
+                    {visite.allowedActions.includes('complete') && <button disabled={acting === visite._id} onClick={() => act(visite, 'complete')} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold">Visite terminée</button>}
+                    {visite.allowedActions.includes('client_absent') && <button disabled={acting === visite._id} onClick={() => act(visite, 'client-absent', 'Commentaire facultatif :')} className="px-3 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-bold">Client absent</button>}
+                    {visite.allowedActions.includes('request_cancellation') && <button disabled={acting === visite._id} onClick={() => act(visite, 'request-cancellation', 'Motif de la demande d’annulation :')} className="px-3 py-2 rounded-lg border text-xs font-bold">Demander l’annulation</button>}
+                    {visite.allowedActions.includes('report_incident') && <button disabled={acting === visite._id} onClick={() => act(visite, 'report-incident', 'Décrivez brièvement l’incident :')} className="px-3 py-2 rounded-lg border text-xs font-bold">Signaler un incident</button>}
                   </div>
                 )}
               </motion.div>

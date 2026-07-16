@@ -15,6 +15,16 @@ export const getOwnerVisites = async () => {
   return res.data?.data?.visites || [];
 };
 
+export const updateOwnerVisite = async (id, action, data = {}) => {
+  const res = await api.patch(`/visites/${id}/owner/${action}`, data);
+  return res.data?.data?.visite;
+};
+
+export const getOwnerVisitesUnreadCount = async () => {
+  const res = await api.get('/visites/owner/unread-count');
+  return res.data?.data?.unreadCount || 0;
+};
+
 export const getAllPayments = async () => {
   const res = await api.get('/visites/all-payments');
   return res.data?.data?.visites || [];

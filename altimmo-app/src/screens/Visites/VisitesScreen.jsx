@@ -15,6 +15,7 @@ import PageHeader from '../../components/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import IllustrationNoVisites from '../../components/illustrations/IllustrationNoVisites';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import { connectSocket } from '../../services/socketService';
 
 const DAYS_SHORT  = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
 const MONTHS_LONG = [
@@ -31,25 +32,25 @@ const formatVisiteDate = (dateStr) => {
   return `${DAYS_SHORT[d.getDay()]} ${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()} à ${h}h${m}`;
 };
 
-const isActive = (v) => v.statut !== 'Annulée' && v.statut !== 'Terminée';
+const isActive = (v) => !['Annulée', 'Terminée', 'terminee', 'annulee_client', 'annulee_proprietaire', 'annulee_staff', 'refusee', 'expiree', 'client_absent', 'proprietaire_absent'].includes(v.status || v.statut);
 
 // ─── VisiteCard ───────────────────────────────────────────────────────────────
-const VisiteCard = React.memo(function VisiteCard({ item, onCancel, showCancel, styles, c }) {
+const VisiteCard = React.memo(function VisiteCard({ item, onCancel, onOwnerAction, showCancel, styles, c }) {
   const property  = item.property || {};
   const title     = property.title || 'Bien immobilier';
   const arrond    = property.address?.arrondissement || '';
   const city      = property.address?.city || '';
   const address   = [arrond, city].filter(Boolean).join(', ');
   const imgUri    = property.images?.[0];
-  const statut    = (item.statut || 'en attente').toLowerCase();
-  const dateStr   = item.dateConfirmee || item.dateProposee;
+  const statut    = (item.status || item.statut || 'demandee').toLowerCase();
+  const dateStr   = item.scheduledStartAt || item.dateConfirmee || item.dateProposee || item.requestedDate;
   const dateLabel = dateStr ? formatVisiteDate(dateStr) : 'En attente de proposition';
   const isPending = !dateStr;
 
   const { color, bg, border, icon } = useMemo(() => {
     if (statut === 'confirmée' || statut === 'confirmee')
       return { color: c.success, bg: 'rgba(56,161,105,0.12)',  border: 'rgba(56,161,105,0.3)',  icon: 'checkmark-circle' };
-    if (statut === 'annulée' || statut === 'annulee')
+    if (statut === 'annulée' || statut.startsWith('annulee') || statut === 'refusee' || statut === 'expiree')
       return { color: c.error,   bg: 'rgba(229,62,62,0.12)',   border: 'rgba(229,62,62,0.3)',   icon: 'close-circle' };
     if (statut === 'terminée' || statut === 'terminee')
       return { color: c.textSub, bg: 'rgba(100,100,100,0.12)', border: 'rgba(100,100,100,0.3)', icon: 'checkmark-done-circle' };
@@ -77,7 +78,7 @@ const VisiteCard = React.memo(function VisiteCard({ item, onCancel, showCancel, 
         {/* Badge statut */}
         <View style={[styles.badge, { backgroundColor: bg, borderColor: border }]}>
           <Ionicons name={icon} size={12} color={color} />
-          <Text style={[styles.badgeText, { color }]}>{item.statut || 'En attente'}</Text>
+          <Text style={[styles.badgeText, { color }]}>{item.displayStatus || item.statut || 'Demandée'}</Text>
         </View>
 
         {/* Titre */}
@@ -123,12 +124,27 @@ const VisiteCard = React.memo(function VisiteCard({ item, onCancel, showCancel, 
             <Text style={styles.cancelBtnText}>Annuler la visite</Text>
           </TouchableOpacity>
         )}
+        {item.allowedActions?.includes('start') && (
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => onOwnerAction('start')}><Text style={styles.cancelBtnText}>Visite commencée</Text></TouchableOpacity>
+        )}
+        {item.allowedActions?.includes('complete') && (
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => onOwnerAction('complete')}><Text style={styles.cancelBtnText}>Visite terminée</Text></TouchableOpacity>
+        )}
+        {item.allowedActions?.includes('client_absent') && (
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => onOwnerAction('client-absent')}><Text style={styles.cancelBtnText}>Client absent</Text></TouchableOpacity>
+        )}
+        {item.allowedActions?.includes('request_cancellation') && (
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => onOwnerAction('request-cancellation')}><Text style={styles.cancelBtnText}>Demander l’annulation</Text></TouchableOpacity>
+        )}
+        {item.allowedActions?.includes('report_incident') && (
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => onOwnerAction('report-incident')}><Text style={styles.cancelBtnText}>Signaler un incident</Text></TouchableOpacity>
+        )}
       </View>
     </View>
   );
 }, (prev, next) =>
   prev.item._id === next.item._id &&
-  prev.item.statut === next.item.statut &&
+  (prev.item.status || prev.item.statut) === (next.item.status || next.item.statut) &&
   prev.showCancel === next.showCancel &&
   prev.styles === next.styles);
 
@@ -169,6 +185,21 @@ export default function VisitesScreen({ navigation }) {
 
   useEffect(() => { chargerVisites(); }, [chargerVisites]);
 
+  useEffect(() => {
+    let activeSocket;
+    const refresh = (payload) => {
+      if (!payload?.visiteId) return;
+      cache.invalidate('visites:');
+      chargerVisites(true);
+    };
+    const events = ['visite:created', 'visite:updated', 'visite:confirmed', 'visite:status_changed', 'visite:cancelled'];
+    connectSocket().then((socket) => {
+      activeSocket = socket;
+      events.forEach((event) => socket.on(event, refresh));
+    }).catch(() => {});
+    return () => events.forEach((event) => activeSocket?.off(event, refresh));
+  }, [chargerVisites]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     chargerVisites(true);
@@ -197,6 +228,17 @@ export default function VisitesScreen({ navigation }) {
     ]);
   }, [chargerVisites]);
 
+  const actionProprietaire = useCallback(async (visite, action) => {
+    try {
+      const payload = action === 'report-incident' ? { comment: 'Incident signalé depuis l’application mobile.' } : {};
+      await api.patch(`/visites/${visite._id}/owner/${action}`, payload, { headers: { 'x-altimmo-client': 'mobile' } });
+      cache.invalidate('visites:');
+      chargerVisites(true);
+    } catch (err) {
+      Alert.alert('Action impossible', err.response?.data?.message || 'Ce rendez-vous ne peut pas être modifié.');
+    }
+  }, [chargerVisites]);
+
   const filtered = useMemo(() =>
     visites.filter(v => tab === 'venir' ? isActive(v) : !isActive(v)),
   [visites, tab]);
@@ -205,11 +247,12 @@ export default function VisitesScreen({ navigation }) {
     <VisiteCard
       item={item}
       onCancel={() => annulerVisite(item)}
+      onOwnerAction={(action) => actionProprietaire(item, action)}
       showCancel={tab === 'venir' && !isProprietaire}
       styles={styles}
       c={c}
     />
-  ), [annulerVisite, tab, isProprietaire, styles, c]);
+  ), [annulerVisite, actionProprietaire, tab, isProprietaire, styles, c]);
 
   const keyExtractor = useCallback((item) => item._id || item.id, []);
 

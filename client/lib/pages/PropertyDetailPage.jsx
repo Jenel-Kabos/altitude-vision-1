@@ -747,8 +747,10 @@ const PropertyDetailPage = () => {
   const [rdvHeure,   setRdvHeure]   = useState('');
   const [rdvTel,     setRdvTel]     = useState(user?.phone || '');
   const [rdvMessage, setRdvMessage] = useState('');
+  const [rdvConsent, setRdvConsent] = useState(false);
   const [rdvLoading, setRdvLoading] = useState(false);
   const [rdvSuccess, setRdvSuccess] = useState(false);
+  const rdvSubmittingRef = useRef(false);
 
   useEffect(() => {
     const load = async () => {
@@ -798,14 +800,17 @@ const PropertyDetailPage = () => {
     setRdvHeure('');
     setRdvTel(user?.phone || '');
     setRdvMessage('');
+    setRdvConsent(false);
     setRdvModal(true);
   };
 
   const soumettreRdv = async () => {
-    if (!rdvDate || !rdvHeure || !rdvTel.trim()) {
-      toast.error("Veuillez remplir la date, l'heure et votre téléphone.");
+    if (rdvSubmittingRef.current) return;
+    if (!rdvDate || !rdvHeure || !rdvTel.trim() || !rdvConsent) {
+      toast.error("Renseignez le créneau, le téléphone et confirmez votre accord de contact.");
       return;
     }
+    rdvSubmittingRef.current = true;
     setRdvLoading(true);
     try {
       const convRes = await api.post('/conversations/start', {
@@ -815,15 +820,17 @@ const PropertyDetailPage = () => {
       await api.post('/visites', {
         propertyId: property._id,
         conversationId: convRes.data?.data?.conversation?._id,
-        datePreferee: new Date(rdvDate).toLocaleDateString('fr-FR'),
+        datePreferee: rdvDate,
         heurePreferee: rdvHeure,
         telephone: rdvTel,
         message: rdvMessage,
+        clientContactConsent: rdvConsent,
       });
       setRdvSuccess(true);
     } catch (err) {
       toast.error(err.response?.data?.message || "Impossible d'envoyer la demande.");
     } finally {
+      rdvSubmittingRef.current = false;
       setRdvLoading(false);
     }
   };
@@ -1382,6 +1389,10 @@ const PropertyDetailPage = () => {
                       placeholder="Précisions sur la visite..."
                       rows={3} />
                   </div>
+                  <label className="flex items-start gap-2 text-sm" style={{ color: INK_MID }}>
+                    <input type="checkbox" checked={rdvConsent} onChange={e => setRdvConsent(e.target.checked)} />
+                    J’accepte d’être contacté par Altimmo pour organiser ce rendez-vous de visite.
+                  </label>
                 </div>
 
                 <button

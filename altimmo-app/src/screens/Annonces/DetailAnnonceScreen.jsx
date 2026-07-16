@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   FlatList, Dimensions, Alert, Share,
   TextInput, Modal, ScrollView, Pressable,
-  ActivityIndicator,
+  ActivityIndicator, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -142,10 +142,12 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const [rdvHeure, setRdvHeure]                     = useState('');
   const [rdvTelephone, setRdvTelephone]             = useState(user?.phone || '');
   const [rdvMessage, setRdvMessage]                 = useState('');
+  const [rdvConsent, setRdvConsent]                 = useState(false);
   const [rdvLoading, setRdvLoading]                 = useState(false);
   const [rdvSuccess, setRdvSuccess]                 = useState(false);
 
   const galleryRef = useRef(null);
+  const rdvSubmittingRef = useRef(false);
 
   // ─── Données dérivées ───
   const photos      = useMemo(() => annonce?.images || annonce?.photos || [], [annonce]);
@@ -296,15 +298,18 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     setRdvHeure('');
     setRdvTelephone(user?.phone || '');
     setRdvMessage('');
+    setRdvConsent(false);
     setRdvModalVisible(true);
   }, [isLoggedIn, navigation, user]);
 
   const soumettreRdv = useCallback(async () => {
-    if (!rdvDate.trim() || !rdvHeure.trim() || !rdvTelephone.trim()) {
-      Alert.alert('Champs requis', "Veuillez remplir la date, l'heure et votre téléphone.");
+    if (rdvSubmittingRef.current) return;
+    if (!rdvDate.trim() || !rdvHeure.trim() || !rdvTelephone.trim() || !rdvConsent) {
+      Alert.alert('Champs requis', "Renseignez le créneau, le téléphone et confirmez votre accord de contact.");
       return;
     }
     try {
+      rdvSubmittingRef.current = true;
       setRdvLoading(true);
       const convRes = await api.post('/conversations/start', {
         propertyId: annonce._id,
@@ -318,14 +323,16 @@ export default function DetailAnnonceScreen({ route, navigation }) {
         heurePreferee: rdvHeure,
         telephone: rdvTelephone,
         message: rdvMessage,
+        clientContactConsent: rdvConsent,
       });
       setRdvSuccess(true);
     } catch (err) {
       Alert.alert('Erreur', err.response?.data?.message || "Impossible d'envoyer la demande.");
     } finally {
+      rdvSubmittingRef.current = false;
       setRdvLoading(false);
     }
-  }, [annonce._id, rdvDate, rdvHeure, rdvTelephone, rdvMessage]);
+  }, [annonce._id, rdvDate, rdvHeure, rdvTelephone, rdvMessage, rdvConsent]);
 
   const closeRdvModal = useCallback(() => {
     setRdvModalVisible(false);
@@ -1097,6 +1104,12 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                     numberOfLines={3}
                     textAlignVertical="top"
                   />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 }}>
+                    <Switch value={rdvConsent} onValueChange={setRdvConsent} trackColor={{ true: c.gold }} />
+                    <Text style={{ flex: 1, color: c.textSub, fontFamily: fonts.body, fontSize: fontSize.sm }}>
+                      J’accepte d’être contacté par Altimmo pour organiser ce rendez-vous de visite.
+                    </Text>
+                  </View>
                 </ScrollView>
 
                 <TouchableOpacity

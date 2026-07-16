@@ -1,11 +1,12 @@
 "use client";
 // src/pages/dashboard/OwnerDashboard.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Home, User, LogOut, Globe, ShieldCheck, Menu, X, Building, Mountain, Calendar } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useAuth } from '../../context/AuthContext';
+import { getOwnerVisitesUnreadCount } from '../../services/visiteService';
 
 const BLUE  = '#2E7BB5';
 const GOLD  = '#C8960C';
@@ -13,7 +14,7 @@ const GREEN = '#16A34A';
 
 const NAV_LINKS = [
   { to: '/mes-biens',         end: true,  Icon: Building,    label: 'Mes Biens',   accent: BLUE  },
-  { to: '/mes-biens/visites', end: false, Icon: Calendar,    label: 'Mes Visites', accent: GOLD  },
+  { to: '/mes-biens/visites', end: false, Icon: Calendar,    label: 'Rendez-vous', accent: GOLD  },
   { to: '/profile',           end: false, Icon: User,        label: 'Mon Profil',  accent: GOLD  },
   { to: '/securite',          end: false, Icon: ShieldCheck, label: 'Sécurité',    accent: GREEN },
 ];
@@ -24,6 +25,12 @@ const OwnerDashboard = ({ children }) => {
   const isActive = (to, end = false) => end ? pathname === to : pathname.startsWith(to);
   const { logout, user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [rendezVousBadge, setRendezVousBadge] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    getOwnerVisitesUnreadCount().then(setRendezVousBadge).catch(() => setRendezVousBadge(0));
+  }, [user, pathname]);
 
   const handleLogout = () => {
     logout();
@@ -105,6 +112,11 @@ const OwnerDashboard = ({ children }) => {
                 style={{ fontFamily: "'DM Sans', sans-serif" }}>
                 <Icon size={16} style={{ color: isActive(to, end) ? accent : undefined, flexShrink: 0 }} />
                 <span>{label}</span>
+                {to === '/mes-biens/visites' && rendezVousBadge > 0 && !isActive(to, end) && (
+                  <span className="ml-auto min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold text-black" style={{ background: GOLD }}>
+                    {rendezVousBadge > 99 ? '99+' : rendezVousBadge}
+                  </span>
+                )}
                 {isActive(to, end) && (
                   <span className="ml-auto w-1 h-4 rounded-full flex-shrink-0"
                     style={{ backgroundColor: accent }} />

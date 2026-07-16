@@ -19,7 +19,10 @@ const { ALL_STAFF }                   = require('../utils/roles');
 
 const USER_LINKS = {
   visite_status: '/mes-visites', visite_cancelled: '/mes-visites', visite_auto_cancelled: '/mes-visites',
-  visite_auto_cancelled_owner: '/mes-visites', visite_confirmee: '/mes-visites', visite_sur_mon_bien: '/mes-visites',
+  visite_auto_cancelled_owner: '/mes-biens/visites', visite_confirmee: '/mes-visites', visite_sur_mon_bien: '/mes-biens/visites',
+  visite_demandee: '/mes-visites', visite_a_confirmer: '/mes-visites', visite_reprogrammee: '/mes-visites',
+  visite_rappel: '/mes-visites', visite_en_cours: '/mes-visites', visite_terminee: '/mes-visites',
+  visite_annulation_demandee: '/mes-biens/visites', visite_client_absent: '/mes-biens/visites', visite_incident: '/mes-biens/visites',
   paiement_confirme: '/mes-paiements', paiement_echoue: '/mes-paiements', payment_success: '/mes-paiements',
   payment_failed: '/mes-paiements', transaction_created: '/mes-paiements', transaction_finalized: '/mes-paiements',
   new_property: '/immobilier/annonces', bien_valide: '/immobilier/annonces', bien_rejete: '/profile',
@@ -32,6 +35,13 @@ const STAFF_LINKS = {
   visite_payee: '/dashboard/paiements', transaction_created: '/dashboard/transactions', quote_received: '/dashboard/quotes',
   estimation_received: '/dashboard/estimations', devis_received: '/dashboard/devis', contact_received: '/dashboard/contact-messages',
   property_pending_moderation: '/dashboard/moderation/properties', nouveau_signalement: '/dashboard/litiges',
+};
+
+const visitSocketEventFor = (type) => {
+  if (['visite_new', 'visite_demandee'].includes(type)) return 'visite:created';
+  if (type === 'visite_confirmee') return 'visite:confirmed';
+  if (['visite_cancelled', 'visite_auto_cancelled', 'visite_auto_cancelled_owner'].includes(type)) return 'visite:cancelled';
+  return 'visite:status_changed';
 };
 
 /**
@@ -89,6 +99,16 @@ async function notify({
       read:      false,
       createdAt: notif.createdAt,
     });
+    if (type?.startsWith('visite_')) {
+      const visiteId = entityId?.toString?.() || resolvedMetadata?.visiteId || resolvedMetadata?.params?.id || null;
+      const visitPayload = {
+        visiteId,
+        eventType: type,
+        updatedAt: notif.createdAt,
+      };
+      getIO().to(id).emit(visitSocketEventFor(type), visitPayload);
+      getIO().to(id).emit('visite:updated', visitPayload);
+    }
   } catch {
     // Socket non initialisé (tests unitaires, etc.) — on ignore
   }
@@ -97,7 +117,7 @@ async function notify({
   if (!isUserOnline(id)) {
     const user = await User.findById(id).select('pushToken').lean();
     if (user?.pushToken) {
-      sendExpoPushNotification(user.pushToken, title, body, {
+      sendExpoPushNotification(user.pushToken, title, resolvedMessage, {
       ...resolvedMetadata,
         notificationId: notif._id.toString(),
         type,
@@ -133,4 +153,4 @@ async function notifyMany(recipientIds, payload) {
   await Promise.allSettled(recipientIds.map((id) => notify({ ...payload, recipient: id })));
 }
 
-module.exports = { notify, notifyStaff, notifyMany };
+module.exports = { notify, notifyStaff, notifyMany, visitSocketEventFor };

@@ -11,6 +11,8 @@ const {
   updateVisite,
   cancelVisite,
   getOwnerVisites,
+  getOwnerUnreadCount,
+  ownerAction,
   updatePaiementVisite,
   getAllPayments,
   getMyPayments,
@@ -28,6 +30,7 @@ router.get('/my', getMyVisites);
 
 // Propriétaire : voir les visites sur ses biens
 router.get('/owner', restrictTo('Proprietaire', 'Admin'), getOwnerVisites);
+router.get('/owner/unread-count', restrictTo('Proprietaire', 'Admin'), getOwnerUnreadCount);
 
 // Staff : voir toutes les visites avec paiement requis
 router.get('/all-payments', restrictTo(...ROLES_UNIVERSAL), getAllPayments);
@@ -58,5 +61,6 @@ router.patch('/:id/paiement', restrictTo(...ROLES_UNIVERSAL), updatePaiementVisi
 
 // Client : annuler sa propre visite
 router.patch('/:id/cancel', cancelVisite);
+router.patch('/:id/owner/:action(start|complete|client-absent|request-cancellation|report-incident)', restrictTo('Proprietaire', 'Admin'), ownerAction);
 
 module.exports = router;

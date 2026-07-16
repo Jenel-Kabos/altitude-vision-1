@@ -12,6 +12,15 @@ const NOTIFICATION_TYPES = [
   'visite_auto_cancelled',       // client : visite annulée automatiquement
   'visite_auto_cancelled_owner', // propriétaire : visite de son bien annulée automatiquement
   'visite_confirmee',            // client : paiement de visite confirmé par le staff
+  'visite_demandee',
+  'visite_a_confirmer',
+  'visite_reprogrammee',
+  'visite_rappel',
+  'visite_en_cours',
+  'visite_terminee',
+  'visite_annulation_demandee',
+  'visite_client_absent',
+  'visite_incident',
   // ── Transactions ──
   'transaction_created',  // client : une transaction le concernant a été ouverte
   'transaction_finalized',// client : transaction réussie (vente/location validée)

@@ -110,9 +110,16 @@ export function useNotifications(isAuthenticated = false) {
       if (!notification.read) setUnreadCount((c) => c + 1);
     };
     socket.on('notification', handleNotification);
+    const handleVisitChanged = (payload) => {
+      if (!payload?.visiteId) return;
+      window.dispatchEvent(new CustomEvent('altitude:visites:changed', { detail: payload }));
+    };
+    const visitEvents = ['visite:created', 'visite:updated', 'visite:confirmed', 'visite:status_changed', 'visite:cancelled'];
+    visitEvents.forEach((event) => socket.on(event, handleVisitChanged));
 
     return () => {
       socket.off('notification', handleNotification);
+      visitEvents.forEach((event) => socket.off(event, handleVisitChanged));
       socket.disconnect();
     };
   }, [isAuthenticated]);
