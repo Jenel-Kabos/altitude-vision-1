@@ -1,7 +1,9 @@
 // Singleton Socket.IO — importer getIO() dans les controllers pour émettre des événements
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('./models/User');
+const Conversation = require('./models/Conversation');
 const logger = require('./utils/logger');
 
 let _io = null;
@@ -9,6 +11,23 @@ let _io = null;
 // Tracking en mémoire des utilisateurs actuellement connectés via socket
 // Clé : userId (string), Valeur : nombre de sockets actives (multi-onglet/device)
 const onlineUsers = new Map();
+
+const STAFF_ROLES = new Set(['Admin', 'Collaborateur']);
+
+const canAccessConversation = async (user, conversationId) => {
+  if (!mongoose.isValidObjectId(conversationId)) return false;
+  const conversation = await Conversation.findById(conversationId)
+    .select('participants isStaffInbox')
+    .lean();
+  if (!conversation) return false;
+
+  const userId = user?._id?.toString();
+  const isParticipant = conversation.participants?.some(
+    (participantId) => participantId.toString() === userId,
+  );
+  const isStaffInboxMember = conversation.isStaffInbox && STAFF_ROLES.has(user?.role);
+  return Boolean(isParticipant || isStaffInboxMember);
+};
 
 /**
  * Initialise Socket.IO sur le serveur HTTP.
@@ -70,22 +89,31 @@ const initSocket = (httpServer, corsOptions) => {
       });
     });
 
-    // Rejoindre une room de conversation (optionnel, pour typing scoped)
-    socket.on('join-room', (conversationId) => {
-      socket.join(`conv:${conversationId}`);
-    });
-
-    // Relayer un message envoyé vers la room du destinataire
-    socket.on('send-message', (payload) => {
-      const { receiverId, ...message } = payload;
-      if (receiverId) {
-        _io.to(receiverId).emit('new-message', message);
+    // Les messages sont exclusivement persistés et émis par les contrôleurs API.
+    // Une room n'est accessible qu'à ses membres (ou au staff pour la boîte partagée).
+    socket.on('join-room', async (conversationId, acknowledge) => {
+      try {
+        const allowed = await canAccessConversation(socket.user, conversationId);
+        if (!allowed) {
+          acknowledge?.({ ok: false, error: 'Accès refusé' });
+          return;
+        }
+        socket.join(`conv:${conversationId}`);
+        acknowledge?.({ ok: true });
+      } catch (error) {
+        logger.error('[Socket] Échec de vérification de conversation', {
+          userId: socket.userId,
+          error,
+        });
+        acknowledge?.({ ok: false, error: 'Vérification impossible' });
       }
     });
 
     // Relayer l'indicateur "en train d'écrire" aux autres membres de la conv
-    socket.on('typing', ({ conversationId, userId }) => {
-      socket.to(`conv:${conversationId}`).emit('typing', { userId });
+    socket.on('typing', ({ conversationId } = {}) => {
+      const room = `conv:${conversationId}`;
+      if (!socket.rooms.has(room)) return;
+      socket.to(room).emit('typing', { userId: socket.userId });
     });
 
     socket.on('disconnect', (reason) => {
@@ -125,4 +153,4 @@ const getIO = () => {
  */
 const isUserOnline = (userId) => onlineUsers.has(userId.toString());
 
-module.exports = { initSocket, getIO, isUserOnline };
+module.exports = { initSocket, getIO, isUserOnline, canAccessConversation };

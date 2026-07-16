@@ -271,7 +271,6 @@ export default function ChatScreen({ route, navigation }) {
       const saved = res.data?.data?.message || res.data?.message;
       if (saved) {
         setMessages(prev => prev.map(m => m._id === tempMsg._id ? saved : m));
-        getSocket()?.emit('send-message', { ...saved, receiverId: contact._id });
       }
     } catch {
       setMessages(prev =>
