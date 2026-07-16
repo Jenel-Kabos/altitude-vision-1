@@ -101,6 +101,43 @@ describe('GET /api/properties/recommended', () => {
   });
 });
 
+describe('GET /api/properties/:id', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('400 — ObjectId invalide sans CastError 500', async () => {
+    const res = await request(app).get('/api/properties/not-an-object-id');
+    expect(res.statusCode).toBe(400);
+    expect(Property.findByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
+  test('404 — ObjectId valide mais bien absent', async () => {
+    Property.findByIdAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(null) });
+    const res = await request(app).get('/api/properties/507f191e810c19729de860ea');
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('200 — projection publique retire documents et coordonnées privées propriétaire', async () => {
+    const document = {
+      _id: '507f191e810c19729de860ea', title: 'TEST DATA PROPERTY', statusAdmin: 'Validée',
+      owner: { _id: '507f1f77bcf86cd799439012', name: 'TEST DATA OWNER', photo: '', email: 'private@example.com', phone: '+242000000000' },
+      documents: ['TEST DATA PRIVATE DOCUMENT'], images: [], latitude: -4, longitude: 15,
+      location: { type: 'Point', coordinates: [15, -4] }, address: { street: 'TEST DATA PRIVATE STREET', city: 'TEST DATA CITY' },
+      toObject() { return { ...this, toObject: undefined }; },
+    };
+    Property.findByIdAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(document) });
+    const res = await request(app).get('/api/properties/507f191e810c19729de860ea');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.property.documents).toBeUndefined();
+    expect(res.body.data.property.owner).toEqual(expect.objectContaining({ name: 'TEST DATA OWNER' }));
+    expect(res.body.data.property.owner.email).toBeUndefined();
+    expect(res.body.data.property.owner.phone).toBeUndefined();
+    expect(res.body.data.property.latitude).toBeUndefined();
+    expect(res.body.data.property.longitude).toBeUndefined();
+    expect(res.body.data.property.location).toBeUndefined();
+    expect(res.body.data.property.address.street).toBeUndefined();
+  });
+});
+
 // ─── POST /api/properties (création — authentification requise) ──────────────
 
 describe('POST /api/properties', () => {

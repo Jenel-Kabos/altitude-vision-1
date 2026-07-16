@@ -1,6 +1,7 @@
 import { buildMetadata, SITE_URL } from '@/lib/seo';
 import PropertyDetailPage from "@/lib/pages/PropertyDetailPage";
 import JsonLd from "@/lib/components/JsonLd";
+import { normalizePropertyDetail } from '@/lib/utils/normalizePropertyDetail';
 
 async function getProperty(id) {
   try {
@@ -10,7 +11,7 @@ async function getProperty(id) {
     );
     if (!res.ok) return null;
     const json = await res.json();
-    return json?.data?.property || json;
+    return normalizePropertyDetail(json?.data?.property || json);
   } catch { return null; }
 }
 
@@ -47,7 +48,7 @@ export default async function Page({ params }) {
       name:        property.title,
       description: property.description,
       url:         `${SITE_URL}/immobilier/property/${propertyId}`,
-      image:       (property.images || [])
+      image:       property.images
         .filter(Boolean)
         .map(img => img.startsWith('http') ? img : `${SITE_URL}${img}`),
       ...(property.price && {

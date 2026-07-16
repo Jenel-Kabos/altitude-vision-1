@@ -1,5 +1,6 @@
 // server/controllers/propertyController.js
 const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const User = require('../models/User');
 const APIFeatures = require('../utils/apiFeatures');
@@ -272,11 +273,15 @@ const getLatestProperties = (req, res, next) => {
  * @route GET /api/properties/:id
  */
 const getProperty = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(400);
+    throw new Error('Identifiant de bien invalide.');
+  }
   const property = await Property.findByIdAndUpdate(
     req.params.id,
     { $inc: { views: 1 } },
     { new: true }
-  ).populate('owner', 'name email photo phone');
+  ).populate('owner', 'name photo');
 
   if (!property) {
     res.status(404);
@@ -292,9 +297,25 @@ const getProperty = asyncHandler(async (req, res) => {
     throw new Error('Cette propriété est en attente de validation.');
   }
 
+  const responseProperty = property.toObject();
+  if (!isAdmin && !isOwner) {
+    delete responseProperty.documents;
+    delete responseProperty.latitude;
+    delete responseProperty.longitude;
+    delete responseProperty.location;
+    if (responseProperty.address) delete responseProperty.address.street;
+    if (responseProperty.owner) {
+      responseProperty.owner = {
+        _id: responseProperty.owner._id,
+        name: responseProperty.owner.name || 'Propriétaire vérifié',
+        photo: responseProperty.owner.photo || '',
+      };
+    }
+  }
+
   res.status(200).json({
     status: 'success',
-    data: { property },
+    data: { property: responseProperty },
   });
 });
 

@@ -1,4 +1,5 @@
 import api from './api';
+import { normalizePropertyDetail } from '../utils/normalizePropertyDetail';
 const apiFormHeaders = () => ({}); // On simule la fonction
 
 /**
@@ -64,16 +65,19 @@ export const getPropertiesWithFilters = async (params = {}) => {
   }
 };
 
-export const getPropertyById = async (propertyId) => {
+export const getPropertyById = async (propertyId, config = {}) => {
   try {
     
-    const response = await api.get(`/properties/${propertyId}`);
+    const response = await api.get(`/properties/${propertyId}`, config);
     const property = response.data?.data?.property || response.data?.data?.properties || null;
     
     
-    return property;
+    return normalizePropertyDetail(property);
   } catch (error) {
-    console.error(`❌ [propertyService] Erreur lors de la récupération de l'annonce ${propertyId} :`, error.response?.data || error.message);
+    if (error.code !== 'ERR_CANCELED') console.error('[PropertyDetail]', {
+      page: 'property-detail', propertyId, phase: 'fetch', status: error.response?.status || null,
+      type: error.name || 'Error', message: error.message,
+    });
     throw error;
   }
 };

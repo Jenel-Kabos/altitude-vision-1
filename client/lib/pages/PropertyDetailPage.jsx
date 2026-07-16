@@ -1,12 +1,12 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MotionImage = motion.create(Image);
-import { getPropertyById, likeProperty, shareProperty } from '../services/propertyService';
+import { getPropertyById, getPropertiesWithFilters, likeProperty, shareProperty } from '../services/propertyService';
 import api from '../services/api';
 import toast from '@/lib/utils/toast';
 import { useAuth } from '../context/AuthContext';
@@ -16,11 +16,13 @@ import {
   Phone, Clock, Scale, ChevronLeft, ChevronRight,
   Heart, Eye, Share2, Percent, ChevronDown, ChevronUp,
   MessageCircle, Calendar, Flag, Home, CheckCircle,
+  ShieldCheck,
 } from 'lucide-react';
 import CommentList from '../components/comments/CommentList';
 import Breadcrumb from '../components/Breadcrumb';
 import ContactModal from '../components/ContactModal';
 import SignalerAnnonceModal from '../components/SignalerAnnonceModal';
+import { formatCurrencyXAF, propertyDetailError } from '../utils/normalizePropertyDetail';
 
 // ─── Design tokens ─────────────────────────────────────────────
 const BLUE      = '#2E7BB5';
@@ -50,10 +52,6 @@ const optimizeCloudinaryUrl = (url, width = 1200) => {
   return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width},c_limit/`);
 };
 
-const priceFormatter = new Intl.NumberFormat('fr-CG', {
-  style: 'currency', currency: 'XAF', maximumFractionDigits: 0,
-});
-
 /* ═══════════════════════════════════════════════════════════════
    CSS — Mobile-first, luxury real estate
    
@@ -75,7 +73,9 @@ const STYLES = `
     background: ${CREAM};
     min-height: 100vh;
     color: ${INK};
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
+  @media (min-width: 1024px) { .pdp-root { padding-bottom: 0; } }
 
   /* ── Barre nav sticky ── */
   .pdp-nav {
@@ -722,6 +722,21 @@ const DetailSkeleton = () => (
   </div>
 );
 
+class SecondarySectionBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error) {
+    console.error('[PropertyDetail]', { page: 'property-detail', phase: this.props.phase, type: error?.name || 'Error', message: error?.message || 'Erreur de section' });
+  }
+  render() {
+    if (this.state.failed) return <p className="text-sm text-gray-500">Cette section est temporairement indisponible.</p>;
+    return this.props.children;
+  }
+}
+
 // ─── Composant principal ───────────────────────────────────────
 const PropertyDetailPage = () => {
   injectStyles();
@@ -730,7 +745,7 @@ const PropertyDetailPage = () => {
   const { user }        = useAuth();
   const [property,  setProperty]  = useState(null);
   const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState('');
+  const [error,     setError]     = useState(null);
   const [mainIdx,       setMainIdx]       = useState(0);
   const [lightbox,      setLightbox]      = useState(false);
   const [mainImgError,  setMainImgError]  = useState(false);
@@ -750,38 +765,72 @@ const PropertyDetailPage = () => {
   const [rdvConsent, setRdvConsent] = useState(false);
   const [rdvLoading, setRdvLoading] = useState(false);
   const [rdvSuccess, setRdvSuccess] = useState(false);
+  const [similarProperties, setSimilarProperties] = useState([]);
   const rdvSubmittingRef = useRef(false);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        const data = await getPropertyById(propertyId);
-        setProperty(data);
-        setLocalLikes(data?.likes?.length || 0);
-        setLocalShares(data?.shares || 0);
-        if (user && data?.likes) {
-          setLiked(data.likes.some(id => id === user._id || id?._id === user._id));
-        }
-      } catch {
-        setError("Impossible de charger les détails de l'annonce.");
-      } finally {
-        setLoading(false);
+  const loadProperty = useCallback(async (signal) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getPropertyById(propertyId, { signal });
+      if (!data) {
+        setProperty(null);
+        setError({ kind: 'not_found', title: 'Bien introuvable', message: 'Ce bien n’existe plus ou n’est plus disponible.' });
+        return;
       }
-    };
-    load();
-  }, [propertyId]);
+      setProperty(data);
+      setLocalLikes(data.likes.length);
+      setLocalShares(data.shares);
+      if (user) setLiked(data.likes.some(id => id === user._id || id?._id === user._id));
+    } catch (requestError) {
+      if (requestError.code !== 'ERR_CANCELED') {
+        setProperty(null);
+        setError(propertyDetailError(requestError));
+      }
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, [propertyId, user]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadProperty(controller.signal);
+    return () => controller.abort();
+  }, [loadProperty]);
+
+  useEffect(() => {
+    if (!property?._id) return undefined;
+    let active = true;
+    getPropertiesWithFilters({
+      type: property.type, transaction: property.status,
+      city: property.address?.city, limit: 6,
+    }).then(({ properties = [] }) => {
+      if (!active) return;
+      setSimilarProperties(properties
+        .filter((item) => item?._id !== property._id && item?.statusAdmin === 'Validée' && item?.availability === 'Disponible')
+        .slice(0, 4));
+    }).catch(() => { if (active) setSimilarProperties([]); });
+    return () => { active = false; };
+  }, [property]);
 
   const handleLike = async () => {
-    if (!user) return;
+    if (!user) { toast.error('Connectez-vous pour enregistrer ce bien.'); return; }
     const next = !liked;
     setLiked(next);
     setLocalLikes(n => next ? n + 1 : Math.max(0, n - 1));
-    try { await likeProperty(propertyId); } catch { setLiked(!next); setLocalLikes(n => next ? Math.max(0, n - 1) : n + 1); }
+    try { await likeProperty(propertyId); toast.success(next ? 'Bien ajouté aux favoris.' : 'Bien retiré des favoris.'); }
+    catch { setLiked(!next); setLocalLikes(n => next ? Math.max(0, n - 1) : n + 1); toast.error('Impossible de modifier vos favoris.'); }
   };
 
   const handleShare = async () => {
-    try { await navigator.clipboard.writeText(window.location.href); } catch {}
+    try {
+      if (navigator.share) await navigator.share({ title: property?.title || 'Bien Altimmo', url: window.location.href });
+      else await navigator.clipboard.writeText(window.location.href);
+    } catch (shareError) {
+      if (shareError?.name === 'AbortError') return;
+      toast.error('Impossible de partager ce bien.');
+      return;
+    }
     if (!shared) {
       setShared(true);
       setLocalShares(n => n + 1);
@@ -791,6 +840,11 @@ const PropertyDetailPage = () => {
   };
 
   const openRdvModal = () => {
+    const ownsProperty = user && property?.owner?._id && String(property.owner._id) === String(user._id || user.id);
+    if (property?.availability !== 'Disponible' || (property?.statusAdmin && property.statusAdmin !== 'Validée') || ownsProperty) {
+      toast.error(ownsProperty ? 'Vous ne pouvez pas demander une visite pour votre propre bien.' : 'Ce bien n’est pas disponible pour une visite.');
+      return;
+    }
     if (!user) {
       router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname));
       return;
@@ -866,18 +920,23 @@ const PropertyDetailPage = () => {
     <div className="pdp-root" style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'80vh', padding:'24px' }}>
       <div style={{ textAlign:'center', padding:40 }}>
         <p style={{ fontFamily:"'Cormorant Garamond', serif", fontSize:'clamp(1.5rem,4vw,1.75rem)', color:INK, marginBottom:8 }}>
-          Annonce introuvable
+          {error?.title || 'Bien introuvable'}
         </p>
-        <p style={{ color:INK_SOFT, fontSize:'clamp(0.82rem,2vw,0.88rem)', marginBottom:24 }}>{error}</p>
-        <Link href="/immobilier/annonces" style={{
+        <p role="alert" style={{ color:INK_SOFT, fontSize:'clamp(0.82rem,2vw,0.88rem)', marginBottom:24 }}>{error?.message}</p>
+        <div className="flex flex-wrap justify-center gap-3">
+        {!['not_found', 'forbidden'].includes(error?.kind) && (
+          <button type="button" onClick={() => loadProperty()} style={{ padding:'12px 24px', background:GOLD, color:INK, border:0, fontWeight:700 }}>Réessayer</button>
+        )}
+        <button type="button" onClick={() => window.history.length > 1 ? router.back() : router.push('/immobilier/annonces')} style={{
           display:'inline-flex', alignItems:'center', gap:8,
           padding:'12px 24px', background:INK, color:'#fff',
           fontFamily:"'DM Sans', sans-serif", fontSize:'clamp(0.68rem,1.5vw,0.75rem)',
           letterSpacing:'0.15em', textTransform:'uppercase',
-          textDecoration:'none', borderRadius:1,
+          textDecoration:'none', borderRadius:1, border:0,
         }}>
           <ArrowLeft size={14} /> Retour aux annonces
-        </Link>
+        </button>
+        </div>
       </div>
     </div>
   );
@@ -906,6 +965,17 @@ const PropertyDetailPage = () => {
   const prevImg = () => setMainIdx(i => (i - 1 + images.length) % images.length);
   const nextImg = () => setMainIdx(i => (i + 1) % images.length);
   const isAvail = property.availability === 'Disponible';
+  const isOwnProperty = Boolean(user && property.owner?._id && String(property.owner._id) === String(user._id || user.id));
+  const canRequestVisit = isAvail && (!property.statusAdmin || property.statusAdmin === 'Validée') && !isOwnProperty;
+  const reference = property.reference || property.ref || property._id;
+  const publicationDate = property.updatedAt || property.createdAt;
+  const locationParts = [property.address?.neighborhood, property.address?.arrondissement, property.address?.city].filter(Boolean);
+  const trustItems = [
+    property.statusAdmin === 'Validée' && 'Annonce vérifiée par Altimmo',
+    property.owner && 'Propriétaire identifié',
+    images.length > 0 && `${images.length} photo${images.length > 1 ? 's' : ''} disponible${images.length > 1 ? 's' : ''}`,
+    isAvail ? 'Disponibilité déclarée' : 'Disponibilité à confirmer',
+  ].filter(Boolean);
 
   return (
     <div className="pdp-root">
@@ -933,6 +1003,10 @@ const PropertyDetailPage = () => {
               <div className="pdp-address">
                 <MapPin size={12} style={{ color:GOLD, flexShrink:0 }} />
                 {displayAddress}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color:INK_SOFT }}>
+                {reference && <span>Réf. {reference}</span>}
+                {publicationDate && <span>Mis à jour le {new Date(publicationDate).toLocaleDateString('fr-FR')}</span>}
               </div>
             </div>
             <div className="pdp-badges">
@@ -982,13 +1056,16 @@ const PropertyDetailPage = () => {
                   <MotionImage
                     key={mainIdx}
                     src={mainImgError ? PLACEHOLDER : mainImage}
-                    alt="Vue principale"
+                    alt={`${property.title} — photo ${mainIdx + 1}`}
                     fill sizes="(max-width: 768px) 100vw, 60vw"
+                    priority={mainIdx === 0}
                     className="pdp-main-img"
                     initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
                     transition={{ duration:0.3 }}
                     onError={() => setMainImgError(true)}
                     onClick={() => setLightbox(mainIdx)}
+                    role="button" tabIndex={0}
+                    onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setLightbox(mainIdx); }}
                   />
                 </AnimatePresence>
 
@@ -1002,7 +1079,7 @@ const PropertyDetailPage = () => {
 
                 {/* Prix */}
                 <div className="pdp-img-price-badge">
-                  <p className="pdp-img-price-value">{priceFormatter.format(property.price || 0)}</p>
+                  <p className="pdp-img-price-value">{formatCurrencyXAF(property.price)}</p>
                 </div>
 
                 {/* Flèches */}
@@ -1026,8 +1103,11 @@ const PropertyDetailPage = () => {
                       src={optimizeCloudinaryUrl(buildImageUrl(img), 200)}
                       alt={`Vue ${i + 1}`}
                       width={120} height={72}
+                      loading="lazy"
                       className={`pdp-thumb${i === mainIdx ? ' active' : ''}`}
                       onClick={() => setMainIdx(i)}
+                      role="button" tabIndex={0}
+                      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setMainIdx(i); }}
                     />
                   ))}
                 </div>
@@ -1079,7 +1159,7 @@ const PropertyDetailPage = () => {
             <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.2, duration:0.5 }}
               className="pdp-card">
               <div className="pdp-card-title">Description</div>
-              <p className={`pdp-desc${descExpanded ? '' : ' pdp-desc-collapsed'}`}>
+              <p className={`pdp-desc${descExpanded ? '' : ' pdp-desc-collapsed'}`} style={{ whiteSpace:'pre-line' }}>
                 {property.description || 'Aucune description disponible pour ce bien.'}
               </p>
               {property.description && property.description.length > 180 && (
@@ -1089,6 +1169,21 @@ const PropertyDetailPage = () => {
                 </button>
               )}
             </motion.div>
+
+            {/* Confiance */}
+            {trustItems.length > 0 && (
+              <motion.section initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} className="pdp-card" aria-labelledby="property-trust-title">
+                <div id="property-trust-title" className="pdp-card-title">Repères de confiance</div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {trustItems.map((item) => (
+                    <div key={item} className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 text-sm text-emerald-900">
+                      <ShieldCheck size={17} aria-hidden="true" /> <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs" style={{ color:INK_SOFT }}>Les informations contractuelles et documents restent à vérifier avec l’agence avant engagement.</p>
+              </motion.section>
+            )}
 
             {/* Informations */}
             <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.25, duration:0.5 }}
@@ -1103,10 +1198,9 @@ const PropertyDetailPage = () => {
             </motion.div>
 
             {/* Équipements */}
-            <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3, duration:0.5 }}
+            {property.amenities.length > 0 && <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3, duration:0.5 }}
               className="pdp-card">
               <div className="pdp-card-title">Équipements & Commodités</div>
-              {Array.isArray(property.amenities) && property.amenities.length > 0 ? (
                 <div className="pdp-tags-wrap">
                   {property.amenities.map((a, i) => (
                     <span key={i} className="pdp-tag">
@@ -1114,17 +1208,51 @@ const PropertyDetailPage = () => {
                     </span>
                   ))}
                 </div>
-              ) : (
-                <p style={{ color:INK_SOFT, fontSize:'clamp(0.80rem,1.8vw,0.85rem)', fontStyle:'italic' }}>
-                  Aucun équipement spécifié.
-                </p>
-              )}
-            </motion.div>
+            </motion.div>}
+
+            {/* Localisation générale */}
+            {locationParts.length > 0 && (
+              <motion.section initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} className="pdp-card" aria-labelledby="property-location-title">
+                <div id="property-location-title" className="pdp-card-title">Localisation</div>
+                <div className="flex items-start gap-3 rounded-xl" style={{ background:GOLD_PALE, padding:16 }}>
+                  <MapPin size={20} style={{ color:GOLD, flexShrink:0 }} aria-hidden="true" />
+                  <div>
+                    <p className="font-semibold" style={{ color:INK }}>{locationParts.join(' · ')}</p>
+                    <p className="mt-1 text-sm" style={{ color:INK_SOFT }}>La localisation exacte et les instructions d’accès sont communiquées après confirmation du rendez-vous.</p>
+                  </div>
+                </div>
+              </motion.section>
+            )}
 
             {/* Commentaires */}
             <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.35, duration:0.5 }}>
-              <CommentList targetType="Property" targetId={property._id} />
+              <SecondarySectionBoundary phase="comments">
+                <CommentList targetType="Property" targetId={property._id} />
+              </SecondarySectionBoundary>
             </motion.div>
+
+            {similarProperties.length > 0 && (
+              <section className="pdp-card" aria-labelledby="similar-properties-title">
+                <div id="similar-properties-title" className="pdp-card-title">Biens similaires</div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {similarProperties.map((item) => {
+                    const reason = item.address?.neighborhood && item.address.neighborhood === property.address?.neighborhood
+                      ? 'Même quartier' : item.type === property.type ? 'Même type' : 'Même transaction';
+                    const image = Array.isArray(item.images) && item.images[0] ? buildImageUrl(item.images[0]) : PLACEHOLDER;
+                    return (
+                      <Link key={item._id} href={`/immobilier/property/${item._id}`} className="overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:shadow-md">
+                        <Image src={image} alt={item.title || 'Bien similaire'} width={420} height={230} loading="lazy" className="h-36 w-full object-cover" unoptimized />
+                        <div className="p-4">
+                          <span className="text-xs font-bold" style={{ color:GOLD }}>{reason}</span>
+                          <h3 className="mt-1 line-clamp-2 font-semibold" style={{ color:INK }}>{item.title || 'Bien immobilier'}</h3>
+                          <p className="mt-2 text-sm font-bold" style={{ color:BLUE_DARK }}>{formatCurrencyXAF(item.price)}</p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
           </div>
 
           {/* ── Sidebar ── */}
@@ -1136,7 +1264,7 @@ const PropertyDetailPage = () => {
               <div className="pdp-sidebar-price">
                 <p className="pdp-sidebar-price-label">Prix du bien</p>
                 <p className="pdp-sidebar-price-value">
-                  {priceFormatter.format(property.price || 0)}
+                  {formatCurrencyXAF(property.price)}
                 </p>
                 <div className="pdp-sidebar-badges">
                   <span className="pdp-sidebar-badge" style={{
@@ -1158,15 +1286,11 @@ const PropertyDetailPage = () => {
               {/* Honoraires d'agence — valeurs stockées en base, formule uniquement en repli */}
               {(() => {
                 const isLocation = property.status === 'location';
-                const honoraires = property.honoraires ?? (
-                  isLocation
-                    ? Math.round((property.price || 0) * 0.8)
-                    : Math.round((property.price || 0) * 0.1)
-                );
+                const honoraires = property.honoraires;
                 const fraisVisite = property.fraisVisite ?? 0;
                 const note        = isLocation
-                  ? '80% du loyer mensuel'
-                  : '10% du prix de vente';
+                  ? 'Selon le mandat de location validé'
+                  : 'Selon le mandat de vente validé';
                 return (
                   <div style={{ padding:'0 clamp(18px,4vw,28px) clamp(6px,1.5vw,10px)' }}>
                     <div className="pdp-fees">
@@ -1175,13 +1299,13 @@ const PropertyDetailPage = () => {
                       </div>
                       <div className="pdp-fees-row">
                         <span className="pdp-fees-row-label" style={{ color:'rgba(255,255,255,0.55)' }}>Montant estimé</span>
-                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>{priceFormatter.format(honoraires)}</span>
+                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>{formatCurrencyXAF(honoraires, 'Non renseigné')}</span>
                         <span className="pdp-fees-row-note" style={{ color:'rgba(255,255,255,0.38)' }}>{note}</span>
                       </div>
                       <div className="pdp-fees-row">
                         <span className="pdp-fees-row-label" style={{ color:'rgba(255,255,255,0.55)' }}>Frais de visite</span>
                         <span className="pdp-fees-row-value" style={{ color:'#fff' }}>
-                          {fraisVisite > 0 ? priceFormatter.format(fraisVisite) : 'Visite gratuite'}
+                          {fraisVisite > 0 ? formatCurrencyXAF(fraisVisite, 'Non renseigné') : 'Visite gratuite'}
                         </span>
                         {fraisVisite > 0 && (
                           <span className="pdp-fees-row-note" style={{ color:'rgba(255,255,255,0.38)' }}>à régler sur place</span>
@@ -1208,9 +1332,12 @@ const PropertyDetailPage = () => {
 
                 <button
                   onClick={openRdvModal}
-                  className="pdp-cta-primary">
+                  disabled={!canRequestVisit}
+                  aria-disabled={!canRequestVisit}
+                  title={!canRequestVisit ? (isOwnProperty ? 'Vous êtes propriétaire de ce bien' : 'Bien indisponible') : undefined}
+                  className="pdp-cta-primary disabled:cursor-not-allowed disabled:opacity-50">
                   <Calendar size={18} />
-                  Planifier une visite
+                  {canRequestVisit ? 'Planifier une visite' : 'Visite indisponible'}
                 </button>
 
                 <a href="tel:+242068002151" className="pdp-cta-tel">
@@ -1253,7 +1380,7 @@ const PropertyDetailPage = () => {
             initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
             transition={{ duration:0.22 }}
             onClick={() => setLightbox(false)}
-            className="pdp-lightbox">
+            className="pdp-lightbox" role="dialog" aria-modal="true" aria-label="Galerie photos en plein écran">
 
             <MotionImage
               key={lightbox}
@@ -1269,7 +1396,7 @@ const PropertyDetailPage = () => {
               onError={() => setLbImgError(true)}
             />
 
-            <button onClick={() => setLightbox(false)} className="pdp-lightbox-close">×</button>
+            <button onClick={() => setLightbox(false)} className="pdp-lightbox-close" aria-label="Fermer la galerie">×</button>
 
             <div className="pdp-lightbox-counter">{lightbox + 1} / {images.length}</div>
 
@@ -1277,11 +1404,13 @@ const PropertyDetailPage = () => {
               <>
                 <button
                   className="pdp-lightbox-arrow pdp-lightbox-arrow-l"
+                  aria-label="Photo précédente"
                   onClick={e => { e.stopPropagation(); setLightbox(i => (i - 1 + images.length) % images.length); }}>
                   ‹
                 </button>
                 <button
                   className="pdp-lightbox-arrow pdp-lightbox-arrow-r"
+                  aria-label="Photo suivante"
                   onClick={e => { e.stopPropagation(); setLightbox(i => (i + 1) % images.length); }}>
                   ›
                 </button>
@@ -1308,6 +1437,16 @@ const PropertyDetailPage = () => {
         )}
       </AnimatePresence>
 
+      {/* Actions prioritaires sur mobile */}
+      {!rdvModal && (
+        <nav aria-label="Actions du bien" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t bg-white/95 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] backdrop-blur lg:hidden" style={{ paddingBottom:'max(8px, env(safe-area-inset-bottom))' }}>
+          <button type="button" onClick={handleLike} aria-label={liked ? 'Retirer des favoris' : 'Ajouter aux favoris'} className="flex min-h-14 flex-col items-center justify-center gap-1 text-xs" style={{ color:liked ? '#E53E3E' : INK_MID }}><Heart size={19} fill={liked ? 'currentColor' : 'none'} />Favori</button>
+          <a href="tel:+242068002151" aria-label="Appeler l’agence Altimmo" className="flex min-h-14 flex-col items-center justify-center gap-1 text-xs" style={{ color:INK_MID }}><Phone size={19} />Appeler</a>
+          <a href="https://wa.me/242068002151" target="_blank" rel="noopener noreferrer" aria-label="Contacter Altimmo sur WhatsApp" className="flex min-h-14 flex-col items-center justify-center gap-1 text-xs" style={{ color:'#168A45' }}><MessageCircle size={19} />WhatsApp</a>
+          <button type="button" onClick={openRdvModal} disabled={!canRequestVisit} aria-label="Demander un rendez-vous de visite" className="flex min-h-14 flex-col items-center justify-center gap-1 text-xs font-bold disabled:opacity-40" style={{ background:GOLD, color:INK }}><Calendar size={19} />Rendez-vous</button>
+        </nav>
+      )}
+
       {showContact && (
         <ContactModal
           intention="Informations Générales"
@@ -1325,14 +1464,20 @@ const PropertyDetailPage = () => {
 
       {rdvModal && (
         <div className="pdp-modal-overlay" onClick={() => setRdvModal(false)}>
-          <div className="pdp-rdv-sheet" onClick={e => e.stopPropagation()}>
+          <div className="pdp-rdv-sheet" role="dialog" aria-modal="true" aria-labelledby="visit-dialog-title" onClick={e => e.stopPropagation()}>
 
             {!rdvSuccess ? (
               <>
                 <div className="pdp-rdv-header">
-                  <h3 className="pdp-rdv-title">Planifier une visite</h3>
-                  <button onClick={() => setRdvModal(false)} className="pdp-rdv-close">✕</button>
+                  <h3 id="visit-dialog-title" className="pdp-rdv-title">Planifier une visite</h3>
+                  <button onClick={() => setRdvModal(false)} className="pdp-rdv-close" aria-label="Fermer le formulaire de rendez-vous">✕</button>
                 </div>
+
+                <ol className="mb-4 grid gap-2 rounded-xl bg-slate-50 p-4 text-sm text-slate-700 sm:grid-cols-3">
+                  <li><strong>1.</strong> Choisissez un créneau</li>
+                  <li><strong>2.</strong> Altimmo confirme</li>
+                  <li><strong>3.</strong> Recevez l’adresse et les instructions</li>
+                </ol>
 
                 <div className="pdp-rdv-bien">
                   <p className="pdp-rdv-bien-nom">{property.title}</p>
@@ -1345,18 +1490,14 @@ const PropertyDetailPage = () => {
                   <div className="pdp-rdv-finance-row">
                     <span>Honoraires d'agence</span>
                     <strong>
-                      {(property.honoraires ?? (
-                        property.status === 'location'
-                          ? Math.round((property.price || 0) * 0.8)
-                          : Math.round((property.price || 0) * 0.1)
-                      )).toLocaleString('fr-FR')} FCFA
+                      {formatCurrencyXAF(property.honoraires, 'Non renseigné')}
                     </strong>
                   </div>
                   <div className="pdp-rdv-finance-row">
                     <span>Frais de visite</span>
                     <strong className={!property.fraisVisite ? 'pdp-rdv-gratuit' : ''}>
                       {property.fraisVisite
-                        ? property.fraisVisite.toLocaleString('fr-FR') + ' FCFA'
+                        ? formatCurrencyXAF(property.fraisVisite, 'Non renseigné')
                         : 'Gratuite'}
                     </strong>
                   </div>
@@ -1365,26 +1506,26 @@ const PropertyDetailPage = () => {
                 <div className="pdp-rdv-form">
                   <div className="pdp-rdv-row">
                     <div className="pdp-rdv-field">
-                      <label>Date souhaitée *</label>
-                      <input type="date" value={rdvDate}
+                      <label htmlFor="visit-date">Date souhaitée *</label>
+                      <input id="visit-date" type="date" value={rdvDate}
                         onChange={e => setRdvDate(e.target.value)}
                         min={new Date().toISOString().split('T')[0]} />
                     </div>
                     <div className="pdp-rdv-field">
-                      <label>Heure souhaitée *</label>
-                      <input type="time" value={rdvHeure}
+                      <label htmlFor="visit-time">Heure souhaitée *</label>
+                      <input id="visit-time" type="time" value={rdvHeure}
                         onChange={e => setRdvHeure(e.target.value)} />
                     </div>
                   </div>
                   <div className="pdp-rdv-field">
-                    <label>Téléphone *</label>
-                    <input type="tel" value={rdvTel}
+                    <label htmlFor="visit-phone">Téléphone *</label>
+                    <input id="visit-phone" type="tel" value={rdvTel}
                       onChange={e => setRdvTel(e.target.value)}
                       placeholder="+242 06 XXX XX XX" />
                   </div>
                   <div className="pdp-rdv-field">
-                    <label>Message (optionnel)</label>
-                    <textarea value={rdvMessage}
+                    <label htmlFor="visit-message">Message (optionnel)</label>
+                    <textarea id="visit-message" value={rdvMessage}
                       onChange={e => setRdvMessage(e.target.value)}
                       placeholder="Précisions sur la visite..."
                       rows={3} />
@@ -1432,6 +1573,9 @@ const PropertyDetailPage = () => {
                 <p className="pdp-rdv-note">
                   Vous recevrez une notification dès confirmation par notre équipe.
                 </p>
+                <Link href="/mes-visites" className="pdp-rdv-close-btn" onClick={() => setRdvModal(false)}>
+                  Voir mes rendez-vous
+                </Link>
                 <button className="pdp-rdv-close-btn" onClick={() => setRdvModal(false)}>
                   Fermer
                 </button>

@@ -9,7 +9,7 @@ import Link from 'next/link';
  */
 export default function GlobalError({ error, reset }) {
   useEffect(() => {
-    console.error('[GlobalError]', error);
+    console.error('[GlobalError]', { type: error?.name || 'Error', message: error?.message || 'Erreur de rendu' });
   }, [error]);
 
   return (
@@ -20,8 +20,7 @@ export default function GlobalError({ error, reset }) {
         Une erreur est survenue
       </h1>
       <p className="text-gray-500 text-sm max-w-md leading-relaxed mb-8">
-        Quelque chose s'est mal passé. L'équipe technique a été notifiée.
-        Vous pouvez réessayer ou retourner à l'accueil.
+        La page n’a pas pu être affichée. Vous pouvez réessayer ou retourner à l’accueil.
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3">
