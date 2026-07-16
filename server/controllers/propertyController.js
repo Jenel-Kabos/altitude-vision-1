@@ -79,6 +79,12 @@ const parseStringArray = (value) => {
   return [];
 };
 
+const parseNonNegativeAmount = (value, fallback) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+};
+
 // ============================================================
 // 🎮 CONTRÔLEURS PRINCIPAUX
 // ============================================================
@@ -100,8 +106,16 @@ const createProperty = asyncHandler(async (req, res, next) => {
     surface, bedrooms, bathrooms, amenities,
     livingRooms, kitchens, constructionType, cautionMultiplicateur,
     profilsLocataireRecherches, documentsRequis,
-    longitude, latitude, address, location
+    longitude, latitude, address, location, honoraires, fraisVisite
   } = req.body;
+
+  const parsedHonoraires = parseNonNegativeAmount(honoraires, null);
+  const parsedFraisVisite = parseNonNegativeAmount(fraisVisite, 0);
+  if ((honoraires !== undefined && honoraires !== '' && parsedHonoraires === null)
+    || (fraisVisite !== undefined && fraisVisite !== '' && parsedFraisVisite === null)) {
+    res.status(400);
+    throw new Error('Les honoraires et frais de visite doivent être des montants positifs ou nuls.');
+  }
 
   // 3. Parsing de l'adresse
   let addressData = {};
@@ -134,6 +148,8 @@ const createProperty = asyncHandler(async (req, res, next) => {
     title,
     description,
     price:           parseFloat(price),
+    honoraires:      parsedHonoraires,
+    fraisVisite:     parsedFraisVisite,
     pole,
     status,
     availability,
@@ -394,6 +410,23 @@ const updateProperty = asyncHandler(async (req, res) => {
   const updateData = { ...req.body };
   excludedFields.forEach(field => delete updateData[field]);
   delete updateData.statusAdmin; // toujours exclu du body
+
+  if (updateData.honoraires !== undefined) {
+    const amount = parseNonNegativeAmount(updateData.honoraires, null);
+    if (updateData.honoraires !== '' && amount === null) {
+      res.status(400);
+      throw new Error('Les honoraires doivent être un montant positif ou nul.');
+    }
+    updateData.honoraires = amount;
+  }
+  if (updateData.fraisVisite !== undefined) {
+    const amount = parseNonNegativeAmount(updateData.fraisVisite, 0);
+    if (updateData.fraisVisite !== '' && amount === null) {
+      res.status(400);
+      throw new Error('Les frais de visite doivent être un montant positif ou nul.');
+    }
+    updateData.fraisVisite = amount;
+  }
   // Un propriétaire qui modifie son bien repasse en modération
   if (!isAdmin) {
     updateData.statusAdmin = 'En attente';

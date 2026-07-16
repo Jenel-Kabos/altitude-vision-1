@@ -16,6 +16,8 @@ const AddPropertyPage = () => {
     title:            '',
     description:      '',
     price:            '',
+    honoraires:       '',
+    fraisVisite:      0,
     pole:             'Altimmo',
     status:           'vente',
     type:             'Appartement',

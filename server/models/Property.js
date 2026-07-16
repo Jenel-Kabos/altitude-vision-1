@@ -46,10 +46,12 @@ const propertySchema = new mongoose.Schema(
 
     honoraires: {
       type: Number,
+      min: [0, 'Les honoraires ne peuvent pas être négatifs'],
       default: null, // null = pas encore saisi manuellement
     },
     fraisVisite: {
       type: Number,
+      min: [0, 'Les frais de visite ne peuvent pas être négatifs'],
       default: 0, // 0 = visite gratuite par défaut
     },
 

@@ -24,7 +24,21 @@ const createPropertyMobile = async (req, res) => {
       cautionMultiplicateur,
       profilsLocataireRecherches,
       documentsRequis,
+      honoraires,
+      fraisVisite,
     } = req.body;
+
+    const parsedHonoraires = honoraires === undefined || honoraires === null || honoraires === ''
+      ? null : Number(honoraires);
+    const parsedFraisVisite = fraisVisite === undefined || fraisVisite === null || fraisVisite === ''
+      ? 0 : Number(fraisVisite);
+    if ((parsedHonoraires !== null && (!Number.isFinite(parsedHonoraires) || parsedHonoraires < 0))
+      || !Number.isFinite(parsedFraisVisite) || parsedFraisVisite < 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Les honoraires et frais de visite doivent être des montants positifs ou nuls.',
+      });
+    }
 
     if (!photos || photos.length === 0) {
       return res.status(400).json({
@@ -43,6 +57,8 @@ const createPropertyMobile = async (req, res) => {
       title: titre,
       description,
       price: prix,
+      honoraires: parsedHonoraires,
+      fraisVisite: parsedFraisVisite,
       surface: superficie,
       bedrooms: chambres || 0,
       bathrooms: bathrooms || 0,

@@ -165,4 +165,82 @@ describe('POST /api/properties', () => {
       .send({ title: 'Villa test', price: 15000000 });
     expect(res.statusCode).toBe(401);
   });
+
+  test('201 — persiste les honoraires et frais de visite saisis à la création web', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Proprietaire')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    Property.create = jest.fn().mockImplementation(async (data) => ({ _id: fakeProp._id, ...data }));
+
+    const res = await request(app)
+      .post('/api/properties')
+      .set('Authorization', `Bearer ${makeToken('Proprietaire')}`)
+      .send({
+        title: 'TEST DATA PROPERTY', description: 'TEST DATA DESCRIPTION', price: '10000000',
+        honoraires: '750000', fraisVisite: '0', pole: 'Altimmo', status: 'vente',
+        type: 'Villa', surface: '100', latitude: '-4.2661', longitude: '15.2832',
+        address: { arrondissement: 'TEST DATA ARRONDISSEMENT' },
+      });
+
+    expect(res.statusCode).toBe(201);
+    expect(Property.create).toHaveBeenCalledWith(expect.objectContaining({
+      honoraires: 750000,
+      fraisVisite: 0,
+    }));
+  });
+
+  test('400 — rejette des honoraires négatifs à la création web', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Proprietaire')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+
+    const res = await request(app)
+      .post('/api/properties')
+      .set('Authorization', `Bearer ${makeToken('Proprietaire')}`)
+      .send({ honoraires: '-1' });
+
+    expect(res.statusCode).toBe(400);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/properties/mobile — honoraires', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('201 — persiste les montants transmis par le mobile', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Proprietaire')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    User.find = jest.fn().mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) });
+    Property.create = jest.fn().mockImplementation(async (data) => ({
+      _id: { toString: () => fakeProp._id },
+      ...data,
+    }));
+
+    const res = await request(app)
+      .post('/api/properties/mobile')
+      .set('Authorization', `Bearer ${makeToken('Proprietaire')}`)
+      .send({
+        titre: 'TEST DATA PROPERTY', description: 'TEST DATA DESCRIPTION', prix: 200000,
+        superficie: 80, arrondissement: 'TEST DATA ARRONDISSEMENT', ville: 'Brazzaville',
+        type: 'Appartement', categorie: 'location', photos: ['https://example.test/image.jpg'],
+        honoraires: 160000, fraisVisite: 0,
+      });
+
+    expect(res.statusCode).toBe(201);
+    expect(Property.create).toHaveBeenCalledWith(expect.objectContaining({
+      honoraires: 160000,
+      fraisVisite: 0,
+    }));
+  });
+
+  test('400 — rejette des frais de visite négatifs depuis le mobile', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Proprietaire')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+
+    const res = await request(app)
+      .post('/api/properties/mobile')
+      .set('Authorization', `Bearer ${makeToken('Proprietaire')}`)
+      .send({ fraisVisite: -100 });
+
+    expect(res.statusCode).toBe(400);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
 });
