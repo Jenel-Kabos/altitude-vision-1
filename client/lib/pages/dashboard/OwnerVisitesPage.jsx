@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Loader2, AlertCircle, Clock, CheckCircle2,
   XCircle, RefreshCw, User, Phone, Mail, Home, MapPin, PlayCircle,
 } from 'lucide-react';
 import { getOwnerVisites, updateOwnerVisite } from '../../services/visiteService';
+import BackButton from '../../components/navigation/BackButton';
 
 const BLUE  = '#2E7BB5';
 const GOLD  = '#C8960C';
@@ -56,6 +57,15 @@ const OwnerVisitesPage = () => {
   const [error,   setError]   = useState(null);
   const [filter,  setFilter]  = useState('all');
   const [acting, setActing] = useState(null);
+  const [selectedVisite, setSelectedVisite] = useState(null);
+  const listRef = useRef(null);
+
+  const closeDetail = () => {
+    setSelectedVisite(null);
+    requestAnimationFrame(() => {
+      if (listRef.current) listRef.current.scrollTop = Number(listRef.current.dataset.scrollTop || 0);
+    });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,6 +73,7 @@ const OwnerVisitesPage = () => {
     try {
       const data = await getOwnerVisites();
       setVisites(data);
+      window.dispatchEvent(new CustomEvent('altitude:owner-visites:read'));
     } catch {
       setError('Impossible de charger les visites.');
     } finally {
@@ -77,14 +88,21 @@ const OwnerVisitesPage = () => {
   }, [load]);
 
   const act = async (visite, action, promptMessage) => {
+    const confirmation = {
+      start: 'Confirmer le démarrage de cette visite ?',
+      complete: 'Confirmer que cette visite est terminée ?',
+    }[action];
+    if (confirmation && !window.confirm(confirmation)) return;
     const reason = promptMessage ? window.prompt(promptMessage) : '';
     if (promptMessage && reason === null) return;
     setActing(visite._id);
     try {
       const updated = await updateOwnerVisite(visite._id, action, { reason });
       setVisites((current) => current.map((item) => item._id === visite._id ? updated : item));
+      setSelectedVisite((current) => current?._id === visite._id ? updated : current);
     } catch (err) {
       setError(err.response?.data?.message || 'Action impossible dans cet état.');
+      if (err.response?.status === 409) await load();
     } finally {
       setActing(null);
     }
@@ -140,10 +158,23 @@ const OwnerVisitesPage = () => {
   );
 
   return (
-    <div className="p-6 space-y-5 max-w-4xl mx-auto">
+    <div
+      ref={listRef}
+      onScroll={event => { event.currentTarget.dataset.scrollTop = String(event.currentTarget.scrollTop); }}
+      className="p-3 sm:p-6 space-y-5 max-w-4xl mx-auto"
+    >
+
+      {selectedVisite && (
+        <BackButton
+          onBack={closeDetail}
+          fallbackHref="/mes-biens/visites"
+          label="Retour aux rendez-vous"
+          className="sm:hidden"
+        />
+      )}
 
       {/* En-tête */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className={`${selectedVisite ? 'hidden sm:flex' : 'flex'} items-center justify-between flex-wrap gap-3`}>
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center"
             style={{ background: `${BLUE}18` }}>
@@ -169,7 +200,7 @@ const OwnerVisitesPage = () => {
 
       {/* Alerte visites en attente */}
       {counts.demandee > 0 && (
-        <div className="flex items-start gap-3 p-4 rounded-xl border"
+        <div className={`${selectedVisite ? 'hidden sm:flex' : 'flex'} items-start gap-3 p-4 rounded-xl border`}
           style={{ background: `${GOLD}10`, borderColor: `${GOLD}40` }}>
           <Clock size={18} style={{ color: GOLD, flexShrink: 0, marginTop: 1 }} />
           <div style={{ fontFamily: FONT }}>
@@ -184,7 +215,7 @@ const OwnerVisitesPage = () => {
       )}
 
       {/* Onglets filtre */}
-      <div className="flex flex-wrap gap-1.5">
+      <div className={`${selectedVisite ? 'hidden sm:flex' : 'flex'} flex-wrap gap-1.5`}>
         {TABS.map(({ id, label }) => (
           <button key={id} onClick={() => setFilter(id)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
@@ -215,11 +246,13 @@ const OwnerVisitesPage = () => {
       ) : (
         <div className="space-y-3">
           <AnimatePresence>
-            {filtered.map((visite, i) => (
+            {filtered.map((visite, i) => {
+              const detailMode = selectedVisite?._id === visite._id;
+              return (
               <motion.div key={visite._id}
                 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                className={`${selectedVisite && !detailMode ? 'hidden sm:block' : 'block'} bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5`}>
 
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -251,7 +284,7 @@ const OwnerVisitesPage = () => {
                   <StatutBadge statut={visite.status || visite.statut} />
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-50 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className={`${detailMode ? 'grid' : 'hidden sm:grid'} mt-4 pt-4 border-t border-gray-50 grid-cols-1 sm:grid-cols-2 gap-4`}>
                   {/* Visiteur */}
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2" style={{ fontFamily: FONT }}>
@@ -313,7 +346,7 @@ const OwnerVisitesPage = () => {
                 </div>
 
                 {visite.notes && (
-                  <div className="mt-3 p-3 rounded-xl" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                  <div className={`${detailMode ? 'block' : 'hidden sm:block'} mt-3 p-3 rounded-xl`} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
                     <p className="text-xs font-semibold text-gray-500 mb-1" style={{ fontFamily: FONT }}>
                       Note du gestionnaire
                     </p>
@@ -321,16 +354,27 @@ const OwnerVisitesPage = () => {
                   </div>
                 )}
                 {visite.allowedActions?.length > 0 && (
-                  <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
-                    {visite.allowedActions.includes('start') && <button disabled={acting === visite._id} onClick={() => act(visite, 'start')} className="px-3 py-2 rounded-lg bg-purple-600 text-white text-xs font-bold">Visite commencée</button>}
-                    {visite.allowedActions.includes('complete') && <button disabled={acting === visite._id} onClick={() => act(visite, 'complete')} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold">Visite terminée</button>}
-                    {visite.allowedActions.includes('client_absent') && <button disabled={acting === visite._id} onClick={() => act(visite, 'client-absent', 'Commentaire facultatif :')} className="px-3 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-bold">Client absent</button>}
+                  <div className={`${detailMode ? 'flex' : 'hidden sm:flex'} mt-4 pt-4 border-t flex-wrap gap-2`}>
+                    {visite.allowedActions.includes('start') && <button disabled={acting === visite._id} onClick={() => act(visite, 'start')} className="px-3 py-2 rounded-lg bg-purple-600 text-white text-xs font-bold">Démarrer la visite</button>}
+                    {visite.allowedActions.includes('complete') && <button disabled={acting === visite._id} onClick={() => act(visite, 'complete')} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold">Terminer la visite</button>}
+                    {visite.allowedActions.includes('client_absent') && <button disabled={acting === visite._id} onClick={() => act(visite, 'client-absent', 'Commentaire facultatif :')} className="px-3 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-bold">Signaler l’absence du client</button>}
                     {visite.allowedActions.includes('request_cancellation') && <button disabled={acting === visite._id} onClick={() => act(visite, 'request-cancellation', 'Motif de la demande d’annulation :')} className="px-3 py-2 rounded-lg border text-xs font-bold">Demander l’annulation</button>}
                     {visite.allowedActions.includes('report_incident') && <button disabled={acting === visite._id} onClick={() => act(visite, 'report-incident', 'Décrivez brièvement l’incident :')} className="px-3 py-2 rounded-lg border text-xs font-bold">Signaler un incident</button>}
                   </div>
                 )}
+                {!detailMode && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedVisite(visite)}
+                    className="sm:hidden mt-4 min-h-11 w-full rounded-xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                    aria-label={`Voir le rendez-vous pour ${visite.property?.title || 'ce bien'}`}
+                  >
+                    Voir le rendez-vous
+                  </button>
+                )}
               </motion.div>
-            ))}
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
