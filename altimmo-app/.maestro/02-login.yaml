@@ -1,0 +1,19 @@
+appId: com.altitudevision.altimmo
+env:
+  TEST_EMAIL: ${TEST_EMAIL}
+  TEST_PASSWORD: ${TEST_PASSWORD}
+---
+- launchApp
+- tapOn:
+    text: "Se connecter|Connexion"
+    optional: true
+- tapOn:
+    text: "Email"
+- inputText: ${TEST_EMAIL}
+- tapOn:
+    text: "Mot de passe"
+- inputText: ${TEST_PASSWORD}
+- tapOn:
+    text: "Se connecter"
+- assertVisible:
+    text: "Annonces"

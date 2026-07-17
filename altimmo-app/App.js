@@ -19,13 +19,29 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { incrementSession } from './src/services/reviewService';
+import { environment } from './src/config/environment';
 
 Sentry.init({
-  dsn: 'https://7fbaf95c5e78879c80fe1eb126f3d7e7@o4511646980767744.ingest.us.sentry.io/4511647058231296',
-  enabled: !__DEV__,
+  dsn: environment.sentryDsn,
+  enabled: !__DEV__ && Boolean(environment.sentryDsn),
   tracesSampleRate: 0.2,
-  environment: __DEV__ ? 'development' : 'production',
+  environment: environment.name,
   attachStacktrace: true,
+  sendDefaultPii: false,
+  beforeSend(event) {
+    if (event.request) {
+      delete event.request.data;
+      delete event.request.cookies;
+      if (event.request.headers) {
+        delete event.request.headers.Authorization;
+        delete event.request.headers.authorization;
+      }
+    }
+    if (event.user) {
+      event.user = event.user.id ? { id: event.user.id } : undefined;
+    }
+    return event;
+  },
 });
 
 function AppInner() {

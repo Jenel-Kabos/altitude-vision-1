@@ -1,0 +1,9 @@
+appId: com.altitudevision.altimmo
+---
+- runFlow: 02-login.yaml
+- openLink: "altimmo://visites"
+- assertVisible:
+    text: "Visites|Rendez-vous"
+- openLink: "altimmo://route-interdite"
+- assertNotVisible:
+    text: "StaffDashboard"

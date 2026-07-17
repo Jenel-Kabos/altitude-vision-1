@@ -1,0 +1,9 @@
+appId: com.altitudevision.altimmo
+env:
+  TEST_EMAIL: ${OWNER_TEST_EMAIL}
+  TEST_PASSWORD: ${OWNER_TEST_PASSWORD}
+---
+- runFlow: 02-login.yaml
+- tapOn: "Visites"
+- assertVisible:
+    text: "Rendez-vous|Visites"

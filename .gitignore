@@ -18,6 +18,27 @@ client/.env.local
 .DS_Store
 npm-debug.log
 
+# Secrets et configuration locale
+.env
+.env.*
+!.env.example
+altimmo-app/.env
+altimmo-app/.env.*
+!altimmo-app/.env.example
+client_secret*.json
+**/client_secret*.json
+service-account*.json
+**/service-account*.json
+credentials.json
+**/credentials.json
+google-services.json
+GoogleService-Info.plist
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+
 # Claude Code
 .claude/*
 !.claude/skills/

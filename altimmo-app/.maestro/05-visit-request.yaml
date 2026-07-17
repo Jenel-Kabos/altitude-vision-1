@@ -1,0 +1,7 @@
+appId: com.altitudevision.altimmo
+---
+- runFlow: 04-property-detail.yaml
+- tapOn:
+    text: "Demander une visite|Planifier une visite"
+- assertVisible:
+    text: "Date|Créneau|Consentement"

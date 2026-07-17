@@ -1,0 +1,9 @@
+appId: com.altitudevision.altimmo
+---
+- runFlow: 03-properties.yaml
+- tapOn:
+    index: 0
+    id: "property-card"
+    optional: true
+- assertVisible:
+    text: "Détails|Caractéristiques|Description"

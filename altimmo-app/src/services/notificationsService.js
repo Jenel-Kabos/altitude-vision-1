@@ -30,6 +30,10 @@ export const enregistrerNotifications = async (userId) => {
   return token.data;
 };
 
+export const dissocierNotifications = async () => {
+  await api.patch('/users/push-token', { pushToken: null });
+};
+
 // ─── Notification locale programmée ──────────────────────────────────────────
 
 export const programmerNotificationLocale = async (titre, corps, delaySeconds = 1) => {
@@ -152,7 +156,7 @@ const TYPE_TO_SCREEN = {
   rental_property_available: ()  => ['Profil', { screen: 'MesAnnonces' }],
 };
 
-async function resolveNavigation(data = {}) {
+export async function resolveNavigation(data = {}) {
   const { type, screen, params } = data;
 
   // Le resolver dédié au type est prioritaire — il peut enrichir les params
@@ -166,7 +170,8 @@ async function resolveNavigation(data = {}) {
   }
 
   // Fallback : screen explicite fourni par le serveur (types sans resolver dédié)
-  if (screen) return [screen, params];
+  const safeScreens = new Set(['Annonces', 'Messages', 'Visites', 'Profil', 'Notifications']);
+  if (screen && safeScreens.has(screen)) return [screen, params];
 
   return null;
 }

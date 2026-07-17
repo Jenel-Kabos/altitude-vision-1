@@ -1,0 +1,8 @@
+appId: com.altitudevision.altimmo
+---
+- runFlow: 02-login.yaml
+- tapOn: "Profil"
+- tapOn:
+    text: "Déconnexion|Se déconnecter"
+- assertVisible:
+    text: "Connexion|Se connecter"

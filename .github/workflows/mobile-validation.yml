@@ -1,0 +1,43 @@
+name: Mobile validation
+
+on:
+  pull_request:
+    paths:
+      - 'altimmo-app/**'
+      - '.github/workflows/mobile-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: altimmo-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: altimmo-app/package-lock.json
+
+      - run: npm ci
+      - run: npm run check:syntax
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npx expo-doctor
+      - run: npx expo config --type public
+
+      - name: Reject tracked credentials
+        working-directory: .
+        shell: bash
+        run: |
+          if git ls-files | grep -Eiq '(^|/)\.env($|\.)|client_secret|service-account|credentials\.json|\.jks$|\.keystore$|\.p8$|\.p12$'; then
+            echo 'Tracked credential-like file detected.'
+            exit 1
+          fi

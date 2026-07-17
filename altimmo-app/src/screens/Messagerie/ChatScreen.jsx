@@ -16,7 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
-import { connectSocket, getSocket } from '../../services/socketService';
+import {
+  getSocket,
+  joinConversation,
+  leaveConversation,
+} from '../../services/socketService';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 
 const EMOJIS = [
@@ -207,12 +211,12 @@ export default function ChatScreen({ route, navigation }) {
       }
     };
 
-    connectSocket().then(socket => {
+    joinConversation(conversation._id).then(() => {
       if (!isMounted) return;
-      socketRef = socket;
-      socket.emit('join-room', conversation._id);
-      socket.on('new-message', handleNewMessage);
-      socket.on('typing',      handleTyping);
+      socketRef = getSocket();
+      if (!socketRef) return;
+      socketRef.on('new-message', handleNewMessage);
+      socketRef.on('typing',      handleTyping);
     });
 
     // Polling uniquement si le socket est mort
@@ -224,6 +228,7 @@ export default function ChatScreen({ route, navigation }) {
       isMounted = false;
       socketRef?.off('new-message', handleNewMessage);
       socketRef?.off('typing',      handleTyping);
+      leaveConversation(conversation._id);
       clearInterval(fallback);
     };
   }, [conversation, conversation?._id, user._id, fetchMessages]);

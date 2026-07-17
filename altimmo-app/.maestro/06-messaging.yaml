@@ -1,0 +1,6 @@
+appId: com.altitudevision.altimmo
+---
+- runFlow: 02-login.yaml
+- tapOn: "Messages"
+- assertVisible:
+    text: "Messages|Conversations"

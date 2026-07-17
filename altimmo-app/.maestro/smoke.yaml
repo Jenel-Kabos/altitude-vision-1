@@ -1,0 +1,7 @@
+appId: com.altitudevision.altimmo
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    text: "Connexion|Se connecter|Annonces"
+    optional: true

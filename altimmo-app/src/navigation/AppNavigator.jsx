@@ -65,13 +65,22 @@ export default function AppNavigator() {
   }
 
   const linking = {
-    prefixes: ['altimmo://'],
+    prefixes: ['altimmo://', 'https://altitudevision.agency'],
     config: {
       screens: {
         Main: {
           screens: {
+            Annonces: {
+              screens: {
+                ListeAnnonces: 'annonces',
+                DetailAnnonce: 'annonces/:propertyId',
+              },
+            },
+            Visites: 'visites',
+            Messages: 'messages',
             Profil: {
               screens: {
+                ProfilHome: 'profil',
                 Transactions:   'paiement/success',
                 PaiementCancel: 'paiement/cancel',
               },

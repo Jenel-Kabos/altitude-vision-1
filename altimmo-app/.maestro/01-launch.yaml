@@ -1,0 +1,6 @@
+appId: com.altitudevision.altimmo
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    text: "Altimmo"

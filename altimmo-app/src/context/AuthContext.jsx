@@ -1,10 +1,41 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { Alert } from 'react-native';
-import api, { saveToken, getToken, deleteToken } from '../services/api';
-import { enregistrerNotifications } from '../services/notificationsService';
+import api, { saveToken, getToken, deleteToken, setSessionInvalidatedHandler } from '../services/api';
+import { enregistrerNotifications, dissocierNotifications } from '../services/notificationsService';
 import { disconnectSocket } from '../services/socketService';
 
 const AuthContext = createContext({});
+
+export async function restoreStoredSession({
+  getStoredToken = getToken,
+  removeStoredToken = deleteToken,
+  apiClient = api,
+  timeoutMs = 5000,
+} = {}) {
+  const storedToken = await getStoredToken();
+  if (!storedToken) return null;
+
+  let timeoutId;
+  try {
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+    });
+    const response = await Promise.race([
+      apiClient.get('/users/me', {
+        headers: { Authorization: `Bearer ${storedToken}` },
+      }),
+      timeoutPromise,
+    ]);
+    const user = response.data?.data?.user || response.data?.user || null;
+    if (!user) throw new Error('invalid session response');
+    return { token: storedToken, user };
+  } catch {
+    await removeStoredToken();
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 export const AuthProvider = ({ children }) => {
   const [user,    setUser]    = useState(null);
@@ -15,29 +46,26 @@ export const AuthProvider = ({ children }) => {
   const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
 
   useEffect(() => { loadStoredAuth(); }, []);
+  useEffect(() => {
+    setSessionInvalidatedHandler(() => {
+      disconnectSocket();
+      setToken(null);
+      setUser(null);
+      setNeedsProfileCompletion(false);
+    });
+    return () => setSessionInvalidatedHandler(null);
+  }, []);
 
   const loadStoredAuth = async () => {
     try {
-      const storedToken = await getToken();
-      if (storedToken) {
-        setToken(storedToken);
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 5000)
-        );
-        const response = await Promise.race([
-          api.get('/users/me', {
-            headers: { Authorization: `Bearer ${storedToken}` },
-          }),
-          timeoutPromise,
-        ]);
-        const loadedUser = response.data?.data?.user || response.data?.user || null;
-        setUser(loadedUser);
-        if (loadedUser?._id) {
-          enregistrerNotifications(loadedUser._id).catch(() => {});
+      const session = await restoreStoredSession();
+      if (session) {
+        setToken(session.token);
+        setUser(session.user);
+        if (session.user?._id) {
+          enregistrerNotifications(session.user._id).catch(() => {});
         }
       }
-    } catch (error) {
-      await deleteToken();
     } finally {
       setLoading(false);
     }
@@ -74,8 +102,6 @@ export const AuthProvider = ({ children }) => {
       const user      = response.data.data?.user || response.data.user;
       const isNewUser = response.data?.isNewUser ?? false;
       if (!token) throw new Error('Token manquant dans la réponse /auth/google');
-      console.log('🔍 Google login user:', JSON.stringify(user));
-      console.log('🔍 Google login token:', token ? '✅' : '❌');
       await saveToken(token);
       setToken(token);
       setUser(user);
@@ -83,7 +109,6 @@ export const AuthProvider = ({ children }) => {
       enregistrerNotifications(user?._id).catch(() => {});
       return { user, isNewUser };
     } catch (error) {
-      console.log('❌ Google login error:', error.response?.data || error.message);
       const code = error?.code || error?.message || '';
       if (
         code.includes('SIGN_IN_CANCELLED') ||
@@ -110,6 +135,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    await dissocierNotifications().catch(() => {});
     await deleteToken();
     disconnectSocket();
     setToken(null);

@@ -1,0 +1,8 @@
+appId: com.altitudevision.altimmo
+---
+- runFlow: 02-login.yaml
+- tapOn: "Annonces"
+- assertVisible:
+    text: "Rechercher|Annonces"
+- swipe:
+    direction: UP

@@ -79,8 +79,11 @@ const VideoGalleryItem = React.memo(function VideoGalleryItem({ uri, isPlaying, 
         useNativeControls={isPlaying}
       />
       {!isPlaying && (
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onPlay} activeOpacity={0.8}
-          style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' }}>
+        <TouchableOpacity
+          onPress={onPlay}
+          activeOpacity={0.8}
+          style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' }}
+        >
           <View style={styles.videoPlayCircle}>
             <Ionicons name="play" size={26} color="#FFFFFF" />
           </View>

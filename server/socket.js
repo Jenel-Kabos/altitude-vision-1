@@ -109,6 +109,11 @@ const initSocket = (httpServer, corsOptions) => {
       }
     });
 
+    socket.on('leave-room', (conversationId) => {
+      if (!mongoose.isValidObjectId(conversationId)) return;
+      socket.leave(`conv:${conversationId}`);
+    });
+
     // Relayer l'indicateur "en train d'écrire" aux autres membres de la conv
     socket.on('typing', ({ conversationId } = {}) => {
       const room = `conv:${conversationId}`;
