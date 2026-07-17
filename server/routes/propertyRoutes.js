@@ -143,6 +143,7 @@ router.patch(
 
 router.post('/:id/like',  authController.protect, propertyController.toggleLike);
 router.post('/:id/share', propertyController.incrementShare);
+router.post('/:id/reviews', authController.protect, propertyController.addPropertyReview);
 
 
 // ============================================================

@@ -373,6 +373,34 @@ const incrementShare = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @description Laisser un avis (commentaire) sur un bien
+ * @route POST /api/properties/:id/reviews
+ */
+const addPropertyReview = asyncHandler(async (req, res) => {
+  const { comment, rating } = req.body;
+  if (!comment || !comment.trim()) {
+    res.status(400);
+    throw new Error('Un commentaire est requis.');
+  }
+
+  const property = await Property.findById(req.params.id);
+  if (!property) { res.status(404); throw new Error('Bien introuvable.'); }
+
+  property.reviews.push({
+    user: req.user._id,
+    comment: comment.trim(),
+    rating: rating || 5,
+  });
+  await property.save();
+  await property.populate('reviews.user', 'name photo');
+
+  res.status(201).json({
+    status: 'success',
+    data: { reviews: property.reviews },
+  });
+});
+
+/**
  * @description Obtenir les biens de l'utilisateur connecté
  * @route GET /api/properties/my-properties
  */
@@ -738,4 +766,5 @@ module.exports = {
   getRecommendedProperties,
   toggleLike,
   incrementShare,
+  addPropertyReview,
 };
