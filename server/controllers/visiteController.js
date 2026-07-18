@@ -51,6 +51,10 @@ exports.createVisite = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Bien introuvable.');
   }
+  if (property.owner && property.owner._id.toString() === req.user.id.toString()) {
+    res.status(403);
+    throw new Error('Vous ne pouvez pas planifier une visite sur votre propre bien.');
+  }
   if (property.availability !== 'Disponible' || property.statusAdmin !== 'Validée' || !property.isPublished) {
     res.status(409);
     throw new Error('Ce bien n’est pas disponible pour une nouvelle visite.');

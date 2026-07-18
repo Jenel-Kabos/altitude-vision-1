@@ -18,6 +18,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Screen, PrixFCFA } from '../../components';
 import HeartFavoriteButton from '../../components/HeartFavoriteButton';
 import { fonts, fontSize, spacing, radius } from '../../theme';
+import { getPropertyPermissions, extractConversation, resolveContactErrorMessage } from '../../services/propertyMapper';
 
 const { width } = Dimensions.get('window');
 // Galerie : ratio 4:3 portrait, plafonné à 310px — compact et élégant
@@ -148,6 +149,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const [rdvConsent, setRdvConsent]                 = useState(false);
   const [rdvLoading, setRdvLoading]                 = useState(false);
   const [rdvSuccess, setRdvSuccess]                 = useState(false);
+  const [contactLoading, setContactLoading]         = useState(false);
 
   const galleryRef = useRef(null);
   const rdvSubmittingRef = useRef(false);
@@ -202,6 +204,11 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     annonce.floor != null ? annonce.floor : (annonce.etage ?? null), [annonce]);
   const commodites  = useMemo(() => annonce.amenities || annonce.commodites || [], [annonce]);
   const reviews     = useMemo(() => annonce.reviews  || annonce.comments   || [], [annonce]);
+
+  // Permissions d'action (contact / visite) — calculées côté client à partir
+  // des champs backend (owner, availability, statusAdmin, isPublished).
+  // Le backend reste la source de vérité et revalide ces règles à l'écriture.
+  const permissions = useMemo(() => getPropertyPermissions(annonce, user), [annonce, user]);
 
   // Agent / propriétaire
   const agentName   = useMemo(() => annonce.owner?.name || annonce.agent?.name || null, [annonce]);
@@ -296,6 +303,10 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   const demanderVisite = useCallback(() => {
     if (!isLoggedIn) { navigation.navigate('Login'); return; }
+    if (!permissions.canRequestVisit) {
+      Alert.alert('Action indisponible', permissions.reason || "La visite n'est pas disponible pour ce bien.");
+      return;
+    }
     setRdvSuccess(false);
     setRdvDate('');
     setRdvHeure('');
@@ -303,7 +314,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     setRdvMessage('');
     setRdvConsent(false);
     setRdvModalVisible(true);
-  }, [isLoggedIn, navigation, user]);
+  }, [isLoggedIn, navigation, user, permissions]);
 
   const soumettreRdv = useCallback(async () => {
     if (rdvSubmittingRef.current) return;
@@ -344,20 +355,29 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   const contacterAgent = useCallback(async () => {
     if (!isLoggedIn) { navigation.navigate('Login'); return; }
+    if (!permissions.canContact) {
+      Alert.alert('Action indisponible', permissions.reason || 'Vous ne pouvez pas contacter pour ce bien.');
+      return;
+    }
+    if (contactLoading) return; // évite les créations multiples en cas de double clic
+    setContactLoading(true);
     try {
       const convRes = await api.post('/conversations/start', {
         propertyId: annonce._id,
         message: `Bonjour, je suis intéressé(e) par : ${title}`,
       });
-      const conversation = convRes.data?.data?.conversation;
+      const conversation = extractConversation(convRes);
+      if (!conversation) throw { isInvalidResponse: true };
       navigation.navigate('Messages', {
         screen: 'Chat',
         params: { conversation, contact: { _id: null, name: 'Équipe Altitude Vision' } },
       });
-    } catch {
-      Alert.alert('Erreur', "Impossible d'ouvrir la messagerie.");
+    } catch (err) {
+      Alert.alert('Erreur', err.isInvalidResponse ? "Impossible d'ouvrir la messagerie." : resolveContactErrorMessage(err));
+    } finally {
+      setContactLoading(false);
     }
-  }, [annonce._id, title, isLoggedIn, navigation]);
+  }, [annonce._id, title, isLoggedIn, navigation, permissions, contactLoading]);
 
   const onGalleryScroll = useCallback((e) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -824,24 +844,47 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
       {/* ══════════════════════ CTA FIXE ══════════════════════ */}
       <SafeAreaView style={styles.ctaSafe} edges={['bottom']}>
-        <View style={styles.ctaRow}>
-          <TouchableOpacity
-            style={styles.ctaBtnSecondary}
-            onPress={contacterAgent}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="chatbubble-outline" size={18} color={c.gold} />
-            <Text style={styles.ctaBtnSecondaryText}>Contacter</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.ctaBtnPrimary}
-            onPress={demanderVisite}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.ctaBtnPrimaryText}>Planifier une visite</Text>
-          </TouchableOpacity>
-        </View>
+        {!permissions.canContact && !permissions.canRequestVisit ? (
+          <View style={styles.ctaReasonWrap}>
+            <Ionicons name="information-circle-outline" size={16} color={c.textMuted} />
+            <Text style={styles.ctaReasonText}>{permissions.reason}</Text>
+          </View>
+        ) : (
+          <View style={styles.ctaRow}>
+            {permissions.canContact && (
+              <TouchableOpacity
+                style={[styles.ctaBtnSecondary, !permissions.canRequestVisit && styles.ctaBtnFull]}
+                onPress={contacterAgent}
+                activeOpacity={0.85}
+                disabled={contactLoading}
+                accessibilityState={{ disabled: contactLoading, busy: contactLoading }}
+              >
+                {contactLoading ? (
+                  <ActivityIndicator color={c.gold} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="chatbubble-outline" size={18} color={c.gold} />
+                    <Text style={styles.ctaBtnSecondaryText}>Contacter</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+            {permissions.canRequestVisit ? (
+              <TouchableOpacity
+                style={styles.ctaBtnPrimary}
+                onPress={demanderVisite}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.ctaBtnPrimaryText}>Planifier une visite</Text>
+              </TouchableOpacity>
+            ) : permissions.canContact && permissions.reason ? (
+              <View style={styles.ctaReasonInline}>
+                <Text style={styles.ctaReasonInlineText} numberOfLines={2}>{permissions.reason}</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
       </SafeAreaView>
 
       {/* ══════════════════════ MODAL BAIL ══════════════════════ */}
@@ -889,18 +932,18 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                   ))}
                 </>
               )}
-              {/* Frais d'agence */}
+              {/* Frais d'agence — valeur réelle (honoraires manuels si saisis, sinon formule par défaut) */}
               <Text style={styles.modalSectionTitle}>Frais d'agence</Text>
-              <Text style={styles.modalValue}>{fmt(Math.round(prix * 0.8))} FCFA</Text>
+              <Text style={styles.modalValue}>{fmt(honoraires)} FCFA</Text>
               <Text style={[styles.modalDocText, { marginTop: 4 }]}>
-                80% du loyer mensuel, réglés à la signature du bail.
+                Réglés à la signature du bail.
               </Text>
 
-              {/* Frais de visite */}
+              {/* Frais de visite — valeur réelle du bien, jamais inventée */}
               <Text style={styles.modalSectionTitle}>Frais de visite</Text>
-              <Text style={styles.modalValue}>5 000 FCFA</Text>
+              <Text style={styles.modalValue}>{fraisVisite > 0 ? `${fmt(fraisVisite)} FCFA` : 'Gratuite'}</Text>
               <Text style={[styles.modalDocText, { marginTop: 4 }]}>
-                À régler le jour de la visite, avant l'entrée dans le bien.
+                {fraisVisite > 0 ? "À régler le jour de la visite, avant l'entrée dans le bien." : "Offerts par l'agence."}
               </Text>
 
               <View style={{ height: 24 }} />
@@ -1700,6 +1743,30 @@ const makeStyles = (c) => {
       fontFamily: fonts.bodyBold,
       fontSize: 14,
       color: '#FFFFFF',
+    },
+    ctaBtnFull: { flex: 1 },
+    ctaReasonWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: PX,
+      paddingVertical: spacing.sm,
+    },
+    ctaReasonText: {
+      flex: 1,
+      fontFamily: fonts.body,
+      fontSize: fontSize.sm,
+      color: c.textMuted,
+    },
+    ctaReasonInline: {
+      flex: 2,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.sm,
+    },
+    ctaReasonInlineText: {
+      fontFamily: fonts.body,
+      fontSize: fontSize.xs,
+      color: c.textMuted,
     },
 
     // ── Modal bail ──

@@ -272,3 +272,55 @@ describe('Rental management route security', () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+// ─── POST /api/properties/:id/reviews (commentaires mobile) ──────────────────
+
+describe('POST /api/properties/:id/reviews', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('401 sans token', async () => {
+    const res = await request(app)
+      .post(`/api/properties/${fakeProp._id}/reviews`)
+      .send({ comment: 'Très beau bien' });
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('400 — commentaire vide rejeté', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
+    const res = await request(app)
+      .post(`/api/properties/${fakeProp._id}/reviews`)
+      .set('Authorization', `Bearer ${makeToken('Client')}`)
+      .send({ comment: '   ' });
+    expect(res.statusCode).toBe(400);
+  });
+
+  test('404 — bien introuvable', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
+    Property.findById = jest.fn().mockResolvedValue(null);
+    const res = await request(app)
+      .post(`/api/properties/${fakeProp._id}/reviews`)
+      .set('Authorization', `Bearer ${makeToken('Client')}`)
+      .send({ comment: 'Très beau bien' });
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('201 — ajoute le commentaire et retourne la liste peuplée', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
+    const property = {
+      reviews: [],
+      save: jest.fn().mockResolvedValue(),
+      populate: jest.fn().mockResolvedValue(),
+    };
+    Property.findById = jest.fn().mockResolvedValue(property);
+
+    const res = await request(app)
+      .post(`/api/properties/${fakeProp._id}/reviews`)
+      .set('Authorization', `Bearer ${makeToken('Client')}`)
+      .send({ comment: 'Très beau bien', rating: 4 });
+
+    expect(res.statusCode).toBe(201);
+    expect(property.save).toHaveBeenCalled();
+    expect(property.reviews).toHaveLength(1);
+    expect(property.reviews[0]).toMatchObject({ comment: 'Très beau bien', rating: 4 });
+  });
+});

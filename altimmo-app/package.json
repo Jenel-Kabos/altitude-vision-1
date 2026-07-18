@@ -88,7 +88,8 @@
       "src/config/**/*.{ts,tsx}",
       "src/services/api.js",
       "src/services/socketService.js",
-      "src/services/notificationsService.js"
+      "src/services/notificationsService.js",
+      "src/services/propertyMapper.js"
     ],
     "coveragePathIgnorePatterns": [
       "/node_modules/",
