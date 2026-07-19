@@ -37,7 +37,14 @@ jobs:
         working-directory: .
         shell: bash
         run: |
-          if git ls-files | grep -Eiq '(^|/)\.env($|\.)|client_secret|service-account|credentials\.json|\.jks$|\.keystore$|\.p8$|\.p12$'; then
+          # .env.example / .env.sample sont des gabarits sans secret (valeurs
+          # vides), volontairement versionnés pour l'onboarding — exclus
+          # explicitement pour éviter le faux positif sur ce nom de fichier.
+          matches=$(git ls-files \
+            | grep -Ei '(^|/)\.env($|\.)|client_secret|service-account|credentials\.json|\.jks$|\.keystore$|\.p8$|\.p12$' \
+            | grep -Eiv '(^|/)\.env\.(example|sample)$' || true)
+          if [ -n "$matches" ]; then
             echo 'Tracked credential-like file detected.'
+            echo "$matches"
             exit 1
           fi

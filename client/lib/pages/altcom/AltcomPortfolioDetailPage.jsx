@@ -172,7 +172,7 @@ const AltcomPortfolioDetailPage = () => {
             <Breadcrumb items={[
               { label: 'Altcom',     href: '/communication' },
               { label: 'Portfolio',  href: '/communication/annonces' },
-              { label: item?.title ?? 'Réalisation' },
+              { label: portfolio?.title ?? 'Réalisation' },
             ]} />
             <div className="flex items-center gap-3">
               <button

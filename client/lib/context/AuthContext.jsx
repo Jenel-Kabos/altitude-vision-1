@@ -49,7 +49,6 @@ export const AuthProvider = ({ children }) => {
                 if (storedUser && storedToken) {
                     const parsedUser = JSON.parse(storedUser);
                     setUser(parsedUser);
-                } else {
                 }
             } catch (error) {
                 console.error("❌ Erreur restauration session:", error);

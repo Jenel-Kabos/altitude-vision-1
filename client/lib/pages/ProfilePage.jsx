@@ -85,8 +85,9 @@ const ProfilePage = () => {
                         </div>
 
                         {/* Nom */}
-                        <h1 className="mt-4" style={{ color: '#111827' }}
+                        <h1 className="mt-4"
                             style={{
+                                color:      '#111827',
                                 fontFamily: "'Cormorant Garamond', serif",
                                 fontSize:   '1.9rem',
                                 fontWeight: 700,

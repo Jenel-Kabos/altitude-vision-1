@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mail, Send, Inbox, SendHorizontal, Star, Trash2, Search, X, Loader2,
   MailOpen, MailPlus, User, Clock, Paperclip, AlertCircle, Check, Download,
-  FileEdit, RotateCcw, Trash, AlertTriangle, ChevronDown
+  FileEdit, RotateCcw, Trash, AlertTriangle, ChevronDown, Eye
 } from 'lucide-react';
 import {
   sendInternalMail,

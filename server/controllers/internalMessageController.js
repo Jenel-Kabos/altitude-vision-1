@@ -357,16 +357,19 @@ exports.searchMessages = asyncHandler(async (req, res) => {
     throw new Error('Une requête de recherche est requise');
   }
 
+  // Deux clés $or dans le même objet littéral se réécrivent silencieusement
+  // en JS (seule la dernière survit) : la restriction d'accès (participant
+  // uniquement) disparaissait, exposant la recherche à TOUS les messages de
+  // la collection. Fusionné dans $and pour que les deux conditions s'appliquent.
   const messages = await InternalMessage.find({
-    $or: [
-      { sender: req.user._id },
-      { recipients: req.user._id },
+    $and: [
+      { $or: [{ sender: req.user._id }, { recipients: req.user._id }] },
+      { $or: [
+        { content: { $regex: query, $options: 'i' } },
+        { subject: { $regex: query, $options: 'i' } },
+      ] },
     ],
     deletedBy: { $ne: req.user._id },
-    $or: [
-      { content: { $regex: query, $options: 'i' } },
-      { subject: { $regex: query, $options: 'i' } },
-    ],
   })
     .populate('sender', 'name email photo role')
     .populate('recipients', 'name email photo role')
