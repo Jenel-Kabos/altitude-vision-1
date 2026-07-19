@@ -33,6 +33,11 @@ describe('normalizeListingType', () => {
     expect(normalizeListingType({ transactionType: 'vente' })).toBe('vente');
     expect(normalizeListingType({ category: 'sell' })).toBe('vente');
   });
+
+  test('reconnaît le status backend "hebergement" et ne le confond jamais avec vente/location', () => {
+    expect(normalizeListingType({ status: 'hebergement' })).toBe('hebergement');
+    expect(normalizeListingType({ status: 'Hebergement' })).toBe('hebergement');
+  });
 });
 
 describe('isPropertyOwner', () => {
@@ -204,6 +209,30 @@ describe('getRentalConditions', () => {
     const rows = getRentalConditions({ price: 100000 });
     const honoraires = rows.find(r => r.key === 'honoraires');
     expect(honoraires.value).toBe(`${(80000).toLocaleString('fr-FR')} FCFA`);
+  });
+
+  test('un hébergement ne contient jamais de vocabulaire de bail (loyer, caution locative, honoraires, profils, documents)', () => {
+    const rows = getRentalConditions({
+      status: 'hebergement',
+      price: 100000,
+      accommodation: {
+        accommodationType: 'villa_meublee',
+        checkInTime: '14:00', checkOutTime: '11:00',
+        securityDeposit: 20000, cleaningFee: 5000,
+        rates: [{ mode: 'nightly', amount: 35000 }],
+      },
+    });
+    expect(rows.find(r => r.key === 'loyer')).toBeUndefined();
+    expect(rows.find(r => r.key === 'caution')).toBeUndefined();
+    expect(rows.find(r => r.key === 'honoraires')).toBeUndefined();
+    expect(rows.find(r => r.key === 'profils')).toBeUndefined();
+    expect(rows.find(r => r.key === 'documents')).toBeUndefined();
+    expect(rows.find(r => r.key === 'caution-sejour').value).toBe(`${(20000).toLocaleString('fr-FR')} FCFA`);
+    expect(rows.find(r => r.key === 'rate-nightly').value).toBe(`${(35000).toLocaleString('fr-FR')} FCFA`);
+  });
+
+  test('un hébergement sans profil Accommodation (bien en attente de configuration) ne casse pas et retourne un tableau vide', () => {
+    expect(getRentalConditions({ status: 'hebergement', price: 100000 })).toEqual([]);
   });
 });
 

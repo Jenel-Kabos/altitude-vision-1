@@ -34,9 +34,14 @@ const STEPS = [
 const STEP_SLOT_W = 88;
 
 const TRANSACTIONS = [
-  { value: 'Vente',    icon: 'cash-outline',     desc: 'Mettre en vente' },
-  { value: 'Location', icon: 'calendar-outline', desc: 'Mettre en location' },
+  { value: 'Vente',       icon: 'cash-outline',      desc: 'Mettre en vente' },
+  { value: 'Location',    icon: 'calendar-outline',  desc: 'Mettre en location' },
+  { value: 'Hebergement', icon: 'bed-outline',       desc: 'Mettre en hébergement meublé' },
 ];
+
+// status Property (minuscule) → valeur du sélecteur Transaction (capitalisée) —
+// mapping explicite pour ne jamais retomber par défaut sur 'Vente'.
+const STATUS_TO_CATEGORIE = { vente: 'Vente', location: 'Location', hebergement: 'Hebergement' };
 
 const PERIODS = ['Mensuel', 'Annuel'];
 const TENANT_PROFILES = ['Salarié', 'Étudiant', 'Indépendant/Affairiste', 'Fonctionnaire', 'Retraité'];
@@ -107,7 +112,7 @@ export default function PublierBienScreen({ navigation, route }) {
       titre: editProperty.title || editProperty.titre || '',
       description: editProperty.description || '',
       type: editProperty.type || '',
-      categorie: editProperty.status?.toLowerCase() === 'location' ? 'Location' : 'Vente',
+      categorie: STATUS_TO_CATEGORIE[editProperty.status?.toLowerCase()] || 'Vente',
       period: 'Mensuel',
       prix: String(editProperty.price || editProperty.prix || ''),
       ville: editProperty.address?.city || 'Brazzaville',
@@ -168,7 +173,7 @@ export default function PublierBienScreen({ navigation, route }) {
     }
     if (n === 2) {
       if (!form.type) e.type = 'Choisissez un type de bien';
-      if (!form.categorie) e.categorie = 'Choisissez vente ou location';
+      if (!form.categorie) e.categorie = 'Choisissez le type de transaction';
     }
     if (n === 3) {
       if (photos.length === 0) e.photos = 'Ajoutez au moins une photo';

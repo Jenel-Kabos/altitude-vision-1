@@ -187,13 +187,19 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     return [annonce.transactionType, annonce.status, annonce.category, annonce.type, annonce.listingType]
       .some(v => v?.toLowerCase() === loc);
   }, [annonce]);
+  const isHebergement = useMemo(
+    () => [annonce.status, annonce.category].some(v => v?.toLowerCase() === 'hebergement'),
+    [annonce],
+  );
 
   // Honoraires saisis manuellement en base (Property.honoraires) si disponibles,
-  // sinon formule par défaut (cohérente avec le web — PropertyDetailPage.jsx)
+  // sinon formule par défaut (cohérente avec le web — PropertyDetailPage.jsx).
+  // Hébergement n'a pas de règle d'honoraires liée à un mandat — pas de formule.
   const honoraires  = useMemo(() => {
     if (annonce.honoraires != null) return annonce.honoraires;
+    if (isHebergement) return 0;
     return isLocation ? Math.round(prix * 0.8) : Math.round(prix * 0.1);
-  }, [annonce, isLocation, prix]);
+  }, [annonce, isLocation, isHebergement, prix]);
   const fraisVisite = useMemo(() => annonce.fraisVisite ?? 0, [annonce]);
 
   const addressText = useMemo(() => {
@@ -617,10 +623,10 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                   <Text style={styles.typeBadgeText}>{typeLabel}</Text>
                 </View>
               ) : null}
-              <View style={[styles.txBadge, isLocation ? styles.txBadgeLoc : styles.txBadgeVente]}>
-                <View style={[styles.txBadgeDot, isLocation ? { backgroundColor: '#185FA5' } : { backgroundColor: c.gold }]} />
-                <Text style={[styles.txBadgeText, isLocation ? { color: '#185FA5' } : { color: c.gold }]}>
-                  {isLocation ? 'Location' : 'Vente'}
+              <View style={[styles.txBadge, isHebergement ? styles.txBadgeHeb : isLocation ? styles.txBadgeLoc : styles.txBadgeVente]}>
+                <View style={[styles.txBadgeDot, isHebergement ? { backgroundColor: '#16A34A' } : isLocation ? { backgroundColor: '#185FA5' } : { backgroundColor: c.gold }]} />
+                <Text style={[styles.txBadgeText, isHebergement ? { color: '#16A34A' } : isLocation ? { color: '#185FA5' } : { color: c.gold }]}>
+                  {isHebergement ? 'Hébergement' : isLocation ? 'Location' : 'Vente'}
                 </Text>
               </View>
             </View>
@@ -705,43 +711,79 @@ export default function DetailAnnonceScreen({ route, navigation }) {
             </View>
           ) : null}
 
-          {/* ── Frais & Conditions ── */}
-          <Animated.View entering={FadeInDown.delay(80).duration(280)} style={styles.feesSection}>
-            <Text style={styles.sectionLabel}>Frais & conditions</Text>
-            <View style={styles.feesCard}>
-              <View style={styles.feesRow}>
-                <View style={styles.feesRowLeft}>
-                  <View style={styles.feesIcon}>
-                    <Ionicons name="business-outline" size={15} color={c.gold} />
+          {/* ── Frais & Conditions (Vente/Location uniquement — jamais de vocabulaire de bail pour Hébergement) ── */}
+          {!isHebergement && (
+            <Animated.View entering={FadeInDown.delay(80).duration(280)} style={styles.feesSection}>
+              <Text style={styles.sectionLabel}>Frais & conditions</Text>
+              <View style={styles.feesCard}>
+                <View style={styles.feesRow}>
+                  <View style={styles.feesRowLeft}>
+                    <View style={styles.feesIcon}>
+                      <Ionicons name="business-outline" size={15} color={c.gold} />
+                    </View>
+                    <View style={styles.feesRowText}>
+                      <Text style={styles.feesRowLabel}>Honoraires d'agence</Text>
+                      <Text style={styles.feesRowNote}>
+                        {isLocation ? '80% du loyer mensuel' : '10% du prix de vente'}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.feesRowText}>
-                    <Text style={styles.feesRowLabel}>Honoraires d'agence</Text>
-                    <Text style={styles.feesRowNote}>
-                      {isLocation ? '80% du loyer mensuel' : '10% du prix de vente'}
-                    </Text>
-                  </View>
+                  <Text style={styles.feesRowValue}>{fmt(honoraires)} FCFA</Text>
                 </View>
-                <Text style={styles.feesRowValue}>{fmt(honoraires)} FCFA</Text>
-              </View>
-              <View style={styles.feesSep} />
-              <View style={styles.feesRow}>
-                <View style={styles.feesRowLeft}>
-                  <View style={[styles.feesIcon, { backgroundColor: 'rgba(46,123,181,0.12)' }]}>
-                    <Ionicons name="eye-outline" size={15} color="#2E7BB5" />
+                <View style={styles.feesSep} />
+                <View style={styles.feesRow}>
+                  <View style={styles.feesRowLeft}>
+                    <View style={[styles.feesIcon, { backgroundColor: 'rgba(46,123,181,0.12)' }]}>
+                      <Ionicons name="eye-outline" size={15} color="#2E7BB5" />
+                    </View>
+                    <View style={styles.feesRowText}>
+                      <Text style={styles.feesRowLabel}>Frais de visite</Text>
+                      <Text style={styles.feesRowNote}>
+                        {fraisVisite > 0 ? 'Réglés le jour de la visite' : 'Offerts par l\'agence'}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.feesRowText}>
-                    <Text style={styles.feesRowLabel}>Frais de visite</Text>
-                    <Text style={styles.feesRowNote}>
-                      {fraisVisite > 0 ? 'Réglés le jour de la visite' : 'Offerts par l\'agence'}
-                    </Text>
-                  </View>
+                  <Text style={[styles.feesRowValue, { color: '#2E7BB5' }]}>
+                    {fraisVisite > 0 ? `${fmt(fraisVisite)} FCFA` : 'Gratuite'}
+                  </Text>
                 </View>
-                <Text style={[styles.feesRowValue, { color: '#2E7BB5' }]}>
-                  {fraisVisite > 0 ? `${fmt(fraisVisite)} FCFA` : 'Gratuite'}
-                </Text>
               </View>
-            </View>
-          </Animated.View>
+            </Animated.View>
+          )}
+
+          {/* ── Tarifs du séjour (Hébergement uniquement) ── */}
+          {isHebergement && annonce.accommodation && (
+            <Animated.View entering={FadeInDown.delay(80).duration(280)} style={styles.feesSection}>
+              <Text style={styles.sectionLabel}>Tarifs du séjour</Text>
+              <View style={styles.feesCard}>
+                {(annonce.accommodation.rates || []).map((r, i, arr) => (
+                  <React.Fragment key={r.mode}>
+                    <View style={styles.feesRow}>
+                      <View style={styles.feesRowLeft}>
+                        <View style={styles.feesIcon}>
+                          <Ionicons name="bed-outline" size={15} color={c.gold} />
+                        </View>
+                        <Text style={styles.feesRowLabel}>
+                          {{ nightly: 'Par nuit', weekly: 'Par semaine', monthly: 'Par mois', yearly: 'Par an' }[r.mode] || r.mode}
+                        </Text>
+                      </View>
+                      <Text style={styles.feesRowValue}>{fmt(r.amount)} FCFA</Text>
+                    </View>
+                    {i < arr.length - 1 && <View style={styles.feesSep} />}
+                  </React.Fragment>
+                ))}
+                {annonce.accommodation.securityDeposit > 0 && (
+                  <>
+                    <View style={styles.feesSep} />
+                    <View style={styles.feesRow}>
+                      <Text style={styles.feesRowLabel}>Caution de séjour</Text>
+                      <Text style={styles.feesRowValue}>{fmt(annonce.accommodation.securityDeposit)} FCFA</Text>
+                    </View>
+                  </>
+                )}
+              </View>
+            </Animated.View>
+          )}
 
           {/* ── Commodités ── */}
           {commodites.length > 0 && (
@@ -1459,6 +1501,7 @@ const makeStyles = (c) => {
     },
     txBadgeVente: { backgroundColor: 'rgba(200,150,12,0.10)' },
     txBadgeLoc:   { backgroundColor: 'rgba(24,95,165,0.10)' },
+    txBadgeHeb:   { backgroundColor: 'rgba(22,163,74,0.10)' },
     txBadgeDot:   { width: 6, height: 6, borderRadius: 3 },
     txBadgeText:  { fontFamily: fonts.bodyBold, fontSize: 11, letterSpacing: 0.5 },
 

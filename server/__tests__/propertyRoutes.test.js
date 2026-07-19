@@ -3,6 +3,7 @@
 
 jest.mock('../models/Property');
 jest.mock('../models/User');
+jest.mock('../models/Accommodation');
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
@@ -25,6 +26,7 @@ const jwt      = require('jsonwebtoken');
 const { app }  = require('../server');
 const Property = require('../models/Property');
 const User     = require('../models/User');
+const Accommodation = require('../models/Accommodation');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -56,12 +58,14 @@ const fakeProp = {
 };
 
 // Chaîne Mongoose complète dont APIFeatures a besoin
-const makeMongoChain = (result = [fakeProp]) => {
+const makeMongoChain = (result = [fakeProp], total = result.length) => {
   const chain = {};
   // toutes les méthodes chainables retournent le même objet
   ['find', 'sort', 'select', 'skip', 'limit', 'populate', 'lean'].forEach(m => {
     chain[m] = jest.fn().mockReturnValue(chain);
   });
+  // countFeatures.query.countDocuments() — même chaîne, résultat distinct
+  chain.countDocuments = jest.fn().mockResolvedValue(total);
   // then/catch permettent d'await la chaîne
   chain.then = (resolve) => Promise.resolve(result).then(resolve);
   chain.catch = (reject) => Promise.resolve(result).catch(reject);
@@ -81,6 +85,24 @@ describe('GET /api/properties', () => {
     // La route est publique — ne doit pas retourner 401 ni 403
     expect(res.statusCode).not.toBe(401);
     expect(res.statusCode).not.toBe(403);
+  });
+
+  test('exclut un hébergement non publié du listing public sans affecter une Vente publiée (documente la limitation de pagination connue)', async () => {
+    const venteProp = { ...fakeProp, _id: 'vente-1', status: 'vente' };
+    const hebergementProp = { _id: 'heb-1', status: 'hebergement', statusAdmin: 'Validée', availability: 'Disponible' };
+    // `total` (2) reflète le compte AVANT filtrage post-fetch — c'est la
+    // limitation documentée dans propertyController.js (getAllProperties).
+    Property.find = jest.fn().mockReturnValue(makeMongoChain([venteProp, hebergementProp], 2));
+    Accommodation.find = jest.fn().mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) });
+
+    const res = await request(app).get('/api/properties');
+    expect(res.statusCode).toBe(200);
+    const ids = (res.body.data?.properties || []).map((p) => p._id);
+    expect(ids).toContain('vente-1');
+    expect(ids).not.toContain('heb-1');
+    // Limitation connue : total (2) > results.length (1) quand un hébergement
+    // non publié est retiré après pagination.
+    expect(res.body.results).toBe(1);
   });
 });
 

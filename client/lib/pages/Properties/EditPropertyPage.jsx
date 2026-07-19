@@ -97,6 +97,8 @@ const EditPropertyPage = () => {
   useEffect(() => {
     if (honorairesTouchedRef.current) return;
     if (!formData.price || !formData.status) return;
+    // Hébergement n'a pas de règle d'honoraires définie (pas de bail) — pas d'auto-calcul.
+    if (formData.status === 'hebergement') return;
     const rate = formData.status === 'location' ? 0.8 : 0.1;
     const calculated = Math.round(Number(formData.price) * rate);
     setFormData((prev) => ({ ...prev, honoraires: calculated }));
@@ -256,6 +258,8 @@ const EditPropertyPage = () => {
             <p className="text-xs text-gray-500 mt-1">
               {formData.status === 'location'
                 ? 'Pré-rempli à 80% du loyer mensuel'
+                : formData.status === 'hebergement'
+                ? "Sans lien avec un bail — à renseigner manuellement si applicable"
                 : 'Pré-rempli à 10% du prix de vente'}
             </p>
           </div>
@@ -429,8 +433,17 @@ const EditPropertyPage = () => {
             >
               <option value="location">Location</option>
               <option value="vente">Vente</option>
+              <option value="hebergement">Hébergement (meublé)</option>
             </select>
           </div>
+
+          {formData.status === 'hebergement' && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-800 text-sm p-3 rounded-lg">
+              Ce bien est un hébergement meublé (séjour de courte/moyenne durée). Le type d'hébergement,
+              la capacité d'accueil et les tarifs se configurent depuis l'espace « Mes hébergements »
+              après l'enregistrement de ce bien.
+            </div>
+          )}
 
           {/* Images existantes */}
           {existingImages.length > 0 && (

@@ -311,6 +311,7 @@ const contratRoutes          = require('./routes/contratRoutes');
 const paiementRoutes         = require('./routes/paiementRoutes');
 const gestionDocumentRoutes  = require('./routes/gestionDocumentRoutes');
 const rentalManagementRoutes = require('./routes/rentalManagementRoutes');
+const accommodationRoutes    = require('./routes/accommodationRoutes');
 
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
@@ -333,6 +334,9 @@ app.use('/api/contrats',         contratRoutes);
 app.use('/api/paiements',        paiementRoutes);
 app.use('/api/gestion-docs',     gestionDocumentRoutes);
 app.use('/api/rental-management', rentalManagementRoutes);
+
+// 🛎️ Hébergement (meublés — Sprint 2)
+app.use('/api/accommodations', accommodationRoutes);
 
 // 💼 Pôle Altcom
 app.use("/api/services", serviceRoutes);

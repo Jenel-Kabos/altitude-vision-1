@@ -14,9 +14,10 @@ import { PROPERTY_TYPES_WITH_ALL } from '../constants/propertyTypes';
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const TRANSACTIONS = [
-  { value: 'vente',    label: 'Vente' },
-  { value: 'location', label: 'Location' },
-  { value: 'tous',     label: 'Tous' },
+  { value: 'vente',       label: 'Vente' },
+  { value: 'location',    label: 'Location' },
+  { value: 'hebergement', label: 'Hébergement' },
+  { value: 'tous',        label: 'Tous' },
 ];
 
 const TYPES_BIEN = PROPERTY_TYPES_WITH_ALL.map(t => t.value);

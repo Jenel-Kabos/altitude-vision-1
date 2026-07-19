@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { User, LogOut, Globe, ShieldCheck, Menu, X, Building, Mountain, Calendar, MessageCircle } from "lucide-react";
+import { User, LogOut, Globe, ShieldCheck, Menu, X, Building, Mountain, Calendar, MessageCircle, Palmtree } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useAuth } from '../../context/AuthContext';
 import { getOwnerVisitesUnreadCount } from '../../services/visiteService';
@@ -14,6 +14,7 @@ const GREEN = '#16A34A';
 
 const NAV_LINKS = [
   { to: '/mes-biens',         end: true,  Icon: Building,    label: 'Mes Biens',   accent: BLUE  },
+  { to: '/mes-hebergements',  end: true,  Icon: Palmtree,    label: 'Mes Hébergements', accent: GOLD },
   { to: '/mes-biens/visites', end: false, Icon: Calendar,    label: 'Rendez-vous', accent: GOLD  },
   { to: '/messages',          end: false, Icon: MessageCircle,label: 'Messagerie',  accent: BLUE  },
   { to: '/profile',           end: false, Icon: User,        label: 'Mon Profil',  accent: GOLD  },

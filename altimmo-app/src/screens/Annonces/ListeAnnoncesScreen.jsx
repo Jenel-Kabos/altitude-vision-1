@@ -35,6 +35,8 @@ const CARD_IMG_H = Math.round(CARD_IMG_W * (3 / 4));
 
 const PAGE_SIZE = 15;
 
+const TRANSACTION_LABELS = { vente: 'Vente', location: 'Location', hebergement: 'Hébergement' };
+
 const DEFAULT_FILTERS = {
   transaction:    'tous',
   typeBien:       'tous',
@@ -85,7 +87,12 @@ function ActiveChip({ label, onRemove, c, chipStyle, textStyle }) {
 }
 
 const AnnonceCard = React.memo(function AnnonceCard({ item, index, onPress, styles, c }) {
-  const isLocation     = item.status?.toLowerCase() === 'location';
+  const statusKey      = item.status?.toLowerCase();
+  const isLocation     = statusKey === 'location';
+  const isHebergement  = statusKey === 'hebergement';
+  const statusLabel    = isHebergement ? 'Hébergement' : isLocation ? 'Location' : 'Vente';
+  const badgeStyle     = isHebergement ? styles.badgeHeb : isLocation ? styles.badgeLoc : styles.badgeVente;
+  const badgeTextStyle = isHebergement ? styles.badgeTextHeb : isLocation ? styles.badgeTextLoc : styles.badgeTextVente;
   const arrondissement = item.address?.arrondissement || '';
   const city           = item.address?.city || 'Brazzaville';
   const addressText    = arrondissement ? `${arrondissement} · ${city}` : city;
@@ -202,9 +209,9 @@ const AnnonceCard = React.memo(function AnnonceCard({ item, index, onPress, styl
             />
 
             {/* Badge Location / Vente — haut gauche */}
-            <View style={[styles.badge, isLocation ? styles.badgeLoc : styles.badgeVente]}>
-              <Text style={[styles.badgeText, isLocation ? styles.badgeTextLoc : styles.badgeTextVente]}>
-                {isLocation ? 'Location' : 'Vente'}
+            <View style={[styles.badge, badgeStyle]}>
+              <Text style={[styles.badgeText, badgeTextStyle]}>
+                {statusLabel}
               </Text>
             </View>
 
@@ -282,7 +289,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
   const filterSummary = useMemo(() => {
     const parts = [];
     if (activeFilters.typeBien !== 'tous') parts.push(activeFilters.typeBien);
-    if (activeFilters.transaction !== 'tous') parts.push(activeFilters.transaction === 'vente' ? 'Vente' : 'Location');
+    if (activeFilters.transaction !== 'tous') parts.push(TRANSACTION_LABELS[activeFilters.transaction] || activeFilters.transaction);
     if (activeFilters.ville !== 'Toutes') parts.push(activeFilters.ville);
     return parts.length > 0 ? parts.join(' · ') : 'Rechercher un bien';
   }, [activeFilters]);
@@ -486,7 +493,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
         >
           {activeFilters.transaction !== 'tous' && (
             <ActiveChip
-              label={activeFilters.transaction === 'vente' ? 'Vente' : 'Location'}
+              label={TRANSACTION_LABELS[activeFilters.transaction] || activeFilters.transaction}
               onRemove={() => setActiveFilters(prev => ({ ...prev, transaction: 'tous' }))}
               c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
             />
@@ -822,6 +829,10 @@ const makeStyles = (c) => StyleSheet.create({
     backgroundColor: 'rgba(74,144,217,0.18)',
     borderColor: 'rgba(74,144,217,0.4)',
   },
+  badgeHeb: {
+    backgroundColor: 'rgba(22,163,74,0.18)',
+    borderColor: 'rgba(22,163,74,0.4)',
+  },
   badgeText: {
     fontSize: 10,
     fontFamily: fonts.bodyBold,
@@ -829,6 +840,7 @@ const makeStyles = (c) => StyleSheet.create({
   },
   badgeTextVente: { color: c.gold },
   badgeTextLoc:   { color: c.blue },
+  badgeTextHeb:   { color: '#16A34A' },
   priceOverlay: {
     position: 'absolute',
     bottom: spacing.sm, right: spacing.sm,
