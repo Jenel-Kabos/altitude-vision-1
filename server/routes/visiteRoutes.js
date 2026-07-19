@@ -18,6 +18,7 @@ const {
   getMyPayments,
   initierPaiementVisite,
   verifierPaiementVisite,
+  getAvailability,
 } = require('../controllers/visiteController');
 
 // 🔒 Toutes les routes nécessitent un token valide
@@ -27,6 +28,9 @@ router.use(protect);
 
 // Client : voir ses propres visites
 router.get('/my', getMyVisites);
+
+// Client : créneaux disponibles pour un bien à une date donnée
+router.get('/availability', getAvailability);
 
 // Propriétaire : voir les visites sur ses biens
 router.get('/owner', restrictTo('Proprietaire', 'Admin'), getOwnerVisites);

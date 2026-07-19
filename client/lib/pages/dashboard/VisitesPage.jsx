@@ -28,6 +28,13 @@ const formatDate = (d) => {
   });
 };
 
+const formatHeure = (d) => {
+  if (!d) return null;
+  return new Date(d).toLocaleTimeString('fr-FR', {
+    timeZone: 'Africa/Brazzaville', hour: '2-digit', minute: '2-digit',
+  });
+};
+
 const isVisiteImminente = (visite) => {
   if (!visite.dateConfirmee || visite.statut !== 'Confirmée') return false;
   const diff = new Date(visite.dateConfirmee) - Date.now();
@@ -347,6 +354,9 @@ const VisitesPage = () => {
                                 <Clock className="w-3.5 h-3.5" />
                                 <span>Heure souhaitée :</span>
                                 <strong>{visite.heurePreferee}</strong>
+                                {visite.requestedEnd && (
+                                  <strong> – {formatHeure(visite.requestedEnd)}</strong>
+                                )}
                               </div>
                             )}
                             {visite.telephone && (

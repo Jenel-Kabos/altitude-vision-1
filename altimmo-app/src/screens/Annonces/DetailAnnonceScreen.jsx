@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   FlatList, Dimensions, Alert, Share,
   TextInput, Modal, ScrollView, Pressable,
-  ActivityIndicator, Switch,
+  ActivityIndicator, Switch, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -19,6 +20,7 @@ import { Screen, PrixFCFA } from '../../components';
 import HeartFavoriteButton from '../../components/HeartFavoriteButton';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 import { getPropertyPermissions, extractConversation, resolveContactErrorMessage } from '../../services/propertyMapper';
+import { formatDateFR, formatTimeHHmm, isFutureDateTime, buildVisitPayload, fetchAvailability } from '../../services/visiteService';
 
 const { width } = Dimensions.get('window');
 // Galerie : ratio 4:3 portrait, plafonné à 310px — compact et élégant
@@ -134,6 +136,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const [commentaire, setCommentaire]       = useState('');
   const [envoi, setEnvoi]                   = useState(false);
   const [favori, setFavori]                 = useState(false);
+  const [likesCount, setLikesCount]         = useState(0);
   const [descExpanded, setDescExpanded]     = useState(false);
   const [bailModalVisible, setBailModalVisible] = useState(false);
   const [showAllComments, setShowAllComments]   = useState(false);
@@ -142,13 +145,17 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const [signalDetails, setSignalDetails]           = useState('');
   const [signalEnvoi, setSignalEnvoi]               = useState(false);
   const [rdvModalVisible, setRdvModalVisible]       = useState(false);
-  const [rdvDate, setRdvDate]                       = useState('');
-  const [rdvHeure, setRdvHeure]                     = useState('');
+  const [rdvDate, setRdvDate]                       = useState(null);
+  const [rdvHeure, setRdvHeure]                     = useState(null);
   const [rdvTelephone, setRdvTelephone]             = useState(user?.phone || '');
   const [rdvMessage, setRdvMessage]                 = useState('');
   const [rdvConsent, setRdvConsent]                 = useState(false);
   const [rdvLoading, setRdvLoading]                 = useState(false);
   const [rdvSuccess, setRdvSuccess]                 = useState(false);
+  const [rdvDatePickerVisible, setRdvDatePickerVisible] = useState(false);
+  const [rdvSlots, setRdvSlots]                     = useState(null);
+  const [rdvSlotsLoading, setRdvSlotsLoading]       = useState(false);
+  const [rdvSlotsError, setRdvSlotsError]           = useState(null);
   const [contactLoading, setContactLoading]         = useState(false);
 
   const galleryRef = useRef(null);
@@ -216,7 +223,6 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   // Engagement
   const viewsCount  = useMemo(() => annonce.views  || 0, [annonce]);
-  const likesCount  = useMemo(() => Array.isArray(annonce.likes) ? annonce.likes.length : (annonce.likesCount || 0), [annonce]);
   const sharesCount = useMemo(() => annonce.shares || 0, [annonce]);
 
   // Features visibles
@@ -253,22 +259,30 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       .catch(() => {});
   }, [annonce._id]);
 
+  // Même source que le web (PropertyDetailPage.jsx) : le compteur et l'état
+  // "aimé" viennent de Property.likes[], jamais de la collection Like générique
+  // (POST /likes) — ces deux systèmes ne sont pas synchronisés entre eux.
   useEffect(() => {
-    api.get(`/likes/status/Property/${annonce._id}`)
-      .then(res => setFavori(res.data?.data?.liked || false))
-      .catch(() => {});
-  }, [annonce._id]);
+    const likes = Array.isArray(annonce.likes) ? annonce.likes : [];
+    setLikesCount(likes.length);
+    setFavori(!!user?._id && likes.some(id => (id?._id || id)?.toString() === user._id.toString()));
+  }, [annonce.likes, user?._id]);
 
   // ─── Actions ───
   const toggleFavori = useCallback(async () => {
+    if (!isLoggedIn) { navigation.navigate('Login'); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const next = !favori;
+    setFavori(next);
+    setLikesCount(n => next ? n + 1 : Math.max(0, n - 1));
     try {
-      const res = await api.post('/likes', { targetType: 'Property', targetId: annonce._id });
-      setFavori(res.data?.data?.liked ?? !favori);
+      await api.post(`/properties/${annonce._id}/like`);
     } catch {
+      setFavori(!next);
+      setLikesCount(n => next ? Math.max(0, n - 1) : n + 1);
       Alert.alert('Erreur', 'Impossible de mettre à jour vos favoris.');
     }
-  }, [annonce._id, favori]);
+  }, [annonce._id, favori, isLoggedIn, navigation]);
 
   const partagerBien = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -279,7 +293,12 @@ export default function DetailAnnonceScreen({ route, navigation }) {
         message: `${title}${addressText ? '\n' + addressText : ''}\n${fmt(prix)} FCFA\n\n${webLink}`,
         url:     webLink,
       });
-      // Incrémenter le compteur de partages
+      // Incrémente le compteur de partages. Sur Android, Share.share() se
+      // résout dès que la feuille de partage est lancée (choix d'une app ou
+      // fermeture) — impossible de savoir si l'utilisateur a réellement
+      // envoyé le contenu au destinataire. Ce compteur mesure donc les
+      // "ouvertures/lancements de partage", pas les envois confirmés — même
+      // convention que le web (PropertyDetailPage.jsx).
       api.post(`/properties/${annonce._id}/share`).catch(() => {});
     } catch { /* annulé */ }
   }, [annonce._id, title, addressText, prix]);
@@ -308,45 +327,112 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       return;
     }
     setRdvSuccess(false);
-    setRdvDate('');
-    setRdvHeure('');
+    setRdvDate(null);
+    setRdvHeure(null);
     setRdvTelephone(user?.phone || '');
     setRdvMessage('');
     setRdvConsent(false);
+    setRdvDatePickerVisible(false);
+    setRdvSlots(null);
+    setRdvSlotsError(null);
     setRdvModalVisible(true);
   }, [isLoggedIn, navigation, user, permissions]);
 
+  // Charge les créneaux disponibles dès qu'une date est choisie. Le backend
+  // revalide toujours le conflit à la soumission (POST /visites) — cet appel
+  // n'est qu'une aide d'affichage, jamais une garantie de réservation.
+  const chargerCreneaux = useCallback(async (date) => {
+    if (!date) return;
+    setRdvSlotsLoading(true);
+    setRdvSlotsError(null);
+    try {
+      const data = await fetchAvailability(annonce._id, date);
+      setRdvSlots(data);
+    } catch {
+      setRdvSlots(null);
+      setRdvSlotsError('Impossible de charger les créneaux disponibles.');
+    } finally {
+      setRdvSlotsLoading(false);
+    }
+  }, [annonce._id]);
+
+  const onChangeRdvDate = useCallback((event, selected) => {
+    setRdvDatePickerVisible(Platform.OS === 'ios');
+    if (event.type === 'dismissed' || !selected) return;
+    setRdvDate(selected);
+    setRdvHeure(null); // un créneau choisi pour l'ancienne date n'est plus valide
+    chargerCreneaux(selected);
+  }, [chargerCreneaux]);
+
+  const selectionnerCreneau = useCallback((hhmm) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    const heure = new Date();
+    heure.setHours(h, m, 0, 0);
+    setRdvHeure(heure);
+  }, []);
+
   const soumettreRdv = useCallback(async () => {
     if (rdvSubmittingRef.current) return;
-    if (!rdvDate.trim() || !rdvHeure.trim() || !rdvTelephone.trim() || !rdvConsent) {
-      Alert.alert('Champs requis', "Renseignez le créneau, le téléphone et confirmez votre accord de contact.");
+    if (!annonce._id) {
+      Alert.alert('Erreur', 'Bien invalide.');
+      return;
+    }
+    if (!rdvDate || !rdvHeure) {
+      Alert.alert('Champs requis', 'Sélectionnez une date et une heure de visite.');
+      return;
+    }
+    if (!isFutureDateTime(rdvDate, rdvHeure)) {
+      Alert.alert('Créneau invalide', 'Choisissez une date et une heure dans le futur.');
+      return;
+    }
+    if (!rdvTelephone.trim() || !rdvConsent) {
+      Alert.alert('Champs requis', "Renseignez le téléphone et confirmez votre accord de contact.");
       return;
     }
     try {
       rdvSubmittingRef.current = true;
       setRdvLoading(true);
+      const dateLabel  = formatDateFR(rdvDate);
+      const heureLabel = formatTimeHHmm(rdvHeure);
       const convRes = await api.post('/conversations/start', {
         propertyId: annonce._id,
-        message: `Demande de visite le ${rdvDate} à ${rdvHeure}. Tél: ${rdvTelephone}${rdvMessage ? '. ' + rdvMessage : ''}`,
+        message: `Demande de visite le ${dateLabel} à ${heureLabel}. Tél: ${rdvTelephone}${rdvMessage ? '. ' + rdvMessage : ''}`,
       });
-      const conversation = convRes.data?.data?.conversation;
-      await api.post('/visites', {
+      const conversation = extractConversation(convRes);
+      await api.post('/visites', buildVisitPayload({
         propertyId: annonce._id,
         conversationId: conversation?._id,
-        datePreferee: rdvDate,
-        heurePreferee: rdvHeure,
+        selectedDate: rdvDate,
+        selectedTime: rdvHeure,
         telephone: rdvTelephone,
         message: rdvMessage,
         clientContactConsent: rdvConsent,
-      });
+      }));
       setRdvSuccess(true);
     } catch (err) {
-      Alert.alert('Erreur', err.response?.data?.message || "Impossible d'envoyer la demande.");
+      if (err.response?.data?.data?.action === 'reschedule') {
+        Alert.alert(
+          'Visite déjà active',
+          err.response.data.message,
+          [
+            { text: 'Annuler', style: 'cancel' },
+            {
+              text: 'Voir mes visites',
+              onPress: () => {
+                setRdvModalVisible(false);
+                navigation.navigate('Visites');
+              },
+            },
+          ],
+        );
+      } else {
+        Alert.alert('Erreur', err.response?.data?.message || "Impossible d'envoyer la demande.");
+      }
     } finally {
       rdvSubmittingRef.current = false;
       setRdvLoading(false);
     }
-  }, [annonce._id, rdvDate, rdvHeure, rdvTelephone, rdvMessage, rdvConsent]);
+  }, [annonce._id, rdvDate, rdvHeure, rdvTelephone, rdvMessage, rdvConsent, navigation]);
 
   const closeRdvModal = useCallback(() => {
     setRdvModalVisible(false);
@@ -1053,11 +1139,11 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                 <View style={styles.rdvRecap}>
                   <View style={styles.rdvRecapRow}>
                     <Ionicons name="calendar-outline" size={16} color={c.gold} />
-                    <Text style={styles.rdvRecapText}>Date souhaitée : {rdvDate}</Text>
+                    <Text style={styles.rdvRecapText}>Date souhaitée : {formatDateFR(rdvDate)}</Text>
                   </View>
                   <View style={styles.rdvRecapRow}>
                     <Ionicons name="time-outline" size={16} color={c.gold} />
-                    <Text style={styles.rdvRecapText}>Heure : {rdvHeure}</Text>
+                    <Text style={styles.rdvRecapText}>Heure : {formatTimeHHmm(rdvHeure)}</Text>
                   </View>
                   <View style={styles.rdvRecapRow}>
                     <Ionicons name="home-outline" size={16} color={c.gold} />
@@ -1104,28 +1190,84 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                   <Text style={styles.rdvFieldLabel}>
                     Date souhaitée <Text style={{ color: c.gold }}>*</Text>
                   </Text>
-                  <TextInput
+                  <TouchableOpacity
                     style={styles.rdvInput}
-                    placeholder="JJ/MM/AAAA"
-                    placeholderTextColor={c.textMuted}
-                    value={rdvDate}
-                    onChangeText={setRdvDate}
-                    keyboardType="numeric"
-                    maxLength={10}
-                  />
+                    onPress={() => setRdvDatePickerVisible(true)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Choisir la date de la visite"
+                  >
+                    <Text style={{
+                      fontFamily: fonts.body, fontSize: fontSize.sm,
+                      color: rdvDate ? c.text : c.textMuted,
+                    }}>
+                      {rdvDate ? formatDateFR(rdvDate) : 'Sélectionner une date'}
+                    </Text>
+                  </TouchableOpacity>
+                  {rdvDatePickerVisible && (
+                    <DateTimePicker
+                      value={rdvDate || new Date()}
+                      mode="date"
+                      minimumDate={new Date()}
+                      display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                      onChange={onChangeRdvDate}
+                    />
+                  )}
 
                   <Text style={styles.rdvFieldLabel}>
-                    Heure souhaitée <Text style={{ color: c.gold }}>*</Text>
+                    Créneau disponible <Text style={{ color: c.gold }}>*</Text>
                   </Text>
-                  <TextInput
-                    style={styles.rdvInput}
-                    placeholder="HH:MM (ex: 10:00)"
-                    placeholderTextColor={c.textMuted}
-                    value={rdvHeure}
-                    onChangeText={setRdvHeure}
-                    keyboardType="numeric"
-                    maxLength={5}
-                  />
+                  {!rdvDate ? (
+                    <Text style={styles.rdvSlotsHint}>Choisissez d'abord une date.</Text>
+                  ) : rdvSlotsLoading ? (
+                    <View style={styles.rdvSlotsLoading}>
+                      <ActivityIndicator color={c.gold} size="small" />
+                      <Text style={styles.rdvSlotsHint}>Chargement des créneaux…</Text>
+                    </View>
+                  ) : rdvSlotsError ? (
+                    <View style={styles.rdvSlotsLoading}>
+                      <Text style={styles.rdvSlotsHint}>{rdvSlotsError}</Text>
+                      <TouchableOpacity onPress={() => chargerCreneaux(rdvDate)} hitSlop={8}>
+                        <Text style={styles.rdvSlotsRetry}>Réessayer</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : !rdvSlots?.availableSlots?.length ? (
+                    <Text style={styles.rdvSlotsHint}>
+                      Aucun créneau disponible pour cette date. Choisissez une autre date.
+                    </Text>
+                  ) : (
+                    <View style={styles.rdvSlotsGrid}>
+                      {[...rdvSlots.availableSlots.map(h => ({ h, disabled: false })),
+                        ...rdvSlots.unavailableSlots.map(h => ({ h, disabled: true }))]
+                        .sort((a, b) => a.h.localeCompare(b.h))
+                        .map(({ h, disabled }) => {
+                          const selected = rdvHeure && formatTimeHHmm(rdvHeure) === h;
+                          return (
+                            <TouchableOpacity
+                              key={h}
+                              disabled={disabled}
+                              onPress={() => selectionnerCreneau(h)}
+                              style={[
+                                styles.rdvSlotChip,
+                                selected && styles.rdvSlotChipSelected,
+                                disabled && styles.rdvSlotChipDisabled,
+                              ]}
+                              accessibilityRole="button"
+                              accessibilityState={{ disabled, selected: !!selected }}
+                              accessibilityLabel={disabled ? `Créneau ${h} indisponible` : `Créneau ${h} disponible`}
+                            >
+                              <Text style={[
+                                styles.rdvSlotChipText,
+                                selected && styles.rdvSlotChipTextSelected,
+                                disabled && styles.rdvSlotChipTextDisabled,
+                              ]}>
+                                {h}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                    </View>
+                  )}
 
                   <Text style={styles.rdvFieldLabel}>
                     Téléphone <Text style={{ color: c.gold }}>*</Text>
@@ -2043,6 +2185,23 @@ const makeStyles = (c) => {
       color: c.text,
     },
     rdvTextarea: { height: 80, textAlignVertical: 'top' },
+    rdvSlotsHint: { fontFamily: fonts.body, fontSize: 13, color: c.textMuted, paddingVertical: 4 },
+    rdvSlotsLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+    rdvSlotsRetry: { fontFamily: fonts.bodyBold, fontSize: 13, color: c.gold },
+    rdvSlotsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    rdvSlotChip: {
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.bgCardAlt,
+    },
+    rdvSlotChipSelected: { backgroundColor: c.gold, borderColor: c.gold },
+    rdvSlotChipDisabled: { opacity: 0.4 },
+    rdvSlotChipText: { fontFamily: fonts.bodyBold, fontSize: 13, color: c.text },
+    rdvSlotChipTextSelected: { color: '#FFFFFF' },
+    rdvSlotChipTextDisabled: { color: c.textMuted, textDecorationLine: 'line-through' },
     rdvSubmitBtn: {
       flexDirection: 'row',
       alignItems: 'center',

@@ -1,3 +1,5 @@
+const { computeVisitEnd } = require('../config/visiteScheduling');
+
 const STATUS = Object.freeze({
   REQUESTED: 'demandee',
   AWAITING_CONFIRMATION: 'en_attente_confirmation',
@@ -132,6 +134,8 @@ const serializeVisite = (doc, viewerRole) => {
   raw.status = status;
   raw.displayStatus = LABELS[status];
   raw.allowedActions = actionsFor(status, viewerRole);
+  // Heure de fin calculée (durée fixe) — jamais stockée, pour affichage dashboard.
+  raw.requestedEnd = raw.scheduledEndAt || (raw.requestedDate ? computeVisitEnd(new Date(raw.requestedDate)) : null);
   return raw;
 };
 

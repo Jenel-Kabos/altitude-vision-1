@@ -136,6 +136,85 @@ describe('GET /api/properties/:id', () => {
     expect(res.body.data.property.location).toBeUndefined();
     expect(res.body.data.property.address.street).toBeUndefined();
   });
+
+  test('200 — incrémente réellement le compteur de vues en base ($inc, jamais un calcul local)', async () => {
+    const document = {
+      _id: '507f191e810c19729de860ea', title: 'TEST DATA PROPERTY', statusAdmin: 'Validée',
+      views: 43, images: [], address: {},
+      toObject() { return { ...this, toObject: undefined }; },
+    };
+    const populateMock = jest.fn().mockResolvedValue(document);
+    Property.findByIdAndUpdate = jest.fn().mockReturnValue({ populate: populateMock });
+    const res = await request(app).get('/api/properties/507f191e810c19729de860ea');
+    expect(res.statusCode).toBe(200);
+    expect(Property.findByIdAndUpdate).toHaveBeenCalledWith(
+      '507f191e810c19729de860ea',
+      { $inc: { views: 1 } },
+      { new: true },
+    );
+    expect(res.body.data.property.views).toBe(43);
+  });
+});
+
+// ─── POST /api/properties/:id/like (favoris — même source que le web) ────────
+
+describe('POST /api/properties/:id/like', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('401 sans token', async () => {
+    const res = await request(app).post(`/api/properties/${fakeProp._id}/like`);
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('404 — bien introuvable', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    Property.findById = jest.fn().mockResolvedValue(null);
+    const res = await request(app)
+      .post(`/api/properties/${fakeProp._id}/like`)
+      .set('Authorization', `Bearer ${makeToken('Client')}`);
+    expect(res.statusCode).toBe(404);
+  });
+
+  test("200 — premier like : ajout unique, pas de doublon possible ($addToSet)", async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    const property = { likes: [] };
+    Property.findById = jest.fn().mockResolvedValue(property);
+    Property.findByIdAndUpdate = jest.fn().mockResolvedValue({ likes: ['507f1f77bcf86cd799439011'] });
+
+    const res = await request(app)
+      .post(`/api/properties/${fakeProp._id}/like`)
+      .set('Authorization', `Bearer ${makeToken('Client')}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ status: 'success', liked: true, likes: 1 });
+    expect(Property.findByIdAndUpdate).toHaveBeenCalledWith(
+      fakeProp._id,
+      { $addToSet: { likes: '507f1f77bcf86cd799439011' } },
+      { new: true },
+    );
+  });
+
+  test('200 — deuxième appel retire le like (toggle) et le compteur redescend', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    const property = { likes: ['507f1f77bcf86cd799439011'] };
+    Property.findById = jest.fn().mockResolvedValue(property);
+    Property.findByIdAndUpdate = jest.fn().mockResolvedValue({ likes: [] });
+
+    const res = await request(app)
+      .post(`/api/properties/${fakeProp._id}/like`)
+      .set('Authorization', `Bearer ${makeToken('Client')}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ status: 'success', liked: false, likes: 0 });
+    expect(Property.findByIdAndUpdate).toHaveBeenCalledWith(
+      fakeProp._id,
+      { $pull: { likes: '507f1f77bcf86cd799439011' } },
+      { new: true },
+    );
+  });
 });
 
 // ─── POST /api/properties (création — authentification requise) ──────────────

@@ -83,6 +83,7 @@ module.exports = {
       'expo-camera',
       'expo-font',
       'expo-secure-store',
+      '@react-native-community/datetimepicker',
       '@react-native-google-signin/google-signin',
       [
         '@sentry/react-native/expo',

@@ -9,6 +9,16 @@ const {
   STATUS, LABELS, LEGACY_TO_STATUS, normalizeStatus, canTransition,
   appendHistory, resetReminderStates, serializeVisite,
 } = require('../services/visiteWorkflowService');
+const {
+  VISIT_DURATION_MINUTES, AGENCY_OPENING_HOURS, computeVisitEnd, computeConflictWindow,
+  isWithinOpeningHours, localParts, parseHHmmToMinutes, formatMinutesToHHmm,
+} = require('../config/visiteScheduling');
+
+// Statuts qui occupent réellement un créneau (mêmes valeurs que le contrôle
+// de doublon historique) — les visites annulées/refusées/terminées/expirées
+// ne bloquent jamais un créneau.
+const SLOT_BLOCKING_STATUS = [STATUS.REQUESTED, STATUS.AWAITING_CONFIRMATION, STATUS.CONFIRMED, STATUS.RESCHEDULED];
+const SLOT_BLOCKING_STATUT_LEGACY = ['En attente', 'Confirmée', 'Replanifiée'];
 
 const sourceOf = (req) => req.get('x-altimmo-client') === 'mobile' ? 'mobile' : 'web';
 const assertObjectId = (id, res) => {
@@ -29,6 +39,85 @@ const buildRequestedStart = (body) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 };
+
+// ─────────────────────────────────────────────
+// GET /api/visites/availability — créneaux disponibles pour un bien/jour
+// ─────────────────────────────────────────────
+exports.getAvailability = asyncHandler(async (req, res) => {
+  const { propertyId, date } = req.query;
+  if (!propertyId || !mongoose.isValidObjectId(propertyId)) {
+    res.status(400);
+    throw new Error('propertyId invalide.');
+  }
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    res.status(400);
+    throw new Error('date invalide (attendu AAAA-MM-JJ).');
+  }
+  const property = await Property.findById(propertyId).select('_id');
+  if (!property) {
+    res.status(404);
+    throw new Error('Bien introuvable.');
+  }
+
+  const dayStart = new Date(`${date}T00:00:00+01:00`);
+  const { dayKey } = localParts(dayStart);
+  const hours = AGENCY_OPENING_HOURS[dayKey];
+
+  if (!hours) {
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        date, durationMinutes: VISIT_DURATION_MINUTES,
+        openingTime: null, closingTime: null,
+        availableSlots: [], unavailableSlots: [],
+      },
+    });
+  }
+
+  const openMinutes  = parseHHmmToMinutes(hours.open);
+  const closeMinutes = parseHHmmToMinutes(hours.close);
+  const candidateStartMinutes = [];
+  for (let m = openMinutes; m + VISIT_DURATION_MINUTES <= closeMinutes; m += VISIT_DURATION_MINUTES) {
+    candidateStartMinutes.push(m);
+  }
+
+  // Visites actives ce jour-là (± une durée de visite pour couvrir les
+  // chevauchements à cheval sur les bornes du jour).
+  const dayEnd = new Date(dayStart.getTime() + 24 * 3600000);
+  const visites = await Visite.find({
+    property: propertyId,
+    $or: [
+      { status: { $in: SLOT_BLOCKING_STATUS } },
+      { status: null, statut: { $in: SLOT_BLOCKING_STATUT_LEGACY } },
+    ],
+    requestedDate: {
+      $gte: new Date(dayStart.getTime() - VISIT_DURATION_MINUTES * 60000),
+      $lt: dayEnd,
+    },
+  }).select('requestedDate');
+
+  const availableSlots = [];
+  const unavailableSlots = [];
+  for (const startMinutes of candidateStartMinutes) {
+    const slotStart = new Date(dayStart.getTime() + startMinutes * 60000);
+    const { afterExclusive, beforeExclusive } = computeConflictWindow(slotStart);
+    const conflict = visites.some((v) => {
+      const vStart = new Date(v.requestedDate);
+      return vStart > afterExclusive && vStart < beforeExclusive;
+    });
+    const label = formatMinutesToHHmm(startMinutes);
+    (conflict ? unavailableSlots : availableSlots).push(label);
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      date, durationMinutes: VISIT_DURATION_MINUTES,
+      openingTime: hours.open, closingTime: hours.close,
+      availableSlots, unavailableSlots,
+    },
+  });
+});
 
 // ─────────────────────────────────────────────
 // POST /api/visites — client crée une demande
@@ -55,7 +144,12 @@ exports.createVisite = asyncHandler(async (req, res) => {
     res.status(403);
     throw new Error('Vous ne pouvez pas planifier une visite sur votre propre bien.');
   }
-  if (property.availability !== 'Disponible' || property.statusAdmin !== 'Validée' || !property.isPublished) {
+  // isPublished appartient au workflow séparé "gestion locative"
+  // (rentalListingSyncService.js) et ne reflète pas la disponibilité
+  // publique générale — voir propertyMapper.js (mobile) pour la même
+  // correction côté client. Un bien validé et disponible ne doit jamais
+  // être bloqué pour cette seule raison.
+  if (property.availability !== 'Disponible' || property.statusAdmin !== 'Validée') {
     res.status(409);
     throw new Error('Ce bien n’est pas disponible pour une nouvelle visite.');
   }
@@ -64,21 +158,51 @@ exports.createVisite = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Choisissez une date et une heure futures valides.');
   }
+  const requestedEnd = computeVisitEnd(requestedStart);
+  if (!isWithinOpeningHours(requestedStart, requestedEnd)) {
+    res.status(400);
+    throw new Error('Choisissez un créneau pendant les horaires d’ouverture de l’agence (Lun-Ven 8h-18h, Sam 9h-14h).');
+  }
   if (!clientContactConsent) {
     res.status(400);
     throw new Error('Le consentement de contact est requis pour organiser la visite.');
   }
-  const duplicate = await Visite.exists({
+  // Une seule visite active par client et par bien : si ce client a déjà une
+  // visite en cours sur CE bien (demandée, en attente, confirmée ou
+  // reprogrammée), on ne crée pas de doublon — on l'invite à reprogrammer
+  // celle qui existe déjà plutôt que d'autoriser une nouvelle réservation.
+  // Les visites annulées/refusées/terminées ne comptent pas (SLOT_BLOCKING_STATUS).
+  const existingActiveVisit = await Visite.findOne({
     property: propertyId, client: req.user.id,
     $or: [
-      { status: { $in: [STATUS.REQUESTED, STATUS.AWAITING_CONFIRMATION, STATUS.CONFIRMED, STATUS.RESCHEDULED] } },
-      { status: null, statut: { $in: ['En attente', 'Confirmée', 'Replanifiée'] } },
+      { status: { $in: SLOT_BLOCKING_STATUS } },
+      { status: null, statut: { $in: SLOT_BLOCKING_STATUT_LEGACY } },
     ],
-    requestedDate: { $gte: new Date(requestedStart.getTime() - 30 * 60 * 1000), $lte: new Date(requestedStart.getTime() + 30 * 60 * 1000) },
+  }).select('_id status statut requestedDate');
+  if (existingActiveVisit) {
+    return res.status(409).json({
+      status: 'fail',
+      message: 'Vous avez déjà une visite active pour ce bien. Souhaitez-vous la reprogrammer ?',
+      data: { existingVisiteId: existingActiveVisit._id, action: 'reschedule' },
+    });
+  }
+  // Conflit de créneau : un bien peut être visité par plusieurs clients le
+  // même jour, à condition que leurs créneaux de VISIT_DURATION_MINUTES ne
+  // se chevauchent pas (toutes visites confondues, tous clients confondus).
+  // existingStart < newEnd ET existingStart > newStart - durée
+  // (équivalent à existingEnd > newStart, sans stocker de champ de fin).
+  const { afterExclusive: conflictWindowStart } = computeConflictWindow(requestedStart);
+  const slotConflict = await Visite.exists({
+    property: propertyId,
+    $or: [
+      { status: { $in: SLOT_BLOCKING_STATUS } },
+      { status: null, statut: { $in: SLOT_BLOCKING_STATUT_LEGACY } },
+    ],
+    requestedDate: { $gt: conflictWindowStart, $lt: requestedEnd },
   });
-  if (duplicate) {
+  if (slotConflict) {
     res.status(409);
-    throw new Error('Une demande similaire existe déjà pour ce créneau.');
+    throw new Error('Ce créneau est déjà réservé pour ce bien. Choisissez un autre horaire.');
   }
   const address = property.address || {};
   const visite = await Visite.create({
@@ -111,6 +235,28 @@ exports.createVisite = asyncHandler(async (req, res) => {
     statut: 'En attente',
     workflowHistory: [{ from: '', to: STATUS.REQUESTED, action: 'create', actor: req.user.id, role: 'client', source: sourceOf(req) }],
   });
+
+  // Protection anti-concurrence : le contrôle de chevauchement ci-dessus et
+  // la création ne sont pas atomiques (pas de transaction Mongo dans ce
+  // projet à ce jour). On revérifie juste après création : si un autre
+  // client a créé une visite en conflit avec un createdAt antérieur pendant
+  // la fenêtre de course, on annule (compense) la création perdante plutôt
+  // que de laisser deux visites incompatibles coexister.
+  const raceConflict = await Visite.exists({
+    _id: { $ne: visite._id },
+    property: propertyId,
+    $or: [
+      { status: { $in: SLOT_BLOCKING_STATUS } },
+      { status: null, statut: { $in: SLOT_BLOCKING_STATUT_LEGACY } },
+    ],
+    requestedDate: { $gt: conflictWindowStart, $lt: requestedEnd },
+    createdAt: { $lt: visite.createdAt },
+  });
+  if (raceConflict) {
+    await Visite.deleteOne({ _id: visite._id });
+    res.status(409);
+    throw new Error('Ce créneau vient d’être réservé par un autre client. Choisissez un autre horaire.');
+  }
 
   await visite.populate('property', 'title images address owner');
 

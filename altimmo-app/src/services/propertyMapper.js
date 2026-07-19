@@ -36,14 +36,20 @@ export function isPropertyOwner(property, user) {
 
 /**
  * Un bien est considéré disponible pour une action (contact, visite) quand
- * ces trois champs backend l'autorisent. Absence de champ = pas de blocage
+ * ces champs backend l'autorisent. Absence de champ = pas de blocage
  * (rétro-compatibilité avec d'anciennes fiches qui ne les renseignent pas).
+ *
+ * `isPublished` est volontairement ignoré ici : ce champ appartient au
+ * sous-workflow "gestion locative" (rentalListingSyncService.js) et ne
+ * reflète pas la visibilité publique générale — GET /properties ne filtre
+ * pas dessus. Un bien validé (statusAdmin) et disponible (availability)
+ * peut légitimement avoir isPublished=false ; l'utiliser ici bloquait à
+ * tort la visite sur 100% des biens réels.
  */
 export function isPropertyAvailable(property) {
   if (!property) return false;
   if (property.availability && property.availability !== 'Disponible') return false;
   if (property.statusAdmin && property.statusAdmin !== 'Validée') return false;
-  if (property.isPublished === false) return false;
   return true;
 }
 

@@ -77,8 +77,10 @@ describe('isPropertyAvailable', () => {
     expect(isPropertyAvailable({ statusAdmin: 'En attente' })).toBe(false);
   });
 
-  test('indisponible si isPublished === false', () => {
-    expect(isPropertyAvailable({ isPublished: false })).toBe(false);
+  test('disponible même si isPublished === false — champ hors sujet (workflow gestion locative séparé)', () => {
+    expect(isPropertyAvailable({
+      availability: 'Disponible', statusAdmin: 'Validée', isPublished: false,
+    })).toBe(true);
   });
 
   test('disponible quand tous les champs l\'autorisent explicitement', () => {
@@ -89,11 +91,13 @@ describe('isPropertyAvailable', () => {
 });
 
 describe('getPropertyPermissions', () => {
+  // isPublished: false — état réel de tous les biens en production actuellement
+  // (workflow "gestion locative" séparé) ; ne doit pas bloquer la visite.
   const availableProperty = {
     owner: { _id: 'owner-1' },
     availability: 'Disponible',
     statusAdmin: 'Validée',
-    isPublished: true,
+    isPublished: false,
   };
 
   test('propriétaire du bien : ni contact ni visite', () => {
