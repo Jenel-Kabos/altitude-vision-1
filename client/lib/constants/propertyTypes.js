@@ -21,11 +21,12 @@ export const PROPERTY_TYPES_WITH_ALL = [
   ...PROPERTY_TYPES,
 ];
 
-// Transactions — status enum MongoDB : 'vente' | 'location'
+// Transactions — status enum MongoDB : 'vente' | 'location' | 'hebergement'
 export const TRANSACTIONS = [
-  { value: 'tous',     label: 'Tous' },
-  { value: 'vente',    label: 'Vente' },
-  { value: 'location', label: 'Location' },
+  { value: 'tous',        label: 'Tous' },
+  { value: 'vente',       label: 'Vente' },
+  { value: 'location',    label: 'Location' },
+  { value: 'hebergement', label: 'Hébergement' },
 ];
 
 // Presets budget (identiques au mobile SearchPanel)

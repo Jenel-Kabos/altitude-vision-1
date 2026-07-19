@@ -19,6 +19,8 @@ import { fonts, fontSize, spacing, radius } from '../../theme';
 
 const PLACEHOLDER_IMG = require('../../../assets/Logo_Altitude_transparent.png');
 
+const TRANSACTION_LABELS = { vente: 'Vente', location: 'Location', hebergement: 'Hébergement' };
+
 const BRAZZAVILLE = {
   latitude:      -4.2634,
   longitude:     15.2429,
@@ -99,11 +101,14 @@ function formatPriceCourt(price) {
 // ─── Pin prix ─────────────────────────────────────────────────────────────────
 
 const LOCATION_BG = '#1A2C4E';
+const HEBERGEMENT_BG = '#14532D';
 
 const PricePin = memo(function PricePin({ price, status, isSelected, pinStyles }) {
-  const isLocation = status?.toLowerCase() === 'location';
+  const statusKey = status?.toLowerCase();
+  const isLocation = statusKey === 'location';
+  const isHebergement = statusKey === 'hebergement';
   const label  = formatPriceCourt(price);
-  const suffix = isLocation ? '/m' : ' FCFA';
+  const suffix = isHebergement ? ' FCFA' : isLocation ? '/m' : ' FCFA';
 
   return (
     <View style={pinStyles.wrapper}>
@@ -111,6 +116,7 @@ const PricePin = memo(function PricePin({ price, status, isSelected, pinStyles }
         pinStyles.bubble,
         isSelected && pinStyles.bubbleSelected,
         isLocation && !isSelected && pinStyles.bubbleLocation,
+        isHebergement && !isSelected && pinStyles.bubbleHebergement,
       ]}>
         <Text style={[pinStyles.amount, isSelected && pinStyles.amountSelected]}>{label}</Text>
         <Text style={[pinStyles.suffix, isSelected && pinStyles.suffixSelected]}>{suffix}</Text>
@@ -119,6 +125,7 @@ const PricePin = memo(function PricePin({ price, status, isSelected, pinStyles }
         pinStyles.triangle,
         isSelected && pinStyles.triangleSelected,
         isLocation && !isSelected && pinStyles.triangleLocation,
+        isHebergement && !isSelected && pinStyles.triangleHebergement,
       ]} />
     </View>
   );
@@ -433,7 +440,7 @@ export default function CarteScreen({ navigation }) {
             >
               {activeFilters.transaction !== 'tous' && (
                 <ActiveChip
-                  label={activeFilters.transaction === 'vente' ? 'Vente' : 'Location'}
+                  label={TRANSACTION_LABELS[activeFilters.transaction] || activeFilters.transaction}
                   onRemove={() => setActiveFilters(prev => ({ ...prev, transaction: 'tous' }))}
                   c={c} styles={styles}
                 />
@@ -578,6 +585,7 @@ const makePinStyles = (c) => StyleSheet.create({
   },
   bubbleSelected: { backgroundColor: c.gold, borderColor: c.gold },
   bubbleLocation: { backgroundColor: LOCATION_BG, borderColor: c.blue },
+  bubbleHebergement: { backgroundColor: HEBERGEMENT_BG, borderColor: '#16A34A' },
   amount: {
     fontFamily: fonts.bodyBold,
     fontSize: 13,
@@ -599,6 +607,7 @@ const makePinStyles = (c) => StyleSheet.create({
   },
   triangleSelected: { borderTopColor: c.gold },
   triangleLocation: { borderTopColor: LOCATION_BG },
+  triangleHebergement: { borderTopColor: HEBERGEMENT_BG },
 });
 
 // ─── Styles écran ─────────────────────────────────────────────────────────────

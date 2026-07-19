@@ -2,13 +2,16 @@
 // Le backend reste la source de vérité : ce module ne fait qu'interpréter
 // de façon cohérente des champs déjà renvoyés par l'API, sans inventer de règle.
 
+const HEBERGEMENT_KEYWORDS = ['hebergement', 'hébergement'];
 const LOCATION_KEYWORDS = ['location', 'louer', 'rent', 'renting'];
 const VENTE_KEYWORDS    = ['vente', 'vendre', 'sale', 'sell'];
 
 /**
  * Normalise le "listingType" d'un bien à partir des différents noms de champs
  * legacy possibles (status, transactionType, category, listingType).
- * Retourne 'location' | 'vente' | null.
+ * Retourne 'location' | 'vente' | 'hebergement' | null.
+ * L'ordre de test importe : hébergement est vérifié avant location/vente pour
+ * éviter tout chevauchement de mot-clé.
  */
 export function normalizeListingType(property) {
   const candidates = [
@@ -20,6 +23,7 @@ export function normalizeListingType(property) {
   for (const raw of candidates) {
     const v = (raw || '').toString().trim().toLowerCase();
     if (!v) continue;
+    if (HEBERGEMENT_KEYWORDS.some((k) => v.includes(k))) return 'hebergement';
     if (LOCATION_KEYWORDS.some((k) => v.includes(k))) return 'location';
     if (VENTE_KEYWORDS.some((k) => v.includes(k)))    return 'vente';
   }
@@ -78,13 +82,59 @@ export function getPropertyPermissions(property, user) {
   return { canContact: true, canRequestVisit: true, reason: null };
 }
 
+const ACCOMMODATION_TYPE_LABELS = {
+  villa_meublee: 'Villa meublée',
+  maison_meublee: 'Maison meublée',
+  appartement_meuble: 'Appartement meublé',
+  studio_meuble: 'Studio meublé',
+  residence_meublee: 'Résidence meublée',
+  bungalow: 'Bungalow',
+};
+
+const RATE_MODE_LABELS = { nightly: 'Tarif / nuit', weekly: 'Tarif / semaine', monthly: 'Tarif / mois', yearly: 'Tarif / an' };
+
+/**
+ * Conditions de séjour Hébergement — jamais de vocabulaire de bail (loyer,
+ * caution locative, mandat, profils locataire, documents de bail). Le champ
+ * "Caution" y a un libellé distinct : "Caution de séjour".
+ */
+function getAccommodationConditions(property) {
+  const fmt = (n) => Number(n || 0).toLocaleString('fr-FR');
+  const acc = property.accommodation;
+  const rows = [];
+  if (!acc) return rows;
+
+  if (acc.accommodationType) {
+    rows.push({ key: 'type', label: 'Formule', value: ACCOMMODATION_TYPE_LABELS[acc.accommodationType] || acc.accommodationType });
+  }
+  if (Array.isArray(acc.rates)) {
+    acc.rates.forEach((r) => {
+      rows.push({ key: `rate-${r.mode}`, label: RATE_MODE_LABELS[r.mode] || r.mode, value: `${fmt(r.amount)} FCFA` });
+    });
+  }
+  if (acc.checkInTime || acc.checkOutTime) {
+    rows.push({ key: 'horaires', label: 'Arrivée / Départ', value: `${acc.checkInTime || '—'} / ${acc.checkOutTime || '—'}` });
+  }
+  if (acc.securityDeposit > 0) {
+    rows.push({ key: 'caution-sejour', label: 'Caution de séjour', value: `${fmt(acc.securityDeposit)} FCFA` });
+  }
+  if (acc.cleaningFee > 0) {
+    rows.push({ key: 'menage', label: 'Frais de ménage', value: `${fmt(acc.cleaningFee)} FCFA` });
+  }
+  return rows;
+}
+
 /**
  * Extrait les conditions de location publiquement affichables, en filtrant
  * les valeurs manquantes/nulles. Ne retourne jamais de donnée privée
  * (contrat signé, identité locataire, documents, historique de paiement).
+ * Hébergement suit une branche entièrement séparée (getAccommodationConditions)
+ * pour ne jamais afficher de vocabulaire de bail.
  */
 export function getRentalConditions(property) {
   if (!property) return [];
+  if (normalizeListingType(property) === 'hebergement') return getAccommodationConditions(property);
+
   const fmt = (n) => Number(n || 0).toLocaleString('fr-FR');
   const price = property.price || property.prix || 0;
   const rows = [];

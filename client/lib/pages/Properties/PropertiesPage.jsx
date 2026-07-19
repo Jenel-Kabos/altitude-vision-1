@@ -385,7 +385,7 @@ function PropertiesContent() {
             <>
               {filters.transaction !== 'tous' && (
                 <FilterChip
-                  label={filters.transaction === 'vente' ? 'Vente' : 'Location'}
+                  label={TRANSACTIONS.find(t => t.value === filters.transaction)?.label || filters.transaction}
                   onRemove={() => handleFilterChange('transaction', 'tous')}
                 />
               )}

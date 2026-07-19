@@ -260,7 +260,6 @@ const Footer = () => (
                       key={j}
                       href={href}
                       style={{
-                        display: 'block',
                         fontFamily: "'DM Sans', sans-serif",
                         fontSize: 'clamp(0.75rem, 1.1vw, 1rem)',
                         color: '#374151',

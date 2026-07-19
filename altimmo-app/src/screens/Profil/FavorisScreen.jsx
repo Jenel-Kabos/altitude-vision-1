@@ -21,7 +21,9 @@ const PLACEHOLDER = require('../../../assets/Logo_Altitude_transparent.png');
 
 // ─── FavCard ─────────────────────────────────────────────────────────────────
 const FavCard = React.memo(function FavCard({ item, onPress, styles, c }) {
-  const isLocation    = item.status?.toLowerCase() === 'location';
+  const statusKey     = item.status?.toLowerCase();
+  const isLocation    = statusKey === 'location';
+  const isHebergement = statusKey === 'hebergement';
   const arrondissement = item.address?.arrondissement || '';
   const city          = item.address?.city || 'Brazzaville';
   const addressText   = arrondissement ? `${arrondissement}, ${city}` : city;
@@ -55,9 +57,9 @@ const FavCard = React.memo(function FavCard({ item, onPress, styles, c }) {
         />
 
         {/* Badge statut — haut-gauche */}
-        <View style={[styles.badge, isLocation ? styles.badgeLoc : styles.badgeVente]}>
-          <Text style={[styles.badgeText, isLocation ? styles.badgeTextLoc : styles.badgeTextVente]}>
-            {isLocation ? 'LOCATION' : 'VENTE'}
+        <View style={[styles.badge, isHebergement ? styles.badgeHeb : isLocation ? styles.badgeLoc : styles.badgeVente]}>
+          <Text style={[styles.badgeText, isHebergement ? styles.badgeTextHeb : isLocation ? styles.badgeTextLoc : styles.badgeTextVente]}>
+            {isHebergement ? 'HÉBERGEMENT' : isLocation ? 'LOCATION' : 'VENTE'}
           </Text>
         </View>
 
@@ -256,6 +258,10 @@ const makeStyles = (c) => StyleSheet.create({
     backgroundColor: 'rgba(24,95,165,0.15)',
     borderColor: 'rgba(24,95,165,0.4)',
   },
+  badgeHeb: {
+    backgroundColor: 'rgba(22,163,74,0.15)',
+    borderColor: 'rgba(22,163,74,0.4)',
+  },
   badgeText: {
     fontFamily: fonts.bodyBold,
     fontSize: 9,
@@ -263,6 +269,7 @@ const makeStyles = (c) => StyleSheet.create({
   },
   badgeTextVente: { color: '#C8960C' },
   badgeTextLoc:   { color: '#185FA5' },
+  badgeTextHeb:   { color: '#16A34A' },
 
   heartBadge: {
     position: 'absolute',

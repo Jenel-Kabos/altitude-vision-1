@@ -13,8 +13,11 @@
     "test": "jest --runInBand --no-watchman",
     "test:watch": "jest --watch --no-watchman",
     "test:coverage": "jest --coverage --runInBand --no-watchman",
-    "doctor": "expo-doctor",
-    "validate": "npm run check:syntax && npm run lint && npm run typecheck && npm run test"
+    "doctor": "npx expo-doctor",
+    "export": "expo export --platform android",
+    "validate": "npm run check:syntax && npm run lint && npm run typecheck && npm run test",
+    "verify": "npm run lint && npm run typecheck",
+    "ci": "npm run check:syntax && npm run lint && npm run typecheck && npm run test:coverage && npm run doctor && npm run export"
   },
   "dependencies": {
     "@expo-google-fonts/cormorant-garamond": "^0.4.1",

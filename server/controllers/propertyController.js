@@ -8,6 +8,9 @@ const { uploadToCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const logger = require('../utils/logger');
 const { notify, notifyMany } = require('../services/notificationService');
+const Accommodation = require('../models/Accommodation');
+const RatePlan = require('../models/RatePlan');
+const { isPubliclyVisible } = require('../services/accommodationService');
 
 // ============================================================
 // 🛠️ UTILITAIRES
@@ -235,10 +238,41 @@ const getAllProperties = asyncHandler(async (req, res) => {
     .limitFields()
     .paginate();
 
-  const [properties, total] = await Promise.all([
+  let [properties, total] = await Promise.all([
     features.query,
     countFeatures.query.countDocuments(),
   ]);
+
+  // Hébergement : filtre post-fetch — un hébergement non publié (Accommodation
+  // absente ou publicationStatus ≠ 'publie') n'apparaît jamais dans le listing
+  // public, même si Property est déjà 'Validée'/'Disponible'.
+  //
+  // ⚠️ LIMITATION CONNUE (Sprint 2, TODO Sprint 3) — deux effets de bord :
+  //   1. `total` (countDocuments, ligne ~243) compte TOUS les Property
+  //      correspondant aux filtres, y compris les hébergements non publiés
+  //      qui seront retirés juste après → `total` peut être légèrement
+  //      surestimé pour une recherche qui inclut des hébergements.
+  //   2. Ce filtre s'applique APRÈS skip/limit (pagination Mongo), donc une
+  //      page peut légitimement contenir moins de `limit` résultats si elle
+  //      incluait des hébergements non publiés avant filtrage.
+  //   Aucun impact sur Vente/Location : l'exclusion ne s'applique jamais à
+  //   ces statuts (vérifié par la suite de tests existante, inchangée).
+  //   Correction non appliquée ce sprint : la réécrire proprement nécessite
+  //   soit une agrégation $lookup Property↔Accommodation, soit de dupliquer
+  //   la logique de filtre() d'APIFeatures pour précalculer l'exclusion
+  //   AVANT paginate() — dans les deux cas un risque de régression sur un
+  //   endpoint public que le périmètre du Sprint 2 ne justifie pas. À
+  //   traiter au Sprint 3 si le volume d'hébergements le justifie.
+  if (!isAdmin) {
+    const hebergementIds = properties.filter((p) => p.status === 'hebergement').map((p) => p._id);
+    if (hebergementIds.length > 0) {
+      const published = await Accommodation.find({
+        property: { $in: hebergementIds }, publicationStatus: 'publie',
+      }).select('property').lean();
+      const publishedSet = new Set(published.map((a) => String(a.property)));
+      properties = properties.filter((p) => p.status !== 'hebergement' || publishedSet.has(String(p._id)));
+    }
+  }
 
   logger.info(`📦 [getAllProperties] total=${total} results=${properties.length} baseFilter=${JSON.stringify(Object.keys(baseFilter))}`);
 
@@ -314,6 +348,17 @@ const getProperty = asyncHandler(async (req, res) => {
     throw new Error('Cette propriété est en attente de validation.');
   }
 
+  // Hébergement : gate additionnel — voir accommodationService.isPubliclyVisible.
+  // Vente/Location ne passent jamais par cette branche, comportement inchangé.
+  let accommodation = null;
+  if (property.status === 'hebergement') {
+    accommodation = await Accommodation.findOne({ property: property._id });
+    if (!isAdmin && !isOwner && !isPubliclyVisible(property, accommodation)) {
+      res.status(403);
+      throw new Error("Cet hébergement est en attente de validation.");
+    }
+  }
+
   const responseProperty = property.toObject();
   if (!isAdmin && !isOwner) {
     delete responseProperty.documents;
@@ -328,6 +373,11 @@ const getProperty = asyncHandler(async (req, res) => {
         photo: responseProperty.owner.photo || '',
       };
     }
+  }
+
+  if (accommodation) {
+    const rates = await RatePlan.find({ accommodation: accommodation._id, active: true });
+    responseProperty.accommodation = { ...accommodation.toObject(), rates };
   }
 
   res.status(200).json({

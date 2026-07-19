@@ -145,4 +145,27 @@ describe('PropertyDetailPage — TEST DATA', () => {
     rerender(<PropertyDetailPage />);
     expect(screen.getByRole('heading', { name: 'TEST DATA HOUSE' })).toBeInTheDocument();
   });
+
+  test('un hébergement affiche le tarif de séjour et jamais le vocabulaire de bail', async () => {
+    getPropertyById.mockResolvedValue({
+      ...property,
+      status: 'hebergement',
+      accommodation: {
+        accommodationType: 'villa_meublee',
+        capacity: { maxAdults: 4, maxChildren: 2 },
+        checkInTime: '15:00', checkOutTime: '10:00',
+        minimumStay: 2, securityDeposit: 50000, cleaningFee: 10000,
+        publicationStatus: 'publie',
+        rates: [{ mode: 'nightly', amount: 35000 }],
+      },
+    });
+    render(<PropertyDetailPage />);
+    expect(await screen.findByRole('heading', { name: 'TEST DATA HOUSE' })).toBeInTheDocument();
+    expect(screen.getAllByText('Hébergement').length).toBeGreaterThan(0);
+    expect(screen.getByText('Tarifs du séjour')).toBeInTheDocument();
+    expect(screen.getByText('Caution de séjour')).toBeInTheDocument();
+    expect(screen.getByText('Villa meublée')).toBeInTheDocument();
+    expect(screen.queryByText("Honoraires d'agence")).not.toBeInTheDocument();
+    expect(screen.queryByText(/mandat de location|mandat de vente/i)).not.toBeInTheDocument();
+  });
 });

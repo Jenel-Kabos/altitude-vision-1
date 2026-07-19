@@ -24,7 +24,12 @@ const ITEM_LENGTH   = CARD_W + GAP;
 // ─── Carte individuelle ───────────────────────────────────────────────────────
 
 const PropertyCard = React.memo(function PropertyCard({ item, onPress, styles, c }) {
-  const isLocation   = item.status?.toLowerCase() === 'location';
+  const statusKey    = item.status?.toLowerCase();
+  const isLocation   = statusKey === 'location';
+  const isHebergement = statusKey === 'hebergement';
+  const statusLabel  = isHebergement ? 'Hébergement' : isLocation ? 'Location' : 'Vente';
+  const statusBadgeStyle = isHebergement ? styles.badgeStatusHeb : isLocation ? styles.badgeStatusLoc : styles.badgeStatusVente;
+  const statusTextStyle  = isHebergement ? styles.badgeStatusTextHeb : isLocation ? styles.badgeStatusTextLoc : styles.badgeStatusTextVente;
   const imgUri       = item.images?.[0] || item.photos?.[0] || null;
   const arrondissement = item.address?.arrondissement;
   const city         = item.address?.city || 'Brazzaville';
@@ -63,9 +68,9 @@ const PropertyCard = React.memo(function PropertyCard({ item, onPress, styles, c
         </View>
 
         {/* Badge Vente / Location (haut-droit) */}
-        <View style={[styles.badgeStatus, isLocation ? styles.badgeStatusLoc : styles.badgeStatusVente]}>
-          <Text style={[styles.badgeStatusText, isLocation ? styles.badgeStatusTextLoc : styles.badgeStatusTextVente]}>
-            {isLocation ? 'Location' : 'Vente'}
+        <View style={[styles.badgeStatus, statusBadgeStyle]}>
+          <Text style={[styles.badgeStatusText, statusTextStyle]}>
+            {statusLabel}
           </Text>
         </View>
       </View>
@@ -241,6 +246,11 @@ const makeStyles = (c) => StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(74,144,217,0.4)',
   },
+  badgeStatusHeb: {
+    backgroundColor: 'rgba(22,163,74,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(22,163,74,0.4)',
+  },
   badgeStatusText: {
     fontFamily: fonts.bodyBold,
     fontSize: 9,
@@ -249,6 +259,7 @@ const makeStyles = (c) => StyleSheet.create({
   },
   badgeStatusTextVente: { color: c.gold },
   badgeStatusTextLoc:   { color: c.blue },
+  badgeStatusTextHeb:   { color: '#16A34A' },
 
   // ─── Corps ───
   body: {

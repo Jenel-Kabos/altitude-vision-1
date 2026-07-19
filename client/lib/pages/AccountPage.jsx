@@ -64,7 +64,7 @@ const PhoneField = ({ value, onChange }) => {
 
     const handleDialChange  = e => onChange(`${e.target.value} ${local}`.trim());
     const handleLocalChange = e => {
-        const clean = e.target.value.replace(/[^\d\s\-]/g, '');
+        const clean = e.target.value.replace(/[^\d\s-]/g, '');
         onChange(`${dialCode} ${clean}`.trim());
     };
 

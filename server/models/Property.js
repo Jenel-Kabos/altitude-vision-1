@@ -33,10 +33,15 @@ const propertySchema = new mongoose.Schema(
       required: [true, 'Veuillez spécifier le type de propriété'],
     },
 
+    // 'hebergement' = occupation par réservation (séjour meublé), jamais par
+    // bail — voir server/models/Accommodation.js. Ne jamais traiter
+    // 'hebergement' comme un synonyme de 'location' : toute logique propre au
+    // bail (Contrat, RentalManagement, Paiement locatif) doit continuer à
+    // tester `status === 'location'` explicitement.
     status: {
       type: String,
       required: true,
-      enum: ['vente', 'location'],
+      enum: ['vente', 'location', 'hebergement'],
     },
 
     price: {

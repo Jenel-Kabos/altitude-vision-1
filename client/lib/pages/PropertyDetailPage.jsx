@@ -941,6 +941,12 @@ const PropertyDetailPage = () => {
     </div>
   );
 
+  const STATUS_LABELS = { vente: 'Vente', location: 'Location', hebergement: 'Hébergement' };
+  const statusLabel = STATUS_LABELS[property.status] || property.status || 'Vente';
+  const accommodation = property.accommodation || null;
+  const nightlyRate = accommodation?.rates?.find(r => r.mode === 'nightly')?.amount ?? null;
+  const displayPrice = accommodation ? (nightlyRate ?? property.price) : property.price;
+
   const images = Array.isArray(property.images) && property.images.length > 0 ? property.images : [];
   const mainImage = images.length > 0 ? optimizeCloudinaryUrl(buildImageUrl(images[mainIdx]), 1200) : PLACEHOLDER;
   const displayAddress = property.address
@@ -958,9 +964,26 @@ const PropertyDetailPage = () => {
   const infoRows = [
     { label: 'Type de bien',  value: property.type             || '—' },
     { label: 'Construction',  value: property.constructionType || '—' },
-    { label: 'Statut',        value: property.status           || '—' },
+    { label: 'Statut',        value: statusLabel },
     { label: 'Disponibilité', value: property.availability     || '—' },
   ];
+
+  const ACCOMMODATION_TYPE_LABELS = {
+    villa_meublee: 'Villa meublée',
+    maison_meublee: 'Maison meublée',
+    appartement_meuble: 'Appartement meublé',
+    studio_meuble: 'Studio meublé',
+    residence_meublee: 'Résidence meublée',
+    bungalow: 'Bungalow',
+  };
+  if (accommodation) {
+    infoRows.push({ label: 'Formule', value: ACCOMMODATION_TYPE_LABELS[accommodation.accommodationType] || accommodation.accommodationType || '—' });
+    infoRows.push({ label: 'Capacité', value: `${accommodation.capacity?.maxAdults || 0} adulte${(accommodation.capacity?.maxAdults || 0) > 1 ? 's' : ''}${accommodation.capacity?.maxChildren ? ` · ${accommodation.capacity.maxChildren} enfant(s)` : ''}` });
+    infoRows.push({ label: 'Arrivée / Départ', value: `${accommodation.checkInTime || '—'} / ${accommodation.checkOutTime || '—'}` });
+    if (accommodation.minimumStay) {
+      infoRows.push({ label: 'Séjour minimum', value: `${accommodation.minimumStay} nuit${accommodation.minimumStay > 1 ? 's' : ''}` });
+    }
+  }
 
   const prevImg = () => setMainIdx(i => (i - 1 + images.length) % images.length);
   const nextImg = () => setMainIdx(i => (i + 1) % images.length);
@@ -1011,7 +1034,7 @@ const PropertyDetailPage = () => {
             </div>
             <div className="pdp-badges">
               <span className="pdp-badge">
-                <Tag size={10} /> En {property.status || 'vente'}
+                <Tag size={10} /> {property.status === 'hebergement' ? statusLabel : `En ${statusLabel}`}
               </span>
               {property.availability && (
                 <span className={`pdp-badge ${isAvail ? 'pdp-badge-avail-yes' : 'pdp-badge-avail-no'}`}>
@@ -1079,7 +1102,9 @@ const PropertyDetailPage = () => {
 
                 {/* Prix */}
                 <div className="pdp-img-price-badge">
-                  <p className="pdp-img-price-value">{formatCurrencyXAF(property.price)}</p>
+                  <p className="pdp-img-price-value">
+                    {formatCurrencyXAF(displayPrice)}{accommodation && nightlyRate ? ' / nuit' : ''}
+                  </p>
                 </div>
 
                 {/* Flèches */}
@@ -1262,9 +1287,9 @@ const PropertyDetailPage = () => {
 
               {/* Prix */}
               <div className="pdp-sidebar-price">
-                <p className="pdp-sidebar-price-label">Prix du bien</p>
+                <p className="pdp-sidebar-price-label">{accommodation ? 'Tarif du séjour' : 'Prix du bien'}</p>
                 <p className="pdp-sidebar-price-value">
-                  {formatCurrencyXAF(property.price)}
+                  {formatCurrencyXAF(displayPrice)}{accommodation && nightlyRate ? ' / nuit' : ''}
                 </p>
                 <div className="pdp-sidebar-badges">
                   <span className="pdp-sidebar-badge" style={{
@@ -1283,8 +1308,44 @@ const PropertyDetailPage = () => {
                 </div>
               </div>
 
-              {/* Honoraires d'agence — valeurs stockées en base, formule uniquement en repli */}
-              {(() => {
+              {/* Hébergement : tarifs de séjour (jamais de vocabulaire de bail) */}
+              {accommodation && (
+                <div style={{ padding:'0 clamp(18px,4vw,28px) clamp(6px,1.5vw,10px)' }}>
+                  <div className="pdp-fees">
+                    <div className="pdp-fees-title">
+                      <Percent size={10} /> Tarifs du séjour
+                    </div>
+                    {(accommodation.rates && accommodation.rates.length > 0) ? accommodation.rates.map((r) => (
+                      <div className="pdp-fees-row" key={r.mode}>
+                        <span className="pdp-fees-row-label" style={{ color:'rgba(255,255,255,0.55)' }}>
+                          {{ nightly:'Par nuit', weekly:'Par semaine', monthly:'Par mois', yearly:'Par an' }[r.mode] || r.mode}
+                        </span>
+                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>{formatCurrencyXAF(r.amount, 'Non renseigné')}</span>
+                      </div>
+                    )) : (
+                      <div className="pdp-fees-row">
+                        <span className="pdp-fees-row-label" style={{ color:'rgba(255,255,255,0.55)' }}>Tarifs</span>
+                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>Non renseignés</span>
+                      </div>
+                    )}
+                    {accommodation.securityDeposit > 0 && (
+                      <div className="pdp-fees-row">
+                        <span className="pdp-fees-row-label" style={{ color:'rgba(255,255,255,0.55)' }}>Caution de séjour</span>
+                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>{formatCurrencyXAF(accommodation.securityDeposit)}</span>
+                      </div>
+                    )}
+                    {accommodation.cleaningFee > 0 && (
+                      <div className="pdp-fees-row">
+                        <span className="pdp-fees-row-label" style={{ color:'rgba(255,255,255,0.55)' }}>Frais de ménage</span>
+                        <span className="pdp-fees-row-value" style={{ color:'#fff' }}>{formatCurrencyXAF(accommodation.cleaningFee)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Honoraires d'agence (Vente/Location uniquement) — valeurs stockées en base, formule en repli */}
+              {!accommodation && (() => {
                 const isLocation = property.status === 'location';
                 const honoraires = property.honoraires;
                 const fraisVisite = property.fraisVisite ?? 0;

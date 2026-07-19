@@ -23,7 +23,7 @@ const formatDate = (d) => {
   catch { return 'N/D'; }
 };
 
-const STATUS_LABEL = { vente: 'Vente', location: 'Location' };
+const STATUS_LABEL = { vente: 'Vente', location: 'Location', hebergement: 'Hébergement' };
 
 const CARD_STYLES = `
   .pcard-root {
@@ -49,6 +49,7 @@ const CARD_STYLES = `
   .pcard-badge { position: absolute; top: 16px; right: 16px; font-size: clamp(0.55rem, 0.9vw, 0.7rem); font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; padding: 5px 12px; border: 1px solid rgba(255,255,255,0.45); backdrop-filter: blur(8px); color: #fff; border-radius: 1px; }
   .pcard-badge-vente { background: rgba(46,123,181,0.72); border-color: rgba(46,123,181,0.6); }
   .pcard-badge-loc { background: rgba(21,128,61,0.72); border-color: rgba(21,128,61,0.5); }
+  .pcard-badge-heb { background: rgba(200,150,12,0.78); border-color: rgba(200,150,12,0.6); }
   .pcard-price { position: absolute; bottom: 18px; left: 20px; font-family: var(--font-cormorant), serif; font-size: clamp(1.2rem, 1.8vw, 1.8rem); font-weight: 500; color: #fff; letter-spacing: 0.01em; text-shadow: 0 1px 8px rgba(0,0,0,0.4); }
   .pcard-price span { font-family: var(--font-dm-sans), sans-serif; font-size: 11px; font-weight: 400; letter-spacing: 0.12em; opacity: 0.85; margin-left: 4px; vertical-align: middle; }
   .pcard-like { position: absolute; top: 14px; left: 14px; background: rgba(250,248,245,0.9); backdrop-filter: blur(6px); border-radius: 50%; padding: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
@@ -129,8 +130,12 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
   };
 
   const imgUrl    = getImageUrl(800);
-  const price     = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(property.price || 0);
   const statusKey = (property.status || 'vente').toLowerCase();
+  const nightlyRate = property.accommodation?.rates?.find?.(r => r.mode === 'nightly')?.amount;
+  const displayAmount = statusKey === 'hebergement' && nightlyRate ? nightlyRate : property.price;
+  const price     = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(displayAmount || 0);
+  const priceSuffix = statusKey === 'hebergement' && nightlyRate ? '/ nuit' : 'FCFA';
+  const badgeClass = statusKey === 'hebergement' ? 'pcard-badge-heb' : statusKey === 'location' ? 'pcard-badge-loc' : 'pcard-badge-vente';
   const amenities = getAmenities();
   const date      = formatDate(property.createdAt);
 
@@ -150,7 +155,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
               : <ImagePlaceholder />}
             <div className="pcard-scrim" />
             <div className="pcard-corner" /><div className="pcard-corner pcard-corner-br" />
-            <div className={`pcard-badge ${statusKey === 'location' ? 'pcard-badge-loc' : 'pcard-badge-vente'}`}>{STATUS_LABEL[statusKey] || property.status}</div>
+            <div className={`pcard-badge ${badgeClass}`}>{STATUS_LABEL[statusKey] || property.status}</div>
             <div className="pcard-like"><LikeButton targetType="Property" targetId={property._id} size="sm" showCount={false} /></div>
           </div>
           <div className="pcard-list-body">
@@ -162,7 +167,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
               <p className="pcard-desc">{property.description || 'Aucune description disponible.'}</p>
             </div>
             <div>
-              <div className="pcard-list-price">{price}<span>FCFA</span></div>
+              <div className="pcard-list-price">{price}<span>{priceSuffix}</span></div>
               <div className="pcard-stats" style={{ marginBottom: 12 }}>
                 {property.bedrooms > 0 && <div className="pcard-stat"><div className="pcard-stat-icon"><Bed size={14} color="#C8960C" /></div><strong>{property.bedrooms}</strong> Ch.</div>}
                 {property.bathrooms > 0 && <div className="pcard-stat"><div className="pcard-stat-icon"><Bath size={13} color="#C8960C" /></div><strong>{property.bathrooms}</strong> SDB</div>}
@@ -192,8 +197,8 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
             : <ImagePlaceholder />}
           <div className="pcard-scrim" />
           <div className="pcard-corner" /><div className="pcard-corner pcard-corner-br" />
-          <div className={`pcard-badge ${statusKey === 'location' ? 'pcard-badge-loc' : 'pcard-badge-vente'}`}>{STATUS_LABEL[statusKey] || property.status}</div>
-          <div className="pcard-price">{price}<span>FCFA</span></div>
+          <div className={`pcard-badge ${badgeClass}`}>{STATUS_LABEL[statusKey] || property.status}</div>
+          <div className="pcard-price">{price}<span>{priceSuffix}</span></div>
           <div className="pcard-like"><LikeButton targetType="Property" targetId={property._id} size="sm" showCount={false} /></div>
         </div>
         <div className="pcard-body">

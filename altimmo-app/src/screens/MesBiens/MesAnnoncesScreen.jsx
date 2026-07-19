@@ -36,7 +36,9 @@ const getModerationInfo = (statusAdmin) => {
 const BienCard = React.memo(function BienCard({
   item, onEdit, onDelete, onToggleAvailability, onRentalRequest, onBail, styles, c,
 }) {
-  const isLocation = item.status?.toLowerCase() === 'location';
+  const statusKey  = item.status?.toLowerCase();
+  const isLocation = statusKey === 'location';
+  const isHebergement = statusKey === 'hebergement';
   const modInfo    = getModerationInfo(item.statusAdmin);
   const city       = item.address?.city || 'Brazzaville';
   const arrond     = item.address?.arrondissement;
@@ -77,9 +79,9 @@ const BienCard = React.memo(function BienCard({
         </View>
 
         {/* Badge type — haut-droite */}
-        <View style={[styles.typeBadge, isLocation ? styles.typeBadgeLoc : styles.typeBadgeVente]}>
-          <Text style={[styles.typeBadgeText, isLocation ? styles.typeBadgeTextLoc : styles.typeBadgeTextVente]}>
-            {isLocation ? 'LOCATION' : 'VENTE'}
+        <View style={[styles.typeBadge, isHebergement ? styles.typeBadgeHeb : isLocation ? styles.typeBadgeLoc : styles.typeBadgeVente]}>
+          <Text style={[styles.typeBadgeText, isHebergement ? styles.typeBadgeTextHeb : isLocation ? styles.typeBadgeTextLoc : styles.typeBadgeTextVente]}>
+            {isHebergement ? 'HÉBERGEMENT' : isLocation ? 'LOCATION' : 'VENTE'}
           </Text>
         </View>
       </View>
@@ -145,16 +147,16 @@ const BienCard = React.memo(function BienCard({
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel={disponible
-              ? (isLocation ? 'Marquer comme loué' : 'Marquer comme vendu')
+              ? (isHebergement ? 'Marquer comme indisponible' : isLocation ? 'Marquer comme loué' : 'Marquer comme vendu')
               : 'Marquer comme disponible'}
           >
             <Ionicons
-              name={disponible ? (isLocation ? 'home' : 'bag-check') : 'checkmark-circle-outline'}
+              name={disponible ? (isHebergement ? 'close-circle' : isLocation ? 'home' : 'bag-check') : 'checkmark-circle-outline'}
               size={15}
               color="#0A0A0A"
             />
             <Text style={[styles.actionText, { color: '#0A0A0A' }]}>
-              {disponible ? (isLocation ? 'Loué' : 'Vendu') : 'Libre'}
+              {disponible ? (isHebergement ? 'Indisponible' : isLocation ? 'Loué' : 'Vendu') : 'Libre'}
             </Text>
           </TouchableOpacity>}
 
@@ -261,9 +263,11 @@ export default function MesAnnoncesScreen({ navigation }) {
   }, []);
 
   const handleToggleAvailability = useCallback(async (item) => {
-    const isLocation = item.status?.toLowerCase() === 'location';
+    const statusKey = item.status?.toLowerCase();
+    const isLocation = statusKey === 'location';
+    const isHebergement = statusKey === 'hebergement';
     const next = item.availability === 'Disponible'
-      ? (isLocation ? 'Loué' : 'Vendu')
+      ? (isHebergement ? 'Indisponible' : isLocation ? 'Loué' : 'Vendu')
       : 'Disponible';
     try {
       const res = await api.put(`/properties/${item._id}`, { availability: next });
@@ -740,9 +744,11 @@ const makeStyles = (c) => StyleSheet.create({
   },
   typeBadgeVente: { backgroundColor: 'rgba(200,150,12,0.15)', borderColor: 'rgba(200,150,12,0.4)' },
   typeBadgeLoc:   { backgroundColor: 'rgba(24,95,165,0.15)',  borderColor: 'rgba(24,95,165,0.4)' },
+  typeBadgeHeb:   { backgroundColor: 'rgba(22,163,74,0.15)',  borderColor: 'rgba(22,163,74,0.4)' },
   typeBadgeText:  { fontSize: 9, letterSpacing: 1, fontFamily: fonts.bodyBold },
   typeBadgeTextVente: { color: '#C8960C' },
   typeBadgeTextLoc:   { color: '#185FA5' },
+  typeBadgeTextHeb:   { color: '#16A34A' },
 
   // ─── Corps card ───
   body: { padding: spacing.md },

@@ -7,7 +7,7 @@ import {
   Home, Calendar, Briefcase, LogOut, BarChart3, Globe, Users,
   CheckCircle2, ShieldCheck, Mail, Menu, X, Star, Mountain, Building,
   ClipboardList, BarChart2, Scale, Megaphone, MessageCircle, FolderOpen,
-  Clock, PenLine, Calculator, FileText, CreditCard,
+  Clock, PenLine, Calculator, FileText, CreditCard, Palmtree,
 } from "lucide-react";
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardBadges } from '../../hooks/useDashboardBadges';
@@ -48,8 +48,9 @@ const NAV_SECTIONS = [
   {
     label: 'Modération',
     links: [
-      { to: '/dashboard/moderation/properties', end: false, Icon: CheckCircle2, label: 'Modération Biens', accent: '#7C3AED', roles: ROLES_MOD, badge: 'moderation' },
-      { to: '/dashboard/moderation/reviews',    end: false, Icon: Star,         label: 'Modération Avis',  accent: '#6366F1', roles: ROLES_MOD },
+      { to: '/dashboard/moderation/properties',  end: false, Icon: CheckCircle2, label: 'Modération Biens',       accent: '#7C3AED', roles: ROLES_MOD, badge: 'moderation' },
+      { to: '/dashboard/moderation/hebergement', end: false, Icon: Palmtree,     label: 'Modération Hébergement', accent: GOLD,      roles: ROLES_ALTIMMO },
+      { to: '/dashboard/moderation/reviews',     end: false, Icon: Star,         label: 'Modération Avis',        accent: '#6366F1', roles: ROLES_MOD },
     ],
   },
   {
