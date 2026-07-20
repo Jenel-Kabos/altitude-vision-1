@@ -16,6 +16,10 @@ jest.mock('../services/notificationService', () => ({
   notifyStaff: jest.fn().mockResolvedValue(),
   notifyMany: jest.fn().mockResolvedValue(),
 }));
+jest.mock('../config/cloudinary', () => ({
+  ...jest.requireActual('../config/cloudinary'),
+  destroyFromCloudinary: jest.fn().mockResolvedValue(),
+}));
 
 const request  = require('supertest');
 const jwt      = require('jsonwebtoken');
@@ -24,6 +28,7 @@ const Accommodation = require('../models/Accommodation');
 const RatePlan       = require('../models/RatePlan');
 const Property        = require('../models/Property');
 const User             = require('../models/User');
+const { destroyFromCloudinary } = require('../config/cloudinary');
 
 // Le vrai modèle expose ACCOMMODATION_TYPES / RATE_MODES en propriétés
 // statiques ; jest.mock('../models/Accommodation') les efface (automock).
@@ -380,5 +385,429 @@ describe('GET /api/properties/:id — visibilité publique Hébergement (brouill
     expect(res.statusCode).toBe(200);
     expect(Accommodation.findOne).not.toHaveBeenCalled();
     expect(res.body.data.property.accommodation).toBeUndefined();
+  });
+});
+
+describe('POST /api/accommodations/admin — création complète (dashboard admin)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  const validBody = () => ({
+    title: 'Villa Meublée Test',
+    description: 'Une belle villa meublée pour séjours courts.',
+    price: '50000',
+    type: 'Villa',
+    surface: '120',
+    bedrooms: '3',
+    bathrooms: '2',
+    'address[city]': 'Brazzaville',
+    'address[arrondissement]': 'Bacongo',
+    latitude: '-4.26',
+    longitude: '15.24',
+    accommodationType: 'villa_meublee',
+    'capacity[maxAdults]': '4',
+    'capacity[maxChildren]': '2',
+    checkInTime: '14:00',
+    checkOutTime: '11:00',
+    nightlyPrice: '35000',
+  });
+
+  const mockCreatedDocs = () => {
+    const property = { _id: PROPERTY_ID, title: 'Villa Meublée Test', status: 'hebergement' };
+    const accommodation = {
+      _id: ACCOMMODATION_ID, property: PROPERTY_ID, accommodationType: 'villa_meublee',
+      toObject() { return { _id: this._id, property: this.property, accommodationType: this.accommodationType }; },
+    };
+    const rate = { _id: 'rate1', accommodation: ACCOMMODATION_ID, mode: 'nightly', amount: 35000, currency: 'XAF' };
+    Property.create = jest.fn().mockResolvedValue(property);
+    Accommodation.create = jest.fn().mockResolvedValue(accommodation);
+    RatePlan.create = jest.fn().mockResolvedValue(rate);
+    return { property, accommodation, rate };
+  };
+
+  test('401 sans token', async () => {
+    const res = await request(app).post('/api/accommodations/admin').send(validBody());
+    expect(res.statusCode).toBe(401);
+  });
+
+  test("403 — un utilisateur non-staff (Proprietaire) est refusé", async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
+      .send(validBody());
+    expect(res.statusCode).toBe(403);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  test("403 — un Client est refusé", async () => {
+    mockUserAuth(OWNER_ID, 'Client');
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
+      .send(validBody());
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('201 — un admin crée un hébergement complet (Property + Accommodation + RatePlan)', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const { property, accommodation, rate } = mockCreatedDocs();
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(validBody());
+
+    expect(res.statusCode).toBe(201);
+    // Property.status forcé à 'hebergement', jamais accepté depuis le client.
+    expect(Property.create).toHaveBeenCalledWith(expect.objectContaining({ status: 'hebergement' }));
+    expect(Accommodation.create).toHaveBeenCalledWith(expect.objectContaining({
+      property: property._id, accommodationType: 'villa_meublee',
+    }));
+    expect(RatePlan.create).toHaveBeenCalledWith(expect.objectContaining({
+      accommodation: accommodation._id, mode: 'nightly', amount: 35000,
+    }));
+    expect(res.body.data.property._id).toBe(PROPERTY_ID);
+    expect(res.body.data.accommodation._id).toBe(ACCOMMODATION_ID);
+    expect(res.body.data.rate.amount).toBe(35000);
+  });
+
+  test("un Collaborateur/CommunityManager (ROLES_ALTIMMO) peut aussi créer", async () => {
+    mockUserAuth('507f1f77bcf86cd799439033', 'CommunityManager');
+    mockCreatedDocs();
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken('507f1f77bcf86cd799439033')}`)
+      .send(validBody());
+    expect(res.statusCode).toBe(201);
+  });
+
+  test("aucun RatePlan n'est créé si le tarif optionnel est absent", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockCreatedDocs();
+    const body = validBody();
+    delete body.nightlyPrice;
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(body);
+
+    expect(res.statusCode).toBe(201);
+    expect(RatePlan.create).not.toHaveBeenCalled();
+    expect(res.body.data.rate).toBeNull();
+  });
+
+  test('422 — accommodationType manquant ou invalide est refusé', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockCreatedDocs();
+    const body = validBody();
+    body.accommodationType = 'chateau_gonflable';
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(body);
+
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  test('422 — titre/description/prix manquants sont refusés', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockCreatedDocs();
+    const body = validBody();
+    delete body.title;
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(body);
+
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  test('422 — un prix par nuit négatif est refusé (RatePlan validation)', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const property = { _id: PROPERTY_ID, title: 'Villa', status: 'hebergement' };
+    const accommodation = {
+      _id: ACCOMMODATION_ID, property: PROPERTY_ID,
+      toObject() { return { _id: this._id }; },
+    };
+    Property.create = jest.fn().mockResolvedValue(property);
+    Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Accommodation.create = jest.fn().mockResolvedValue(accommodation);
+    Accommodation.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    const validationError = Object.assign(new Error('RatePlan validation failed: amount: Le montant ne peut pas être négatif.'), { name: 'ValidationError' });
+    RatePlan.create = jest.fn().mockRejectedValue(validationError);
+
+    const body = validBody();
+    body.nightlyPrice = '-5000';
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(body);
+
+    // Un montant négatif produit un Number négatif → hasValidInitialRate()
+    // exige amount > 0, donc aucun RatePlan n'est même tenté : traité comme
+    // "pas de tarif fourni", la création réussit sans RatePlan.
+    expect(res.statusCode).toBe(201);
+    expect(RatePlan.create).not.toHaveBeenCalled();
+    expect(res.body.data.rate).toBeNull();
+  });
+
+  test('422 — une capacité invalide (maxAdults à 0) est refusée par le schéma Accommodation', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const property = { _id: PROPERTY_ID, title: 'Villa', status: 'hebergement' };
+    Property.create = jest.fn().mockResolvedValue(property);
+    Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    const validationError = Object.assign(
+      new Error('Accommodation validation failed: capacity.maxAdults: Path `capacity.maxAdults` (0) is less than minimum allowed value (1).'),
+      { name: 'ValidationError' },
+    );
+    Accommodation.create = jest.fn().mockRejectedValue(validationError);
+
+    const body = validBody();
+    body['capacity[maxAdults]'] = '0';
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(body);
+
+    expect(res.statusCode).toBe(422);
+    // Aucun Property orphelin : compensation déclenchée.
+    expect(Property.findByIdAndDelete).toHaveBeenCalledWith(PROPERTY_ID);
+  });
+
+  test("422 — une capacité non numérique (\"abc\") est refusée avant tout accès base (pas de NaN silencieux)", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockCreatedDocs();
+    const body = validBody();
+    body['capacity[maxAdults]'] = 'abc';
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(body);
+
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  test('422 — un prix par nuit non numérique est refusé avant tout accès base', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockCreatedDocs();
+    const body = validBody();
+    body.nightlyPrice = 'gratuit';
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(body);
+
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  test('422 — un format de check-in invalide est refusé', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockCreatedDocs();
+    const body = validBody();
+    body.checkInTime = '25:99';
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(body);
+
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  test('422 — maximumStay < minimumStay est refusé', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockCreatedDocs();
+    const body = validBody();
+    body.minimumStay = '5';
+    body.maximumStay = '2';
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(body);
+
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  test('aucun Property orphelin ne subsiste si Accommodation échoue (compensation), et les images Cloudinary déjà uploadées sont nettoyées', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const property = {
+      _id: PROPERTY_ID, title: 'Villa', status: 'hebergement',
+      images: ['https://res.cloudinary.com/demo/image/upload/v1/altitude-vision/properties/abc.jpg'],
+    };
+    Property.create = jest.fn().mockResolvedValue(property);
+    Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Accommodation.create = jest.fn().mockRejectedValue(new Error('DB down'));
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(validBody());
+
+    expect(res.statusCode).toBe(500);
+    expect(Property.findByIdAndDelete).toHaveBeenCalledTimes(1);
+    expect(Property.findByIdAndDelete).toHaveBeenCalledWith(PROPERTY_ID);
+    expect(RatePlan.create).not.toHaveBeenCalled();
+    expect(destroyFromCloudinary).toHaveBeenCalledWith(property.images[0]);
+  });
+
+  test('aucun Property ni Accommodation orphelins ne subsistent si le RatePlan échoue de façon inattendue', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const property = { _id: PROPERTY_ID, title: 'Villa', status: 'hebergement' };
+    const accommodation = { _id: ACCOMMODATION_ID, property: PROPERTY_ID, toObject() { return { _id: this._id }; } };
+    Property.create = jest.fn().mockResolvedValue(property);
+    Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Accommodation.create = jest.fn().mockResolvedValue(accommodation);
+    Accommodation.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    RatePlan.create = jest.fn().mockRejectedValue(new Error('DB down'));
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(validBody());
+
+    expect(res.statusCode).toBe(500);
+    expect(Accommodation.findByIdAndDelete).toHaveBeenCalledWith(ACCOMMODATION_ID);
+    expect(Property.findByIdAndDelete).toHaveBeenCalledWith(PROPERTY_ID);
+  });
+});
+
+describe('PUT /api/accommodations/admin/:propertyId — édition complète (dashboard admin)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  const existingProperty = (overrides = {}) => ({
+    _id: PROPERTY_ID,
+    title: 'Villa existante',
+    status: 'hebergement',
+    save: jest.fn().mockResolvedValue(),
+    ...overrides,
+  });
+
+  test('401 sans token', async () => {
+    const res = await request(app).put(`/api/accommodations/admin/${PROPERTY_ID}`).send({ title: 'x' });
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('403 — un non-staff est refusé', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const res = await request(app)
+      .put(`/api/accommodations/admin/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
+      .send({ title: 'x' });
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('404 — bien introuvable', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Property.findById = jest.fn().mockResolvedValue(null);
+    const res = await request(app)
+      .put(`/api/accommodations/admin/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ title: 'x' });
+    expect(res.statusCode).toBe(404);
+  });
+
+  test("422 — refuse un bien qui n'est pas de type hébergement", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Property.findById = jest.fn().mockResolvedValue(existingProperty({ status: 'vente' }));
+    const res = await request(app)
+      .put(`/api/accommodations/admin/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ title: 'x' });
+    expect(res.statusCode).toBe(422);
+  });
+
+  test("200 — met à jour Property + Accommodation existant sans créer de doublon", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const property = existingProperty();
+    Property.findById = jest.fn().mockResolvedValue(property);
+    const existingAccommodation = {
+      _id: ACCOMMODATION_ID, property: PROPERTY_ID, accommodationType: 'villa_meublee',
+      publicationStatus: 'brouillon',
+      save: jest.fn().mockResolvedValue(),
+      toObject() { return { _id: this._id, accommodationType: this.accommodationType }; },
+    };
+    Accommodation.findOne = jest.fn().mockResolvedValue(existingAccommodation);
+
+    const res = await request(app)
+      .put(`/api/accommodations/admin/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ title: 'Villa mise à jour', beds: '5' });
+
+    expect(res.statusCode).toBe(200);
+    expect(Accommodation.create).not.toHaveBeenCalled();
+    expect(existingAccommodation.save).toHaveBeenCalled();
+    expect(property.title).toBe('Villa mise à jour');
+  });
+
+  test("crée l'Accommodation si elle manque exceptionnellement (ancien Property sans profil)", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Property.findById = jest.fn().mockResolvedValue(existingProperty());
+    Accommodation.findOne = jest.fn().mockResolvedValue(null);
+    Accommodation.create = jest.fn().mockResolvedValue({
+      _id: ACCOMMODATION_ID, toObject() { return { _id: this._id }; },
+    });
+
+    const res = await request(app)
+      .put(`/api/accommodations/admin/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ accommodationType: 'studio_meuble' });
+
+    expect(res.statusCode).toBe(200);
+    expect(Accommodation.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("ne crée pas de nouveau RatePlan si aucun tarif n'est fourni en édition", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Property.findById = jest.fn().mockResolvedValue(existingProperty());
+    Accommodation.findOne = jest.fn().mockResolvedValue({
+      _id: ACCOMMODATION_ID, save: jest.fn().mockResolvedValue(),
+      toObject() { return { _id: this._id }; },
+    });
+
+    const res = await request(app)
+      .put(`/api/accommodations/admin/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ title: 'Sans changement de tarif' });
+
+    expect(res.statusCode).toBe(200);
+    expect(RatePlan.create).not.toHaveBeenCalled();
+    expect(RatePlan.updateMany).not.toHaveBeenCalled();
+  });
+
+  test("un nouveau tarif désactive l'ancien plutôt que de créer un doublon (même mode)", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Property.findById = jest.fn().mockResolvedValue(existingProperty());
+    Accommodation.findOne = jest.fn().mockResolvedValue({
+      _id: ACCOMMODATION_ID, save: jest.fn().mockResolvedValue(),
+      toObject() { return { _id: this._id }; },
+    });
+    RatePlan.updateMany = jest.fn().mockResolvedValue({});
+    RatePlan.create = jest.fn().mockResolvedValue({ mode: 'nightly', amount: 40000, currency: 'XAF' });
+
+    const res = await request(app)
+      .put(`/api/accommodations/admin/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ nightlyPrice: '40000' });
+
+    expect(res.statusCode).toBe(200);
+    expect(RatePlan.updateMany).toHaveBeenCalledWith(
+      { accommodation: ACCOMMODATION_ID, mode: 'nightly', active: true },
+      { $set: { active: false } },
+    );
+    expect(RatePlan.create).toHaveBeenCalledTimes(1);
   });
 });

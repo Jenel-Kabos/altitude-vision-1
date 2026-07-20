@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 const MapLeaflet = dynamic(() => import('./MapLeaflet'), { ssr: false });
 import { VILLES, getArrondissementsFor } from "../../constants/locations";
 import { PROPERTY_TYPES } from "../../constants/propertyTypes";
+import { ACCOMMODATION_TYPES, CANCELLATION_POLICIES } from "../../constants/accommodation";
 
 // ✅ Préfixe les URLs relatives avec l'URL du backend.
 // file.path retourne "uploads/events/photo.jpg" (sans slash ni domaine),
@@ -38,6 +39,14 @@ const PropertyForm = ({
   loading,
   existingImages = [],
   setExistingImages = () => {},
+  // Hors périmètre par défaut : seul ManagePropertiesPage.jsx (dashboard
+  // admin) passe `enableHebergement`. Les formulaires propriétaire
+  // (MyPropertiesPage.jsx, OwnerPropertyManagement.jsx) ne le passent pas et
+  // ne voient donc jamais l'option "Hébergement" ni ses champs — la création
+  // d'un hébergement en 2 étapes (Property puis /mes-hebergements) reste
+  // inchangée pour eux.
+  enableHebergement = false,
+  errors = {},
 }) => {
   const fileInputRef = useRef(null);
 
@@ -67,6 +76,9 @@ const PropertyForm = ({
   useEffect(() => {
     if (honorairesTouchedRef.current) return;
     if (!formData.price || !formData.status) return;
+    // Hébergement n'a pas de règle d'honoraires liée à un mandat — pas
+    // d'auto-calcul (même choix que EditPropertyPage.jsx, Sprint 2).
+    if (formData.status === 'hebergement') return;
     const rate = formData.status === 'location' ? 0.8 : 0.1;
     const calculated = Math.round(Number(formData.price) * rate);
     setFormData((prev) => ({ ...prev, honoraires: calculated }));
@@ -201,6 +213,8 @@ const PropertyForm = ({
         <p className="text-xs text-gray-500">
           {formData.status === 'location'
             ? 'Pré-rempli à 80% du loyer mensuel'
+            : formData.status === 'hebergement'
+            ? "Sans lien avec un bail — à renseigner manuellement si applicable"
             : 'Pré-rempli à 10% du prix de vente'}
         </p>
       </div>
@@ -249,6 +263,7 @@ const PropertyForm = ({
           >
             <option value="vente">Vendre</option>
             <option value="location">Louer</option>
+            {enableHebergement && <option value="hebergement">Hébergement</option>}
           </select>
         </div>
       </div>
@@ -518,6 +533,221 @@ const PropertyForm = ({
             </div>
           </div>
         </div>
+      )}
+
+      {enableHebergement && formData.status === 'hebergement' && (
+        <>
+          {/* ------------------ SECTION INFOS D'HÉBERGEMENT ------------------ */}
+          <div className="border-t pt-4 mt-4">
+            <h3 className="text-lg font-semibold mb-3">Informations d'hébergement</h3>
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type d'hébergement *</label>
+                <select
+                  name="accommodationType"
+                  value={formData.accommodationType || ''}
+                  onChange={handleChange}
+                  aria-label="Type d'hébergement"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                >
+                  <option value="">Sélectionner...</option>
+                  {ACCOMMODATION_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+                {errors.accommodationType && (
+                  <p className="text-xs text-red-600 mt-1">{errors.accommodationType}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Politique d'annulation</label>
+                <select
+                  name="cancellationPolicy"
+                  value={formData.cancellationPolicy || 'moderee'}
+                  onChange={handleChange}
+                  aria-label="Politique d'annulation"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                >
+                  {CANCELLATION_POLICIES.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Capacité maximale (adultes) *</label>
+                <input
+                  name="maxAdults"
+                  type="number"
+                  min="1"
+                  value={formData.maxAdults ?? ''}
+                  onChange={handleChange}
+                  placeholder="Ex: 4"
+                  aria-label="Capacité maximale en adultes"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                />
+                {errors.maxAdults && <p className="text-xs text-red-600 mt-1">{errors.maxAdults}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Capacité (enfants)</label>
+                <input
+                  name="maxChildren"
+                  type="number"
+                  min="0"
+                  value={formData.maxChildren ?? ''}
+                  onChange={handleChange}
+                  placeholder="Ex: 2"
+                  aria-label="Capacité maximale en enfants"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de lits</label>
+                <input
+                  name="beds"
+                  type="number"
+                  min="0"
+                  value={formData.beds ?? ''}
+                  onChange={handleChange}
+                  placeholder="Ex: 3"
+                  aria-label="Nombre de lits"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Check-in *</label>
+                <input
+                  name="checkInTime"
+                  type="time"
+                  value={formData.checkInTime || '14:00'}
+                  onChange={handleChange}
+                  aria-label="Heure de check-in"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                />
+                {errors.checkInTime && <p className="text-xs text-red-600 mt-1">{errors.checkInTime}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Check-out *</label>
+                <input
+                  name="checkOutTime"
+                  type="time"
+                  value={formData.checkOutTime || '11:00'}
+                  onChange={handleChange}
+                  aria-label="Heure de check-out"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                />
+                {errors.checkOutTime && <p className="text-xs text-red-600 mt-1">{errors.checkOutTime}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Durée minimale du séjour (nuits)</label>
+                <input
+                  name="minimumStay"
+                  type="number"
+                  min="1"
+                  value={formData.minimumStay ?? 1}
+                  onChange={handleChange}
+                  aria-label="Durée minimale du séjour"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Durée maximale du séjour (nuits)</label>
+                <input
+                  name="maximumStay"
+                  type="number"
+                  min="1"
+                  value={formData.maximumStay ?? ''}
+                  onChange={handleChange}
+                  placeholder="Illimitée si vide"
+                  aria-label="Durée maximale du séjour"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                />
+                {errors.maximumStay && <p className="text-xs text-red-600 mt-1">{errors.maximumStay}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Caution de séjour (FCFA)</label>
+                <input
+                  name="securityDeposit"
+                  type="number"
+                  min="0"
+                  value={formData.securityDeposit ?? 0}
+                  onChange={handleChange}
+                  aria-label="Caution de séjour"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Frais de ménage (FCFA)</label>
+                <input
+                  name="cleaningFee"
+                  type="number"
+                  min="0"
+                  value={formData.cleaningFee ?? 0}
+                  onChange={handleChange}
+                  aria-label="Frais de ménage"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Règles de la maison</label>
+              <input
+                name="houseRules"
+                value={formData.houseRules || ''}
+                onChange={handleChange}
+                placeholder="Ex: Non fumeur, Pas d'animaux, Pas de fête (séparées par des virgules)"
+                aria-label="Règles de la maison"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+              />
+              <p className="text-xs text-gray-500 mt-1">Séparez les règles par des virgules</p>
+            </div>
+          </div>
+
+          {/* ------------------ SECTION TARIFICATION ------------------ */}
+          <div className="border-t pt-4 mt-4">
+            <h3 className="text-lg font-semibold mb-3">Tarification</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Prix par nuit (FCFA)</label>
+                <input
+                  name="nightlyPrice"
+                  type="number"
+                  min="0"
+                  value={formData.nightlyPrice ?? ''}
+                  onChange={handleChange}
+                  placeholder="Ex: 35000"
+                  aria-label="Prix par nuit"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                />
+                {errors.nightlyPrice && <p className="text-xs text-red-600 mt-1">{errors.nightlyPrice}</p>}
+                <p className="text-xs text-gray-500 mt-1">Laisser vide pour ne pas créer de tarif pour l'instant</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Devise</label>
+                <input
+                  value="XAF"
+                  readOnly
+                  aria-label="Devise"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-900"
+                />
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* ------------------ SECTION IMAGES ------------------ */}

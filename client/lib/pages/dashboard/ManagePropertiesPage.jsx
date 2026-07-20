@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
-import { getAllProperties, deleteProperty, updateProperty, addProperty, toggleRecommande } from "../../services/propertyService";
+import { getAllProperties, getPropertyById, deleteProperty, updateProperty, addProperty, toggleRecommande } from "../../services/propertyService";
+import { createFullAccommodation, updateFullAccommodation } from "../../services/accommodationService";
 import { useAuth } from '../../context/AuthContext';
 import {
   PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle,
@@ -36,9 +37,15 @@ const ManagePropertiesPage = () => {
     surface: "", bedrooms: "", bathrooms: "", livingRooms: "",
     constructionType: "Non spécifié", kitchens: "", amenities: "",
     latitude: -4.266, longitude: 15.283, images: [],
+    // Hébergement (dashboard admin uniquement — voir PropertyForm.enableHebergement)
+    accommodationType: "", maxAdults: "", maxChildren: "", beds: "",
+    checkInTime: "14:00", checkOutTime: "11:00", minimumStay: 1, maximumStay: "",
+    cancellationPolicy: "moderee", houseRules: "", securityDeposit: 0, cleaningFee: 0,
+    nightlyPrice: "",
   };
   const [formData, setFormData]       = useState(emptyForm);
   const [loadingSubmit, setSubmit]    = useState(false);
+  const [errors, setErrors]           = useState({});
 
   useEffect(() => { fetchProperties(); }, []);
 
@@ -78,9 +85,10 @@ const ManagePropertiesPage = () => {
     setShowAddModal(false);
     setShowEditModal(false);
     setEditingId(null);
+    setErrors({});
   };
 
-  const handleEdit = (property) => {
+  const handleEdit = async (property) => {
     setEditingId(property._id);
     setExistingImages(property.images || []);
     setFormData({
@@ -104,12 +112,70 @@ const ManagePropertiesPage = () => {
       latitude:         property.location?.coordinates?.[1] || -4.266,
       longitude:        property.location?.coordinates?.[0] || 15.283,
       images:           [],
+      // Champs hébergement — préremplis si un profil Accommodation existe déjà
+      // (voir ci-dessous), sinon valeurs par défaut du modèle.
+      accommodationType: "", maxAdults: "", maxChildren: "", beds: "",
+      checkInTime: "14:00", checkOutTime: "11:00", minimumStay: 1, maximumStay: "",
+      cancellationPolicy: "moderee", houseRules: "", securityDeposit: 0, cleaningFee: 0,
+      nightlyPrice: "",
     });
     setShowEditModal(true);
+
+    // Le listing admin (getAllProperties) n'embarque pas l'Accommodation —
+    // seul le détail (getPropertyById) le fait. On la récupère à part pour
+    // préremplir la section Hébergement sans dupliquer cette logique.
+    if (property.status === 'hebergement') {
+      try {
+        const full = await getPropertyById(property._id);
+        const acc = full?.accommodation;
+        if (acc) {
+          const nightlyRate = (acc.rates || []).find((r) => r.mode === 'nightly');
+          setFormData((prev) => ({
+            ...prev,
+            accommodationType: acc.accommodationType || "",
+            maxAdults: acc.capacity?.maxAdults ?? "",
+            maxChildren: acc.capacity?.maxChildren ?? "",
+            beds: acc.beds ?? "",
+            checkInTime: acc.checkInTime || "14:00",
+            checkOutTime: acc.checkOutTime || "11:00",
+            minimumStay: acc.minimumStay ?? 1,
+            maximumStay: acc.maximumStay ?? "",
+            cancellationPolicy: acc.cancellationPolicy || "moderee",
+            houseRules: Array.isArray(acc.houseRules) ? acc.houseRules.join(", ") : "",
+            securityDeposit: acc.securityDeposit ?? 0,
+            cleaningFee: acc.cleaningFee ?? 0,
+            nightlyPrice: nightlyRate?.amount ?? "",
+          }));
+        }
+      } catch {
+        showNotif("Bien chargé, mais les informations d'hébergement n'ont pas pu être récupérées.", "error");
+      }
+    }
+  };
+
+  // Validation propre à l'hébergement — n'exige que les champs réellement
+  // requis par le modèle Accommodation/RatePlan (jamais les champs de bail :
+  // caution locative, profils locataires, documents requis).
+  const validateHebergement = (data) => {
+    const e = {};
+    if (!data.accommodationType) e.accommodationType = "Le type d'hébergement est requis.";
+    if (!(Number(data.maxAdults) > 0)) e.maxAdults = "La capacité (adultes) doit être supérieure à 0.";
+    if (!data.checkInTime) e.checkInTime = "L'heure de check-in est requise.";
+    if (!data.checkOutTime) e.checkOutTime = "L'heure de check-out est requise.";
+    if (data.maximumStay !== "" && data.maximumStay !== undefined && data.maximumStay !== null) {
+      const min = Number(data.minimumStay) || 1;
+      const max = Number(data.maximumStay);
+      if (max < min) e.maximumStay = "La durée maximale doit être ≥ à la durée minimale.";
+    }
+    if (data.nightlyPrice !== "" && data.nightlyPrice !== undefined && data.nightlyPrice !== null) {
+      if (!(Number(data.nightlyPrice) > 0)) e.nightlyPrice = "Le prix par nuit doit être positif.";
+    }
+    return e;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrors({});
     setSubmit(true);
     try {
       if (!editingId && (!formData.images || formData.images.length === 0)) {
@@ -118,9 +184,28 @@ const ManagePropertiesPage = () => {
         return;
       }
 
-      const data = new FormData();
-      const { address, amenities, images, latitude, longitude, ...rest } = formData;
+      const isHebergement = formData.status === 'hebergement';
+      if (isHebergement) {
+        const validationErrors = validateHebergement(formData);
+        if (Object.keys(validationErrors).length > 0) {
+          setErrors(validationErrors);
+          showNotif("Veuillez corriger les champs indiqués.", "error");
+          setSubmit(false);
+          return;
+        }
+      }
 
+      const {
+        address, amenities, images, latitude, longitude,
+        // Champs hébergement — retirés du FormData générique Property et
+        // ré-ajoutés explicitement ci-dessous (noms attendus par le backend).
+        accommodationType, maxAdults, maxChildren, beds,
+        checkInTime, checkOutTime, minimumStay, maximumStay,
+        cancellationPolicy, houseRules, securityDeposit, cleaningFee, nightlyPrice,
+        ...rest
+      } = formData;
+
+      const data = new FormData();
       Object.entries(rest).forEach(([k, v]) => {
         if (v !== "" && v !== null && v !== undefined) data.append(k, v);
       });
@@ -143,14 +228,41 @@ const ManagePropertiesPage = () => {
         coordinates: [parseFloat(longitude), parseFloat(latitude)],
       }));
 
+      if (isHebergement) {
+        data.append('accommodationType', accommodationType);
+        if (maxAdults !== "") data.append('capacity[maxAdults]', maxAdults);
+        if (maxChildren !== "") data.append('capacity[maxChildren]', maxChildren);
+        if (beds !== "") data.append('beds', beds);
+        data.append('checkInTime', checkInTime);
+        data.append('checkOutTime', checkOutTime);
+        data.append('minimumStay', minimumStay || 1);
+        if (maximumStay !== "") data.append('maximumStay', maximumStay);
+        data.append('cancellationPolicy', cancellationPolicy || 'moderee');
+        if (houseRules) data.append('houseRules', houseRules);
+        data.append('securityDeposit', securityDeposit || 0);
+        data.append('cleaningFee', cleaningFee || 0);
+        if (nightlyPrice !== "") data.append('nightlyPrice', nightlyPrice);
+      }
+
       if (editingId) {
-        const response = await updateProperty(editingId, data);
-        setProperties(p => p.map(x => x._id === editingId ? response : x));
-        showNotif("Bien modifié avec succès !");
+        if (isHebergement) {
+          const response = await updateFullAccommodation(editingId, data);
+          setProperties(p => p.map(x => x._id === editingId ? response.property : x));
+          showNotif("Hébergement modifié avec succès !");
+        } else {
+          const response = await updateProperty(editingId, data);
+          setProperties(p => p.map(x => x._id === editingId ? response : x));
+          showNotif("Bien modifié avec succès !");
+        }
       } else {
-        await addProperty(data);
+        if (isHebergement) {
+          await createFullAccommodation(data);
+          showNotif("Hébergement créé avec succès !");
+        } else {
+          await addProperty(data);
+          showNotif("Bien ajouté avec succès !");
+        }
         fetchProperties();
-        showNotif("Bien ajouté avec succès !");
       }
       resetForm();
     } catch (err) {
@@ -229,7 +341,9 @@ const ManagePropertiesPage = () => {
             onError={() => setImgSrc(ALTIMMO_FALLBACK)} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           <span className="absolute top-2 left-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">{property.type || 'Bien'}</span>
-          <span className="absolute top-2 right-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">{property.status || 'Vente'}</span>
+          <span className="absolute top-2 right-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+            {{ vente: 'Vente', location: 'Location', hebergement: 'Hébergement' }[property.status] || 'Vente'}
+          </span>
           <div className="absolute bottom-2 left-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">{property.price} FCFA</div>
         </div>
         <div className="p-4">
@@ -386,7 +500,8 @@ const ManagePropertiesPage = () => {
                 </div>
               </div>
               <div className="p-3 sm:p-6 overflow-y-auto flex-grow">
-                <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit} />
+                <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
+                  enableHebergement errors={errors} />
               </div>
             </div>
           </div>
@@ -406,7 +521,8 @@ const ManagePropertiesPage = () => {
               </div>
               <div className="p-3 sm:p-6 overflow-y-auto flex-grow">
                 <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
-                  existingImages={existingImages} setExistingImages={setExistingImages} />
+                  existingImages={existingImages} setExistingImages={setExistingImages}
+                  enableHebergement errors={errors} />
               </div>
             </div>
           </div>

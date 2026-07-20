@@ -10,15 +10,7 @@ import {
   submitAccommodation,
   upsertAccommodationRate,
 } from "../../services/accommodationService";
-
-const ACCOMMODATION_TYPES = [
-  { value: "villa_meublee", label: "Villa meublée" },
-  { value: "maison_meublee", label: "Maison meublée" },
-  { value: "appartement_meuble", label: "Appartement meublé" },
-  { value: "studio_meuble", label: "Studio meublé" },
-  { value: "residence_meublee", label: "Résidence meublée" },
-  { value: "bungalow", label: "Bungalow" },
-];
+import { ACCOMMODATION_TYPES } from "../../constants/accommodation";
 
 const PUBLICATION_LABELS = {
   brouillon: { label: "Brouillon", className: "bg-gray-100 text-gray-700" },
