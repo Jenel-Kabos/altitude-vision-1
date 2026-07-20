@@ -7,8 +7,20 @@
 // Vente ou Location.
 //
 // Sprint 2 (MVP) : logements meublés entiers uniquement (occupancyMode
-// toujours 'entire_place'). Hotel/RoomType/Room ne sont volontairement PAS
-// créés — voir Sprint 1.5 §09 pour le périmètre exact.
+// toujours 'entire_place'). RoomType/Room/Unit ne sont volontairement PAS
+// créés — voir Sprint 1.5 §09 et server/docs/HEBERGEMENT.md ("Sprint Hôtel")
+// pour le périmètre exact.
+//
+// Sprint Hôtel : accommodationType accepte désormais 'hotel' — dans ce cas,
+// `hotel` référence l'établissement (voir Hotel.js), qui reste une fiche
+// d'établissement et non une entité réservable. `occupancyMode` est forcé à
+// 'room_based' pour ce type (voir hook pre('validate') plus bas) : la
+// disponibilité/réservation d'un hôtel sera portée par une future entité
+// Room/Unit (hors périmètre de ce sprint), jamais par l'établissement
+// entier — contrairement aux logements meublés classiques
+// ('entire_place'). Aucune logique de recherche/tarification/affichage ne
+// lit ce champ à ce jour (vérifié par grep) : l'ajout de 'room_based' est
+// donc sans impact sur le comportement existant.
 
 const mongoose = require('mongoose');
 
@@ -19,7 +31,16 @@ const ACCOMMODATION_TYPES = [
   'studio_meuble',
   'residence_meublee',
   'bungalow',
+  'hotel',
+  'residence_hoteliere',
+  'chambre_hotes',
+  'autre',
 ];
+
+// Types pour lesquels une référence Hotel est acceptée/pertinente. Les
+// logements meublés "entiers" classiques n'ont jamais de Hotel rattaché
+// (voir accommodationController.buildAccommodationData).
+const HOTEL_ACCOMMODATION_TYPES = ['hotel'];
 
 const accommodationSchema = new mongoose.Schema(
   {
@@ -42,11 +63,35 @@ const accommodationSchema = new mongoose.Schema(
       required: [true, "Le type d'hébergement est requis."],
     },
 
-    // Sprint 2 : uniquement des logements entiers. Le champ existe déjà pour
-    // ne pas avoir à migrer le schéma au Sprint 4 (chambres d'hôtel).
+    // Établissement hôtelier — renseigné uniquement quand accommodationType
+    // === 'hotel' (voir HOTEL_ACCOMMODATION_TYPES). `null` pour tous les
+    // autres types, y compris 'chambre_hotes' et 'residence_hoteliere' qui
+    // n'exigent pas de fiche Hotel dans ce sprint.
+    // Défense en profondeur : le contrôleur (buildHotelInput) impose déjà
+    // une référence Hotel pour accommodationType='hotel' avant tout accès
+    // base, mais l'invariant est aussi vérifié ici pour ne jamais dépendre
+    // d'un seul point d'entrée (ex : un futur script de migration/import).
+    hotel: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Hotel',
+      default: null,
+      index: true,
+      validate: {
+        validator: function hotelRequiredForHotelType(v) {
+          return !HOTEL_ACCOMMODATION_TYPES.includes(this.accommodationType) || Boolean(v);
+        },
+        message: "Une référence à un établissement hôtelier (hotel) est requise pour accommodationType='hotel'.",
+      },
+    },
+
+    // Sprint 2 : logements meublés entiers ('entire_place'). Sprint Hôtel :
+    // 'room_based' pour accommodationType='hotel' — forcé par le hook
+    // pre('validate') ci-dessous, jamais laissé au choix de l'appelant, pour
+    // que l'invariant tienne quel que soit le point d'entrée (création
+    // propriétaire, création/édition admin, futurs appels).
     occupancyMode: {
       type: String,
-      enum: ['entire_place'],
+      enum: ['entire_place', 'room_based'],
       default: 'entire_place',
       required: true,
     },
@@ -111,7 +156,18 @@ const accommodationSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// Invariant occupancyMode ⟺ accommodationType, appliqué à CHAQUE validation
+// (création ET édition, quel que soit l'appelant) — jamais délégué au
+// contrôleur/service pour éviter qu'un point d'entrée oublié laisse
+// 'entire_place' sur un hôtel ou 'room_based' sur un logement meublé.
+accommodationSchema.pre('validate', function forceOccupancyMode() {
+  this.occupancyMode = HOTEL_ACCOMMODATION_TYPES.includes(this.accommodationType)
+    ? 'room_based'
+    : 'entire_place';
+});
+
 const Accommodation = mongoose.model('Accommodation', accommodationSchema);
 Accommodation.ACCOMMODATION_TYPES = ACCOMMODATION_TYPES;
+Accommodation.HOTEL_ACCOMMODATION_TYPES = HOTEL_ACCOMMODATION_TYPES;
 
 module.exports = Accommodation;

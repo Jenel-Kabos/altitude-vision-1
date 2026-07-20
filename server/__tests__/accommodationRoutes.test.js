@@ -5,6 +5,7 @@ jest.mock('../models/Accommodation');
 jest.mock('../models/RatePlan');
 jest.mock('../models/Property');
 jest.mock('../models/User');
+jest.mock('../models/Hotel');
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
@@ -28,14 +29,18 @@ const Accommodation = require('../models/Accommodation');
 const RatePlan       = require('../models/RatePlan');
 const Property        = require('../models/Property');
 const User             = require('../models/User');
+const Hotel             = require('../models/Hotel');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 
 // Le vrai modèle expose ACCOMMODATION_TYPES / RATE_MODES en propriétés
 // statiques ; jest.mock('../models/Accommodation') les efface (automock).
 // On les restaure ici pour que le contrôleur (qui les lit) continue de
 // fonctionner sous mock.
-Accommodation.ACCOMMODATION_TYPES = ['villa_meublee', 'maison_meublee', 'appartement_meuble', 'studio_meuble', 'residence_meublee', 'bungalow'];
+Accommodation.ACCOMMODATION_TYPES = ['villa_meublee', 'maison_meublee', 'appartement_meuble', 'studio_meuble', 'residence_meublee', 'bungalow', 'hotel', 'residence_hoteliere', 'chambre_hotes', 'autre'];
+Accommodation.HOTEL_ACCOMMODATION_TYPES = ['hotel'];
 RatePlan.RATE_MODES = ['nightly', 'weekly', 'monthly', 'yearly'];
+
+const HOTEL_ID = '707f1f77bcf86cd799439055';
 
 const OWNER_ID = '507f1f77bcf86cd799439011';
 const OTHER_OWNER_ID = '507f1f77bcf86cd799439099';
@@ -685,6 +690,314 @@ describe('POST /api/accommodations/admin — création complète (dashboard admi
   });
 });
 
+describe('POST /api/accommodations/admin — rattachement à un Hôtel (Sprint Hôtel)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  const hotelBody = (overrides = {}) => ({
+    title: 'Hôtel Le Panorama',
+    description: "Chambre standard dans l'hôtel Le Panorama.",
+    price: '50000',
+    type: 'Appartement meublé',
+    surface: '30',
+    bedrooms: '1',
+    bathrooms: '1',
+    'address[city]': 'Brazzaville',
+    'address[arrondissement]': 'Bacongo',
+    latitude: '-4.26',
+    longitude: '15.24',
+    accommodationType: 'hotel',
+    'capacity[maxAdults]': '2',
+    'capacity[maxChildren]': '0',
+    checkInTime: '14:00',
+    checkOutTime: '11:00',
+    ...overrides,
+  });
+
+  const mockPropertyAndAccommodation = () => {
+    const property = { _id: PROPERTY_ID, title: 'Hôtel Le Panorama', status: 'hebergement' };
+    const accommodation = {
+      _id: ACCOMMODATION_ID, property: PROPERTY_ID, accommodationType: 'hotel', hotel: HOTEL_ID,
+      toObject() { return { _id: this._id, property: this.property, accommodationType: this.accommodationType, hotel: this.hotel }; },
+    };
+    Property.create = jest.fn().mockResolvedValue(property);
+    Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Accommodation.create = jest.fn().mockResolvedValue(accommodation);
+    Accommodation.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    return { property, accommodation };
+  };
+
+  test('422 — accommodationType=hotel sans hotelMode est refusé', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockPropertyAndAccommodation();
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody());
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  test('422 — hotelMode=existing sans hotelId est refusé', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockPropertyAndAccommodation();
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'existing' }));
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  test("422 — référence Hôtel inexistante refusée (aucune référence arbitraire acceptée)", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const { property } = mockPropertyAndAccommodation();
+    Hotel.findById = jest.fn().mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'existing', hotelId: HOTEL_ID }));
+
+    expect(res.statusCode).toBe(422);
+    // Le Property déjà créé pour tenter le rattachement est compensé.
+    expect(Property.findByIdAndDelete).toHaveBeenCalledWith(property._id);
+    expect(Accommodation.create).not.toHaveBeenCalled();
+  });
+
+  test("422 — un hotelId mal formé (pas un ObjectId) est refusé avant toute création de Property", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockPropertyAndAccommodation();
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'existing', hotelId: 'pas-un-object-id' }));
+
+    expect(res.statusCode).toBe(422);
+    // Rejeté au même stade que les autres champs invalides : aucun Property
+    // créé (donc rien à compenser), contrairement à une référence Hotel
+    // bien formée mais inexistante (voir test précédent).
+    expect(Property.create).not.toHaveBeenCalled();
+    expect(Hotel.findById).not.toHaveBeenCalled();
+  });
+
+  test('201 — rattachement à un Hôtel existant', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockPropertyAndAccommodation();
+    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Le Panorama' });
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'existing', hotelId: HOTEL_ID }));
+
+    expect(res.statusCode).toBe(201);
+    expect(Accommodation.create).toHaveBeenCalledWith(expect.objectContaining({ hotel: HOTEL_ID }));
+    expect(Hotel.create).not.toHaveBeenCalled();
+    expect(res.body.data.hotel).toBe(HOTEL_ID);
+  });
+
+  test("422 — création d'un nouvel hôtel sans nom est refusée", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockPropertyAndAccommodation();
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'create', hotelName: '   ' }));
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+    expect(Hotel.create).not.toHaveBeenCalled();
+  });
+
+  test('422 — un email hôtel invalide est refusé', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockPropertyAndAccommodation();
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'create', hotelName: 'Le Panorama', hotelEmail: 'pas-un-email' }));
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  test('422 — un nombre d\'étoiles hors 1-5 est refusé', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockPropertyAndAccommodation();
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'create', hotelName: 'Le Panorama', hotelStarRating: '9' }));
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  test("422 — un nombre d'étoiles non numérique (\"abc\") est refusé avant tout accès base", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockPropertyAndAccommodation();
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'create', hotelName: 'Le Panorama', hotelStarRating: 'abc' }));
+    expect(res.statusCode).toBe(422);
+    expect(Property.create).not.toHaveBeenCalled();
+    expect(Hotel.create).not.toHaveBeenCalled();
+  });
+
+  test("201 — création d'un nouvel Hôtel rattaché au nouveau Property", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const { property } = mockPropertyAndAccommodation();
+    Hotel.create = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Le Panorama' });
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({
+        hotelMode: 'create', hotelName: 'Le Panorama', hotelStarRating: '4',
+        hotelEmail: 'contact@panorama.cg', hotelHasRestaurant: 'true',
+      }));
+
+    expect(res.statusCode).toBe(201);
+    expect(Hotel.create).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Le Panorama', starRating: 4, property: property._id, hasRestaurant: true,
+    }));
+    expect(Accommodation.create).toHaveBeenCalledWith(expect.objectContaining({ hotel: HOTEL_ID }));
+    expect(res.body.data.hotel).toBe(HOTEL_ID);
+  });
+
+  test('201 — hotelHasRestaurant="false" (chaîne, convention FormData) ne devient jamais true', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockPropertyAndAccommodation();
+    Hotel.create = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Le Panorama' });
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({
+        hotelMode: 'create', hotelName: 'Le Panorama',
+        hotelHasRestaurant: 'false', hotelHasReception: 'false',
+      }));
+
+    expect(res.statusCode).toBe(201);
+    expect(Hotel.create).toHaveBeenCalledWith(expect.objectContaining({
+      hasRestaurant: false, hasReception: false,
+    }));
+  });
+
+  test('201 — hotelServices (chaîne séparée par des virgules) est normalisé en tableau', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockPropertyAndAccommodation();
+    Hotel.create = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Le Panorama' });
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({
+        hotelMode: 'create', hotelName: 'Le Panorama', hotelServices: 'Piscine, Wifi , Climatisation',
+      }));
+
+    expect(res.statusCode).toBe(201);
+    expect(Hotel.create).toHaveBeenCalledWith(expect.objectContaining({
+      services: ['Piscine', 'Wifi', 'Climatisation'],
+    }));
+  });
+
+  test("201 — hotelEmail/hotelWebsite absents sont transmis vides, jamais undefined (aucune propriété arbitraire du body ne fuite)", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    mockPropertyAndAccommodation();
+    Hotel.create = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Le Panorama' });
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'create', hotelName: 'Le Panorama', neverAllowedField: 'injected' }));
+
+    expect(res.statusCode).toBe(201);
+    const created = Hotel.create.mock.calls[0][0];
+    expect(created.email).toBe('');
+    expect(created.website).toBe('');
+    expect(created).not.toHaveProperty('neverAllowedField');
+  });
+
+  test("compensation — un Hôtel nouvellement créé est supprimé si l'Accommodation échoue ensuite", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const property = { _id: PROPERTY_ID, title: 'Hôtel', status: 'hebergement' };
+    Property.create = jest.fn().mockResolvedValue(property);
+    Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Hotel.create = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Le Panorama' });
+    Hotel.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Accommodation.create = jest.fn().mockRejectedValue(new Error('DB down'));
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'create', hotelName: 'Le Panorama' }));
+
+    expect(res.statusCode).toBe(500);
+    expect(Hotel.findByIdAndDelete).toHaveBeenCalledWith(HOTEL_ID);
+    expect(Property.findByIdAndDelete).toHaveBeenCalledWith(PROPERTY_ID);
+  });
+
+  test("compensation — un Hôtel nouvellement créé est supprimé si le RatePlan échoue ensuite", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const property = { _id: PROPERTY_ID, title: 'Hôtel', status: 'hebergement' };
+    const accommodation = { _id: ACCOMMODATION_ID, property: PROPERTY_ID, toObject() { return { _id: this._id }; } };
+    Property.create = jest.fn().mockResolvedValue(property);
+    Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Hotel.create = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Le Panorama' });
+    Hotel.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Accommodation.create = jest.fn().mockResolvedValue(accommodation);
+    Accommodation.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    RatePlan.create = jest.fn().mockRejectedValue(new Error('DB down'));
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'create', hotelName: 'Le Panorama', nightlyPrice: '35000' }));
+
+    expect(res.statusCode).toBe(500);
+    expect(Accommodation.findByIdAndDelete).toHaveBeenCalledWith(ACCOMMODATION_ID);
+    expect(Hotel.findByIdAndDelete).toHaveBeenCalledWith(HOTEL_ID);
+    expect(Property.findByIdAndDelete).toHaveBeenCalledWith(PROPERTY_ID);
+  });
+
+  test("un Hôtel EXISTANT sélectionné par l'utilisateur n'est jamais supprimé, même si l'Accommodation échoue ensuite", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const property = { _id: PROPERTY_ID, title: 'Hôtel', status: 'hebergement' };
+    Property.create = jest.fn().mockResolvedValue(property);
+    Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Le Panorama' });
+    Hotel.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Accommodation.create = jest.fn().mockRejectedValue(new Error('DB down'));
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ hotelMode: 'existing', hotelId: HOTEL_ID }));
+
+    expect(res.statusCode).toBe(500);
+    expect(Hotel.findByIdAndDelete).not.toHaveBeenCalled();
+    expect(Property.findByIdAndDelete).toHaveBeenCalledWith(PROPERTY_ID);
+  });
+
+  test("un autre type d'hébergement (villa_meublee) n'exige aucune référence Hôtel", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const property = { _id: PROPERTY_ID, title: 'Villa', status: 'hebergement' };
+    const accommodation = { _id: ACCOMMODATION_ID, property: PROPERTY_ID, toObject() { return { _id: this._id }; } };
+    Property.create = jest.fn().mockResolvedValue(property);
+    Accommodation.create = jest.fn().mockResolvedValue(accommodation);
+
+    const res = await request(app)
+      .post('/api/accommodations/admin')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send(hotelBody({ accommodationType: 'villa_meublee' }));
+
+    expect(res.statusCode).toBe(201);
+    expect(Hotel.create).not.toHaveBeenCalled();
+    expect(Hotel.findById).not.toHaveBeenCalled();
+    expect(Accommodation.create).toHaveBeenCalledWith(expect.objectContaining({ hotel: null }));
+  });
+});
+
 describe('PUT /api/accommodations/admin/:propertyId — édition complète (dashboard admin)', () => {
   afterEach(() => jest.clearAllMocks());
 
@@ -809,5 +1122,106 @@ describe('PUT /api/accommodations/admin/:propertyId — édition complète (dash
       { $set: { active: false } },
     );
     expect(RatePlan.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("édition sans changement d'hôtel : la référence existante est conservée, aucune duplication", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Property.findById = jest.fn().mockResolvedValue(existingProperty());
+    const existingAccommodation = {
+      _id: ACCOMMODATION_ID, property: PROPERTY_ID, accommodationType: 'hotel', hotel: HOTEL_ID,
+      save: jest.fn().mockResolvedValue(),
+      toObject() { return { _id: this._id, accommodationType: this.accommodationType, hotel: this.hotel }; },
+    };
+    Accommodation.findOne = jest.fn().mockResolvedValue(existingAccommodation);
+
+    const res = await request(app)
+      .put(`/api/accommodations/admin/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ title: 'Hôtel mis à jour' });
+
+    expect(res.statusCode).toBe(200);
+    expect(Accommodation.create).not.toHaveBeenCalled();
+    expect(Hotel.create).not.toHaveBeenCalled();
+    expect(existingAccommodation.hotel).toBe(HOTEL_ID);
+  });
+
+  test("édition — rattacher à un nouvel Hôtel existant remplace la référence sans supprimer l'ancien", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Property.findById = jest.fn().mockResolvedValue(existingProperty());
+    const previousHotelId = '707f1f77bcf86cd799439066';
+    const existingAccommodation = {
+      _id: ACCOMMODATION_ID, property: PROPERTY_ID, accommodationType: 'hotel', hotel: previousHotelId,
+      save: jest.fn().mockResolvedValue(),
+      toObject() { return { _id: this._id, accommodationType: this.accommodationType, hotel: this.hotel }; },
+    };
+    Accommodation.findOne = jest.fn().mockResolvedValue(existingAccommodation);
+    Accommodation.countDocuments = jest.fn().mockResolvedValue(1); // encore référencé ailleurs
+    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Nouvel hôtel' });
+
+    const res = await request(app)
+      .put(`/api/accommodations/admin/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ hotelMode: 'existing', hotelId: HOTEL_ID });
+
+    expect(res.statusCode).toBe(200);
+    expect(existingAccommodation.hotel).toBe(HOTEL_ID);
+    expect(Hotel.findByIdAndDelete).not.toHaveBeenCalled();
+    expect(res.body.data.hotelOrphaned).toBe(false);
+  });
+
+  test("édition — passer à un type non-hôtel détache la référence et signale un hôtel orphelin sans le supprimer", async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Property.findById = jest.fn().mockResolvedValue(existingProperty());
+    const existingAccommodation = {
+      _id: ACCOMMODATION_ID, property: PROPERTY_ID, accommodationType: 'hotel', hotel: HOTEL_ID,
+      save: jest.fn().mockResolvedValue(),
+      toObject() { return { _id: this._id, accommodationType: this.accommodationType, hotel: this.hotel }; },
+    };
+    Accommodation.findOne = jest.fn().mockResolvedValue(existingAccommodation);
+    Accommodation.countDocuments = jest.fn().mockResolvedValue(0); // plus aucune référence
+
+    const res = await request(app)
+      .put(`/api/accommodations/admin/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ accommodationType: 'villa_meublee' });
+
+    expect(res.statusCode).toBe(200);
+    expect(existingAccommodation.hotel).toBeNull();
+    expect(Hotel.findByIdAndDelete).not.toHaveBeenCalled();
+    expect(res.body.data.hotelOrphaned).toBe(true);
+  });
+});
+
+describe('GET /api/hotels — liste des établissements (sélecteur admin)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('401 sans token', async () => {
+    const res = await request(app).get('/api/hotels');
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('403 — un Proprietaire ne peut pas consulter la liste des hôtels', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const res = await request(app)
+      .get('/api/hotels')
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('200 — un admin récupère la liste des hôtels actifs', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Hotel.find = jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([{ _id: HOTEL_ID, name: 'Le Panorama' }]),
+        }),
+      }),
+    });
+    const res = await request(app)
+      .get('/api/hotels')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.hotels).toHaveLength(1);
+    expect(Hotel.find).toHaveBeenCalledWith({ status: 'actif' });
   });
 });

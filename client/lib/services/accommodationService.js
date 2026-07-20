@@ -74,3 +74,16 @@ export const updateFullAccommodation = async (propertyId, formData) => {
   const res = await api.put(`/accommodations/admin/${propertyId}`, formData);
   return res.data.data;
 };
+
+// ── Établissements hôteliers (Sprint Hôtel) — sélecteur admin ──
+
+/** Liste des hôtels actifs pour le sélecteur "Établissement hôtelier". */
+export const getHotels = async () => {
+  const res = await api.get('/hotels');
+  return res.data.data.hotels;
+};
+
+export const getHotel = async (id) => {
+  const res = await api.get(`/hotels/${id}`);
+  return res.data.data.hotel;
+};

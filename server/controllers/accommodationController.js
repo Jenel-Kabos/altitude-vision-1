@@ -129,6 +129,93 @@ function buildRateData(req) {
   return { mode: 'nightly', amount, currency: rateCurrency || undefined };
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Construit `hotelInput` pour accommodationService (création/mise à jour) à
+ * partir du body admin :
+ *  - `null` si accommodationType n'est pas 'hotel' (aucune référence exigée
+ *    pour villa_meublee/maison_meublee/appartement_meuble/studio_meuble/
+ *    chambre_hotes — voir Accommodation.HOTEL_ACCOMMODATION_TYPES) ;
+ *  - { mode: 'existing', hotelId } ou { mode: 'create', hotelData } sinon.
+ * Lève une erreur 422 explicite pour toute donnée incohérente — jamais de
+ * référence Hotel arbitraire ni de nom d'hôtel manquant à la création.
+ */
+function buildHotelInput(req, { accommodationType, required }) {
+  const isHotelType = accommodationType && Accommodation.HOTEL_ACCOMMODATION_TYPES.includes(accommodationType);
+  const { hotelMode, hotelId } = req.body;
+
+  if (!isHotelType) return null; // type non-hôtel : aucune référence acceptée
+  if (!hotelMode) {
+    if (!required) return null; // édition : type hôtel inchangé, rien à modifier côté Hotel
+    const err = new Error("Le mode de rattachement à l'hôtel (existant ou nouveau) est requis.");
+    err.statusCode = 422;
+    throw err;
+  }
+
+  if (hotelMode === 'existing') {
+    if (!hotelId) {
+      const err = new Error("Un établissement hôtelier doit être sélectionné.");
+      err.statusCode = 422;
+      throw err;
+    }
+    // Vérifié ici (avant toute création de Property) pour rejeter un ID mal
+    // formé au même stade que les autres champs invalides — l'existence
+    // réelle du document est revérifiée par accommodationService.resolveHotel
+    // (défense en profondeur, notamment pour l'appel depuis updateFull où le
+    // Property existe déjà).
+    if (!mongoose.isValidObjectId(hotelId)) {
+      const err = new Error("Référence d'établissement hôtelier invalide.");
+      err.statusCode = 422;
+      throw err;
+    }
+    return { mode: 'existing', hotelId };
+  }
+
+  if (hotelMode === 'create') {
+    const {
+      hotelName, hotelDescription, hotelStarRating, hotelPhone,
+      hotelEmail, hotelWebsite, hotelServices, hotelHasRestaurant, hotelHasReception,
+    } = req.body;
+
+    if (!hotelName || !hotelName.trim()) {
+      const err = new Error("Le nom de l'hôtel est requis pour créer un nouvel établissement.");
+      err.statusCode = 422;
+      throw err;
+    }
+    if (hotelEmail && !EMAIL_RE.test(hotelEmail)) {
+      const err = new Error("L'adresse email de l'hôtel est invalide.");
+      err.statusCode = 422;
+      throw err;
+    }
+    const starRating = parseNumericField(hotelStarRating, "Le nombre d'étoiles");
+    if (starRating !== undefined && (starRating < 1 || starRating > 5)) {
+      const err = new Error("Le nombre d'étoiles doit être compris entre 1 et 5.");
+      err.statusCode = 422;
+      throw err;
+    }
+
+    return {
+      mode: 'create',
+      hotelData: {
+        name: hotelName.trim(),
+        description: hotelDescription || '',
+        starRating: starRating ?? null,
+        phone: hotelPhone || '',
+        email: hotelEmail || '',
+        website: hotelWebsite || '',
+        services: hotelServices !== undefined ? parseStringArray(hotelServices) : [],
+        hasRestaurant: hotelHasRestaurant === 'true' || hotelHasRestaurant === true,
+        hasReception: hotelHasReception === 'true' || hotelHasReception === true,
+      },
+    };
+  }
+
+  const err = new Error('Mode de rattachement hôtel invalide (existing ou create attendu).');
+  err.statusCode = 422;
+  throw err;
+}
+
 /** Construit le payload Property (mêmes champs que propertyController.createProperty). */
 async function buildPropertyData(req, ownerId) {
   const {
@@ -492,9 +579,11 @@ exports.createFull = async (req, res) => {
 
     let accommodationData;
     let rateData;
+    let hotelInput;
     try {
       accommodationData = buildAccommodationData(req);
       rateData = buildRateData(req);
+      hotelInput = buildHotelInput(req, { accommodationType, required: true });
     } catch (error) {
       // Property n'est pas encore créé (aucun document à compenser), mais les
       // images ont déjà pu être uploadées vers Cloudinary — on les nettoie.
@@ -505,7 +594,7 @@ exports.createFull = async (req, res) => {
     let result;
     try {
       result = await createFullAccommodation({
-        propertyData, accommodationData, rateData, actingUser: req.user,
+        propertyData, accommodationData, rateData, hotelInput, actingUser: req.user,
       });
     } catch (error) {
       return fail(res, error.statusCode || 500, error.message);
@@ -527,6 +616,7 @@ exports.createFull = async (req, res) => {
         property: result.property,
         accommodation: serializeAccommodation(result.accommodation, result.rate ? [result.rate] : []),
         rate: result.rate,
+        hotel: result.hotel,
       },
     });
   } catch (error) {
@@ -552,15 +642,23 @@ exports.updateFull = async (req, res) => {
       return fail(res, 422, "Type d'hébergement invalide.");
     }
 
+    // Type "effectif" pour décider si une référence Hotel est pertinente :
+    // celui envoyé dans la requête, sinon celui déjà en base (édition
+    // partielle — l'admin ne renvoie pas forcément accommodationType).
+    const existingAccommodationForType = await Accommodation.findOne({ property: property._id });
+    const effectiveType = accommodationType || existingAccommodationForType?.accommodationType;
+
     // Validé AVANT toute mutation de `property` : si les champs Accommodation/
-    // RatePlan sont invalides, on ne veut pas avoir déjà persisté une partie
-    // de la mise à jour Property (évite un état incohérent mi-modifié).
+    // RatePlan/Hotel sont invalides, on ne veut pas avoir déjà persisté une
+    // partie de la mise à jour Property (évite un état incohérent mi-modifié).
     let accommodationData;
     let rateData;
+    let hotelInput;
     try {
       accommodationData = buildAccommodationData(req);
       if (!accommodationData.accommodationType) delete accommodationData.accommodationType;
       rateData = buildRateData(req);
+      hotelInput = buildHotelInput(req, { accommodationType: effectiveType, required: false });
     } catch (error) {
       return fail(res, error.statusCode || 422, error.message);
     }
@@ -612,7 +710,7 @@ exports.updateFull = async (req, res) => {
     await property.save();
 
     const result = await updateFullAccommodation({
-      property, accommodationData, rateData, actingUser: req.user,
+      property, accommodationData, rateData, hotelInput, actingUser: req.user,
     });
 
     logAction({
@@ -631,6 +729,9 @@ exports.updateFull = async (req, res) => {
         property,
         accommodation: serializeAccommodation(result.accommodation, result.rate ? [result.rate] : []),
         rate: result.rate,
+        // Signal informatif seulement — l'ancien Hotel n'est jamais supprimé
+        // automatiquement (voir accommodationService.updateFullAccommodation).
+        hotelOrphaned: result.hotelOrphaned,
       },
     });
   } catch (error) {
