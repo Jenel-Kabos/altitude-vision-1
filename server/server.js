@@ -313,6 +313,8 @@ const gestionDocumentRoutes  = require('./routes/gestionDocumentRoutes');
 const rentalManagementRoutes = require('./routes/rentalManagementRoutes');
 const accommodationRoutes    = require('./routes/accommodationRoutes');
 const hotelRoutes            = require('./routes/hotelRoutes');
+const salePropertyRoutes     = require('./routes/salePropertyRoutes');
+const rentalPropertyRoutes   = require('./routes/rentalPropertyRoutes');
 
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
@@ -339,6 +341,15 @@ app.use('/api/rental-management', rentalManagementRoutes);
 // 🛎️ Hébergement (meublés — Sprint 2)
 app.use('/api/accommodations', accommodationRoutes);
 app.use('/api/hotels', hotelRoutes);
+
+// 🏷️ Vente / Location — formulaires admin dédiés (Sprint A, séparation par
+// transaction). Espace de noms dédié (comme /api/accommodations et
+// /api/hotels), volontairement PAS sous /api/admin/properties : ce préfixe
+// est déjà utilisé par adminRoutes.js (GET /api/admin/properties existant)
+// et un sous-chemin /properties/sales aurait risqué d'être masqué par ses
+// routes internes.
+app.use('/api/sale-properties', salePropertyRoutes);
+app.use('/api/rental-properties', rentalPropertyRoutes);
 
 // 💼 Pôle Altcom
 app.use("/api/services", serviceRoutes);

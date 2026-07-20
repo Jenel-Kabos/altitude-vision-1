@@ -13,7 +13,12 @@ const syncLeaseOccupation = async (contract, actor) => {
   if (!property || property.status !== 'location') return;
   const rental = await RentalManagement.findOneAndUpdate(
     { property: property._id },
-    { $setOnInsert: { property: property._id, owner: property.owner, manager: actor }, $set: { monthlyRent: contract.montantLoyer ?? property.price } },
+    {
+      $setOnInsert: { property: property._id, owner: property.owner, manager: actor },
+      // Un bail signé implique une gestion active, même si l'écran d'activation
+      // dédié n'a jamais été utilisé (Sprint A — voir rentalManagementController.create).
+      $set: { monthlyRent: contract.montantLoyer ?? property.price, managementActivated: true },
+    },
     { new: true, upsert: true, runValidators: true },
   );
   if (contract.statut === 'actif') {

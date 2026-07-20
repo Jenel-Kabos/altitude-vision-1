@@ -6,6 +6,8 @@ jest.mock('../models/RatePlan');
 jest.mock('../models/Property');
 jest.mock('../models/User');
 jest.mock('../models/Hotel');
+jest.mock('../models/SaleManagement');
+jest.mock('../models/RentalManagement');
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
@@ -30,7 +32,14 @@ const RatePlan       = require('../models/RatePlan');
 const Property        = require('../models/Property');
 const User             = require('../models/User');
 const Hotel             = require('../models/Hotel');
+const SaleManagement    = require('../models/SaleManagement');
+const RentalManagement  = require('../models/RentalManagement');
 const { destroyFromCloudinary } = require('../config/cloudinary');
+
+// GET /api/properties/:id embarque désormais sale/rental (Sprint A) — par
+// défaut aucune fiche, comme pour un ancien Property créé avant ce sprint.
+SaleManagement.findOne = jest.fn().mockResolvedValue(null);
+RentalManagement.findOne = jest.fn().mockResolvedValue(null);
 
 // Le vrai modèle expose ACCOMMODATION_TYPES / RATE_MODES en propriétés
 // statiques ; jest.mock('../models/Accommodation') les efface (automock).

@@ -1,9 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ManagePropertiesPage from '../pages/dashboard/ManagePropertiesPage';
 import {
-  getAllProperties, getPropertyById, addProperty, updateProperty,
+  getAllProperties, getPropertyById,
 } from '../services/propertyService';
 import { createFullAccommodation, updateFullAccommodation, getHotels } from '../services/accommodationService';
+import { createFullSaleProperty, updateFullSaleProperty } from '../services/salePropertyService';
+import { createFullRentalProperty } from '../services/rentalPropertyService';
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
@@ -28,6 +30,23 @@ vi.mock('../services/accommodationService', () => ({
   updateFullAccommodation: vi.fn(),
   getHotels: vi.fn(),
 }));
+
+vi.mock('../services/salePropertyService', () => ({
+  createFullSaleProperty: vi.fn(),
+  updateFullSaleProperty: vi.fn(),
+}));
+
+vi.mock('../services/rentalPropertyService', () => ({
+  createFullRentalProperty: vi.fn(),
+  updateFullRentalProperty: vi.fn(),
+}));
+
+// Sprint A — cliquer "Ajouter" ouvre désormais un sélecteur métier
+// (Vente/Location/Hébergement meublé) avant tout formulaire.
+const chooseBusinessCard = async (label) => {
+  fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(label, 'i') }));
+};
 
 const fillCommonFields = () => {
   fireEvent.change(screen.getByLabelText('Titre du bien'), { target: { value: 'TEST DATA VILLA' } });
@@ -54,19 +73,17 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     getHotels.mockResolvedValue([]);
   });
 
-  test("l'option Hébergement apparaît dans le formulaire admin", async () => {
+  test("le sélecteur métier propose Vente, Location et Hébergement meublé", async () => {
     render(<ManagePropertiesPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
-    const statusSelect = await screen.findByLabelText('Statut');
-    const options = within(statusSelect).getAllByRole('option').map((o) => o.value);
-    expect(options).toContain('hebergement');
+    expect(await screen.findByRole('button', { name: /Vente/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Location/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Hébergement meublé/i })).toBeInTheDocument();
   });
 
-  test('sélectionner Hébergement affiche les bons champs et masque les conditions de bail', async () => {
+  test('choisir Hébergement meublé affiche les bons champs (statut déjà réglé, pas de re-sélection)', async () => {
     render(<ManagePropertiesPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
-    const statusSelect = await screen.findByLabelText('Statut');
-    fireEvent.change(statusSelect, { target: { value: 'hebergement' } });
+    await chooseBusinessCard('Hébergement meublé');
 
     expect(screen.getByText("Informations d'hébergement")).toBeInTheDocument();
     expect(screen.getByText('Tarification')).toBeInTheDocument();
@@ -74,34 +91,54 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     expect(screen.getByLabelText('Capacité maximale en adultes')).toBeInTheDocument();
     expect(screen.getByLabelText('Heure de check-in')).toBeInTheDocument();
     expect(screen.getByLabelText('Prix par nuit')).toBeInTheDocument();
-
-    // Champs de location longue durée jamais affichés pour Hébergement.
-    expect(screen.queryByText('Conditions de bail')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Caution demandée')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Statut').value).toBe('hebergement');
   });
 
-  test('Location affiche toujours les conditions de bail (non-régression)', async () => {
+  test('choisir Location ouvre RentalPropertyForm (formulaire dédié, plus PropertyForm)', async () => {
     render(<ManagePropertiesPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
-    fireEvent.change(await screen.findByLabelText('Statut'), { target: { value: 'location' } });
-    expect(screen.getByText('Conditions de bail')).toBeInTheDocument();
+    await chooseBusinessCard('Location');
+
+    expect(screen.getByText('Loyer et charges')).toBeInTheDocument();
+    expect(screen.getByText('Conditions du bail')).toBeInTheDocument();
+    expect(screen.getByLabelText('Loyer mensuel')).toBeInTheDocument();
+    // Aucun champ hôtelier/hébergement ni statut technique dans ce formulaire dédié.
+    expect(screen.queryByLabelText('Statut')).not.toBeInTheDocument();
     expect(screen.queryByText("Informations d'hébergement")).not.toBeInTheDocument();
   });
 
-  test('Vente ne montre ni conditions de bail ni section hébergement (non-régression)', async () => {
+  test('choisir Vente ouvre SalePropertyForm (formulaire dédié, plus PropertyForm)', async () => {
     render(<ManagePropertiesPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
-    // 'vente' est déjà la valeur par défaut du formulaire.
-    expect(screen.queryByText('Conditions de bail')).not.toBeInTheDocument();
+    await chooseBusinessCard('Vente');
+
+    expect(screen.getByText('Situation juridique')).toBeInTheDocument();
+    expect(screen.getByText('Prix et négociation')).toBeInTheDocument();
+    expect(screen.getByLabelText('Prix de vente')).toBeInTheDocument();
+    // Aucun champ de loyer, de tarif par nuit, ni statut technique.
+    expect(screen.queryByLabelText('Statut')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loyer et charges')).not.toBeInTheDocument();
     expect(screen.queryByText("Informations d'hébergement")).not.toBeInTheDocument();
+  });
+
+  test("changer de carte (Annuler) avant soumission ne conserve aucune donnée saisie dans l'autre formulaire (Sprint A, audit sécurité)", async () => {
+    render(<ManagePropertiesPage />);
+    await chooseBusinessCard('Vente');
+    fireEvent.change(screen.getByLabelText("Titre de l'annonce"), { target: { value: 'TEST DATA NE DOIT PAS FUITER' } });
+
+    // Retour au sélecteur puis choix d'un autre type métier — le composant
+    // SalePropertyForm est démonté (pas juste masqué), donc RentalPropertyForm
+    // repart d'un état totalement neuf.
+    fireEvent.click(screen.getByText('Annuler'));
+    fireEvent.click(await screen.findByRole('button', { name: /Location/i }));
+
+    expect(screen.getByLabelText("Titre de l'annonce").value).toBe('');
+    expect(screen.queryByText('TEST DATA NE DOIT PAS FUITER')).not.toBeInTheDocument();
   });
 
   test('affiche les erreurs de validation près des champs concernés sans appeler l’API', async () => {
     render(<ManagePropertiesPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    await chooseBusinessCard('Hébergement meublé');
     fillCommonFields();
     addFakeImage();
-    fireEvent.change(await screen.findByLabelText('Statut'), { target: { value: 'hebergement' } });
     // accommodationType volontairement laissé vide.
 
     fireEvent.click(screen.getByText('Enregistrer le bien'));
@@ -110,17 +147,16 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     expect(createFullAccommodation).not.toHaveBeenCalled();
   });
 
-  test('un succès de création envoie le payload correct, ferme et réinitialise le formulaire', async () => {
+  test('un succès de création Hébergement envoie le payload correct, ferme et réinitialise le formulaire', async () => {
     createFullAccommodation.mockResolvedValue({
       property: { _id: 'TEST-DATA-PROPERTY', status: 'hebergement' },
       accommodation: { _id: 'TEST-DATA-ACC' },
       rate: { amount: 35000 },
     });
     render(<ManagePropertiesPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    await chooseBusinessCard('Hébergement meublé');
     fillCommonFields();
     addFakeImage();
-    fireEvent.change(await screen.findByLabelText('Statut'), { target: { value: 'hebergement' } });
     fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'villa_meublee' } });
     fireEvent.change(screen.getByLabelText('Capacité maximale en adultes'), { target: { value: '4' } });
     fireEvent.change(screen.getByLabelText('Prix par nuit'), { target: { value: '35000' } });
@@ -135,21 +171,58 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     expect(sentFormData.get('title')).toBe('TEST DATA VILLA');
 
     // Formulaire fermé/réinitialisé après succès.
-    await waitFor(() => expect(screen.queryByText('Ajouter un nouveau bien')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Ajouter une annonce')).not.toBeInTheDocument());
     expect(await screen.findByText('Hébergement créé avec succès !')).toBeInTheDocument();
   });
 
-  test('une Vente réussie utilise toujours addProperty (non-régression du chemin existant)', async () => {
-    addProperty.mockResolvedValue({ _id: 'TEST-DATA-PROPERTY', status: 'vente' });
+  test('une création Vente réussie appelle createFullSaleProperty avec le bon payload (Sprint A)', async () => {
+    createFullSaleProperty.mockResolvedValue({
+      property: { _id: 'TEST-DATA-PROPERTY', status: 'vente' },
+      sale: { _id: 'TEST-DATA-SALE' },
+    });
     render(<ManagePropertiesPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
-    fillCommonFields();
-    addFakeImage();
+    await chooseBusinessCard('Vente');
+    fireEvent.change(screen.getByLabelText("Titre de l'annonce"), { target: { value: 'TEST DATA VILLA VENTE' } });
+    fireEvent.change(screen.getByLabelText("Description de l'annonce"), { target: { value: 'TEST DESC' } });
+    fireEvent.change(screen.getByLabelText('Prix de vente'), { target: { value: '75000000' } });
+    fireEvent.change(screen.getByLabelText('Surface en m²'), { target: { value: '200' } });
+    fireEvent.change(screen.getByLabelText('Arrondissement'), { target: { value: 'Bacongo' } });
+    const input = document.querySelector('input[type="file"]');
+    fireEvent.change(input, { target: { files: [new File(['x'], 'photo.png', { type: 'image/png' })] } });
 
-    fireEvent.click(screen.getByText('Enregistrer le bien'));
+    fireEvent.click(screen.getByText("Enregistrer l'annonce"));
 
-    await waitFor(() => expect(addProperty).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(createFullSaleProperty).toHaveBeenCalledTimes(1));
+    const sentFormData = createFullSaleProperty.mock.calls[0][0];
+    expect(sentFormData.get('price')).toBe('75000000');
+    expect(sentFormData.get('title')).toBe('TEST DATA VILLA VENTE');
     expect(createFullAccommodation).not.toHaveBeenCalled();
+    expect(createFullRentalProperty).not.toHaveBeenCalled();
+  });
+
+  test('une création Location réussie appelle createFullRentalProperty avec le bon payload (Sprint A)', async () => {
+    createFullRentalProperty.mockResolvedValue({
+      property: { _id: 'TEST-DATA-PROPERTY', status: 'location' },
+      rental: { _id: 'TEST-DATA-RENTAL' },
+    });
+    render(<ManagePropertiesPage />);
+    await chooseBusinessCard('Location');
+    fireEvent.change(screen.getByLabelText("Titre de l'annonce"), { target: { value: 'TEST DATA APPART LOCATION' } });
+    fireEvent.change(screen.getByLabelText("Description de l'annonce"), { target: { value: 'TEST DESC' } });
+    fireEvent.change(screen.getByLabelText('Loyer mensuel'), { target: { value: '150000' } });
+    fireEvent.change(screen.getByLabelText('Surface en m²'), { target: { value: '80' } });
+    fireEvent.change(screen.getByLabelText('Arrondissement'), { target: { value: 'Bacongo' } });
+    const input = document.querySelector('input[type="file"]');
+    fireEvent.change(input, { target: { files: [new File(['x'], 'photo.png', { type: 'image/png' })] } });
+
+    fireEvent.click(screen.getByText("Enregistrer l'annonce"));
+
+    await waitFor(() => expect(createFullRentalProperty).toHaveBeenCalledTimes(1));
+    const sentFormData = createFullRentalProperty.mock.calls[0][0];
+    expect(sentFormData.get('price')).toBe('150000');
+    expect(sentFormData.get('monthlyRent')).toBe('150000');
+    expect(createFullAccommodation).not.toHaveBeenCalled();
+    expect(createFullSaleProperty).not.toHaveBeenCalled();
   });
 
   test("l'édition d'un hébergement précharge les champs Accommodation existants", async () => {
@@ -180,10 +253,57 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     expect(screen.getByLabelText('Prix par nuit').value).toBe('20000');
   });
 
+  test("l'édition d'une annonce Vente précharge SalePropertyForm avec la fiche SaleManagement (Sprint A)", async () => {
+    const property = {
+      _id: 'TEST-DATA-PROPERTY', title: 'TEST DATA VILLA VENTE', description: 'TEST DESC',
+      status: 'vente', price: 75000000, surface: 200,
+      address: { city: 'Brazzaville', arrondissement: 'Bacongo', neighborhood: 'Q' },
+      images: ['https://example.com/a.jpg'],
+    };
+    getAllProperties.mockResolvedValue([property]);
+    getPropertyById.mockResolvedValue({ ...property, sale: { negotiable: true, legalStatus: 'regularise' } });
+    updateFullSaleProperty.mockResolvedValue({ property: { ...property }, sale: { negotiable: true } });
+
+    render(<ManagePropertiesPage />);
+    fireEvent.click(await screen.findByTitle('Modifier'));
+
+    await waitFor(() => expect(getPropertyById).toHaveBeenCalledWith('TEST-DATA-PROPERTY'));
+    await waitFor(() => expect(screen.getByLabelText("Titre de l'annonce").value).toBe('TEST DATA VILLA VENTE'));
+    expect(screen.getByLabelText('Prix de vente').value).toBe('75000000');
+    expect(screen.getByLabelText('Prix négociable').checked).toBe(true);
+    // Type de transaction verrouillé et indiqué clairement en édition (audit sécurité Sprint A).
+    expect(screen.getByText(/non modifiable en édition/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Statut')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Enregistrer l'annonce"));
+    await waitFor(() => expect(updateFullSaleProperty).toHaveBeenCalledTimes(1));
+    expect(updateFullSaleProperty).toHaveBeenCalledWith('TEST-DATA-PROPERTY', expect.any(FormData));
+  });
+
+  test("l'édition d'une annonce Location précharge RentalPropertyForm avec la fiche RentalManagement (Sprint A)", async () => {
+    const property = {
+      _id: 'TEST-DATA-PROPERTY', title: 'TEST DATA APPART', status: 'location',
+      price: 150000, address: { city: 'Brazzaville', arrondissement: 'Bacongo', neighborhood: 'Q' },
+      images: ['https://example.com/a.jpg'],
+    };
+    getAllProperties.mockResolvedValue([property]);
+    getPropertyById.mockResolvedValue({ ...property, rental: { monthlyRent: 150000, cautionMultiplicateur: 3 } });
+
+    render(<ManagePropertiesPage />);
+    fireEvent.click(await screen.findByTitle('Modifier'));
+
+    await waitFor(() => expect(getPropertyById).toHaveBeenCalledWith('TEST-DATA-PROPERTY'));
+    await waitFor(() => expect(screen.getByLabelText("Titre de l'annonce").value).toBe('TEST DATA APPART'));
+    expect(screen.getByLabelText('Loyer mensuel').value).toBe('150000');
+    expect(screen.getByLabelText('Multiplicateur de caution').value).toBe('3');
+    // Type de transaction verrouillé et indiqué clairement en édition (audit sécurité Sprint A).
+    expect(screen.getByText(/non modifiable en édition/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Statut')).not.toBeInTheDocument();
+  });
+
   test("les types historiques (residence_meublee, bungalow) ne sont pas proposés à la création", async () => {
     render(<ManagePropertiesPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
-    fireEvent.change(await screen.findByLabelText('Statut'), { target: { value: 'hebergement' } });
+    await chooseBusinessCard('Hébergement meublé');
 
     const typeSelect = screen.getByLabelText("Type d'hébergement");
     const values = within(typeSelect).getAllByRole('option').map((o) => o.value);
@@ -232,7 +352,7 @@ describe('ManagePropertiesPage — Hébergement — Établissement hôtelier (Sp
   const openHebergementForm = async () => {
     render(<ManagePropertiesPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
-    fireEvent.change(await screen.findByLabelText('Statut'), { target: { value: 'hebergement' } });
+    fireEvent.click(await screen.findByRole('button', { name: /Hébergement meublé/i }));
   };
 
   test("l'option Hôtel apparaît dans la liste des types d'hébergement", async () => {

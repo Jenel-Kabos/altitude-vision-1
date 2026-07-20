@@ -11,7 +11,8 @@ const { logAction, buildAuteur } = require('../services/actionLogService');
 const { notify } = require('../services/notificationService');
 const {
   uploadFilesToCloudinary, parseAmenities, parseStringArray,
-  parseNonNegativeAmount, parseAddress, parseGeoLocation,
+  parseNonNegativeAmount, parseAddress, parseGeoLocation, buildBasePropertyData,
+  parseNumericField,
 } = require('./propertyController');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 
@@ -32,23 +33,6 @@ const ALLOWED_FIELDS = [
 
 async function getActiveRates(accommodationId) {
   return RatePlan.find({ accommodation: accommodationId, active: true }).sort({ mode: 1 });
-}
-
-/**
- * Convertit vers un nombre fini, ou lève une erreur 422 explicite si la
- * valeur fournie n'est pas vide mais n'est pas un nombre valide — jamais de
- * NaN silencieux propagé jusqu'au schéma Mongoose (ex : "abc" en capacité).
- * Une valeur vide/absente retourne `undefined` (champ non fourni).
- */
-function parseNumericField(value, label) {
-  if (value === undefined || value === null || value === '') return undefined;
-  const n = Number(value);
-  if (!Number.isFinite(n)) {
-    const err = new Error(`${label} doit être un nombre valide.`);
-    err.statusCode = 422;
-    throw err;
-  }
-  return n;
 }
 
 /** Format "HH:MM" strict (24h) — même contrainte que le type `time` HTML5. */
@@ -216,51 +200,14 @@ function buildHotelInput(req, { accommodationType, required }) {
   throw err;
 }
 
-/** Construit le payload Property (mêmes champs que propertyController.createProperty). */
+/**
+ * Construit le payload Property (mêmes champs que propertyController.createProperty).
+ * Délègue à `buildBasePropertyData` (Sprint A) — status forcé à 'hebergement',
+ * jamais accepté depuis le client, comme avant ce refactor (zéro changement
+ * de comportement).
+ */
 async function buildPropertyData(req, ownerId) {
-  const {
-    title, description, price, pole, availability, type,
-    surface, bedrooms, bathrooms, amenities,
-    livingRooms, kitchens, constructionType,
-    location, honoraires, fraisVisite, longitude, latitude,
-  } = req.body;
-
-  const parsedHonoraires = parseNonNegativeAmount(honoraires, null);
-  const parsedFraisVisite = parseNonNegativeAmount(fraisVisite, 0);
-  if ((honoraires !== undefined && honoraires !== '' && parsedHonoraires === null)
-    || (fraisVisite !== undefined && fraisVisite !== '' && parsedFraisVisite === null)) {
-    const err = new Error('Les honoraires et frais de visite doivent être des montants positifs ou nuls.');
-    err.statusCode = 422;
-    throw err;
-  }
-
-  const imagePaths = await uploadFilesToCloudinary(req.files);
-
-  return {
-    owner: ownerId,
-    title,
-    description,
-    price: parseFloat(price),
-    honoraires: parsedHonoraires,
-    fraisVisite: parsedFraisVisite,
-    pole: pole || 'Altimmo',
-    status: 'hebergement', // forcé — jamais accepté depuis le client
-    availability: availability || 'Disponible',
-    type,
-    address: parseAddress(req),
-    surface: parseFloat(surface),
-    bedrooms: parseInt(bedrooms || 0),
-    bathrooms: parseInt(bathrooms || 0),
-    livingRooms: parseInt(livingRooms || 0),
-    kitchens: parseInt(kitchens || 0),
-    constructionType,
-    amenities: parseAmenities(amenities),
-    longitude,
-    latitude,
-    location: parseGeoLocation(location),
-    images: imagePaths,
-    statusAdmin: 'En attente',
-  };
+  return buildBasePropertyData(req, ownerId, 'hebergement');
 }
 
 // ─────────────────────────────────────────────

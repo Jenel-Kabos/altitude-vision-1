@@ -7,10 +7,30 @@ import { createFullAccommodation, updateFullAccommodation } from "../../services
 import { useAuth } from '../../context/AuthContext';
 import {
   PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle,
-  ArrowLeft, ArrowRight, Building2, MapPin, Maximize2, Bed, Bath, Sparkles, Send
+  ArrowLeft, ArrowRight, Building2, MapPin, Maximize2, Bed, Bath, Sparkles, Send,
+  Landmark, Key,
 } from "lucide-react";
 import PropertyForm from "../../components/dashboard/PropertyForm";
+import SalePropertyForm from "../../components/dashboard/SalePropertyForm";
+import RentalPropertyForm from "../../components/dashboard/RentalPropertyForm";
 import Image from 'next/image';
+
+// Catégorie métier affichée pour chaque bien — Sprint A (séparation
+// Vente/Location/Hébergement), voir server/docs/PROPERTY_TRANSACTION_ARCHITECTURE.md.
+const BUSINESS_TYPES = [
+  {
+    key: 'vente', label: 'Vente', Icon: Landmark,
+    description: 'Vendre une maison, un appartement, un terrain, un immeuble ou un local.',
+  },
+  {
+    key: 'location', label: 'Location', Icon: Key,
+    description: 'Louer un logement ou local avec loyer mensuel et contrat de bail.',
+  },
+  {
+    key: 'hebergement', label: 'Hébergement meublé', Icon: Sparkles,
+    description: 'Proposer une villa, un appartement, une maison ou un studio à la nuitée.',
+  },
+];
 
 const PROPERTIES_PER_PAGE = 8;
 
@@ -28,6 +48,15 @@ const ManagePropertiesPage = () => {
   const [currentPage, setCurrentPage]       = useState(1);
   const [existingImages, setExistingImages] = useState([]);
   const [confirmState, setConfirm]          = useState({ isOpen: false, message: '', onConfirm: () => {} });
+  // Sprint A — sélecteur métier initial ('vente'|'location'|'hebergement') ;
+  // null = écran de sélection encore affiché dans la modale "Ajouter".
+  const [addChoice, setAddChoice]           = useState(null);
+  // Bien en cours d'édition (objet complet, pas seulement `formData`) — sert
+  // à déterminer quel formulaire spécialisé afficher (SalePropertyForm /
+  // RentalPropertyForm / PropertyForm legacy pour l'hébergement).
+  const [editingProperty, setEditingProperty] = useState(null);
+  const [editFullData, setEditFullData]     = useState(null); // { property, sale? , rental? }
+  const [editLoading, setEditLoading]       = useState(false);
 
   const emptyForm = {
     title: "", description: "", price: "", honoraires: "", fraisVisite: 0,
@@ -90,6 +119,37 @@ const ManagePropertiesPage = () => {
     setShowEditModal(false);
     setEditingId(null);
     setErrors({});
+    setAddChoice(null);
+    setEditingProperty(null);
+    setEditFullData(null);
+    setEditLoading(false);
+  };
+
+  // Point d'entrée unique du bouton "Modifier" — détermine quel formulaire
+  // spécialisé afficher selon la catégorie métier réelle du bien (Sprint A).
+  // Hébergement continue d'utiliser exactement le flux existant (handleEdit
+  // ci-dessous, inchangé) ; Vente/Location chargent la fiche
+  // SaleManagement/RentalManagement associée pour préremplir le nouveau
+  // formulaire dédié.
+  const handleEditClick = async (property) => {
+    setEditingProperty(property);
+    if (property.status === 'hebergement') {
+      await handleEdit(property);
+      return;
+    }
+    setEditingId(property._id);
+    setExistingImages(property.images || []);
+    setShowEditModal(true);
+    setEditLoading(true);
+    try {
+      const full = await getPropertyById(property._id);
+      setEditFullData(full);
+    } catch {
+      showNotif("Erreur lors du chargement du bien.", "error");
+      setEditFullData({ property });
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   const handleEdit = async (property) => {
@@ -328,6 +388,18 @@ const ManagePropertiesPage = () => {
     }
   };
 
+  // Sprint A — SalePropertyForm/RentalPropertyForm gèrent leur propre appel
+  // API et leurs propres erreurs ; ManagePropertiesPage n'a qu'à rafraîchir
+  // la liste et fermer la modale en cas de succès.
+  const handleSaleRentalCreateSuccess = () => {
+    fetchProperties();
+    resetForm();
+  };
+  const handleSaleRentalUpdateSuccess = (result) => {
+    setProperties((p) => p.map((x) => (x._id === editingId ? result.property : x)));
+    resetForm();
+  };
+
   const handleToggleRecommande = async (propertyId, currentValue) => {
     try {
       await toggleRecommande(propertyId, !currentValue);
@@ -437,7 +509,7 @@ const ManagePropertiesPage = () => {
           )}
           <div className="flex gap-2">
             {canEdit && (
-              <button onClick={() => handleEdit(property)}
+              <button onClick={() => handleEditClick(property)}
                 className="flex-1 p-2.5 text-blue-600 hover:text-white bg-blue-50 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center" title="Modifier">
                 <Edit className="w-5 h-5" />
               </button>
@@ -549,14 +621,44 @@ const ManagePropertiesPage = () => {
               <div className="p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white/95 z-20 rounded-t-2xl">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl text-white"><Sparkles className="w-6 h-6" /></div>
-                  <h2 className="pr-10 text-xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Ajouter un nouveau bien</h2>
+                  <h2 className="pr-10 text-xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                    {addChoice ? `Ajouter — ${BUSINESS_TYPES.find((t) => t.key === addChoice)?.label}` : 'Ajouter une annonce'}
+                  </h2>
                   <button onClick={resetForm} disabled={loadingSubmit}
                     className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"><X className="w-6 h-6" /></button>
                 </div>
               </div>
               <div className="p-3 sm:p-6 overflow-y-auto flex-grow">
-                <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
-                  enableHebergement errors={errors} />
+                {!addChoice && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {BUSINESS_TYPES.map(({ key, label, Icon, description }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          setAddChoice(key);
+                          if (key === 'hebergement') setFormData((prev) => ({ ...prev, status: 'hebergement' }));
+                        }}
+                        className="flex flex-col items-start gap-2 p-5 border-2 border-gray-200 rounded-xl text-left hover:border-blue-500 hover:shadow-lg transition-all"
+                      >
+                        <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><Icon className="w-6 h-6" /></div>
+                        <h3 className="font-bold text-gray-800">{label}</h3>
+                        <p className="text-sm text-gray-500">{description}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {addChoice === 'vente' && (
+                  <SalePropertyForm onSuccess={handleSaleRentalCreateSuccess} onCancel={() => setAddChoice(null)} />
+                )}
+                {addChoice === 'location' && (
+                  <RentalPropertyForm onSuccess={handleSaleRentalCreateSuccess} onCancel={() => setAddChoice(null)} />
+                )}
+                {addChoice === 'hebergement' && (
+                  <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
+                    enableHebergement errors={errors} />
+                )}
               </div>
             </div>
           </div>
@@ -575,9 +677,34 @@ const ManagePropertiesPage = () => {
                 </div>
               </div>
               <div className="p-3 sm:p-6 overflow-y-auto flex-grow">
-                <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
-                  existingImages={existingImages} setExistingImages={setExistingImages}
-                  enableHebergement errors={errors} />
+                {editingProperty?.status === 'hebergement' && (
+                  <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
+                    existingImages={existingImages} setExistingImages={setExistingImages}
+                    enableHebergement errors={errors} />
+                )}
+                {editingProperty?.status !== 'hebergement' && editLoading && (
+                  <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>
+                )}
+                {editingProperty?.status === 'vente' && !editLoading && (
+                  <SalePropertyForm
+                    propertyId={editingId}
+                    initialProperty={editFullData}
+                    initialSale={editFullData?.sale}
+                    existingImages={existingImages}
+                    onSuccess={handleSaleRentalUpdateSuccess}
+                    onCancel={resetForm}
+                  />
+                )}
+                {editingProperty?.status === 'location' && !editLoading && (
+                  <RentalPropertyForm
+                    propertyId={editingId}
+                    initialProperty={editFullData}
+                    initialRental={editFullData?.rental}
+                    existingImages={existingImages}
+                    onSuccess={handleSaleRentalUpdateSuccess}
+                    onCancel={resetForm}
+                  />
+                )}
               </div>
             </div>
           </div>
