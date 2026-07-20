@@ -5,10 +5,23 @@
 // (Sprint 1.5 §02) mais volontairement plus simple : pas de workflow
 // d'occupation, pas de bail, pas de maintenance — hors périmètre Sprint 2.
 
+const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
 const RatePlan = require('../models/RatePlan');
+const Hotel = require('../models/Hotel');
 const { destroyFromCloudinary } = require('../config/cloudinary');
+const logger = require('../utils/logger');
+
+/**
+ * Suppression compensatoire best-effort : ne bloque jamais la propagation de
+ * l'erreur métier initiale si elle échoue à son tour, mais journalise pour
+ * ne jamais masquer un document orphelin silencieusement (voir logs Render).
+ * Ne renvoie jamais les détails internes de cet échec au client.
+ */
+const compensateDelete = (label, promise) => promise.catch((err) => {
+  logger.error(`Compensation ${label} échouée — document potentiellement orphelin`, err);
+});
 
 /** Best-effort : ne bloque jamais la compensation si Cloudinary est indisponible. */
 const cleanupImages = (images = []) => Promise.all(images.map((url) => destroyFromCloudinary(url)));
@@ -73,34 +86,104 @@ function hasValidInitialRate(rateInput) {
 }
 
 /**
+ * Résout la référence Hotel d'un Accommodation 'hotel' :
+ *  - hotelInput.mode === 'existing' → vérifie que l'Hotel existe réellement
+ *    (jamais de référence arbitraire/inexistante) ; ne sera JAMAIS supprimé
+ *    par la compensation (l'utilisateur l'a choisi, pas créé) ;
+ *  - hotelInput.mode === 'create'   → crée un nouvel Hotel minimal, rattaché
+ *    au Property en cours de création ; celui-ci EST compensé (supprimé) si
+ *    une étape suivante échoue.
+ *  - hotelInput absent/null (type non-hôtel) → { hotelId: null }.
+ *
+ * @returns {Promise<{hotelId: string|null, hotelWasCreated: boolean}>}
+ */
+async function resolveHotel({ hotelInput, propertyId, actingUser }) {
+  if (!hotelInput) return { hotelId: null, hotelWasCreated: false };
+
+  if (hotelInput.mode === 'existing') {
+    if (!mongoose.isValidObjectId(hotelInput.hotelId)) {
+      const err = new Error("Référence d'établissement hôtelier invalide.");
+      err.statusCode = 422;
+      throw err;
+    }
+    const hotel = await Hotel.findById(hotelInput.hotelId);
+    if (!hotel) {
+      const err = new Error("L'établissement hôtelier sélectionné est introuvable.");
+      err.statusCode = 422;
+      throw err;
+    }
+    return { hotelId: hotel._id, hotelWasCreated: false };
+  }
+
+  // mode === 'create'
+  try {
+    const hotel = await Hotel.create({
+      ...hotelInput.hotelData,
+      property: propertyId,
+      createdBy: actingUser.id,
+    });
+    return { hotelId: hotel._id, hotelWasCreated: true };
+  } catch (error) {
+    const wrapped = new Error(`Échec de création de l'établissement hôtelier : ${error.message}`);
+    wrapped.step = 'hotel';
+    if (error.name === 'ValidationError') wrapped.statusCode = 422;
+    throw wrapped;
+  }
+}
+
+/** Compensation ciblée : ne supprime le Hotel que s'il vient d'être créé. */
+async function compensateHotel(hotelId, hotelWasCreated) {
+  if (hotelWasCreated && hotelId) {
+    await compensateDelete(`Hotel(${hotelId})`, Hotel.findByIdAndDelete(hotelId));
+  }
+}
+
+/**
  * Création complète et atomique (côté applicatif) d'un hébergement depuis le
- * dashboard admin : Property + Accommodation + RatePlan initial optionnel.
+ * dashboard admin : Property + (Hotel optionnel) + Accommodation + RatePlan
+ * initial optionnel.
  *
  * Pas de transaction MongoDB ici (aucun précédent dans ce codebase, et le
  * driver/replica-set n'a jamais été validé pour ça) — compensation explicite
  * à la place : toute étape qui échoue déclenche la suppression des documents
  * déjà créés, pour ne jamais laisser de Property orphelin sans Accommodation.
+ * Un Hotel existant sélectionné par l'admin n'est en revanche JAMAIS supprimé
+ * par la compensation — seul un Hotel créé pendant CET appel l'est.
  *
  * @param {object} params
  * @param {object} params.propertyData   — payload prêt pour Property.create()
  *   (status déjà forcé à 'hebergement' par l'appelant)
  * @param {object} params.accommodationData — champs ALLOWED_FIELDS d'Accommodation
  * @param {object|null} params.rateData  — { mode, amount, currency } ou null
+ * @param {object|null} params.hotelInput — { mode: 'existing', hotelId } ou
+ *   { mode: 'create', hotelData } ou `null` (type non-hôtel)
  * @param {object} params.actingUser     — req.user (créateur)
- * @returns {Promise<{property, accommodation, rate}>}
+ * @returns {Promise<{property, accommodation, rate, hotel: ObjectId|null}>}
  */
-async function createFullAccommodation({ propertyData, accommodationData, rateData, actingUser }) {
+async function createFullAccommodation({ propertyData, accommodationData, rateData, hotelInput, actingUser }) {
   const property = await Property.create(propertyData);
+
+  let hotelId = null;
+  let hotelWasCreated = false;
+  try {
+    ({ hotelId, hotelWasCreated } = await resolveHotel({ hotelInput, propertyId: property._id, actingUser }));
+  } catch (error) {
+    await compensateDelete(`Property(${property._id})`, Property.findByIdAndDelete(property._id));
+    await cleanupImages(property.images);
+    throw error; // déjà enrichi (.statusCode) par resolveHotel
+  }
 
   let accommodation;
   try {
     accommodation = await Accommodation.create({
       ...accommodationData,
+      hotel: hotelId,
       property: property._id,
       createdBy: actingUser.id,
     });
   } catch (error) {
-    await Property.findByIdAndDelete(property._id).catch(() => {});
+    await compensateHotel(hotelId, hotelWasCreated);
+    await compensateDelete(`Property(${property._id})`, Property.findByIdAndDelete(property._id));
     await cleanupImages(property.images);
     const wrapped = new Error(`Échec de création de l'hébergement (Property annulé) : ${error.message}`);
     wrapped.step = 'accommodation';
@@ -123,8 +206,9 @@ async function createFullAccommodation({ propertyData, accommodationData, rateDa
         createdBy: actingUser.id,
       });
     } catch (error) {
-      await Accommodation.findByIdAndDelete(accommodation._id).catch(() => {});
-      await Property.findByIdAndDelete(property._id).catch(() => {});
+      await compensateDelete(`Accommodation(${accommodation._id})`, Accommodation.findByIdAndDelete(accommodation._id));
+      await compensateHotel(hotelId, hotelWasCreated);
+      await compensateDelete(`Property(${property._id})`, Property.findByIdAndDelete(property._id));
       await cleanupImages(property.images);
       const wrapped = new Error(`Échec de création du tarif (Property et Accommodation annulés) : ${error.message}`);
       wrapped.step = 'rate';
@@ -133,35 +217,70 @@ async function createFullAccommodation({ propertyData, accommodationData, rateDa
     }
   }
 
-  return { property, accommodation, rate };
+  return { property, accommodation, rate, hotel: hotelId };
 }
 
 /**
  * Mise à jour d'un hébergement existant depuis le dashboard admin — met à
  * jour Property, puis met à jour (ou crée s'il manque exceptionnellement)
- * l'Accommodation lié, puis upsert le tarif nightly (désactive l'ancien tarif
- * actif du même mode plutôt que d'en créer un doublon — même convention que
+ * l'Accommodation lié (y compris sa référence Hotel, voir ci-dessous), puis
+ * upsert le tarif nightly (désactive l'ancien tarif actif du même mode
+ * plutôt que d'en créer un doublon — même convention que
  * accommodationController.upsertRate).
  *
- * @returns {Promise<{property, accommodation, rate}>}
+ * Gestion de la référence Hotel :
+ *  - `hotelInput` fourni ('existing'|'create') → résout/crée le Hotel et
+ *    remplace `accommodation.hotel` (jamais de suppression du Hotel
+ *    précédemment rattaché — il peut être réutilisé ailleurs) ;
+ *  - `accommodationData.accommodationType` change vers un type non-hôtel →
+ *    `accommodation.hotel` est remis à `null` ; si plus aucun Accommodation
+ *    ne référence l'ancien Hotel, `hotelOrphaned: true` est renvoyé (simple
+ *    signal informatif, l'établissement n'est jamais supprimé automatiquement) ;
+ *  - `hotelInput` absent et le type reste inchangé → `accommodation.hotel`
+ *    n'est pas touché.
+ *
+ * @returns {Promise<{property, accommodation, rate, hotelOrphaned: boolean}>}
  */
-async function updateFullAccommodation({ property, accommodationData, rateData, actingUser }) {
+async function updateFullAccommodation({ property, accommodationData, rateData, hotelInput, actingUser }) {
   let accommodation = await Accommodation.findOne({ property: property._id });
+  let hotelOrphaned = false;
+  const previousHotelId = accommodation?.hotel || null;
 
   if (!accommodation) {
+    let hotelId = null;
+    if (hotelInput) {
+      ({ hotelId } = await resolveHotel({ hotelInput, propertyId: property._id, actingUser }));
+    }
     accommodation = await Accommodation.create({
       ...accommodationData,
+      hotel: hotelId,
       property: property._id,
       createdBy: actingUser.id,
     });
   } else {
+    const becomesNonHotel = accommodationData.accommodationType
+      && !Accommodation.HOTEL_ACCOMMODATION_TYPES.includes(accommodationData.accommodationType);
+
     Object.assign(accommodation, accommodationData);
     accommodation.updatedBy = actingUser.id;
     if (accommodation.publicationStatus === 'rejete') {
       accommodation.publicationStatus = 'brouillon';
       accommodation.rejectionReason = '';
     }
+
+    if (hotelInput) {
+      const { hotelId } = await resolveHotel({ hotelInput, propertyId: property._id, actingUser });
+      accommodation.hotel = hotelId;
+    } else if (becomesNonHotel) {
+      accommodation.hotel = null;
+    }
+
     await accommodation.save();
+
+    if (previousHotelId && String(previousHotelId) !== String(accommodation.hotel || '')) {
+      const stillReferenced = await Accommodation.countDocuments({ hotel: previousHotelId });
+      hotelOrphaned = stillReferenced === 0;
+    }
   }
 
   let rate = null;
@@ -180,7 +299,7 @@ async function updateFullAccommodation({ property, accommodationData, rateData, 
     });
   }
 
-  return { property, accommodation, rate };
+  return { property, accommodation, rate, hotelOrphaned };
 }
 
 module.exports = {

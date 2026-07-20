@@ -42,6 +42,10 @@ const ManagePropertiesPage = () => {
     checkInTime: "14:00", checkOutTime: "11:00", minimumStay: 1, maximumStay: "",
     cancellationPolicy: "moderee", houseRules: "", securityDeposit: 0, cleaningFee: 0,
     nightlyPrice: "",
+    // Établissement hôtelier (Sprint Hôtel — uniquement si accommodationType === 'hotel')
+    hotelMode: "", hotelId: "", hotelName: "", hotelDescription: "",
+    hotelStarRating: "", hotelPhone: "", hotelEmail: "", hotelWebsite: "",
+    hotelServices: "", hotelHasRestaurant: false, hotelHasReception: false,
   };
   const [formData, setFormData]       = useState(emptyForm);
   const [loadingSubmit, setSubmit]    = useState(false);
@@ -118,6 +122,9 @@ const ManagePropertiesPage = () => {
       checkInTime: "14:00", checkOutTime: "11:00", minimumStay: 1, maximumStay: "",
       cancellationPolicy: "moderee", houseRules: "", securityDeposit: 0, cleaningFee: 0,
       nightlyPrice: "",
+      hotelMode: "", hotelId: "", hotelName: "", hotelDescription: "",
+      hotelStarRating: "", hotelPhone: "", hotelEmail: "", hotelWebsite: "",
+      hotelServices: "", hotelHasRestaurant: false, hotelHasReception: false,
     });
     setShowEditModal(true);
 
@@ -145,6 +152,11 @@ const ManagePropertiesPage = () => {
             securityDeposit: acc.securityDeposit ?? 0,
             cleaningFee: acc.cleaningFee ?? 0,
             nightlyPrice: nightlyRate?.amount ?? "",
+            // Établissement déjà rattaché : on prérempli en mode "existing" —
+            // l'admin peut changer d'hôtel ou en créer un nouveau, mais on ne
+            // duplique jamais la fiche Hotel existante au premier chargement.
+            hotelMode: acc.hotel ? 'existing' : "",
+            hotelId: acc.hotel ? String(acc.hotel) : "",
           }));
         }
       } catch {
@@ -169,6 +181,27 @@ const ManagePropertiesPage = () => {
     }
     if (data.nightlyPrice !== "" && data.nightlyPrice !== undefined && data.nightlyPrice !== null) {
       if (!(Number(data.nightlyPrice) > 0)) e.nightlyPrice = "Le prix par nuit doit être positif.";
+    }
+    // Établissement hôtelier requis uniquement pour accommodationType='hotel'
+    // — villa_meublee/maison_meublee/appartement_meuble/studio_meuble/
+    // chambre_hotes/residence_hoteliere/autre n'exigent aucune référence Hotel.
+    if (data.accommodationType === 'hotel') {
+      if (!data.hotelMode) {
+        e.hotelMode = "Sélectionnez un établissement existant ou créez-en un nouveau.";
+      } else if (data.hotelMode === 'existing' && !data.hotelId) {
+        e.hotelId = "Un établissement hôtelier doit être sélectionné.";
+      } else if (data.hotelMode === 'create') {
+        if (!data.hotelName || !data.hotelName.trim()) {
+          e.hotelName = "Le nom de l'hôtel est requis.";
+        }
+        if (data.hotelEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.hotelEmail)) {
+          e.hotelEmail = "Adresse email invalide.";
+        }
+        if (data.hotelStarRating !== "" && data.hotelStarRating !== undefined && data.hotelStarRating !== null) {
+          const stars = Number(data.hotelStarRating);
+          if (!(stars >= 1 && stars <= 5)) e.hotelStarRating = "Le nombre d'étoiles doit être compris entre 1 et 5.";
+        }
+      }
     }
     return e;
   };
@@ -202,6 +235,8 @@ const ManagePropertiesPage = () => {
         accommodationType, maxAdults, maxChildren, beds,
         checkInTime, checkOutTime, minimumStay, maximumStay,
         cancellationPolicy, houseRules, securityDeposit, cleaningFee, nightlyPrice,
+        hotelMode, hotelId, hotelName, hotelDescription, hotelStarRating,
+        hotelPhone, hotelEmail, hotelWebsite, hotelServices, hotelHasRestaurant, hotelHasReception,
         ...rest
       } = formData;
 
@@ -242,6 +277,26 @@ const ManagePropertiesPage = () => {
         data.append('securityDeposit', securityDeposit || 0);
         data.append('cleaningFee', cleaningFee || 0);
         if (nightlyPrice !== "") data.append('nightlyPrice', nightlyPrice);
+
+        // Établissement hôtelier — uniquement pertinent pour accommodationType
+        // === 'hotel' ; jamais envoyé pour les autres types (voir
+        // accommodationController.buildHotelInput côté backend).
+        if (accommodationType === 'hotel' && hotelMode) {
+          data.append('hotelMode', hotelMode);
+          if (hotelMode === 'existing') {
+            if (hotelId) data.append('hotelId', hotelId);
+          } else if (hotelMode === 'create') {
+            data.append('hotelName', hotelName || '');
+            if (hotelDescription) data.append('hotelDescription', hotelDescription);
+            if (hotelStarRating !== "") data.append('hotelStarRating', hotelStarRating);
+            if (hotelPhone) data.append('hotelPhone', hotelPhone);
+            if (hotelEmail) data.append('hotelEmail', hotelEmail);
+            if (hotelWebsite) data.append('hotelWebsite', hotelWebsite);
+            if (hotelServices) data.append('hotelServices', hotelServices);
+            data.append('hotelHasRestaurant', hotelHasRestaurant ? 'true' : 'false');
+            data.append('hotelHasReception', hotelHasReception ? 'true' : 'false');
+          }
+        }
       }
 
       if (editingId) {

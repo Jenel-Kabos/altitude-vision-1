@@ -3,7 +3,7 @@ import ManagePropertiesPage from '../pages/dashboard/ManagePropertiesPage';
 import {
   getAllProperties, getPropertyById, addProperty, updateProperty,
 } from '../services/propertyService';
-import { createFullAccommodation, updateFullAccommodation } from '../services/accommodationService';
+import { createFullAccommodation, updateFullAccommodation, getHotels } from '../services/accommodationService';
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
@@ -26,6 +26,7 @@ vi.mock('../services/propertyService', () => ({
 vi.mock('../services/accommodationService', () => ({
   createFullAccommodation: vi.fn(),
   updateFullAccommodation: vi.fn(),
+  getHotels: vi.fn(),
 }));
 
 const fillCommonFields = () => {
@@ -50,6 +51,7 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
   beforeEach(() => {
     vi.clearAllMocks();
     getAllProperties.mockResolvedValue([]);
+    getHotels.mockResolvedValue([]);
   });
 
   test("l'option Hébergement apparaît dans le formulaire admin", async () => {
@@ -176,5 +178,202 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     expect(screen.getByLabelText('Capacité maximale en adultes').value).toBe('2');
     expect(screen.getByLabelText('Heure de check-in').value).toBe('15:00');
     expect(screen.getByLabelText('Prix par nuit').value).toBe('20000');
+  });
+
+  test("les types historiques (residence_meublee, bungalow) ne sont pas proposés à la création", async () => {
+    render(<ManagePropertiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    fireEvent.change(await screen.findByLabelText('Statut'), { target: { value: 'hebergement' } });
+
+    const typeSelect = screen.getByLabelText("Type d'hébergement");
+    const values = within(typeSelect).getAllByRole('option').map((o) => o.value);
+    expect(values).not.toContain('residence_meublee');
+    expect(values).not.toContain('bungalow');
+  });
+
+  test("l'édition d'une ancienne annonce 'bungalow' affiche et conserve cette valeur historique", async () => {
+    const property = {
+      _id: 'TEST-DATA-PROPERTY', title: 'TEST DATA BUNGALOW', status: 'hebergement',
+      price: 50000, address: { city: 'Brazzaville', arrondissement: '', neighborhood: 'Q' },
+      images: ['https://example.com/a.jpg'],
+    };
+    getAllProperties.mockResolvedValue([property]);
+    getPropertyById.mockResolvedValue({
+      ...property,
+      accommodation: {
+        accommodationType: 'bungalow',
+        capacity: { maxAdults: 2 },
+        checkInTime: '14:00', checkOutTime: '11:00',
+        rates: [],
+      },
+    });
+
+    render(<ManagePropertiesPage />);
+    fireEvent.click(await screen.findByTitle('Modifier'));
+
+    await waitFor(() => expect(screen.getByLabelText("Type d'hébergement").value).toBe('bungalow'));
+    const typeSelect = screen.getByLabelText("Type d'hébergement");
+    // La valeur historique doit être présente dans la liste (sinon le
+    // <select> retomberait silencieusement sur la 1ère option au rendu) ET
+    // rester sélectionnée si l'admin enregistre sans changer le type.
+    const values = within(typeSelect).getAllByRole('option').map((o) => o.value);
+    expect(values).toContain('bungalow');
+    expect(typeSelect.value).toBe('bungalow');
+  });
+});
+
+describe('ManagePropertiesPage — Hébergement — Établissement hôtelier (Sprint Hôtel) — TEST DATA', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getAllProperties.mockResolvedValue([]);
+    getHotels.mockResolvedValue([]);
+  });
+
+  const openHebergementForm = async () => {
+    render(<ManagePropertiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    fireEvent.change(await screen.findByLabelText('Statut'), { target: { value: 'hebergement' } });
+  };
+
+  test("l'option Hôtel apparaît dans la liste des types d'hébergement", async () => {
+    await openHebergementForm();
+    const typeSelect = screen.getByLabelText("Type d'hébergement");
+    const values = within(typeSelect).getAllByRole('option').map((o) => o.value);
+    expect(values).toContain('hotel');
+  });
+
+  test("choisir un type non-hôtel ne montre jamais la section Établissement hôtelier", async () => {
+    await openHebergementForm();
+    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'villa_meublee' } });
+    expect(screen.queryByText('Établissement hôtelier')).not.toBeInTheDocument();
+  });
+
+  test("choisir le type Hôtel affiche la section Établissement hôtelier et charge la liste", async () => {
+    getHotels.mockResolvedValue([{ _id: 'HOTEL-1', name: 'Hôtel Le Panorama' }]);
+    await openHebergementForm();
+    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
+
+    expect(await screen.findByText('Établissement hôtelier')).toBeInTheDocument();
+    await waitFor(() => expect(getHotels).toHaveBeenCalledTimes(1));
+  });
+
+  test("mode 'existant' : le sélecteur d'hôtel liste les établissements chargés", async () => {
+    getHotels.mockResolvedValue([{ _id: 'HOTEL-1', name: 'Hôtel Le Panorama' }]);
+    await openHebergementForm();
+    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
+    await screen.findByText('Établissement hôtelier');
+
+    fireEvent.click(screen.getByLabelText('Sélectionner un établissement existant'));
+    const hotelSelect = await screen.findByLabelText('Établissement hôtelier');
+    expect(await within(hotelSelect).findByRole('option', { name: 'Hôtel Le Panorama' })).toBeInTheDocument();
+  });
+
+  test("validation — accommodationType=hotel sans mode de rattachement est refusé sans appeler l'API", async () => {
+    await openHebergementForm();
+    fillCommonFields();
+    addFakeImage();
+    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
+    fireEvent.change(screen.getByLabelText('Capacité maximale en adultes'), { target: { value: '2' } });
+
+    fireEvent.click(screen.getByText('Enregistrer le bien'));
+
+    expect(await screen.findByText('Sélectionnez un établissement existant ou créez-en un nouveau.')).toBeInTheDocument();
+    expect(createFullAccommodation).not.toHaveBeenCalled();
+  });
+
+  test("validation — création d'un nouvel hôtel sans nom est refusée", async () => {
+    await openHebergementForm();
+    fillCommonFields();
+    addFakeImage();
+    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
+    fireEvent.change(screen.getByLabelText('Capacité maximale en adultes'), { target: { value: '2' } });
+    fireEvent.click(screen.getByLabelText('Créer un nouvel établissement'));
+
+    fireEvent.click(screen.getByText('Enregistrer le bien'));
+
+    expect(await screen.findByText("Le nom de l'hôtel est requis.")).toBeInTheDocument();
+    expect(createFullAccommodation).not.toHaveBeenCalled();
+  });
+
+  test("un rattachement à un hôtel existant envoie hotelMode='existing' et hotelId dans le payload", async () => {
+    getHotels.mockResolvedValue([{ _id: 'HOTEL-1', name: 'Hôtel Le Panorama' }]);
+    createFullAccommodation.mockResolvedValue({
+      property: { _id: 'TEST-DATA-PROPERTY', status: 'hebergement' },
+      accommodation: { _id: 'TEST-DATA-ACC' },
+      rate: null,
+      hotel: 'HOTEL-1',
+    });
+    await openHebergementForm();
+    fillCommonFields();
+    addFakeImage();
+    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
+    fireEvent.change(screen.getByLabelText('Capacité maximale en adultes'), { target: { value: '2' } });
+    fireEvent.click(screen.getByLabelText('Sélectionner un établissement existant'));
+    const hotelSelect = await screen.findByLabelText('Établissement hôtelier');
+    await waitFor(() => expect(within(hotelSelect).getAllByRole('option').length).toBeGreaterThan(1));
+    fireEvent.change(hotelSelect, { target: { value: 'HOTEL-1' } });
+
+    fireEvent.click(screen.getByText('Enregistrer le bien'));
+
+    await waitFor(() => expect(createFullAccommodation).toHaveBeenCalledTimes(1));
+    const sentFormData = createFullAccommodation.mock.calls[0][0];
+    expect(sentFormData.get('hotelMode')).toBe('existing');
+    expect(sentFormData.get('hotelId')).toBe('HOTEL-1');
+    expect(sentFormData.get('hotelName')).toBeNull();
+  });
+
+  test("la création d'un nouvel hôtel envoie hotelMode='create' et les champs de l'établissement", async () => {
+    createFullAccommodation.mockResolvedValue({
+      property: { _id: 'TEST-DATA-PROPERTY', status: 'hebergement' },
+      accommodation: { _id: 'TEST-DATA-ACC' },
+      rate: null,
+      hotel: 'NEW-HOTEL-ID',
+    });
+    await openHebergementForm();
+    fillCommonFields();
+    addFakeImage();
+    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
+    fireEvent.change(screen.getByLabelText('Capacité maximale en adultes'), { target: { value: '2' } });
+    fireEvent.click(screen.getByLabelText('Créer un nouvel établissement'));
+    fireEvent.change(screen.getByLabelText("Nom de l'hôtel"), { target: { value: 'Hôtel Le Panorama' } });
+    fireEvent.change(screen.getByLabelText("Nombre d'étoiles"), { target: { value: '4' } });
+
+    fireEvent.click(screen.getByText('Enregistrer le bien'));
+
+    await waitFor(() => expect(createFullAccommodation).toHaveBeenCalledTimes(1));
+    const sentFormData = createFullAccommodation.mock.calls[0][0];
+    expect(sentFormData.get('hotelMode')).toBe('create');
+    expect(sentFormData.get('hotelName')).toBe('Hôtel Le Panorama');
+    expect(sentFormData.get('hotelStarRating')).toBe('4');
+    expect(sentFormData.get('hotelId')).toBeNull();
+  });
+
+  test("l'édition d'un hébergement de type hôtel précharge le mode 'existant' et l'établissement rattaché", async () => {
+    const property = {
+      _id: 'TEST-DATA-PROPERTY', title: 'TEST DATA HOTEL', status: 'hebergement',
+      price: 50000, address: { city: 'Brazzaville', arrondissement: '', neighborhood: 'Q' },
+      images: ['https://example.com/a.jpg'],
+    };
+    getAllProperties.mockResolvedValue([property]);
+    getHotels.mockResolvedValue([{ _id: 'HOTEL-1', name: 'Hôtel Le Panorama' }]);
+    getPropertyById.mockResolvedValue({
+      ...property,
+      accommodation: {
+        accommodationType: 'hotel',
+        hotel: 'HOTEL-1',
+        capacity: { maxAdults: 2 },
+        checkInTime: '14:00', checkOutTime: '11:00',
+        rates: [],
+      },
+    });
+
+    render(<ManagePropertiesPage />);
+    fireEvent.click(await screen.findByTitle('Modifier'));
+
+    await waitFor(() => expect(screen.getByLabelText("Type d'hébergement").value).toBe('hotel'));
+    await screen.findByText('Établissement hôtelier');
+    expect(screen.getByLabelText('Sélectionner un établissement existant').checked).toBe(true);
+    const hotelSelect = await screen.findByLabelText('Établissement hôtelier');
+    await waitFor(() => expect(hotelSelect.value).toBe('HOTEL-1'));
   });
 });

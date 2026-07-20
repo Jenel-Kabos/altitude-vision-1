@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useRef, useMemo, useEffect } from "react";
+import React, { useRef, useMemo, useEffect, useState } from "react";
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 
 const MapLeaflet = dynamic(() => import('./MapLeaflet'), { ssr: false });
 import { VILLES, getArrondissementsFor } from "../../constants/locations";
 import { PROPERTY_TYPES } from "../../constants/propertyTypes";
-import { ACCOMMODATION_TYPES, CANCELLATION_POLICIES } from "../../constants/accommodation";
+import { ACCOMMODATION_TYPES, LEGACY_ACCOMMODATION_TYPES, CANCELLATION_POLICIES, HOTEL_ACCOMMODATION_TYPES } from "../../constants/accommodation";
+import { getHotels } from "../../services/accommodationService";
 
 // ✅ Préfixe les URLs relatives avec l'URL du backend.
 // file.path retourne "uploads/events/photo.jpg" (sans slash ni domaine),
@@ -83,6 +84,38 @@ const PropertyForm = ({
     const calculated = Math.round(Number(formData.price) * rate);
     setFormData((prev) => ({ ...prev, honoraires: calculated }));
   }, [formData.price, formData.status, setFormData]);
+
+  // Liste des établissements pour le sélecteur "Établissement hôtelier" —
+  // chargée une seule fois dès que le type Hôtel est sélectionné (jamais pour
+  // les autres types, ni pour les formulaires propriétaire qui ne passent
+  // pas enableHebergement).
+  const [hotels, setHotels] = useState([]);
+  const [hotelsLoading, setHotelsLoading] = useState(false);
+  const isHotelType = enableHebergement && HOTEL_ACCOMMODATION_TYPES.includes(formData.accommodationType);
+
+  // Valeurs historiques (residence_meublee/bungalow) : jamais proposées à la
+  // création, mais réinjectées si c'est la valeur déjà en base pour l'annonce
+  // en cours d'édition — une sauvegarde sans changement ne doit jamais la
+  // faire disparaître silencieusement du <select>.
+  const accommodationTypeOptions = useMemo(() => {
+    const currentLegacy = LEGACY_ACCOMMODATION_TYPES.find((t) => t.value === formData.accommodationType);
+    return currentLegacy ? [...ACCOMMODATION_TYPES, currentLegacy] : ACCOMMODATION_TYPES;
+  }, [formData.accommodationType]);
+
+  useEffect(() => {
+    if (!isHotelType) return;
+    let cancelled = false;
+    setHotelsLoading(true);
+    getHotels()
+      .then((list) => { if (!cancelled) setHotels(list || []); })
+      .catch(() => { if (!cancelled) setHotels([]); })
+      .finally(() => { if (!cancelled) setHotelsLoading(false); });
+    return () => { cancelled = true; };
+  }, [isHotelType]);
+
+  const handleHotelCheckbox = (name) => (e) => {
+    setFormData((prev) => ({ ...prev, [name]: e.target.checked }));
+  };
 
   const handleChange = (e) => {
     if (e.target.name === 'honoraires') {
@@ -552,7 +585,7 @@ const PropertyForm = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                 >
                   <option value="">Sélectionner...</option>
-                  {ACCOMMODATION_TYPES.map((t) => (
+                  {accommodationTypeOptions.map((t) => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>
@@ -576,6 +609,170 @@ const PropertyForm = ({
                 </select>
               </div>
             </div>
+
+            {isHotelType && (
+              <div className="border rounded-md p-3 mb-3 bg-gray-50">
+                <h4 className="text-sm font-semibold mb-2">Établissement hôtelier</h4>
+                <p className="text-xs text-gray-500 mb-2">
+                  L'adresse, la ville, le quartier, les coordonnées GPS et les photos restent
+                  ceux du bien ci-dessus — ne pas les ressaisir ici.
+                </p>
+
+                <div className="flex gap-4 mb-3">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      name="hotelMode"
+                      value="existing"
+                      checked={formData.hotelMode === 'existing'}
+                      onChange={handleChange}
+                    />
+                    Sélectionner un établissement existant
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      name="hotelMode"
+                      value="create"
+                      checked={formData.hotelMode === 'create'}
+                      onChange={handleChange}
+                    />
+                    Créer un nouvel établissement
+                  </label>
+                </div>
+                {errors.hotelMode && <p className="text-xs text-red-600 mb-2">{errors.hotelMode}</p>}
+
+                {formData.hotelMode === 'existing' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Établissement *</label>
+                    <select
+                      name="hotelId"
+                      value={formData.hotelId || ''}
+                      onChange={handleChange}
+                      aria-label="Établissement hôtelier"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    >
+                      <option value="">
+                        {hotelsLoading ? 'Chargement…' : 'Sélectionner...'}
+                      </option>
+                      {hotels.map((h) => (
+                        <option key={h._id} value={h._id}>{h.name}</option>
+                      ))}
+                    </select>
+                    {errors.hotelId && <p className="text-xs text-red-600 mt-1">{errors.hotelId}</p>}
+                  </div>
+                )}
+
+                {formData.hotelMode === 'create' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nom de l'hôtel *</label>
+                      <input
+                        name="hotelName"
+                        value={formData.hotelName || ''}
+                        onChange={handleChange}
+                        placeholder="Ex: Hôtel Le Panorama"
+                        aria-label="Nom de l'hôtel"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      />
+                      {errors.hotelName && <p className="text-xs text-red-600 mt-1">{errors.hotelName}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                      <textarea
+                        name="hotelDescription"
+                        value={formData.hotelDescription || ''}
+                        onChange={handleChange}
+                        rows={2}
+                        aria-label="Description de l'hôtel"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Nombre d'étoiles</label>
+                        <select
+                          name="hotelStarRating"
+                          value={formData.hotelStarRating || ''}
+                          onChange={handleChange}
+                          aria-label="Nombre d'étoiles"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        >
+                          <option value="">Non renseigné</option>
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
+                        {errors.hotelStarRating && <p className="text-xs text-red-600 mt-1">{errors.hotelStarRating}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+                        <input
+                          name="hotelPhone"
+                          value={formData.hotelPhone || ''}
+                          onChange={handleChange}
+                          aria-label="Téléphone de l'hôtel"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input
+                          name="hotelEmail"
+                          type="email"
+                          value={formData.hotelEmail || ''}
+                          onChange={handleChange}
+                          aria-label="Email de l'hôtel"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        />
+                        {errors.hotelEmail && <p className="text-xs text-red-600 mt-1">{errors.hotelEmail}</p>}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Site web</label>
+                      <input
+                        name="hotelWebsite"
+                        value={formData.hotelWebsite || ''}
+                        onChange={handleChange}
+                        aria-label="Site web de l'hôtel"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Services proposés</label>
+                      <input
+                        name="hotelServices"
+                        value={formData.hotelServices || ''}
+                        onChange={handleChange}
+                        placeholder="Ex: Piscine, Wifi, Climatisation (séparés par des virgules)"
+                        aria-label="Services de l'hôtel"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+                      />
+                    </div>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(formData.hotelHasRestaurant)}
+                          onChange={handleHotelCheckbox('hotelHasRestaurant')}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        Restaurant sur place
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(formData.hotelHasReception)}
+                          onChange={handleHotelCheckbox('hotelHasReception')}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        Réception 24h/24
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-3 gap-3 mb-3">
               <div>
