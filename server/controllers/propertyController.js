@@ -88,6 +88,42 @@ const parseNonNegativeAmount = (value, fallback) => {
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
 };
 
+/**
+ * Reconstruit l'adresse à partir du body — supporte à la fois un champ
+ * `address` JSON (string ou objet déjà parsé) et les champs à plat
+ * `address[street]`, `address[arrondissement]`… (FormData multipart).
+ * Extrait de createProperty pour être réutilisable (ex : création admin
+ * d'un hébergement complet — voir accommodationController.createFull).
+ */
+const parseAddress = (req) => {
+  const { address } = req.body;
+  let addressData = {};
+  if (typeof address === 'string') {
+    try { addressData = JSON.parse(address); }
+    catch (e) { addressData = address || {}; }
+  } else {
+    addressData = address || {};
+  }
+  return {
+    arrondissement: addressData.arrondissement || req.body['address[arrondissement]'],
+    neighborhood:   addressData.neighborhood || req.body['address[neighborhood]'],
+    street:         addressData.street || req.body['address[street]'],
+    city:           addressData.city || req.body['address[city]'] || 'Brazzaville',
+  };
+};
+
+/**
+ * Parse le champ `location` (GeoJSON, string ou objet) — retourne `undefined`
+ * si absent/invalide plutôt que de faire planter la création.
+ */
+const parseGeoLocation = (location) => {
+  if (!location) return undefined;
+  if (typeof location === 'string') {
+    try { return JSON.parse(location); } catch (e) { return undefined; }
+  }
+  return location;
+};
+
 // ============================================================
 // 🎮 CONTRÔLEURS PRINCIPAUX
 // ============================================================
@@ -109,7 +145,7 @@ const createProperty = asyncHandler(async (req, res, next) => {
     surface, bedrooms, bathrooms, amenities,
     livingRooms, kitchens, constructionType, cautionMultiplicateur,
     profilsLocataireRecherches, documentsRequis,
-    longitude, latitude, address, location, honoraires, fraisVisite
+    location, honoraires, fraisVisite
   } = req.body;
 
   const parsedHonoraires = parseNonNegativeAmount(honoraires, null);
@@ -121,30 +157,11 @@ const createProperty = asyncHandler(async (req, res, next) => {
   }
 
   // 3. Parsing de l'adresse
-  let addressData = {};
-  if (typeof address === 'string') {
-    try { addressData = JSON.parse(address); }
-    catch (e) { addressData = address || {}; }
-  } else {
-    addressData = address || {};
-  }
-
-  const finalAddress = {
-    arrondissement: addressData.arrondissement || req.body['address[arrondissement]'],
-    neighborhood:   addressData.neighborhood || req.body['address[neighborhood]'],
-    street:         addressData.street || req.body['address[street]'],
-    city:           addressData.city || req.body['address[city]'] || 'Brazzaville'
-  };
+  const finalAddress = parseAddress(req);
 
   // 4. Parsing de la Location (GeoJSON)
-  let finalLocation = undefined;
-  if (location) {
-    if (typeof location === 'string') {
-      try { finalLocation = JSON.parse(location); } catch (e) {}
-    } else {
-      finalLocation = location;
-    }
-  }
+  const finalLocation = parseGeoLocation(location);
+  const { longitude, latitude } = req.body;
 
   // 5. Création en base
   const newProperty = await Property.create({
@@ -817,4 +834,12 @@ module.exports = {
   toggleLike,
   incrementShare,
   addPropertyReview,
+  // Helpers réutilisés par accommodationController (création admin complète
+  // d'un hébergement) — évite de dupliquer la logique d'upload/parsing.
+  uploadFilesToCloudinary,
+  parseAmenities,
+  parseStringArray,
+  parseNonNegativeAmount,
+  parseAddress,
+  parseGeoLocation,
 };

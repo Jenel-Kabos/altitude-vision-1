@@ -50,3 +50,27 @@ export const upsertAccommodationRate = async (id, data) => {
 export const deactivateAccommodationRate = async (id, rateId) => {
   await api.delete(`/accommodations/${id}/rate-plans/${rateId}`);
 };
+
+// ── Dashboard admin — création/édition complète Property+Accommodation+RatePlan ──
+
+/**
+ * Crée un hébergement complet (Property + Accommodation + RatePlan optionnel)
+ * depuis le dashboard admin, en un seul appel atomique côté backend.
+ * @param {FormData} formData
+ * @returns {Promise<{property, accommodation, rate}>}
+ */
+export const createFullAccommodation = async (formData) => {
+  const res = await api.post('/accommodations/admin', formData);
+  return res.data.data;
+};
+
+/**
+ * Met à jour un hébergement complet existant (Property + Accommodation +
+ * tarif nightly optionnel) depuis le dashboard admin.
+ * @param {string} propertyId
+ * @param {FormData} formData
+ */
+export const updateFullAccommodation = async (propertyId, formData) => {
+  const res = await api.put(`/accommodations/admin/${propertyId}`, formData);
+  return res.data.data;
+};

@@ -38,6 +38,42 @@ hébergement n'est visible publiquement que si les DEUX conditions sont réunies
 sur l'Accommodation (type, capacité, horaires) **et** sur la Property (bedrooms,
 bathrooms > 0) — voir `evaluateReadiness(accommodation, property)`.
 
+## Création/édition depuis le dashboard admin
+
+`POST /api/accommodations/admin` et `PUT /api/accommodations/admin/:propertyId`
+(rôles `ROLES_ALTIMMO` : Admin, Collaborateur, GestionnaireImmobilier,
+CommunityManager) créent/mettent à jour **en un seul appel** les trois entités
+(Property + Accommodation + RatePlan nightly optionnel) depuis
+`ManagePropertiesPage.jsx` (formulaire admin, `PropertyForm.jsx` avec le prop
+`enableHebergement`). `Property.status` est toujours forcé à `'hebergement'`
+côté serveur, jamais accepté depuis le client.
+
+**Différence avec la création propriétaire** : le flux propriétaire
+(`POST /api/accommodations`, `/mes-hebergements`) reste en 2 étapes — créer la
+Property via le formulaire générique, puis configurer l'Accommodation
+séparément. Le flux admin fait les deux en une seule requête, pour permettre
+à un admin de créer un hébergement complet pour le compte d'un tiers sans
+allers-retours.
+
+**Payload** (multipart) : champs Property identiques à `POST /api/properties`,
+plus `accommodationType`, `capacity[maxAdults]`, `capacity[maxChildren]`,
+`beds`, `checkInTime`/`checkOutTime` (format `HH:MM` strict), `minimumStay`/
+`maximumStay`, `cancellationPolicy`, `houseRules`, `securityDeposit`,
+`cleaningFee`, et `nightlyPrice` (optionnel — aucun RatePlan créé si absent).
+
+**Compensation** (pas de transaction MongoDB — aucun précédent dans ce
+codebase) : si Accommodation échoue après la création de Property, Property
+est supprimé ; si RatePlan échoue après Accommodation, les deux sont
+supprimés. Les images déjà uploadées vers Cloudinary sont aussi nettoyées
+dans ces deux cas. Toute valeur numérique/horaire invalide (NaN, format
+horaire incorrect, `maximumStay < minimumStay`) est rejetée en 422 **avant**
+tout accès base — voir `parseNumericField`/`parseTimeField` dans
+`accommodationController.js`.
+
+En édition, l'Accommodation existante est mise à jour (jamais dupliquée) et
+un nouveau tarif nightly désactive l'ancien plutôt que d'en créer un doublon
+— même convention que `upsertRate`.
+
 ## Limitations actuelles
 
 - Filtrage de visibilité en listing public (`getAllProperties`) appliqué **après**

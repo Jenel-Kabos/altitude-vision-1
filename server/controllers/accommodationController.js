@@ -3,12 +3,24 @@ const mongoose = require('mongoose');
 const Accommodation = require('../models/Accommodation');
 const RatePlan = require('../models/RatePlan');
 const Property = require('../models/Property');
-const { evaluateReadiness, serializeAccommodation } = require('../services/accommodationService');
+const {
+  evaluateReadiness, serializeAccommodation,
+  createFullAccommodation, updateFullAccommodation,
+} = require('../services/accommodationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { notify } = require('../services/notificationService');
+const {
+  uploadFilesToCloudinary, parseAmenities, parseStringArray,
+  parseNonNegativeAmount, parseAddress, parseGeoLocation,
+} = require('./propertyController');
+const { destroyFromCloudinary } = require('../config/cloudinary');
 
 const fail = (res, statusCode, message, extra = {}) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...extra });
+
+/** Best-effort : n'interrompt jamais la réponse d'erreur en cours. */
+const cleanupUploadedImages = (images = []) =>
+  Promise.all(images.map((url) => destroyFromCloudinary(url))).catch(() => {});
 
 // bedrooms/bathrooms/amenities sont volontairement absents : Property reste
 // leur unique source de vérité (voir Accommodation.js et accommodationService.js).
@@ -20,6 +32,148 @@ const ALLOWED_FIELDS = [
 
 async function getActiveRates(accommodationId) {
   return RatePlan.find({ accommodation: accommodationId, active: true }).sort({ mode: 1 });
+}
+
+/**
+ * Convertit vers un nombre fini, ou lève une erreur 422 explicite si la
+ * valeur fournie n'est pas vide mais n'est pas un nombre valide — jamais de
+ * NaN silencieux propagé jusqu'au schéma Mongoose (ex : "abc" en capacité).
+ * Une valeur vide/absente retourne `undefined` (champ non fourni).
+ */
+function parseNumericField(value, label) {
+  if (value === undefined || value === null || value === '') return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    const err = new Error(`${label} doit être un nombre valide.`);
+    err.statusCode = 422;
+    throw err;
+  }
+  return n;
+}
+
+/** Format "HH:MM" strict (24h) — même contrainte que le type `time` HTML5. */
+const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+function parseTimeField(value, label) {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (!TIME_RE.test(value)) {
+    const err = new Error(`${label} doit être au format HH:MM (ex : 14:00).`);
+    err.statusCode = 422;
+    throw err;
+  }
+  return value;
+}
+
+/**
+ * `capacity` peut arriver en JSON (`capacity: '{"maxAdults":4}'`) ou en champs
+ * à plat FormData (`capacity[maxAdults]`, `capacity[maxChildren]`) — même
+ * stratégie que parseAddress côté propertyController.
+ */
+function parseCapacity(req) {
+  const { capacity } = req.body;
+  let data = {};
+  if (typeof capacity === 'string') {
+    try { data = JSON.parse(capacity); } catch (e) { data = {}; }
+  } else if (capacity && typeof capacity === 'object') {
+    data = capacity;
+  }
+  const maxAdults = parseNumericField(data.maxAdults ?? req.body['capacity[maxAdults]'], 'La capacité (adultes)');
+  const maxChildren = parseNumericField(data.maxChildren ?? req.body['capacity[maxChildren]'], 'La capacité (enfants)');
+  const out = {};
+  if (maxAdults !== undefined) out.maxAdults = maxAdults;
+  if (maxChildren !== undefined) out.maxChildren = maxChildren;
+  return out;
+}
+
+/** Construit le payload Accommodation (ALLOWED_FIELDS) à partir du body admin. */
+function buildAccommodationData(req) {
+  const {
+    accommodationType, furnished, beds, checkInTime, checkOutTime,
+    minimumStay, maximumStay, houseRules, cancellationPolicy,
+    securityDeposit, cleaningFee, currency,
+  } = req.body;
+
+  const data = { accommodationType };
+  const capacity = parseCapacity(req);
+  if (Object.keys(capacity).length > 0) data.capacity = capacity;
+  if (furnished !== undefined) data.furnished = furnished === 'true' || furnished === true;
+  const parsedBeds = parseNumericField(beds, 'Le nombre de lits');
+  if (parsedBeds !== undefined) data.beds = parsedBeds;
+  const parsedCheckIn = parseTimeField(checkInTime, 'Le check-in');
+  if (parsedCheckIn !== undefined) data.checkInTime = parsedCheckIn;
+  const parsedCheckOut = parseTimeField(checkOutTime, 'Le check-out');
+  if (parsedCheckOut !== undefined) data.checkOutTime = parsedCheckOut;
+  const parsedMinStay = parseNumericField(minimumStay, 'La durée minimale du séjour');
+  if (parsedMinStay !== undefined) data.minimumStay = parsedMinStay;
+  const parsedMaxStay = parseNumericField(maximumStay, 'La durée maximale du séjour');
+  if (parsedMaxStay !== undefined) data.maximumStay = parsedMaxStay;
+  if (parsedMinStay !== undefined && parsedMaxStay !== undefined && parsedMaxStay < parsedMinStay) {
+    const err = new Error('La durée maximale du séjour doit être supérieure ou égale à la durée minimale.');
+    err.statusCode = 422;
+    throw err;
+  }
+  if (houseRules !== undefined) data.houseRules = parseStringArray(houseRules);
+  if (cancellationPolicy) data.cancellationPolicy = cancellationPolicy;
+  const parsedDeposit = parseNumericField(securityDeposit, 'La caution de séjour');
+  if (parsedDeposit !== undefined) data.securityDeposit = parsedDeposit;
+  const parsedCleaning = parseNumericField(cleaningFee, 'Les frais de ménage');
+  if (parsedCleaning !== undefined) data.cleaningFee = parsedCleaning;
+  if (currency) data.currency = currency;
+  return data;
+}
+
+/** Construit le payload RatePlan (nightly) — `null` si aucun tarif fourni. */
+function buildRateData(req) {
+  const { nightlyPrice, rateCurrency } = req.body;
+  const amount = parseNumericField(nightlyPrice, 'Le prix par nuit');
+  if (amount === undefined) return null;
+  return { mode: 'nightly', amount, currency: rateCurrency || undefined };
+}
+
+/** Construit le payload Property (mêmes champs que propertyController.createProperty). */
+async function buildPropertyData(req, ownerId) {
+  const {
+    title, description, price, pole, availability, type,
+    surface, bedrooms, bathrooms, amenities,
+    livingRooms, kitchens, constructionType,
+    location, honoraires, fraisVisite, longitude, latitude,
+  } = req.body;
+
+  const parsedHonoraires = parseNonNegativeAmount(honoraires, null);
+  const parsedFraisVisite = parseNonNegativeAmount(fraisVisite, 0);
+  if ((honoraires !== undefined && honoraires !== '' && parsedHonoraires === null)
+    || (fraisVisite !== undefined && fraisVisite !== '' && parsedFraisVisite === null)) {
+    const err = new Error('Les honoraires et frais de visite doivent être des montants positifs ou nuls.');
+    err.statusCode = 422;
+    throw err;
+  }
+
+  const imagePaths = await uploadFilesToCloudinary(req.files);
+
+  return {
+    owner: ownerId,
+    title,
+    description,
+    price: parseFloat(price),
+    honoraires: parsedHonoraires,
+    fraisVisite: parsedFraisVisite,
+    pole: pole || 'Altimmo',
+    status: 'hebergement', // forcé — jamais accepté depuis le client
+    availability: availability || 'Disponible',
+    type,
+    address: parseAddress(req),
+    surface: parseFloat(surface),
+    bedrooms: parseInt(bedrooms || 0),
+    bathrooms: parseInt(bathrooms || 0),
+    livingRooms: parseInt(livingRooms || 0),
+    kitchens: parseInt(kitchens || 0),
+    constructionType,
+    amenities: parseAmenities(amenities),
+    longitude,
+    latitude,
+    location: parseGeoLocation(location),
+    images: imagePaths,
+    statusAdmin: 'En attente',
+  };
 }
 
 // ─────────────────────────────────────────────
@@ -307,6 +461,178 @@ exports.deactivateRate = async (req, res) => {
     );
     if (!rate) return fail(res, 404, 'Tarif introuvable.');
     res.json({ status: 'success', data: { rate } });
+  } catch (error) {
+    fail(res, 500, error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// POST /api/accommodations/admin — staff (ROLES_ALTIMMO) crée un hébergement
+// complet en un seul appel : Property + Accommodation + RatePlan optionnel.
+// Restriction de rôle appliquée par le middleware de route (voir
+// accommodationRoutes.js) — jamais uniquement côté frontend.
+// ─────────────────────────────────────────────
+exports.createFull = async (req, res) => {
+  try {
+    const { accommodationType, owner } = req.body;
+    if (!accommodationType || !Accommodation.ACCOMMODATION_TYPES.includes(accommodationType)) {
+      return fail(res, 422, "Type d'hébergement invalide ou manquant.");
+    }
+    const ownerId = mongoose.isValidObjectId(owner) ? owner : req.user.id;
+
+    let propertyData;
+    try {
+      propertyData = await buildPropertyData(req, ownerId);
+    } catch (error) {
+      return fail(res, error.statusCode || 422, error.message);
+    }
+    if (!propertyData.title || !propertyData.description || !Number.isFinite(propertyData.price)) {
+      return fail(res, 422, 'Titre, description et prix sont obligatoires.');
+    }
+
+    let accommodationData;
+    let rateData;
+    try {
+      accommodationData = buildAccommodationData(req);
+      rateData = buildRateData(req);
+    } catch (error) {
+      // Property n'est pas encore créé (aucun document à compenser), mais les
+      // images ont déjà pu être uploadées vers Cloudinary — on les nettoie.
+      await cleanupUploadedImages(propertyData.images);
+      return fail(res, error.statusCode || 422, error.message);
+    }
+
+    let result;
+    try {
+      result = await createFullAccommodation({
+        propertyData, accommodationData, rateData, actingUser: req.user,
+      });
+    } catch (error) {
+      return fail(res, error.statusCode || 500, error.message);
+    }
+
+    logAction({
+      action: 'Hébergement créé (admin)',
+      description: `"${result.property.title}" créé depuis le dashboard admin`,
+      module: 'Altimmo',
+      typeAction: 'CREATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(result.property._id), type: 'Property', nom: result.property.title },
+      req,
+    });
+
+    res.status(201).json({
+      status: 'success',
+      data: {
+        property: result.property,
+        accommodation: serializeAccommodation(result.accommodation, result.rate ? [result.rate] : []),
+        rate: result.rate,
+      },
+    });
+  } catch (error) {
+    fail(res, 500, error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// PUT /api/accommodations/admin/:propertyId — staff met à jour un hébergement
+// complet existant (Property + Accommodation + tarif nightly).
+// ─────────────────────────────────────────────
+exports.updateFull = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.propertyId)) return fail(res, 400, 'Identifiant invalide.');
+    const property = await Property.findById(req.params.propertyId);
+    if (!property) return fail(res, 404, 'Bien introuvable.');
+    if (property.status !== 'hebergement') {
+      return fail(res, 422, "Ce bien n'est pas de type hébergement.");
+    }
+
+    const { accommodationType } = req.body;
+    if (accommodationType && !Accommodation.ACCOMMODATION_TYPES.includes(accommodationType)) {
+      return fail(res, 422, "Type d'hébergement invalide.");
+    }
+
+    // Validé AVANT toute mutation de `property` : si les champs Accommodation/
+    // RatePlan sont invalides, on ne veut pas avoir déjà persisté une partie
+    // de la mise à jour Property (évite un état incohérent mi-modifié).
+    let accommodationData;
+    let rateData;
+    try {
+      accommodationData = buildAccommodationData(req);
+      if (!accommodationData.accommodationType) delete accommodationData.accommodationType;
+      rateData = buildRateData(req);
+    } catch (error) {
+      return fail(res, error.statusCode || 422, error.message);
+    }
+
+    // Champs Property (mêmes noms que createProperty) — mise à jour directe,
+    // sans upload si aucune nouvelle image n'est fournie.
+    const {
+      title, description, price, availability, type,
+      surface, bedrooms, bathrooms, amenities,
+      livingRooms, kitchens, constructionType,
+      location, honoraires, fraisVisite, longitude, latitude, existingImages,
+    } = req.body;
+
+    if (title !== undefined) property.title = title;
+    if (description !== undefined) property.description = description;
+    if (price !== undefined && price !== '') property.price = parseFloat(price);
+    if (availability) property.availability = availability;
+    if (type) property.type = type;
+    if (surface !== undefined && surface !== '') property.surface = parseFloat(surface);
+    if (bedrooms !== undefined && bedrooms !== '') property.bedrooms = parseInt(bedrooms);
+    if (bathrooms !== undefined && bathrooms !== '') property.bathrooms = parseInt(bathrooms);
+    if (livingRooms !== undefined && livingRooms !== '') property.livingRooms = parseInt(livingRooms);
+    if (kitchens !== undefined && kitchens !== '') property.kitchens = parseInt(kitchens);
+    if (constructionType) property.constructionType = constructionType;
+    if (amenities !== undefined) property.amenities = parseAmenities(amenities);
+    if (longitude !== undefined) property.longitude = longitude;
+    if (latitude !== undefined) property.latitude = latitude;
+    if (location) property.location = parseGeoLocation(location);
+    if (req.body.address) property.address = parseAddress(req);
+    if (honoraires !== undefined) {
+      const parsed = parseNonNegativeAmount(honoraires, null);
+      if (honoraires !== '' && parsed === null) return fail(res, 422, 'Honoraires invalides.');
+      property.honoraires = parsed;
+    }
+    if (fraisVisite !== undefined) {
+      const parsed = parseNonNegativeAmount(fraisVisite, 0);
+      if (fraisVisite !== '' && parsed === null) return fail(res, 422, 'Frais de visite invalides.');
+      property.fraisVisite = parsed;
+    }
+
+    const newImages = await uploadFilesToCloudinary(req.files);
+    if (newImages.length > 0) {
+      const kept = existingImages ? parseStringArray(existingImages) : [];
+      property.images = [...kept, ...newImages];
+    } else if (existingImages !== undefined) {
+      property.images = parseStringArray(existingImages);
+    }
+
+    await property.save();
+
+    const result = await updateFullAccommodation({
+      property, accommodationData, rateData, actingUser: req.user,
+    });
+
+    logAction({
+      action: 'Hébergement modifié (admin)',
+      description: `"${property.title}" modifié depuis le dashboard admin`,
+      module: 'Altimmo',
+      typeAction: 'MODIFICATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(property._id), type: 'Property', nom: property.title },
+      req,
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        property,
+        accommodation: serializeAccommodation(result.accommodation, result.rate ? [result.rate] : []),
+        rate: result.rate,
+      },
+    });
   } catch (error) {
     fail(res, 500, error.message);
   }
