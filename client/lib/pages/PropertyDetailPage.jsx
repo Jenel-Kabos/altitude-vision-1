@@ -23,6 +23,12 @@ import Breadcrumb from '../components/Breadcrumb';
 import ContactModal from '../components/ContactModal';
 import SignalerAnnonceModal from '../components/SignalerAnnonceModal';
 import { formatCurrencyXAF, propertyDetailError } from '../utils/normalizePropertyDetail';
+import { INCLUDED_SERVICES, CANCELLATION_POLICIES } from '../constants/accommodation';
+
+// Sprint B1 — labels partagés pour les services inclus / politique
+// d'annulation affichés sur la fiche publique.
+const ACCOMMODATION_INCLUDED_SERVICE_LABELS = INCLUDED_SERVICES.map(({ key, label }) => ({ key, label }));
+const ACCOMMODATION_CANCELLATION_LABELS = Object.fromEntries(CANCELLATION_POLICIES.map((p) => [p.value, p.label]));
 
 // ─── Design tokens ─────────────────────────────────────────────
 const BLUE      = '#2E7BB5';
@@ -1234,6 +1240,55 @@ const PropertyDetailPage = () => {
                   ))}
                 </div>
             </motion.div>}
+
+            {/* Sprint B1 — Équipements structurés, services inclus et règles
+                de l'hébergement (uniquement si un profil Accommodation existe :
+                déjà présent dans la réponse publique de propertyController.getOne,
+                aucun nouvel appel réseau nécessaire). */}
+            {accommodation && (accommodation.amenities && Object.values(accommodation.amenities).some((l) => l?.length)) && (
+              <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} className="pdp-card">
+                <div className="pdp-card-title">Équipements de l'hébergement</div>
+                <div className="pdp-tags-wrap">
+                  {Object.values(accommodation.amenities).flat().map((a, i) => (
+                    <span key={i} className="pdp-tag"><Check size={10} color={GOLD} /> {a}</span>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {accommodation && accommodation.includedServices && Object.values(accommodation.includedServices).some(Boolean) && (
+              <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} className="pdp-card">
+                <div className="pdp-card-title">Services inclus</div>
+                <div className="pdp-tags-wrap">
+                  {ACCOMMODATION_INCLUDED_SERVICE_LABELS
+                    .filter(({ key }) => accommodation.includedServices[key])
+                    .map(({ key, label }) => (
+                      <span key={key} className="pdp-tag"><Check size={10} color={GOLD} /> {label}</span>
+                    ))}
+                </div>
+              </motion.div>
+            )}
+
+            {accommodation && (accommodation.rules || accommodation.houseRules?.length > 0) && (
+              <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} className="pdp-card">
+                <div className="pdp-card-title">Règles de la maison</div>
+                <div className="pdp-tags-wrap">
+                  <span className="pdp-tag">{accommodation.rules?.petsAllowed ? 'Animaux acceptés' : 'Animaux non acceptés'}</span>
+                  <span className="pdp-tag">{accommodation.rules?.partiesAllowed ? 'Fêtes autorisées' : 'Fêtes non autorisées'}</span>
+                  <span className="pdp-tag">{accommodation.rules?.smokingAllowed ? 'Fumeur autorisé' : 'Non fumeur'}</span>
+                  <span className="pdp-tag">{accommodation.rules?.childrenAllowed !== false ? 'Enfants acceptés' : 'Enfants non acceptés'}</span>
+                  {accommodation.rules?.minimumAge > 0 && <span className="pdp-tag">Âge minimum : {accommodation.rules.minimumAge} ans</span>}
+                </div>
+                {accommodation.houseRules?.length > 0 && (
+                  <p className="mt-2 text-sm" style={{ color: INK_SOFT }}>{accommodation.houseRules.join(', ')}</p>
+                )}
+                {accommodation.cancellationPolicy && (
+                  <p className="mt-1 text-sm" style={{ color: INK_SOFT }}>
+                    Politique d'annulation : {ACCOMMODATION_CANCELLATION_LABELS[accommodation.cancellationPolicy] || accommodation.cancellationPolicy}
+                  </p>
+                )}
+              </motion.div>
+            )}
 
             {/* Localisation générale */}
             {locationParts.length > 0 && (

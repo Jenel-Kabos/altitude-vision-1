@@ -58,7 +58,9 @@ function evaluateReadiness(accommodation, property) {
  * Un hébergement est visible publiquement seulement si :
  *  - Property est publiable selon les règles EXISTANTES (statusAdmin
  *    'Validée' + availability 'Disponible') — inchangé, jamais réévalué ici ;
- *  - Accommodation.publicationStatus === 'publie'.
+ *  - Accommodation.publicationStatus === 'publie' ;
+ *  - Accommodation.active !== false (Sprint B1 : levier de désactivation
+ *    temporaire du propriétaire, sans perte du statut 'publie').
  * Vente/Location ne passent jamais par cette fonction — leur visibilité
  * reste 100% gouvernée par Property seul, comme avant ce sprint.
  */
@@ -67,7 +69,64 @@ function isPubliclyVisible(property, accommodation) {
     return false;
   }
   if (property.status !== 'hebergement') return true; // règle Vente/Location inchangée
-  return accommodation?.publicationStatus === 'publie';
+  return accommodation?.publicationStatus === 'publie' && accommodation?.active !== false;
+}
+
+// Sprint B1 — score de complétude. Chaque catégorie vaut un poids fixe
+// (somme = 100) et est "acquise" en tout-ou-rien (pas de fraction partielle
+// dans ce sprint — plus simple à auditer/tester, et suffisant pour bloquer
+// la publication d'une annonce manifestement incomplète).
+const COMPLETION_WEIGHTS = {
+  informations: 20,
+  photos: 20,
+  tarifs: 20,
+  equipements: 20,
+  regles: 10,
+  services: 10,
+};
+
+function hasAnyAmenity(amenities) {
+  if (!amenities) return false;
+  return Object.values(amenities).some((list) => Array.isArray(list) && list.length > 0);
+}
+
+function hasAnyIncludedService(services) {
+  if (!services) return false;
+  return Object.values(services).some(Boolean);
+}
+
+/**
+ * Calcule le score de complétude d'un hébergement (0-100) + le détail par
+ * catégorie, utilisé pour bloquer la publication (voir reviewDecision) et
+ * pour l'affichage en dashboard/modération.
+ * @param {object} accommodation — document Accommodation (ou plain object)
+ * @param {object} property — Property lié (bedrooms/bathrooms/title/description/images)
+ * @param {Array} rates — tarifs actifs (au moins un requis pour la catégorie "tarifs")
+ */
+function computeCompletionScore(accommodation, property, rates = []) {
+  const informationsOk = Boolean(property?.title)
+    && Boolean(property?.description)
+    && Boolean(accommodation?.accommodationType)
+    && Number(accommodation?.capacity?.maxAdults) > 0
+    && Number.isFinite(property?.bedrooms)
+    && Number(property?.bathrooms) > 0;
+
+  const photosOk = (property?.images?.length || 0) >= 3;
+  const tarifsOk = (rates || []).some((rate) => rate.active !== false && Number(rate.amount) > 0);
+  const equipementsOk = hasAnyAmenity(accommodation?.amenities);
+  const reglesOk = Boolean(accommodation?.checkInTime) && Boolean(accommodation?.checkOutTime);
+  const servicesOk = hasAnyIncludedService(accommodation?.includedServices);
+
+  const breakdown = {
+    informations: informationsOk ? COMPLETION_WEIGHTS.informations : 0,
+    photos: photosOk ? COMPLETION_WEIGHTS.photos : 0,
+    tarifs: tarifsOk ? COMPLETION_WEIGHTS.tarifs : 0,
+    equipements: equipementsOk ? COMPLETION_WEIGHTS.equipements : 0,
+    regles: reglesOk ? COMPLETION_WEIGHTS.regles : 0,
+    services: servicesOk ? COMPLETION_WEIGHTS.services : 0,
+  };
+  const score = Object.values(breakdown).reduce((sum, v) => sum + v, 0);
+  return { score, breakdown, complete: score === 100 };
 }
 
 function serializeAccommodation(doc, rates = []) {
@@ -302,8 +361,131 @@ async function updateFullAccommodation({ property, accommodationData, rateData, 
   return { property, accommodation, rate, hotelOrphaned };
 }
 
+/**
+ * Duplique un hébergement (Property + Accommodation + tarifs actifs) pour le
+ * propriétaire : la copie repart systématiquement en 'brouillon' — jamais
+ * publiée automatiquement — pour repasser par la modération. Les images
+ * Cloudinary sont réutilisées telles quelles (mêmes URLs, aucun nouvel
+ * upload : conforme à "Ne pas modifier Cloudinary").
+ */
+async function duplicateAccommodation({ accommodation, property, actingUser }) {
+  const clonedProperty = await Property.create({
+    owner: property.owner,
+    title: `${property.title} (copie)`,
+    description: property.description,
+    price: property.price,
+    honoraires: property.honoraires,
+    fraisVisite: property.fraisVisite,
+    status: 'hebergement',
+    availability: property.availability,
+    type: property.type,
+    surface: property.surface,
+    bedrooms: property.bedrooms,
+    bathrooms: property.bathrooms,
+    livingRooms: property.livingRooms,
+    kitchens: property.kitchens,
+    constructionType: property.constructionType,
+    amenities: property.amenities,
+    images: property.images,
+    address: property.address,
+    location: property.location,
+    longitude: property.longitude,
+    latitude: property.latitude,
+    statusAdmin: 'En attente',
+  });
+
+  const clonedAccommodation = await Accommodation.create({
+    property: clonedProperty._id,
+    accommodationType: accommodation.accommodationType,
+    hotel: accommodation.hotel,
+    furnished: accommodation.furnished,
+    capacity: accommodation.capacity,
+    beds: accommodation.beds,
+    checkInTime: accommodation.checkInTime,
+    checkOutTime: accommodation.checkOutTime,
+    minimumStay: accommodation.minimumStay,
+    maximumStay: accommodation.maximumStay,
+    amenities: accommodation.amenities,
+    rules: accommodation.rules,
+    houseRules: accommodation.houseRules,
+    includedServices: accommodation.includedServices,
+    gallery: accommodation.gallery,
+    cancellationPolicy: accommodation.cancellationPolicy,
+    securityDeposit: accommodation.securityDeposit,
+    cleaningFee: accommodation.cleaningFee,
+    currency: accommodation.currency,
+    createdBy: actingUser.id,
+  });
+
+  const activeRates = await RatePlan.find({ accommodation: accommodation._id, active: true });
+  const clonedRates = await Promise.all(activeRates.map((rate) => RatePlan.create({
+    accommodation: clonedAccommodation._id,
+    mode: rate.mode,
+    amount: rate.amount,
+    currency: rate.currency,
+    createdBy: actingUser.id,
+  })));
+
+  return { property: clonedProperty, accommodation: clonedAccommodation, rates: clonedRates };
+}
+
+/**
+ * Supprime intégralement un hébergement : Accommodation, ses RatePlan, le
+ * Property porteur et ses images Cloudinary. Best-effort sur les
+ * compensations Cloudinary (voir cleanupImages) — ne bloque jamais la
+ * suppression métier si Cloudinary est indisponible.
+ */
+async function deleteAccommodation({ accommodation, property }) {
+  await RatePlan.deleteMany({ accommodation: accommodation._id });
+  await Accommodation.findByIdAndDelete(accommodation._id);
+  await Property.findByIdAndDelete(property._id);
+  await cleanupImages(property.images);
+}
+
+/**
+ * Liste paginée pour le dashboard admin ("Tous les hébergements") — filtrage
+ * par statut de publication, type, recherche texte (titre du Property via
+ * agrégation légère), tri et pagination. Reste séparé de
+ * `ManagePropertiesPage`/`getAllProperties` (générique Vente/Location/
+ * Hébergement) car les statuts filtrés ici (brouillon/soumis/publié/
+ * suspendu/rejeté) sont propres à Accommodation, pas à Property.statusAdmin.
+ */
+async function listAccommodationsForAdmin({ status, type, search, sort, page = 1, limit = 20 }) {
+  const query = {};
+  if (status && status !== 'tous') query.publicationStatus = status;
+  if (type && type !== 'tous') query.accommodationType = type;
+
+  let accommodationsQuery = Accommodation.find(query).populate({
+    path: 'property',
+    select: 'title images address owner bedrooms bathrooms price statusAdmin availability',
+    ...(search ? { match: { title: new RegExp(search, 'i') } } : {}),
+  });
+
+  const sortMap = {
+    recent: { updatedAt: -1 },
+    ancien: { updatedAt: 1 },
+    prix_asc: { updatedAt: -1 }, // le prix vit sur Property — tri appliqué après population si demandé
+    prix_desc: { updatedAt: -1 },
+  };
+  accommodationsQuery = accommodationsQuery.sort(sortMap[sort] || sortMap.recent);
+
+  let accommodations = await accommodationsQuery;
+  if (search) accommodations = accommodations.filter((acc) => acc.property); // match null → exclu
+
+  if (sort === 'prix_asc') accommodations.sort((a, b) => (a.property?.price || 0) - (b.property?.price || 0));
+  if (sort === 'prix_desc') accommodations.sort((a, b) => (b.property?.price || 0) - (a.property?.price || 0));
+
+  const total = accommodations.length;
+  const start = (Math.max(1, Number(page) || 1) - 1) * (Number(limit) || 20);
+  const paged = accommodations.slice(start, start + (Number(limit) || 20));
+
+  return { accommodations: paged, total, page: Number(page) || 1, limit: Number(limit) || 20 };
+}
+
 module.exports = {
   evaluateReadiness, isPubliclyVisible, serializeAccommodation,
   createFullAccommodation, updateFullAccommodation, hasValidInitialRate,
+  computeCompletionScore, duplicateAccommodation, deleteAccommodation,
+  listAccommodationsForAdmin,
   ACCOMMODATION_REQUIRED_FIELDS, PROPERTY_REQUIRED_FIELDS,
 };

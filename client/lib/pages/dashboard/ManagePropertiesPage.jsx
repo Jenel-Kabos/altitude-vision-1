@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { getAllProperties, getPropertyById, deleteProperty, updateProperty, addProperty, toggleRecommande } from "../../services/propertyService";
 import { createFullAccommodation, updateFullAccommodation } from "../../services/accommodationService";
@@ -8,35 +9,31 @@ import { useAuth } from '../../context/AuthContext';
 import {
   PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle,
   ArrowLeft, ArrowRight, Building2, MapPin, Maximize2, Bed, Bath, Sparkles, Send,
-  Landmark, Key,
 } from "lucide-react";
 import PropertyForm from "../../components/dashboard/PropertyForm";
 import SalePropertyForm from "../../components/dashboard/SalePropertyForm";
 import RentalPropertyForm from "../../components/dashboard/RentalPropertyForm";
+import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
+import PropertyWizard from "../../components/dashboard/PropertyWizard";
 import Image from 'next/image';
 
-// Catégorie métier affichée pour chaque bien — Sprint A (séparation
-// Vente/Location/Hébergement), voir server/docs/PROPERTY_TRANSACTION_ARCHITECTURE.md.
-const BUSINESS_TYPES = [
-  {
-    key: 'vente', label: 'Vente', Icon: Landmark,
-    description: 'Vendre une maison, un appartement, un terrain, un immeuble ou un local.',
-  },
-  {
-    key: 'location', label: 'Location', Icon: Key,
-    description: 'Louer un logement ou local avec loyer mensuel et contrat de bail.',
-  },
-  {
-    key: 'hebergement', label: 'Hébergement meublé', Icon: Sparkles,
-    description: 'Proposer une villa, un appartement, une maison ou un studio à la nuitée.',
-  },
-];
+// Libellés d'affichage pour le titre de la modale "Ajouter" — le choix
+// métier lui-même est piloté par PropertyWizard.jsx (Sprint 0, point
+// d'entrée unique de création — voir ARCHITECTURE_ALTIMMO_V2.md).
+const BUSINESS_TYPE_LABELS = { vente: 'Vente', location: 'Location', hebergement: 'Hébergement' };
 
 const PROPERTIES_PER_PAGE = 8;
 
 const ManagePropertiesPage = () => {
   const { canEdit, canDelete, user } = useAuth();
   const canAddProperty = ['Admin', 'CommunityManager', 'Collaborateur'].includes(user?.role);
+  // Sprint 0 (architecture Altimmo) — pré-filtre lu depuis l'URL
+  // (?status=vente|location|hebergement), posé par les liens dédiés du
+  // domaine Immobilier dans AdminDashboard.jsx. Filtre 100% frontend, ne
+  // change aucun appel API : getAllProperties() renvoie toujours tout,
+  // exactement comme avant ce sprint.
+  const searchParams = useSearchParams();
+  const statusFilter = searchParams?.get('status') ?? null;
   const [properties, setProperties]         = useState([]);
   const [filteredProperties, setFiltered]   = useState([]);
   const [loading, setLoading]               = useState(false);
@@ -71,6 +68,11 @@ const ManagePropertiesPage = () => {
     checkInTime: "14:00", checkOutTime: "11:00", minimumStay: 1, maximumStay: "",
     cancellationPolicy: "moderee", houseRules: "", securityDeposit: 0, cleaningFee: 0,
     nightlyPrice: "",
+    // Sprint B1 — équipements structurés (nom distinct de `amenities`, qui
+    // reste le champ générique texte libre de Property) / règles / services inclus
+    accommodationAmenities: { cuisine: [], salon: [], internet: [], exterieur: [], parking: [], securite: [] },
+    rules: { petsAllowed: false, partiesAllowed: false, smokingAllowed: false, childrenAllowed: true, minimumAge: 0 },
+    includedServices: { menage: false, petitDejeuner: false, blanchisserie: false, transfert: false, cuisine: false },
     // Établissement hôtelier (Sprint Hôtel — uniquement si accommodationType === 'hotel')
     hotelMode: "", hotelId: "", hotelName: "", hotelDescription: "",
     hotelStarRating: "", hotelPhone: "", hotelEmail: "", hotelWebsite: "",
@@ -83,23 +85,28 @@ const ManagePropertiesPage = () => {
   useEffect(() => { fetchProperties(); }, []);
 
   useEffect(() => {
-    const list = searchTerm
-      ? properties.filter(p =>
-          p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.address?.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.address?.arrondissement?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.type?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      : properties;
+    let list = statusFilter ? properties.filter((p) => p.status === statusFilter) : properties;
+    if (searchTerm) {
+      list = list.filter(p =>
+        p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.address?.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.address?.arrondissement?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.type?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
     setFiltered(list);
     setCurrentPage(1);
-  }, [searchTerm, properties]);
+  }, [searchTerm, properties, statusFilter]);
 
   const fetchProperties = async () => {
     setLoading(true);
     try {
       const res = await getAllProperties();
-      setProperties(res); setFiltered(res);
+      // `filteredProperties` est dérivé exclusivement par l'effet de filtrage
+      // ci-dessous (searchTerm + statusFilter) — ne pas le fixer ici en
+      // parallèle, sous peine de courte-circuiter le filtre ?status= au
+      // premier rendu après chargement (Sprint 0).
+      setProperties(res);
     } catch {
       showNotif("Erreur lors du chargement des biens.", "error");
     } finally {
@@ -123,6 +130,21 @@ const ManagePropertiesPage = () => {
     setEditingProperty(null);
     setEditFullData(null);
     setEditLoading(false);
+  };
+
+  // Réponse du PropertyWizard (Sprint 0) — détermine le formulaire à charger.
+  // Un `accommodationType` n'est fourni que pour Hébergement (étape 2 du
+  // wizard, y compris "Hôtel") ; PropertyForm garde son propre sélecteur
+  // interne, simplement préréglé ici.
+  const handleWizardComplete = ({ transactionType, accommodationType }) => {
+    setAddChoice(transactionType);
+    if (transactionType === 'hebergement') {
+      setFormData((prev) => ({
+        ...prev,
+        status: 'hebergement',
+        ...(accommodationType ? { accommodationType } : {}),
+      }));
+    }
   };
 
   // Point d'entrée unique du bouton "Modifier" — détermine quel formulaire
@@ -182,6 +204,9 @@ const ManagePropertiesPage = () => {
       checkInTime: "14:00", checkOutTime: "11:00", minimumStay: 1, maximumStay: "",
       cancellationPolicy: "moderee", houseRules: "", securityDeposit: 0, cleaningFee: 0,
       nightlyPrice: "",
+      accommodationAmenities: { cuisine: [], salon: [], internet: [], exterieur: [], parking: [], securite: [] },
+      rules: { petsAllowed: false, partiesAllowed: false, smokingAllowed: false, childrenAllowed: true, minimumAge: 0 },
+      includedServices: { menage: false, petitDejeuner: false, blanchisserie: false, transfert: false, cuisine: false },
       hotelMode: "", hotelId: "", hotelName: "", hotelDescription: "",
       hotelStarRating: "", hotelPhone: "", hotelEmail: "", hotelWebsite: "",
       hotelServices: "", hotelHasRestaurant: false, hotelHasReception: false,
@@ -212,6 +237,9 @@ const ManagePropertiesPage = () => {
             securityDeposit: acc.securityDeposit ?? 0,
             cleaningFee: acc.cleaningFee ?? 0,
             nightlyPrice: nightlyRate?.amount ?? "",
+            accommodationAmenities: acc.amenities || { cuisine: [], salon: [], internet: [], exterieur: [], parking: [], securite: [] },
+            rules: acc.rules || { petsAllowed: false, partiesAllowed: false, smokingAllowed: false, childrenAllowed: true, minimumAge: 0 },
+            includedServices: acc.includedServices || { menage: false, petitDejeuner: false, blanchisserie: false, transfert: false, cuisine: false },
             // Établissement déjà rattaché : on prérempli en mode "existing" —
             // l'admin peut changer d'hôtel ou en créer un nouveau, mais on ne
             // duplique jamais la fiche Hotel existante au premier chargement.
@@ -295,6 +323,7 @@ const ManagePropertiesPage = () => {
         accommodationType, maxAdults, maxChildren, beds,
         checkInTime, checkOutTime, minimumStay, maximumStay,
         cancellationPolicy, houseRules, securityDeposit, cleaningFee, nightlyPrice,
+        accommodationAmenities, rules, includedServices,
         hotelMode, hotelId, hotelName, hotelDescription, hotelStarRating,
         hotelPhone, hotelEmail, hotelWebsite, hotelServices, hotelHasRestaurant, hotelHasReception,
         ...rest
@@ -337,6 +366,11 @@ const ManagePropertiesPage = () => {
         data.append('securityDeposit', securityDeposit || 0);
         data.append('cleaningFee', cleaningFee || 0);
         if (nightlyPrice !== "") data.append('nightlyPrice', nightlyPrice);
+        // Nom distinct de "amenities" (déjà utilisé ci-dessus pour le champ
+        // générique texte libre de Property) — voir accommodationController.buildAccommodationData.
+        data.append('accommodationAmenities', JSON.stringify(accommodationAmenities || {}));
+        data.append('rules', JSON.stringify(rules || {}));
+        data.append('includedServices', JSON.stringify(includedServices || {}));
 
         // Établissement hôtelier — uniquement pertinent pour accommodationType
         // === 'hotel' ; jamais envoyé pour les autres types (voir
@@ -560,7 +594,9 @@ const ManagePropertiesPage = () => {
             <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl leading-tight font-black bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">Gestion des Biens</h1>
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl leading-tight font-black bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">
+              {{ vente: 'Vente', location: 'Location', hebergement: 'Hébergement' }[statusFilter] || 'Toutes les annonces'}
+            </h1>
             <p className="text-sm sm:text-lg text-gray-600 font-medium mt-1">Gérez le patrimoine immobilier de <span className="font-bold text-blue-600">Altimmo</span></p>
           </div>
         </div>
@@ -622,7 +658,7 @@ const ManagePropertiesPage = () => {
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl text-white"><Sparkles className="w-6 h-6" /></div>
                   <h2 className="pr-10 text-xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                    {addChoice ? `Ajouter — ${BUSINESS_TYPES.find((t) => t.key === addChoice)?.label}` : 'Ajouter une annonce'}
+                    {addChoice ? `Ajouter — ${BUSINESS_TYPE_LABELS[addChoice] || addChoice}` : 'Ajouter une annonce'}
                   </h2>
                   <button onClick={resetForm} disabled={loadingSubmit}
                     className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"><X className="w-6 h-6" /></button>
@@ -630,23 +666,7 @@ const ManagePropertiesPage = () => {
               </div>
               <div className="p-3 sm:p-6 overflow-y-auto flex-grow">
                 {!addChoice && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {BUSINESS_TYPES.map(({ key, label, Icon, description }) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => {
-                          setAddChoice(key);
-                          if (key === 'hebergement') setFormData((prev) => ({ ...prev, status: 'hebergement' }));
-                        }}
-                        className="flex flex-col items-start gap-2 p-5 border-2 border-gray-200 rounded-xl text-left hover:border-blue-500 hover:shadow-lg transition-all"
-                      >
-                        <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><Icon className="w-6 h-6" /></div>
-                        <h3 className="font-bold text-gray-800">{label}</h3>
-                        <p className="text-sm text-gray-500">{description}</p>
-                      </button>
-                    ))}
-                  </div>
+                  <PropertyWizard onComplete={handleWizardComplete} />
                 )}
 
                 {addChoice === 'vente' && (
@@ -655,7 +675,13 @@ const ManagePropertiesPage = () => {
                 {addChoice === 'location' && (
                   <RentalPropertyForm onSuccess={handleSaleRentalCreateSuccess} onCancel={() => setAddChoice(null)} />
                 )}
-                {addChoice === 'hebergement' && (
+                {/* Sprint B2 — "Hôtel" ouvre désormais HotelPropertyForm (domaine
+                    Hôtellerie dédié), jamais PropertyForm. Tous les autres types
+                    d'hébergement (Sprint B1, inchangés) restent sur PropertyForm. */}
+                {addChoice === 'hebergement' && formData.accommodationType === 'hotel' && (
+                  <HotelPropertyForm onSuccess={() => { resetForm(); fetchProperties(); }} onCancel={resetForm} />
+                )}
+                {addChoice === 'hebergement' && formData.accommodationType !== 'hotel' && (
                   <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
                     enableHebergement errors={errors} />
                 )}

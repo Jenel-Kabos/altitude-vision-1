@@ -8,7 +8,7 @@ import {
   Menu, X, LayoutDashboard, Building, LogOut,
   UserCircle, Heart, MessageCircle, UserPlus,
   LogIn, ChevronDown, Home, Phone, Newspaper, ArrowUpRight, Smartphone,
-  CreditCard, Calendar,
+  CreditCard, Calendar, Landmark, KeyRound, Palmtree,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getConversationsUnreadCount } from '../../services/unreadCountService';
@@ -18,10 +18,16 @@ import NotificationBell from '../notifications/NotificationBell';
 const NAV_LINKS = [
   { to: '/',              label: 'Accueil',     Icon: Home      },
   {
+    // Sprint 0 (architecture Altimmo) — remplace l'ancien lien générique
+    // "Toutes les annonces" par une navigation par intention métier. Chaque
+    // route réutilise le listing existant (AltimmoAnnonces) via ?status=
+    // (et ?type= pour Séjourner) — voir server/docs/ARCHITECTURE_ALTIMMO_V2.md.
     to: '/immobilier',    label: 'Altimmo',     Icon: Building,
     children: [
-      { to: '/immobilier',          label: 'Altimmo',     Icon: Building, desc: 'Annonces & biens' },
-      { to: '/altimmo/application', label: 'App Altimmo', Icon: null,     desc: "Télécharger l'app" },
+      { to: '/immobilier/acheter',   label: 'Acheter',    Icon: Landmark, desc: 'Maisons, appartements, terrains…' },
+      { to: '/immobilier/louer',     label: 'Louer',      Icon: KeyRound, desc: 'Location longue durée avec bail' },
+      { to: '/immobilier/sejourner', label: 'Séjourner',  Icon: Palmtree, desc: 'Meublés à la nuitée & hôtels' },
+      { to: '/altimmo/application',  label: 'App Altimmo', Icon: null,    desc: "Télécharger l'app" },
     ],
   },
   { to: '/evenementiel',  label: 'Mila Events', Icon: null      },

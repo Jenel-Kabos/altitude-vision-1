@@ -6,6 +6,8 @@ const Property = require('../models/Property');
 const {
   evaluateReadiness, serializeAccommodation,
   createFullAccommodation, updateFullAccommodation,
+  computeCompletionScore, duplicateAccommodation, deleteAccommodation,
+  listAccommodationsForAdmin,
 } = require('../services/accommodationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { notify } = require('../services/notificationService');
@@ -23,12 +25,13 @@ const fail = (res, statusCode, message, extra = {}) =>
 const cleanupUploadedImages = (images = []) =>
   Promise.all(images.map((url) => destroyFromCloudinary(url))).catch(() => {});
 
-// bedrooms/bathrooms/amenities sont volontairement absents : Property reste
-// leur unique source de vérité (voir Accommodation.js et accommodationService.js).
+// bedrooms/bathrooms sont volontairement absents : Property reste leur
+// unique source de vérité (voir Accommodation.js et accommodationService.js).
 const ALLOWED_FIELDS = [
   'accommodationType', 'furnished', 'capacity', 'beds',
   'checkInTime', 'checkOutTime', 'minimumStay', 'maximumStay',
   'houseRules', 'cancellationPolicy', 'securityDeposit', 'cleaningFee', 'currency',
+  'amenities', 'rules', 'includedServices', 'gallery',
 ];
 
 async function getActiveRates(accommodationId) {
@@ -68,6 +71,22 @@ function parseCapacity(req) {
   return out;
 }
 
+/**
+ * Parse un champ objet arrivant soit en JSON string (`amenities: '{"cuisine":["four"]}'`),
+ * soit déjà en objet (appel programmatique/tests). Retourne `undefined` si le
+ * champ est absent, pour ne jamais écraser silencieusement une valeur
+ * existante en édition partielle.
+ */
+function parseJSONObjectField(req, key) {
+  const raw = req.body[key];
+  if (raw === undefined) return undefined;
+  if (raw && typeof raw === 'object') return raw;
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw); } catch (e) { return undefined; }
+  }
+  return undefined;
+}
+
 /** Construit le payload Accommodation (ALLOWED_FIELDS) à partir du body admin. */
 function buildAccommodationData(req) {
   const {
@@ -79,6 +98,17 @@ function buildAccommodationData(req) {
   const data = { accommodationType };
   const capacity = parseCapacity(req);
   if (Object.keys(capacity).length > 0) data.capacity = capacity;
+  // Nom de champ transporté "accommodationAmenities" (distinct de
+  // "amenities", déjà utilisé pour le champ générique texte libre de
+  // Property dans le même payload) — mappé ici vers Accommodation.amenities.
+  const amenities = parseJSONObjectField(req, 'accommodationAmenities');
+  if (amenities !== undefined) data.amenities = amenities;
+  const rules = parseJSONObjectField(req, 'rules');
+  if (rules !== undefined) data.rules = rules;
+  const includedServices = parseJSONObjectField(req, 'includedServices');
+  if (includedServices !== undefined) data.includedServices = includedServices;
+  const gallery = parseJSONObjectField(req, 'gallery');
+  if (gallery !== undefined) data.gallery = gallery;
   if (furnished !== undefined) data.furnished = furnished === 'true' || furnished === true;
   const parsedBeds = parseNumericField(beds, 'Le nombre de lits');
   if (parsedBeds !== undefined) data.beds = parsedBeds;
@@ -270,7 +300,14 @@ exports.mine = async (req, res) => {
     const accommodations = await Accommodation.find({ createdBy: req.user.id })
       .populate('property', 'title images address status statusAdmin availability price bedrooms bathrooms')
       .sort({ updatedAt: -1 });
-    res.json({ status: 'success', data: { accommodations: accommodations.map((a) => serializeAccommodation(a)) } });
+    const withScore = await Promise.all(accommodations.map(async (a) => {
+      const rates = await getActiveRates(a._id);
+      return {
+        ...serializeAccommodation(a, rates),
+        completion: computeCompletionScore(a, a.property, rates),
+      };
+    }));
+    res.json({ status: 'success', data: { accommodations: withScore } });
   } catch (error) {
     fail(res, 500, error.message);
   }
@@ -288,7 +325,8 @@ exports.getOne = async (req, res) => {
     const isStaff = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'].includes(req.user.role);
     if (!isOwner && !isStaff) return fail(res, 403, 'Accès refusé.');
     const rates = await getActiveRates(accommodation._id);
-    res.json({ status: 'success', data: { accommodation: serializeAccommodation(accommodation, rates) } });
+    const completion = computeCompletionScore(accommodation, accommodation.property, rates);
+    res.json({ status: 'success', data: { accommodation: serializeAccommodation(accommodation, rates), completion } });
   } catch (error) {
     fail(res, 500, error.message);
   }
@@ -368,63 +406,248 @@ exports.pending = async (req, res) => {
     const accommodations = await Accommodation.find({ publicationStatus: 'soumis' })
       .populate('property', 'title images address owner bedrooms bathrooms')
       .sort({ submittedAt: 1 });
-    res.json({ status: 'success', data: { accommodations: accommodations.map((a) => serializeAccommodation(a)) } });
+    const withScore = await Promise.all(accommodations.map(async (a) => {
+      const rates = await getActiveRates(a._id);
+      return {
+        ...serializeAccommodation(a, rates),
+        completion: computeCompletionScore(a, a.property, rates),
+      };
+    }));
+    res.json({ status: 'success', data: { accommodations: withScore } });
   } catch (error) {
     fail(res, 500, error.message);
   }
 };
 
 // ─────────────────────────────────────────────
-// PATCH /api/accommodations/:id/:action — staff valide|rejette (même
-// convention que PATCH /api/properties/:id/:action)
+// GET /api/accommodations/admin/list — staff : "Tous les hébergements"
+// (filtres statut/type/recherche/tri + pagination — voir accommodationService)
+// ─────────────────────────────────────────────
+exports.listAdmin = async (req, res) => {
+  try {
+    const { status, type, search, sort, page, limit } = req.query;
+    const result = await listAccommodationsForAdmin({ status, type, search, sort, page, limit });
+    const accommodations = await Promise.all(result.accommodations.map(async (a) => {
+      const rates = await getActiveRates(a._id);
+      return {
+        ...serializeAccommodation(a, rates),
+        completion: computeCompletionScore(a, a.property, rates),
+      };
+    }));
+    res.json({
+      status: 'success',
+      data: { accommodations, total: result.total, page: result.page, limit: result.limit },
+    });
+  } catch (error) {
+    fail(res, 500, error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// PATCH /api/accommodations/:id/:action — staff valide|rejette|suspend|réactive
+// (même convention que PATCH /api/properties/:id/:action)
 // ─────────────────────────────────────────────
 exports.reviewDecision = async (req, res) => {
   try {
     const { id, action } = req.params;
     if (!mongoose.isValidObjectId(id)) return fail(res, 400, 'Identifiant invalide.');
-    let newStatus;
-    if (action === 'validate') newStatus = 'publie';
-    else if (action === 'reject') newStatus = 'rejete';
-    else return fail(res, 400, 'Action invalide (validate ou reject attendu).');
 
-    const accommodation = await Accommodation.findById(id).populate('property', 'title owner');
+    const VALID_ACTIONS = ['validate', 'reject', 'suspend', 'unsuspend'];
+    if (!VALID_ACTIONS.includes(action)) {
+      return fail(res, 400, 'Action invalide (validate, reject, suspend ou unsuspend attendu).');
+    }
+
+    const accommodation = await Accommodation.findById(id).populate('property', 'title owner images bedrooms bathrooms');
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
-    if (accommodation.publicationStatus !== 'soumis') {
+
+    if (['validate', 'reject'].includes(action) && accommodation.publicationStatus !== 'soumis') {
       return fail(res, 409, 'Seul un hébergement soumis peut être validé ou rejeté.');
     }
-    if (newStatus === 'rejete' && !String(req.body.reason || '').trim()) {
-      return fail(res, 422, 'Un motif de rejet est requis.');
+    if (action === 'suspend' && accommodation.publicationStatus !== 'publie') {
+      return fail(res, 409, 'Seul un hébergement publié peut être suspendu.');
+    }
+    if (action === 'unsuspend' && accommodation.publicationStatus !== 'suspendu') {
+      return fail(res, 409, "Seul un hébergement suspendu peut être réactivé.");
+    }
+    if (['reject', 'suspend'].includes(action) && !String(req.body.reason || '').trim()) {
+      return fail(res, 422, 'Un motif est requis.');
+    }
+    if (action === 'validate') {
+      const rates = await getActiveRates(accommodation._id);
+      const completion = computeCompletionScore(accommodation, accommodation.property, rates);
+      if (!completion.complete) {
+        return fail(res, 422, 'Cet hébergement est incomplet et ne peut pas être publié.', { completion });
+      }
     }
 
+    const newStatus = { validate: 'publie', reject: 'rejete', suspend: 'suspendu', unsuspend: 'publie' }[action];
     accommodation.publicationStatus = newStatus;
     accommodation.reviewedBy = req.user.id;
-    accommodation.rejectionReason = newStatus === 'rejete' ? String(req.body.reason).trim() : '';
-    accommodation.publishedAt = newStatus === 'publie' ? new Date() : null;
+    accommodation.rejectionReason = action === 'reject' ? String(req.body.reason).trim() : accommodation.rejectionReason;
+    accommodation.suspensionReason = action === 'suspend' ? String(req.body.reason).trim() : (action === 'unsuspend' ? '' : accommodation.suspensionReason);
+    if (action === 'validate') accommodation.publishedAt = new Date();
+    if (action === 'suspend') accommodation.suspendedAt = new Date();
     await accommodation.save();
 
-    if (accommodation.property?.owner) {
+    if (accommodation.property?.owner && ['validate', 'reject', 'suspend'].includes(action)) {
+      const notifType = { validate: 'bien_valide', reject: 'bien_rejete', suspend: 'bien_rejete' }[action];
+      const title = { validate: '✅ Hébergement validé', reject: '❌ Hébergement non validé', suspend: '⛔ Hébergement suspendu' }[action];
+      const body = action === 'validate'
+        ? `"${accommodation.property.title}" est maintenant visible sur la plateforme.`
+        : action === 'reject'
+          ? `"${accommodation.property.title}" n'a pas été validé. ${accommodation.rejectionReason}`
+          : `"${accommodation.property.title}" a été suspendu. ${accommodation.suspensionReason}`;
       notify({
         recipient: accommodation.property.owner,
-        type: newStatus === 'publie' ? 'bien_valide' : 'bien_rejete',
-        title: newStatus === 'publie' ? '✅ Hébergement validé' : '❌ Hébergement non validé',
-        body: newStatus === 'publie'
-          ? `"${accommodation.property.title}" est maintenant visible sur la plateforme.`
-          : `"${accommodation.property.title}" n'a pas été validé. ${accommodation.rejectionReason}`,
+        type: notifType,
+        title,
+        body,
         data: { propertyId: accommodation.property._id.toString(), screen: 'Annonces' },
       }).catch(() => {});
     }
 
     logAction({
-      action: newStatus === 'publie' ? 'Hébergement validé' : 'Hébergement rejeté',
-      description: `Hébergement ${accommodation._id} ${newStatus} par l'admin`,
+      action: { validate: 'Hébergement validé', reject: 'Hébergement rejeté', suspend: 'Hébergement suspendu', unsuspend: 'Hébergement réactivé' }[action],
+      description: `Hébergement ${accommodation._id} → ${newStatus} par l'admin`,
       module: 'Altimmo',
-      typeAction: newStatus === 'publie' ? 'VALIDATION' : 'REJET',
+      typeAction: { validate: 'VALIDATION', reject: 'REJET', suspend: 'SUSPENSION', unsuspend: 'REACTIVATION' }[action],
       auteur: buildAuteur(req.user),
       cible: { id: String(id), type: 'Accommodation' },
       req,
     });
 
     res.json({ status: 'success', data: { accommodation: serializeAccommodation(accommodation) } });
+  } catch (error) {
+    fail(res, 500, error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// PATCH /api/accommodations/:id/deactivate | /reactivate — propriétaire
+// masque/réaffiche temporairement une annonce PUBLIÉE, sans repasser par la
+// modération (contrairement à suspend/unsuspend, réservé au staff).
+// ─────────────────────────────────────────────
+exports.deactivate = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const accommodation = await Accommodation.findById(req.params.id);
+    if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
+    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
+      return fail(res, 403, "Vous ne pouvez modifier que vos propres hébergements.");
+    }
+    // Contrôle final Sprint B2 — pour un hébergement 'hotel', ce levier doit
+    // passer par PATCH /api/hotels/:id/deactivate (qui synchronise aussi
+    // Hotel.active), jamais ici directement : sinon Hotel.active et
+    // Accommodation.active divergent silencieusement.
+    if (accommodation.accommodationType === 'hotel') {
+      return fail(res, 409, "Un établissement hôtelier se désactive depuis le domaine Hôtellerie (Mes hôtels).");
+    }
+    accommodation.active = false;
+    await accommodation.save();
+    res.json({ status: 'success', data: { accommodation: serializeAccommodation(accommodation) } });
+  } catch (error) {
+    fail(res, 500, error.message);
+  }
+};
+
+exports.reactivate = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const accommodation = await Accommodation.findById(req.params.id);
+    if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
+    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
+      return fail(res, 403, "Vous ne pouvez modifier que vos propres hébergements.");
+    }
+    if (accommodation.accommodationType === 'hotel') {
+      return fail(res, 409, "Un établissement hôtelier se réactive depuis le domaine Hôtellerie (Mes hôtels).");
+    }
+    accommodation.active = true;
+    await accommodation.save();
+    res.json({ status: 'success', data: { accommodation: serializeAccommodation(accommodation) } });
+  } catch (error) {
+    fail(res, 500, error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// POST /api/accommodations/:id/duplicate — propriétaire duplique une annonce
+// (nouvelle Property + Accommodation en 'brouillon', tarifs actifs clonés).
+// ─────────────────────────────────────────────
+exports.duplicate = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const accommodation = await Accommodation.findById(req.params.id).populate('property');
+    if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
+    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
+      return fail(res, 403, "Vous ne pouvez dupliquer que vos propres hébergements.");
+    }
+    // Contrôle final Sprint B2 — un hébergement de type 'hotel' est
+    // l'adaptateur d'un Hotel (domaine Hôtellerie), qui possède ses propres
+    // catégories/tarifs. Le dupliquer ici créerait une seconde Accommodation
+    // pointant vers le MÊME Hotel (jamais un nouveau), un état incohérent.
+    // La duplication d'un établissement passe exclusivement par
+    // POST /api/hotels/:id/duplicate (voir hotelService.duplicateHotel).
+    if (accommodation.accommodationType === 'hotel') {
+      return fail(res, 409, "Un établissement hôtelier se duplique depuis le domaine Hôtellerie (Mes hôtels), pas depuis Hébergement.");
+    }
+    const result = await duplicateAccommodation({
+      accommodation, property: accommodation.property, actingUser: req.user,
+    });
+
+    logAction({
+      action: 'Hébergement dupliqué',
+      description: `"${accommodation.property.title}" dupliqué en brouillon`,
+      module: 'Altimmo',
+      typeAction: 'CREATION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(result.accommodation._id), type: 'Accommodation', nom: result.property.title },
+      req,
+    });
+
+    res.status(201).json({
+      status: 'success',
+      data: { property: result.property, accommodation: serializeAccommodation(result.accommodation, result.rates) },
+    });
+  } catch (error) {
+    fail(res, 500, error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// DELETE /api/accommodations/:id — propriétaire supprime définitivement
+// (Accommodation + Property + RatePlan + images Cloudinary).
+// ─────────────────────────────────────────────
+exports.remove = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const accommodation = await Accommodation.findById(req.params.id).populate('property');
+    if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
+    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
+      return fail(res, 403, "Vous ne pouvez supprimer que vos propres hébergements.");
+    }
+    // Contrôle final Sprint B2 — supprimer ici ne nettoierait QUE
+    // Accommodation + Property, en laissant orphelins le Hotel, ses
+    // RoomCategory et leurs RatePlan (référençant un Property désormais
+    // supprimé). La suppression d'un établissement doit passer par
+    // DELETE /api/hotels/:id (hotelService.deleteHotel), qui cascade
+    // correctement sur ces trois entités.
+    if (accommodation.accommodationType === 'hotel') {
+      return fail(res, 409, "Un établissement hôtelier se supprime depuis le domaine Hôtellerie (Mes hôtels), pas depuis Hébergement.");
+    }
+    const propertyTitle = accommodation.property?.title || '';
+    await deleteAccommodation({ accommodation, property: accommodation.property });
+
+    logAction({
+      action: 'Hébergement supprimé',
+      description: `"${propertyTitle}" supprimé définitivement`,
+      module: 'Altimmo',
+      typeAction: 'SUPPRESSION',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(req.params.id), type: 'Accommodation', nom: propertyTitle },
+      req,
+    });
+
+    res.json({ status: 'success', data: {} });
   } catch (error) {
     fail(res, 500, error.message);
   }

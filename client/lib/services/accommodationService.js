@@ -37,6 +37,35 @@ export const reviewAccommodation = async (id, action, data = {}) => {
   return res.data.data.accommodation;
 };
 
+// ── Sprint B1 : cycle de vie propriétaire (désactiver/dupliquer/supprimer) ──
+
+export const deactivateAccommodation = async (id) => {
+  const res = await api.patch(`/accommodations/${id}/deactivate`);
+  return res.data.data.accommodation;
+};
+
+export const reactivateAccommodation = async (id) => {
+  const res = await api.patch(`/accommodations/${id}/reactivate`);
+  return res.data.data.accommodation;
+};
+
+export const duplicateAccommodation = async (id) => {
+  const res = await api.post(`/accommodations/${id}/duplicate`);
+  return res.data.data;
+};
+
+export const deleteAccommodation = async (id) => {
+  await api.delete(`/accommodations/${id}`);
+};
+
+// ── Sprint B1 : dashboard admin — "Tous les hébergements" ──
+
+/** @param {{status?, type?, search?, sort?, page?, limit?}} params */
+export const getAccommodationsAdmin = async (params = {}) => {
+  const res = await api.get('/accommodations/admin/list', { params });
+  return res.data.data; // { accommodations, total, page, limit }
+};
+
 export const getAccommodationRates = async (id) => {
   const res = await api.get(`/accommodations/${id}/rate-plans`);
   return res.data.data.rates;

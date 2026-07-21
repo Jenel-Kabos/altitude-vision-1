@@ -218,10 +218,24 @@ describe('POST /api/accommodations/:id/submit — soumission', () => {
 describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
   afterEach(() => jest.clearAllMocks());
 
+  // Sprint B1 : "validate" exige désormais un score de complétude à 100%
+  // (voir computeCompletionScore) — ce fixture est donc volontairement
+  // complet (photos/tarif/équipements/services) pour représenter le cas
+  // nominal ; le cas incomplet est testé séparément ci-dessous.
   const submitted = (overrides = {}) => ({
     _id: ACCOMMODATION_ID,
     publicationStatus: 'soumis',
-    property: { _id: PROPERTY_ID, title: 'Villa Test', owner: OWNER_ID },
+    accommodationType: 'villa_meublee',
+    capacity: { maxAdults: 4 },
+    checkInTime: '14:00',
+    checkOutTime: '11:00',
+    amenities: { cuisine: ['Four'], salon: [], internet: [], exterieur: [], parking: [], securite: [] },
+    includedServices: { menage: true, petitDejeuner: false, blanchisserie: false, transfert: false, cuisine: false },
+    property: {
+      _id: PROPERTY_ID, title: 'Villa Test', owner: OWNER_ID,
+      description: 'Une belle villa', bedrooms: 3, bathrooms: 2,
+      images: ['a.jpg', 'b.jpg', 'c.jpg'],
+    },
     save: jest.fn().mockResolvedValue(),
     ...overrides,
   });
@@ -235,10 +249,11 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  test('200 — admin valide : publicationStatus="publie", publishedAt renseigné', async () => {
+  test('200 — admin valide un hébergement complet : publicationStatus="publie", publishedAt renseigné', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
     const acc = submitted();
     Accommodation.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(acc) });
+    RatePlan.find = jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([{ mode: 'nightly', amount: 35000, active: true }]) });
     const res = await request(app)
       .patch(`/api/accommodations/${ACCOMMODATION_ID}/validate`)
       .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
@@ -246,6 +261,56 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
     expect(res.statusCode).toBe(200);
     expect(acc.publicationStatus).toBe('publie');
     expect(acc.publishedAt).not.toBeNull();
+  });
+
+  test('422 — un hébergement incomplet (aucun tarif, aucun équipement) ne peut pas être validé', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const acc = submitted({ amenities: { cuisine: [], salon: [], internet: [], exterieur: [], parking: [], securite: [] } });
+    Accommodation.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(acc) });
+    RatePlan.find = jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
+    const res = await request(app)
+      .patch(`/api/accommodations/${ACCOMMODATION_ID}/validate`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({});
+    expect(res.statusCode).toBe(422);
+    expect(res.body.completion.complete).toBe(false);
+    expect(acc.publicationStatus).toBe('soumis');
+  });
+
+  test('200 — admin suspend un hébergement publié (motif requis) puis le réactive', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const acc = submitted({ publicationStatus: 'publie' });
+    Accommodation.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(acc) });
+    const resNoReason = await request(app)
+      .patch(`/api/accommodations/${ACCOMMODATION_ID}/suspend`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({});
+    expect(resNoReason.statusCode).toBe(422);
+
+    const res = await request(app)
+      .patch(`/api/accommodations/${ACCOMMODATION_ID}/suspend`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ reason: 'Signalement client' });
+    expect(res.statusCode).toBe(200);
+    expect(acc.publicationStatus).toBe('suspendu');
+    expect(acc.suspensionReason).toBe('Signalement client');
+
+    const resUnsuspend = await request(app)
+      .patch(`/api/accommodations/${ACCOMMODATION_ID}/unsuspend`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({});
+    expect(resUnsuspend.statusCode).toBe(200);
+    expect(acc.publicationStatus).toBe('publie');
+  });
+
+  test('409 — impossible de suspendre un hébergement qui n\'est pas publié', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Accommodation.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(submitted({ publicationStatus: 'brouillon' })) });
+    const res = await request(app)
+      .patch(`/api/accommodations/${ACCOMMODATION_ID}/suspend`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ reason: 'x' });
+    expect(res.statusCode).toBe(409);
   });
 
   test('422 — rejet sans motif refusé', async () => {
@@ -304,12 +369,186 @@ describe('GET /api/accommodations/status/pending — file de modération staff',
     Accommodation.find = jest.fn().mockReturnValue({
       populate: jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([acc]) }),
     });
+    // Sprint B1 — pending() calcule désormais un score de complétude par
+    // hébergement (getActiveRates → RatePlan.find(...).sort(...)).
+    RatePlan.find = jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
     const res = await request(app)
       .get('/api/accommodations/status/pending')
       .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
     expect(res.statusCode).toBe(200);
     expect(res.body.data.accommodations).toHaveLength(1);
+    expect(res.body.data.accommodations[0].completion).toBeDefined();
     expect(Accommodation.find).toHaveBeenCalledWith({ publicationStatus: 'soumis' });
+  });
+});
+
+describe('Sprint B1 — cycle de vie propriétaire (deactivate/reactivate/duplicate/delete)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  const owned = (overrides = {}) => ({
+    _id: ACCOMMODATION_ID,
+    createdBy: OWNER_ID,
+    active: true,
+    save: jest.fn().mockResolvedValue(),
+    ...overrides,
+  });
+
+  test('403 — un autre propriétaire ne peut pas désactiver', async () => {
+    mockUserAuth(OTHER_OWNER_ID, 'Proprietaire');
+    Accommodation.findById = jest.fn().mockResolvedValue(owned());
+    const res = await request(app)
+      .patch(`/api/accommodations/${ACCOMMODATION_ID}/deactivate`)
+      .set('Authorization', `Bearer ${makeToken(OTHER_OWNER_ID)}`);
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('200 — le propriétaire désactive puis réactive son hébergement', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const acc = owned();
+    Accommodation.findById = jest.fn().mockResolvedValue(acc);
+    const res = await request(app)
+      .patch(`/api/accommodations/${ACCOMMODATION_ID}/deactivate`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res.statusCode).toBe(200);
+    expect(acc.active).toBe(false);
+
+    const res2 = await request(app)
+      .patch(`/api/accommodations/${ACCOMMODATION_ID}/reactivate`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res2.statusCode).toBe(200);
+    expect(acc.active).toBe(true);
+  });
+
+  test('201 — le propriétaire duplique son hébergement en brouillon', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const property = { _id: PROPERTY_ID, title: 'Villa Test', owner: OWNER_ID, images: [] };
+    const acc = owned({ property, accommodationType: 'villa_meublee' });
+    Accommodation.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(acc) });
+    Property.create = jest.fn().mockResolvedValue({ _id: 'NEW-PROPERTY-ID', title: 'Villa Test (copie)' });
+    Accommodation.create = jest.fn().mockResolvedValue({ _id: 'NEW-ACC-ID', publicationStatus: 'brouillon' });
+    RatePlan.find = jest.fn().mockResolvedValue([]);
+    const res = await request(app)
+      .post(`/api/accommodations/${ACCOMMODATION_ID}/duplicate`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res.statusCode).toBe(201);
+    expect(Property.create).toHaveBeenCalled();
+    expect(Accommodation.create).toHaveBeenCalled();
+  });
+
+  test('200 — le propriétaire supprime définitivement son hébergement', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const property = { _id: PROPERTY_ID, title: 'Villa Test', owner: OWNER_ID, images: [] };
+    Accommodation.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(owned({ property })) });
+    RatePlan.deleteMany = jest.fn().mockResolvedValue({});
+    Accommodation.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    const res = await request(app)
+      .delete(`/api/accommodations/${ACCOMMODATION_ID}`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res.statusCode).toBe(200);
+    expect(Accommodation.findByIdAndDelete).toHaveBeenCalledWith(ACCOMMODATION_ID);
+    expect(Property.findByIdAndDelete).toHaveBeenCalledWith(PROPERTY_ID);
+  });
+});
+
+describe('Contrôle final Sprint B2 — un hébergement de type hotel ne se gère jamais depuis le domaine Hébergement', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  // Sans ce garde-fou, DELETE/duplicate/deactivate ici ne toucheraient QUE
+  // Accommodation + Property, laissant orphelins le Hotel, ses
+  // RoomCategory et leurs RatePlan (référençant un Property supprimé) —
+  // constaté à l'audit final avant le Sprint C.
+  const hotelTypeAcc = (overrides = {}) => ({
+    _id: ACCOMMODATION_ID,
+    createdBy: OWNER_ID,
+    accommodationType: 'hotel',
+    active: true,
+    property: { _id: PROPERTY_ID, title: 'Hôtel Test', owner: OWNER_ID, images: [] },
+    save: jest.fn().mockResolvedValue(),
+    ...overrides,
+  });
+
+  test("409 — DELETE /api/accommodations/:id refuse un hébergement de type hotel", async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    Accommodation.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(hotelTypeAcc()) });
+    const res = await request(app)
+      .delete(`/api/accommodations/${ACCOMMODATION_ID}`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res.statusCode).toBe(409);
+    expect(Accommodation.findByIdAndDelete).not.toHaveBeenCalled();
+  });
+
+  test("409 — POST /api/accommodations/:id/duplicate refuse un hébergement de type hotel", async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    Accommodation.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(hotelTypeAcc()) });
+    const res = await request(app)
+      .post(`/api/accommodations/${ACCOMMODATION_ID}/duplicate`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res.statusCode).toBe(409);
+    expect(Accommodation.create).not.toHaveBeenCalled();
+  });
+
+  test("409 — PATCH /api/accommodations/:id/deactivate refuse un hébergement de type hotel", async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const acc = hotelTypeAcc();
+    Accommodation.findById = jest.fn().mockResolvedValue(acc);
+    const res = await request(app)
+      .patch(`/api/accommodations/${ACCOMMODATION_ID}/deactivate`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res.statusCode).toBe(409);
+    expect(acc.active).toBe(true); // inchangé
+  });
+
+  test("409 — PATCH /api/accommodations/:id/reactivate refuse un hébergement de type hotel", async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    Accommodation.findById = jest.fn().mockResolvedValue(hotelTypeAcc({ active: false }));
+    const res = await request(app)
+      .patch(`/api/accommodations/${ACCOMMODATION_ID}/reactivate`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res.statusCode).toBe(409);
+  });
+
+  test("200 — un hébergement non-hotel n'est pas affecté par ce garde-fou (régression)", async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const property = { _id: PROPERTY_ID, title: 'Villa Test', owner: OWNER_ID, images: [] };
+    Accommodation.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(hotelTypeAcc({ accommodationType: 'villa_meublee', property })) });
+    RatePlan.deleteMany = jest.fn().mockResolvedValue({});
+    Accommodation.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    const res = await request(app)
+      .delete(`/api/accommodations/${ACCOMMODATION_ID}`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('GET /api/accommodations/admin/list — Sprint B1 (dashboard admin, tous statuts)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('403 — un propriétaire ne peut pas lister tous les hébergements', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const res = await request(app)
+      .get('/api/accommodations/admin/list')
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('200 — un admin liste les hébergements filtrés par statut, avec pagination', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const acc = {
+      _id: ACCOMMODATION_ID,
+      publicationStatus: 'publie',
+      property: { _id: PROPERTY_ID, title: 'Villa Test', price: 50000 },
+      toObject() { return { ...this, toObject: undefined }; },
+    };
+    Accommodation.find = jest.fn().mockReturnValue({ populate: jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([acc]) }) });
+    RatePlan.find = jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
+    const res = await request(app)
+      .get('/api/accommodations/admin/list?status=publie&page=1&limit=20')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.accommodations).toHaveLength(1);
+    expect(res.body.data.total).toBe(1);
   });
 });
 

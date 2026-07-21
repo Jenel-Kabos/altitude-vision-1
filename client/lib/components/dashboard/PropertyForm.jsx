@@ -7,7 +7,10 @@ import dynamic from 'next/dynamic';
 const MapLeaflet = dynamic(() => import('./MapLeaflet'), { ssr: false });
 import { VILLES, getArrondissementsFor } from "../../constants/locations";
 import { PROPERTY_TYPES } from "../../constants/propertyTypes";
-import { ACCOMMODATION_TYPES, LEGACY_ACCOMMODATION_TYPES, CANCELLATION_POLICIES, HOTEL_ACCOMMODATION_TYPES } from "../../constants/accommodation";
+import {
+  ACCOMMODATION_TYPES, LEGACY_ACCOMMODATION_TYPES, CANCELLATION_POLICIES, HOTEL_ACCOMMODATION_TYPES,
+  AMENITY_CATEGORIES, INCLUDED_SERVICES,
+} from "../../constants/accommodation";
 import { getHotels } from "../../services/accommodationService";
 
 // ✅ Préfixe les URLs relatives avec l'URL du backend.
@@ -165,6 +168,31 @@ const PropertyForm = ({
         [field]: nextValues,
       };
     });
+  };
+
+  // Sprint B1 — équipements structurés par catégorie (formData.amenities =
+  // { cuisine: [...], salon: [...], ... }, miroir de server/models/
+  // Accommodation.js). Distinct de handleCheckboxArrayChange (tableau plat)
+  // car chaque catégorie est indépendante des autres.
+  const handleAmenityToggle = (category, value) => {
+    setFormData((prev) => {
+      const current = Array.isArray(prev.accommodationAmenities?.[category]) ? prev.accommodationAmenities[category] : [];
+      const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+      return { ...prev, accommodationAmenities: { ...prev.accommodationAmenities, [category]: next } };
+    });
+  };
+
+  // formData.rules = { petsAllowed, partiesAllowed, smokingAllowed, childrenAllowed, minimumAge }
+  const handleRuleChange = (name, value) => {
+    setFormData((prev) => ({ ...prev, rules: { ...prev.rules, [name]: value } }));
+  };
+
+  // formData.includedServices = { menage, petitDejeuner, blanchisserie, transfert, cuisine }
+  const handleServiceToggle = (key) => {
+    setFormData((prev) => ({
+      ...prev,
+      includedServices: { ...prev.includedServices, [key]: !prev.includedServices?.[key] },
+    }));
   };
 
   const handleImageChange = (e) => {
@@ -911,6 +939,83 @@ const PropertyForm = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
               />
               <p className="text-xs text-gray-500 mt-1">Séparez les règles par des virgules</p>
+            </div>
+          </div>
+
+          {/* ------------------ SECTION ÉQUIPEMENTS ------------------ */}
+          <div className="border-t pt-4 mt-4">
+            <h3 className="text-lg font-semibold mb-3">Équipements</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {AMENITY_CATEGORIES.map((category) => (
+                <div key={category.key}>
+                  <p className="text-sm font-medium text-gray-700 mb-2">{category.label}</p>
+                  <div className="space-y-1">
+                    {category.options.map((option) => (
+                      <label key={option} className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={(formData.accommodationAmenities?.[category.key] || []).includes(option)}
+                          onChange={() => handleAmenityToggle(category.key, option)}
+                          aria-label={`${category.label} — ${option}`}
+                        />
+                        {option}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ------------------ SECTION SERVICES INCLUS ------------------ */}
+          <div className="border-t pt-4 mt-4">
+            <h3 className="text-lg font-semibold mb-3">Services inclus</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {INCLUDED_SERVICES.map((service) => (
+                <label key={service.key} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.includedServices?.[service.key])}
+                    onChange={() => handleServiceToggle(service.key)}
+                    aria-label={service.label}
+                  />
+                  {service.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* ------------------ SECTION RÈGLES ------------------ */}
+          <div className="border-t pt-4 mt-4">
+            <h3 className="text-lg font-semibold mb-3">Règles</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+              {[
+                ['petsAllowed', 'Animaux acceptés'],
+                ['partiesAllowed', 'Fêtes autorisées'],
+                ['smokingAllowed', 'Fumeur autorisé'],
+                ['childrenAllowed', 'Enfants acceptés'],
+              ].map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={key === 'childrenAllowed' ? formData.rules?.childrenAllowed !== false : Boolean(formData.rules?.[key])}
+                    onChange={(e) => handleRuleChange(key, e.target.checked)}
+                    aria-label={label}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <div className="w-1/2 pr-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Âge minimum</label>
+              <input
+                type="number"
+                min="0"
+                value={formData.rules?.minimumAge ?? 0}
+                onChange={(e) => handleRuleChange('minimumAge', Number(e.target.value))}
+                aria-label="Âge minimum"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              />
             </div>
           </div>
 

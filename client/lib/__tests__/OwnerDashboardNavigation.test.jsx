@@ -18,13 +18,25 @@ describe('Navigation propriétaire', () => {
     getOwnerVisitesUnreadCount.mockResolvedValue(3);
     render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
 
-    const visits = screen.getByRole('link', { name: /Rendez-vous/i });
+    const visits = screen.getByRole('link', { name: /Mes rendez-vous/i });
     expect(visits).toHaveAttribute('href', '/mes-biens/visites');
     expect(visits).not.toHaveAttribute('aria-current');
-    expect(screen.getByRole('link', { name: 'Mes Biens' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Toutes mes annonces' })).toHaveAttribute('aria-current', 'page');
     expect(await screen.findByText('Nouveaux rendez-vous :')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Messagerie' })).toHaveAttribute('href', '/messages');
+    expect(screen.getByRole('link', { name: 'Mes messages' })).toHaveAttribute('href', '/messages');
     expect(screen.getByRole('link', { name: 'Sécurité' })).toHaveAttribute('href', '/mes-biens/securite');
     await waitFor(() => expect(getOwnerVisitesUnreadCount).toHaveBeenCalled());
+  });
+
+  test("Sprint 0 — expose le domaine Mes annonces (Vente/Location/Hébergement), Mes hôtels et Mes paiements en préparation de navigation", async () => {
+    getOwnerVisitesUnreadCount.mockResolvedValue(0);
+    render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
+
+    expect(screen.getByText('Mes annonces')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Vente' })).toHaveAttribute('href', '/mes-biens?status=vente');
+    expect(screen.getByRole('link', { name: 'Location' })).toHaveAttribute('href', '/mes-biens?status=location');
+    expect(screen.getByRole('link', { name: 'Hébergement' })).toHaveAttribute('href', '/mes-hebergements');
+    expect(screen.getByRole('link', { name: 'Mes hôtels' })).toHaveAttribute('href', '/mes-hotels');
+    expect(screen.getByRole('link', { name: 'Mes paiements' })).toHaveAttribute('href', '/mes-biens/paiements');
   });
 });

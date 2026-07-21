@@ -90,3 +90,45 @@ describe('Accommodation model — occupancyMode ⟺ accommodationType (Sprint H�
     expect(errors.occupancyMode).toBeDefined();
   });
 });
+
+describe('Accommodation model — Sprint B1 (équipements/règles/services/galerie/suspendu) — TEST DATA', () => {
+  test('amenities/rules/includedServices ont des valeurs par défaut cohérentes', async () => {
+    const acc = base({ accommodationType: 'villa_meublee' });
+    await acc.validate();
+    expect(acc.amenities.cuisine).toEqual([]);
+    expect(acc.amenities.securite).toEqual([]);
+    expect(acc.rules.childrenAllowed).toBe(true);
+    expect(acc.rules.petsAllowed).toBe(false);
+    expect(acc.rules.minimumAge).toBe(0);
+    expect(acc.includedServices.menage).toBe(false);
+    expect(acc.gallery).toEqual([]);
+    expect(acc.active).toBe(true);
+  });
+
+  test('amenities accepte des valeurs libres par catégorie (pas d\'enum strict serveur)', async () => {
+    const acc = base({
+      accommodationType: 'appartement_meuble',
+      amenities: { cuisine: ['Four', 'Réfrigérateur'], internet: ['Wifi'] },
+    });
+    await expect(acc.validate()).resolves.toBeUndefined();
+    expect(acc.amenities.cuisine).toEqual(['Four', 'Réfrigérateur']);
+  });
+
+  test("publicationStatus accepte désormais 'suspendu'", async () => {
+    const acc = base({ accommodationType: 'villa_meublee', publicationStatus: 'suspendu' });
+    await expect(acc.validate()).resolves.toBeUndefined();
+  });
+
+  test('publicationStatus rejette toute valeur hors enum', () => {
+    const acc = base({ accommodationType: 'villa_meublee' });
+    acc.publicationStatus = 'archive';
+    const errors = acc.validateSync()?.errors || {};
+    expect(errors.publicationStatus).toBeDefined();
+  });
+
+  test('gallery exige une url par entrée', () => {
+    const acc = base({ accommodationType: 'villa_meublee', gallery: [{ type: 'photo' }] });
+    const errors = acc.validateSync()?.errors || {};
+    expect(Object.keys(errors).some((k) => k.startsWith('gallery'))).toBe(true);
+  });
+});

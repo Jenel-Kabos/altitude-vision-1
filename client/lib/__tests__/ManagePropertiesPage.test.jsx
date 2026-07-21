@@ -6,12 +6,21 @@ import {
 import { createFullAccommodation, updateFullAccommodation, getHotels } from '../services/accommodationService';
 import { createFullSaleProperty, updateFullSaleProperty } from '../services/salePropertyService';
 import { createFullRentalProperty } from '../services/rentalPropertyService';
+import { useSearchParams } from 'next/navigation';
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
     user: { _id: 'TEST-ADMIN', id: 'TEST-ADMIN', role: 'Admin', name: 'TEST ADMIN' },
     canEdit: true, canDelete: true,
   }),
+}));
+
+// Sprint 0 (architecture Altimmo) — ManagePropertiesPage lit désormais
+// ?status= depuis l'URL (liens dédiés Vente/Location/Hébergement du
+// domaine Immobilier). Aucun filtre actif par défaut ; surchargé par test
+// au besoin via useSearchParams.mockReturnValue(...).
+vi.mock('next/navigation', () => ({
+  useSearchParams: vi.fn(() => new URLSearchParams()),
 }));
 
 vi.mock('../components/dashboard/MapLeaflet', () => ({ default: () => <div>TEST DATA MAP</div> }));
@@ -42,10 +51,16 @@ vi.mock('../services/rentalPropertyService', () => ({
 }));
 
 // Sprint A — cliquer "Ajouter" ouvre désormais un sélecteur métier
-// (Vente/Location/Hébergement meublé) avant tout formulaire.
+// (Vente/Location/Hébergement) avant tout formulaire.
 const chooseBusinessCard = async (label) => {
   fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
   fireEvent.click(await screen.findByRole('button', { name: new RegExp(label, 'i') }));
+  if (label === 'Hébergement') {
+    // Étape 2 du PropertyWizard (Sprint 0) : un type doit être choisi avant
+    // d'atteindre le formulaire. "Villa" par défaut pour les tests qui ne
+    // portent pas spécifiquement sur cette étape.
+    fireEvent.click(await screen.findByRole('button', { name: /^Villa$/i }));
+  }
 };
 
 const fillCommonFields = () => {
@@ -71,19 +86,24 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     vi.clearAllMocks();
     getAllProperties.mockResolvedValue([]);
     getHotels.mockResolvedValue([]);
+    // Ré-affirmé explicitement à chaque test : mockReturnValue (contrairement
+    // à mockReturnValueOnce) survit aux multiples re-renders du composant
+    // (ManagePropertiesPage appelle useSearchParams() à chaque rendu, pas
+    // une seule fois), donc ne pas fuiter vers le test suivant sans reset ici.
+    useSearchParams.mockReturnValue(new URLSearchParams());
   });
 
-  test("le sélecteur métier propose Vente, Location et Hébergement meublé", async () => {
+  test("le sélecteur métier propose Vente, Location et Hébergement", async () => {
     render(<ManagePropertiesPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
     expect(await screen.findByRole('button', { name: /Vente/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Location/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Hébergement meublé/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Hébergement/i })).toBeInTheDocument();
   });
 
-  test('choisir Hébergement meublé affiche les bons champs (statut déjà réglé, pas de re-sélection)', async () => {
+  test('choisir Hébergement affiche les bons champs (statut déjà réglé, pas de re-sélection)', async () => {
     render(<ManagePropertiesPage />);
-    await chooseBusinessCard('Hébergement meublé');
+    await chooseBusinessCard('Hébergement');
 
     expect(screen.getByText("Informations d'hébergement")).toBeInTheDocument();
     expect(screen.getByText('Tarification')).toBeInTheDocument();
@@ -92,6 +112,36 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     expect(screen.getByLabelText('Heure de check-in')).toBeInTheDocument();
     expect(screen.getByLabelText('Prix par nuit')).toBeInTheDocument();
     expect(screen.getByLabelText('Statut').value).toBe('hebergement');
+  });
+
+  test("PropertyWizard étape 2 — choisir Résidence meublée préremplit accommodationType (Sprint B1)", async () => {
+    render(<ManagePropertiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Hébergement/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Résidence meublée$/i }));
+
+    await waitFor(() => expect(screen.getByLabelText("Type d'hébergement").value).toBe('residence_meublee'));
+  });
+
+  test("Sprint B2 — Hôtel est de nouveau proposé à l'étape 2 du wizard et ouvre HotelPropertyForm", async () => {
+    render(<ManagePropertiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Hébergement/i }));
+    expect(screen.getByRole('button', { name: /^Hôtel$/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Hôtel$/i }));
+    expect(await screen.findByLabelText("Nom de l'hôtel")).toBeInTheDocument();
+  });
+
+  test("PropertyWizard étape 2 — le bouton Retour ramène à l'étape 1 sans perdre le contexte", async () => {
+    render(<ManagePropertiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Hébergement/i }));
+    expect(await screen.findByText("Quel type d'hébergement ?")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retour' }));
+    expect(await screen.findByRole('button', { name: /Vente/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Location/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Hébergement/i })).toBeInTheDocument();
   });
 
   test('choisir Location ouvre RentalPropertyForm (formulaire dédié, plus PropertyForm)', async () => {
@@ -136,10 +186,14 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
 
   test('affiche les erreurs de validation près des champs concernés sans appeler l’API', async () => {
     render(<ManagePropertiesPage />);
-    await chooseBusinessCard('Hébergement meublé');
+    await chooseBusinessCard('Hébergement');
     fillCommonFields();
     addFakeImage();
-    // accommodationType volontairement laissé vide.
+    // Le PropertyWizard préremplit accommodationType (étape 2) — on le
+    // revide manuellement ici pour vérifier que la validation de secours
+    // dans PropertyForm/handleSubmit fonctionne toujours si l'utilisateur
+    // revient en arrière sur le <select>.
+    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: '' } });
 
     fireEvent.click(screen.getByText('Enregistrer le bien'));
 
@@ -154,7 +208,7 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
       rate: { amount: 35000 },
     });
     render(<ManagePropertiesPage />);
-    await chooseBusinessCard('Hébergement meublé');
+    await chooseBusinessCard('Hébergement');
     fillCommonFields();
     addFakeImage();
     fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'villa_meublee' } });
@@ -173,6 +227,31 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     // Formulaire fermé/réinitialisé après succès.
     await waitFor(() => expect(screen.queryByText('Ajouter une annonce')).not.toBeInTheDocument());
     expect(await screen.findByText('Hébergement créé avec succès !')).toBeInTheDocument();
+  });
+
+  test('Sprint B1 — cocher des équipements/services/règles les inclut dans le payload envoyé', async () => {
+    createFullAccommodation.mockResolvedValue({
+      property: { _id: 'TEST-DATA-PROPERTY', status: 'hebergement' },
+      accommodation: { _id: 'TEST-DATA-ACC' },
+      rate: null,
+    });
+    render(<ManagePropertiesPage />);
+    await chooseBusinessCard('Hébergement');
+    fillCommonFields();
+    addFakeImage();
+    fireEvent.change(screen.getByLabelText('Capacité maximale en adultes'), { target: { value: '4' } });
+
+    fireEvent.click(screen.getByLabelText('Cuisine — Four'));
+    fireEvent.click(screen.getByLabelText('Ménage'));
+    fireEvent.click(screen.getByLabelText('Animaux acceptés'));
+
+    fireEvent.click(screen.getByText('Enregistrer le bien'));
+
+    await waitFor(() => expect(createFullAccommodation).toHaveBeenCalledTimes(1));
+    const sentFormData = createFullAccommodation.mock.calls[0][0];
+    expect(JSON.parse(sentFormData.get('accommodationAmenities')).cuisine).toContain('Four');
+    expect(JSON.parse(sentFormData.get('includedServices')).menage).toBe(true);
+    expect(JSON.parse(sentFormData.get('rules')).petsAllowed).toBe(true);
   });
 
   test('une création Vente réussie appelle createFullSaleProperty avec le bon payload (Sprint A)', async () => {
@@ -301,13 +380,13 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     expect(screen.queryByLabelText('Statut')).not.toBeInTheDocument();
   });
 
-  test("les types historiques (residence_meublee, bungalow) ne sont pas proposés à la création", async () => {
+  test("le type historique 'bungalow' n'est pas proposé à la création (residence_meublee, promue Sprint B1, l'est désormais)", async () => {
     render(<ManagePropertiesPage />);
-    await chooseBusinessCard('Hébergement meublé');
+    await chooseBusinessCard('Hébergement');
 
     const typeSelect = screen.getByLabelText("Type d'hébergement");
     const values = within(typeSelect).getAllByRole('option').map((o) => o.value);
-    expect(values).not.toContain('residence_meublee');
+    expect(values).toContain('residence_meublee');
     expect(values).not.toContain('bungalow');
   });
 
@@ -340,6 +419,21 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     expect(values).toContain('bungalow');
     expect(typeSelect.value).toBe('bungalow');
   });
+
+  test("un lien du domaine Immobilier (?status=vente) filtre la liste sans appel API supplémentaire (Sprint 0)", async () => {
+    useSearchParams.mockReturnValue(new URLSearchParams('status=vente'));
+    getAllProperties.mockResolvedValue([
+      { _id: 'P-VENTE', title: 'TEST DATA VENTE', status: 'vente', images: [] },
+      { _id: 'P-LOCATION', title: 'TEST DATA LOCATION', status: 'location', images: [] },
+    ]);
+
+    render(<ManagePropertiesPage />);
+
+    expect(await screen.findByText('TEST DATA VENTE')).toBeInTheDocument();
+    expect(screen.queryByText('TEST DATA LOCATION')).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^Vente$/i })).toBeInTheDocument();
+    expect(getAllProperties).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('ManagePropertiesPage — Hébergement — Établissement hôtelier (Sprint Hôtel) — TEST DATA', () => {
@@ -347,12 +441,17 @@ describe('ManagePropertiesPage — Hébergement — Établissement hôtelier (Sp
     vi.clearAllMocks();
     getAllProperties.mockResolvedValue([]);
     getHotels.mockResolvedValue([]);
+    useSearchParams.mockReturnValue(new URLSearchParams());
   });
 
   const openHebergementForm = async () => {
     render(<ManagePropertiesPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Hébergement meublé/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Hébergement/i }));
+    // Étape 2 du PropertyWizard (Sprint 0) : ces tests changent ensuite
+    // eux-mêmes le type via le <select> de PropertyForm, donc le choix
+    // initial ici n'a pas d'importance.
+    fireEvent.click(await screen.findByRole('button', { name: /^Villa$/i }));
   };
 
   test("l'option Hôtel apparaît dans la liste des types d'hébergement", async () => {
@@ -362,113 +461,34 @@ describe('ManagePropertiesPage — Hébergement — Établissement hôtelier (Sp
     expect(values).toContain('hotel');
   });
 
-  test("choisir un type non-hôtel ne montre jamais la section Établissement hôtelier", async () => {
+  test("choisir un type non-hôtel ne montre jamais HotelPropertyForm ni la section Établissement hôtelier embarquée", async () => {
     await openHebergementForm();
     fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'villa_meublee' } });
     expect(screen.queryByText('Établissement hôtelier')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Nom de l'hôtel")).not.toBeInTheDocument();
   });
 
-  test("choisir le type Hôtel affiche la section Établissement hôtelier et charge la liste", async () => {
-    getHotels.mockResolvedValue([{ _id: 'HOTEL-1', name: 'Hôtel Le Panorama' }]);
+  test("Sprint B2 — choisir/basculer vers le type Hôtel dans le wizard ou le <select> ouvre HotelPropertyForm (jamais PropertyForm)", async () => {
     await openHebergementForm();
     fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
 
-    expect(await screen.findByText('Établissement hôtelier')).toBeInTheDocument();
-    await waitFor(() => expect(getHotels).toHaveBeenCalledTimes(1));
+    // PropertyForm (et son ancien sélecteur embarqué "existant/nouveau") a
+    // disparu — remplacé par le formulaire dédié HotelPropertyForm.
+    expect(screen.queryByLabelText("Type d'hébergement")).not.toBeInTheDocument();
+    expect(await screen.findByLabelText("Nom de l'hôtel")).toBeInTheDocument();
+    expect(screen.getByText('Catégories de chambres')).toBeInTheDocument();
   });
 
-  test("mode 'existant' : le sélecteur d'hôtel liste les établissements chargés", async () => {
-    getHotels.mockResolvedValue([{ _id: 'HOTEL-1', name: 'Hôtel Le Panorama' }]);
-    await openHebergementForm();
-    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
-    await screen.findByText('Établissement hôtelier');
+  test("Sprint B2 — choisir directement Hôtel à l'étape 2 du wizard ouvre HotelPropertyForm", async () => {
+    render(<ManagePropertiesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Hébergement/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Hôtel$/i }));
 
-    fireEvent.click(screen.getByLabelText('Sélectionner un établissement existant'));
-    const hotelSelect = await screen.findByLabelText('Établissement hôtelier');
-    expect(await within(hotelSelect).findByRole('option', { name: 'Hôtel Le Panorama' })).toBeInTheDocument();
+    expect(await screen.findByLabelText("Nom de l'hôtel")).toBeInTheDocument();
   });
 
-  test("validation — accommodationType=hotel sans mode de rattachement est refusé sans appeler l'API", async () => {
-    await openHebergementForm();
-    fillCommonFields();
-    addFakeImage();
-    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
-    fireEvent.change(screen.getByLabelText('Capacité maximale en adultes'), { target: { value: '2' } });
-
-    fireEvent.click(screen.getByText('Enregistrer le bien'));
-
-    expect(await screen.findByText('Sélectionnez un établissement existant ou créez-en un nouveau.')).toBeInTheDocument();
-    expect(createFullAccommodation).not.toHaveBeenCalled();
-  });
-
-  test("validation — création d'un nouvel hôtel sans nom est refusée", async () => {
-    await openHebergementForm();
-    fillCommonFields();
-    addFakeImage();
-    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
-    fireEvent.change(screen.getByLabelText('Capacité maximale en adultes'), { target: { value: '2' } });
-    fireEvent.click(screen.getByLabelText('Créer un nouvel établissement'));
-
-    fireEvent.click(screen.getByText('Enregistrer le bien'));
-
-    expect(await screen.findByText("Le nom de l'hôtel est requis.")).toBeInTheDocument();
-    expect(createFullAccommodation).not.toHaveBeenCalled();
-  });
-
-  test("un rattachement à un hôtel existant envoie hotelMode='existing' et hotelId dans le payload", async () => {
-    getHotels.mockResolvedValue([{ _id: 'HOTEL-1', name: 'Hôtel Le Panorama' }]);
-    createFullAccommodation.mockResolvedValue({
-      property: { _id: 'TEST-DATA-PROPERTY', status: 'hebergement' },
-      accommodation: { _id: 'TEST-DATA-ACC' },
-      rate: null,
-      hotel: 'HOTEL-1',
-    });
-    await openHebergementForm();
-    fillCommonFields();
-    addFakeImage();
-    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
-    fireEvent.change(screen.getByLabelText('Capacité maximale en adultes'), { target: { value: '2' } });
-    fireEvent.click(screen.getByLabelText('Sélectionner un établissement existant'));
-    const hotelSelect = await screen.findByLabelText('Établissement hôtelier');
-    await waitFor(() => expect(within(hotelSelect).getAllByRole('option').length).toBeGreaterThan(1));
-    fireEvent.change(hotelSelect, { target: { value: 'HOTEL-1' } });
-
-    fireEvent.click(screen.getByText('Enregistrer le bien'));
-
-    await waitFor(() => expect(createFullAccommodation).toHaveBeenCalledTimes(1));
-    const sentFormData = createFullAccommodation.mock.calls[0][0];
-    expect(sentFormData.get('hotelMode')).toBe('existing');
-    expect(sentFormData.get('hotelId')).toBe('HOTEL-1');
-    expect(sentFormData.get('hotelName')).toBeNull();
-  });
-
-  test("la création d'un nouvel hôtel envoie hotelMode='create' et les champs de l'établissement", async () => {
-    createFullAccommodation.mockResolvedValue({
-      property: { _id: 'TEST-DATA-PROPERTY', status: 'hebergement' },
-      accommodation: { _id: 'TEST-DATA-ACC' },
-      rate: null,
-      hotel: 'NEW-HOTEL-ID',
-    });
-    await openHebergementForm();
-    fillCommonFields();
-    addFakeImage();
-    fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: 'hotel' } });
-    fireEvent.change(screen.getByLabelText('Capacité maximale en adultes'), { target: { value: '2' } });
-    fireEvent.click(screen.getByLabelText('Créer un nouvel établissement'));
-    fireEvent.change(screen.getByLabelText("Nom de l'hôtel"), { target: { value: 'Hôtel Le Panorama' } });
-    fireEvent.change(screen.getByLabelText("Nombre d'étoiles"), { target: { value: '4' } });
-
-    fireEvent.click(screen.getByText('Enregistrer le bien'));
-
-    await waitFor(() => expect(createFullAccommodation).toHaveBeenCalledTimes(1));
-    const sentFormData = createFullAccommodation.mock.calls[0][0];
-    expect(sentFormData.get('hotelMode')).toBe('create');
-    expect(sentFormData.get('hotelName')).toBe('Hôtel Le Panorama');
-    expect(sentFormData.get('hotelStarRating')).toBe('4');
-    expect(sentFormData.get('hotelId')).toBeNull();
-  });
-
-  test("l'édition d'un hébergement de type hôtel précharge le mode 'existant' et l'établissement rattaché", async () => {
+  test("l'édition d'un hébergement de type hôtel précharge le mode 'existant' et l'établissement rattaché (legacy, PropertyForm)", async () => {
     const property = {
       _id: 'TEST-DATA-PROPERTY', title: 'TEST DATA HOTEL', status: 'hebergement',
       price: 50000, address: { city: 'Brazzaville', arrondissement: '', neighborhood: 'Q' },
