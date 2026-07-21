@@ -16,9 +16,16 @@ const fail = (res, error) => res.status(error.statusCode || 500).json({
 
 exports.list = async (req, res) => {
   try {
-    const filter = {};
-    ['occupancyStatus', 'availabilityStatus', 'publicationStatus', 'owner', 'active'].forEach((key) => {
-      if (req.query[key] !== undefined) filter[key] = req.query[key];
+    // Par défaut, ne liste que les dossiers réellement activés (Sprint A) —
+    // une simple annonce Location créée via POST /api/rental-properties ne
+    // doit pas apparaître dans le module Gestion Locative tant qu'elle n'a
+    // pas été explicitement activée. `?managementActivated=false` permet de
+    // consulter les annonces en attente d'activation si un écran futur en a besoin.
+    const filter = { managementActivated: true };
+    ['occupancyStatus', 'availabilityStatus', 'publicationStatus', 'owner', 'active', 'managementActivated'].forEach((key) => {
+      if (req.query[key] !== undefined) {
+        filter[key] = key === 'managementActivated' || key === 'active' ? req.query[key] === 'true' : req.query[key];
+      }
     });
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
@@ -47,7 +54,10 @@ exports.stats = async (_req, res) => {
     const windowDays = contractAlertWindowDays();
     const soon = new Date(Date.now() + windowDays * 24 * 60 * 60 * 1000);
     const [grouped, overduePayments, partialPayments, expiringContracts, expiredContracts] = await Promise.all([
-      RentalManagement.aggregate([{ $group: { _id: null, total: { $sum: 1 }, vacant: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'vacant'] }, 1, 0] } }, available: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'disponible'] }, 1, 0] } }, occupied: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'occupe'] }, 1, 0] } }, notice: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'preavis'] }, 1, 0] } }, scheduledExits: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'sortie_programmee'] }, 1, 0] } }, inModeration: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'en_attente_moderation'] }, 1, 0] } }, published: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'publie'] }, 1, 0] } }, maintenance: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'maintenance'] }, 1, 0] } }, blockingInspections: { $sum: { $cond: [{ $and: [{ $eq: ['$occupancyStatus', 'sortie_programmee'] }, { $eq: [{ $ifNull: ['$exitInspectionClearedAt', null] }, null] }] }, 1, 0] } }, readyToRepublish: { $sum: { $cond: [{ $and: [{ $eq: ['$occupancyStatus', 'vacant'] }, { $eq: ['$publicationReadiness.ready', true] }, { $ne: ['$publicationStatus', 'publie'] }] }, 1, 0] } } } }]),
+      // Sprint A : n'agrège que les dossiers réellement activés — une
+      // simple annonce Location ne doit jamais gonfler les statistiques de
+      // gestion locative (voir server/docs/PROPERTY_TRANSACTION_ARCHITECTURE.md).
+      RentalManagement.aggregate([{ $match: { managementActivated: true } }, { $group: { _id: null, total: { $sum: 1 }, vacant: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'vacant'] }, 1, 0] } }, available: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'disponible'] }, 1, 0] } }, occupied: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'occupe'] }, 1, 0] } }, notice: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'preavis'] }, 1, 0] } }, scheduledExits: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'sortie_programmee'] }, 1, 0] } }, inModeration: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'en_attente_moderation'] }, 1, 0] } }, published: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'publie'] }, 1, 0] } }, maintenance: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'maintenance'] }, 1, 0] } }, blockingInspections: { $sum: { $cond: [{ $and: [{ $eq: ['$occupancyStatus', 'sortie_programmee'] }, { $eq: [{ $ifNull: ['$exitInspectionClearedAt', null] }, null] }] }, 1, 0] } }, readyToRepublish: { $sum: { $cond: [{ $and: [{ $eq: ['$occupancyStatus', 'vacant'] }, { $eq: ['$publicationReadiness.ready', true] }, { $ne: ['$publicationStatus', 'publie'] }] }, 1, 0] } } } }]),
       Paiement.countDocuments({ statut: { $in: ['impayé', 'en_retard'] } }),
       Paiement.countDocuments({ statut: 'partiel' }),
       Contrat.countDocuments({ type: 'location', statut: 'actif', dateFinBail: { $gte: new Date(), $lte: soon } }),
@@ -165,7 +175,13 @@ exports.create = async (req, res) => {
     const details = Object.fromEntries(allowed.filter((key) => req.body[key] !== undefined).map((key) => [key, req.body[key]]));
     const rental = await RentalManagement.findOneAndUpdate(
       { property: property._id },
-      { $setOnInsert: { property: property._id, owner: property.owner, manager: req.user.id }, $set: details },
+      {
+        $setOnInsert: { property: property._id, owner: property.owner, manager: req.user.id },
+        // Activation explicite (Sprint A) : marque le dossier comme
+        // réellement géré, même s'il avait été créé "en attente" par le
+        // nouveau flux de simple annonce (POST /api/rental-properties).
+        $set: { ...details, managementActivated: true },
+      },
       { new: true, upsert: true, runValidators: true },
     );
     sync.refreshReadiness(rental, property);

@@ -1,22 +1,39 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { getAllProperties, getPropertyById, deleteProperty, updateProperty, addProperty, toggleRecommande } from "../../services/propertyService";
 import { createFullAccommodation, updateFullAccommodation } from "../../services/accommodationService";
 import { useAuth } from '../../context/AuthContext';
 import {
   PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle,
-  ArrowLeft, ArrowRight, Building2, MapPin, Maximize2, Bed, Bath, Sparkles, Send
+  ArrowLeft, ArrowRight, Building2, MapPin, Maximize2, Bed, Bath, Sparkles, Send,
 } from "lucide-react";
 import PropertyForm from "../../components/dashboard/PropertyForm";
+import SalePropertyForm from "../../components/dashboard/SalePropertyForm";
+import RentalPropertyForm from "../../components/dashboard/RentalPropertyForm";
+import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
+import PropertyWizard from "../../components/dashboard/PropertyWizard";
 import Image from 'next/image';
+
+// Libellés d'affichage pour le titre de la modale "Ajouter" — le choix
+// métier lui-même est piloté par PropertyWizard.jsx (Sprint 0, point
+// d'entrée unique de création — voir ARCHITECTURE_ALTIMMO_V2.md).
+const BUSINESS_TYPE_LABELS = { vente: 'Vente', location: 'Location', hebergement: 'Hébergement' };
 
 const PROPERTIES_PER_PAGE = 8;
 
 const ManagePropertiesPage = () => {
   const { canEdit, canDelete, user } = useAuth();
   const canAddProperty = ['Admin', 'CommunityManager', 'Collaborateur'].includes(user?.role);
+  // Sprint 0 (architecture Altimmo) — pré-filtre lu depuis l'URL
+  // (?status=vente|location|hebergement), posé par les liens dédiés du
+  // domaine Immobilier dans AdminDashboard.jsx. Filtre 100% frontend, ne
+  // change aucun appel API : getAllProperties() renvoie toujours tout,
+  // exactement comme avant ce sprint.
+  const searchParams = useSearchParams();
+  const statusFilter = searchParams?.get('status') ?? null;
   const [properties, setProperties]         = useState([]);
   const [filteredProperties, setFiltered]   = useState([]);
   const [loading, setLoading]               = useState(false);
@@ -28,6 +45,15 @@ const ManagePropertiesPage = () => {
   const [currentPage, setCurrentPage]       = useState(1);
   const [existingImages, setExistingImages] = useState([]);
   const [confirmState, setConfirm]          = useState({ isOpen: false, message: '', onConfirm: () => {} });
+  // Sprint A — sélecteur métier initial ('vente'|'location'|'hebergement') ;
+  // null = écran de sélection encore affiché dans la modale "Ajouter".
+  const [addChoice, setAddChoice]           = useState(null);
+  // Bien en cours d'édition (objet complet, pas seulement `formData`) — sert
+  // à déterminer quel formulaire spécialisé afficher (SalePropertyForm /
+  // RentalPropertyForm / PropertyForm legacy pour l'hébergement).
+  const [editingProperty, setEditingProperty] = useState(null);
+  const [editFullData, setEditFullData]     = useState(null); // { property, sale? , rental? }
+  const [editLoading, setEditLoading]       = useState(false);
 
   const emptyForm = {
     title: "", description: "", price: "", honoraires: "", fraisVisite: 0,
@@ -42,6 +68,11 @@ const ManagePropertiesPage = () => {
     checkInTime: "14:00", checkOutTime: "11:00", minimumStay: 1, maximumStay: "",
     cancellationPolicy: "moderee", houseRules: "", securityDeposit: 0, cleaningFee: 0,
     nightlyPrice: "",
+    // Sprint B1 — équipements structurés (nom distinct de `amenities`, qui
+    // reste le champ générique texte libre de Property) / règles / services inclus
+    accommodationAmenities: { cuisine: [], salon: [], internet: [], exterieur: [], parking: [], securite: [] },
+    rules: { petsAllowed: false, partiesAllowed: false, smokingAllowed: false, childrenAllowed: true, minimumAge: 0 },
+    includedServices: { menage: false, petitDejeuner: false, blanchisserie: false, transfert: false, cuisine: false },
     // Établissement hôtelier (Sprint Hôtel — uniquement si accommodationType === 'hotel')
     hotelMode: "", hotelId: "", hotelName: "", hotelDescription: "",
     hotelStarRating: "", hotelPhone: "", hotelEmail: "", hotelWebsite: "",
@@ -54,23 +85,28 @@ const ManagePropertiesPage = () => {
   useEffect(() => { fetchProperties(); }, []);
 
   useEffect(() => {
-    const list = searchTerm
-      ? properties.filter(p =>
-          p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.address?.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.address?.arrondissement?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.type?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      : properties;
+    let list = statusFilter ? properties.filter((p) => p.status === statusFilter) : properties;
+    if (searchTerm) {
+      list = list.filter(p =>
+        p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.address?.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.address?.arrondissement?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.type?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
     setFiltered(list);
     setCurrentPage(1);
-  }, [searchTerm, properties]);
+  }, [searchTerm, properties, statusFilter]);
 
   const fetchProperties = async () => {
     setLoading(true);
     try {
       const res = await getAllProperties();
-      setProperties(res); setFiltered(res);
+      // `filteredProperties` est dérivé exclusivement par l'effet de filtrage
+      // ci-dessous (searchTerm + statusFilter) — ne pas le fixer ici en
+      // parallèle, sous peine de courte-circuiter le filtre ?status= au
+      // premier rendu après chargement (Sprint 0).
+      setProperties(res);
     } catch {
       showNotif("Erreur lors du chargement des biens.", "error");
     } finally {
@@ -90,6 +126,52 @@ const ManagePropertiesPage = () => {
     setShowEditModal(false);
     setEditingId(null);
     setErrors({});
+    setAddChoice(null);
+    setEditingProperty(null);
+    setEditFullData(null);
+    setEditLoading(false);
+  };
+
+  // Réponse du PropertyWizard (Sprint 0) — détermine le formulaire à charger.
+  // Un `accommodationType` n'est fourni que pour Hébergement (étape 2 du
+  // wizard, y compris "Hôtel") ; PropertyForm garde son propre sélecteur
+  // interne, simplement préréglé ici.
+  const handleWizardComplete = ({ transactionType, accommodationType }) => {
+    setAddChoice(transactionType);
+    if (transactionType === 'hebergement') {
+      setFormData((prev) => ({
+        ...prev,
+        status: 'hebergement',
+        ...(accommodationType ? { accommodationType } : {}),
+      }));
+    }
+  };
+
+  // Point d'entrée unique du bouton "Modifier" — détermine quel formulaire
+  // spécialisé afficher selon la catégorie métier réelle du bien (Sprint A).
+  // Hébergement continue d'utiliser exactement le flux existant (handleEdit
+  // ci-dessous, inchangé) ; Vente/Location chargent la fiche
+  // SaleManagement/RentalManagement associée pour préremplir le nouveau
+  // formulaire dédié.
+  const handleEditClick = async (property) => {
+    setEditingProperty(property);
+    if (property.status === 'hebergement') {
+      await handleEdit(property);
+      return;
+    }
+    setEditingId(property._id);
+    setExistingImages(property.images || []);
+    setShowEditModal(true);
+    setEditLoading(true);
+    try {
+      const full = await getPropertyById(property._id);
+      setEditFullData(full);
+    } catch {
+      showNotif("Erreur lors du chargement du bien.", "error");
+      setEditFullData({ property });
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   const handleEdit = async (property) => {
@@ -122,6 +204,9 @@ const ManagePropertiesPage = () => {
       checkInTime: "14:00", checkOutTime: "11:00", minimumStay: 1, maximumStay: "",
       cancellationPolicy: "moderee", houseRules: "", securityDeposit: 0, cleaningFee: 0,
       nightlyPrice: "",
+      accommodationAmenities: { cuisine: [], salon: [], internet: [], exterieur: [], parking: [], securite: [] },
+      rules: { petsAllowed: false, partiesAllowed: false, smokingAllowed: false, childrenAllowed: true, minimumAge: 0 },
+      includedServices: { menage: false, petitDejeuner: false, blanchisserie: false, transfert: false, cuisine: false },
       hotelMode: "", hotelId: "", hotelName: "", hotelDescription: "",
       hotelStarRating: "", hotelPhone: "", hotelEmail: "", hotelWebsite: "",
       hotelServices: "", hotelHasRestaurant: false, hotelHasReception: false,
@@ -152,6 +237,9 @@ const ManagePropertiesPage = () => {
             securityDeposit: acc.securityDeposit ?? 0,
             cleaningFee: acc.cleaningFee ?? 0,
             nightlyPrice: nightlyRate?.amount ?? "",
+            accommodationAmenities: acc.amenities || { cuisine: [], salon: [], internet: [], exterieur: [], parking: [], securite: [] },
+            rules: acc.rules || { petsAllowed: false, partiesAllowed: false, smokingAllowed: false, childrenAllowed: true, minimumAge: 0 },
+            includedServices: acc.includedServices || { menage: false, petitDejeuner: false, blanchisserie: false, transfert: false, cuisine: false },
             // Établissement déjà rattaché : on prérempli en mode "existing" —
             // l'admin peut changer d'hôtel ou en créer un nouveau, mais on ne
             // duplique jamais la fiche Hotel existante au premier chargement.
@@ -235,6 +323,7 @@ const ManagePropertiesPage = () => {
         accommodationType, maxAdults, maxChildren, beds,
         checkInTime, checkOutTime, minimumStay, maximumStay,
         cancellationPolicy, houseRules, securityDeposit, cleaningFee, nightlyPrice,
+        accommodationAmenities, rules, includedServices,
         hotelMode, hotelId, hotelName, hotelDescription, hotelStarRating,
         hotelPhone, hotelEmail, hotelWebsite, hotelServices, hotelHasRestaurant, hotelHasReception,
         ...rest
@@ -277,6 +366,11 @@ const ManagePropertiesPage = () => {
         data.append('securityDeposit', securityDeposit || 0);
         data.append('cleaningFee', cleaningFee || 0);
         if (nightlyPrice !== "") data.append('nightlyPrice', nightlyPrice);
+        // Nom distinct de "amenities" (déjà utilisé ci-dessus pour le champ
+        // générique texte libre de Property) — voir accommodationController.buildAccommodationData.
+        data.append('accommodationAmenities', JSON.stringify(accommodationAmenities || {}));
+        data.append('rules', JSON.stringify(rules || {}));
+        data.append('includedServices', JSON.stringify(includedServices || {}));
 
         // Établissement hôtelier — uniquement pertinent pour accommodationType
         // === 'hotel' ; jamais envoyé pour les autres types (voir
@@ -326,6 +420,18 @@ const ManagePropertiesPage = () => {
     } finally {
       setSubmit(false);
     }
+  };
+
+  // Sprint A — SalePropertyForm/RentalPropertyForm gèrent leur propre appel
+  // API et leurs propres erreurs ; ManagePropertiesPage n'a qu'à rafraîchir
+  // la liste et fermer la modale en cas de succès.
+  const handleSaleRentalCreateSuccess = () => {
+    fetchProperties();
+    resetForm();
+  };
+  const handleSaleRentalUpdateSuccess = (result) => {
+    setProperties((p) => p.map((x) => (x._id === editingId ? result.property : x)));
+    resetForm();
   };
 
   const handleToggleRecommande = async (propertyId, currentValue) => {
@@ -437,7 +543,7 @@ const ManagePropertiesPage = () => {
           )}
           <div className="flex gap-2">
             {canEdit && (
-              <button onClick={() => handleEdit(property)}
+              <button onClick={() => handleEditClick(property)}
                 className="flex-1 p-2.5 text-blue-600 hover:text-white bg-blue-50 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center" title="Modifier">
                 <Edit className="w-5 h-5" />
               </button>
@@ -488,7 +594,9 @@ const ManagePropertiesPage = () => {
             <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl leading-tight font-black bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">Gestion des Biens</h1>
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl leading-tight font-black bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">
+              {{ vente: 'Vente', location: 'Location', hebergement: 'Hébergement' }[statusFilter] || 'Toutes les annonces'}
+            </h1>
             <p className="text-sm sm:text-lg text-gray-600 font-medium mt-1">Gérez le patrimoine immobilier de <span className="font-bold text-blue-600">Altimmo</span></p>
           </div>
         </div>
@@ -549,14 +657,34 @@ const ManagePropertiesPage = () => {
               <div className="p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white/95 z-20 rounded-t-2xl">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl text-white"><Sparkles className="w-6 h-6" /></div>
-                  <h2 className="pr-10 text-xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Ajouter un nouveau bien</h2>
+                  <h2 className="pr-10 text-xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                    {addChoice ? `Ajouter — ${BUSINESS_TYPE_LABELS[addChoice] || addChoice}` : 'Ajouter une annonce'}
+                  </h2>
                   <button onClick={resetForm} disabled={loadingSubmit}
                     className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"><X className="w-6 h-6" /></button>
                 </div>
               </div>
               <div className="p-3 sm:p-6 overflow-y-auto flex-grow">
-                <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
-                  enableHebergement errors={errors} />
+                {!addChoice && (
+                  <PropertyWizard onComplete={handleWizardComplete} />
+                )}
+
+                {addChoice === 'vente' && (
+                  <SalePropertyForm onSuccess={handleSaleRentalCreateSuccess} onCancel={() => setAddChoice(null)} />
+                )}
+                {addChoice === 'location' && (
+                  <RentalPropertyForm onSuccess={handleSaleRentalCreateSuccess} onCancel={() => setAddChoice(null)} />
+                )}
+                {/* Sprint B2 — "Hôtel" ouvre désormais HotelPropertyForm (domaine
+                    Hôtellerie dédié), jamais PropertyForm. Tous les autres types
+                    d'hébergement (Sprint B1, inchangés) restent sur PropertyForm. */}
+                {addChoice === 'hebergement' && formData.accommodationType === 'hotel' && (
+                  <HotelPropertyForm onSuccess={() => { resetForm(); fetchProperties(); }} onCancel={resetForm} />
+                )}
+                {addChoice === 'hebergement' && formData.accommodationType !== 'hotel' && (
+                  <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
+                    enableHebergement errors={errors} />
+                )}
               </div>
             </div>
           </div>
@@ -575,9 +703,34 @@ const ManagePropertiesPage = () => {
                 </div>
               </div>
               <div className="p-3 sm:p-6 overflow-y-auto flex-grow">
-                <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
-                  existingImages={existingImages} setExistingImages={setExistingImages}
-                  enableHebergement errors={errors} />
+                {editingProperty?.status === 'hebergement' && (
+                  <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
+                    existingImages={existingImages} setExistingImages={setExistingImages}
+                    enableHebergement errors={errors} />
+                )}
+                {editingProperty?.status !== 'hebergement' && editLoading && (
+                  <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>
+                )}
+                {editingProperty?.status === 'vente' && !editLoading && (
+                  <SalePropertyForm
+                    propertyId={editingId}
+                    initialProperty={editFullData}
+                    initialSale={editFullData?.sale}
+                    existingImages={existingImages}
+                    onSuccess={handleSaleRentalUpdateSuccess}
+                    onCancel={resetForm}
+                  />
+                )}
+                {editingProperty?.status === 'location' && !editLoading && (
+                  <RentalPropertyForm
+                    propertyId={editingId}
+                    initialProperty={editFullData}
+                    initialRental={editFullData?.rental}
+                    existingImages={existingImages}
+                    onSuccess={handleSaleRentalUpdateSuccess}
+                    onCancel={resetForm}
+                  />
+                )}
               </div>
             </div>
           </div>

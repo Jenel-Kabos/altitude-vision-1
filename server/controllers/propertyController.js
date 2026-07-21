@@ -11,6 +11,69 @@ const { notify, notifyMany } = require('../services/notificationService');
 const Accommodation = require('../models/Accommodation');
 const RatePlan = require('../models/RatePlan');
 const { isPubliclyVisible } = require('../services/accommodationService');
+// Sprint A (séparation Vente/Location) — fiches satellites embarquées dans
+// GET /api/properties/:id pour le préremplissage d'édition
+// (SalePropertyForm/RentalPropertyForm), même convention que `accommodation`.
+const SaleManagement = require('../models/SaleManagement');
+const RentalManagement = require('../models/RentalManagement');
+
+/**
+ * Projection publique de SaleManagement — jamais le document complet côté
+ * public (GET /api/properties/:id utilise `optionalAuth`, donc accessible
+ * sans authentification). Exclut `manager`/`createdBy`/`updatedBy` (identifiants
+ * internes), `agencyCommission`/`sellerConditions` (négociation interne),
+ * `publicationStatus` (workflow interne), `ownershipDocumentType`/
+ * `ownershipDocumentAvailable` (situation juridique détaillée, réservée au
+ * staff/propriétaire). Seules les informations commerciales de vente
+ * réellement nécessaires à l'annonce sont exposées.
+ */
+function serializeSalePublic(sale) {
+  const { negotiable, legalStatus, financingAccepted } = sale.toObject ? sale.toObject() : sale;
+  return { negotiable, legalStatus, financingAccepted };
+}
+
+/**
+ * Projection publique de RentalManagement — jamais le document complet côté
+ * public. Exclut tout ce qui relève du dossier locatif opérationnel :
+ * `currentTenant`, `activeLease`, `occupancyStatus`, `availabilityStatus`,
+ * `publicationStatus`/`publicationPolicy`/`publicationAuthorized`, `manager`,
+ * `managementFee` (frais internes d'agence), `mandateStartAt`/`mandateEndAt`,
+ * `maintenanceStatus`/`maintenanceReason`, `noticeStartedAt`/`plannedExitAt`/
+ * `exitInspectionClearedAt`, `publicationReadiness`, `workflowHistory`
+ * (acteurs + commentaires internes), `actionRequests`. Seules les
+ * informations utiles à un locataire potentiel sont exposées.
+ */
+// Champs présents à la fois sur Property (historique, Sprint 2 et avant) et
+// RentalManagement (Sprint A) — voir server/docs/PROPERTY_TRANSACTION_ARCHITECTURE.md
+// ("Compatibilité legacy"). Property n'a volontairement PAS d'équivalent pour
+// les champs 100% nouveaux (furnished, chargesIncluded, minimumLeaseMonths…).
+const LEGACY_RENTAL_FALLBACK_FIELDS = ['cautionMultiplicateur', 'profilsLocataireRecherches', 'documentsRequis'];
+
+/**
+ * Priorité explicite au chargement d'édition : RentalManagement (si
+ * réellement activé/curaté) → Property legacy → valeur par défaut du schéma
+ * RentalManagement (déjà appliquée par Mongoose à l'hydratation). Un
+ * RentalManagement `managementActivated: false` (créé par le simple flux
+ * d'annonce, jamais retouché) n'a que des valeurs par défaut pour ces champs
+ * — ne doit jamais masquer une vraie valeur historique saisie sur Property.
+ */
+function applyLegacyRentalFallback(rentalObj, property, rentalDoc) {
+  if (rentalDoc.managementActivated) return rentalObj; // dossier réellement activé : RentalManagement fait foi
+  LEGACY_RENTAL_FALLBACK_FIELDS.forEach((field) => {
+    const legacyValue = property[field];
+    const hasLegacyValue = Array.isArray(legacyValue) ? legacyValue.length > 0 : legacyValue !== undefined && legacyValue !== null;
+    if (hasLegacyValue) rentalObj[field] = legacyValue;
+  });
+  return rentalObj;
+}
+
+function serializeRentalPublic(rental) {
+  const {
+    furnished, chargesIncluded, minimumLeaseMonths, availableFrom,
+    petsAllowed, rentalConditions,
+  } = rental.toObject ? rental.toObject() : rental;
+  return { furnished, chargesIncluded, minimumLeaseMonths, availableFrom, petsAllowed, rentalConditions };
+}
 
 // ============================================================
 // 🛠️ UTILITAIRES
@@ -89,6 +152,25 @@ const parseNonNegativeAmount = (value, fallback) => {
 };
 
 /**
+ * Convertit vers un nombre fini, ou lève une erreur 422 explicite si la
+ * valeur fournie n'est pas vide mais n'est pas un nombre valide — jamais de
+ * NaN silencieux propagé jusqu'au schéma Mongoose. Une valeur vide/absente
+ * retourne `undefined` (champ non fourni). Partagé par
+ * accommodationController.js, salePropertyController.js et
+ * rentalPropertyController.js (Sprint A).
+ */
+const parseNumericField = (value, label) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    const err = new Error(`${label} doit être un nombre valide.`);
+    err.statusCode = 422;
+    throw err;
+  }
+  return n;
+};
+
+/**
  * Reconstruit l'adresse à partir du body — supporte à la fois un champ
  * `address` JSON (string ou objet déjà parsé) et les champs à plat
  * `address[street]`, `address[arrondissement]`… (FormData multipart).
@@ -123,6 +205,60 @@ const parseGeoLocation = (location) => {
   }
   return location;
 };
+
+/**
+ * Construit le payload Property commun à tous les flux de création admin
+ * complète (hébergement, vente, location — voir accommodationController.js,
+ * salePropertyController.js, rentalPropertyController.js). `status` est
+ * TOUJOURS fourni par l'appelant, jamais lu depuis `req.body` — le choix
+ * métier (via l'endpoint appelé) détermine le statut, jamais un champ
+ * technique du formulaire (Sprint A, séparation Vente/Location/Hébergement).
+ */
+async function buildBasePropertyData(req, ownerId, status) {
+  const {
+    title, description, price, pole, availability, type,
+    surface, bedrooms, bathrooms, amenities,
+    livingRooms, kitchens, constructionType,
+    location, honoraires, fraisVisite, longitude, latitude,
+  } = req.body;
+
+  const parsedHonoraires = parseNonNegativeAmount(honoraires, null);
+  const parsedFraisVisite = parseNonNegativeAmount(fraisVisite, 0);
+  if ((honoraires !== undefined && honoraires !== '' && parsedHonoraires === null)
+    || (fraisVisite !== undefined && fraisVisite !== '' && parsedFraisVisite === null)) {
+    const err = new Error('Les honoraires et frais de visite doivent être des montants positifs ou nuls.');
+    err.statusCode = 422;
+    throw err;
+  }
+
+  const imagePaths = await uploadFilesToCloudinary(req.files);
+
+  return {
+    owner: ownerId,
+    title,
+    description,
+    price: parseFloat(price),
+    honoraires: parsedHonoraires,
+    fraisVisite: parsedFraisVisite,
+    pole: pole || 'Altimmo',
+    status,
+    availability: availability || 'Disponible',
+    type,
+    address: parseAddress(req),
+    surface: parseFloat(surface),
+    bedrooms: parseInt(bedrooms || 0),
+    bathrooms: parseInt(bathrooms || 0),
+    livingRooms: parseInt(livingRooms || 0),
+    kitchens: parseInt(kitchens || 0),
+    constructionType,
+    amenities: parseAmenities(amenities),
+    longitude,
+    latitude,
+    location: parseGeoLocation(location),
+    images: imagePaths,
+    statusAdmin: 'En attente',
+  };
+}
 
 // ============================================================
 // 🎮 CONTRÔLEURS PRINCIPAUX
@@ -376,6 +512,18 @@ const getProperty = asyncHandler(async (req, res) => {
     }
   }
 
+  // Sprint A : fiches Vente/Location embarquées pour le préremplissage
+  // d'édition côté dashboard admin (SalePropertyForm/RentalPropertyForm) —
+  // aucun gate de visibilité additionnel (déjà couvert par statusAdmin
+  // ci-dessus, comme pour Vente/Location avant ce sprint).
+  let sale = null;
+  let rental = null;
+  if (property.status === 'vente') {
+    sale = await SaleManagement.findOne({ property: property._id });
+  } else if (property.status === 'location') {
+    rental = await RentalManagement.findOne({ property: property._id });
+  }
+
   const responseProperty = property.toObject();
   if (!isAdmin && !isOwner) {
     delete responseProperty.documents;
@@ -395,6 +543,15 @@ const getProperty = asyncHandler(async (req, res) => {
   if (accommodation) {
     const rates = await RatePlan.find({ accommodation: accommodation._id, active: true });
     responseProperty.accommodation = { ...accommodation.toObject(), rates };
+  }
+  // Document complet réservé au staff/propriétaire (préremplissage édition
+  // dashboard) — projection restreinte sinon, quel que soit le statut de
+  // modération (cette route est publique via `optionalAuth`).
+  if (sale) responseProperty.sale = (isAdmin || isOwner) ? sale.toObject() : serializeSalePublic(sale);
+  if (rental) {
+    responseProperty.rental = (isAdmin || isOwner)
+      ? applyLegacyRentalFallback(rental.toObject(), property, rental)
+      : serializeRentalPublic(rental);
   }
 
   res.status(200).json({
@@ -842,4 +999,8 @@ module.exports = {
   parseNonNegativeAmount,
   parseAddress,
   parseGeoLocation,
+  buildBasePropertyData,
+  parseNumericField,
+  serializeSalePublic,
+  serializeRentalPublic,
 };

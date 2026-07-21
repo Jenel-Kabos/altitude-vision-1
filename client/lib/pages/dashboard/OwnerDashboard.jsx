@@ -3,7 +3,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { User, LogOut, Globe, ShieldCheck, Menu, X, Building, Mountain, Calendar, MessageCircle, Palmtree } from "lucide-react";
+import {
+  User, LogOut, Globe, ShieldCheck, Menu, X, Building, Mountain, Calendar,
+  MessageCircle, Palmtree, Landmark, KeyRound, Building2, CreditCard,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useAuth } from '../../context/AuthContext';
 import { getOwnerVisitesUnreadCount } from '../../services/visiteService';
@@ -12,13 +15,23 @@ const BLUE  = '#2E7BB5';
 const GOLD  = '#C8960C';
 const GREEN = '#16A34A';
 
+// Sprint 0 (architecture Altimmo) — "Mes annonces" regroupe Vente/Location
+// (toujours sur /mes-biens, formulaire generique inchangé — voir
+// ARCHITECTURE_ALTIMMO_V2.md, la séparation par formulaire dédié
+// SalePropertyForm/RentalPropertyForm reste un flux admin uniquement pour
+// l'instant) et Hébergement (page propriétaire déjà dédiée). "Mes hôtels"
+// et "Mes paiements" préparent la navigation uniquement (pages vides).
 const NAV_LINKS = [
-  { to: '/mes-biens',         end: true,  Icon: Building,    label: 'Mes Biens',   accent: BLUE  },
-  { to: '/mes-hebergements',  end: true,  Icon: Palmtree,    label: 'Mes Hébergements', accent: GOLD },
-  { to: '/mes-biens/visites', end: false, Icon: Calendar,    label: 'Rendez-vous', accent: GOLD  },
-  { to: '/messages',          end: false, Icon: MessageCircle,label: 'Messagerie',  accent: BLUE  },
-  { to: '/profile',           end: false, Icon: User,        label: 'Mon Profil',  accent: GOLD  },
-  { to: '/mes-biens/securite',end: false, Icon: ShieldCheck, label: 'Sécurité',    accent: GREEN },
+  { to: '/mes-biens',                    end: true,  Icon: Building,      label: 'Toutes mes annonces', accent: BLUE, section: 'Mes annonces' },
+  { to: '/mes-biens?status=vente',       end: false, Icon: Landmark,      label: 'Vente',                accent: BLUE, section: 'Mes annonces' },
+  { to: '/mes-biens?status=location',    end: false, Icon: KeyRound,      label: 'Location',             accent: BLUE, section: 'Mes annonces' },
+  { to: '/mes-hebergements',             end: true,  Icon: Palmtree,      label: 'Hébergement',          accent: GOLD, section: 'Mes annonces' },
+  { to: '/mes-hotels',                   end: true,  Icon: Building2,     label: 'Mes hôtels',           accent: GOLD, section: null },
+  { to: '/mes-biens/visites',            end: false, Icon: Calendar,      label: 'Mes rendez-vous',      accent: GOLD, section: null },
+  { to: '/mes-biens/paiements',          end: false, Icon: CreditCard,    label: 'Mes paiements',        accent: GOLD, section: null },
+  { to: '/messages',                     end: false, Icon: MessageCircle, label: 'Mes messages',         accent: BLUE, section: null },
+  { to: '/profile',                      end: false, Icon: User,          label: 'Mon profil',           accent: GOLD, section: null },
+  { to: '/mes-biens/securite',           end: false, Icon: ShieldCheck,   label: 'Sécurité',              accent: GREEN, section: null },
 ];
 
 const OwnerDashboard = ({ children }) => {
@@ -150,8 +163,15 @@ const OwnerDashboard = ({ children }) => {
 
           {/* Nav */}
           <nav className="px-3 py-3 space-y-0.5">
-            {NAV_LINKS.map(({ to, end, Icon, label, accent }) => (
-              <Link key={to} href={to} onClick={close}
+            {NAV_LINKS.map(({ to, end, Icon, label, accent, section }, index) => (
+              <React.Fragment key={to}>
+                {section && section !== NAV_LINKS[index - 1]?.section && (
+                  <p className="px-3 pt-3 pb-1 text-white/25 text-xs font-semibold uppercase tracking-widest"
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                    {section}
+                  </p>
+                )}
+              <Link href={to} onClick={close}
                 aria-current={isActive(to, end) ? 'page' : undefined}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 ${
                   isActive(to, end)
@@ -172,6 +192,7 @@ const OwnerDashboard = ({ children }) => {
                     style={{ backgroundColor: accent }} />
                 )}
               </Link>
+              </React.Fragment>
             ))}
           </nav>
         </div>

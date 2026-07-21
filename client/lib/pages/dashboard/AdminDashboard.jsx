@@ -8,6 +8,7 @@ import {
   CheckCircle2, ShieldCheck, Mail, Menu, X, Star, Mountain, Building,
   ClipboardList, BarChart2, Scale, Megaphone, MessageCircle, FolderOpen,
   Clock, PenLine, Calculator, FileText, CreditCard, Palmtree,
+  Landmark, KeyRound, Users2, FileSignature, Wrench, Building2,
 } from "lucide-react";
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardBadges } from '../../hooks/useDashboardBadges';
@@ -34,22 +35,66 @@ const NAV_SECTIONS = [
     label: null,
     links: [
       { to: '/dashboard',                    end: true,  Icon: BarChart3,    label: 'Tableau de bord',    accent: BLUE,      roles: ALL_STAFF },
-      { to: '/dashboard/properties',         end: false, Icon: Home,         label: 'Altimmo',             accent: BLUE,      roles: ROLES_ALTIMMO },
-      { to: '/dashboard/visites',            end: false, Icon: Calendar,     label: 'Rendez-vous',         accent: GOLD,      roles: ALL_STAFF, badge: 'visites' },
-      { to: '/dashboard/estimations',        end: false, Icon: Calculator,   label: 'Estimations',         accent: GOLD,      roles: ROLES_ESTIM, badge: 'estimations' },
-      { to: '/dashboard/devis',              end: false, Icon: FileText,     label: 'Devis locatif',       accent: GOLD,      roles: ROLES_ESTIM },
-      { to: '/dashboard/gestion-locative',   end: false, Icon: Building,     label: 'Gestion Locative',   accent: BLUE,      roles: ROLES_GL },
-      { to: '/dashboard/paiements',          end: false, Icon: CreditCard,   label: 'Paiements visites',   accent: GOLD,      roles: ALL_STAFF },
+    ],
+  },
+  {
+    // Domaine 1 — Immobilier : Vente/Location/Hébergement en tant qu'annonces
+    // (publication). La gestion des baux actifs vit dans le domaine séparé
+    // "Gestion locative" ci-dessous — voir ARCHITECTURE_ALTIMMO_V2.md.
+    label: 'Immobilier',
+    links: [
+      { to: '/dashboard/properties',               end: true,  Icon: Home,       label: 'Toutes les annonces', accent: BLUE, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/properties?status=vente',       end: false, Icon: Landmark,   label: 'Vente',               accent: BLUE, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/properties?status=location',    end: false, Icon: KeyRound,   label: 'Location',            accent: BLUE, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/properties?status=hebergement', end: false, Icon: Palmtree,   label: 'Hébergement',         accent: BLUE, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/hebergements',       end: false, Icon: Palmtree,   label: 'Gestion hébergements', accent: GOLD, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/estimations',        end: false, Icon: Calculator, label: 'Estimations',  accent: GOLD, roles: ROLES_ESTIM, badge: 'estimations' },
+      { to: '/dashboard/devis',              end: false, Icon: FileText,   label: 'Devis locatif', accent: GOLD, roles: ROLES_ESTIM },
+      { to: '/dashboard/visites',            end: false, Icon: Calendar,   label: 'Visites',       accent: GOLD, roles: ALL_STAFF, badge: 'visites' },
+      { to: '/dashboard/paiements',          end: false, Icon: CreditCard, label: 'Paiements visites', accent: GOLD, roles: ALL_STAFF },
+      { to: '/dashboard/proprietaires',      end: false, Icon: Users2,     label: 'Propriétaires', accent: BLUE, roles: ROLES_ALTIMMO },
+    ],
+  },
+  {
+    // Domaine 2 — Gestion locative : bail actif uniquement (locataire, loyer,
+    // préavis, sortie, maintenance) — jamais la publication d'une annonce.
+    // Une annonce Location n'y apparaît que si managementActivated === true
+    // (voir RentalManagement, server/docs/PROPERTY_TRANSACTION_ARCHITECTURE.md).
+    label: 'Gestion locative',
+    links: [
+      { to: '/dashboard/gestion-locative',            end: true,  Icon: Building,       label: "Vue d'ensemble", accent: BLUE, roles: ROLES_GL },
+      { to: '/dashboard/gestion-locative/baux',        end: false, Icon: FileSignature, label: 'Baux',           accent: BLUE, roles: ROLES_GL },
+      { to: '/dashboard/gestion-locative/locataires',  end: false, Icon: Users,         label: 'Locataires',     accent: BLUE, roles: ROLES_GL },
+      { to: '/dashboard/gestion-locative/paiements',   end: false, Icon: CreditCard,    label: 'Paiements',      accent: BLUE, roles: ROLES_GL },
+      { to: '/dashboard/gestion-locative/preavis',     end: false, Icon: Clock,         label: 'Préavis',        accent: BLUE, roles: ROLES_GL },
+      { to: '/dashboard/gestion-locative/maintenance', end: false, Icon: Wrench,        label: 'Maintenance',    accent: BLUE, roles: ROLES_GL },
+      { to: '/dashboard/documents',                    end: false, Icon: FolderOpen,    label: 'Documents',      accent: GOLD, roles: ROLES_DOCS },
+    ],
+  },
+  {
+    // Domaine 3 — Hôtellerie : établissement (Hotel), pas une chambre.
+    // RoomType/réservations hors périmètre — voir ARCHITECTURE_ALTIMMO_V2.md.
+    label: 'Hôtellerie',
+    links: [
+      // Sprint B2 — Catégories de chambres et Tarifs sont gérés PAR
+      // établissement (depuis sa fiche, /dashboard/hotels/[hotelId]/...),
+      // jamais comme des listes plates globales : un seul lien de nav.
+      { to: '/dashboard/hotels',                end: true,  Icon: Building2, label: 'Établissements',         accent: GOLD, roles: ROLES_ALTIMMO },
+    ],
+  },
+  {
+    label: null,
+    links: [
       { to: '/dashboard/events',             end: false, Icon: Calendar,     label: 'Mila Events',         accent: '#D42B2B', roles: ROLES_CM   },
       { to: '/dashboard/altcom',             end: false, Icon: Briefcase,    label: 'Altcom',              accent: GOLD,      roles: ROLES_CM   },
-      { to: '/dashboard/documents',          end: false, Icon: FolderOpen,   label: 'Documents',           accent: '#C8960C', roles: ROLES_DOCS },
     ],
   },
   {
     label: 'Modération',
     links: [
       { to: '/dashboard/moderation/properties',  end: false, Icon: CheckCircle2, label: 'Modération Biens',       accent: '#7C3AED', roles: ROLES_MOD, badge: 'moderation' },
-      { to: '/dashboard/moderation/hebergement', end: false, Icon: Palmtree,     label: 'Modération Hébergement', accent: GOLD,      roles: ROLES_ALTIMMO },
+      { to: '/dashboard/moderation/hebergement', end: false, Icon: Palmtree,     label: 'Modération Hébergement', accent: GOLD,      roles: ROLES_MOD },
+      { to: '/dashboard/moderation/hotellerie',  end: false, Icon: Building2,    label: 'Modération Hôtellerie',  accent: GOLD,      roles: ROLES_MOD },
       { to: '/dashboard/moderation/reviews',     end: false, Icon: Star,         label: 'Modération Avis',        accent: '#6366F1', roles: ROLES_MOD },
     ],
   },
@@ -266,7 +311,14 @@ const AdminDashboard = ({ children }) => {
           {/* Nav */}
           <nav className="px-3 py-3 space-y-0.5 overflow-y-auto"
             style={{ maxHeight: 'calc(100dvh - 220px)' }}>
-            {NAV_SECTIONS.map((section, si) => (
+            {NAV_SECTIONS.map((section, si) => {
+              const visibleLinks = section.links.filter(link => !link.roles || link.roles.includes(user?.role));
+              // Une section dont aucun lien n'est visible pour le rôle
+              // courant ne doit jamais afficher un en-tête "orphelin" sans
+              // rien en dessous (bug pré-existant, révélé par les nouveaux
+              // domaines Gestion locative/Hôtellerie — Sprint 0).
+              if (visibleLinks.length === 0) return null;
+              return (
               <div key={si}>
                 {section.label && (
                   <p className="px-3 pt-3 pb-1 text-white/25 text-xs font-semibold uppercase tracking-widest"
@@ -274,8 +326,7 @@ const AdminDashboard = ({ children }) => {
                     {section.label}
                   </p>
                 )}
-                {section.links
-                  .filter(link => !link.roles || link.roles.includes(user?.role))
+                {visibleLinks
                   .map(({ to, end, Icon, label, accent, badge }) => (
                   <Link key={to} href={to} onClick={close}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
@@ -299,7 +350,8 @@ const AdminDashboard = ({ children }) => {
                   </Link>
                 ))}
               </div>
-            ))}
+              );
+            })}
           </nav>
         </div>
 

@@ -9,6 +9,10 @@ import {
   updateAccommodation,
   submitAccommodation,
   upsertAccommodationRate,
+  deactivateAccommodation,
+  reactivateAccommodation,
+  duplicateAccommodation,
+  deleteAccommodation,
 } from "../../services/accommodationService";
 import { ACCOMMODATION_TYPES } from "../../constants/accommodation";
 
@@ -16,6 +20,7 @@ const PUBLICATION_LABELS = {
   brouillon: { label: "Brouillon", className: "bg-gray-100 text-gray-700" },
   soumis: { label: "En attente de validation", className: "bg-yellow-100 text-yellow-800" },
   publie: { label: "Publié", className: "bg-green-100 text-green-800" },
+  suspendu: { label: "Suspendu", className: "bg-orange-100 text-orange-800" },
   rejete: { label: "Rejeté", className: "bg-red-100 text-red-700" },
 };
 
@@ -53,8 +58,17 @@ const MyAccommodationsPage = () => {
     try {
       setLoading(true);
       const [props, accs] = await Promise.all([getMyProperties(), getMyAccommodations()]);
-      setProperties((props || []).filter((p) => p.status === "hebergement"));
-      setAccommodations(accs || []);
+      const accList = accs || [];
+      // Contrôle final Sprint B2 — un hébergement de type 'hotel' se gère
+      // exclusivement depuis "Mes hôtels" (son propre cycle de vie,
+      // catégories, tarifs) : l'API refuse désormais dupliquer/supprimer/
+      // désactiver un tel hébergement depuis cette page (409), donc il ne
+      // doit plus y apparaître du tout pour éviter des actions vouées à échouer.
+      const hotelPropertyIds = new Set(
+        accList.filter((a) => a.accommodationType === 'hotel').map((a) => a.property?._id || a.property),
+      );
+      setProperties((props || []).filter((p) => p.status === "hebergement" && !hotelPropertyIds.has(p._id)));
+      setAccommodations(accList);
     } catch (err) {
       console.error(err);
       toast.error("Erreur lors du chargement de vos hébergements.");
@@ -139,6 +153,47 @@ const MyAccommodationsPage = () => {
     }
   };
 
+  const handleDeactivate = async (id) => {
+    try {
+      await deactivateAccommodation(id);
+      toast.success("Annonce désactivée (masquée du public).");
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Erreur lors de la désactivation.");
+    }
+  };
+
+  const handleReactivate = async (id) => {
+    try {
+      await reactivateAccommodation(id);
+      toast.success("Annonce réactivée.");
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Erreur lors de la réactivation.");
+    }
+  };
+
+  const handleDuplicate = async (id) => {
+    try {
+      await duplicateAccommodation(id);
+      toast.success("Annonce dupliquée en brouillon.");
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Erreur lors de la duplication.");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Supprimer définitivement cet hébergement ? Cette action est irréversible.")) return;
+    try {
+      await deleteAccommodation(id);
+      toast.success("Hébergement supprimé.");
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Erreur lors de la suppression.");
+    }
+  };
+
   const handleRateSave = async (accId, mode) => {
     const amount = Number(rateInputs[`${accId}_${mode}`]);
     if (!amount || amount <= 0) {
@@ -181,9 +236,22 @@ const MyAccommodationsPage = () => {
                 <p className="text-sm text-gray-500">{property.address_city || property.address?.city}</p>
               </div>
               {acc && (
-                <span className={`text-xs font-semibold px-2 py-1 rounded ${PUBLICATION_LABELS[acc.publicationStatus]?.className || "bg-gray-100"}`}>
-                  {PUBLICATION_LABELS[acc.publicationStatus]?.label || acc.publicationStatus}
-                </span>
+                <div className="flex items-center gap-2">
+                  {acc.publicationStatus === "publie" && acc.active === false && (
+                    <span className="text-xs font-semibold px-2 py-1 rounded bg-gray-200 text-gray-600">Désactivée</span>
+                  )}
+                  <span className={`text-xs font-semibold px-2 py-1 rounded ${PUBLICATION_LABELS[acc.publicationStatus]?.className || "bg-gray-100"}`}>
+                    {PUBLICATION_LABELS[acc.publicationStatus]?.label || acc.publicationStatus}
+                  </span>
+                  {acc.completion && (
+                    <span
+                      className={`text-xs font-semibold px-2 py-1 rounded ${acc.completion.complete ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}
+                      title={`Informations ${acc.completion.breakdown.informations}/20 · Photos ${acc.completion.breakdown.photos}/20 · Tarifs ${acc.completion.breakdown.tarifs}/20 · Équipements ${acc.completion.breakdown.equipements}/20 · Règles ${acc.completion.breakdown.regles}/10 · Services ${acc.completion.breakdown.services}/10`}
+                    >
+                      Complétude {acc.completion.score}%
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 
@@ -230,6 +298,22 @@ const MyAccommodationsPage = () => {
                       Soumettre pour validation
                     </button>
                   )}
+                  {acc.publicationStatus === "publie" && acc.active !== false && (
+                    <button onClick={() => handleDeactivate(acc._id)} className="bg-gray-600 text-white px-3 py-1.5 rounded text-sm">
+                      Désactiver
+                    </button>
+                  )}
+                  {acc.publicationStatus === "publie" && acc.active === false && (
+                    <button onClick={() => handleReactivate(acc._id)} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm">
+                      Réactiver
+                    </button>
+                  )}
+                  <button onClick={() => handleDuplicate(acc._id)} className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded text-sm">
+                    Dupliquer
+                  </button>
+                  <button onClick={() => handleDelete(acc._id)} className="bg-red-600 text-white px-3 py-1.5 rounded text-sm">
+                    Supprimer
+                  </button>
                 </div>
 
                 <div className="mt-3 border-t pt-3">

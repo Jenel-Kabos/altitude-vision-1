@@ -6,11 +6,24 @@
 // Property (adresse, ville, quartier, coordonnées GPS, images principales —
 // voir Sprint Hôtel §01, aucune duplication).
 //
-// Périmètre volontairement minimal : pas de gestion de chambres/unités, pas
-// de calendrier, pas de réservation — voir server/docs/HEBERGEMENT.md
-// ("Sprint Hôtel"). Un Hotel n'est qu'une fiche d'établissement à ce stade.
+// Sprint B2 : véritable domaine Hôtellerie — un Hotel gère désormais ses
+// RoomCategory (voir RoomCategory.js), sa galerie enrichie (même structure
+// que Accommodation.gallery, Sprint B1), ses services structurés, son
+// contact, et son propre cycle de publication (score de complétude dédié,
+// voir hotelService.computeHotelCompletionScore). Toujours PAS de
+// Room/Reservation/Calendar — voir HOTEL_V2.md.
 
 const mongoose = require('mongoose');
+
+// Services structurés (Sprint B2) — chaque clé est un booléen. Remplace
+// l'ancien `services: [String]` en tant que source de vérité pour le
+// nouveau domaine Hôtellerie ; `services` (texte libre) est conservé pour
+// toute mention additionnelle non couverte par cette liste (aucune perte de
+// donnée existante, aucune migration).
+const HOTEL_SERVICE_KEYS = [
+  'restaurant', 'bar', 'piscine', 'spa', 'salleSport',
+  'salleConference', 'navette', 'parking', 'reception24h', 'wifi',
+];
 
 const hotelSchema = new mongoose.Schema(
   {
@@ -19,6 +32,9 @@ const hotelSchema = new mongoose.Schema(
       required: [true, "Le nom de l'hôtel est requis."],
       trim: true,
     },
+    // Enseigne / marque commerciale (Sprint B2) — distincte du nom légal
+    // (ex : nom = "SARL Panorama Hôtellerie", enseigne = "Hôtel Panorama").
+    brand: { type: String, trim: true, default: '' },
     description: { type: String, trim: true, default: '' },
 
     starRating: {
@@ -54,14 +70,54 @@ const hotelSchema = new mongoose.Schema(
       },
     },
 
-    services: { type: [String], default: [] },
-    hasRestaurant: { type: Boolean, default: false },
+    // Contact (Sprint B2) — informatif, aucun impact sur les permissions.
+    contact: {
+      responsable: { type: String, trim: true, default: '' },
+      horaires: { type: String, trim: true, default: '' },
+      languesParlees: { type: [String], default: [] },
+    },
+
+    services: { type: [String], default: [] }, // texte libre historique, conservé
+    hotelServices: {
+      // Structuré (Sprint B2) — voir HOTEL_SERVICE_KEYS.
+      restaurant: { type: Boolean, default: false },
+      bar: { type: Boolean, default: false },
+      piscine: { type: Boolean, default: false },
+      spa: { type: Boolean, default: false },
+      salleSport: { type: Boolean, default: false },
+      salleConference: { type: Boolean, default: false },
+      navette: { type: Boolean, default: false },
+      parking: { type: Boolean, default: false },
+      reception24h: { type: Boolean, default: false },
+      wifi: { type: Boolean, default: false },
+    },
+    hasRestaurant: { type: Boolean, default: false }, // legacy, conservé (voir hasRestaurant/hasReception)
     hasReception: { type: Boolean, default: false },
 
+    // Galerie enrichie (Sprint B2) — même structure que
+    // Accommodation.gallery (Sprint B1) : métadonnées posées sur les URLs
+    // déjà hébergées par Property.images via Cloudinary (aucun changement
+    // Cloudinary). Si vide, l'affichage retombe sur Property.images.
+    gallery: {
+      type: [
+        {
+          url: { type: String, required: true },
+          type: { type: String, enum: ['photo', 'video'], default: 'photo' },
+          isCover: { type: Boolean, default: false },
+          order: { type: Number, default: 0 },
+          alt: { type: String, default: '', trim: true },
+        },
+      ],
+      default: [],
+    },
+
     // Gestionnaire/propriétaire de l'établissement — même convention que
-    // Property.owner. Ne conditionne aucun droit d'accès à ce stade (pas de
-    // dashboard hôtel dédié dans ce sprint) — champ informatif.
-    manager: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    // Property.owner.
+    // index: true — corrige un index manquant constaté à l'audit final
+    // Sprint B2 : `hotelController.mine` filtre systématiquement par
+    // `manager` (GET /api/hotels/mine, "Mes hôtels"), ce qui provoquait un
+    // scan complet de la collection Hotel sans cet index.
+    manager: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
 
     // Property "ancre" créé en même temps que ce Hotel, s'il y en a un.
     // Pas d'unicité : un même Hotel pourra plus tard être référencé par
@@ -75,6 +131,28 @@ const hotelSchema = new mongoose.Schema(
       index: true, // filtré sur chaque GET /api/hotels (sélecteur admin)
     },
 
+    // Cycle de publication dédié (Sprint B2) — même forme que
+    // Accommodation.publicationStatus (Sprint B1/audit sécurité). Gate la
+    // visibilité du DOMAINE HÔTELLERIE (dashboard, modération) ; la
+    // visibilité PUBLIQUE de l'annonce reste gouvernée par
+    // Accommodation.publicationStatus (inchangé, voir accommodationService.
+    // isPubliclyVisible) — synchronisée au moment de la validation/
+    // suspension par hotelService.syncLinkedAccommodations (best-effort,
+    // jamais bloquant).
+    publicationStatus: {
+      type: String,
+      enum: ['brouillon', 'soumis', 'publie', 'rejete', 'suspendu'],
+      default: 'brouillon',
+      index: true,
+    },
+    rejectionReason: { type: String, trim: true, default: '' },
+    suspensionReason: { type: String, trim: true, default: '' },
+    submittedAt: { type: Date, default: null },
+    publishedAt: { type: Date, default: null },
+    suspendedAt: { type: Date, default: null },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    active: { type: Boolean, default: true }, // levier propriétaire, cf Accommodation.active
+
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
@@ -82,5 +160,6 @@ const hotelSchema = new mongoose.Schema(
 );
 
 const Hotel = mongoose.model('Hotel', hotelSchema);
+Hotel.HOTEL_SERVICE_KEYS = HOTEL_SERVICE_KEYS;
 
 module.exports = Hotel;

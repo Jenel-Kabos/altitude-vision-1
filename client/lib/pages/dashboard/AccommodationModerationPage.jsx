@@ -4,15 +4,12 @@ import React, { useEffect, useState } from "react";
 import { CheckCircle2, XCircle, MapPin } from "lucide-react";
 import toast from "@/lib/utils/toast";
 import { getPendingAccommodations, reviewAccommodation } from "../../services/accommodationService";
+import { ACCOMMODATION_TYPES, INCLUDED_SERVICES } from "../../constants/accommodation";
 
-const ACCOMMODATION_TYPE_LABELS = {
-  villa_meublee: "Villa meublée",
-  maison_meublee: "Maison meublée",
-  appartement_meuble: "Appartement meublé",
-  studio_meuble: "Studio meublé",
-  residence_meublee: "Résidence meublée",
-  bungalow: "Bungalow",
-};
+// Sprint B1 — réutilise la liste de référence partagée (constants/accommodation.js)
+// au lieu d'un mapping local dupliqué et incomplet (l'ancien ne couvrait ni
+// hotel/residence_hoteliere/chambre_hotes/autre, ni les valeurs legacy).
+const typeLabel = (value) => ACCOMMODATION_TYPES.find((t) => t.value === value)?.label || value;
 
 const AccommodationModerationPage = () => {
   const [accommodations, setAccommodations] = useState([]);
@@ -84,14 +81,49 @@ const AccommodationModerationPage = () => {
         <div className="grid gap-4 md:grid-cols-2">
           {accommodations.map((acc) => (
             <div key={acc._id} className="border rounded-lg p-4 bg-white shadow-sm">
-              <h3 className="font-semibold text-lg">{acc.property?.title || "Bien sans titre"}</h3>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold text-lg">{acc.property?.title || "Bien sans titre"}</h3>
+                {acc.completion && (
+                  <span className={`shrink-0 text-xs font-semibold px-2 py-1 rounded ${acc.completion.complete ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                    Complétude {acc.completion.score}%
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
                 <MapPin size={13} /> {[acc.property?.address?.arrondissement, acc.property?.address?.city].filter(Boolean).join(", ") || "Adresse non renseignée"}
               </p>
-              <p className="text-sm mt-2">Type : {ACCOMMODATION_TYPE_LABELS[acc.accommodationType] || acc.accommodationType}</p>
+
+              {acc.property?.images?.length > 0 && (
+                <div className="flex gap-1.5 mt-2 overflow-x-auto">
+                  {acc.property.images.slice(0, 5).map((url, i) => (
+                    <img key={i} src={url} alt="" className="w-16 h-16 object-cover rounded shrink-0" />
+                  ))}
+                </div>
+              )}
+
+              <p className="text-sm mt-2">Type : {typeLabel(acc.accommodationType)}</p>
               <p className="text-sm">Capacité : {acc.capacity?.maxAdults || 0} adulte(s), {acc.capacity?.maxChildren || 0} enfant(s)</p>
               <p className="text-sm">Chambres : {acc.property?.bedrooms ?? '—'} · Salles de bain : {acc.property?.bathrooms ?? '—'}</p>
               <p className="text-sm">Arrivée / Départ : {acc.checkInTime} / {acc.checkOutTime}</p>
+
+              {acc.rates?.length > 0 && (
+                <p className="text-sm">
+                  Tarifs : {acc.rates.map((r) => `${r.amount} ${r.currency} (${r.mode})`).join(" · ")}
+                </p>
+              )}
+              {!acc.rates?.length && <p className="text-sm text-amber-700">Aucun tarif actif renseigné.</p>}
+
+              {acc.amenities && Object.values(acc.amenities).some((l) => l?.length) && (
+                <p className="text-sm mt-1">
+                  Équipements : {Object.values(acc.amenities).flat().join(", ")}
+                </p>
+              )}
+
+              {acc.includedServices && Object.values(acc.includedServices).some(Boolean) && (
+                <p className="text-sm">
+                  Services inclus : {INCLUDED_SERVICES.filter((s) => acc.includedServices[s.key]).map((s) => s.label).join(", ")}
+                </p>
+              )}
 
               {rejectingId === acc._id ? (
                 <div className="mt-3 space-y-2">

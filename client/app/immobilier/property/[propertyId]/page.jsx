@@ -2,6 +2,7 @@ import { buildMetadata, SITE_URL } from '@/lib/seo';
 import PropertyDetailPage from "@/lib/pages/PropertyDetailPage";
 import JsonLd from "@/lib/components/JsonLd";
 import { normalizePropertyDetail } from '@/lib/utils/normalizePropertyDetail';
+import { buildVacationRental } from "@/lib/jsonld";
 
 async function getProperty(id) {
   try {
@@ -69,6 +70,10 @@ export default async function Page({ params }) {
       },
       ...(property.surface && { floorSize: { "@type": "QuantitativeValue", value: property.surface, unitCode: "MTK" } }),
     });
+
+    if (property.status === 'hebergement' && property.accommodation) {
+      schemas.push(buildVacationRental(property, property.accommodation));
+    }
 
     schemas.push({
       "@context":     "https://schema.org",

@@ -1,6 +1,7 @@
 import { buildMetadata, SITE_URL } from '@/lib/seo';
 import PropertyDetailPage from "@/lib/pages/PropertyDetailPage";
 import JsonLd from "@/lib/components/JsonLd";
+import { buildVacationRental } from "@/lib/jsonld";
 
 async function getProperty(id) {
   try {
@@ -68,6 +69,14 @@ export default async function Page({ params }) {
       },
       ...(property.surface && { floorSize: { "@type": "QuantitativeValue", value: property.surface, unitCode: "MTK" } }),
     });
+
+    // Sprint B1 — hébergement indépendant : schema.org VacationRental en
+    // complément du RealEstateListing générique ci-dessus (les moteurs de
+    // recherche acceptent plusieurs @type sur une même page via un tableau
+    // de schémas — voir JsonLd.jsx).
+    if (property.status === 'hebergement' && property.accommodation) {
+      schemas.push(buildVacationRental(property, property.accommodation));
+    }
 
     schemas.push({
       "@context":     "https://schema.org",

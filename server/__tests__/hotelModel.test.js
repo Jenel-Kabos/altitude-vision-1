@@ -73,4 +73,29 @@ describe('Hotel model — TEST DATA', () => {
   test('timestamps activés (createdAt/updatedAt gérés par le schéma)', () => {
     expect(Hotel.schema.options.timestamps).toBe(true);
   });
+
+  test('publicationStatus par défaut "brouillon", active par défaut true, gallery vide (Sprint B2)', async () => {
+    const hotel = base();
+    await expect(hotel.validate()).resolves.toBeUndefined();
+    expect(hotel.publicationStatus).toBe('brouillon');
+    expect(hotel.active).toBe(true);
+    expect(hotel.gallery).toEqual([]);
+  });
+
+  test("publicationStatus accepte 'suspendu' (Sprint B2)", async () => {
+    await expect(base({ publicationStatus: 'suspendu' }).validate()).resolves.toBeUndefined();
+  });
+
+  test('publicationStatus hors enum est rejeté', () => {
+    const hotel = base();
+    hotel.publicationStatus = 'archive';
+    const errors = hotel.validateSync()?.errors || {};
+    expect(errors.publicationStatus).toBeDefined();
+  });
+
+  test("un index existe sur 'manager' (contrôle final Sprint B2 — corrige un scan complet sur GET /api/hotels/mine)", () => {
+    const indexes = Hotel.schema.indexes();
+    const managerIndex = indexes.find(([fields]) => fields.manager === 1);
+    expect(managerIndex).toBeDefined();
+  });
 });
