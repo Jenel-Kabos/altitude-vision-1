@@ -2,6 +2,7 @@ const express = require('express');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/hotelController');
 const roomCategoryCtrl = require('../controllers/roomCategoryController');
+const reservationCtrl = require('../controllers/hotelReservationController');
 const { ROLES_ALTIMMO } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
 
@@ -10,6 +11,13 @@ const router = express.Router();
 // Public — liste et fiche hôtel (pages publiques), AVANT auth.protect.
 router.get('/public', ctrl.listPublic);
 router.get('/public/:id', ctrl.getPublic);
+
+// Sprint C — disponibilité + demande de réservation, accessibles sans
+// compte. `auth.optionalAuth` attache req.user si un jeton valide est
+// fourni (pour rattacher la demande à un compte client existant), sans
+// jamais l'exiger — voir hotelReservationController.createPublicReservation.
+router.get('/:hotelId/availability', auth.optionalAuth, reservationCtrl.getPublicAvailability);
+router.post('/:hotelId/reservations', auth.optionalAuth, reservationCtrl.createPublicReservation);
 
 router.use(auth.protect);
 

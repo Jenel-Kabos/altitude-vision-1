@@ -35,6 +35,10 @@ const USER_LINKS = {
   rental_payment_overdue: '/mes-paiements', rental_contract_expiring: '/mes-biens',
   quote_status: '/profile', quote_response: '/profile', contrat_new: '/profile', contrat_updated: '/profile',
   account_verified: '/profile', account_suspended: '/profile', message_staff: '/messages', new_message: '/messages',
+  // Sprint C — moteur de réservation hôtelière.
+  hotel_reservation_pending: '/mes-hotels/reservations', hotel_reservation_confirmed: '/mes-reservations-hotel',
+  hotel_reservation_rejected: '/mes-reservations-hotel', hotel_reservation_cancelled: '/mes-reservations-hotel',
+  hotel_reservation_expired: '/mes-reservations-hotel',
 };
 
 const STAFF_LINKS = {
@@ -50,6 +54,7 @@ const STAFF_LINKS = {
   rental_maintenance_completed: '/dashboard/gestion-locative', rental_property_available: '/dashboard/gestion-locative',
   rental_payment_overdue: '/dashboard/gestion-locative', rental_contract_expiring: '/dashboard/gestion-locative',
   rental_owner_request: '/dashboard/gestion-locative',
+  hotel_reservation_expired_batch: '/dashboard/hotel-reservations',
 };
 
 const visitSocketEventFor = (type) => {

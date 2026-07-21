@@ -137,6 +137,25 @@ cron.schedule('*/5 * * * *', async () => {
 
 logger.info('⏰ [CRON] Rappels de visites activés (toutes les 5 minutes)');
 
+// ============================================================
+// 🛎️ CRON JOB — Sprint C : expiration des demandes de réservation hôtelière
+// 'pending' non confirmées avant leur pendingExpiresAt. Même fréquence et
+// même pattern que le cron Visites ci-dessus (fonction pure testable,
+// aucune dépendance à l'horloge système dans son test).
+// ============================================================
+const { processReservationExpiry } = require('./services/hotelReservationExpiryService');
+
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    const result = await processReservationExpiry();
+    if (result.expired) logger.info(`⏰ [CRON Réservations Hôtel] ${result.expired} expiration(s)`);
+  } catch (err) {
+    logger.error('❌ [CRON Réservations Hôtel] Erreur automatisation:', err.message);
+  }
+});
+
+logger.info('⏰ [CRON] Expiration des réservations hôtelières en attente activée (toutes les 5 minutes)');
+
 
 const app = express();
 
@@ -313,6 +332,7 @@ const gestionDocumentRoutes  = require('./routes/gestionDocumentRoutes');
 const rentalManagementRoutes = require('./routes/rentalManagementRoutes');
 const accommodationRoutes    = require('./routes/accommodationRoutes');
 const hotelRoutes            = require('./routes/hotelRoutes');
+const hotelReservationRoutes = require('./routes/hotelReservationRoutes');
 const salePropertyRoutes     = require('./routes/salePropertyRoutes');
 const rentalPropertyRoutes   = require('./routes/rentalPropertyRoutes');
 
@@ -341,6 +361,7 @@ app.use('/api/rental-management', rentalManagementRoutes);
 // 🛎️ Hébergement (meublés — Sprint 2)
 app.use('/api/accommodations', accommodationRoutes);
 app.use('/api/hotels', hotelRoutes);
+app.use('/api/hotel-reservations', hotelReservationRoutes);
 
 // 🏷️ Vente / Location — formulaires admin dédiés (Sprint A, séparation par
 // transaction). Espace de noms dédié (comme /api/accommodations et

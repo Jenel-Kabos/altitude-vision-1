@@ -10,6 +10,7 @@ import { MapPin, Star, Wifi } from "lucide-react";
 import { getPublicHotel } from "../services/hotelService";
 import { HOTEL_SERVICES, HOTEL_RATE_TYPES } from "../constants/hotel";
 import { formatCurrencyXAF } from "../utils/normalizePropertyDetail";
+import HotelBookingWidget from "../components/HotelBookingWidget";
 
 const GOLD = "#C8960C";
 const BLUE = "#2E7BB5";
@@ -94,6 +95,8 @@ const HotelPublicDetailPage = () => {
           </div>
         </section>
       )}
+
+      <HotelBookingWidget hotelId={hotel._id || params?.hotelId} categories={categories || []} />
 
       <section className="mt-8">
         <h2 className="text-xl font-bold mb-2" style={{ color: BLUE }}>Localisation</h2>
