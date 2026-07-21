@@ -80,6 +80,7 @@ const NAV_SECTIONS = [
       // établissement (depuis sa fiche, /dashboard/hotels/[hotelId]/...),
       // jamais comme des listes plates globales : un seul lien de nav.
       { to: '/dashboard/hotels',                end: true,  Icon: Building2, label: 'Établissements',         accent: GOLD, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/hotel-reservations',    end: true,  Icon: Calendar,  label: 'Réservations hôtelières', accent: GOLD, roles: ROLES_ALTIMMO },
     ],
   },
   {

@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   User, LogOut, Globe, ShieldCheck, Menu, X, Building, Mountain, Calendar,
-  MessageCircle, Palmtree, Landmark, KeyRound, Building2, CreditCard,
+  MessageCircle, Palmtree, Landmark, KeyRound, Building2, CreditCard, BookOpenCheck,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useAuth } from '../../context/AuthContext';
@@ -27,6 +27,7 @@ const NAV_LINKS = [
   { to: '/mes-biens?status=location',    end: false, Icon: KeyRound,      label: 'Location',             accent: BLUE, section: 'Mes annonces' },
   { to: '/mes-hebergements',             end: true,  Icon: Palmtree,      label: 'Hébergement',          accent: GOLD, section: 'Mes annonces' },
   { to: '/mes-hotels',                   end: true,  Icon: Building2,     label: 'Mes hôtels',           accent: GOLD, section: null },
+  { to: '/mes-hotels/reservations',       end: true,  Icon: BookOpenCheck, label: 'Mes réservations',     accent: GOLD, section: null },
   { to: '/mes-biens/visites',            end: false, Icon: Calendar,      label: 'Mes rendez-vous',      accent: GOLD, section: null },
   { to: '/mes-biens/paiements',          end: false, Icon: CreditCard,    label: 'Mes paiements',        accent: GOLD, section: null },
   { to: '/messages',                     end: false, Icon: MessageCircle, label: 'Mes messages',         accent: BLUE, section: null },
