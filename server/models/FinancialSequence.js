@@ -10,5 +10,6 @@ const schema = new mongoose.Schema({
   prefix: { type: String, required: true, trim: true, maxlength: 30 },
   currentValue: { type: Number, required: true, default: 0, min: 0 },
 }, { timestamps: true });
+schema.path('currentValue').validate(Number.isSafeInteger, 'currentValue doit être un entier sûr.');
 schema.index({ domain: 1, establishmentType: 1, establishmentId: 1, documentType: 1, year: 1 }, { unique: true });
 module.exports = mongoose.model('FinancialSequence', schema);

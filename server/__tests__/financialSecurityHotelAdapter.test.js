@@ -26,6 +26,11 @@ describe('Financial Core — isolation et permissions', () => {
     await expect(authz.assertAccountingRole({ role: 'Admin' })).resolves.toBe(true);
     await expect(authz.assertAccountingRole({ role: 'Secretaire' })).resolves.toBe(true);
   });
+  test('la matrice de capacités financières reste explicite et fermée', () => {
+    expect(authz.hasFinancialCapability({ role: 'Secretaire' }, 'financial.payment.create')).toBe(true);
+    expect(authz.hasFinancialCapability({ role: 'Proprietaire' }, 'financial.document.issue')).toBe(false);
+    expect(() => authz.assertFinancialCapability({ role: 'Client' }, 'financial.ledger.view')).toThrow(expect.objectContaining({ code: 'FINANCIAL_UNAUTHORIZED' }));
+  });
   test('le hash invité et les métadonnées fournisseur sont exclus par défaut', () => {
     expect(FinancialDocument.schema.path('guestAccess.tokenHash').options.select).toBe(false);
     expect(FinancialPayment.schema.path('providerMetadata').options.select).toBe(false);

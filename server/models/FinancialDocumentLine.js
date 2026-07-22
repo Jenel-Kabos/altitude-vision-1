@@ -8,6 +8,8 @@ const schema = new mongoose.Schema({
   taxes: [{ taxCode: String, taxLabel: String, rateBasisPoints: { type: Number, min: 0 }, amountMinor: { type: Number, min: 0 }, included: { type: Boolean, default: false } }],
   sourceType: { type: String, enum: C.FINANCIAL_SUBJECT_TYPES, required: true }, sourceId: { type: ObjectId, required: true }, serviceDate: Date, metadata: { type: mongoose.Schema.Types.Mixed, default: {} }, createdBy: { type: ObjectId, ref: 'User', required: true },
 }, { timestamps: true });
+['unitAmountMinor', 'subtotalMinor', 'discountAmountMinor', 'taxAmountMinor', 'feesAmountMinor', 'totalMinor'].forEach((path) => schema.path(path).validate(Number.isSafeInteger, `${path} doit être un entier sûr.`));
+schema.path('quantity').validate(Number.isSafeInteger, 'quantity doit être un entier sûr.');
 schema.index({ financialDocument: 1, lineNumber: 1 }, { unique: true });
 schema.index({ sourceType: 1, sourceId: 1 });
 module.exports = mongoose.model('FinancialDocumentLine', schema);
