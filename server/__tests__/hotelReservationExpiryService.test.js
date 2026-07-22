@@ -5,14 +5,18 @@ jest.mock('../models/Hotel');
 jest.mock('../models/RoomCategory');
 jest.mock('../models/RatePlan');
 jest.mock('../services/hotelAvailabilityService');
+jest.mock('../services/roomAssignmentService', () => ({ releaseRoom: jest.fn() }));
 jest.mock('../services/notificationService', () => ({ notify: jest.fn().mockResolvedValue(), notifyStaff: jest.fn().mockResolvedValue() }));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 
 const HotelReservation = require('../models/HotelReservation');
 const availability = require('../services/hotelAvailabilityService');
+const roomAssignmentService = require('../services/roomAssignmentService');
 const { notifyStaff } = require('../services/notificationService');
 const { processReservationExpiry } = require('../services/hotelReservationExpiryService');
+
+const NO_ACTIVE_ASSIGNMENT = Object.assign(new Error('Aucune chambre active à libérer pour cette réservation.'), { statusCode: 404 });
 
 HotelReservation.ALLOWED_TRANSITIONS = {
   pending: ['confirmed', 'rejected', 'cancelled', 'expired'],
@@ -31,6 +35,7 @@ describe('processReservationExpiry — Sprint C §11 — TEST DATA', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     availability.releaseInventory.mockResolvedValue();
+    roomAssignmentService.releaseRoom.mockRejectedValue(NO_ACTIVE_ASSIGNMENT);
   });
 
   test('expire les réservations pending dont pendingExpiresAt est dépassé, et libère leur inventaire', async () => {

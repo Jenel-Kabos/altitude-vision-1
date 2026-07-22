@@ -68,6 +68,9 @@ const MesReservationsHotelPage = () => {
                 <Calendar size={13} /> {new Date(r.checkInDate).toLocaleDateString('fr-FR')} → {new Date(r.checkOutDate).toLocaleDateString('fr-FR')} ({r.nights} nuit(s))
               </p>
               <p className="text-sm text-gray-600 mt-1">Référence : {r.reference}</p>
+              {r.status === "checked_in" && r.room?.roomNumber && (
+                <p className="text-sm text-blue-700 font-medium mt-1">Chambre {r.room.roomNumber}</p>
+              )}
               <p className="text-sm font-semibold mt-1">{formatCurrencyXAF(r.totalAmount)}</p>
 
               {CANCELLABLE.includes(r.status) && (

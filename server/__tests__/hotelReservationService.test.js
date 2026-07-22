@@ -10,6 +10,7 @@ jest.mock('../models/RoomCategory');
 jest.mock('../models/RatePlan');
 jest.mock('../models/HotelReservation');
 jest.mock('../services/hotelAvailabilityService');
+jest.mock('../services/roomAssignmentService', () => ({ releaseRoom: jest.fn() }));
 jest.mock('../services/notificationService', () => ({ notify: jest.fn().mockResolvedValue(), notifyStaff: jest.fn().mockResolvedValue() }));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
@@ -19,9 +20,12 @@ const RoomCategory = require('../models/RoomCategory');
 const RatePlan = require('../models/RatePlan');
 const HotelReservation = require('../models/HotelReservation');
 const availability = require('../services/hotelAvailabilityService');
+const roomAssignmentService = require('../services/roomAssignmentService');
 const {
   computeReservationPricing, createReservation, transitionStatus, updateReservation,
 } = require('../services/hotelReservationService');
+
+const NO_ACTIVE_ASSIGNMENT = Object.assign(new Error('Aucune chambre active à libérer pour cette réservation.'), { statusCode: 404 });
 
 HotelReservation.ALLOWED_TRANSITIONS = {
   pending: ['confirmed', 'rejected', 'cancelled', 'expired'],
@@ -157,6 +161,9 @@ describe('transitionStatus — cycle de vie centralisé — TEST DATA', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     availability.releaseInventory.mockResolvedValue();
+    // Par défaut, aucune chambre affectée — comportement pré-Sprint D
+    // inchangé pour la majorité des tests de ce describe.
+    roomAssignmentService.releaseRoom.mockRejectedValue(NO_ACTIVE_ASSIGNMENT);
   });
 
   const pendingReservation = () => ({
@@ -220,6 +227,41 @@ describe('transitionStatus — cycle de vie centralisé — TEST DATA', () => {
   test('cancelled → confirmed est explicitement rejeté (statut terminal)', async () => {
     const res = { ...pendingReservation(), status: 'cancelled' };
     await expect(transitionStatus(res, { to: 'confirmed', actingUser: { id: USER_ID } })).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  // Correctif — anomalie réelle : une chambre pré-affectée (Sprint D) restait
+  // 'reserved' indéfiniment si la réservation était annulée/rejetée/expirée
+  // avant le check-in. transitionStatus doit désormais libérer toute
+  // affectation active dans ce cas.
+  describe('libération de la chambre affectée sur annulation/rejet/expiration (correctif)', () => {
+    test('confirmed → cancelled avec une chambre affectée : la chambre est libérée vers "available"', async () => {
+      roomAssignmentService.releaseRoom.mockResolvedValue({ assignment: { _id: 'ASSIGN-1' }, room: { _id: 'ROOM-1', status: 'available' } });
+      const res = { ...pendingReservation(), status: 'confirmed' };
+      await transitionStatus(res, { to: 'cancelled', actingUser: { id: USER_ID }, reason: 'x' });
+      expect(roomAssignmentService.releaseRoom).toHaveBeenCalledWith(
+        expect.objectContaining({ reservationId: 'RES-1', nextRoomStatus: 'available' }),
+      );
+    });
+
+    test("pending → rejected sans chambre affectée : aucune erreur (404 avalée silencieusement)", async () => {
+      const res = pendingReservation();
+      const updated = await transitionStatus(res, { to: 'rejected', actingUser: { id: USER_ID }, reason: 'Complet' });
+      expect(updated.status).toBe('rejected');
+    });
+
+    test('pending → expired avec une chambre affectée : la chambre est aussi libérée', async () => {
+      roomAssignmentService.releaseRoom.mockResolvedValue({ assignment: { _id: 'ASSIGN-2' }, room: { _id: 'ROOM-2', status: 'available' } });
+      const res = pendingReservation();
+      await transitionStatus(res, { to: 'expired', actingUser: null, reason: 'Expiration automatique' });
+      expect(roomAssignmentService.releaseRoom).toHaveBeenCalled();
+    });
+
+    test('une erreur non-404 lors de la libération remonte (jamais avalée silencieusement)', async () => {
+      const boom = Object.assign(new Error('DB indisponible'), { statusCode: 500 });
+      roomAssignmentService.releaseRoom.mockRejectedValue(boom);
+      const res = { ...pendingReservation(), status: 'confirmed' };
+      await expect(transitionStatus(res, { to: 'cancelled', actingUser: { id: USER_ID }, reason: 'x' })).rejects.toBe(boom);
+    });
   });
 });
 

@@ -5,6 +5,7 @@ jest.mock('../models/Hotel');
 jest.mock('../models/RoomCategory');
 jest.mock('../models/RatePlan');
 jest.mock('../models/HotelReservation');
+jest.mock('../models/RoomAssignment');
 jest.mock('../models/User');
 jest.mock('../services/hotelAvailabilityService');
 jest.mock('../services/hotelReservationService');
@@ -28,6 +29,7 @@ const { app } = require('../server');
 const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
 const HotelReservation = require('../models/HotelReservation');
+const RoomAssignment = require('../models/RoomAssignment');
 const User = require('../models/User');
 const availability = require('../services/hotelAvailabilityService');
 const reservationService = require('../services/hotelReservationService');
@@ -231,6 +233,47 @@ describe('Sécurité — accès inter-tenant interdit (Sprint C)', () => {
       const res = await request(app)[method](url);
       expect(res.statusCode).toBe(401);
     }
+  });
+});
+
+describe('GET /api/hotel-reservations/mine — numéro de chambre visible SEULEMENT après check-in (Sprint D §11)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('checked_in — le numéro de chambre est attaché', async () => {
+    mockUserAuth(CLIENT_ID, 'Client');
+    HotelReservation.find = jest.fn().mockReturnValue({
+      populate: jest.fn().mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          sort: jest.fn().mockResolvedValue([
+            { _id: RESERVATION_ID, status: 'checked_in', toObject() { return { _id: RESERVATION_ID, status: 'checked_in' }; } },
+          ]),
+        }),
+      }),
+    });
+    RoomAssignment.find = jest.fn().mockReturnValue({
+      populate: jest.fn().mockResolvedValue([{ reservation: RESERVATION_ID, room: { roomNumber: '101' } }]),
+    });
+    const res = await request(app).get('/api/hotel-reservations/mine').set('Authorization', `Bearer ${makeToken(CLIENT_ID)}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.reservations[0].room).toEqual({ roomNumber: '101' });
+  });
+
+  test('confirmed (pas encore checked_in) — aucun numéro de chambre, même si une chambre est déjà pré-affectée', async () => {
+    mockUserAuth(CLIENT_ID, 'Client');
+    HotelReservation.find = jest.fn().mockReturnValue({
+      populate: jest.fn().mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          sort: jest.fn().mockResolvedValue([
+            { _id: RESERVATION_ID, status: 'confirmed', toObject() { return { _id: RESERVATION_ID, status: 'confirmed' }; } },
+          ]),
+        }),
+      }),
+    });
+    RoomAssignment.find = jest.fn();
+    const res = await request(app).get('/api/hotel-reservations/mine').set('Authorization', `Bearer ${makeToken(CLIENT_ID)}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.reservations[0].room).toBeUndefined();
+    expect(RoomAssignment.find).not.toHaveBeenCalled();
   });
 });
 

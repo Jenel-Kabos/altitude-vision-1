@@ -9,6 +9,7 @@ import { getAdminHotelReservations } from "../../services/hotelReservationServic
 import { RESERVATION_STATUSES, RESERVATION_STATUS_CLASSES, RESERVATION_SOURCES } from "../../constants/hotelReservation";
 import { formatCurrencyXAF } from "../../utils/normalizePropertyDetail";
 import { toast } from "react-hot-toast";
+import RoomAssignmentPanel from "../../components/RoomAssignmentPanel";
 
 const STATUS_TABS = [{ value: "", label: "Tous" }, ...RESERVATION_STATUSES];
 
@@ -110,6 +111,9 @@ const AdminHotelReservationsPage = () => {
                               ))}
                             </ul>
                           </div>
+                        )}
+                        {(r.status === "confirmed" || r.status === "checked_in") && (
+                          <RoomAssignmentPanel reservation={r} onChanged={load} />
                         )}
                       </td>
                     </tr>

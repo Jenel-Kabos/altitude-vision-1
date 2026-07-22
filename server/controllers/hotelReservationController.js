@@ -10,11 +10,35 @@ const mongoose = require('mongoose');
 const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
 const HotelReservation = require('../models/HotelReservation');
+const RoomAssignment = require('../models/RoomAssignment');
 const { getAvailability } = require('../services/hotelAvailabilityService');
 const {
   createReservation, transitionStatus, updateReservation,
 } = require('../services/hotelReservationService');
+const { performCheckIn } = require('../services/checkInService');
+const { performCheckOut } = require('../services/checkOutService');
+const { getActiveAssignment } = require('../services/roomAssignmentService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+
+/**
+ * N'attache le numéro de chambre QUE pour les réservations checked_in
+ * (mission §11 : "le client ne voit jamais son numéro de chambre avant le
+ * check-in") — jamais pour une chambre pré-affectée avant l'arrivée.
+ */
+async function attachRoomNumberIfCheckedIn(reservations) {
+  const checkedInIds = reservations.filter((r) => r.status === 'checked_in').map((r) => r._id);
+  if (checkedInIds.length === 0) return reservations;
+  const assignments = await RoomAssignment.find({ reservation: { $in: checkedInIds }, releasedAt: null })
+    .populate('room', 'roomNumber');
+  const roomByReservation = new Map(assignments.map((a) => [String(a.reservation), a.room]));
+  return reservations.map((r) => {
+    const obj = r.toObject ? r.toObject() : r;
+    if (r.status === 'checked_in' && roomByReservation.has(String(r._id))) {
+      obj.room = { roomNumber: roomByReservation.get(String(r._id))?.roomNumber };
+    }
+    return obj;
+  });
+}
 
 const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
 
@@ -32,6 +56,26 @@ function logDenied(req, action) {
     cible: { id: String(req.params.id || req.params.hotelId || ''), type: 'HotelReservation' },
     req,
   });
+}
+
+/**
+ * Projection minimale de l'affectation active — jamais `assignedBy`, jamais
+ * `reason`, jamais `notes` de la chambre (mission §8, correctif : "ne jamais
+ * exposer inutilement des données internes").
+ */
+function projectRoomAssignment(assignment) {
+  if (!assignment) return null;
+  return {
+    id: assignment._id,
+    room: {
+      id: assignment.room._id,
+      roomNumber: assignment.room.roomNumber,
+      floor: assignment.room.floor,
+      status: assignment.room.status,
+      roomCategory: assignment.room.roomCategory,
+    },
+    assignedAt: assignment.assignedAt,
+  };
 }
 
 async function assertReservationAccess(req, reservation) {
@@ -147,7 +191,7 @@ exports.mine = async (req, res) => {
       .populate('hotel', 'name')
       .populate('roomCategory', 'name')
       .sort({ createdAt: -1 });
-    res.json({ status: 'success', data: { reservations } });
+    res.json({ status: 'success', data: { reservations: await attachRoomNumberIfCheckedIn(reservations) } });
   } catch (error) {
     fail(res, 500, error.message);
   }
@@ -162,9 +206,38 @@ exports.getOne = async (req, res) => {
     if (!reservation) return fail(res, 404, 'Réservation introuvable.');
     const access = await assertReservationAccess(req, reservation);
     if (!access) { logDenied(req, 'Lecture réservation'); return fail(res, 403, 'Accès refusé.'); }
-    res.json({ status: 'success', data: { reservation } });
+    const [withRoom] = await attachRoomNumberIfCheckedIn([reservation]);
+    res.json({ status: 'success', data: { reservation: withRoom } });
   } catch (error) {
     fail(res, 500, error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// Correctif Sprint D — GET /:id/room-assignment : récupération PERSISTANTE
+// de l'affectation active (Option A du correctif). Corrige l'anomalie
+// identifiée à l'audit : RoomAssignmentPanel.jsx n'affichait la chambre
+// affectée qu'après une action effectuée dans la session React en cours,
+// jamais après un rechargement — aucun endpoint de lecture n'existait.
+// ─────────────────────────────────────────────
+exports.getRoomAssignment = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const reservation = await HotelReservation.findById(req.params.id);
+    if (!reservation) return fail(res, 404, 'Réservation introuvable.');
+    const access = await assertReservationAccess(req, reservation);
+    if (!access) { logDenied(req, 'Lecture affectation de chambre'); return fail(res, 403, 'Accès refusé.'); }
+
+    // Mission §11/§13 (inchangée) : le client ne reçoit jamais le numéro de
+    // chambre avant le check-in — même via cet endpoint dédié.
+    if (access.role === 'guest' && reservation.status !== 'checked_in') {
+      return res.json({ status: 'success', data: { activeRoomAssignment: null } });
+    }
+
+    const assignment = await getActiveAssignment(reservation._id);
+    res.json({ status: 'success', data: { activeRoomAssignment: projectRoomAssignment(assignment) } });
+  } catch (error) {
+    fail(res, error.statusCode || 500, error.message);
   }
 };
 
@@ -338,6 +411,56 @@ async function reviewAction(req, res, targetStatus, requireReason) {
 
 exports.confirm = (req, res) => reviewAction(req, res, 'confirmed', false);
 exports.reject = (req, res) => reviewAction(req, res, 'rejected', true);
+
+// ─────────────────────────────────────────────
+// Sprint D — check-in / check-out (jamais accessible au client, mission §13
+// : le client ne choisit jamais sa chambre ni ne déclenche lui-même ces
+// opérations — réservé propriétaire/staff, comme confirm/reject).
+// ─────────────────────────────────────────────
+exports.checkIn = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const reservation = await HotelReservation.findById(req.params.id);
+    if (!reservation) return fail(res, 404, 'Réservation introuvable.');
+    const access = await assertReservationAccess(req, reservation);
+    if (!access || access.role === 'guest') { logDenied(req, 'Check-in'); return fail(res, 403, 'Accès refusé.'); }
+
+    const { roomId, reason } = req.body;
+    const result = await performCheckIn({ reservation, roomId, actingUser: req.user, reason: reason || '' });
+
+    logAction({
+      action: 'Check-in effectué', description: `${result.reservation.reference} — check-in (chambre ${result.room.roomNumber})`, module: 'Altimmo',
+      typeAction: 'MODIFICATION', auteur: buildAuteur(req.user),
+      cible: { id: String(result.reservation._id), type: 'HotelReservation', nom: result.reservation.reference }, req,
+    });
+
+    res.json({ status: 'success', data: { reservation: result.reservation, room: result.room } });
+  } catch (error) {
+    fail(res, error.statusCode || 500, error.message);
+  }
+};
+
+exports.checkOut = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const reservation = await HotelReservation.findById(req.params.id);
+    if (!reservation) return fail(res, 404, 'Réservation introuvable.');
+    const access = await assertReservationAccess(req, reservation);
+    if (!access || access.role === 'guest') { logDenied(req, 'Check-out'); return fail(res, 403, 'Accès refusé.'); }
+
+    const result = await performCheckOut({ reservation, actingUser: req.user, reason: req.body?.reason || '' });
+
+    logAction({
+      action: 'Check-out effectué', description: `${result.reservation.reference} — check-out`, module: 'Altimmo',
+      typeAction: 'MODIFICATION', auteur: buildAuteur(req.user),
+      cible: { id: String(result.reservation._id), type: 'HotelReservation', nom: result.reservation.reference }, req,
+    });
+
+    res.json({ status: 'success', data: { reservation: result.reservation, room: result.room } });
+  } catch (error) {
+    fail(res, error.statusCode || 500, error.message);
+  }
+};
 
 // ─────────────────────────────────────────────
 // Administration

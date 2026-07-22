@@ -12,6 +12,14 @@ vi.mock('../services/hotelReservationService', () => ({
   confirmHotelReservation: vi.fn(),
   rejectHotelReservation: vi.fn(),
   cancelHotelReservation: vi.fn(),
+  checkInHotelReservation: vi.fn(),
+  checkOutHotelReservation: vi.fn(),
+  getReservationRoomAssignment: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('../services/hotelService', () => ({
+  getRooms: vi.fn().mockResolvedValue([]),
+  assignRoom: vi.fn(),
+  changeRoom: vi.fn(),
 }));
 
 const reservation = (overrides = {}) => ({

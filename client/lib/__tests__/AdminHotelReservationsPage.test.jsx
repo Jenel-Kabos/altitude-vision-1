@@ -5,6 +5,14 @@ import { getAdminHotelReservations } from '../services/hotelReservationService';
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../services/hotelReservationService', () => ({
   getAdminHotelReservations: vi.fn(),
+  checkInHotelReservation: vi.fn(),
+  checkOutHotelReservation: vi.fn(),
+  getReservationRoomAssignment: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('../services/hotelService', () => ({
+  getRooms: vi.fn().mockResolvedValue([]),
+  assignRoom: vi.fn(),
+  changeRoom: vi.fn(),
 }));
 
 const reservation = (overrides = {}) => ({

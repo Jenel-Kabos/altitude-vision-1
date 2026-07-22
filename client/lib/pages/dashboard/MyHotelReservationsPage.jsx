@@ -12,6 +12,7 @@ import {
 } from "../../services/hotelReservationService";
 import { RESERVATION_STATUSES, RESERVATION_STATUS_CLASSES } from "../../constants/hotelReservation";
 import { formatCurrencyXAF } from "../../utils/normalizePropertyDetail";
+import RoomAssignmentPanel from "../../components/RoomAssignmentPanel";
 
 const STATUS_TABS = [{ value: "", label: "Tous" }, ...RESERVATION_STATUSES];
 
@@ -178,6 +179,9 @@ const MyHotelReservationsPage = () => {
               )}
               {r.status === "rejected" && r.rejectionReason && <p className="text-xs text-red-600 mt-2">Motif : {r.rejectionReason}</p>}
               {r.status === "cancelled" && r.cancellationReason && <p className="text-xs text-gray-600 mt-2">Motif d'annulation : {r.cancellationReason}</p>}
+              {(r.status === "confirmed" || r.status === "checked_in") && (
+                <RoomAssignmentPanel reservation={r} onChanged={load} />
+              )}
             </div>
           ))}
         </div>

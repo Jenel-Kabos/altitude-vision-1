@@ -143,3 +143,41 @@ export const archiveRoomCategoryRate = async (categoryId, rateId) => {
   const res = await api.delete(`/hotels/room-categories/${categoryId}/rate-plans/${rateId}`);
   return res.data.data.rate;
 };
+
+// ── Sprint D — chambres physiques (tableau des chambres / plan d'étage) ──
+
+export const getRooms = async (hotelId, params = {}) => {
+  const res = await api.get(`/hotels/${hotelId}/rooms`, { params });
+  return res.data.data.rooms;
+};
+
+export const createRoom = async (hotelId, data) => {
+  const res = await api.post(`/hotels/${hotelId}/rooms`, data);
+  return res.data.data.room;
+};
+
+export const updateRoom = async (id, data) => {
+  const res = await api.patch(`/hotels/rooms/${id}`, data);
+  return res.data.data.room;
+};
+
+export const deleteRoom = async (id) => {
+  await api.delete(`/hotels/rooms/${id}`);
+};
+
+// ── Sprint D — affectation de chambre ──
+
+export const assignRoom = async ({ reservationId, roomId, reason }) => {
+  const res = await api.post('/hotels/room-assignments', { reservationId, roomId, reason });
+  return res.data.data.assignment;
+};
+
+export const changeRoom = async ({ reservationId, newRoomId, reason }) => {
+  const res = await api.patch('/hotels/room-assignments/change', { reservationId, newRoomId, reason });
+  return res.data.data.assignment;
+};
+
+export const releaseRoom = async ({ reservationId, reason }) => {
+  const res = await api.patch('/hotels/room-assignments/release', { reservationId, reason });
+  return res.data.data;
+};

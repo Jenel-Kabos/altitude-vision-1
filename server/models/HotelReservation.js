@@ -15,15 +15,24 @@
 const mongoose = require('mongoose');
 const AutoIncrement = require('mongoose-sequence')(mongoose);
 
-const RESERVATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'expired', 'rejected'];
+// Sprint D — 'checked_in'/'checked_out' ajoutés (annoncés dès le Sprint C
+// comme réservés à "un sprint ultérieur", c'est celui-ci). 'no_show' reste
+// volontairement absent — toujours hors périmètre, pas encore justifié.
+const RESERVATION_STATUSES = ['pending', 'confirmed', 'cancelled', 'expired', 'rejected', 'checked_in', 'checked_out'];
 const RESERVATION_SOURCES = ['public_web', 'owner_dashboard', 'admin_dashboard'];
 
 // Transitions autorisées — centralisées ici (source de vérité unique pour le
 // schéma ET pour hotelReservationService, qui importe cette même constante
-// plutôt que de dupliquer la règle).
+// plutôt que de dupliquer la règle). Sprint D : confirmed → checked_in →
+// checked_out, appliquées exclusivement par checkInService/checkOutService
+// (jamais par transitionStatus générique — voir HOTEL_OPERATIONS_V1.md).
+// Une fois checked_in, l'annulation n'est plus une transition valide (un
+// client physiquement présent ne s'"annule" pas) — seul checked_out est permis.
 const ALLOWED_TRANSITIONS = {
   pending: ['confirmed', 'rejected', 'cancelled', 'expired'],
-  confirmed: ['cancelled'],
+  confirmed: ['cancelled', 'checked_in'],
+  checked_in: ['checked_out'],
+  checked_out: [],
   cancelled: [],
   expired: [],
   rejected: [],

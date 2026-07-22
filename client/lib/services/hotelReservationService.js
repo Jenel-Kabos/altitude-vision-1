@@ -68,3 +68,22 @@ export const getPendingHotelReservations = async () => {
   const res = await api.get('/hotel-reservations/status/pending');
   return res.data.data.reservations;
 };
+
+// ── Sprint D — check-in / check-out (jamais accessible au client) ──
+
+export const checkInHotelReservation = async (id, { roomId, reason } = {}) => {
+  const res = await api.patch(`/hotel-reservations/${id}/check-in`, { roomId, reason });
+  return res.data.data; // { reservation, room }
+};
+
+export const checkOutHotelReservation = async (id, { reason } = {}) => {
+  const res = await api.patch(`/hotel-reservations/${id}/check-out`, { reason });
+  return res.data.data; // { reservation, room }
+};
+
+// Correctif — récupération PERSISTANTE de l'affectation active (survit à un
+// rechargement), remplace la dépendance exclusive à l'état local post-action.
+export const getReservationRoomAssignment = async (id) => {
+  const res = await api.get(`/hotel-reservations/${id}/room-assignment`);
+  return res.data.data.activeRoomAssignment; // null | { id, room:{id,roomNumber,floor,status,roomCategory}, assignedAt }
+};
