@@ -16,6 +16,12 @@ const logAction = async ({
   req,
 }) => {
   try {
+    // Les tests d'intégration Supertest utilisent les modèles mockés sans
+    // connexion Mongo. Ne pas laisser Mongoose bufferiser une écriture
+    // fire-and-forget après la fin de Jest. Les tests unitaires qui mockent
+    // ActionLog (sans propriété `db`) continuent de vérifier create().
+    if (process.env.NODE_ENV === 'test' && ActionLog.db?.readyState === 0) return;
+
     // Enrichir metadata avec IP et User-Agent si req est fourni
     const enrichedMetadata = { ...metadata };
     if (req) {

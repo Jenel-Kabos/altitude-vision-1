@@ -1,0 +1,14 @@
+const express = require('express');
+const auth = require('../controllers/authController');
+const ctrl = require('../controllers/financialController');
+const router = express.Router();
+router.use(auth.protect);
+router.post('/hotel/reservations/:reservationId/invoice-draft', ctrl.createHotelDraft);
+router.get('/documents/:documentId', ctrl.getDocument);
+router.patch('/documents/:documentId/draft', ctrl.updateDraft);
+router.post('/documents/:documentId/issue', ctrl.issue);
+router.post('/payments/manual', ctrl.createManualPayment);
+router.post('/allocations', ctrl.allocate);
+router.post('/allocations/:allocationId/reverse', ctrl.reverseAllocation);
+router.get('/documents/:documentId/ledger', ctrl.getLedger);
+module.exports = router;

@@ -340,6 +340,7 @@ const inspectionRoutes       = require('./routes/inspectionRoutes');
 const maintenanceRoutes      = require('./routes/maintenanceRoutes');
 const salePropertyRoutes     = require('./routes/salePropertyRoutes');
 const rentalPropertyRoutes   = require('./routes/rentalPropertyRoutes');
+const financialRoutes        = require('./routes/financialRoutes');
 
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
@@ -372,6 +373,8 @@ app.use('/api/tenant-portal', tenantPortalRoutes);
 app.use('/api/accommodations', accommodationRoutes);
 app.use('/api/hotels', hotelRoutes);
 app.use('/api/hotel-reservations', hotelReservationRoutes);
+// 💰 Noyau financier F1 — routes staff protégées, sans fournisseur réel.
+app.use('/api/financial', financialRoutes);
 // 🧹 Housekeeping / Inspection / Maintenance (Sprint E)
 app.use('/api/housekeeping', housekeepingRoutes);
 app.use('/api/inspections', inspectionRoutes);
