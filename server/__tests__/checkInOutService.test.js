@@ -5,6 +5,10 @@
 jest.mock('../models/HotelReservation');
 jest.mock('../models/Room');
 jest.mock('../services/roomAssignmentService');
+// Sprint E — checkOutService crée désormais une HousekeepingTask
+// automatiquement (mission §3) ; testé isolément dans
+// housekeepingService.test.js / checkOutService.test.js dédié.
+jest.mock('../services/housekeepingService', () => ({ createTask: jest.fn().mockResolvedValue({}) }));
 jest.mock('../services/notificationService', () => ({ notify: jest.fn().mockResolvedValue() }));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
@@ -12,6 +16,7 @@ jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 const HotelReservation = require('../models/HotelReservation');
 const Room = require('../models/Room');
 const roomAssignmentService = require('../services/roomAssignmentService');
+const housekeepingService = require('../services/housekeepingService');
 const { performCheckIn } = require('../services/checkInService');
 const { performCheckOut } = require('../services/checkOutService');
 
@@ -116,10 +121,15 @@ describe('checkInService.performCheckIn — TEST DATA', () => {
 });
 
 describe('checkOutService.performCheckOut — TEST DATA', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    housekeepingService.createTask.mockResolvedValue({});
+  });
+
+  const HOTEL_ID = '707f1f77bcf86cd799439055';
 
   const checkedInReservation = (overrides = {}) => ({
-    _id: RESERVATION_ID, status: 'checked_in', reference: 'RES-2026-000001',
+    _id: RESERVATION_ID, status: 'checked_in', reference: 'RES-2026-000001', hotel: HOTEL_ID,
     statusHistory: [], guestUser: null,
     save: jest.fn().mockResolvedValue(),
     ...overrides,
@@ -134,6 +144,48 @@ describe('checkOutService.performCheckOut — TEST DATA', () => {
     expect(result.reservation.status).toBe('checked_out');
     expect(roomAssignmentService.releaseRoom).toHaveBeenCalledWith(expect.objectContaining({ nextRoomStatus: 'cleaning' }));
     expect(result.room.status).toBe('cleaning');
+  });
+
+  // Sprint E — génération automatique d'une tâche de ménage au check-out (mission §3).
+  describe('génération automatique de la tâche de ménage (Sprint E, câblage)', () => {
+    test('createTask est appelé avec le type checkout_cleaning et la priorité normal', async () => {
+      const reservation = checkedInReservation();
+      roomAssignmentService.getActiveAssignment.mockResolvedValue({ room: ROOM_ID });
+      roomAssignmentService.releaseRoom.mockResolvedValue({ room: { _id: ROOM_ID, status: 'cleaning' } });
+
+      await performCheckOut({ reservation, actingUser: { id: USER_ID } });
+      expect(housekeepingService.createTask).toHaveBeenCalledWith(expect.objectContaining({
+        roomId: ROOM_ID, hotelId: HOTEL_ID, reservationId: RESERVATION_ID, type: 'checkout_cleaning', priority: 'normal',
+      }));
+    });
+
+    test('une tâche déjà ouverte (409) est absorbée silencieusement — le check-out réussit quand même', async () => {
+      const reservation = checkedInReservation();
+      roomAssignmentService.getActiveAssignment.mockResolvedValue({ room: ROOM_ID });
+      roomAssignmentService.releaseRoom.mockResolvedValue({ room: { _id: ROOM_ID, status: 'cleaning' } });
+      const err = Object.assign(new Error('Une tâche de ménage est déjà ouverte pour cette chambre.'), { statusCode: 409 });
+      housekeepingService.createTask.mockRejectedValue(err);
+
+      const result = await performCheckOut({ reservation, actingUser: { id: USER_ID } });
+      expect(result.reservation.status).toBe('checked_out');
+    });
+
+    test('une erreur non-409 de createTask remonte (jamais avalée silencieusement)', async () => {
+      const reservation = checkedInReservation();
+      roomAssignmentService.getActiveAssignment.mockResolvedValue({ room: ROOM_ID });
+      roomAssignmentService.releaseRoom.mockResolvedValue({ room: { _id: ROOM_ID, status: 'cleaning' } });
+      const boom = Object.assign(new Error('DB indisponible'), { statusCode: 500 });
+      housekeepingService.createTask.mockRejectedValue(boom);
+
+      await expect(performCheckOut({ reservation, actingUser: { id: USER_ID } })).rejects.toBe(boom);
+    });
+
+    test('pas de tâche créée si la réservation n\'avait pas de chambre affectée', async () => {
+      const reservation = checkedInReservation();
+      roomAssignmentService.getActiveAssignment.mockResolvedValue(null);
+      await performCheckOut({ reservation, actingUser: { id: USER_ID } });
+      expect(housekeepingService.createTask).not.toHaveBeenCalled();
+    });
   });
 
   test('409 si la réservation n\'est pas checked_in', async () => {

@@ -333,6 +333,9 @@ const rentalManagementRoutes = require('./routes/rentalManagementRoutes');
 const accommodationRoutes    = require('./routes/accommodationRoutes');
 const hotelRoutes            = require('./routes/hotelRoutes');
 const hotelReservationRoutes = require('./routes/hotelReservationRoutes');
+const housekeepingRoutes     = require('./routes/housekeepingRoutes');
+const inspectionRoutes       = require('./routes/inspectionRoutes');
+const maintenanceRoutes      = require('./routes/maintenanceRoutes');
 const salePropertyRoutes     = require('./routes/salePropertyRoutes');
 const rentalPropertyRoutes   = require('./routes/rentalPropertyRoutes');
 
@@ -362,6 +365,10 @@ app.use('/api/rental-management', rentalManagementRoutes);
 app.use('/api/accommodations', accommodationRoutes);
 app.use('/api/hotels', hotelRoutes);
 app.use('/api/hotel-reservations', hotelReservationRoutes);
+// 🧹 Housekeeping / Inspection / Maintenance (Sprint E)
+app.use('/api/housekeeping', housekeepingRoutes);
+app.use('/api/inspections', inspectionRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 
 // 🏷️ Vente / Location — formulaires admin dédiés (Sprint A, séparation par
 // transaction). Espace de noms dédié (comme /api/accommodations et

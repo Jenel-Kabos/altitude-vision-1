@@ -8,9 +8,10 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import {
-  getHotelDetail, submitHotel, deactivateHotel, reactivateHotel, duplicateHotel, deleteHotel,
+  getHotelDetail, submitHotel, deactivateHotel, reactivateHotel, duplicateHotel, deleteHotel, getRooms,
 } from "../../services/hotelService";
 import { HOTEL_PUBLICATION_STATUSES } from "../../constants/hotel";
+import { ROOM_STATUSES, ROOM_STATUS_CLASSES } from "../../constants/room";
 
 const STATUS_CLASSES = {
   brouillon: "bg-gray-100 text-gray-700",
@@ -25,6 +26,7 @@ const HotelDetailPage = () => {
   const hotelId = params?.hotelId;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [roomCounts, setRoomCounts] = useState(null);
 
   const load = async () => {
     if (!hotelId) return;
@@ -39,7 +41,21 @@ const HotelDetailPage = () => {
     }
   };
 
-  useEffect(() => { load(); }, [hotelId]);
+  // Sprint E §12 — compteurs de statut des chambres (disponibles/occupées/
+  // nettoyage/inspection/hors service), calculés côté client à partir du
+  // tableau des chambres existant (pas de nouvel endpoint agrégé).
+  const loadRoomCounts = async () => {
+    if (!hotelId) return;
+    try {
+      const rooms = await getRooms(hotelId);
+      const counts = (rooms || []).reduce((acc, r) => ({ ...acc, [r.status]: (acc[r.status] || 0) + 1 }), {});
+      setRoomCounts(counts);
+    } catch (err) {
+      // silencieux — les compteurs sont un complément, pas un bloquant
+    }
+  };
+
+  useEffect(() => { load(); loadRoomCounts(); }, [hotelId]);
 
   if (loading) return <p className="text-center mt-10">Chargement...</p>;
   if (!data?.hotel) return <p className="text-center mt-10 text-gray-500">Établissement introuvable.</p>;
@@ -105,6 +121,17 @@ const HotelDetailPage = () => {
           {hotel.active === false && <span className="text-xs font-semibold px-2 py-1 rounded bg-gray-200 text-gray-600">Désactivé</span>}
         </div>
       </div>
+
+      {roomCounts && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6">
+          {['available', 'occupied', 'cleaning', 'inspection', 'out_of_service'].map((statusValue) => (
+            <div key={statusValue} className={`border rounded p-3 ${ROOM_STATUS_CLASSES[statusValue]}`}>
+              <div className="text-2xl font-bold">{roomCounts[statusValue] || 0}</div>
+              <div className="text-xs font-medium">{ROOM_STATUSES.find((s) => s.value === statusValue)?.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 mb-6">
         <Link href={`/dashboard/hotels/${hotelId}/room-categories`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
