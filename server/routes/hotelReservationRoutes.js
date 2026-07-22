@@ -31,6 +31,13 @@ router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), ctrl.pending);
 router.patch('/:id/cancel', ctrl.cancel);
 router.patch('/:id/confirm', ctrl.confirm);
 router.patch('/:id/reject', ctrl.reject);
+// Sprint D — jamais accessible au client (ownership vérifiée dans le contrôleur).
+router.patch('/:id/check-in', ctrl.checkIn);
+router.patch('/:id/check-out', ctrl.checkOut);
+// Correctif Sprint D — lecture persistante de l'affectation active (voir
+// mission "AFFECTATION PERSISTANTE"). Accessible au client, mais projection
+// nulle avant check-in (contrôlée dans le contrôleur).
+router.get('/:id/room-assignment', ctrl.getRoomAssignment);
 
 // Génériques — toujours en dernier.
 router.patch('/:id', ctrl.update);

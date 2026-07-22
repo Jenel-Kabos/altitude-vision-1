@@ -81,6 +81,9 @@ const NAV_SECTIONS = [
       // jamais comme des listes plates globales : un seul lien de nav.
       { to: '/dashboard/hotels',                end: true,  Icon: Building2, label: 'Établissements',         accent: GOLD, roles: ROLES_ALTIMMO },
       { to: '/dashboard/hotel-reservations',    end: true,  Icon: Calendar,  label: 'Réservations hôtelières', accent: GOLD, roles: ROLES_ALTIMMO },
+      // Sprint D — vue globale des chambres (libre/occupée/nettoyage/
+      // inspection), tous établissements confondus (mission §18).
+      { to: '/dashboard/hotel-rooms',           end: true,  Icon: KeyRound,  label: 'Chambres (vue globale)', accent: GOLD, roles: ROLES_ALTIMMO },
     ],
   },
   {

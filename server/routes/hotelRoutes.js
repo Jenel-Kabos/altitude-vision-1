@@ -2,6 +2,8 @@ const express = require('express');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/hotelController');
 const roomCategoryCtrl = require('../controllers/roomCategoryController');
+const roomCtrl = require('../controllers/roomController');
+const roomAssignmentCtrl = require('../controllers/roomAssignmentController');
 const reservationCtrl = require('../controllers/hotelReservationController');
 const { ROLES_ALTIMMO } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
@@ -55,6 +57,18 @@ router.patch('/room-categories/:id/activate', roomCategoryCtrl.activate);
 router.get('/room-categories/:id/rate-plans', roomCategoryCtrl.listRates);
 router.post('/room-categories/:id/rate-plans', roomCategoryCtrl.upsertRate);
 router.delete('/room-categories/:id/rate-plans/:rateId', roomCategoryCtrl.archiveRate);
+
+// Sprint D — chambres physiques (propriétaire + staff, filtré par assertHotelAccess)
+router.get('/:hotelId/rooms', roomCtrl.list);
+router.post('/:hotelId/rooms', roomCtrl.create);
+router.patch('/rooms/:id', roomCtrl.update);
+router.delete('/rooms/:id', roomCtrl.remove);
+
+// Sprint D — affectation de chambre (accès résolu via l'hôtel de la
+// réservation, jamais un :hotelId d'URL — voir roomAssignmentController).
+router.post('/room-assignments', roomAssignmentCtrl.assign);
+router.patch('/room-assignments/change', roomAssignmentCtrl.change);
+router.patch('/room-assignments/release', roomAssignmentCtrl.release);
 
 // Staff — validate|reject|suspend|unsuspend (même convention qu'Accommodation)
 router.patch('/:id/:action', auth.restrictTo(...ROLES_ALTIMMO), ctrl.reviewDecision);

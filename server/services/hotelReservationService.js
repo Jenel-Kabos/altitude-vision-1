@@ -13,6 +13,7 @@ const HotelReservation = require('../models/HotelReservation');
 const {
   assertNotPast, assertAvailability, reserveInventory, releaseInventory, getNightDates,
 } = require('./hotelAvailabilityService');
+const { releaseRoom } = require('./roomAssignmentService');
 const { notify } = require('./notificationService');
 const logger = require('../utils/logger');
 
@@ -174,6 +175,20 @@ async function transitionStatus(reservation, { to, actingUser, reason = '' }) {
       checkInDate: reservation.checkInDate,
       checkOutDate: reservation.checkOutDate,
       roomsCount: reservation.roomsCount,
+    });
+    // Correctif — anomalie réelle détectée à l'audit : une chambre affectée
+    // en amont (Sprint D) restait "reserved" indéfiniment si la réservation
+    // était annulée/rejetée/expirée AVANT le check-in — orpheline, jamais
+    // reproposée. Ces trois transitions ne sont atteignables que depuis un
+    // statut pré-check-in (voir ALLOWED_TRANSITIONS : `checked_in` ne peut
+    // transiter que vers `checked_out`), donc toute affectation active à ce
+    // stade n'a jamais été occupée — libération directe vers 'available'.
+    // `releaseRoom` lève une 404 s'il n'existe aucune affectation active —
+    // cas normal (aucune chambre n'avait encore été affectée), ignoré ici.
+    await releaseRoom({
+      reservationId: reservation._id, actingUser, reason: `Réservation ${to}`, nextRoomStatus: 'available',
+    }).catch((err) => {
+      if (err.statusCode !== 404) throw err;
     });
   }
 

@@ -48,6 +48,19 @@ describe('MesReservationsHotelPage — Sprint C (espace client) — TEST DATA', 
     expect(screen.queryByRole('button', { name: 'Annuler' })).not.toBeInTheDocument();
   });
 
+  test("affiche le numéro de chambre uniquement après check-in (mission Sprint D §11)", async () => {
+    getMyHotelReservations.mockResolvedValue([reservation({ status: 'checked_in', room: { roomNumber: '101' } })]);
+    render(<MesReservationsHotelPage />);
+    expect(await screen.findByText(/Chambre 101/)).toBeInTheDocument();
+  });
+
+  test("n'affiche aucun numéro de chambre avant le check-in, même si une chambre est déjà affectée", async () => {
+    getMyHotelReservations.mockResolvedValue([reservation({ status: 'confirmed', room: { roomNumber: '101' } })]);
+    render(<MesReservationsHotelPage />);
+    await screen.findByText('Hôtel Test');
+    expect(screen.queryByText(/Chambre 101/)).not.toBeInTheDocument();
+  });
+
   test('annuler demande confirmation puis appelle le service', async () => {
     getMyHotelReservations.mockResolvedValue([reservation({ status: 'pending' })]);
     cancelHotelReservation.mockResolvedValue({});

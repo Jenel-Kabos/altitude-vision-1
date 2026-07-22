@@ -55,10 +55,9 @@ describe('HotelReservation model — statuts et transitions — TEST DATA', () =
     expect(res.status).toBe('pending');
   });
 
-  test('statuts autorisés : pending/confirmed/cancelled/expired/rejected uniquement', () => {
-    expect(HotelReservation.RESERVATION_STATUSES).toEqual(['pending', 'confirmed', 'cancelled', 'expired', 'rejected']);
-    expect(HotelReservation.RESERVATION_STATUSES).not.toContain('checked_in');
-    expect(HotelReservation.RESERVATION_STATUSES).not.toContain('checked_out');
+  test('statuts autorisés : pending/confirmed/cancelled/expired/rejected/checked_in/checked_out (Sprint D)', () => {
+    expect(HotelReservation.RESERVATION_STATUSES).toEqual(['pending', 'confirmed', 'cancelled', 'expired', 'rejected', 'checked_in', 'checked_out']);
+    // 'no_show' reste hors périmètre — jamais ajouté sans justification.
     expect(HotelReservation.RESERVATION_STATUSES).not.toContain('no_show');
   });
 
@@ -69,12 +68,18 @@ describe('HotelReservation model — statuts et transitions — TEST DATA', () =
     expect(errors.status).toBeDefined();
   });
 
-  test('les transitions autorisées sont centralisées et correctes (mission §7)', () => {
+  test('les transitions autorisées sont centralisées et correctes (Sprint C §7 + Sprint D check-in/check-out)', () => {
     expect(HotelReservation.ALLOWED_TRANSITIONS.pending).toEqual(expect.arrayContaining(['confirmed', 'rejected', 'cancelled', 'expired']));
-    expect(HotelReservation.ALLOWED_TRANSITIONS.confirmed).toEqual(['cancelled']);
+    expect(HotelReservation.ALLOWED_TRANSITIONS.confirmed).toEqual(expect.arrayContaining(['cancelled', 'checked_in']));
+    expect(HotelReservation.ALLOWED_TRANSITIONS.checked_in).toEqual(['checked_out']);
+    expect(HotelReservation.ALLOWED_TRANSITIONS.checked_out).toEqual([]);
     expect(HotelReservation.ALLOWED_TRANSITIONS.cancelled).toEqual([]);
     expect(HotelReservation.ALLOWED_TRANSITIONS.expired).toEqual([]);
     expect(HotelReservation.ALLOWED_TRANSITIONS.rejected).toEqual([]);
+  });
+
+  test('checked_in ne peut plus être annulé (seul checked_out est permis une fois le client présent)', () => {
+    expect(HotelReservation.ALLOWED_TRANSITIONS.checked_in).not.toContain('cancelled');
   });
 
   test('sources autorisées : public_web/owner_dashboard/admin_dashboard', () => {

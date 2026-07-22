@@ -113,6 +113,9 @@ const HotelDetailPage = () => {
         <Link href={`/dashboard/hotels/${hotelId}/rates`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
           Tarifs
         </Link>
+        <Link href={`/dashboard/hotels/${hotelId}/rooms`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
+          Chambres
+        </Link>
         {(hotel.publicationStatus === 'brouillon' || hotel.publicationStatus === 'rejete') && (
           <button onClick={handleSubmit} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm">Soumettre pour validation</button>
         )}
