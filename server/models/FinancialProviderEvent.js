@@ -1,0 +1,4 @@
+const mongoose = require('mongoose');
+const schema = new mongoose.Schema({ provider: { type: String, required: true }, providerEventId: { type: String, required: true }, providerPaymentId: String, eventType: { type: String, required: true }, payloadHash: { type: String, required: true }, signatureVerified: { type: Boolean, required: true }, status: { type: String, enum: ['received', 'processing', 'processed', 'failed'], default: 'received' }, processingStartedAt: Date, processedAt: Date, failedAt: Date, retryCount: { type: Number, default: 0 }, lastError: { type: String, select: false }, financialPayment: { type: mongoose.Schema.Types.ObjectId, ref: 'FinancialPayment' }, businessOperationKey: { type: String, required: true } }, { timestamps: true });
+schema.index({ provider: 1, providerEventId: 1 }, { unique: true }); schema.index({ financialPayment: 1 });
+module.exports = mongoose.model('FinancialProviderEvent', schema);
