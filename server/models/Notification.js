@@ -51,6 +51,12 @@ const NOTIFICATION_TYPES = [
   'rental_payment_overdue',
   'rental_contract_expiring',
   'rental_owner_request',
+  // ── Portail locataire GL-B3 ──
+  'tenant_invitation_received', 'tenant_invitation_accepted', 'tenant_invitation_rejected',
+  'tenant_link_requested', 'tenant_link_approved', 'tenant_link_rejected',
+  'tenant_document_added', 'tenant_receipt_added', 'tenant_payment_recorded',
+  'tenant_maintenance_created', 'tenant_maintenance_scheduled', 'tenant_maintenance_resolved',
+  'tenant_notice_recorded', 'tenant_notice_acknowledged', 'tenant_notice_cancelled', 'tenant_notice_closed',
   // ── Biens immobiliers ──
   'new_property',                 // tous les utilisateurs : nouveau bien validé et publié
   'property_pending_moderation',  // staff : nouveau bien mobile en attente de modération

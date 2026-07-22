@@ -513,3 +513,109 @@ totalement séparé. Aucune modification nécessaire au-delà de cet audit.
    avec captures d'écran avant/après pour garantir zéro régression visuelle.
 4. Envisager un vrai template d'email d'invitation (actuellement un HTML
    inline minimal dans le contrôleur).
+# Sprint GL-B3 — Portail locataire
+
+## Clôture GL-B3.1 — stabilisation
+
+### Interface staff de rattachement
+
+`/dashboard/gestion-locative/locataires` intègre `TenantLinkManagement`. La vue réutilise les quatre endpoints GL-B3, avec recherche serveur (nom, prénom, email, téléphone, compte ou ObjectId), filtres type/statut, pagination, confirmations de refus/annulation, verrou anti-double-clic et rafraîchissement après mutation. Les réponses 401, 403 et les erreurs réseau sont distinguées.
+
+Statuts conservés sans migration :
+
+```text
+invitation:   pending ── accepted | expired | cancelled
+self_request: pending ── approved | rejected
+```
+
+Une relance clôt une invitation encore `pending`, puis crée un nouveau jeton haché avec une nouvelle échéance.
+
+### Producteurs de notifications
+
+| Producteur métier | Événement portail | Déclenchement |
+|---|---|---|
+| Génération bail, état des lieux, courrier visible | `tenant_document_added` | après upload Cloudinary et écriture dans `Contrat.documents` |
+| Génération quittance | `tenant_receipt_added` | après disponibilité réelle du PDF |
+| Création/validation paiement | `tenant_payment_recorded` | après réussite MongoDB |
+| Démarrage/accusé/annulation/clôture préavis | `tenant_notice_*` | après sauvegarde de la transition |
+
+Le destinataire est toujours résolu par `Contrat.locataire → Locataire.user` ou `RentalManagement.currentTenant → Locataire.user`. Les clés `tenant:<domaine>:<entité>:<état>` utilisent l'index unique `Notification.dedupeKey`. Paiement et quittance restent deux notifications distinctes : la première atteste l'opération financière, la seconde l'apparition ultérieure d'un fichier téléchargeable. Un document interne absent de `Contrat.documents` ne produit aucun événement.
+
+### Stabilisation des tests
+
+- `PublicEstimationWizard` : la cause était un debounce encore actif qui réécrivait le brouillon après une soumission réussie. `success` annule désormais le timer et interdit une nouvelle persistance. Aucun timeout n'a été augmenté.
+- Mobile `AuthContext` : le test isolé et la suite complète confirment que toutes les promesses se terminent et que le timer de `restoreStoredSession` est nettoyé. L'ancien dépassement était une contention du premier passage global, non reproductible après stabilisation ; aucun timeout n'a été modifié.
+- Jest serveur : `watchman: false` reste dans l'unique `jest.config.js`. La découverte `**/__tests__/**/*.test.js`, le setup et la couverture sont inchangés. Cette option évite la dépendance au daemon et à son cache utilisateur sur macOS/CI, sans ignorer de test.
+- Expo Doctor : relancé avec accès réseau, résultat `18/18 checks passed`. L'ancien `ENOTFOUND registry.npmjs.org` provenait de la restriction DNS sandboxée.
+
+### Upload maintenance
+
+Le middleware dédié accepte au plus cinq JPEG/PNG/WebP de 8 Mio chacun. Si un upload partiel ou la création métier échoue, les objets Cloudinary déjà créés sont supprimés. Les projections publiques ne contiennent que les pièces du ticket appartenant au locataire et aucune URL de document contractuel brute.
+
+### Recette technique couverte
+
+Les tests de services et d'intégration couvrent invitation, activation, liaison `Locataire.user`, lecture du portail, paiements, documents avec ownership, maintenance, préavis, notifications et refus d'un dossier tiers (404). Les intégrations Zoho/Cloudinary sont testées par mocks contrôlés ; aucune émission réelle d'email ni création de ressource de production n'est effectuée pendant la recette automatisée.
+
+### Limites
+
+Une recette manuelle de bout en bout sur un environnement de preview avec comptes et ressources temporaires reste recommandée avant déploiement. Elle doit utiliser un tenant de test dédié et supprimer ses médias Cloudinary après validation.
+
+## Architecture
+
+Le portail est un sous-domaine HTTP isolé monté sur `/api/tenant-portal`. Il ne reçoit jamais de `locataireId` pour lire les données métier :
+
+```mermaid
+flowchart LR
+  JWT[JWT authentifié] --> U[req.user]
+  U -->|Locataire.user| L[Locataire]
+  L --> C[Contrat location]
+  C --> P[Paiement]
+  C --> D[Documents / états des lieux]
+  C --> R[RentalManagement / préavis]
+  L --> M[RentalMaintenanceTicket]
+```
+
+`tenantLinkService.resolveLocataireForUser` est l'unique porte d'entrée. Les projections excluent les notes internes, coûts de maintenance, assignations et décisions de gestion. Les totaux, soldes, pénalités et jours restants sont calculés côté serveur.
+
+## Cycle de vie et rattachement
+
+```mermaid
+stateDiagram-v2
+  [*] --> NonRattache
+  NonRattache --> InvitationPending: invitation gestionnaire
+  InvitationPending --> Rattache: acceptation du jeton
+  InvitationPending --> Expiree: échéance 7 jours
+  InvitationPending --> Annulee: annulation gestionnaire
+  NonRattache --> DemandePending: demande locataire
+  DemandePending --> Rattache: validation gestionnaire
+  DemandePending --> Refusee: refus gestionnaire
+```
+
+Une demande autonome reste `pending` jusqu'à une décision explicite du staff. Une invitation est hachée en SHA-256, à usage unique et limitée à sept jours. `Locataire.user` garde des protections d'unicité et les transitions concurrentes utilisent une écriture gardée.
+
+## Permissions
+
+| Ressource | Locataire rattaché | Staff immobilier |
+|---|---:|---:|
+| Profil, baux, échéances, paiements, solde | Lecture de ses données | Gestion existante |
+| Documents | Liste sans URL + téléchargement après ownership | Gestion existante |
+| Préavis | Lecture, jamais de modification après validation | Workflow existant |
+| Maintenance | Création + suivi sans coûts/assignation | Assignation, planification, coûts, décisions |
+| Rattachement | Accepter/demander/suivre | Inviter, lister, valider, refuser, relancer, annuler |
+
+## API exposées
+
+- `GET /api/tenant-portal/dashboard`, `/me`, `/lease`, `/leases`
+- `GET /api/tenant-portal/payments?page&limit`
+- `GET /api/tenant-portal/documents?page&limit`
+- `GET /api/tenant-portal/documents/:documentId/download`
+- `GET /api/tenant-portal/notice`
+- `GET|POST /api/tenant-portal/maintenance`
+- `GET /api/tenant-portal/link-status`
+- `POST /api/tenant-portal/activate`, `/request-link`
+- `GET /api/locataires/link-requests?type&status&page&limit`
+- `PATCH /api/locataires/link-requests/:requestId/review`
+- `PATCH /api/locataires/invitations/:requestId/cancel`
+- `POST /api/locataires/invitations/:requestId/resend`
+
+Les endpoints historiques `/api/rental-management/owner/my` et actions propriétaire restent inchangés pour préserver l'application `altimmo-app`.

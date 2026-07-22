@@ -8,18 +8,27 @@
 const express = require('express');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/tenantPortalController');
+const { rentalMaintenanceUpload, upload } = require('../config/cloudinary');
+// `upload` fallback keeps compatibility with legacy test/application mocks;
+// production always exports the stricter dedicated middleware.
+const maintenanceUpload = rentalMaintenanceUpload || upload;
 
 const router = express.Router();
 router.use(auth.protect);
 
 router.post('/activate', ctrl.activate);
 router.post('/request-link', ctrl.requestLink);
+router.get('/link-status', ctrl.getLinkStatus);
 
+router.get('/dashboard', ctrl.getDashboard);
 router.get('/me', ctrl.getMe);
 router.get('/lease', ctrl.getLease);
+router.get('/leases', ctrl.getLeases);
 router.get('/payments', ctrl.getPayments);
 router.get('/documents', ctrl.getDocuments);
+router.get('/documents/:documentId/download', ctrl.downloadDocument);
 router.get('/notice', ctrl.getNotice);
-router.post('/maintenance', ctrl.createMaintenanceRequest);
+router.get('/maintenance', ctrl.getMaintenance);
+router.post('/maintenance', maintenanceUpload.array('photos', 5), ctrl.createMaintenanceRequest);
 
 module.exports = router;

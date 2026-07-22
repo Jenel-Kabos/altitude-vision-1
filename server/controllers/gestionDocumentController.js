@@ -4,6 +4,7 @@ const { uploadToCloudinary } = require('../config/cloudinary');
 const zohoMailService        = require('../services/zohoMailService');
 const pdfService             = require('../services/pdfService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+const { notifyContractTenant } = require('../services/rentalTenantNotificationService');
 
 const MOIS_FR = [
   'janvier','février','mars','avril','mai','juin',
@@ -14,7 +15,16 @@ const MOIS_FR = [
 const fetchContrat = (id) =>
   Contrat.findById(id)
     .populate('proprietaire', 'nom prenom email telephone adresse ville')
-    .populate('locataire',    'nom prenom email telephone adresse ville');
+    .populate('locataire',    'nom prenom email telephone adresse ville user');
+
+const notifyVisibleDocument = (contract, saved, kind = 'document') => notifyContractTenant(contract, {
+  type: kind === 'receipt' ? 'tenant_receipt_added' : 'tenant_document_added',
+  title: kind === 'receipt' ? 'Nouvelle quittance disponible' : 'Nouveau document disponible',
+  body: `« ${saved.nom} » est disponible dans votre espace locataire.`,
+  entityType: 'Contrat', entityId: contract._id,
+  dedupeKey: `tenant:${kind}:${contract._id}:${saved.url}`,
+  metadata: { contractId: String(contract._id), documentType: saved.type },
+}).catch(() => {});
 
 // ── Helper : upload PDF buffer to Cloudinary ─────────────────
 const uploadPdf = async (buffer, folder, filename) => {
@@ -68,6 +78,7 @@ exports.generateBail = async (req, res) => {
     const fname   = `bail_${Date.now()}`;
     const url     = await uploadPdf(buffer, folder, fname);
     const saved   = await saveDocToContrat(c._id, 'Contrat de bail', url, 'bail');
+    await notifyVisibleDocument(c, saved);
 
     res.json({ status:'success', data:{ document: saved } });
     logAction({
@@ -107,6 +118,7 @@ exports.generateQuittance = async (req, res) => {
     const url       = await uploadPdf(buffer, folder, fname);
     const nom       = `Quittance ${moisLabel} ${p.annee}`;
     const saved     = await saveDocToContrat(c._id, nom, url, 'quittance');
+    await notifyVisibleDocument(c, saved, 'receipt');
 
     res.json({ status:'success', data:{ document: saved } });
     logAction({
@@ -143,6 +155,7 @@ exports.generateMiseEnDemeure = async (req, res) => {
     const url       = await uploadPdf(buffer, folder, fname);
     const nom       = `Mise en demeure — ${moisLabel} ${p.annee}`;
     const saved     = await saveDocToContrat(c._id, nom, url, 'mise_en_demeure');
+    await notifyVisibleDocument(c, saved);
 
     // Envoi automatique par email si locataire a un email
     if (c.locataire?.email) {
@@ -202,6 +215,7 @@ exports.generatePreavis = async (req, res) => {
       url,
       'preavis',
     );
+    await notifyVisibleDocument(c, saved);
 
     res.json({ status:'success', data:{ document: saved } });
     logAction({
@@ -257,6 +271,7 @@ exports.generateEtatDesLieux = async (req, res) => {
       url,
       `etat_${type}`,
     );
+    await notifyVisibleDocument(c, saved);
 
     res.json({ status:'success', data:{ document: saved } });
     logAction({

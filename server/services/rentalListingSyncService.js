@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const RentalManagement = require('../models/RentalManagement');
+const Locataire = require('../models/Locataire');
 const { notify, notifyStaff } = require('./notificationService');
 
 const DISPLAY = {
@@ -61,6 +62,13 @@ const notifyTransition = async (management, property, type, title, body) => {
     notifyStaff(payload),
     management.owner ? notify({ ...payload, recipient: management.owner, link: '/mes-biens' }) : Promise.resolve(),
   ]);
+};
+
+const notifyCurrentTenant = async (management, type, title, body, suffix, tenantId = management.currentTenant) => {
+  if (!tenantId) return;
+  const tenant = await Locataire.findById(tenantId).select('user').lean();
+  if (!tenant?.user) return;
+  await notify({ recipient: tenant.user, type, title, body, link: '/espace-locataire', entityType: 'RentalManagement', entityId: management._id, dedupeKey: `tenant:notice:${management._id}:${suffix}:${management.workflowHistory.length}`, metadata: { rentalManagementId: String(management._id) } }).catch(() => {});
 };
 
 const loadContext = async (managementId) => {
@@ -188,6 +196,7 @@ const startNotice = async (managementId, { actor, comment = '', plannedExitAt, s
   appendHistory(management, { from, to: 'sortie_programmee', action: 'notice_started', actor, source, comment });
   await Promise.all([property.save(), management.save()]);
   await notifyTransition(management, property, 'rental_notice_started', 'Préavis enregistré', `Une sortie est programmée pour le bien « ${property.title} ».`);
+  await notifyCurrentTenant(management, 'tenant_notice_recorded', 'Préavis enregistré', `Votre départ est programmé le ${planned.toLocaleDateString('fr-FR')}.`, 'started');
   return { management, property };
 };
 
@@ -210,6 +219,7 @@ const acknowledgeNotice = async (managementId, { actor, comment = '' } = {}) => 
   });
   await management.save();
   await notifyTransition(management, property, 'rental_notice_acknowledged', 'Préavis accusé réception', `Le préavis pour « ${property.title} » a été accusé réception.`);
+  await notifyCurrentTenant(management, 'tenant_notice_acknowledged', 'Préavis validé', 'Votre préavis a été accusé réception par le gestionnaire.', 'acknowledged');
   return { management, property };
 };
 
@@ -229,11 +239,13 @@ const cancelNotice = async (managementId, { actor, comment = '' } = {}) => {
   appendHistory(management, { from, to: 'occupe', action: 'notice_cancelled', actor, comment });
   await Promise.all([property.save(), management.save()]);
   await notifyTransition(management, property, 'rental_notice_cancelled', 'Préavis annulé', `Le préavis pour « ${property.title} » a été annulé — le locataire reste en place.`);
+  await notifyCurrentTenant(management, 'tenant_notice_cancelled', 'Préavis annulé', 'Votre préavis a été annulé.', 'cancelled');
   return { management, property };
 };
 
 const markPropertyVacant = async (managementId, { actor, comment = '' } = {}) => {
   const { management, property } = await loadContext(managementId);
+  const departingTenant = management.currentTenant;
   const vacancyReadiness = evaluateVacancyReadiness(management);
   if (!vacancyReadiness.ready) {
     const error = new Error('La sortie doit être validée et sans blocage avant remise en disponibilité.'); error.statusCode = 422; error.vacancyReadiness = vacancyReadiness; throw error;
@@ -249,6 +261,7 @@ const markPropertyVacant = async (managementId, { actor, comment = '' } = {}) =>
   appendHistory(management, { from, to: 'vacant', action: 'mark_vacant', actor, comment });
   const readiness = refreshReadiness(management, property);
   await Promise.all([property.save(), management.save()]);
+  if (departingTenant) await notifyCurrentTenant(management, 'tenant_notice_closed', 'Départ locatif clôturé', 'Votre sortie locative a été clôturée.', 'closed', departingTenant);
   await notifyTransition(management, property, 'rental_property_available', 'Bien disponible', `Le bien « ${property.title} » est de nouveau disponible.`);
   if (management.publicationPolicy === 'automatique' && management.publicationAuthorized) {
     return publishRentalProperty(management._id, actor, 'Republication après validation de sortie');

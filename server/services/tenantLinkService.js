@@ -16,6 +16,7 @@
 const crypto = require('crypto');
 const Locataire = require('../models/Locataire');
 const TenantLinkRequest = require('../models/TenantLinkRequest');
+const { notify, notifyStaff } = require('./notificationService');
 
 const INVITATION_TTL_DAYS = 7;
 
@@ -99,6 +100,9 @@ async function activateInvitation({ rawToken, userId }) {
   request.acceptedAt = new Date();
   await request.save();
 
+  await notify({ recipient: userId, type: 'tenant_invitation_accepted', title: 'Espace locataire activé', body: 'Votre compte est maintenant rattaché à votre dossier locataire.' }).catch(() => {});
+  await notifyStaff({ type: 'tenant_invitation_accepted', title: 'Invitation locataire acceptée', body: 'Un locataire a activé son espace.', data: { locataireId: String(locataire._id) } }).catch(() => {});
+
   return { locataire, request };
 }
 
@@ -133,6 +137,7 @@ async function requestLink({ locataireId, userId }) {
     if (error.code === 11000) throw fail('Une demande est déjà en attente pour ce dossier.', 409);
     throw error;
   }
+  await notifyStaff({ type: 'tenant_link_requested', title: 'Nouvelle demande de rattachement', body: 'Un utilisateur demande le rattachement à un dossier locataire.', data: { requestId: String(request._id), locataireId: String(locataire._id) } }).catch(() => {});
   return request;
 }
 
@@ -160,6 +165,8 @@ async function reviewLinkRequest({ requestId, decision, actingUser, comment = ''
   request.reviewComment = comment;
   if (decision === 'approved') request.acceptedAt = new Date();
   await request.save();
+
+  await notify({ recipient: request.user, type: decision === 'approved' ? 'tenant_link_approved' : 'tenant_link_rejected', title: decision === 'approved' ? 'Rattachement validé' : 'Rattachement refusé', body: decision === 'approved' ? 'Votre portail locataire est maintenant accessible.' : 'Votre demande de rattachement a été refusée.', data: { requestId: String(request._id) } }).catch(() => {});
 
   return { request, locataire };
 }

@@ -71,6 +71,13 @@ const estimationUpload = multer({
       ? cb(null, true)
       : cb(new Error(`Format non autorisé : ${file.mimetype}`), false),
 });
+const rentalMaintenanceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024, files: 5 },
+  fileFilter: (_req, file, cb) => ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)
+    ? cb(null, true)
+    : cb(new Error(`Format image non autorisé : ${file.mimetype}`), false),
+});
 
 // ── 3. Upload vers Cloudinary (stream) ───────────────────────
 // ✅ Options d'optimisation centralisées ici plutôt que répétées
@@ -132,6 +139,7 @@ const destroyFromCloudinary = async (url) => {
 module.exports = {
   upload,
   estimationUpload,
+  rentalMaintenanceUpload,
   uploadToCloudinary,
   destroyFromCloudinary,
 };

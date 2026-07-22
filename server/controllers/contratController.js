@@ -211,6 +211,12 @@ exports.getPaiements = async (req, res) => {
 exports.createPaiement = async (req, res) => {
   try {
     const p = await Paiement.create({ ...req.body, contrat: req.params.id });
+    const { notifyContractTenant } = require('../services/rentalTenantNotificationService');
+    await notifyContractTenant(req.params.id, {
+      type: 'tenant_payment_recorded', title: 'Paiement locatif enregistré',
+      body: `Une échéance ${p.mois || ''}/${p.annee || ''} a été enregistrée.`, entityType: 'Paiement', entityId: p._id,
+      dedupeKey: `tenant:payment:${p._id}:${p.statut}`, metadata: { paymentId: String(p._id), status: p.statut },
+    }).catch(() => {});
     res.status(201).json({ status: 'success', data: { paiement: p } });
   } catch (err) {
     res.status(400).json({ status: 'error', message: err.message });

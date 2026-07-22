@@ -104,6 +104,12 @@ export const deleteLocataire = async (id) => {
   await api.delete(`/locataires/${id}`);
 };
 
+export const inviteLocataire = async (id) => (await api.post(`/locataires/${id}/invite`)).data.data;
+export const getTenantLinkRequests = async (params = {}) => (await api.get('/locataires/link-requests', { params })).data.data;
+export const reviewTenantLinkRequest = async (requestId, decision, comment = '') => (await api.patch(`/locataires/link-requests/${requestId}/review`, { decision, comment })).data.data;
+export const cancelTenantInvitation = async (requestId) => (await api.patch(`/locataires/invitations/${requestId}/cancel`)).data.data;
+export const resendTenantInvitation = async (requestId) => (await api.post(`/locataires/invitations/${requestId}/resend`)).data.data;
+
 // ── Contrats ──────────────────────────────────────────────────
 
 export const getContrats = async (params = {}) => {
