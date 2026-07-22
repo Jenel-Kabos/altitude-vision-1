@@ -5,6 +5,9 @@ const { fail } = require('./financialError');
 const { getNextFinancialDocumentNumber } = require('./financialSequenceService');
 const { appendFinancialLedgerEntry } = require('./financialLedgerService');
 const { assertFinancialDocumentTransition } = require('./financialStateService');
+const { runFinancialOperation } = require('./financialTransactionService');
+const { financialCheckpoint } = require('./financialFaultInjection');
+const inSession = (query, session) => (session ? query.session(session) : query);
 
 function calculateLine(input) {
   const quantity = input.quantity;
@@ -40,17 +43,27 @@ async function replaceDraftLines(documentId, lines, actorId) {
   await appendFinancialLedgerEntry({ eventType: 'financial_document.draft_updated', domain: document.domain, establishmentType: document.establishmentType, establishmentId: document.establishmentId, entityType: 'FinancialDocument', entityId: document._id, actorType: 'user', actorId, businessOperationKey: `document:${document._id}:draft:${document.updatedAt.getTime()}`, newState: calculated.totals });
   return document;
 }
-async function issueFinancialDocument({ documentId, actor, businessOperationKey, establishmentCode }) {
-  let document = await FinancialDocument.findById(documentId);
+async function issueFinancialDocumentCore({ documentId, actor, businessOperationKey, establishmentCode, session, faultInjector }) {
+  await financialCheckpoint(faultInjector, 'issue.before_sequence', { businessOperationKey });
+  let document = await inSession(FinancialDocument.findById(documentId), session);
   if (!document) fail('FINANCIAL_DOCUMENT_NOT_ISSUED', 'Facture introuvable.', 404);
   if (document.status === 'issued') return document;
   assertFinancialDocumentTransition(document.status, 'issued');
-  const lines = await FinancialDocumentLine.find({ financialDocument: documentId });
+  const lines = await inSession(FinancialDocumentLine.find({ financialDocument: documentId }), session);
   const { totals } = calculateDocumentTotals(lines.map((line) => line.toObject()));
-  const next = await getNextFinancialDocumentNumber({ domain: document.domain, establishmentType: document.establishmentType, establishmentId: document.establishmentId, documentType: document.documentType, year: new Date().getUTCFullYear(), establishmentCode });
-  document = await FinancialDocument.findOneAndUpdate({ _id: documentId, status: 'draft' }, { ...totals, balanceMinor: totals.totalMinor, status: 'issued', documentNumber: next.formattedNumber, sequenceValue: next.sequenceValue, sequenceYear: new Date().getUTCFullYear(), issueDate: new Date(), issuedAt: new Date(), issuedBy: actor.id || actor._id, updatedBy: actor.id || actor._id }, { new: true });
-  if (!document) return FinancialDocument.findById(documentId);
-  await appendFinancialLedgerEntry({ eventType: 'financial_document.issued', domain: document.domain, establishmentType: document.establishmentType, establishmentId: document.establishmentId, entityType: 'FinancialDocument', entityId: document._id, actorType: 'user', actorId: actor.id || actor._id, amountMinor: document.totalMinor, currency: document.currency, idempotencyKey: businessOperationKey, businessOperationKey: `document:${document._id}:issued`, previousState: { status: 'draft' }, newState: { status: 'issued', documentNumber: document.documentNumber } });
+  const next = await getNextFinancialDocumentNumber({ domain: document.domain, establishmentType: document.establishmentType, establishmentId: document.establishmentId, documentType: document.documentType, year: new Date().getUTCFullYear(), establishmentCode, session });
+  await financialCheckpoint(faultInjector, 'issue.after_sequence', { businessOperationKey, sequenceValue: next.sequenceValue });
+  await financialCheckpoint(faultInjector, 'issue.before_document_update', { businessOperationKey });
+  document = await FinancialDocument.findOneAndUpdate({ _id: documentId, status: 'draft' }, { ...totals, balanceMinor: totals.totalMinor, status: 'issued', documentNumber: next.formattedNumber, sequenceValue: next.sequenceValue, sequenceYear: new Date().getUTCFullYear(), issueDate: new Date(), issuedAt: new Date(), issuedBy: actor.id || actor._id, updatedBy: actor.id || actor._id }, { new: true, session });
+  if (!document) return inSession(FinancialDocument.findById(documentId), session);
+  await financialCheckpoint(faultInjector, 'issue.after_document_update', { businessOperationKey, documentId });
+  await financialCheckpoint(faultInjector, 'issue.before_ledger', { businessOperationKey, documentId });
+  const ledgerData = { eventType: 'financial_document.issued', domain: document.domain, establishmentType: document.establishmentType, establishmentId: document.establishmentId, entityType: 'FinancialDocument', entityId: document._id, actorType: 'user', actorId: actor.id || actor._id, amountMinor: document.totalMinor, currency: document.currency, idempotencyKey: businessOperationKey, businessOperationKey: `document:${document._id}:issued`, previousState: { status: 'draft' }, newState: { status: 'issued', documentNumber: document.documentNumber } };
+  await (session ? appendFinancialLedgerEntry(ledgerData, { session }) : appendFinancialLedgerEntry(ledgerData));
+  await financialCheckpoint(faultInjector, 'issue.after_ledger', { businessOperationKey, documentId });
   return document;
+}
+async function issueFinancialDocument(args) {
+  return runFinancialOperation({ operationName: 'financial_document.issue', transactionMode: args.transactionMode }, ({ session }) => issueFinancialDocumentCore({ ...args, session }));
 }
 module.exports = { calculateLine, calculateDocumentTotals, recalculateDocument, replaceDraftLines, issueFinancialDocument };

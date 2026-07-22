@@ -15,6 +15,10 @@ const schema = new mongoose.Schema({
   guestAccess: { tokenHash: { type: String, select: false }, expiresAt: Date, revokedAt: Date, scope: [{ type: String, enum: ['view', 'download', 'pay'] }], createdAt: Date, lastAccessAt: Date },
   createdBy: { type: ObjectId, ref: 'User', required: true }, updatedBy: { type: ObjectId, ref: 'User' },
 }, { timestamps: true });
+['subtotalMinor', 'discountTotalMinor', 'taxTotalMinor', 'feesTotalMinor', 'totalMinor', 'amountAllocatedMinor', 'balanceMinor'].forEach((path) => {
+  schema.path(path).validate(Number.isSafeInteger, `${path} doit être un entier sûr.`);
+  schema.path(path).validate((value) => value >= 0, `${path} ne peut pas être négatif.`);
+});
 schema.index({ domain: 1, establishmentId: 1, status: 1 });
 schema.index({ domain: 1, establishmentId: 1, documentNumber: 1 }, { unique: true, partialFilterExpression: { documentNumber: { $type: 'string' } } });
 schema.index({ domain: 1, subjectType: 1, subjectId: 1 });

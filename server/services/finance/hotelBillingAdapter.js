@@ -6,6 +6,9 @@ const { assertCurrency, assertAmountMinor } = require('./moneyService');
 const { calculateDocumentTotals } = require('./financialDocumentService');
 const { appendFinancialLedgerEntry } = require('./financialLedgerService');
 const { fail } = require('./financialError');
+const { runFinancialOperation } = require('./financialTransactionService');
+const { financialCheckpoint } = require('./financialFaultInjection');
+const inSession = (query, session) => (session ? query.session(session) : query);
 
 function toMinor(value, currency) {
   const number = Number(value || 0);
@@ -23,13 +26,16 @@ function buildHotelReservationInvoiceLines(reservation, actorId) {
   const base = { lineType: 'accommodation', description: `Séjour ${reservation.reference} — ${reservation.nights} nuit(s), ${reservation.roomsCount} chambre(s)`, quantity: reservation.nights * reservation.roomsCount, unitAmountMinor: toMinor(reservation.unitPrice, currency), discountAmountMinor: toMinor(reservation.discount, currency), taxAmountMinor: toMinor(reservation.taxes, currency), feesAmountMinor: toMinor(reservation.fees, currency), taxes: [], sourceType: 'HotelReservation', sourceId: reservation._id, serviceDate: reservation.checkInDate, createdBy: actorId };
   return calculateDocumentTotals([base]).lines;
 }
-async function createHotelInvoiceDraftFromReservation({ reservationId, actor }) {
-  const reservation = await HotelReservation.findById(reservationId);
+async function createHotelInvoiceDraftCore({ reservationId, actor, session, transactional, faultInjector }) {
+  const reservation = await inSession(HotelReservation.findById(reservationId), session);
   assertReservationCanBeBilled(reservation);
-  const hotel = await Hotel.findById(reservation.hotel);
+  await financialCheckpoint(faultInjector, 'draft.after_reservation_read', { reservationId });
+  const reservationStillActive = await inSession(HotelReservation.exists({ _id: reservationId, status: { $nin: ['cancelled', 'expired', 'rejected'] } }), session);
+  if (!reservationStillActive) fail('FINANCIAL_RESERVATION_CHANGED', 'La réservation a été supprimée ou invalidée pendant la facturation.', 409);
+  const hotel = await inSession(Hotel.findById(reservation.hotel), session);
   if (!hotel) fail('FINANCIAL_ESTABLISHMENT_MISMATCH', 'Hôtel introuvable.', 404);
   const key = `hotel-reservation-primary-invoice:${reservation._id}`;
-  const existing = await FinancialDocument.findOne({ domain: 'hotel', businessOperationKey: key });
+  const existing = await inSession(FinancialDocument.findOne({ domain: 'hotel', businessOperationKey: key }), session);
   if (existing) return existing;
   const currency = assertCurrency(reservation.currency || reservation.rateSnapshot?.currency || 'XAF');
   const actorId = actor.id || actor._id;
@@ -37,19 +43,29 @@ async function createHotelInvoiceDraftFromReservation({ reservationId, actor }) 
   const { totals } = calculateDocumentTotals(lines);
   let document;
   try {
-    document = await FinancialDocument.create({ domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotel._id, documentType: 'invoice', currency, subjectType: 'HotelReservation', subjectId: reservation._id, customer: getHotelCustomerSnapshot(reservation), seller: getHotelSellerSnapshot(hotel), servicePeriodStart: reservation.checkInDate, servicePeriodEnd: reservation.checkOutDate, ...totals, balanceMinor: totals.totalMinor, businessOperationKey: key, metadata: { reservationReference: reservation.reference }, createdBy: actorId, updatedBy: actorId });
+    const data = { domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotel._id, documentType: 'invoice', currency, subjectType: 'HotelReservation', subjectId: reservation._id, customer: getHotelCustomerSnapshot(reservation), seller: getHotelSellerSnapshot(hotel), servicePeriodStart: reservation.checkInDate, servicePeriodEnd: reservation.checkOutDate, ...totals, balanceMinor: totals.totalMinor, businessOperationKey: key, metadata: { reservationReference: reservation.reference }, createdBy: actorId, updatedBy: actorId };
+    document = session ? (await FinancialDocument.create([data], { session }))[0] : await FinancialDocument.create(data);
   } catch (error) {
-    if (error.code === 11000) return FinancialDocument.findOne({ domain: 'hotel', businessOperationKey: key });
+    if (error.code === 11000) return inSession(FinancialDocument.findOne({ domain: 'hotel', businessOperationKey: key }), session);
     throw error;
   }
   try {
-    await FinancialDocumentLine.insertMany(lines.map((line, index) => ({ ...line, financialDocument: document._id, lineNumber: index + 1 })));
-    await appendFinancialLedgerEntry({ eventType: 'financial_document.draft_created', domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotel._id, entityType: 'FinancialDocument', entityId: document._id, actorType: 'user', actorId, amountMinor: document.totalMinor, currency, businessOperationKey: key, newState: { status: 'draft' } });
+    await financialCheckpoint(faultInjector, 'draft.after_document', { businessOperationKey: key, documentId: document._id });
+    await financialCheckpoint(faultInjector, 'draft.before_lines', { businessOperationKey: key, documentId: document._id });
+    await FinancialDocumentLine.insertMany(lines.map((line, index) => ({ ...line, financialDocument: document._id, lineNumber: index + 1 })), { session });
+    await financialCheckpoint(faultInjector, 'draft.after_lines', { businessOperationKey: key, documentId: document._id });
+    await financialCheckpoint(faultInjector, 'draft.before_ledger', { businessOperationKey: key, documentId: document._id });
+    await appendFinancialLedgerEntry({ eventType: 'financial_document.draft_created', domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotel._id, entityType: 'FinancialDocument', entityId: document._id, actorType: 'user', actorId, amountMinor: document.totalMinor, currency, businessOperationKey: key, newState: { status: 'draft' } }, { session });
     return document;
   } catch (error) {
-    await FinancialDocumentLine.deleteMany({ financialDocument: document._id });
-    await FinancialDocument.deleteOne({ _id: document._id, status: 'draft' });
+    if (!transactional) {
+      await FinancialDocumentLine.deleteMany({ financialDocument: document._id });
+      await FinancialDocument.deleteOne({ _id: document._id, status: 'draft' });
+    }
     throw error;
   }
+}
+async function createHotelInvoiceDraftFromReservation(args) {
+  return runFinancialOperation({ operationName: 'financial_document.hotel_draft', transactionMode: args.transactionMode }, (context) => createHotelInvoiceDraftCore({ ...args, ...context }));
 }
 module.exports = { assertReservationCanBeBilled, getHotelCustomerSnapshot, getHotelSellerSnapshot, buildHotelReservationInvoiceLines, createHotelInvoiceDraftFromReservation };
