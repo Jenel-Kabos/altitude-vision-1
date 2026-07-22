@@ -20,7 +20,13 @@ const COLLAB_ROLES = [
 const STAFF_ALL  = ['Admin', ...COLLAB_ROLES];
 
 // Documents + paiements
-const STAFF_DOC  = ['Admin', 'Secretaire', 'Collaborateur'];
+// Correctif Sprint GL-B2 : GestionnaireImmobilier voyait le lien "Documents"
+// dans la sidebar (ROLES_DOCS l'inclut déjà) mais recevait un 403 réel sur
+// GET /api/documents et les routes de génération documentaire locative
+// (gestionDocumentRoutes/contratRoutes docOnly, toutes basées sur STAFF_DOC)
+// — incohérence entre navigation et API, corrigée ici plutôt qu'en
+// dupliquant une nouvelle constante.
+const STAFF_DOC  = ['Admin', 'Secretaire', 'Collaborateur', 'GestionnaireImmobilier'];
 
 // Gestion immobilière : proprio, biens, locataires, contrats
 const STAFF_IMMO = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];

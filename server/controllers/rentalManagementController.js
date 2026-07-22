@@ -238,6 +238,9 @@ exports.markVacant = runAction((id, options) => sync.markPropertyVacant(id, opti
 exports.markMaintenance = runAction((id, options) => sync.markMaintenance(id, options));
 exports.completeMaintenance = runAction((id, options) => sync.completeMaintenance(id, { ...options, controlValidated: options.controlValidated }));
 exports.startNotice = runAction((id, options) => sync.startNotice(id, options));
+// Sprint GL-B2 — accusé de réception / annulation d'un préavis en cours.
+exports.acknowledgeNotice = runAction((id, options) => sync.acknowledgeNotice(id, options));
+exports.cancelNotice = runAction((id, options) => sync.cancelNotice(id, options));
 
 exports.history = async (req, res) => {
   try {

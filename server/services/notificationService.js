@@ -30,6 +30,7 @@ const USER_LINKS = {
   rental_listing_suspended: '/mes-biens', rental_property_occupied: '/mes-biens',
   rental_exit_scheduled: '/mes-biens', rental_maintenance: '/mes-biens',
   rental_listing_submitted: '/mes-biens', rental_notice_started: '/mes-biens',
+  rental_notice_acknowledged: '/mes-biens', rental_notice_cancelled: '/mes-biens',
   rental_inspection_required: '/mes-biens', rental_maintenance_started: '/mes-biens',
   rental_maintenance_completed: '/mes-biens', rental_property_available: '/mes-biens',
   rental_payment_overdue: '/mes-paiements', rental_contract_expiring: '/mes-biens',
@@ -42,6 +43,8 @@ const USER_LINKS = {
   // Sprint E — notifications individuelles (via notify() direct, pas
   // notifyStaff) : employé assigné à une tâche/un ticket.
   housekeeping_task_assigned: '/dashboard/housekeeping', maintenance_ticket_assigned: '/dashboard/maintenance',
+  // Sprint GL-B2 — assignation individuelle (notify direct, jamais notifyStaff).
+  rental_maintenance_ticket_assigned: '/dashboard/gestion-locative/maintenance',
 };
 
 const STAFF_LINKS = {
@@ -53,6 +56,7 @@ const STAFF_LINKS = {
   rental_listing_suspended: '/dashboard/gestion-locative', rental_property_occupied: '/dashboard/gestion-locative',
   rental_exit_scheduled: '/dashboard/gestion-locative', rental_maintenance: '/dashboard/gestion-locative',
   rental_listing_submitted: '/dashboard/gestion-locative', rental_notice_started: '/dashboard/gestion-locative',
+  rental_notice_acknowledged: '/dashboard/gestion-locative', rental_notice_cancelled: '/dashboard/gestion-locative',
   rental_inspection_required: '/dashboard/gestion-locative', rental_maintenance_started: '/dashboard/gestion-locative',
   rental_maintenance_completed: '/dashboard/gestion-locative', rental_property_available: '/dashboard/gestion-locative',
   rental_payment_overdue: '/dashboard/gestion-locative', rental_contract_expiring: '/dashboard/gestion-locative',
@@ -64,6 +68,9 @@ const STAFF_LINKS = {
   housekeeping_task_created: '/dashboard/housekeeping', housekeeping_task_completed: '/dashboard/housekeeping',
   room_inspection_failed: '/dashboard/housekeeping', room_returned_to_service: '/dashboard/housekeeping',
   maintenance_ticket_created: '/dashboard/maintenance', maintenance_ticket_resolved: '/dashboard/maintenance',
+  // Sprint GL-B2 — maintenance LOCATIVE (distincte de la maintenance hôtelière ci-dessus).
+  rental_maintenance_ticket_created: '/dashboard/gestion-locative/maintenance',
+  rental_maintenance_ticket_resolved: '/dashboard/gestion-locative/maintenance',
 };
 
 const visitSocketEventFor = (type) => {

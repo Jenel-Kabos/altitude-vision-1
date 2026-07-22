@@ -10,11 +10,65 @@ exports.getAll = async (req, res) => {
     if (req.query.statut)  filter.statut  = req.query.statut;
     if (req.query.annee)   filter.annee   = parseInt(req.query.annee, 10);
 
-    const paiements = await Paiement.find(filter)
-      .populate('contrat', 'type adresseBien montantLoyer')
-      .sort({ annee: 1, mois: 1 });
+    // Sprint GL-B2 — pagination optionnelle (comportement inchangé si
+    // `page`/`limit` absents, pour ne casser aucun appelant existant).
+    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 20));
 
-    res.json({ status: 'success', data: { paiements } });
+    let query = Paiement.find(filter)
+      .populate({
+        path: 'contrat',
+        select: 'type adresseBien montantLoyer locataire',
+        populate: { path: 'locataire', select: 'nom prenom' },
+      })
+      .sort({ annee: 1, mois: 1 });
+    if (hasPagination) query = query.skip((page - 1) * limit).limit(limit);
+
+    const [paiements, total] = await Promise.all([
+      query,
+      hasPagination ? Paiement.countDocuments(filter) : Promise.resolve(undefined),
+    ]);
+
+    res.json({
+      status: 'success',
+      data: hasPagination
+        ? { paiements, total, page, totalPages: Math.ceil(total / limit) }
+        : { paiements },
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────
+// GET /api/paiements/stats — statistiques d'encaissement (mission GL-B2).
+// Calculs entièrement côté serveur — jamais recalculés côté client.
+// ─────────────────────────────────────────────
+exports.getStats = async (req, res) => {
+  try {
+    const { annee } = req.query;
+    const filter = {};
+    if (annee) filter.annee = parseInt(annee, 10);
+
+    const [grouped] = await Paiement.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalAttendu: { $sum: { $ifNull: ['$montantTotal', '$montant'] } },
+          totalEncaisse: { $sum: { $cond: [{ $eq: ['$statut', 'payé'] }, { $ifNull: ['$montantRecu', '$montant'] }, { $ifNull: ['$montantRecu', 0] }] } },
+          nbPayes: { $sum: { $cond: [{ $eq: ['$statut', 'payé'] }, 1, 0] } },
+          nbPartiels: { $sum: { $cond: [{ $eq: ['$statut', 'partiel'] }, 1, 0] } },
+          nbImpayes: { $sum: { $cond: [{ $in: ['$statut', ['impayé', 'en_retard']] }, 1, 0] } },
+          nbTotal: { $sum: 1 },
+        },
+      },
+    ]);
+    const stats = grouped || { totalAttendu: 0, totalEncaisse: 0, nbPayes: 0, nbPartiels: 0, nbImpayes: 0, nbTotal: 0 };
+    stats.totalImpaye = Math.max(0, (stats.totalAttendu || 0) - (stats.totalEncaisse || 0));
+    stats.tauxEncaissement = stats.totalAttendu > 0 ? Math.round((stats.totalEncaisse / stats.totalAttendu) * 100) : 0;
+    res.json({ status: 'success', data: { stats } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }

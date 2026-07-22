@@ -67,6 +67,13 @@ const rentalManagementSchema = new mongoose.Schema({
   managementActivated: { type: Boolean, default: true, index: true },
   occupancyStatus: {
     type: String,
+    // Dette technique GL-B2 (Mission 5, audit) — 'preavis' est un enum MORT :
+    // aucune fonction de ce codebase ne l'assigne jamais (`startNotice`
+    // transitionne directement vers 'sortie_programmee'). Décision : le
+    // CONSERVER (dépréciation non destructive, jamais de suppression d'une
+    // valeur d'enum en production — un document existant ou un futur import
+    // pourrait la porter) mais ne JAMAIS l'assigner dans du code nouveau.
+    // Voir RENTAL_MANAGEMENT_V2.md §Mission 5 pour la décision complète.
     enum: ['vacant', 'preavis', 'occupe', 'sortie_programmee', 'travaux', 'indisponible'],
     default: 'vacant',
     index: true,
@@ -125,6 +132,9 @@ const rentalManagementSchema = new mongoose.Schema({
   maintenanceStatus: { type: String, enum: ['aucune', 'signalee', 'en_cours', 'controle_requis'], default: 'aucune' },
   maintenanceReason: { type: String, trim: true, maxlength: 1000 },
   noticeStartedAt: Date,
+  // Sprint GL-B2 — accusé de réception du préavis (distinct de sa création :
+  // voir rentalListingSyncService.acknowledgeNotice).
+  noticeAcknowledgedAt: Date,
   plannedExitAt: Date,
   exitInspectionClearedAt: Date,
   publicationReadiness: {

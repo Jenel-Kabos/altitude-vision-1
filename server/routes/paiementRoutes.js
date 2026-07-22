@@ -14,6 +14,7 @@ router.post('/webhook-cinetpay',               cinetpay.webhookCinetpay);
 
 // Routes spécifiques AVANT /:id pour éviter les conflits
 router.get( '/alertes',            protect, ctrl.getAlertes);
+router.get( '/stats',              protect, ctrl.getStats);
 router.post('/calculer-penalites', protect, ctrl.calculerPenalites);
 
 router.get('/',       protect, ctrl.getAll);

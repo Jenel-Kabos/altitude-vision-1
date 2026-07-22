@@ -123,4 +123,60 @@ describe('rentalListingSyncService', () => {
     await sync.publishRentalProperty(managementId, ownerId);
     expect(notifications.notifyStaff).toHaveBeenCalledTimes(1);
   });
+
+  // Sprint GL-B2 — préavis : création (startNotice, déjà existant),
+  // accusé de réception, annulation.
+  describe('préavis — startNotice/acknowledgeNotice/cancelNotice (Sprint GL-B2)', () => {
+    test('startNotice exige une date de sortie future valide', async () => {
+      context(makeManagement({ occupancyStatus: 'occupe' }));
+      await expect(sync.startNotice(managementId, { actor: ownerId, plannedExitAt: null })).rejects.toMatchObject({ statusCode: 422 });
+      await expect(sync.startNotice(managementId, { actor: ownerId, plannedExitAt: '2020-01-01' })).rejects.toMatchObject({ statusCode: 422 });
+    });
+
+    test('startNotice : occupe → sortie_programmee, noticeStartedAt/plannedExitAt renseignés', async () => {
+      const { management, property } = context(makeManagement({ occupancyStatus: 'occupe' }));
+      const future = new Date(Date.now() + 30 * 24 * 3600 * 1000);
+      await sync.startNotice(managementId, { actor: ownerId, plannedExitAt: future.toISOString() });
+      expect(management.occupancyStatus).toBe('sortie_programmee');
+      expect(management.noticeStartedAt).toBeInstanceOf(Date);
+      expect(management.plannedExitAt.getTime()).toBe(future.getTime());
+      expect(property.isPublished).toBe(false);
+    });
+
+    test('acknowledgeNotice refuse si aucun préavis en cours', async () => {
+      context(makeManagement({ occupancyStatus: 'occupe' }));
+      await expect(sync.acknowledgeNotice(managementId, { actor: ownerId })).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    test('acknowledgeNotice renseigne noticeAcknowledgedAt sans changer le statut', async () => {
+      const { management } = context(makeManagement({ occupancyStatus: 'sortie_programmee', noticeAcknowledgedAt: null }));
+      await sync.acknowledgeNotice(managementId, { actor: ownerId });
+      expect(management.noticeAcknowledgedAt).toBeInstanceOf(Date);
+      expect(management.occupancyStatus).toBe('sortie_programmee');
+    });
+
+    test('acknowledgeNotice est idempotent (pas de double notification)', async () => {
+      context(makeManagement({ occupancyStatus: 'sortie_programmee', noticeAcknowledgedAt: new Date('2026-01-01') }));
+      await sync.acknowledgeNotice(managementId, { actor: ownerId });
+      expect(notifications.notifyStaff).not.toHaveBeenCalled();
+    });
+
+    test('cancelNotice refuse si aucun préavis en cours', async () => {
+      context(makeManagement({ occupancyStatus: 'occupe' }));
+      await expect(sync.cancelNotice(managementId, { actor: ownerId })).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    test('cancelNotice : sortie_programmee → occupe, dates de préavis réinitialisées', async () => {
+      const { management, property } = context(
+        makeManagement({ occupancyStatus: 'sortie_programmee', noticeStartedAt: new Date(), plannedExitAt: new Date(), noticeAcknowledgedAt: new Date() }),
+        makeProperty({ availability: 'Indisponible' }),
+      );
+      await sync.cancelNotice(managementId, { actor: ownerId, comment: 'Le locataire reste finalement.' });
+      expect(management.occupancyStatus).toBe('occupe');
+      expect(management.noticeStartedAt).toBeNull();
+      expect(management.plannedExitAt).toBeNull();
+      expect(management.noticeAcknowledgedAt).toBeNull();
+      expect(property.availability).toBe('Loué');
+    });
+  });
 });
