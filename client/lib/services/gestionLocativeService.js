@@ -77,6 +77,17 @@ export const getLocataires = async () => {
   return res.data.data.locataires;
 };
 
+// Sprint GL-B2 — liste enrichie (bien, bail, paiements, préavis actif).
+export const getLocataireDossiers = async (params = {}) => {
+  const res = await api.get('/locataires/dossiers', { params });
+  return res.data.data; // { locataires, total, page, totalPages }
+};
+
+export const getLocataireDossier = async (id) => {
+  const res = await api.get(`/locataires/${id}/dossier`);
+  return res.data.data.locataire;
+};
+
 export const createLocataire = async (data) => {
   const fd = toFormData(data);
   const res = await api.post('/locataires', fd);
@@ -144,6 +155,40 @@ export const calculerPenalites = async () => {
 
 export const getAlertesPaiements = async () => {
   const res = await api.get('/paiements/alertes');
+  return res.data.data;
+};
+
+// Sprint GL-B2 — liste paginée (tableau de bord Paiements locatifs) et
+// statistiques d'encaissement (calculées côté serveur).
+export const getPaiementsPage = async (params = {}) => {
+  const res = await api.get('/paiements', { params });
+  return res.data.data; // { paiements, total, page, totalPages }
+};
+
+export const getPaiementsStats = async (params = {}) => {
+  const res = await api.get('/paiements/stats', { params });
+  return res.data.data.stats;
+};
+
+// ── Sprint GL-B2 — Préavis (actions sur RentalManagement) ────────
+
+export const acknowledgeNotice = async (rentalManagementId, comment) => {
+  const res = await api.post(`/rental-management/${rentalManagementId}/acknowledge-notice`, { comment });
+  return res.data.data.rental;
+};
+
+export const cancelNotice = async (rentalManagementId, comment) => {
+  const res = await api.post(`/rental-management/${rentalManagementId}/cancel-notice`, { comment });
+  return res.data.data.rental;
+};
+
+export const startNotice = async (rentalManagementId, plannedExitAt, comment) => {
+  const res = await api.post(`/rental-management/${rentalManagementId}/start-notice`, { plannedExitAt, comment });
+  return res.data.data.rental;
+};
+
+export const validateExit = async (rentalManagementId, data = {}) => {
+  const res = await api.post(`/rental-management/${rentalManagementId}/validate-exit`, data);
   return res.data.data;
 };
 

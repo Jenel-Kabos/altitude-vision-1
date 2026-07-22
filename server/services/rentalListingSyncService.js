@@ -38,7 +38,10 @@ const allowedActionsFor = (management, role = 'staff') => {
   if (management.occupancyStatus === 'vacant' && management.availabilityStatus === 'disponible') actions.push('publish', 'start_maintenance');
   if (['publie', 'en_attente_moderation'].includes(management.publicationStatus)) actions.push('suspend_listing');
   if (management.occupancyStatus === 'occupe') actions.push('start_notice');
-  if (management.occupancyStatus === 'sortie_programmee') actions.push('validate_exit', 'start_maintenance');
+  if (management.occupancyStatus === 'sortie_programmee') {
+    actions.push('validate_exit', 'start_maintenance', 'cancel_notice');
+    if (!management.noticeAcknowledgedAt) actions.push('acknowledge_notice');
+  }
   if (management.availabilityStatus === 'maintenance') actions.push('complete_maintenance');
   return actions;
 };
@@ -188,6 +191,47 @@ const startNotice = async (managementId, { actor, comment = '', plannedExitAt, s
   return { management, property };
 };
 
+// ─────────────────────────────────────────────
+// Sprint GL-B2 — accusé de réception et annulation d'un préavis en cours.
+// `startNotice` (ci-dessus) fait déjà "création" ; ces deux fonctions
+// complètent le cycle demandé par la mission (§Préavis) sans dupliquer la
+// logique de transition déjà centralisée ici.
+// ─────────────────────────────────────────────
+const acknowledgeNotice = async (managementId, { actor, comment = '' } = {}) => {
+  const { management, property } = await loadContext(managementId);
+  if (management.occupancyStatus !== 'sortie_programmee') {
+    const error = new Error("Aucun préavis en cours pour ce dossier."); error.statusCode = 409; throw error;
+  }
+  if (management.noticeAcknowledgedAt) return { management, property };
+  management.noticeAcknowledgedAt = new Date();
+  appendHistory(management, {
+    from: management.occupancyStatus, to: management.occupancyStatus,
+    action: 'notice_acknowledged', actor, comment,
+  });
+  await management.save();
+  await notifyTransition(management, property, 'rental_notice_acknowledged', 'Préavis accusé réception', `Le préavis pour « ${property.title} » a été accusé réception.`);
+  return { management, property };
+};
+
+const cancelNotice = async (managementId, { actor, comment = '' } = {}) => {
+  const { management, property } = await loadContext(managementId);
+  if (management.occupancyStatus !== 'sortie_programmee') {
+    const error = new Error("Aucun préavis en cours pour ce dossier."); error.statusCode = 409; throw error;
+  }
+  const from = management.occupancyStatus;
+  management.occupancyStatus = 'occupe';
+  management.availabilityStatus = 'indisponible';
+  management.publicationStatus = 'suspendu';
+  management.noticeStartedAt = null;
+  management.plannedExitAt = null;
+  management.noticeAcknowledgedAt = null;
+  property.availability = 'Loué';
+  appendHistory(management, { from, to: 'occupe', action: 'notice_cancelled', actor, comment });
+  await Promise.all([property.save(), management.save()]);
+  await notifyTransition(management, property, 'rental_notice_cancelled', 'Préavis annulé', `Le préavis pour « ${property.title} » a été annulé — le locataire reste en place.`);
+  return { management, property };
+};
+
 const markPropertyVacant = async (managementId, { actor, comment = '' } = {}) => {
   const { management, property } = await loadContext(managementId);
   const vacancyReadiness = evaluateVacancyReadiness(management);
@@ -252,5 +296,5 @@ const serializeRentalManagement = (management, role = 'staff') => ({
 module.exports = {
   evaluatePublicationReadiness, evaluateVacancyReadiness, allowedActionsFor, refreshReadiness, publishRentalProperty,
   suspendRentalListing, markPropertyRented, schedulePropertyExit, markPropertyVacant,
-  startNotice, markMaintenance, completeMaintenance, serializeRentalManagement,
+  startNotice, acknowledgeNotice, cancelNotice, markMaintenance, completeMaintenance, serializeRentalManagement,
 };

@@ -330,6 +330,8 @@ const contratRoutes          = require('./routes/contratRoutes');
 const paiementRoutes         = require('./routes/paiementRoutes');
 const gestionDocumentRoutes  = require('./routes/gestionDocumentRoutes');
 const rentalManagementRoutes = require('./routes/rentalManagementRoutes');
+const rentalMaintenanceRoutes = require('./routes/rentalMaintenanceRoutes');
+const tenantPortalRoutes = require('./routes/tenantPortalRoutes');
 const accommodationRoutes    = require('./routes/accommodationRoutes');
 const hotelRoutes            = require('./routes/hotelRoutes');
 const hotelReservationRoutes = require('./routes/hotelReservationRoutes');
@@ -360,6 +362,11 @@ app.use('/api/contrats',         contratRoutes);
 app.use('/api/paiements',        paiementRoutes);
 app.use('/api/gestion-docs',     gestionDocumentRoutes);
 app.use('/api/rental-management', rentalManagementRoutes);
+// 🔧 Maintenance locative (Sprint GL-B2) — distincte de /api/maintenance (hôtelier, Sprint E).
+app.use('/api/rental-maintenance', rentalMaintenanceRoutes);
+// 🏠 Portail locataire (dette technique GL-B2, Mission 2) — préparation,
+// aucune page publique modifiée.
+app.use('/api/tenant-portal', tenantPortalRoutes);
 
 // 🛎️ Hébergement (meublés — Sprint 2)
 app.use('/api/accommodations', accommodationRoutes);

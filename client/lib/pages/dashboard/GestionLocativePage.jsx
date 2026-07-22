@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
   Building, Users, Home, FileText, CreditCard,
   Plus, Pencil, Trash2, X, ChevronRight, Check,
-  AlertCircle, Loader2, Eye, RefreshCw, Camera,
+  AlertCircle, Loader2, Eye, Camera,
   Download, Send, Receipt,
 } from "lucide-react";
 import {
@@ -15,13 +15,23 @@ import {
   getPaiements,     updatePaiement,     marquerPaiementPaye, calculerPenalites,
   addBienPhotos,
   getRentalManagement, getRentalManagementStats, getRentalManagementDetail, runRentalAction,
+  getLocataireDossiers, getPaiementsStats,
 } from "../../services/gestionLocativeService";
 import {
   getContratDocuments, generateBail, generateQuittance, generateMiseEnDemeure,
-  generatePreavis, generateEtatDesLieux, envoyerDocument,
+  generatePreavis, generateEtatDesLieux, envoyerDocument, getAllDocuments,
 } from "../../services/documentService";
+import { getRentalMaintenanceTickets } from "../../services/rentalMaintenanceService";
 import { getAllProperties } from "../../services/propertyService";
 import { PROPERTY_TYPES } from "../../constants/propertyTypes";
+// Dette technique GL-B2 (Mission 9) — extraction progressive de la vue
+// d'ensemble en composants dédiés (aucun changement visuel).
+import RentalStats from "../../components/dashboard/RentalStats";
+import TenantTable from "../../components/dashboard/TenantTable";
+import PaymentOverview from "../../components/dashboard/PaymentOverview";
+import NoticeOverview from "../../components/dashboard/NoticeOverview";
+import MaintenanceOverview from "../../components/dashboard/MaintenanceOverview";
+import DocumentOverview from "../../components/dashboard/DocumentOverview";
 
 // ── Palette ──────────────────────────────────────────────────
 const BLUE   = '#2E7BB5';
@@ -1602,6 +1612,13 @@ const GestionLocativePage = () => {
   const [rentals,       setRentals]       = useState([]);
   const [rentalStats,   setRentalStats]   = useState({ total:0, vacant:0, available:0, occupied:0, published:0, maintenance:0, readyToRepublish:0, overduePayments:0, partialPayments:0, expiringContracts:0, expiredContracts:0, blockingInspections:0 });
   const [rentalActionId,setRentalActionId]= useState(null);
+  // Sprint GL-B2 — vue d'ensemble enrichie : locataires actifs, loyers
+  // attendus/encaissés (calculs serveur), préavis actifs, maintenances
+  // locatives ouvertes/urgentes, documents récents.
+  const [overviewExtra, setOverviewExtra] = useState({
+    locatairesActifs: 0, paiementStats: null, preavisActifs: 0,
+    maintenancesOuvertes: 0, maintenancesUrgentes: 0, documentsRecents: [],
+  });
   const [rentalDetail, setRentalDetail] = useState(null);
   const [rentalDetailLoading, setRentalDetailLoading] = useState(false);
 
@@ -1655,6 +1672,30 @@ const GestionLocativePage = () => {
       setLoading(false);
     }
   }, []);
+
+  // Sprint GL-B2 — chargement séparé (best-effort, jamais bloquant pour le
+  // reste de la page si l'un de ces appels échoue).
+  const loadOverviewExtra = useCallback(async () => {
+    const [dossiers, paiementStats, preavis, maintenanceTickets, documentsRecents] = await Promise.all([
+      getLocataireDossiers({ limit: 1 }).catch(() => ({ total: 0 })),
+      getPaiementsStats().catch(() => null),
+      getRentalManagement({ occupancyStatus: 'sortie_programmee', limit: 1 }).catch(() => ({ total: 0 })),
+      getRentalMaintenanceTickets({}).catch(() => []),
+      getAllDocuments().catch(() => []),
+    ]);
+    const ouvertes = (maintenanceTickets || []).filter((t) => ['ouvert', 'assigne', 'planifie', 'en_cours'].includes(t.status));
+    const urgentesOuvertes = ouvertes.filter((t) => t.priority === 'urgente');
+    setOverviewExtra({
+      locatairesActifs: dossiers.total || 0,
+      paiementStats,
+      preavisActifs: preavis.total || 0,
+      maintenancesOuvertes: ouvertes.length,
+      maintenancesUrgentes: urgentesOuvertes.length,
+      documentsRecents: (documentsRecents || []).slice(0, 5),
+    });
+  }, []);
+
+  useEffect(() => { loadOverviewExtra(); }, [loadOverviewExtra]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1921,33 +1962,23 @@ const GestionLocativePage = () => {
               <p className="text-xs text-gray-400">Biens synchronisés · Contrats · Locataires · Paiements</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 flex-wrap">
-            {[
-              ['Biens gérés',     rentalStats.total || 0,       BLUE],
-              ['Vacants',         rentalStats.vacant || 0,      GREEN],
-              ['Publiés',         rentalStats.published || 0,   '#7C3AED'],
-              ['Maintenance',     rentalStats.maintenance || 0, GOLD],
-              ['Impayés',         rentalStats.overduePayments || 0, RED],
-              ['Paiements partiels',rentalStats.partialPayments || 0, GOLD],
-              [`Contrats ≤ ${rentalStats.contractAlertWindowDays || 30}j`,rentalStats.expiringContracts || 0, '#7C3AED'],
-              ['Contrats expirés', rentalStats.expiredContracts || 0, RED],
-              ['Sorties bloquées',rentalStats.blockingInspections || 0, '#7C3AED'],
-              ['Contrats actifs', contratsActifs,            GREEN],
-            ].map(([l,v,c])=>(
-              <div key={l} className="text-center">
-                <p className="text-xl font-extrabold" style={{color:c}}>{v}</p>
-                <p className="text-xs text-gray-400">{l}</p>
-              </div>
-            ))}
-            {loyersMensuel > 0 && (
-              <div className="text-center border-l border-gray-100 pl-4">
-                <p className="text-sm font-extrabold" style={{color:GREEN}}>{Number(loyersMensuel).toLocaleString('fr-FR')}</p>
-                <p className="text-xs text-gray-400">FCFA/mois</p>
-              </div>
-            )}
-            <button onClick={load} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-all"><RefreshCw size={16}/></button>
-          </div>
+          <RentalStats
+            rentalStats={rentalStats} contratsActifs={contratsActifs} loyersMensuel={loyersMensuel}
+            onRefresh={load} colors={{ BLUE, GREEN, GOLD, RED }}
+          />
         </div>
+      </div>
+
+      {/* Sprint GL-B2 — Vue d'ensemble enrichie (données réelles) */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <h2 className="text-sm font-bold text-gray-700 mb-3">Vue d'ensemble</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          <TenantTable count={overviewExtra.locatairesActifs} colors={{ BLUE, GREEN, GOLD, RED }} />
+          <NoticeOverview count={overviewExtra.preavisActifs} colors={{ BLUE, GREEN, GOLD, RED }} />
+          <MaintenanceOverview ouvertes={overviewExtra.maintenancesOuvertes} urgentes={overviewExtra.maintenancesUrgentes} colors={{ BLUE, GREEN, GOLD, RED }} />
+          <PaymentOverview paiementStats={overviewExtra.paiementStats} colors={{ BLUE, GREEN, GOLD, RED }} />
+        </div>
+        <DocumentOverview documents={overviewExtra.documentsRecents} />
       </div>
 
       {/* Onglets */}

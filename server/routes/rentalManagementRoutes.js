@@ -21,6 +21,8 @@ router.post('/:id/mark-vacant', ctrl.markVacant);
 router.post('/:id/maintenance', ctrl.markMaintenance);
 router.post('/:id/complete-maintenance', ctrl.completeMaintenance);
 router.post('/:id/start-notice', ctrl.startNotice);
+router.post('/:id/acknowledge-notice', ctrl.acknowledgeNotice);
+router.post('/:id/cancel-notice', ctrl.cancelNotice);
 router.post('/:id/validate-exit', ctrl.validateExitInspection);
 router.post('/:id/requests/:requestId/resolve', ctrl.resolveRequest);
 

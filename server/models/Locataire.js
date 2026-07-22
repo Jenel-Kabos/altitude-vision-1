@@ -11,6 +11,21 @@ const locataireSchema = new mongoose.Schema({
   profession:     { type: String, trim: true },
   revenuMensuel:  { type: Number, min: 0 },
   notes:          { type: String, trim: true },
+
+  // Dette technique GL-B2 — liaison OPTIONNELLE vers un compte User (portail
+  // locataire). Un User n'est jamais automatiquement un Locataire (un
+  // visiteur/prospect/propriétaire n'a pas de dossier locatif) — ce champ
+  // n'est renseigné qu'après un rattachement explicite et validé (invitation
+  // acceptée ou demande de rattachement approuvée par un gestionnaire, voir
+  // TenantLinkRequest.js). Jamais rempli automatiquement sur simple
+  // correspondance d'email — voir tenantLinkService.js.
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 }, { timestamps: true });
+
+// Un compte User ne peut être rattaché qu'à UN SEUL dossier Locataire à la
+// fois (index unique partiel — `$type` car `user` a une valeur par défaut
+// `null` toujours présente, même convention que RoomAssignment/
+// HousekeepingTask, Sprints D/E).
+locataireSchema.index({ user: 1 }, { unique: true, partialFilterExpression: { user: { $type: 'objectId' } } });
 
 module.exports = mongoose.model('Locataire', locataireSchema);
