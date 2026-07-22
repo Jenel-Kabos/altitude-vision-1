@@ -67,4 +67,18 @@ describe('Room model — TEST DATA', () => {
       expect(Room.ROOM_STATUS_TRANSITIONS.inspection).toContain('available');
     });
   });
+
+  describe('ROOM_STATUS_TRANSITIONS — Sprint E §9 (maintenance)', () => {
+    test("out_of_service ne peut JAMAIS transiter directement vers available (inspection réussie obligatoire)", () => {
+      expect(Room.ROOM_STATUS_TRANSITIONS.out_of_service).not.toContain('available');
+    });
+
+    test('out_of_service → inspection est autorisé (ré-inspection post-maintenance)', () => {
+      expect(Room.ROOM_STATUS_TRANSITIONS.out_of_service).toEqual(['inspection']);
+    });
+
+    test('inspection → out_of_service reste possible (inspection échouée)', () => {
+      expect(Room.ROOM_STATUS_TRANSITIONS.inspection).toContain('out_of_service');
+    });
+  });
 });

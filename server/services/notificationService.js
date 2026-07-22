@@ -39,6 +39,9 @@ const USER_LINKS = {
   hotel_reservation_pending: '/mes-hotels/reservations', hotel_reservation_confirmed: '/mes-reservations-hotel',
   hotel_reservation_rejected: '/mes-reservations-hotel', hotel_reservation_cancelled: '/mes-reservations-hotel',
   hotel_reservation_expired: '/mes-reservations-hotel',
+  // Sprint E — notifications individuelles (via notify() direct, pas
+  // notifyStaff) : employé assigné à une tâche/un ticket.
+  housekeeping_task_assigned: '/dashboard/housekeeping', maintenance_ticket_assigned: '/dashboard/maintenance',
 };
 
 const STAFF_LINKS = {
@@ -55,6 +58,12 @@ const STAFF_LINKS = {
   rental_payment_overdue: '/dashboard/gestion-locative', rental_contract_expiring: '/dashboard/gestion-locative',
   rental_owner_request: '/dashboard/gestion-locative',
   hotel_reservation_expired_batch: '/dashboard/hotel-reservations',
+  // Sprint E — housekeeping / inspection / maintenance (diffusion staff via
+  // notifyStaff, jamais un individu — voir USER_LINKS pour les
+  // notifications d'assignation individuelle).
+  housekeeping_task_created: '/dashboard/housekeeping', housekeeping_task_completed: '/dashboard/housekeeping',
+  room_inspection_failed: '/dashboard/housekeeping', room_returned_to_service: '/dashboard/housekeeping',
+  maintenance_ticket_created: '/dashboard/maintenance', maintenance_ticket_resolved: '/dashboard/maintenance',
 };
 
 const visitSocketEventFor = (type) => {

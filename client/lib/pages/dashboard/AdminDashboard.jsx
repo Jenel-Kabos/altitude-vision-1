@@ -84,6 +84,9 @@ const NAV_SECTIONS = [
       // Sprint D — vue globale des chambres (libre/occupée/nettoyage/
       // inspection), tous établissements confondus (mission §18).
       { to: '/dashboard/hotel-rooms',           end: true,  Icon: KeyRound,  label: 'Chambres (vue globale)', accent: GOLD, roles: ROLES_ALTIMMO },
+      // Sprint E — housekeeping/inspection/maintenance (mission §10-11).
+      { to: '/dashboard/housekeeping',          end: true,  Icon: Wrench,    label: 'Ménage',                 accent: GOLD, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/maintenance',           end: true,  Icon: Wrench,    label: 'Interventions techniques', accent: GOLD, roles: ROLES_ALTIMMO },
     ],
   },
   {

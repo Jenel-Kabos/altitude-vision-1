@@ -7,6 +7,7 @@
 
 const HotelReservation = require('../models/HotelReservation');
 const { releaseRoom, getActiveAssignment } = require('./roomAssignmentService');
+const { createTask } = require('./housekeepingService');
 const { notify } = require('./notificationService');
 
 function fail(message, statusCode) {
@@ -29,6 +30,17 @@ async function performCheckOut({ reservation, actingUser, reason = '' }) {
     // nettoyage avant de redevenir réservable (mission §6).
     const released = await releaseRoom({ reservationId: reservation._id, actingUser, reason, nextRoomStatus: 'cleaning' });
     room = released.room;
+
+    // Sprint E §3 — génération automatique d'une tâche de ménage au
+    // check-out. `createTask` refuse silencieusement (409 absorbé ici) si
+    // une tâche ouverte existe déjà pour cette chambre — cas normal en cas
+    // de double-appel/relance, jamais bloquant pour le check-out lui-même.
+    await createTask({
+      roomId: room._id, hotelId: reservation.hotel, reservationId: reservation._id,
+      type: 'checkout_cleaning', priority: 'normal', actingUser,
+    }).catch((err) => {
+      if (err.statusCode !== 409) throw err;
+    });
   }
 
   const from = reservation.status;

@@ -13,17 +13,24 @@ const mongoose = require('mongoose');
 
 const ROOM_STATUSES = ['available', 'occupied', 'reserved', 'out_of_service', 'cleaning', 'inspection'];
 
-// Transitions autorisées (mission §7) — centralisées ici, jamais dupliquées
-// dans un contrôleur/service. `occupied → available` est volontairement
-// ABSENT : un check-out (checkOutService) est le seul chemin qui libère une
-// chambre occupée, et il la fait toujours transiter par 'cleaning' d'abord.
+// Transitions autorisées (Sprint D §7, complétées Sprint E §9) — centralisées
+// ici, jamais dupliquées dans un contrôleur/service. `occupied → available`
+// est volontairement ABSENT : un check-out (checkOutService) est le seul
+// chemin qui libère une chambre occupée, et il la fait toujours transiter
+// par 'cleaning' d'abord.
+//
+// Sprint E : `out_of_service → available` directement est désormais
+// INTERDIT (mission §9 — "interdire out_of_service → available sans
+// inspection réussie") ; seule `out_of_service → inspection` est permise,
+// suivie d'une inspection réussie (RoomInspection.result === 'passed',
+// voir inspectionService.approveInspection) pour rejoindre 'available'.
 const ROOM_STATUS_TRANSITIONS = {
   available: ['reserved', 'occupied', 'out_of_service'],
   reserved: ['occupied', 'available', 'out_of_service'],
   occupied: ['cleaning', 'out_of_service'],
   cleaning: ['inspection', 'available', 'out_of_service'],
   inspection: ['available', 'cleaning', 'out_of_service'],
-  out_of_service: ['available'],
+  out_of_service: ['inspection'],
 };
 
 const roomSchema = new mongoose.Schema(
