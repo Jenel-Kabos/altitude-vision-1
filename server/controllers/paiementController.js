@@ -2,6 +2,7 @@ const Paiement = require('../models/Paiement');
 const Contrat  = require('../models/Contrat');
 const { verifierPaiementsEnRetard } = require('../services/alerteService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+const { notifyContractTenant } = require('../services/rentalTenantNotificationService');
 
 exports.getAll = async (req, res) => {
   try {
@@ -140,6 +141,12 @@ exports.marquerPaye = async (req, res) => {
       },
       { new: true },
     );
+
+    await notifyContractTenant(p.contrat, {
+      type: 'tenant_payment_recorded', title: 'Paiement locatif enregistré',
+      body: `Votre paiement ${updated.mois || ''}/${updated.annee || ''} est ${statut}.`, entityType: 'Paiement', entityId: updated._id,
+      dedupeKey: `tenant:payment:${updated._id}:${statut}`, metadata: { paymentId: String(updated._id), status: statut },
+    }).catch(() => {});
 
     res.json({ status: 'success', data: { paiement: updated } });
     const moisLabel = updated.mois ? updated.mois + '/' + updated.annee : String(updated.annee || '');

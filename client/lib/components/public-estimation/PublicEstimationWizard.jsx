@@ -246,6 +246,10 @@ export default function PublicEstimationWizard() {
     } catch {}
   }, []);
   useEffect(() => {
+    // Une soumission réussie doit définitivement supprimer le brouillon.
+    // L'ajout de `success` force aussi le cleanup du debounce encore en vol,
+    // qui pouvait auparavant réécrire localStorage après removeItem().
+    if (success) return undefined;
     const id = setTimeout(() => {
       const safe = JSON.parse(JSON.stringify(form));
       delete safe._locationError;
@@ -259,7 +263,7 @@ export default function PublicEstimationWizard() {
       );
     }, 400);
     return () => clearTimeout(id);
-  }, [form]);
+  }, [form, success]);
   useEffect(() => {
     headingRef.current?.focus();
   }, [stepIndex]);

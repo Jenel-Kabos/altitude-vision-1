@@ -1,16 +1,20 @@
 jest.mock('../models/Property', () => ({ findById: jest.fn() }));
 jest.mock('../models/RentalManagement', () => ({ findById: jest.fn() }));
+jest.mock('../models/Locataire', () => ({ findById: jest.fn() }));
 jest.mock('../services/notificationService', () => ({ notify: jest.fn().mockResolvedValue({}), notifyStaff: jest.fn().mockResolvedValue(undefined) }));
 
 const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const RentalManagement = require('../models/RentalManagement');
+const Locataire = require('../models/Locataire');
 const sync = require('../services/rentalListingSyncService');
 const notifications = require('../services/notificationService');
 
 const managementId = new mongoose.Types.ObjectId();
 const propertyId = new mongoose.Types.ObjectId();
 const ownerId = new mongoose.Types.ObjectId();
+const tenantId = new mongoose.Types.ObjectId();
+const tenantUserId = new mongoose.Types.ObjectId();
 
 const makeProperty = (overrides = {}) => ({
   _id: propertyId,
@@ -134,13 +138,15 @@ describe('rentalListingSyncService', () => {
     });
 
     test('startNotice : occupe → sortie_programmee, noticeStartedAt/plannedExitAt renseignés', async () => {
-      const { management, property } = context(makeManagement({ occupancyStatus: 'occupe' }));
+      Locataire.findById.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ user: tenantUserId }) }) });
+      const { management, property } = context(makeManagement({ occupancyStatus: 'occupe', currentTenant: tenantId }));
       const future = new Date(Date.now() + 30 * 24 * 3600 * 1000);
       await sync.startNotice(managementId, { actor: ownerId, plannedExitAt: future.toISOString() });
       expect(management.occupancyStatus).toBe('sortie_programmee');
       expect(management.noticeStartedAt).toBeInstanceOf(Date);
       expect(management.plannedExitAt.getTime()).toBe(future.getTime());
       expect(property.isPublished).toBe(false);
+      expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ recipient: tenantUserId, type: 'tenant_notice_recorded', link: '/espace-locataire' }));
     });
 
     test('acknowledgeNotice refuse si aucun préavis en cours', async () => {
@@ -149,10 +155,12 @@ describe('rentalListingSyncService', () => {
     });
 
     test('acknowledgeNotice renseigne noticeAcknowledgedAt sans changer le statut', async () => {
-      const { management } = context(makeManagement({ occupancyStatus: 'sortie_programmee', noticeAcknowledgedAt: null }));
+      Locataire.findById.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ user: tenantUserId }) }) });
+      const { management } = context(makeManagement({ occupancyStatus: 'sortie_programmee', noticeAcknowledgedAt: null, currentTenant: tenantId }));
       await sync.acknowledgeNotice(managementId, { actor: ownerId });
       expect(management.noticeAcknowledgedAt).toBeInstanceOf(Date);
       expect(management.occupancyStatus).toBe('sortie_programmee');
+      expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ recipient: tenantUserId, type: 'tenant_notice_acknowledged' }));
     });
 
     test('acknowledgeNotice est idempotent (pas de double notification)', async () => {
@@ -168,15 +176,17 @@ describe('rentalListingSyncService', () => {
 
     test('cancelNotice : sortie_programmee → occupe, dates de préavis réinitialisées', async () => {
       const { management, property } = context(
-        makeManagement({ occupancyStatus: 'sortie_programmee', noticeStartedAt: new Date(), plannedExitAt: new Date(), noticeAcknowledgedAt: new Date() }),
+        makeManagement({ occupancyStatus: 'sortie_programmee', noticeStartedAt: new Date(), plannedExitAt: new Date(), noticeAcknowledgedAt: new Date(), currentTenant: tenantId }),
         makeProperty({ availability: 'Indisponible' }),
       );
+      Locataire.findById.mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ user: tenantUserId }) }) });
       await sync.cancelNotice(managementId, { actor: ownerId, comment: 'Le locataire reste finalement.' });
       expect(management.occupancyStatus).toBe('occupe');
       expect(management.noticeStartedAt).toBeNull();
       expect(management.plannedExitAt).toBeNull();
       expect(management.noticeAcknowledgedAt).toBeNull();
       expect(property.availability).toBe('Loué');
+      expect(notifications.notify).toHaveBeenCalledWith(expect.objectContaining({ recipient: tenantUserId, type: 'tenant_notice_cancelled' }));
     });
   });
 });

@@ -19,6 +19,7 @@ router.get('/dossiers', readAll, ctrl.listDossiers);
 router.get('/link-requests', protect, ctrl.listLinkRequests);
 router.patch('/link-requests/:requestId/review', protect, ctrl.reviewLinkRequest);
 router.patch('/invitations/:requestId/cancel', protect, ctrl.cancelInvitation);
+router.post('/invitations/:requestId/resend', protect, ctrl.resendInvitation);
 router.get('/:id/dossier', readAll, ctrl.getDossier);
 router.post('/:id/invite', protect, ctrl.invite);
 router.get('/:id',    readAll,   ctrl.getOne);

@@ -1,4 +1,5 @@
 module.exports = {
+  watchman: false,
   testEnvironment: 'node',
   testMatch: ['**/__tests__/**/*.test.js'],
   collectCoverageFrom: [

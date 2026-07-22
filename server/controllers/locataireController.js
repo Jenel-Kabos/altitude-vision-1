@@ -8,7 +8,8 @@ const TenantLinkRequest = require('../models/TenantLinkRequest');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const tenantLinkService = require('../services/tenantLinkService');
-const { sendEmailViaZoho } = require('../services/emailService');
+const tenantPortalEmailService = require('../services/tenantPortalEmailService');
+const User = require('../models/User');
 
 const uploadPiece = async (file) => {
   if (!file) return undefined;
@@ -266,12 +267,7 @@ exports.invite = async (req, res) => {
 
     if (locataire.email) {
       const activationUrl = `${process.env.FRONTEND_URL || ''}/activer-espace-locataire?token=${rawToken}`;
-      sendEmailViaZoho(
-        process.env.ZOHO_FROM_EMAIL,
-        locataire.email,
-        'Activez votre espace locataire — Altitude Vision',
-        `Bonjour ${locataire.prenom || ''},<br/><br/>Vous êtes invité(e) à activer votre espace locataire : <a href="${activationUrl}">${activationUrl}</a><br/>Ce lien expire dans 7 jours.`,
-      ).catch(() => {});
+      tenantPortalEmailService.sendInvitation({ to: locataire.email, name: locataire.prenom, activationUrl }).catch(() => {});
     }
 
     logAction({
@@ -303,14 +299,44 @@ exports.cancelInvitation = async (req, res) => {
 // GET /api/locataires/link-requests — demandes de rattachement (self_request) en attente.
 exports.listLinkRequests = async (req, res) => {
   try {
-    const requests = await TenantLinkRequest.find({ type: 'self_request', status: 'pending' })
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 50);
+    const match = {};
+    if (req.query.type) match.type = req.query.type;
+    if (req.query.status) match.status = req.query.status;
+    if (String(req.query.search || '').trim()) {
+      const search = String(req.query.search).trim().slice(0, 100);
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(escaped, 'i');
+      const [tenantIds, userIds] = await Promise.all([
+        Locataire.find({ $or: [{ nom: rx }, { prenom: rx }, { email: rx }, { telephone: rx }] }).distinct('_id'),
+        User.find({ $or: [{ name: rx }, { email: rx }] }).distinct('_id'),
+      ]);
+      match.$or = [{ locataire: { $in: tenantIds } }, { user: { $in: userIds } }];
+      if (mongoose.isValidObjectId(search)) match.$or.push({ _id: search });
+    }
+    const [requests, total] = await Promise.all([TenantLinkRequest.find(match)
       .populate('locataire', 'nom prenom email telephone')
       .populate('user', 'name email')
-      .sort({ createdAt: -1 });
-    res.json({ status: 'success', data: { requests } });
+      .sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit), TenantLinkRequest.countDocuments(match)]);
+    res.json({ status: 'success', data: { requests, pagination: { page, limit, total, pages: Math.ceil(total / limit) } } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
+};
+
+// POST /api/locataires/invitations/:requestId/resend — relance avec un nouveau jeton.
+exports.resendInvitation = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.requestId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
+    const previous = await TenantLinkRequest.findById(req.params.requestId).populate('locataire');
+    if (!previous || previous.type !== 'invitation') return res.status(404).json({ status: 'fail', message: 'Invitation introuvable.' });
+    if (previous.status === 'pending') await tenantLinkService.cancelInvitation({ requestId: previous._id, actingUser: req.user });
+    const { request, rawToken, locataire } = await tenantLinkService.inviteTenant({ locataireId: previous.locataire._id, actingUser: req.user });
+    const activationUrl = `${process.env.FRONTEND_URL || ''}/activer-espace-locataire?token=${rawToken}`;
+    await tenantPortalEmailService.sendInvitation({ to: locataire.email, name: locataire.prenom, activationUrl }).catch(() => {});
+    res.status(201).json({ status: 'success', data: { request: { _id: request._id, status: request.status, tokenExpiresAt: request.tokenExpiresAt } } });
+  } catch (error) { res.status(error.statusCode || 500).json({ status: (error.statusCode || 500) >= 500 ? 'error' : 'fail', message: error.message }); }
 };
 
 // PATCH /api/locataires/link-requests/:requestId/review — validation OBLIGATOIRE par un gestionnaire.
@@ -319,6 +345,13 @@ exports.reviewLinkRequest = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.requestId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
     const { decision, comment } = req.body;
     const result = await tenantLinkService.reviewLinkRequest({ requestId: req.params.requestId, decision, actingUser: req.user, comment });
+    try {
+      const query = TenantLinkRequest.findById(req.params.requestId);
+      if (query?.populate) {
+        const populated = await query.populate('user', 'email name').populate('locataire', 'prenom nom email');
+        tenantPortalEmailService.sendLinkDecision({ to: populated?.user?.email, name: populated?.locataire?.prenom || populated?.user?.name, approved: decision === 'approved', comment }).catch(() => {});
+      }
+    } catch { /* L'email ne bloque jamais la décision métier. */ }
 
     logAction({
       action: `Demande de rattachement ${decision === 'approved' ? 'approuvée' : 'rejetée'}`, description: `Demande ${req.params.requestId} traitée`, module: 'GestionLocative',

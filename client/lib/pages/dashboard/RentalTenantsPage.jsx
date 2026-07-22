@@ -10,6 +10,7 @@ import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { getLocataireDossiers } from "../../services/gestionLocativeService";
 import { formatCurrencyXAF } from "../../utils/normalizePropertyDetail";
+import TenantLinkManagement from "../../components/dashboard/TenantLinkManagement";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('fr-FR') : '—');
 
@@ -150,6 +151,7 @@ const RentalTenantsPage = () => {
           </div>
         </div>
       )}
+      <TenantLinkManagement />
     </div>
   );
 };

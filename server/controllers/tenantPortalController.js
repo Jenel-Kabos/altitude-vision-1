@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const tenantPortalService = require('../services/tenantPortalService');
 const tenantLinkService = require('../services/tenantLinkService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
@@ -29,11 +30,18 @@ exports.getLease = async (req, res) => {
     fail(res, error.statusCode || 500, error.message);
   }
 };
+exports.getLeases = async (req, res) => {
+  try { res.json({ status: 'success', data: { leases: await tenantPortalService.getMyLeases(req.user.id) } }); }
+  catch (error) { fail(res, error.statusCode || 500, error.message); }
+};
+exports.getDashboard = async (req, res) => {
+  try { res.json({ status: 'success', data: { dashboard: await tenantPortalService.getDashboard(req.user.id) } }); }
+  catch (error) { fail(res, error.statusCode || 500, error.message); }
+};
 
 exports.getPayments = async (req, res) => {
   try {
-    const payments = await tenantPortalService.getMyPayments(req.user.id);
-    res.json({ status: 'success', data: { payments } });
+    res.json({ status: 'success', data: await tenantPortalService.getMyPaymentPage(req.user.id, req.query) });
   } catch (error) {
     fail(res, error.statusCode || 500, error.message);
   }
@@ -41,11 +49,22 @@ exports.getPayments = async (req, res) => {
 
 exports.getDocuments = async (req, res) => {
   try {
-    const documents = await tenantPortalService.getMyDocuments(req.user.id);
-    res.json({ status: 'success', data: { documents } });
+    res.json({ status: 'success', data: await tenantPortalService.getMyDocumentPage(req.user.id, req.query) });
   } catch (error) {
     fail(res, error.statusCode || 500, error.message);
   }
+};
+exports.downloadDocument = async (req, res) => {
+  try {
+    const document = await tenantPortalService.getMyDocumentDownload(req.user.id, req.params.documentId);
+    if (!/^https:\/\//i.test(document.url)) return fail(res, 422, 'Document indisponible.');
+    res.set('Cache-Control', 'private, no-store');
+    return res.redirect(document.url);
+  } catch (error) { return fail(res, error.statusCode || 500, error.message); }
+};
+exports.getMaintenance = async (req, res) => {
+  try { res.json({ status: 'success', data: await tenantPortalService.getMyMaintenance(req.user.id, req.query) }); }
+  catch (error) { fail(res, error.statusCode || 500, error.message); }
 };
 
 exports.getNotice = async (req, res) => {
@@ -58,13 +77,23 @@ exports.getNotice = async (req, res) => {
 };
 
 exports.createMaintenanceRequest = async (req, res) => {
+  const attachments = [];
   try {
     const { category, description } = req.body;
-    const ticket = await tenantPortalService.createMyMaintenanceRequest(req.user.id, { category, description });
+    for (const file of (req.files || [])) {
+      const uploaded = await uploadToCloudinary(file.buffer, { folder: 'altitude-vision/rental-maintenance', resource_type: 'image' });
+      attachments.push({ url: uploaded.secure_url, nom: file.originalname });
+    }
+    const ticket = await tenantPortalService.createMyMaintenanceRequest(req.user.id, { category, description, attachments });
     res.status(201).json({ status: 'success', data: { ticket } });
   } catch (error) {
+    await Promise.allSettled(attachments.map((file) => destroyFromCloudinary(file.url)));
     fail(res, error.statusCode || 500, error.message);
   }
+};
+exports.getLinkStatus = async (req, res) => {
+  try { res.json({ status: 'success', data: await tenantPortalService.getLinkStatus(req.user.id) }); }
+  catch (error) { fail(res, error.statusCode || 500, error.message); }
 };
 
 // ─────────────────────────────────────────────

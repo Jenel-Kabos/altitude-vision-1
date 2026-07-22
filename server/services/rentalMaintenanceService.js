@@ -6,6 +6,7 @@
 
 const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
 const RentalManagement = require('../models/RentalManagement');
+const Locataire = require('../models/Locataire');
 const { notify, notifyStaff } = require('./notificationService');
 
 function fail(message, statusCode) {
@@ -50,7 +51,7 @@ async function syncRentalManagementMaintenanceStatus(propertyId) {
 
 async function createTicket({
   propertyId, leaseId = null, tenantId = null, ownerId = null,
-  category, priority = 'normale', description, estimatedCost = null, attachments = [], actingUser,
+  category, priority = 'normale', description, estimatedCost = null, attachments = [], actingUser, tenantUserId = null,
 }) {
   const ticket = await RentalMaintenanceTicket.create({
     property: propertyId, lease: leaseId, tenant: tenantId, owner: ownerId,
@@ -66,6 +67,7 @@ async function createTicket({
     body: `Un ticket de maintenance (${category}) a été créé.`,
     data: { ticketId: String(ticket._id), propertyId: String(propertyId) },
   }).catch(() => {});
+  if (tenantUserId) await notify({ recipient: tenantUserId, type: 'tenant_maintenance_created', title: 'Demande de maintenance créée', body: 'Votre demande a bien été transmise au gestionnaire.', data: { ticketId: String(ticket._id) } }).catch(() => {});
 
   return ticket;
 }
@@ -105,6 +107,10 @@ async function scheduleTicket({ ticketId, scheduledFor, actingUser }) {
   ticket.status = 'planifie';
   ticket.updatedBy = actingUser?.id || null;
   await ticket.save();
+  if (ticket.tenant) {
+    const tenant = await Locataire.findById(ticket.tenant).select('user').lean();
+    if (tenant?.user) await notify({ recipient: tenant.user, type: 'tenant_maintenance_scheduled', title: 'Intervention planifiée', body: `Une intervention est planifiée le ${date.toLocaleDateString('fr-FR')}.`, data: { ticketId: String(ticket._id) } }).catch(() => {});
+  }
   return ticket;
 }
 
@@ -138,6 +144,10 @@ async function resolveTicket({ ticketId, actualCost = null, actingUser }) {
     body: 'Un ticket de maintenance locative a été résolu.',
     data: { ticketId: String(ticket._id), propertyId: String(ticket.property) },
   }).catch(() => {});
+  if (ticket.tenant) {
+    const tenant = await Locataire.findById(ticket.tenant).select('user').lean();
+    if (tenant?.user) await notify({ recipient: tenant.user, type: 'tenant_maintenance_resolved', title: 'Maintenance résolue', body: 'Votre demande de maintenance a été marquée comme résolue.', data: { ticketId: String(ticket._id) } }).catch(() => {});
+  }
 
   return ticket;
 }

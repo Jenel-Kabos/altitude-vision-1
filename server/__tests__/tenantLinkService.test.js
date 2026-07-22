@@ -7,6 +7,7 @@ jest.mock('../models/Locataire');
 jest.mock('../models/TenantLinkRequest');
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
+jest.mock('../services/notificationService', () => ({ notify: jest.fn().mockResolvedValue(), notifyStaff: jest.fn().mockResolvedValue() }));
 
 const Locataire = require('../models/Locataire');
 const TenantLinkRequest = require('../models/TenantLinkRequest');
