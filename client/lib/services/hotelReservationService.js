@@ -76,10 +76,11 @@ export const checkInHotelReservation = async (id, { roomId, reason } = {}) => {
   return res.data.data; // { reservation, room }
 };
 
-export const checkOutHotelReservation = async (id, { reason } = {}) => {
-  const res = await api.patch(`/hotel-reservations/${id}/check-out`, { reason });
+export const checkOutHotelReservation = async (id, { reason, financialOverride } = {}) => {
+  const res = await api.patch(`/hotel-reservations/${id}/check-out`, { reason, financialOverride });
   return res.data.data; // { reservation, room }
 };
+export const getCheckoutFinancialReadiness = async (id) => { const res = await api.get(`/hotel-reservations/${id}/checkout-financial-readiness`); return res.data.data.financialReadiness; };
 
 // Correctif — récupération PERSISTANTE de l'affectation active (survit à un
 // rechargement), remplace la dépendance exclusive à l'état local post-action.

@@ -15,7 +15,7 @@ const FinancialLedgerEntry = require('../models/FinancialLedgerEntry');
 const FinancialProviderEvent = require('../models/FinancialProviderEvent');
 const User = require('../models/User');
 const financialRoutes = require('../routes/financialRoutes');
-const { issueFinancialDocument, replaceDraftLines } = require('../services/finance/financialDocumentService');
+const { issueFinancialDocument, replaceDraftLines, finalizeDocumentLines } = require('../services/finance/financialDocumentService');
 const { createHotelInvoiceDraftFromReservation } = require('../services/finance/hotelBillingAdapter');
 const { allocatePaymentToDocument, reversePaymentAllocation } = require('../services/finance/paymentAllocationService');
 const { scanFinancialConsistency, planFinancialReconciliation, applyFinancialReconciliation } = require('../services/finance/financialReconciliationService');
@@ -216,7 +216,7 @@ test('des clés différentes sur un même renversement ont un gagnant unique', a
   const allocation = await allocatePaymentToDocument({ paymentId: pay._id, documentId: doc._id, amountMinor: 30000, businessOperationKey: 'different-reversal-source', actor, transactionMode: 'transactional' });
   const results = await Promise.allSettled(Array.from({ length: 20 }, (_, index) => reversePaymentAllocation({ allocationId: allocation._id, reason: 'Correction', businessOperationKey: `reversal-key-${index}`, actor, transactionMode: 'transactional' })));
   expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
-  expect(results.filter((result) => result.status === 'rejected').every((result) => result.reason.code === 'FINANCIAL_INVALID_TRANSITION')).toBe(true);
+  expect(results.filter((result) => result.status === 'rejected').every((result) => result.reason.code === 'FINANCIAL_ALLOCATION_ALREADY_REVERSED')).toBe(true);
   expect(await FinancialPayment.findById(pay._id)).toMatchObject({ allocatedAmountMinor: 0, availableAmountMinor: 100000 });
   expect(await FinancialDocument.findById(doc._id)).toMatchObject({ amountAllocatedMinor: 0, balanceMinor: 100000 });
   expect(await FinancialLedgerEntry.countDocuments({ entityId: allocation._id, eventType: 'payment.allocation_reversed' })).toBe(1);
@@ -285,6 +285,7 @@ test('campagne exclusivement métier produit un cycle financier complet avec sca
   const inputs = [{ reservation: a.reservation, actorId: a.owner }, { reservation: reservationA2, actorId: a.owner }, { reservation: b.reservation, actorId: b.owner }];
   const drafts = await Promise.all(inputs.map(({ reservation, actorId }) => createHotelInvoiceDraftFromReservation({ reservationId: reservation._id, actor: { id: actorId }, transactionMode: 'transactional' })));
   await Promise.all(drafts.map((draft, index) => replaceDraftLines(draft._id, [{ lineType: 'accommodation', description: 'Séjour validé', quantity: 1, unitAmountMinor: 60000, discountAmountMinor: 0, taxAmountMinor: 0, feesAmountMinor: 0, sourceType: 'HotelReservation', sourceId: inputs[index].reservation._id }], inputs[index].actorId)));
+  await Promise.all(drafts.map((draft, index) => finalizeDocumentLines({ documentId: draft._id, actor: { id: inputs[index].actorId } })));
   const issued = await Promise.all(drafts.map((draft, index) => issueFinancialDocument({ documentId: draft._id, actor: { id: inputs[index].actorId }, businessOperationKey: `business-issue-${index}`, establishmentCode: index < 2 ? 'BIZA' : 'BIZB', transactionMode: 'transactional' })));
   const [paymentA, paymentB] = await Promise.all([
     createManualPayment({ data: { establishmentId: a.hotel._id, amountMinor: 120000, currency: 'XAF', method: 'cash', confirmed: true }, actor: { id: a.owner } }),

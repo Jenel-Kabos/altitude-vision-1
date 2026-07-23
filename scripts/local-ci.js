@@ -51,7 +51,11 @@ const runBuildAndExport = mode !== 'verify';
 
 // ── SERVER ─────────────────────────────────────────────────────────────
 check('SERVER', 'Lint', WORKSPACES.server, ['run', 'lint']);
-if (runTests) check('SERVER', 'Tests', WORKSPACES.server, ['test']);
+// Les suites MongoDB Replica Set (mongodb-memory-server + wiredTiger) sont coûteuses en
+// CPU/mémoire à démarrer simultanément ; elles tournent dans une étape dédiée en --runInBand
+// pendant que le reste des tests serveur reste parallèle (voir server/docs/HOTEL_FINANCIAL_PDF_EMAIL_F2_4.md).
+if (runTests) check('SERVER', 'Tests unitaires', WORKSPACES.server, ['run', 'test:unit']);
+if (runTests) check('SERVER', 'Tests MongoDB (séquentiel)', WORKSPACES.server, ['run', 'test:mongo']);
 
 // ── CLIENT ─────────────────────────────────────────────────────────────
 check('CLIENT', 'Lint', WORKSPACES.client, ['run', 'lint']);

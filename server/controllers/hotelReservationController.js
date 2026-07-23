@@ -18,6 +18,7 @@ const {
 const { performCheckIn } = require('../services/checkInService');
 const { performCheckOut } = require('../services/checkOutService');
 const { getActiveAssignment } = require('../services/roomAssignmentService');
+const { evaluateHotelCheckoutFinancialReadiness } = require('../services/finance/hotelCheckoutFinancialReadinessService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 
 /**
@@ -434,7 +435,7 @@ exports.checkIn = async (req, res) => {
       cible: { id: String(result.reservation._id), type: 'HotelReservation', nom: result.reservation.reference }, req,
     });
 
-    res.json({ status: 'success', data: { reservation: result.reservation, room: result.room } });
+    res.json({ status: 'success', data: { reservation: result.reservation, room: result.room, financialDocument: result.financialDocument } });
   } catch (error) {
     fail(res, error.statusCode || 500, error.message);
   }
@@ -448,7 +449,7 @@ exports.checkOut = async (req, res) => {
     const access = await assertReservationAccess(req, reservation);
     if (!access || access.role === 'guest') { logDenied(req, 'Check-out'); return fail(res, 403, 'Accès refusé.'); }
 
-    const result = await performCheckOut({ reservation, actingUser: req.user, reason: req.body?.reason || '' });
+    const result = await performCheckOut({ reservationId: reservation._id, actingUser: req.user, reason: req.body?.reason || '', financialOverride: req.body?.financialOverride, transactionMode: 'auto' });
 
     logAction({
       action: 'Check-out effectué', description: `${result.reservation.reference} — check-out`, module: 'Altimmo',
@@ -456,10 +457,22 @@ exports.checkOut = async (req, res) => {
       cible: { id: String(result.reservation._id), type: 'HotelReservation', nom: result.reservation.reference }, req,
     });
 
-    res.json({ status: 'success', data: { reservation: result.reservation, room: result.room } });
+    res.json({ status: 'success', data: { reservation: result.reservation, room: result.room, financialCheckout: result.financialCheckout } });
   } catch (error) {
-    fail(res, error.statusCode || 500, error.message);
+    fail(res, error.statusCode || 500, error.message, { ...(error.code ? { code: error.code } : {}), ...(error.financialReadiness ? { financialReadiness: error.financialReadiness } : {}) });
   }
+};
+
+exports.checkoutFinancialReadiness = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const reservation = await HotelReservation.findById(req.params.id);
+    if (!reservation) return fail(res, 404, 'Réservation introuvable.');
+    const access = await assertReservationAccess(req, reservation);
+    if (!access || access.role === 'guest') return fail(res, 403, 'Accès refusé.');
+    const readiness = await evaluateHotelCheckoutFinancialReadiness({ reservationId: reservation._id, actor: req.user, requestedHotelId: reservation.hotel });
+    res.json({ status: 'success', data: { financialReadiness: readiness } });
+  } catch (error) { fail(res, error.statusCode || 500, error.message, error.code ? { code: error.code } : {}); }
 };
 
 // ─────────────────────────────────────────────

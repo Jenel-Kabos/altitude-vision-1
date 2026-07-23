@@ -137,6 +137,7 @@ const destroyFromCloudinary = async (url) => {
 };
 
 module.exports = {
+  cloudinary,
   upload,
   estimationUpload,
   rentalMaintenanceUpload,

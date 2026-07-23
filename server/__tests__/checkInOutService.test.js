@@ -4,18 +4,28 @@
 
 jest.mock('../models/HotelReservation');
 jest.mock('../models/Room');
+jest.mock('../models/FinancialDocument');
 jest.mock('../services/roomAssignmentService');
+jest.mock('../services/finance/hotelBillingAdapter', () => ({ createHotelInvoiceDraftFromReservation: jest.fn() }));
+jest.mock('../services/finance/hotelCheckoutFinancialReadinessService', () => ({ evaluateHotelCheckoutFinancialReadiness: jest.fn() }));
+jest.mock('../services/finance/financialAuthorizationService', () => ({ CAPABILITIES: { HOTEL_CHECKOUT_OVERRIDE: 'override' }, authorizeFinancialAction: jest.fn() }));
+jest.mock('../services/finance/financialLedgerService', () => ({ appendFinancialLedgerEntry: jest.fn() }));
 // Sprint E — checkOutService crée désormais une HousekeepingTask
 // automatiquement (mission §3) ; testé isolément dans
 // housekeepingService.test.js / checkOutService.test.js dédié.
 jest.mock('../services/housekeepingService', () => ({ createTask: jest.fn().mockResolvedValue({}) }));
-jest.mock('../services/notificationService', () => ({ notify: jest.fn().mockResolvedValue() }));
+jest.mock('../services/notificationService', () => ({ notify: jest.fn().mockResolvedValue(), notifyStaff: jest.fn().mockResolvedValue() }));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 
 const HotelReservation = require('../models/HotelReservation');
 const Room = require('../models/Room');
+const FinancialDocument = require('../models/FinancialDocument');
 const roomAssignmentService = require('../services/roomAssignmentService');
+const { createHotelInvoiceDraftFromReservation } = require('../services/finance/hotelBillingAdapter');
+const { evaluateHotelCheckoutFinancialReadiness } = require('../services/finance/hotelCheckoutFinancialReadinessService');
+const financialAuthz = require('../services/finance/financialAuthorizationService');
+const financialLedger = require('../services/finance/financialLedgerService');
 const housekeepingService = require('../services/housekeepingService');
 const { performCheckIn } = require('../services/checkInService');
 const { performCheckOut } = require('../services/checkOutService');
@@ -39,7 +49,11 @@ const confirmedReservation = (overrides = {}) => ({
 });
 
 describe('checkInService.performCheckIn — TEST DATA', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    FinancialDocument.findOne.mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
+    createHotelInvoiceDraftFromReservation.mockResolvedValue({ _id: 'f07f1f77bcf86cd799439010', status: 'draft' });
+  });
 
   test('confirmed → checked_in avec une chambre déjà pré-affectée', async () => {
     const reservation = confirmedReservation();
@@ -49,11 +63,32 @@ describe('checkInService.performCheckIn — TEST DATA', () => {
     const result = await performCheckIn({ reservation, actingUser: { id: USER_ID } });
     expect(result.reservation.status).toBe('checked_in');
     expect(result.room.status).toBe('occupied');
+    expect(result.financialDocument).toMatchObject({ status: 'draft', created: true, alreadyExisted: false });
     expect(Room.findOneAndUpdate).toHaveBeenCalledWith(
       { _id: ROOM_ID, status: { $in: ['available', 'reserved'] } },
       expect.objectContaining({ $set: expect.objectContaining({ status: 'occupied' }) }),
       { new: true },
     );
+  });
+
+  test('un brouillon existant est récupéré sans duplication', async () => {
+    const reservation = confirmedReservation();
+    roomAssignmentService.getActiveAssignment.mockResolvedValue({ room: { _id: ROOM_ID, status: 'reserved', roomNumber: '101' } });
+    Room.findOneAndUpdate = jest.fn().mockResolvedValue({ _id: ROOM_ID, status: 'occupied', roomNumber: '101' });
+    FinancialDocument.findOne.mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: 'f07f1f77bcf86cd799439010', status: 'draft' }) });
+    const result = await performCheckIn({ reservation, actingUser: { id: USER_ID } });
+    expect(result.financialDocument).toMatchObject({ created: false, alreadyExisted: true });
+    expect(createHotelInvoiceDraftFromReservation).toHaveBeenCalledTimes(1);
+  });
+
+  test('un échec financier conserve le check-in et expose une reprise sûre', async () => {
+    const reservation = confirmedReservation();
+    roomAssignmentService.getActiveAssignment.mockResolvedValue({ room: { _id: ROOM_ID, status: 'reserved', roomNumber: '101' } });
+    Room.findOneAndUpdate = jest.fn().mockResolvedValue({ _id: ROOM_ID, status: 'occupied', roomNumber: '101' });
+    createHotelInvoiceDraftFromReservation.mockRejectedValue(Object.assign(new Error('Mongo indisponible'), { code: 'FINANCIAL_DRAFT_TEMPORARY_FAILURE' }));
+    const result = await performCheckIn({ reservation, actingUser: { id: USER_ID } });
+    expect(result.reservation.status).toBe('checked_in');
+    expect(result.financialDocument).toEqual({ status: 'creation_failed', retryable: true, code: 'FINANCIAL_DRAFT_TEMPORARY_FAILURE' });
   });
 
   test("affecte automatiquement une chambre au check-in si aucune n'était pré-affectée", async () => {
@@ -124,6 +159,9 @@ describe('checkOutService.performCheckOut — TEST DATA', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     housekeepingService.createTask.mockResolvedValue({});
+    evaluateHotelCheckoutFinancialReadiness.mockResolvedValue({ allowed: true, status: 'ready', blockers: [], warnings: [], financialSnapshot: {} });
+    financialAuthz.authorizeFinancialAction.mockResolvedValue({});
+    financialLedger.appendFinancialLedgerEntry.mockResolvedValue({ _id: 'audit-1' });
   });
 
   const HOTEL_ID = '707f1f77bcf86cd799439055';
@@ -207,5 +245,27 @@ describe('checkOutService.performCheckOut — TEST DATA', () => {
     roomAssignmentService.releaseRoom.mockResolvedValue({ room: { _id: ROOM_ID, status: 'cleaning' } });
     const result = await performCheckOut({ reservation, actingUser: { id: USER_ID }, reason: 'Départ anticipé' });
     expect(result.reservation.statusHistory[0]).toMatchObject({ from: 'checked_in', to: 'checked_out', reason: 'Départ anticipé' });
+  });
+
+  test('bloque avant toute mutation et expose CHECKOUT_BLOCKED_FINANCIAL', async () => {
+    const reservation = checkedInReservation();
+    evaluateHotelCheckoutFinancialReadiness.mockResolvedValue({ allowed: false, status: 'blocked', blockers: [{ code: 'FINANCIAL_BALANCE_REMAINING' }], warnings: [], financialSnapshot: { balanceMinor: 10000, currency: 'XAF' } });
+    await expect(performCheckOut({ reservation, actingUser: { id: USER_ID, role: 'Collaborateur' } })).rejects.toMatchObject({ code: 'CHECKOUT_BLOCKED_FINANCIAL', statusCode: 409 });
+    expect(roomAssignmentService.getActiveAssignment).not.toHaveBeenCalled(); expect(housekeepingService.createTask).not.toHaveBeenCalled(); expect(reservation.save).not.toHaveBeenCalled();
+  });
+
+  test('refuse la dérogation au gestionnaire', async () => {
+    const reservation = checkedInReservation();
+    evaluateHotelCheckoutFinancialReadiness.mockResolvedValue({ allowed: false, status: 'blocked', blockers: [{ code: 'FINANCIAL_BALANCE_REMAINING' }], warnings: [], financialSnapshot: { balanceMinor: 10000, currency: 'XAF' } });
+    await expect(performCheckOut({ reservation, actingUser: { id: USER_ID, role: 'Collaborateur' }, financialOverride: { requested: true, reason: 'Validation exceptionnelle documentée' } })).rejects.toMatchObject({ code: 'FINANCIAL_OVERRIDE_FORBIDDEN', statusCode: 403 });
+  });
+
+  test('Admin déroge avec audit sans modifier les faits financiers', async () => {
+    const reservation = checkedInReservation();
+    evaluateHotelCheckoutFinancialReadiness.mockResolvedValue({ allowed: false, status: 'blocked', blockers: [{ code: 'FINANCIAL_BALANCE_REMAINING' }], warnings: [{ code: 'UNALLOCATED_CONFIRMED_PAYMENT' }], financialSnapshot: { documentId: '507f1f77bcf86cd799439099', documentTotalMinor: 100000, allocatedMinor: 90000, balanceMinor: 10000, paymentStatus: 'partially_paid', currency: 'XAF' } });
+    roomAssignmentService.getActiveAssignment.mockResolvedValue(null);
+    const result = await performCheckOut({ reservation, actingUser: { id: USER_ID, role: 'Admin' }, financialOverride: { requested: true, reason: 'Départ autorisé par la direction', ticket: 'INC-42' } });
+    expect(result.financialCheckout).toMatchObject({ status: 'overridden', overrideApplied: true, overrideAuditId: 'audit-1' });
+    expect(financialLedger.appendFinancialLedgerEntry).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'hotel_checkout.financial_override', metadata: expect.objectContaining({ balanceMinor: 10000, reason: 'Départ autorisé par la direction' }) }), { session: null });
   });
 });

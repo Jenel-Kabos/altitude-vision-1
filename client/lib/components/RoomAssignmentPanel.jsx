@@ -14,16 +14,18 @@ import React, { useEffect, useState, useCallback } from "react";
 import { toast } from "react-hot-toast";
 import { getRooms, assignRoom, changeRoom } from "../services/hotelService";
 import {
-  checkInHotelReservation, checkOutHotelReservation, getReservationRoomAssignment,
+  checkInHotelReservation, checkOutHotelReservation, getCheckoutFinancialReadiness, getReservationRoomAssignment,
 } from "../services/hotelReservationService";
 
-const RoomAssignmentPanel = ({ reservation, onChanged }) => {
+const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
   const [open, setOpen] = useState(false);
   const [rooms, setRooms] = useState([]);
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [assignment, setAssignment] = useState(null);
   const [loadingAssignment, setLoadingAssignment] = useState(true);
   const [loadingRooms, setLoadingRooms] = useState(false);
+  const [financialReadiness, setFinancialReadiness] = useState(null);
+  const [loadingReadiness, setLoadingReadiness] = useState(false);
 
   const hotelId = reservation.hotel?._id || reservation.hotel;
   const roomCategoryId = reservation.roomCategory?._id || reservation.roomCategory;
@@ -46,6 +48,8 @@ const RoomAssignmentPanel = ({ reservation, onChanged }) => {
   }, [reservation._id]);
 
   useEffect(() => { loadAssignment(); }, [loadAssignment]);
+  const loadReadiness = useCallback(async () => { if (reservation.status !== 'checked_in') return; setLoadingReadiness(true); try { setFinancialReadiness(await getCheckoutFinancialReadiness(reservation._id)); } catch { setFinancialReadiness(null); } finally { setLoadingReadiness(false); } }, [reservation._id, reservation.status]);
+  useEffect(() => { loadReadiness(); }, [loadReadiness]);
 
   const refresh = async () => {
     await loadAssignment();
@@ -113,12 +117,20 @@ const RoomAssignmentPanel = ({ reservation, onChanged }) => {
   };
 
   const handleCheckOut = async () => {
-    if (!window.confirm("Confirmer le check-out de cette réservation ?")) return;
+    let financialOverride;
+    if (financialReadiness?.status === 'blocked') {
+      if (!isAdmin) return;
+      if (!window.confirm("La situation financière bloque ce départ. Appliquer une dérogation administrative sans effacer la dette ?")) return;
+      const overrideReason = window.prompt("Justification obligatoire de la dérogation financière :");
+      if (!overrideReason?.trim()) { toast.error("Une justification est obligatoire."); return; }
+      financialOverride = { requested: true, reason: overrideReason };
+    } else if (!window.confirm("Confirmer le check-out de cette réservation ?")) return;
     try {
-      await checkOutHotelReservation(reservation._id);
-      toast.success("Check-out effectué.");
+      const result = await checkOutHotelReservation(reservation._id, { financialOverride });
+      toast.success(result.financialCheckout?.overrideApplied ? "Check-out effectué avec dérogation administrative." : "Check-out effectué.");
       await refresh();
     } catch (err) {
+      if (err.response?.data?.code === 'CHECKOUT_BLOCKED_FINANCIAL') { setFinancialReadiness(err.response.data.financialReadiness); await loadReadiness(); }
       toast.error(err.response?.data?.message || "Erreur lors du check-out.");
     }
   };
@@ -149,11 +161,12 @@ const RoomAssignmentPanel = ({ reservation, onChanged }) => {
           </>
         )}
         {reservation.status === "checked_in" && (
-          <button onClick={handleCheckOut} className="bg-gray-700 text-white px-3 py-1.5 rounded text-sm">
-            Check-out
+          <button disabled={loadingReadiness || (financialReadiness?.status === 'blocked' && !isAdmin)} onClick={handleCheckOut} className="bg-gray-700 text-white px-3 py-1.5 rounded text-sm disabled:opacity-40">
+            {financialReadiness?.status === 'blocked' && isAdmin ? 'Dérogation et check-out' : 'Check-out'}
           </button>
         )}
       </div>
+      {reservation.status === 'checked_in' && <div className="mt-2 rounded bg-gray-50 p-2 text-xs" data-testid="checkout-financial-readiness">{loadingReadiness ? 'Évaluation financière...' : !financialReadiness ? 'État financier indisponible' : <><strong>{financialReadiness.status === 'ready' ? 'Prêt pour check-out' : financialReadiness.status === 'warning' ? 'Prêt avec avertissements' : 'Check-out bloqué'}</strong><div>Total : {Number(financialReadiness.financialSnapshot?.documentTotalMinor || 0).toLocaleString('fr-FR')} XAF · Alloué : {Number(financialReadiness.financialSnapshot?.allocatedMinor || 0).toLocaleString('fr-FR')} XAF · Solde : {Number(financialReadiness.financialSnapshot?.balanceMinor || 0).toLocaleString('fr-FR')} {financialReadiness.financialSnapshot?.currency || 'XAF'}</div>{financialReadiness.blockers?.map((item) => <p key={item.code} className="text-red-700">{item.code}</p>)}{financialReadiness.warnings?.map((item) => <p key={item.code} className="text-amber-700">{item.code}</p>)}</>}</div>}
 
       {open && (
         <div className="mt-2 flex flex-wrap items-center gap-2">

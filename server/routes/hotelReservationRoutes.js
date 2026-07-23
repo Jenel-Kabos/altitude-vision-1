@@ -33,6 +33,7 @@ router.patch('/:id/confirm', ctrl.confirm);
 router.patch('/:id/reject', ctrl.reject);
 // Sprint D — jamais accessible au client (ownership vérifiée dans le contrôleur).
 router.patch('/:id/check-in', ctrl.checkIn);
+router.get('/:id/checkout-financial-readiness', ctrl.checkoutFinancialReadiness);
 router.patch('/:id/check-out', ctrl.checkOut);
 // Correctif Sprint D — lecture persistante de l'affectation active (voir
 // mission "AFFECTATION PERSISTANTE"). Accessible au client, mais projection
