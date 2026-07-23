@@ -59,6 +59,8 @@ const sendEmail = async (options) => {
       subject: options.subject,
       html: options.html,
       text: options.text || undefined,
+      attachments: options.attachments || undefined,
+      messageId: options.messageId || undefined,
     };
 
     // 4. Envoyer
@@ -68,7 +70,8 @@ const sendEmail = async (options) => {
 
   } catch (error) {
     console.error(`❌ [Email] Erreur envoi: ${error.message}`);
-    throw new Error("L'email n'a pas pu être envoyé.");
+    error.normalizedEmailMessage = "L'email n'a pas pu être envoyé.";
+    throw error;
   }
 };
 

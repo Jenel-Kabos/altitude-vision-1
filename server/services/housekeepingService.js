@@ -33,10 +33,10 @@ function assertTransition(current, next) {
  * (type 'checkout_cleaning', automatique) et par le staff (refresh/
  * deep_cleaning, manuel) — voir mission §3-4.
  */
-async function createTask({ roomId, hotelId, reservationId = null, type, priority = 'normal', notes = '', actingUser }) {
+async function createTask({ roomId, hotelId, reservationId = null, type, priority = 'normal', notes = '', actingUser, session, notifyAfterCreate = true }) {
   let task;
   try {
-    task = await HousekeepingTask.create({
+    const data = {
       room: roomId,
       hotel: hotelId,
       reservation: reservationId,
@@ -44,7 +44,8 @@ async function createTask({ roomId, hotelId, reservationId = null, type, priorit
       priority,
       notes,
       createdBy: actingUser?.id || null,
-    });
+    };
+    task = session ? (await HousekeepingTask.create([data], { session }))[0] : await HousekeepingTask.create(data);
   } catch (error) {
     // E11000 : une tâche ouverte existe déjà pour cette chambre — l'index
     // unique partiel {room, open:true} a fait son travail (mission §3 :
@@ -53,7 +54,7 @@ async function createTask({ roomId, hotelId, reservationId = null, type, priorit
     throw error;
   }
 
-  await notifyStaff({
+  if (notifyAfterCreate) await notifyStaff({
     type: 'housekeeping_task_created',
     title: '🧹 Nouvelle tâche de ménage',
     body: `Une tâche de ménage (${type}) a été créée.`,

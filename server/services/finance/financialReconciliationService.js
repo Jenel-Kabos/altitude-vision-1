@@ -21,6 +21,8 @@ const scopeFilter = ({ domain, establishmentId, establishment, document, payment
 const sum = (items, field) => items.reduce((total, item) => total + Number(item[field] || 0), 0);
 
 async function scanFinancialConsistency(scope = {}) {
+  const session = scope.session;
+  const lean = (query) => (session ? query.session(session) : query).lean();
   const emptyFilter = { _id: { $in: [] } };
   const documentFilter = scope.payment ? emptyFilter : scopeFilter({ ...scope, payment: undefined });
   const paymentFilter = scope.document ? emptyFilter : scopeFilter({ ...scope, document: undefined });
@@ -28,8 +30,8 @@ async function scanFinancialConsistency(scope = {}) {
   const allocationFilter = scope.document ? { financialDocument: scope.document } : scope.payment ? { financialPayment: scope.payment } : baseFilter;
   const limit = Math.min(Math.max(Number(scope.limit) || 1000, 1), 10000);
   const [documents, payments, allocations, lines, ledgers, sequences] = await Promise.all([
-    FinancialDocument.find(documentFilter).limit(limit).lean(), FinancialPayment.find(paymentFilter).limit(limit).lean(), PaymentAllocation.find(allocationFilter).limit(limit).lean(),
-    FinancialDocumentLine.find({}).lean(), FinancialLedgerEntry.find(baseFilter).lean(), FinancialSequence.find(baseFilter).lean(),
+    lean(FinancialDocument.find(documentFilter).limit(limit)), lean(FinancialPayment.find(paymentFilter).limit(limit)), lean(PaymentAllocation.find(allocationFilter).limit(limit)),
+    lean(FinancialDocumentLine.find({})), lean(FinancialLedgerEntry.find(baseFilter)), lean(FinancialSequence.find(baseFilter)),
   ]);
   const active = allocations.filter((item) => item.status === 'active');
   const issues = [];
@@ -68,8 +70,8 @@ async function scanFinancialConsistency(scope = {}) {
   }
 
   for (const allocation of allocations) {
-    const document = documentById.get(String(allocation.financialDocument)) || await FinancialDocument.findById(allocation.financialDocument).lean();
-    const payment = paymentById.get(String(allocation.financialPayment)) || await FinancialPayment.findById(allocation.financialPayment).lean();
+    const document = documentById.get(String(allocation.financialDocument)) || await lean(FinancialDocument.findById(allocation.financialDocument));
+    const payment = paymentById.get(String(allocation.financialPayment)) || await lean(FinancialPayment.findById(allocation.financialPayment));
     if (!document) issues.push(issue('FINANCIAL_ALLOCATION_DOCUMENT_MISSING', 'PaymentAllocation', allocation._id, { severity: CRITICAL }));
     if (!payment) issues.push(issue('FINANCIAL_ALLOCATION_PAYMENT_MISSING', 'PaymentAllocation', allocation._id, { severity: CRITICAL }));
     if (document && payment && (!same(document.establishmentId, payment.establishmentId) || !same(allocation.establishmentId, document.establishmentId))) issues.push(issue('FINANCIAL_ALLOCATION_ESTABLISHMENT_MISMATCH', 'PaymentAllocation', allocation._id, { severity: CRITICAL }));

@@ -123,14 +123,14 @@ async function changeRoom({ reservationId, newRoomId, reservation, actingUser, r
 }
 
 /** Libère une affectation déjà chargée — usage interne (changeRoom/checkOutService). */
-async function releaseRoomAssignment(assignment, { actingUser, reason = '', nextRoomStatus = 'available' } = {}) {
+async function releaseRoomAssignment(assignment, { actingUser, reason = '', nextRoomStatus = 'available', session } = {}) {
   assignment.releasedAt = new Date();
   if (reason) assignment.reason = reason;
-  await assignment.save();
+  await assignment.save({ session });
   const room = await Room.findByIdAndUpdate(
     assignment.room,
     { $set: { status: nextRoomStatus, updatedBy: actingUser?.id || null } },
-    { new: true },
+    { new: true, session },
   );
   return { assignment, room };
 }
@@ -139,14 +139,16 @@ async function releaseRoomAssignment(assignment, { actingUser, reason = '', next
  * Libère la chambre active d'une réservation par son id (API publique du
  * service) — renvoie `{ assignment, room }` (room = document Room mis à jour).
  */
-async function releaseRoom({ reservationId, actingUser, reason = '', nextRoomStatus = 'available' }) {
-  const assignment = await RoomAssignment.findOne({ reservation: reservationId, releasedAt: null });
+async function releaseRoom({ reservationId, actingUser, reason = '', nextRoomStatus = 'available', session }) {
+  const query = RoomAssignment.findOne({ reservation: reservationId, releasedAt: null });
+  const assignment = await (session ? query.session(session) : query);
   if (!assignment) throw fail('Aucune chambre active à libérer pour cette réservation.', 404);
-  return releaseRoomAssignment(assignment, { actingUser, reason, nextRoomStatus });
+  return releaseRoomAssignment(assignment, { actingUser, reason, nextRoomStatus, session });
 }
 
-async function getActiveAssignment(reservationId) {
-  return RoomAssignment.findOne({ reservation: reservationId, releasedAt: null }).populate('room');
+async function getActiveAssignment(reservationId, { session } = {}) {
+  const query = RoomAssignment.findOne({ reservation: reservationId, releasedAt: null }).populate('room');
+  return session ? query.session(session) : query;
 }
 
 module.exports = {

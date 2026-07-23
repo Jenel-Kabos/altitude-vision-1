@@ -7,6 +7,7 @@ const FinancialPayment = require('../models/FinancialPayment');
 const FinancialDocument = require('../models/FinancialDocument');
 const PaymentAllocation = require('../models/PaymentAllocation');
 const ledger = require('../services/finance/financialLedgerService');
+const { hashPayload } = require('../services/finance/financialIdempotencyService');
 const { allocatePaymentToDocument, reversePaymentAllocation, derivePaymentStatus } = require('../services/finance/paymentAllocationService');
 
 const actor = { id: '507f1f77bcf86cd799439015' };
@@ -26,27 +27,28 @@ describe('Financial Core — allocations', () => {
     expect(d.paymentStatus).toBe('partially_paid'); expect(ledger.appendFinancialLedgerEntry).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'payment.allocated' }));
   });
   test('retourne une allocation idempotente sans réserver de montant', async () => {
-    PaymentAllocation.findOne.mockResolvedValue({ _id: 'existing' });
-    await expect(allocatePaymentToDocument(input)).resolves.toEqual({ _id: 'existing' });
+    const payloadHash = hashPayload({ paymentId: input.paymentId, documentId: input.documentId, amountMinor: input.amountMinor });
+    PaymentAllocation.findOne.mockResolvedValue({ _id: 'existing', metadata: { payloadHash } });
+    await expect(allocatePaymentToDocument(input)).resolves.toEqual({ _id: 'existing', metadata: { payloadHash } });
     expect(FinancialPayment.findOneAndUpdate).not.toHaveBeenCalled();
   });
   test.each([
-    [payment({ status: 'pending' }), document(), 'FINANCIAL_PAYMENT_NOT_AVAILABLE'],
+    [payment({ status: 'pending' }), document(), 'FINANCIAL_PAYMENT_NOT_ALLOCATABLE'],
     [payment({ currency: 'EUR' }), document(), 'FINANCIAL_CURRENCY_MISMATCH'],
     [payment({ establishmentId: '507f1f77bcf86cd799439099' }), document(), 'FINANCIAL_ESTABLISHMENT_MISMATCH'],
     [payment(), document({ status: 'draft' }), 'FINANCIAL_DOCUMENT_NOT_ISSUED'],
-    [payment({ availableAmountMinor: 10 }), document(), 'FINANCIAL_OVERALLOCATION'],
+    [payment({ availableAmountMinor: 10 }), document(), 'FINANCIAL_PAYMENT_OVERALLOCATION'],
   ])('rejette les invariants paiement/facture', async (p, d, code) => {
     FinancialPayment.findById.mockResolvedValue(p); FinancialDocument.findById.mockResolvedValue(d);
     await expect(allocatePaymentToDocument(input)).rejects.toMatchObject({ code });
   });
   test('une course sur le paiement est rejetée atomiquement', async () => {
     FinancialPayment.findById.mockResolvedValue(payment()); FinancialDocument.findById.mockResolvedValue(document()); FinancialPayment.findOneAndUpdate.mockResolvedValue(null);
-    await expect(allocatePaymentToDocument(input)).rejects.toMatchObject({ code: 'FINANCIAL_OVERALLOCATION' });
+    await expect(allocatePaymentToDocument(input)).rejects.toMatchObject({ code: 'FINANCIAL_PAYMENT_OVERALLOCATION' });
   });
   test('une course sur la facture compense la réservation du paiement', async () => {
     FinancialPayment.findById.mockResolvedValue(payment()); FinancialDocument.findById.mockResolvedValue(document()); FinancialPayment.findOneAndUpdate.mockResolvedValue(payment({ availableAmountMinor: 70000 })); FinancialDocument.findOneAndUpdate.mockResolvedValue(null);
-    await expect(allocatePaymentToDocument(input)).rejects.toMatchObject({ code: 'FINANCIAL_OVERALLOCATION' });
+    await expect(allocatePaymentToDocument(input)).rejects.toMatchObject({ code: 'FINANCIAL_DOCUMENT_OVERPAYMENT' });
     expect(FinancialPayment.updateOne).toHaveBeenCalledWith({ _id: input.paymentId }, { $inc: { availableAmountMinor: 30000, allocatedAmountMinor: -30000 } });
   });
 });
@@ -61,6 +63,6 @@ describe('Financial Core — renversement', () => {
   });
   test('rejette un double renversement non idempotent', async () => {
     PaymentAllocation.findOneAndUpdate.mockResolvedValue(null); PaymentAllocation.findById.mockResolvedValue({ status: 'reversed', metadata: { reversalOperationKey: 'other' } });
-    await expect(reversePaymentAllocation({ allocationId: 'a', reason: 'x', businessOperationKey: 'reverse-2', actor })).rejects.toMatchObject({ code: 'FINANCIAL_INVALID_TRANSITION' });
+    await expect(reversePaymentAllocation({ allocationId: 'a', reason: 'x', businessOperationKey: 'reverse-2', actor })).rejects.toMatchObject({ code: 'FINANCIAL_ALLOCATION_ALREADY_REVERSED' });
   });
 });

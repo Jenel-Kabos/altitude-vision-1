@@ -3,7 +3,7 @@ import { toast } from 'react-hot-toast';
 import RoomAssignmentPanel from '../components/RoomAssignmentPanel';
 import { getRooms, assignRoom, changeRoom } from '../services/hotelService';
 import {
-  checkInHotelReservation, checkOutHotelReservation, getReservationRoomAssignment,
+  checkInHotelReservation, checkOutHotelReservation, getCheckoutFinancialReadiness, getReservationRoomAssignment,
 } from '../services/hotelReservationService';
 
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -16,6 +16,7 @@ vi.mock('../services/hotelReservationService', () => ({
   checkInHotelReservation: vi.fn(),
   checkOutHotelReservation: vi.fn(),
   getReservationRoomAssignment: vi.fn(),
+  getCheckoutFinancialReadiness: vi.fn(),
 }));
 
 const reservation = (overrides = {}) => ({
@@ -28,6 +29,7 @@ describe('RoomAssignmentPanel — correctif (affectation persistante + garde-fou
     vi.clearAllMocks();
     getRooms.mockResolvedValue([{ _id: 'ROOM-1', roomNumber: '101', roomCategory: { name: 'Standard' } }]);
     getReservationRoomAssignment.mockResolvedValue(null);
+    getCheckoutFinancialReadiness.mockResolvedValue({ allowed: true, status: 'ready', blockers: [], warnings: [], financialSnapshot: { documentTotalMinor: 100000, allocatedMinor: 100000, balanceMinor: 0, currency: 'XAF' } });
   });
 
   test('affiche un état de chargement puis interroge le backend au montage', async () => {
@@ -99,6 +101,26 @@ describe('RoomAssignmentPanel — correctif (affectation persistante + garde-fou
     await screen.findByText(/Chambre affectée : 101/);
     fireEvent.click(screen.getByRole('button', { name: 'Check-out' }));
     await waitFor(() => expect(getReservationRoomAssignment).toHaveBeenCalledTimes(2));
+  });
+
+  test('désactive le check-out bloqué pour un non-Admin et affiche les bloqueurs', async () => {
+    getCheckoutFinancialReadiness.mockResolvedValue({ allowed: false, status: 'blocked', blockers: [{ code: 'FINANCIAL_BALANCE_REMAINING' }], warnings: [], financialSnapshot: { documentTotalMinor: 100000, allocatedMinor: 40000, balanceMinor: 60000, currency: 'XAF' } });
+    render(<RoomAssignmentPanel reservation={reservation({ status: 'checked_in' })} />);
+    expect(await screen.findByText('Check-out bloqué')).toBeInTheDocument(); expect(screen.getByText('FINANCIAL_BALANCE_REMAINING')).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Check-out' })).toBeDisabled();
+  });
+
+  test('Admin peut demander une dérogation justifiée', async () => {
+    getCheckoutFinancialReadiness.mockResolvedValue({ allowed: false, status: 'blocked', blockers: [{ code: 'FINANCIAL_BALANCE_REMAINING' }], warnings: [], financialSnapshot: { balanceMinor: 60000, currency: 'XAF' } });
+    checkOutHotelReservation.mockResolvedValue({ financialCheckout: { status: 'overridden', overrideApplied: true } }); vi.spyOn(window, 'confirm').mockReturnValue(true); vi.spyOn(window, 'prompt').mockReturnValue('Départ exceptionnel validé par la direction');
+    render(<RoomAssignmentPanel reservation={reservation({ status: 'checked_in' })} isAdmin />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Dérogation et check-out' }));
+    await waitFor(() => expect(checkOutHotelReservation).toHaveBeenCalledWith('RES-1', { financialOverride: { requested: true, reason: 'Départ exceptionnel validé par la direction' } }));
+  });
+
+  test('rafraîchit un état devenu bloqué sans mutation optimiste', async () => {
+    getCheckoutFinancialReadiness.mockResolvedValueOnce({ allowed: true, status: 'ready', blockers: [], warnings: [], financialSnapshot: { balanceMinor: 0, currency: 'XAF' } }).mockResolvedValue({ allowed: false, status: 'blocked', blockers: [{ code: 'FINANCIAL_BALANCE_REMAINING' }], warnings: [], financialSnapshot: { balanceMinor: 1, currency: 'XAF' } }); vi.spyOn(window, 'confirm').mockReturnValue(true);
+    checkOutHotelReservation.mockRejectedValue({ response: { data: { code: 'CHECKOUT_BLOCKED_FINANCIAL', message: 'Bloqué', financialReadiness: { allowed: false, status: 'blocked', blockers: [{ code: 'FINANCIAL_BALANCE_REMAINING' }], warnings: [], financialSnapshot: { balanceMinor: 1 } } } } });
+    const onChanged = vi.fn(); render(<RoomAssignmentPanel reservation={reservation({ status: 'checked_in' })} onChanged={onChanged} />); fireEvent.click(await screen.findByRole('button', { name: 'Check-out' })); await waitFor(() => expect(screen.getByText('FINANCIAL_BALANCE_REMAINING')).toBeInTheDocument()); expect(onChanged).not.toHaveBeenCalled();
   });
 
   test('changement de chambre rafraîchit l\'affectation après succès', async () => {

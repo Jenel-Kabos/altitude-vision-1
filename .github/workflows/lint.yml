@@ -70,7 +70,12 @@ jobs:
       - name: Run tests (${{ matrix.directory }})
         run: |
           cd ${{ matrix.directory }}
-          npm test
+          if [ "${{ matrix.directory }}" = "server" ]; then
+            npm run test:unit
+            npm run test:mongo
+          else
+            npm test
+          fi
 
   type-check:
     runs-on: ubuntu-latest

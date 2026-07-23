@@ -9,6 +9,10 @@ const HotelReservation = require('../models/HotelReservation');
 const Room = require('../models/Room');
 const { assignRoom, getActiveAssignment, assertSingleRoom } = require('./roomAssignmentService');
 const { notify } = require('./notificationService');
+const { notifyStaff } = require('./notificationService');
+const FinancialDocument = require('../models/FinancialDocument');
+const { createHotelInvoiceDraftFromReservation } = require('./finance/hotelBillingAdapter');
+const logger = require('../utils/logger');
 
 function fail(message, statusCode) {
   const err = new Error(message);
@@ -68,7 +72,21 @@ async function performCheckIn({ reservation, roomId, actingUser, reason = '' }) 
     }).catch(() => {});
   }
 
-  return { reservation, room: updatedRoom };
+  // Frontières séparées (option B F2.1) : le séjour est validé avant la
+  // création financière. Une panne financière ne rollbacke donc jamais un
+  // check-in réussi ; la même clé métier permet une reprise sans doublon.
+  let financialDocument;
+  try {
+    const existing = await FinancialDocument.findOne({ domain: 'hotel', subjectType: 'HotelReservation', subjectId: reservation._id }).select('_id status');
+    const document = await createHotelInvoiceDraftFromReservation({ reservationId: reservation._id, actor: actingUser, source: 'check_in' });
+    financialDocument = { id: document._id, status: document.status, created: !existing, alreadyExisted: Boolean(existing) };
+  } catch (error) {
+    logger.error('hotel.check_in.financial_draft_failed', { reservationId: String(reservation._id), hotelId: String(reservation.hotel), errorCode: error.code || 'FINANCIAL_DRAFT_CREATION_FAILED' });
+    notifyStaff({ type: 'hotel_financial_draft_failed', title: 'Brouillon financier à reprendre', body: `Le check-in ${reservation.reference} est réussi, mais son brouillon financier doit être recréé.`, data: { reservationId: String(reservation._id), hotelId: String(reservation.hotel) } }).catch(() => {});
+    financialDocument = { status: 'creation_failed', retryable: true, code: error.code || 'FINANCIAL_DRAFT_CREATION_FAILED' };
+  }
+
+  return { reservation, room: updatedRoom, financialDocument };
 }
 
 module.exports = { performCheckIn };
