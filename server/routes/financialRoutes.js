@@ -1,8 +1,14 @@
 const express = require('express');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/financialController');
+const dashboardCtrl = require('../controllers/hotelFinancialDashboardController');
 const router = express.Router();
 router.use(auth.protect);
+router.get('/hotel/dashboard/summary', dashboardCtrl.getSummary);
+router.get('/hotel/dashboard/trends', dashboardCtrl.getTrends);
+router.get('/hotel/dashboard/breakdown', dashboardCtrl.getBreakdown);
+router.get('/hotel/dashboard/aging', dashboardCtrl.getAging);
+router.get('/hotel/dashboard/alerts', dashboardCtrl.getAlerts);
 router.post('/hotel/reservations/:reservationId/invoice-draft', ctrl.createHotelDraft);
 router.get('/hotel/reservations/:reservationId/document', ctrl.getReservationDocument);
 router.get('/hotel/:hotelId/documents', ctrl.listHotelDocuments);

@@ -20,6 +20,9 @@ const CAPABILITIES = Object.freeze({
   DOCUMENT_PDF_DOWNLOAD: 'financial.document.pdf.download',
   DOCUMENT_EMAIL_SEND: 'financial.document.email.send',
   DOCUMENT_DELIVERY_VIEW: 'financial.document.delivery.view',
+  DASHBOARD_VIEW: 'financial.hotel.dashboard.view',
+  DASHBOARD_ALERTS_VIEW: 'financial.hotel.dashboard.alerts.view',
+  DASHBOARD_OVERRIDE_AUDIT_VIEW: 'financial.hotel.dashboard.override_audit.view',
 });
 
 const managerCapabilities = [
@@ -31,13 +34,15 @@ const managerCapabilities = [
   CAPABILITIES.RECONCILIATION_VIEW, CAPABILITIES.HOTEL_CHECKOUT_VIEW,
   CAPABILITIES.DOCUMENT_PDF_GENERATE, CAPABILITIES.DOCUMENT_PDF_DOWNLOAD,
   CAPABILITIES.DOCUMENT_EMAIL_SEND, CAPABILITIES.DOCUMENT_DELIVERY_VIEW,
+  CAPABILITIES.DASHBOARD_VIEW, CAPABILITIES.DASHBOARD_ALERTS_VIEW,
 ];
-const adminCapabilities = [...managerCapabilities, CAPABILITIES.RECONCILIATION_RUN, CAPABILITIES.HOTEL_CHECKOUT_OVERRIDE];
+const adminCapabilities = [...managerCapabilities, CAPABILITIES.RECONCILIATION_RUN, CAPABILITIES.HOTEL_CHECKOUT_OVERRIDE, CAPABILITIES.DASHBOARD_OVERRIDE_AUDIT_VIEW];
 const ownerCapabilities = [
   CAPABILITIES.DOCUMENT_VIEW, CAPABILITIES.PAYMENT_VIEW,
   CAPABILITIES.LEDGER_VIEW, CAPABILITIES.RECONCILIATION_VIEW,
   CAPABILITIES.HOTEL_CHECKOUT_VIEW,
   CAPABILITIES.DOCUMENT_PDF_DOWNLOAD, CAPABILITIES.DOCUMENT_DELIVERY_VIEW,
+  CAPABILITIES.DASHBOARD_VIEW, CAPABILITIES.DASHBOARD_ALERTS_VIEW,
 ];
 
 const FINANCIAL_CAPABILITIES = Object.freeze({
@@ -75,6 +80,15 @@ async function authorizeFinancialAction({ user, capability, establishmentId }) {
   return assertFinancialScope(user, establishmentId);
 }
 
+// Portee dediee au dashboard : un hotelId est obligatoire pour tout role sauf Admin,
+// qui peut consulter une consolidation globale (hotelId omis) sans scanner tous les hotels un par un.
+async function assertFinancialDashboardScope(user, capability, hotelId) {
+  assertFinancialCapability(user, capability);
+  if (hotelId) return { hotel: await assertFinancialScope(user, hotelId), global: false };
+  if (user.role !== 'Admin') fail('FINANCIAL_DASHBOARD_ACCESS_DENIED', 'Un hotelId est requis pour ce role.', 403);
+  return { hotel: null, global: true };
+}
+
 async function assertAccountingRole(user) {
   if (!user || !ACCOUNTING_ROLES.includes(user.role)) fail('FINANCIAL_UNAUTHORIZED', 'Permission comptable requise.', 403);
   return true;
@@ -96,6 +110,9 @@ const assertCanGenerateFinancialDocumentPdf = withCapability(CAPABILITIES.DOCUME
 const assertCanDownloadFinancialDocumentPdf = withCapability(CAPABILITIES.DOCUMENT_PDF_DOWNLOAD);
 const assertCanSendFinancialDocumentEmail = withCapability(CAPABILITIES.DOCUMENT_EMAIL_SEND);
 const assertCanViewFinancialDocumentDeliveries = withCapability(CAPABILITIES.DOCUMENT_DELIVERY_VIEW);
+const assertCanViewFinancialDashboard = (user, hotelId) => assertFinancialDashboardScope(user, CAPABILITIES.DASHBOARD_VIEW, hotelId);
+const assertCanViewFinancialDashboardAlerts = (user, hotelId) => assertFinancialDashboardScope(user, CAPABILITIES.DASHBOARD_ALERTS_VIEW, hotelId);
+const assertCanViewFinancialDashboardOverrideAudit = (user, hotelId) => assertFinancialDashboardScope(user, CAPABILITIES.DASHBOARD_OVERRIDE_AUDIT_VIEW, hotelId);
 
 // Compatibilite interne F1.1 : cette fonction signifie desormais "creer un paiement".
 const assertCanManageFinancialPayment = assertCanCreateFinancialPayment;
@@ -104,7 +121,8 @@ const assertCanManageHotelFinance = assertFinancialScope;
 module.exports = {
   CAPABILITIES, ACCOUNTING_ROLES, HOTEL_FINANCE_ROLES, FINANCIAL_CAPABILITIES,
   hasFinancialCapability, assertFinancialCapability, assertFinancialScope,
-  authorizeFinancialAction, assertAccountingRole, assertCanManageHotelFinance,
+  authorizeFinancialAction, assertFinancialDashboardScope, assertAccountingRole, assertCanManageHotelFinance,
+  assertCanViewFinancialDashboard, assertCanViewFinancialDashboardAlerts, assertCanViewFinancialDashboardOverrideAudit,
   assertCanCreateFinancialDraft, assertCanEditFinancialDraft,
   assertCanIssueFinancialDocument, assertCanViewFinancialDocument,
   assertCanViewFinancialPayment, assertCanCreateFinancialPayment,
