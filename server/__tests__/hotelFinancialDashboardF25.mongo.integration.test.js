@@ -101,9 +101,13 @@ test('isole strictement les données entre deux hôtels différents', async () =
   const foreignManager = { role: 'Collaborateur', _id: id() };
   await expect(dashboard.getHotelFinancialDashboardSummary({ user: foreignManager, filters: filtersA })).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
 
-  // Le manager légitime de l'hôtel A ne doit voir que l'hôtel A même sans filtre hotelId explicite fourni par erreur d'un autre scope.
+  // F2.6 : le manager légitime de l'hôtel A n'a qu'un seul hôtel accessible (rattachement legacy
+  // Hotel.manager) — le serveur le déduit automatiquement même sans hotelId explicite (§26), et
+  // ne lui montre jamais que les données de son propre hôtel.
   const managerA = { role: 'Collaborateur', _id: hotelA.manager };
-  await expect(dashboard.getHotelFinancialDashboardSummary({ user: managerA, filters: dashboard.validateDashboardFilters({}) })).rejects.toMatchObject({ code: 'FINANCIAL_DASHBOARD_ACCESS_DENIED' });
+  const autoScoped = await dashboard.getHotelFinancialDashboardSummary({ user: managerA, filters: dashboard.validateDashboardFilters({}) });
+  expect(autoScoped.scope).toMatchObject({ global: false, hotelId: String(hotelA._id) });
+  expect(autoScoped.totals.invoicedMinor).toBe(111000);
 });
 
 test('consolidation globale réservée à Admin (hotelId omis)', async () => {

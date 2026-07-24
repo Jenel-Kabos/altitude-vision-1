@@ -6,24 +6,21 @@
 // uniquement ses hôtels".
 
 const mongoose = require('mongoose');
-const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
 const Room = require('../models/Room');
 const RoomAssignment = require('../models/RoomAssignment');
 const { logAction, buildAuteur } = require('../services/actionLogService');
-
-const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
+const { assertOperationalHotelAccess } = require('../services/hotel/hotelAccessScopeService');
+const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
 
-async function assertHotelAccess(req, hotelId) {
-  const hotel = await Hotel.findById(hotelId);
-  if (!hotel) return { error: 404 };
-  if (String(hotel.manager) !== String(req.user.id) && !STAFF_ROLES.includes(req.user.role)) {
-    return { error: 403 };
-  }
-  return { hotel };
+// F2.6.1 : remplace l'ancien bypass `STAFF_ROLES.includes(req.user.role)` (accès à TOUT hôtel
+// dès que le rôle matchait) par le scope central — Admin, Hotel.manager legacy, ou un
+// HotelStaffAssignment actif portant la capacité requise sur CET hôtel précis.
+async function assertHotelAccess(req, hotelId, capability) {
+  return assertOperationalHotelAccess({ actor: req.user, hotelId, capability });
 }
 
 // ─────────────────────────────────────────────
@@ -32,7 +29,7 @@ async function assertHotelAccess(req, hotelId) {
 exports.list = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.hotelId)) return fail(res, 400, 'Identifiant invalide.');
-    const { error } = await assertHotelAccess(req, req.params.hotelId);
+    const { error } = await assertHotelAccess(req, req.params.hotelId, CAP.ROOM_VIEW);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez consulter que vos propres hôtels.");
 
@@ -80,7 +77,7 @@ exports.list = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.hotelId)) return fail(res, 400, 'Identifiant invalide.');
-    const { error } = await assertHotelAccess(req, req.params.hotelId);
+    const { error } = await assertHotelAccess(req, req.params.hotelId, CAP.ROOM_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
@@ -124,7 +121,7 @@ exports.update = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const room = await Room.findById(req.params.id);
     if (!room) return fail(res, 404, 'Chambre introuvable.');
-    const { error } = await assertHotelAccess(req, room.hotel);
+    const { error } = await assertHotelAccess(req, room.hotel, CAP.ROOM_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
@@ -173,7 +170,7 @@ exports.remove = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const room = await Room.findById(req.params.id);
     if (!room) return fail(res, 404, 'Chambre introuvable.');
-    const { error } = await assertHotelAccess(req, room.hotel);
+    const { error } = await assertHotelAccess(req, room.hotel, CAP.ROOM_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 

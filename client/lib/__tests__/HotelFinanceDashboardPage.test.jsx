@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { toast } from 'react-hot-toast';
 import HotelFinanceDashboardPage from '../pages/dashboard/HotelFinanceDashboardPage';
 import * as dashboardService from '../services/hotelFinancialDashboardService';
+import * as hotelAccessService from '../services/hotelAccessService';
 
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../services/hotelFinancialDashboardService', () => ({
@@ -11,6 +12,7 @@ vi.mock('../services/hotelFinancialDashboardService', () => ({
   getHotelFinancialDashboardAging: vi.fn(),
   getHotelFinancialDashboardAlerts: vi.fn(),
 }));
+vi.mock('../services/hotelAccessService', () => ({ getAccessibleHotels: vi.fn() }));
 
 const summary = (overrides = {}) => ({
   period: { from: '2026-01-01T00:00:00Z', to: '2026-01-31T00:00:00Z', timezone: 'Africa/Brazzaville' },
@@ -30,6 +32,7 @@ const alerts = (items = [], total = items.length) => ({ alerts: items, paginatio
 describe('HotelFinanceDashboardPage F2.5', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hotelAccessService.getAccessibleHotels.mockResolvedValue({ globalAccess: true, hotels: [{ id: 'HOTEL-1', name: 'Hôtel Un' }, { id: 'HOTEL-2', name: 'Hôtel Deux' }] });
     dashboardService.getHotelFinancialDashboardSummary.mockResolvedValue({ summary: summary() });
     dashboardService.getHotelFinancialDashboardTrends.mockResolvedValue({ trends });
     dashboardService.getHotelFinancialDashboardBreakdown.mockResolvedValue({ breakdown });
@@ -85,7 +88,21 @@ describe('HotelFinanceDashboardPage F2.5', () => {
   test('le filtre hôtel déclenche un nouveau chargement scoping le hotelId', async () => {
     render(<HotelFinanceDashboardPage />);
     await screen.findByText('500 000 XAF');
-    fireEvent.change(screen.getByLabelText('Hôtel (vide = consolidation)'), { target: { value: 'HOTEL-1' } });
+    fireEvent.change(screen.getByLabelText('Hôtel'), { target: { value: 'HOTEL-1' } });
     await waitFor(() => expect(dashboardService.getHotelFinancialDashboardSummary).toHaveBeenCalledWith(expect.objectContaining({ hotelId: 'HOTEL-1' })));
+  });
+
+  test('un seul hôtel accessible est présélectionné automatiquement (sans saisie)', async () => {
+    hotelAccessService.getAccessibleHotels.mockResolvedValue({ globalAccess: false, hotels: [{ id: 'HOTEL-1', name: 'Hôtel Un' }] });
+    render(<HotelFinanceDashboardPage />);
+    await waitFor(() => expect(dashboardService.getHotelFinancialDashboardSummary).toHaveBeenCalledWith(expect.objectContaining({ hotelId: 'HOTEL-1' })));
+    expect(screen.getByLabelText('Hôtel')).toBeDisabled();
+  });
+
+  test("n'affiche jamais un hôtel non accessible dans le sélecteur", async () => {
+    hotelAccessService.getAccessibleHotels.mockResolvedValue({ globalAccess: false, hotels: [{ id: 'HOTEL-1', name: 'Hôtel Un' }] });
+    render(<HotelFinanceDashboardPage />);
+    await screen.findByText('500 000 XAF');
+    expect(screen.queryByText('Hôtel Deux')).not.toBeInTheDocument();
   });
 });

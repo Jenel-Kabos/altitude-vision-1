@@ -88,8 +88,9 @@ function dataStatusFromIssues(issues = []) {
 }
 
 async function resolveScope(user, hotelId, capabilityAssert) {
-  const { hotel, global } = await capabilityAssert(user, hotelId);
-  return { hotelMatch: global ? {} : { establishmentId: oid(hotelId) }, global, hotel };
+  const { hotel, global, hotelId: resolvedHotelId } = await capabilityAssert(user, hotelId);
+  const effectiveHotelId = resolvedHotelId || hotelId;
+  return { hotelMatch: global ? {} : { establishmentId: oid(effectiveHotelId) }, global, hotel, resolvedHotelId: effectiveHotelId };
 }
 
 function num(value) {
@@ -97,7 +98,7 @@ function num(value) {
 }
 
 async function getHotelFinancialDashboardSummary({ user, filters }) {
-  const { hotelMatch, global } = await resolveScope(user, filters.hotelId, authz.assertCanViewFinancialDashboard);
+  const { hotelMatch, global, resolvedHotelId } = await resolveScope(user, filters.hotelId, authz.assertCanViewFinancialDashboard);
   const period = { $gte: filters.dateFrom, $lte: filters.dateTo };
 
   const issuedMatch = { domain: DOMAIN, ...hotelMatch, status: 'issued', issueDate: period };
@@ -168,7 +169,7 @@ async function getHotelFinancialDashboardSummary({ user, filters }) {
 
   return {
     period: { from: filters.dateFrom.toISOString(), to: filters.dateTo.toISOString(), timezone: TIMEZONE },
-    scope: { hotelId: filters.hotelId || null, global },
+    scope: { hotelId: resolvedHotelId || null, global },
     currency: 'XAF',
     dataStatus,
     generatedAt: new Date().toISOString(),
@@ -345,7 +346,7 @@ function severityRank(severity) {
 }
 
 async function getHotelFinancialDashboardAlerts({ user, filters }) {
-  const { hotelMatch, global } = await resolveScope(user, filters.hotelId, authz.assertCanViewFinancialDashboardAlerts);
+  const { hotelMatch, global, resolvedHotelId } = await resolveScope(user, filters.hotelId, authz.assertCanViewFinancialDashboardAlerts);
   const period = { $gte: filters.dateFrom, $lte: filters.dateTo };
   const alerts = [];
 

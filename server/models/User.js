@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const bcrypt   = require('bcryptjs');
 const crypto   = require('crypto');
+const { isSimpleValidEmail, EMAIL_MAX_LENGTH } = require('../utils/emailValidation');
 
 // ======================================================
 // 🧩 SCHÉMA UTILISATEUR
@@ -21,10 +22,15 @@ const userSchema = new mongoose.Schema(
             required:  [true, 'Un email est requis.'],
             unique:    true,
             lowercase: true,
-            match: [
-                /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
-                'Veuillez fournir un email valide.',
-            ],
+            trim:      true,
+            // F2.6.3 : l'ancien regex (`/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/`) est
+            // vulnérable à un ReDoS catastrophique (backtracking exponentiel) — remplacé par une
+            // validation bornée en temps linéaire (server/utils/emailValidation.js).
+            maxlength: [EMAIL_MAX_LENGTH, 'Email trop long.'],
+            validate: {
+                validator: isSimpleValidEmail,
+                message: 'Veuillez fournir un email valide.',
+            },
         },
 
         // 🔧 default null (plus de 'default.jpg' incompatible avec Cloudinary)

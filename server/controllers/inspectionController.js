@@ -7,33 +7,29 @@
 // roomAssignmentController.js (Sprint D).
 
 const mongoose = require('mongoose');
-const Hotel = require('../models/Hotel');
 const Room = require('../models/Room');
 const RoomInspection = require('../models/RoomInspection');
 const inspectionService = require('../services/inspectionService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
-
-const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
+const { assertOperationalHotelAccess } = require('../services/hotel/hotelAccessScopeService');
+const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
 
-async function assertHotelAccess(req, hotelId) {
-  const hotel = await Hotel.findById(hotelId);
-  if (!hotel) return { error: 404 };
-  if (String(hotel.manager) !== String(req.user.id) && !STAFF_ROLES.includes(req.user.role)) {
-    return { error: 403 };
-  }
-  return { hotel };
+// F2.6.1 : remplace le bypass STAFF_ROLES par le scope central. Un inspecteur A ne peut plus
+// approuver/rejeter une inspection B même en connaissant son identifiant.
+async function assertHotelAccess(req, hotelId, capability) {
+  return assertOperationalHotelAccess({ actor: req.user, hotelId, capability });
 }
 
-async function loadInspectionWithAccess(req, inspectionId) {
+async function loadInspectionWithAccess(req, inspectionId, capability) {
   if (!mongoose.isValidObjectId(inspectionId)) return { error: 400 };
   const inspection = await RoomInspection.findById(inspectionId);
   if (!inspection) return { error: 404 };
   const room = await Room.findById(inspection.room);
   if (!room) return { error: 404 };
-  const { error } = await assertHotelAccess(req, room.hotel);
+  const { error } = await assertHotelAccess(req, room.hotel, capability);
   if (error) return { error };
   return { inspection, room };
 }
@@ -49,7 +45,7 @@ exports.create = async (req, res) => {
     }
     const room = await Room.findById(roomId);
     if (!room) return fail(res, 404, 'Chambre introuvable.');
-    const { error } = await assertHotelAccess(req, room.hotel);
+    const { error } = await assertHotelAccess(req, room.hotel, CAP.INSPECTION_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
 
@@ -74,7 +70,7 @@ exports.create = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.approve = async (req, res) => {
   try {
-    const { error } = await loadInspectionWithAccess(req, req.params.id);
+    const { error } = await loadInspectionWithAccess(req, req.params.id, CAP.INSPECTION_APPROVE);
     if (error === 400) return fail(res, 400, 'Identifiant invalide.');
     if (error === 404) return fail(res, 404, 'Inspection introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
@@ -98,7 +94,7 @@ exports.approve = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.reject = async (req, res) => {
   try {
-    const { error } = await loadInspectionWithAccess(req, req.params.id);
+    const { error } = await loadInspectionWithAccess(req, req.params.id, CAP.INSPECTION_REJECT);
     if (error === 400) return fail(res, 400, 'Identifiant invalide.');
     if (error === 404) return fail(res, 404, 'Inspection introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');

@@ -1,5 +1,6 @@
 const Hotel = require('../../models/Hotel');
 const { fail } = require('./financialError');
+const { resolveHotelAccessScope } = require('../hotel/hotelAccessScopeService');
 
 const CAPABILITIES = Object.freeze({
   DOCUMENT_VIEW: 'financial.document.view',
@@ -65,28 +66,40 @@ function assertFinancialCapability(user, capability) {
   return true;
 }
 
-async function assertFinancialScope(user, hotelId) {
+// F2.6 : la portee accepte, dans l'ordre, Admin (bypass), le legacy Hotel.manager (compatibilite
+// F0-F2.5, aucune migration n'est un prealable bloquant), puis un rattachement HotelStaffAssignment
+// actif portant la capacite requise (quand elle est precisee par l'appelant).
+async function assertFinancialScope(user, hotelId, capability) {
   if (!user) fail('FINANCIAL_UNAUTHORIZED', 'Authentification requise.', 401);
   const hotel = await Hotel.findById(hotelId).select('manager name brand email phone property');
   if (!hotel) fail('FINANCIAL_UNAUTHORIZED', 'Etablissement inaccessible.', 404);
-  if (user.role !== 'Admin' && id(hotel.manager) !== id(user)) {
-    fail('FINANCIAL_UNAUTHORIZED', 'Acces financier refuse.', 403);
-  }
+  if (user.role === 'Admin' || id(hotel.manager) === id(user)) return hotel;
+  const scope = await resolveHotelAccessScope({ actor: user, requiredCapability: capability, requestedHotelId: hotelId }).catch(() => null);
+  if (!scope) fail('FINANCIAL_UNAUTHORIZED', 'Acces financier refuse.', 403);
   return hotel;
 }
 
 async function authorizeFinancialAction({ user, capability, establishmentId }) {
   assertFinancialCapability(user, capability);
-  return assertFinancialScope(user, establishmentId);
+  return assertFinancialScope(user, establishmentId, capability);
 }
 
-// Portee dediee au dashboard : un hotelId est obligatoire pour tout role sauf Admin,
-// qui peut consulter une consolidation globale (hotelId omis) sans scanner tous les hotels un par un.
+// F2.6 : delegue la resolution reelle multi-hotels a hotelAccessScopeService (Admin -> global ;
+// un seul hotel accessible -> auto-selectionne ; plusieurs -> selection explicite requise ;
+// aucun -> refuse). Les codes d'erreur historiques F2.5 sont preserves pour ne pas regresser.
 async function assertFinancialDashboardScope(user, capability, hotelId) {
   assertFinancialCapability(user, capability);
-  if (hotelId) return { hotel: await assertFinancialScope(user, hotelId), global: false };
-  if (user.role !== 'Admin') fail('FINANCIAL_DASHBOARD_ACCESS_DENIED', 'Un hotelId est requis pour ce role.', 403);
-  return { hotel: null, global: true };
+  let scope;
+  try {
+    scope = await resolveHotelAccessScope({ actor: user, requiredCapability: capability, requestedHotelId: hotelId });
+  } catch (error) {
+    if (error.code === 'HOTEL_SCOPE_REQUIRED') fail('FINANCIAL_DASHBOARD_ACCESS_DENIED', error.message, 403);
+    if (error.code === 'HOTEL_ACCESS_DENIED') fail('FINANCIAL_UNAUTHORIZED', 'Acces financier refuse.', error.statusCode || 403);
+    throw error;
+  }
+  if (scope.globalAccess) return { hotel: null, global: true, hotelId: hotelId || null, accessibleHotelIds: null };
+  const resolvedHotelId = hotelId || scope.hotelIds[0];
+  return { hotel: { _id: resolvedHotelId }, global: false, hotelId: resolvedHotelId, accessibleHotelIds: scope.hotelIds };
 }
 
 async function assertAccountingRole(user) {

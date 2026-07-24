@@ -358,7 +358,10 @@ describe('Sprint B2 — cycle de vie propriétaire (deactivate/reactivate/duplic
   test('200 — le propriétaire supprime définitivement son hôtel', async () => {
     mockUserAuth(OWNER_ID, 'Proprietaire');
     const property = { _id: PROPERTY_ID, images: [] };
-    Hotel.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(owned({ property })) });
+    const hotelDoc = owned({ property });
+    // F2.6.2 : le contrôleur appelle `.populate('property')` et le scope central appelle
+    // `Hotel.findById` directement (sans populate) — le mock doit satisfaire les deux usages.
+    Hotel.findById = jest.fn().mockReturnValue(Object.assign(Promise.resolve(hotelDoc), { populate: jest.fn().mockResolvedValue(hotelDoc) }));
     RoomCategory.find = jest.fn().mockResolvedValue([]);
     RatePlan.deleteMany = jest.fn().mockResolvedValue({});
     RoomCategory.deleteMany = jest.fn().mockResolvedValue({});

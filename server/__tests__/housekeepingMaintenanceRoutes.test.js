@@ -4,6 +4,7 @@
 // hotelOperationsRoutes.test.js, Sprint D).
 
 jest.mock('../models/Hotel');
+jest.mock('../models/HotelStaffAssignment');
 jest.mock('../models/Room');
 jest.mock('../models/HousekeepingTask');
 jest.mock('../models/RoomInspection');
@@ -30,6 +31,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { app } = require('../server');
 const Hotel = require('../models/Hotel');
+const HotelStaffAssignment = require('../models/HotelStaffAssignment');
 const Room = require('../models/Room');
 const HousekeepingTask = require('../models/HousekeepingTask');
 const RoomInspection = require('../models/RoomInspection');
@@ -119,7 +121,8 @@ describe('GET /api/housekeeping — liste filtrable (Sprint E)', () => {
 
   test("200 — le propriétaire ne voit que ses propres hôtels (scope automatique sans hotelId)", async () => {
     mockUserAuth(OWNER_ID, 'Proprietaire');
-    Hotel.find = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue([{ _id: HOTEL_ID }]) });
+    HotelStaffAssignment.find = jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
+    Hotel.find = jest.fn().mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([{ _id: HOTEL_ID }]), sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([{ _id: HOTEL_ID }]) }) }) });
     HousekeepingTask.find = jest.fn().mockReturnValue({
       populate: jest.fn().mockReturnThis(), sort: jest.fn().mockResolvedValue([]),
     });
@@ -130,6 +133,7 @@ describe('GET /api/housekeeping — liste filtrable (Sprint E)', () => {
 
   test('200 — filtre par statut et priorité transmis à la requête', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
+    Hotel.find = jest.fn().mockReturnValue({ select: jest.fn().mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) }) });
     HousekeepingTask.find = jest.fn().mockReturnValue({
       populate: jest.fn().mockReturnThis(), sort: jest.fn().mockResolvedValue([]),
     });
@@ -269,6 +273,7 @@ describe('GET /api/maintenance — liste filtrable (Sprint E)', () => {
 
   test('200 — liste avec populate room/hotel/assignedTo/inspection.housekeepingTask', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
+    Hotel.find = jest.fn().mockReturnValue({ select: jest.fn().mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) }) });
     const populateChain = { populate: jest.fn(), sort: jest.fn().mockResolvedValue([]) };
     populateChain.populate.mockReturnValue(populateChain);
     MaintenanceTicket.find = jest.fn().mockReturnValue(populateChain);
