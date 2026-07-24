@@ -17,7 +17,7 @@ const actionLogSchema = new mongoose.Schema({
     enum: [
       'Altimmo','MilaEvents','Altcom','GestionLocative',
       'Utilisateurs','Actualites','Portfolio','Devis',
-      'Messagerie','Dashboard',
+      'Messagerie','Dashboard','Hotel',
     ],
   },
   auteur: {

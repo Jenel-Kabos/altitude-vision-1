@@ -6,25 +6,26 @@
 // mission §13 : le propriétaire ne gère que ses propres hôtels.
 
 const mongoose = require('mongoose');
-const Hotel = require('../models/Hotel');
 const HotelReservation = require('../models/HotelReservation');
 const { assignRoom, changeRoom, releaseRoom } = require('../services/roomAssignmentService');
 const { notify } = require('../services/notificationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
-
-const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
+const { assertOperationalHotelAccess } = require('../services/hotel/hotelAccessScopeService');
+const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
 
+// F2.6.1 : l'hôtel vient toujours de la réservation persistée (jamais d'un paramètre séparé) ;
+// l'accès staff passe désormais par le scope central (Hotel.manager legacy ou
+// HotelStaffAssignment actif), plus le bypass STAFF_ROLES sans vérification de rattachement.
 async function loadReservationWithAccess(req, reservationId) {
   if (!mongoose.isValidObjectId(reservationId)) return { error: 400 };
   const reservation = await HotelReservation.findById(reservationId);
   if (!reservation) return { error: 404 };
-  const hotel = await Hotel.findById(reservation.hotel);
-  const isOwner = hotel?.manager && String(hotel.manager) === String(req.user.id);
-  if (!isOwner && !STAFF_ROLES.includes(req.user.role)) return { error: 403 };
-  return { reservation, hotel };
+  const { error } = await assertOperationalHotelAccess({ actor: req.user, hotelId: reservation.hotel, capability: CAP.ROOM_ASSIGNMENT_MANAGE });
+  if (error) return { error: error === 404 ? 404 : 403 };
+  return { reservation };
 }
 
 async function notifyGuestRoomEvent(reservation, type, title, body) {

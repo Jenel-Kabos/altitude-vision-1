@@ -8,22 +8,18 @@
 // accommodationController.upsertRate (Sprint B1).
 
 const mongoose = require('mongoose');
-const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
 const RatePlan = require('../models/RatePlan');
+const { assertOperationalHotelAccess } = require('../services/hotel/hotelAccessScopeService');
+const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
 
-const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
-
-async function assertHotelAccess(req, hotelId) {
-  const hotel = await Hotel.findById(hotelId);
-  if (!hotel) return { error: 404 };
-  if (String(hotel.manager) !== String(req.user.id) && !STAFF_ROLES.includes(req.user.role)) {
-    return { error: 403 };
-  }
-  return { hotel };
+// F2.6.1 : les catégories de chambres sont hôtelières (RoomCategory.hotel) — même scope central
+// que les chambres (pas de capacité dédiée, réutilise hotel.room.view/manage, mission §5/§10).
+async function assertHotelAccess(req, hotelId, capability) {
+  return assertOperationalHotelAccess({ actor: req.user, hotelId, capability });
 }
 
 // ─────────────────────────────────────────────
@@ -38,7 +34,7 @@ exports.list = async (req, res) => {
     // lié à cet établissement. La consultation publique d'un hôtel publié
     // passe par un endpoint dédié séparé (GET /api/hotels/public/:id),
     // jamais par celui-ci.
-    const { error } = await assertHotelAccess(req, req.params.hotelId);
+    const { error } = await assertHotelAccess(req, req.params.hotelId, CAP.ROOM_VIEW);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez consulter que vos propres hôtels.");
     const categories = await RoomCategory.find({ hotel: req.params.hotelId }).sort({ createdAt: 1 });
@@ -68,7 +64,7 @@ exports.list = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.hotelId)) return fail(res, 400, 'Identifiant invalide.');
-    const { error } = await assertHotelAccess(req, req.params.hotelId);
+    const { error } = await assertHotelAccess(req, req.params.hotelId, CAP.ROOM_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
@@ -100,7 +96,7 @@ exports.update = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const category = await RoomCategory.findById(req.params.id);
     if (!category) return fail(res, 404, 'Catégorie introuvable.');
-    const { error } = await assertHotelAccess(req, category.hotel);
+    const { error } = await assertHotelAccess(req, category.hotel, CAP.ROOM_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
@@ -123,7 +119,7 @@ exports.remove = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const category = await RoomCategory.findById(req.params.id);
     if (!category) return fail(res, 404, 'Catégorie introuvable.');
-    const { error } = await assertHotelAccess(req, category.hotel);
+    const { error } = await assertHotelAccess(req, category.hotel, CAP.ROOM_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
@@ -143,7 +139,7 @@ exports.duplicate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const category = await RoomCategory.findById(req.params.id);
     if (!category) return fail(res, 404, 'Catégorie introuvable.');
-    const { error } = await assertHotelAccess(req, category.hotel);
+    const { error } = await assertHotelAccess(req, category.hotel, CAP.ROOM_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
@@ -173,7 +169,7 @@ exports.deactivate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const category = await RoomCategory.findById(req.params.id);
     if (!category) return fail(res, 404, 'Catégorie introuvable.');
-    const { error } = await assertHotelAccess(req, category.hotel);
+    const { error } = await assertHotelAccess(req, category.hotel, CAP.ROOM_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
     category.status = 'inactif';
@@ -189,7 +185,7 @@ exports.activate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const category = await RoomCategory.findById(req.params.id);
     if (!category) return fail(res, 404, 'Catégorie introuvable.');
-    const { error } = await assertHotelAccess(req, category.hotel);
+    const { error } = await assertHotelAccess(req, category.hotel, CAP.ROOM_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
     category.status = 'actif';
@@ -214,7 +210,7 @@ exports.listRates = async (req, res) => {
     // de l'hôtel ou le staff, jamais par un utilisateur tiers authentifié.
     const category = await RoomCategory.findById(req.params.id);
     if (!category) return fail(res, 404, 'Catégorie introuvable.');
-    const { error } = await assertHotelAccess(req, category.hotel);
+    const { error } = await assertHotelAccess(req, category.hotel, CAP.ROOM_VIEW);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez consulter que vos propres hôtels.");
     const query = { roomCategory: req.params.id };
@@ -232,7 +228,7 @@ exports.upsertRate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const category = await RoomCategory.findById(req.params.id);
     if (!category) return fail(res, 404, 'Catégorie introuvable.');
-    const { error } = await assertHotelAccess(req, category.hotel);
+    const { error } = await assertHotelAccess(req, category.hotel, CAP.ROOM_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
@@ -266,7 +262,7 @@ exports.archiveRate = async (req, res) => {
     }
     const category = await RoomCategory.findById(req.params.id);
     if (!category) return fail(res, 404, 'Catégorie introuvable.');
-    const { error } = await assertHotelAccess(req, category.hotel);
+    const { error } = await assertHotelAccess(req, category.hotel, CAP.ROOM_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 

@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import * as dashboardService from '../../services/hotelFinancialDashboardService';
+import { getAccessibleHotels } from '../../services/hotelAccessService';
 
 const money = (minor) => `${Number(minor || 0).toLocaleString('fr-FR')} XAF`;
 const SEVERITY_LABEL = { critical: 'Critique', warning: 'Avertissement', info: 'Info' };
@@ -29,6 +30,9 @@ function KpiCard({ label, value, hint, tone = 'default' }) {
 
 export default function HotelFinanceDashboardPage() {
   const [hotelId, setHotelId] = useState('');
+  const [accessibleHotels, setAccessibleHotels] = useState([]);
+  const [globalAccess, setGlobalAccess] = useState(false);
+  const [hotelsLoaded, setHotelsLoaded] = useState(false);
   const [dateFrom, setDateFrom] = useState(isoDate(new Date(Date.now() - 29 * 86400000)));
   const [dateTo, setDateTo] = useState(isoDate(new Date()));
   const [summary, setSummary] = useState(null);
@@ -71,8 +75,22 @@ export default function HotelFinanceDashboardPage() {
     setLoading(false);
   }, [hotelId, dateFrom, dateTo]);
 
+  useEffect(() => {
+    let cancelled = false;
+    getAccessibleHotels().then((result) => {
+      if (cancelled) return;
+      setAccessibleHotels(result.hotels);
+      setGlobalAccess(result.globalAccess);
+      // Un seul hôtel accessible (non-Admin) : présélection automatique côté client, cohérente
+      // avec la résolution serveur (§26) — l'utilisateur n'a jamais à saisir un identifiant.
+      if (!result.globalAccess && result.hotels.length === 1) setHotelId(result.hotels[0].id);
+      setHotelsLoaded(true);
+    }).catch(() => setHotelsLoaded(true));
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => { setAlertsPage(1); }, [hotelId, dateFrom, dateTo]);
-  useEffect(() => { load(alertsPage); }, [load, alertsPage]);
+  useEffect(() => { if (hotelsLoaded) load(alertsPage); }, [load, alertsPage, hotelsLoaded]);
 
   const applyQuickRange = (range) => { setDateFrom(isoDate(range.from())); setDateTo(isoDate(range.to())); };
 
@@ -85,8 +103,12 @@ export default function HotelFinanceDashboardPage() {
 
       <section className="mb-4 flex flex-wrap items-end gap-3 rounded border bg-gray-50 p-3">
         <div>
-          <label className="block text-[11px] text-gray-500" htmlFor="hotel-finance-hotel-id">Hôtel (vide = consolidation)</label>
-          <input id="hotel-finance-hotel-id" className="rounded border px-2 py-1 text-xs" value={hotelId} onChange={(e) => setHotelId(e.target.value.trim())} placeholder="Identifiant hôtel" />
+          <label className="block text-[11px] text-gray-500" htmlFor="hotel-finance-hotel-id">Hôtel</label>
+          <select id="hotel-finance-hotel-id" className="rounded border px-2 py-1 text-xs" value={hotelId} onChange={(e) => setHotelId(e.target.value)} disabled={!hotelsLoaded || (accessibleHotels.length <= 1 && !globalAccess)}>
+            {globalAccess && <option value="">Consolidation globale</option>}
+            {accessibleHotels.length === 0 && !globalAccess && <option value="">Aucun hôtel accessible</option>}
+            {accessibleHotels.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+          </select>
         </div>
         <div>
           <label className="block text-[11px] text-gray-500" htmlFor="hotel-finance-from">Du</label>

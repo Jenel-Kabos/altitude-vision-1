@@ -6,6 +6,7 @@
 // accommodationService.isPubliclyVisible, inchangée). Pattern calqué sur
 // accommodationService.js (Sprint B1).
 
+const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const Hotel = require('../models/Hotel');
 const Accommodation = require('../models/Accommodation');
@@ -13,9 +14,25 @@ const RoomCategory = require('../models/RoomCategory');
 const RatePlan = require('../models/RatePlan');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const { createFullAccommodation } = require('./accommodationService');
+const { ensureHotelManagerAssignment } = require('./hotel/hotelStaffAssignmentService');
 const logger = require('../utils/logger');
 
 const cleanupImages = (images = []) => Promise.all(images.map((url) => destroyFromCloudinary(url))).catch(() => {});
+
+/**
+ * Compensation ciblée (F2.6.3 — correctif d'atomicité) : si la transaction
+ * Hotel.manager → HotelStaffAssignment → ActionLog échoue, l'hôtel (et son Accommodation/
+ * Property, créés ensemble par `createFullAccommodation`) ne doit JAMAIS survivre sans son
+ * rattachement — sinon on recrée exactement le trou de gouvernance que F2.6.3 corrige (un
+ * hôtel avec manager mais sans HotelStaffAssignment). Même convention que les compensations
+ * déjà établies dans accommodationService.js (suppression best-effort, jamais silencieuse).
+ */
+async function compensateHotelCreation({ hotelId, accommodationId, propertyId, images }) {
+  await Accommodation.findByIdAndDelete(accommodationId).catch((err) => logger.error(`Compensation Accommodation(${accommodationId}) échouée — document potentiellement orphelin`, err));
+  await Hotel.findByIdAndDelete(hotelId).catch((err) => logger.error(`Compensation Hotel(${hotelId}) échouée — document potentiellement orphelin`, err));
+  await Property.findByIdAndDelete(propertyId).catch((err) => logger.error(`Compensation Property(${propertyId}) échouée — document potentiellement orphelin`, err));
+  await cleanupImages(images);
+}
 
 // ─────────────────────────────────────────────
 // Score de complétude dédié Hôtel (Sprint B2)
@@ -114,6 +131,38 @@ async function resyncLinkedAccommodations(hotelId, hotel) {
 }
 
 /**
+ * F2.6.3 (correctif d'atomicité) — gouvernance transactionnelle du manager d'un hôtel
+ * fraîchement créé : `HotelStaffAssignment` + son `ActionLog` associé (écrit par
+ * `ensureHotelManagerAssignment` via `auditAssignment`/`logAction`) réussissent ou échouent
+ * ensemble, dans une véritable transaction Mongo. Si l'un des deux échoue, la transaction est
+ * annulée PUIS l'hôtel (et son Accommodation/Property, créés juste avant par
+ * `createFullAccommodation` — flux historique non transactionnel, INCHANGÉ, hors périmètre de
+ * ce correctif) sont compensés (supprimés) : jamais d'hôtel avec manager mais sans
+ * rattachement actif. L'erreur n'est jamais avalée : journalisée puis repropagée à l'appelant.
+ * Ne fait rien si `hotel.manager` est absent (comportement historique préservé).
+ */
+async function ensureManagerGovernanceAtomic({ hotel, actingUser, accommodation, property }) {
+  if (!hotel?.manager) return;
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    await ensureHotelManagerAssignment({
+      hotelId: hotel._id, managerId: hotel.manager, actor: actingUser, session, source: 'hotel_creation',
+    });
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction().catch(() => {});
+    logger.error('hotel.manager_assignment_creation_failed', { hotelId: String(hotel._id), managerId: String(hotel.manager), error: error.message });
+    await compensateHotelCreation({
+      hotelId: hotel._id, accommodationId: accommodation._id, propertyId: property._id, images: property.images,
+    });
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
+
+/**
  * Création complète d'un hôtel (Property + Hotel + Accommodation-adaptateur)
  * — réutilise `accommodationService.createFullAccommodation` (déjà testé,
  * gère la compensation orpheline) en forçant accommodationType='hotel'.
@@ -132,6 +181,7 @@ async function createFullHotel({ propertyData, hotelData, actingUser }) {
     actingUser,
   });
   const hotel = await Hotel.findById(result.hotel);
+  await ensureManagerGovernanceAtomic({ hotel, actingUser, accommodation: result.accommodation, property: result.property });
   return { property: result.property, hotel, accommodation: result.accommodation };
 }
 
@@ -236,9 +286,11 @@ async function deleteHotel({ hotel, property }) {
 }
 
 /** Liste paginée pour le dashboard admin ("Établissements"). */
-async function listHotelsForAdmin({ status, search, sort, page = 1, limit = 20 }) {
+async function listHotelsForAdmin({ status, search, sort, page = 1, limit = 20, hotelIds }) {
   const query = {};
   if (status && status !== 'tous') query.publicationStatus = status;
+  // F2.6.2 : scope optionnel (non-Admin) — même filtre pour la liste et le total.
+  if (hotelIds) query._id = { $in: hotelIds };
 
   let hotelsQuery = Hotel.find(query).populate({
     path: 'property',
@@ -262,5 +314,6 @@ async function listHotelsForAdmin({ status, search, sort, page = 1, limit = 20 }
 module.exports = {
   computeHotelCompletionScore, syncLinkedAccommodations, resyncLinkedAccommodations,
   createFullHotel, updateFullHotel, duplicateHotel, deleteHotel, listHotelsForAdmin,
+  ensureManagerGovernanceAtomic,
   HOTEL_COMPLETION_WEIGHTS,
 };

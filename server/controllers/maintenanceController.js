@@ -5,31 +5,27 @@
 // housekeepingController.js.
 
 const mongoose = require('mongoose');
-const Hotel = require('../models/Hotel');
 const Room = require('../models/Room');
 const MaintenanceTicket = require('../models/MaintenanceTicket');
 const maintenanceService = require('../services/maintenanceService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
-
-const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
+const { assertOperationalHotelAccess, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
+const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
 
-async function assertHotelAccess(req, hotelId) {
-  const hotel = await Hotel.findById(hotelId);
-  if (!hotel) return { error: 404 };
-  if (String(hotel.manager) !== String(req.user.id) && !STAFF_ROLES.includes(req.user.role)) {
-    return { error: 403 };
-  }
-  return { hotel };
+// F2.6.1 : remplace le bypass STAFF_ROLES par le scope central — un rôle global
+// (Collaborateur/GestionnaireImmobilier/CommunityManager/Prestataire) ne suffit plus seul.
+async function assertHotelAccess(req, hotelId, capability) {
+  return assertOperationalHotelAccess({ actor: req.user, hotelId, capability });
 }
 
-async function loadTicketWithAccess(req, ticketId) {
+async function loadTicketWithAccess(req, ticketId, capability) {
   if (!mongoose.isValidObjectId(ticketId)) return { error: 400 };
   const ticket = await MaintenanceTicket.findById(ticketId);
   if (!ticket) return { error: 404 };
-  const { error } = await assertHotelAccess(req, ticket.hotel);
+  const { error } = await assertHotelAccess(req, ticket.hotel, capability);
   if (error) return { error };
   return { ticket };
 }
@@ -39,19 +35,19 @@ async function loadTicketWithAccess(req, ticketId) {
 // ─────────────────────────────────────────────
 exports.list = async (req, res) => {
   try {
-    const isStaff = STAFF_ROLES.includes(req.user.role);
     const { hotelId, status, priority, category } = req.query;
 
     const query = {};
     if (hotelId) {
       if (!mongoose.isValidObjectId(hotelId)) return fail(res, 400, 'Identifiant invalide.');
-      const { error } = await assertHotelAccess(req, hotelId);
+      const { error } = await assertHotelAccess(req, hotelId, CAP.MAINTENANCE_VIEW);
       if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
       if (error === 403) return fail(res, 403, 'Vous ne pouvez consulter que vos propres hôtels.');
       query.hotel = hotelId;
-    } else if (!isStaff) {
-      const hotels = await Hotel.find({ manager: req.user.id }).select('_id');
-      query.hotel = { $in: hotels.map((h) => h._id) };
+    } else {
+      // F2.6.1 : mêmes garanties que housekeeping.list — scope réel, aucune fuite de count.
+      const { globalAccess, hotels } = await listAccessibleHotels(req.user);
+      if (!globalAccess) query.hotel = { $in: hotels.map((h) => h._id) };
     }
     if (status) query.status = status;
     if (priority) query.priority = priority;
@@ -82,7 +78,7 @@ exports.create = async (req, res) => {
     if (!mongoose.isValidObjectId(hotelId) || !mongoose.isValidObjectId(roomId)) {
       return fail(res, 422, 'Identifiants invalides.');
     }
-    const { error } = await assertHotelAccess(req, hotelId);
+    const { error } = await assertHotelAccess(req, hotelId, CAP.MAINTENANCE_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
     if (!MaintenanceTicket.MAINTENANCE_CATEGORIES.includes(category)) return fail(res, 422, 'Catégorie invalide.');
@@ -113,7 +109,7 @@ exports.create = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.assign = async (req, res) => {
   try {
-    const { error, ticket } = await loadTicketWithAccess(req, req.params.id);
+    const { error, ticket } = await loadTicketWithAccess(req, req.params.id, CAP.MAINTENANCE_MANAGE);
     if (error === 400) return fail(res, 400, 'Identifiant invalide.');
     if (error === 404) return fail(res, 404, 'Ticket introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
@@ -133,7 +129,7 @@ exports.assign = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.start = async (req, res) => {
   try {
-    const { error, ticket } = await loadTicketWithAccess(req, req.params.id);
+    const { error, ticket } = await loadTicketWithAccess(req, req.params.id, CAP.MAINTENANCE_MANAGE);
     if (error === 400) return fail(res, 400, 'Identifiant invalide.');
     if (error === 404) return fail(res, 404, 'Ticket introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
@@ -150,7 +146,7 @@ exports.start = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.resolve = async (req, res) => {
   try {
-    const { error, ticket } = await loadTicketWithAccess(req, req.params.id);
+    const { error, ticket } = await loadTicketWithAccess(req, req.params.id, CAP.MAINTENANCE_MANAGE);
     if (error === 400) return fail(res, 400, 'Identifiant invalide.');
     if (error === 404) return fail(res, 404, 'Ticket introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
@@ -167,7 +163,7 @@ exports.resolve = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.close = async (req, res) => {
   try {
-    const { error, ticket } = await loadTicketWithAccess(req, req.params.id);
+    const { error, ticket } = await loadTicketWithAccess(req, req.params.id, CAP.MAINTENANCE_CLOSE);
     if (error === 400) return fail(res, 400, 'Identifiant invalide.');
     if (error === 404) return fail(res, 404, 'Ticket introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');

@@ -20,6 +20,8 @@ const { performCheckOut } = require('../services/checkOutService');
 const { getActiveAssignment } = require('../services/roomAssignmentService');
 const { evaluateHotelCheckoutFinancialReadiness } = require('../services/finance/hotelCheckoutFinancialReadinessService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+const { resolveHotelAccessScope, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
+const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
 
 /**
  * N'attache le numéro de chambre QUE pour les réservations checked_in
@@ -40,8 +42,6 @@ async function attachRoomNumberIfCheckedIn(reservations) {
     return obj;
   });
 }
-
-const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
 
 const fail = (res, statusCode, message, extra = {}) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...extra });
@@ -79,13 +79,18 @@ function projectRoomAssignment(assignment) {
   };
 }
 
+// F2.6 : un rôle staff (Collaborateur/GestionnaireImmobilier/CommunityManager) n'accorde plus
+// automatiquement l'accès à TOUTE réservation de TOUT hôtel — l'accès dérive de l'hôtel réel de
+// la réservation persistée, via le scope central (Hotel.manager legacy ou HotelStaffAssignment actif).
 async function assertReservationAccess(req, reservation) {
   const isGuest = reservation.guestUser && String(reservation.guestUser) === String(req.user?.id);
   if (isGuest) return { role: 'guest' };
   const hotel = await Hotel.findById(reservation.hotel);
-  const isOwner = hotel?.manager && String(hotel.manager) === String(req.user?.id);
+  if (!hotel) return null;
+  const isOwner = hotel.manager && String(hotel.manager) === String(req.user?.id);
   if (isOwner) return { role: 'owner', hotel };
-  if (STAFF_ROLES.includes(req.user?.role)) return { role: 'staff', hotel };
+  const scope = await resolveHotelAccessScope({ actor: req.user, requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.RESERVATION_VIEW, requestedHotelId: reservation.hotel }).catch(() => null);
+  if (scope) return { role: 'staff', hotel };
   return null;
 }
 
@@ -274,15 +279,30 @@ exports.cancel = async (req, res) => {
 // Propriétaire — "Mes réservations" (staff peut aussi créer/gérer, voir
 // mission §8 "Administration" : même contrat, ownership élargie au staff)
 // ─────────────────────────────────────────────
+const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
+
 exports.ownerList = async (req, res) => {
   try {
-    const isStaff = STAFF_ROLES.includes(req.user.role);
     const { hotelId, status, search, page = 1, limit = 20 } = req.query;
 
-    const hotelQuery = isStaff ? {} : { manager: req.user.id };
-    if (hotelId) hotelQuery._id = hotelId;
-    const hotels = await Hotel.find(hotelQuery).select('_id name');
-    const hotelIds = hotels.map((h) => h._id);
+    // F2.6 : un rôle staff ne voit plus automatiquement TOUS les hôtels (faille corrigée) — la
+    // liste vient du scope central (Admin -> tous, sinon rattachements HotelStaffAssignment actifs
+    // + Hotel.manager legacy). Le chemin Proprietaire reste inchangé (hotel.manager===lui, F0-F2.5).
+    let hotelIds;
+    if (STAFF_ROLES.includes(req.user.role)) {
+      const { globalAccess, hotels: accessibleHotels } = await listAccessibleHotels(req.user);
+      hotelIds = accessibleHotels.map((h) => h._id);
+      if (hotelId) {
+        const allowed = globalAccess || hotelIds.some((allowedId) => String(allowedId) === String(hotelId));
+        if (!allowed) { logDenied(req, 'Liste réservations'); return fail(res, 403, 'Accès refusé.'); }
+        hotelIds = [hotelId];
+      }
+    } else {
+      const hotelQuery = { manager: req.user.id };
+      if (hotelId) hotelQuery._id = hotelId;
+      const hotels = await Hotel.find(hotelQuery).select('_id name');
+      hotelIds = hotels.map((h) => h._id);
+    }
     if (hotelIds.length === 0) return res.json({ status: 'success', data: { reservations: [], total: 0, page: Number(page), limit: Number(limit) } });
 
     const query = { hotel: { $in: hotelIds } };
@@ -311,7 +331,8 @@ exports.ownerCreate = async (req, res) => {
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
     const isStaff = STAFF_ROLES.includes(req.user.role);
     const isOwner = hotel.manager && String(hotel.manager) === String(req.user.id);
-    if (!isOwner && !isStaff) { logDenied(req, 'Création réservation'); return fail(res, 403, "Vous ne pouvez créer une réservation que pour vos propres hôtels."); }
+    const scope = isOwner ? true : await resolveHotelAccessScope({ actor: req.user, requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.RESERVATION_CREATE, requestedHotelId: hotelId }).catch(() => null);
+    if (!isOwner && !scope) { logDenied(req, 'Création réservation'); return fail(res, 403, "Vous ne pouvez créer une réservation que pour vos propres hôtels."); }
 
     const {
       roomCategoryId, ratePlanId, checkInDate, checkOutDate,

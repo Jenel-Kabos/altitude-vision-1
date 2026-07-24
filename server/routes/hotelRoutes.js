@@ -5,6 +5,9 @@ const roomCategoryCtrl = require('../controllers/roomCategoryController');
 const roomCtrl = require('../controllers/roomController');
 const roomAssignmentCtrl = require('../controllers/roomAssignmentController');
 const reservationCtrl = require('../controllers/hotelReservationController');
+const staffCtrl = require('../controllers/hotelStaffAssignmentController');
+const { requireHotelCapability } = require('../middleware/hotelAccessMiddleware');
+const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
 const { ROLES_ALTIMMO } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
 
@@ -22,6 +25,21 @@ router.get('/:hotelId/availability', auth.optionalAuth, reservationCtrl.getPubli
 router.post('/:hotelId/reservations', auth.optionalAuth, reservationCtrl.createPublicReservation);
 
 router.use(auth.protect);
+
+// F2.6 — hôtels accessibles à l'utilisateur courant (Admin, manager legacy ou rattachement actif).
+// Placée avant '/:id' générique pour ne jamais être capturée par le paramètre.
+router.get('/accessible', staffCtrl.accessibleHotels);
+
+// F2.6 — gouvernance des accès hôteliers (gestion du personnel rattaché).
+const staffView = requireHotelCapability(HOTEL_OPERATIONAL_CAPABILITIES.STAFF_ASSIGNMENT_VIEW, (req) => req.params.hotelId);
+const staffManage = requireHotelCapability(HOTEL_OPERATIONAL_CAPABILITIES.STAFF_ASSIGNMENT_MANAGE, (req) => req.params.hotelId);
+router.get('/:hotelId/staff-assignments', staffView, staffCtrl.list);
+router.post('/:hotelId/staff-assignments', staffManage, staffCtrl.create);
+router.get('/:hotelId/staff-assignments/:assignmentId', staffView, staffCtrl.get);
+router.patch('/:hotelId/staff-assignments/:assignmentId', staffManage, staffCtrl.update);
+router.post('/:hotelId/staff-assignments/:assignmentId/suspend', staffManage, staffCtrl.suspend);
+router.post('/:hotelId/staff-assignments/:assignmentId/reactivate', staffManage, staffCtrl.reactivate);
+router.post('/:hotelId/staff-assignments/:assignmentId/revoke', staffManage, staffCtrl.revoke);
 
 // Staff (dashboard admin) — placées AVANT '/:id' pour ne jamais être
 // capturées par le paramètre générique.

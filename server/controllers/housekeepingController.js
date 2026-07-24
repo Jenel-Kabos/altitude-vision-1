@@ -6,31 +6,27 @@
 // l'hôtel ou staff (STAFF_ROLES), jamais le client (mission §14).
 
 const mongoose = require('mongoose');
-const Hotel = require('../models/Hotel');
 const Room = require('../models/Room');
 const HousekeepingTask = require('../models/HousekeepingTask');
 const housekeepingService = require('../services/housekeepingService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
-
-const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
+const { assertOperationalHotelAccess, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
+const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
 
-async function assertHotelAccess(req, hotelId) {
-  const hotel = await Hotel.findById(hotelId);
-  if (!hotel) return { error: 404 };
-  if (String(hotel.manager) !== String(req.user.id) && !STAFF_ROLES.includes(req.user.role)) {
-    return { error: 403 };
-  }
-  return { hotel };
+// F2.6.1 : remplace le bypass STAFF_ROLES par le scope central (Admin, Hotel.manager legacy,
+// ou HotelStaffAssignment actif avec la capacité requise sur CET hôtel précis).
+async function assertHotelAccess(req, hotelId, capability) {
+  return assertOperationalHotelAccess({ actor: req.user, hotelId, capability });
 }
 
-async function loadTaskWithAccess(req, taskId) {
+async function loadTaskWithAccess(req, taskId, capability) {
   if (!mongoose.isValidObjectId(taskId)) return { error: 400 };
   const task = await HousekeepingTask.findById(taskId);
   if (!task) return { error: 404 };
-  const { error } = await assertHotelAccess(req, task.hotel);
+  const { error } = await assertHotelAccess(req, task.hotel, capability);
   if (error) return { error };
   return { task };
 }
@@ -40,19 +36,22 @@ async function loadTaskWithAccess(req, taskId) {
 // ─────────────────────────────────────────────
 exports.list = async (req, res) => {
   try {
-    const isStaff = STAFF_ROLES.includes(req.user.role);
     const { hotelId, status, priority } = req.query;
 
     const query = {};
     if (hotelId) {
       if (!mongoose.isValidObjectId(hotelId)) return fail(res, 400, 'Identifiant invalide.');
-      const { error } = await assertHotelAccess(req, hotelId);
+      const { error } = await assertHotelAccess(req, hotelId, CAP.HOUSEKEEPING_VIEW);
       if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
       if (error === 403) return fail(res, 403, 'Vous ne pouvez consulter que vos propres hôtels.');
       query.hotel = hotelId;
-    } else if (!isStaff) {
-      const hotels = await Hotel.find({ manager: req.user.id }).select('_id');
-      query.hotel = { $in: hotels.map((h) => h._id) };
+    } else {
+      // F2.6.1 : aucun `hotelId` fourni — le scope vient exclusivement des hôtels réellement
+      // accessibles (Admin = tous, sinon rattachements HotelStaffAssignment actifs + legacy
+      // Hotel.manager), jamais d'un bypass de rôle. Le total/count suit le même filtre que la
+      // liste (aucune fuite, mission §19).
+      const { globalAccess, hotels } = await listAccessibleHotels(req.user);
+      if (!globalAccess) query.hotel = { $in: hotels.map((h) => h._id) };
     }
     if (status) query.status = status;
     if (priority) query.priority = priority;
@@ -78,7 +77,7 @@ exports.create = async (req, res) => {
     if (!mongoose.isValidObjectId(hotelId) || !mongoose.isValidObjectId(roomId)) {
       return fail(res, 422, 'Identifiants invalides.');
     }
-    const { error } = await assertHotelAccess(req, hotelId);
+    const { error } = await assertHotelAccess(req, hotelId, CAP.HOUSEKEEPING_MANAGE);
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
     if (!HousekeepingTask.HOUSEKEEPING_TYPES.includes(type)) return fail(res, 422, 'Type de tâche invalide.');
@@ -108,7 +107,7 @@ exports.create = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.assign = async (req, res) => {
   try {
-    const { error, task } = await loadTaskWithAccess(req, req.params.id);
+    const { error, task } = await loadTaskWithAccess(req, req.params.id, CAP.HOUSEKEEPING_MANAGE);
     if (error === 400) return fail(res, 400, 'Identifiant invalide.');
     if (error === 404) return fail(res, 404, 'Tâche introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
@@ -128,7 +127,7 @@ exports.assign = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.start = async (req, res) => {
   try {
-    const { error, task } = await loadTaskWithAccess(req, req.params.id);
+    const { error, task } = await loadTaskWithAccess(req, req.params.id, CAP.HOUSEKEEPING_MANAGE);
     if (error === 400) return fail(res, 400, 'Identifiant invalide.');
     if (error === 404) return fail(res, 404, 'Tâche introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
@@ -145,7 +144,7 @@ exports.start = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.complete = async (req, res) => {
   try {
-    const { error, task } = await loadTaskWithAccess(req, req.params.id);
+    const { error, task } = await loadTaskWithAccess(req, req.params.id, CAP.HOUSEKEEPING_COMPLETE);
     if (error === 400) return fail(res, 400, 'Identifiant invalide.');
     if (error === 404) return fail(res, 404, 'Tâche introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
@@ -169,7 +168,7 @@ exports.complete = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.cancel = async (req, res) => {
   try {
-    const { error, task } = await loadTaskWithAccess(req, req.params.id);
+    const { error, task } = await loadTaskWithAccess(req, req.params.id, CAP.HOUSEKEEPING_MANAGE);
     if (error === 400) return fail(res, 400, 'Identifiant invalide.');
     if (error === 404) return fail(res, 404, 'Tâche introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');

@@ -23,11 +23,19 @@ const {
   uploadFilesToCloudinary, parseAmenities, parseStringArray,
   parseNonNegativeAmount, parseAddress, parseGeoLocation, buildBasePropertyData,
 } = require('./propertyController');
+const { assertOperationalHotelAccess, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
+const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 
 const fail = (res, statusCode, message, extra = {}) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...extra });
 
-const STAFF_ROLES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
+// F2.6.2 : l'entité Hotel elle-même passe désormais par le même scope central que les domaines
+// opérationnels (F2.6.1) — plus aucun bypass sur la seule base du rôle global. Un utilisateur
+// non Admin ne voit/ne modifie que les hôtels auxquels il est effectivement rattaché
+// (HotelStaffAssignment actif) ou dont il est le Hotel.manager legacy.
+async function assertHotelAccess(req, hotelId, capability) {
+  return assertOperationalHotelAccess({ actor: req.user, hotelId, capability });
+}
 
 async function getHotelCompletion(hotel, property) {
   const categories = await RoomCategory.find({ hotel: hotel._id, status: 'actif' });
@@ -80,7 +88,12 @@ async function batchCategoriesAndCompletion(hotels) {
 // ─────────────────────────────────────────────
 exports.list = async (req, res) => {
   try {
-    const hotels = await Hotel.find({ status: 'actif' })
+    const query = { status: 'actif' };
+    if (req.user.role !== 'Admin') {
+      const { hotels: accessibleHotels } = await listAccessibleHotels(req.user);
+      query._id = { $in: accessibleHotels.map((h) => h._id) };
+    }
+    const hotels = await Hotel.find(query)
       .select('name starRating phone email')
       .sort({ name: 1 })
       .limit(200);
@@ -98,8 +111,8 @@ exports.getOne = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id).populate('property');
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    const isManager = hotel.manager && String(hotel.manager) === String(req.user.id);
-    if (!isManager && !STAFF_ROLES.includes(req.user.role)) return fail(res, 403, 'Accès refusé.');
+    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_VIEW);
+    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : 'Accès refusé.');
     const completion = await getHotelCompletion(hotel, hotel.property);
     res.json({ status: 'success', data: { hotel, completion } });
   } catch (error) {
@@ -195,7 +208,15 @@ exports.mine = async (req, res) => {
 exports.listAdmin = async (req, res) => {
   try {
     const { status, search, sort, page, limit } = req.query;
-    const result = await listHotelsForAdmin({ status, search, sort, page, limit });
+    // F2.6.2 : un non-Admin ne voit que ses hôtels réellement rattachés (jamais {} pour tout
+    // le staff Altimmo) — le total (pagination) utilise exactement le même scope que la liste.
+    let hotelIds;
+    if (req.user.role !== 'Admin') {
+      const { hotels: accessibleHotels } = await listAccessibleHotels(req.user);
+      hotelIds = accessibleHotels.map((h) => h._id);
+      if (hotelIds.length === 0) return res.json({ status: 'success', data: { hotels: [], total: 0, page: Number(page) || 1, limit: Number(limit) || 20 } });
+    }
+    const result = await listHotelsForAdmin({ status, search, sort, page, limit, hotelIds });
     const { completionByHotel } = await batchCategoriesAndCompletion(result.hotels);
     const hotels = result.hotels.map((h) => ({ ...h.toObject(), completion: completionByHotel.get(String(h._id)) }));
     res.json({ status: 'success', data: { hotels, total: result.total, page: result.page, limit: result.limit } });
@@ -257,11 +278,11 @@ exports.createFull = async (req, res) => {
     if (!req.body.name || !req.body.name.trim()) {
       return fail(res, 422, "Le nom de l'hôtel est requis.");
     }
-    // Seul le staff peut assigner un propriétaire arbitraire ; un
-    // Proprietaire créant son propre hôtel (POST /mine) ne peut jamais se
-    // faire passer pour un autre owner (défense en profondeur, même
-    // convention que accommodationController.createFull).
-    const ownerId = (STAFF_ROLES.includes(req.user.role) && mongoose.isValidObjectId(req.body.owner))
+    // F2.6.2 : l'attribution d'un propriétaire arbitraire est une action sensible sans hôtel
+    // existant à rattacher (donc sans portée à vérifier) — resserrée à Admin uniquement (au lieu
+    // de tout le staff Altimmo). Un Proprietaire créant son propre hôtel (POST /mine) ne peut
+    // jamais se faire passer pour un autre owner (défense en profondeur, inchangé).
+    const ownerId = (req.user.role === 'Admin' && mongoose.isValidObjectId(req.body.owner))
       ? req.body.owner
       : req.user.id;
     let propertyData;
@@ -306,9 +327,8 @@ exports.updateFull = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.hotelId)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.hotelId);
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    if (hotel.manager && String(hotel.manager) !== String(req.user.id) && !STAFF_ROLES.includes(req.user.role)) {
-      return fail(res, 403, "Vous ne pouvez modifier que vos propres hôtels.");
-    }
+    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
+    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez modifier que vos propres hôtels.");
     const property = hotel.property ? await Property.findById(hotel.property) : null;
     if (!property) return fail(res, 404, 'Bien introuvable.');
 
@@ -381,9 +401,11 @@ exports.submit = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id).populate('property');
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    if (String(hotel.manager) !== String(req.user.id) && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez soumettre que vos propres hôtels.");
-    }
+    // F2.6.3 (volet D) : dernière comparaison directe `Hotel.manager` restante dans ce
+    // contrôleur — centralisée pour clôturer complètement l'audit (aucune régression : Admin
+    // et manager exact conservent le même accès, un `hotel_manager` rattaché l'obtient aussi).
+    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
+    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez soumettre que vos propres hôtels.");
     if (!['brouillon', 'rejete'].includes(hotel.publicationStatus)) {
       return fail(res, 409, 'Cet hôtel a déjà été soumis.');
     }
@@ -402,7 +424,12 @@ exports.submit = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.pending = async (req, res) => {
   try {
-    const hotels = await Hotel.find({ publicationStatus: 'soumis' })
+    const query = { publicationStatus: 'soumis' };
+    if (req.user.role !== 'Admin') {
+      const { hotels: accessibleHotels } = await listAccessibleHotels(req.user);
+      query._id = { $in: accessibleHotels.map((h) => h._id) };
+    }
+    const hotels = await Hotel.find(query)
       .populate('property', 'title images address owner')
       .sort({ submittedAt: 1 });
     const { categoriesByHotel, completionByHotel } = await batchCategoriesAndCompletion(hotels);
@@ -429,6 +456,11 @@ exports.reviewDecision = async (req, res) => {
 
     const hotel = await Hotel.findById(id).populate('property', 'title owner');
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
+    // F2.6.2 : cette action n'avait auparavant AUCUN contrôle de portée au-delà du filtre de
+    // rôle global au niveau route — n'importe quel membre du staff Altimmo pouvait valider,
+    // rejeter, suspendre ou réactiver n'importe quel hôtel.
+    const { error: scopeError } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
+    if (scopeError) return fail(res, scopeError, scopeError === 404 ? 'Hôtel introuvable.' : 'Accès refusé.');
 
     if (['validate', 'reject'].includes(action) && hotel.publicationStatus !== 'soumis') {
       return fail(res, 409, 'Seul un hôtel soumis peut être validé ou rejeté.');
@@ -521,9 +553,8 @@ exports.deactivate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id);
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    if (String(hotel.manager) !== String(req.user.id) && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez modifier que vos propres hôtels.");
-    }
+    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
+    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez modifier que vos propres hôtels.");
     hotel.active = false;
     await hotel.save();
     const syncResult = await syncLinkedAccommodations(hotel._id, { active: false });
@@ -549,9 +580,8 @@ exports.reactivate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id);
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    if (String(hotel.manager) !== String(req.user.id) && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez modifier que vos propres hôtels.");
-    }
+    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
+    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez modifier que vos propres hôtels.");
     hotel.active = true;
     await hotel.save();
     const syncResult = await syncLinkedAccommodations(hotel._id, { active: true });
@@ -582,6 +612,9 @@ exports.resync = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id);
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
+    // F2.6.2 : aucun contrôle de portée n'existait auparavant sur cette action de récupération.
+    const { error: scopeError } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
+    if (scopeError) return fail(res, scopeError, scopeError === 404 ? 'Hôtel introuvable.' : 'Accès refusé.');
     const syncResult = await resyncLinkedAccommodations(hotel._id, hotel);
     if (!syncResult.ok) return fail(res, 500, `Resynchronisation échouée : ${syncResult.error}`);
 
@@ -609,9 +642,8 @@ exports.duplicate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id).populate('property');
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    if (String(hotel.manager) !== String(req.user.id) && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez dupliquer que vos propres hôtels.");
-    }
+    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
+    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez dupliquer que vos propres hôtels.");
     const result = await duplicateHotel({ hotel, property: hotel.property, actingUser: req.user });
 
     logAction({
@@ -638,9 +670,8 @@ exports.remove = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id).populate('property');
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    if (String(hotel.manager) !== String(req.user.id) && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez supprimer que vos propres hôtels.");
-    }
+    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
+    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez supprimer que vos propres hôtels.");
     const name = hotel.name;
     await deleteHotel({ hotel, property: hotel.property });
 

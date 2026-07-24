@@ -3,7 +3,11 @@ const ActionLog = require('../models/ActionLog');
 
 /**
  * Enregistre une action dans le journal d'audit.
- * Non-bloquant : les erreurs sont absorbées pour ne jamais interrompre l'opération principale.
+ * Non-bloquant par défaut : les erreurs sont absorbées pour ne jamais interrompre
+ * l'opération principale — SAUF si un `session` (transaction Mongo) est fourni : dans ce
+ * cas l'appelant est explicitement dans un flux transactionnel qui doit pouvoir échouer et
+ * déclencher un rollback (F2.6.3 — atomicité Hotel+HotelStaffAssignment+ActionLog), donc
+ * l'erreur est propagée au lieu d'être avalée.
  */
 const logAction = async ({
   action,
@@ -14,13 +18,14 @@ const logAction = async ({
   typeAction,
   metadata = {},
   req,
+  session,
 }) => {
-  try {
+  const write = async () => {
     // Les tests d'intégration Supertest utilisent les modèles mockés sans
     // connexion Mongo. Ne pas laisser Mongoose bufferiser une écriture
     // fire-and-forget après la fin de Jest. Les tests unitaires qui mockent
     // ActionLog (sans propriété `db`) continuent de vérifier create().
-    if (process.env.NODE_ENV === 'test' && ActionLog.db?.readyState === 0) return;
+    if (process.env.NODE_ENV === 'test' && ActionLog.db?.readyState === 0) return undefined;
 
     // Enrichir metadata avec IP et User-Agent si req est fourni
     const enrichedMetadata = { ...metadata };
@@ -29,7 +34,7 @@ const logAction = async ({
       enrichedMetadata.userAgent = req.headers['user-agent'] || '';
     }
 
-    await ActionLog.create({
+    const [created] = await ActionLog.create([{
       action,
       description,
       module:     moduleName,
@@ -37,10 +42,18 @@ const logAction = async ({
       cible,
       typeAction,
       metadata:   enrichedMetadata,
-    });
+    }], { session });
+    return created;
+  };
+
+  if (session) return write();
+
+  try {
+    return await write();
   } catch (err) {
     // Ne jamais faire planter l'opération principale à cause d'un log
     console.error('[ActionLog] Erreur lors de l\'enregistrement:', err.message);
+    return undefined;
   }
 };
 
