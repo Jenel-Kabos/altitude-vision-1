@@ -37,19 +37,26 @@ export const getAllProperties = async (options = {}) => {
  * @returns {Promise<Object>} - Objet propriété
  */
 /**
- * Récupère les biens avec filtres complets (utilisé par PropertiesPage web)
- * Paramètres : { search, transaction, type, city, arrondissement, minPrice, maxPrice, page, limit, sort }
+ * Récupère les biens avec filtres complets (utilisé par AltimmoPage/AltimmoAnnonces et
+ * PropertiesPage web) — nomenclature canonique (audit filtrage Altimmo) : `offerType`,
+ * `propertyType`, `city`, `arrondissement`, `minPrice`, `maxPrice`, `search`, `sort`, `page`,
+ * `limit`. Les anciens noms `transaction`/`type` restent acceptés en entrée de CETTE fonction
+ * (alias, jamais envoyés tels quels à l'API) pour ne pas casser les appelants existants
+ * (`PropertiesPage.jsx`, hors périmètre de cette harmonisation) — voir §10 de l'audit.
  */
 export const getPropertiesWithFilters = async (params = {}) => {
   try {
+    const offerType    = params.offerType    ?? params.transaction;
+    const propertyType = params.propertyType ?? params.type;
+
     const qs = new URLSearchParams();
-    if (params.search)                             qs.set('search', params.search.trim());
-    if (params.transaction && params.transaction !== 'tous') qs.set('status', params.transaction);
-    if (params.type        && params.type !== 'tous')        qs.set('type',   params.type);
-    if (params.city        && params.city !== 'Toutes')      qs.set('city',   params.city);
+    if (params.search)                                qs.set('search',       params.search.trim());
+    if (offerType && offerType !== 'tous')             qs.set('offerType',    offerType);
+    if (propertyType && propertyType !== 'tous')       qs.set('propertyType', propertyType);
+    if (params.city   && params.city !== 'Toutes')     qs.set('city',         params.city);
     if (params.arrondissement && params.arrondissement !== 'Tous') qs.set('arrondissement', params.arrondissement);
-    if (params.minPrice > 0)                       qs.set('price[gte]', String(params.minPrice));
-    if (params.maxPrice && params.maxPrice < 500_000_000) qs.set('price[lte]', String(params.maxPrice));
+    if (params.minPrice > 0)                           qs.set('minPrice', String(params.minPrice));
+    if (params.maxPrice && params.maxPrice < 500_000_000) qs.set('maxPrice', String(params.maxPrice));
     qs.set('page',  String(params.page  || 1));
     qs.set('limit', String(params.limit || 12));
     if (params.sort) qs.set('sort', params.sort);

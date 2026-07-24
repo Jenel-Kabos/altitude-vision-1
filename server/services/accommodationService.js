@@ -11,6 +11,7 @@ const Accommodation = require('../models/Accommodation');
 const RatePlan = require('../models/RatePlan');
 const Hotel = require('../models/Hotel');
 const { destroyFromCloudinary } = require('../config/cloudinary');
+const { escapeRegex } = require('../utils/regexEscape');
 const logger = require('../utils/logger');
 
 /**
@@ -458,7 +459,7 @@ async function listAccommodationsForAdmin({ status, type, search, sort, page = 1
   let accommodationsQuery = Accommodation.find(query).populate({
     path: 'property',
     select: 'title images address owner bedrooms bathrooms price statusAdmin availability',
-    ...(search ? { match: { title: new RegExp(search, 'i') } } : {}),
+    ...(search ? { match: { title: new RegExp(escapeRegex(search), 'i') } } : {}),
   });
 
   const sortMap = {

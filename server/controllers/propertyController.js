@@ -11,6 +11,7 @@ const { notify, notifyMany } = require('../services/notificationService');
 const Accommodation = require('../models/Accommodation');
 const RatePlan = require('../models/RatePlan');
 const { isPubliclyVisible } = require('../services/accommodationService');
+const { buildPropertyMongoFilter } = require('../services/propertyFilterService');
 // Sprint A (séparation Vente/Location) — fiches satellites embarquées dans
 // GET /api/properties/:id pour le préremplissage d'édition
 // (SalePropertyForm/RentalPropertyForm), même convention que `accommodation`.
@@ -363,29 +364,20 @@ const getAllProperties = asyncHandler(async (req, res) => {
     baseFilter.pole        = 'Altimmo';
   }
 
-  // ── 2. Champs d'adresse imbriqués → regex insensible à la casse ─────────
-  //    On les retire de req.query AVANT de construire APIFeatures.
-  const escape = (s) => s.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  if (req.query.city) {
-    baseFilter['address.city'] = { $regex: new RegExp(`^${escape(req.query.city)}$`, 'i') };
-    delete req.query.city;
-  }
-  if (req.query.arrondissement) {
-    baseFilter['address.arrondissement'] = { $regex: new RegExp(`^${escape(req.query.arrondissement)}$`, 'i') };
-    delete req.query.arrondissement;
-  }
-
-  // ── 3. Retirer du req.query les champs déjà dans baseFilter ─────────────
-  //    (évite le double-filtrage si le client les envoie aussi)
+  // ── 2. Nomenclature canonique (offerType/propertyType/city/arrondissement/minPrice/
+  //    maxPrice) + alias legacy (status/transaction/listingType, type, ville, price[gte/lte])
+  //    → filtre Mongo sûr (regex ancrée/échappée pour city/arrondissement), voir
+  //    propertyFilterService.js. Le reste (search, sort, page, limit, fields, et tout
+  //    passthrough) continue d'être géré par APIFeatures exactement comme avant.
   delete req.query.statusAdmin;
   delete req.query.availability;
   delete req.query.pole;
+  const { mongoFilter, remainingQuery } = buildPropertyMongoFilter(req.query);
+  Object.assign(baseFilter, mongoFilter);
 
-  // ── 4. APIFeatures gère : type, status, price[gte/lte], search, sort, page, limit
-  const queryForCount = { ...req.query };
-  const countFeatures = new APIFeatures(Property.find(baseFilter), queryForCount).filter();
+  const countFeatures = new APIFeatures(Property.find(baseFilter), { ...remainingQuery }).filter();
 
-  const features = new APIFeatures(Property.find(baseFilter), req.query)
+  const features = new APIFeatures(Property.find(baseFilter), remainingQuery)
     .filter()
     .sort()
     .limitFields()
@@ -466,9 +458,11 @@ const getPendingPropertiesCount = asyncHandler(async (_req, res) => {
  * @description Middleware pour les dernières propriétés
  */
 const getLatestProperties = (req, res, next) => {
-  req.query.limit       = '5';
-  req.query.sort        = '-createdAt';
-  req.query.statusAdmin = 'Validée';
+  req.query.limit = '5';
+  req.query.sort  = '-createdAt';
+  // Pas de `req.query.statusAdmin` ici : `getAllProperties` l'impose déjà lui-même pour tout
+  // non-admin (baseFilter.statusAdmin) et le retire systématiquement de req.query — une
+  // affectation ici était sans effet et trompeuse (audit filtrage Altimmo).
   next();
 };
 
@@ -945,7 +939,10 @@ const setRecommande = asyncHandler(async (req, res) => {
  * @route GET /api/properties/recommended
  */
 const getRecommendedProperties = asyncHandler(async (req, res) => {
-  const publicFilter = { statusAdmin: 'Validée', availability: 'Disponible' };
+  // `pole: 'Altimmo'` — cohérent avec `getAllProperties` (audit filtrage Altimmo) : sans ce
+  // filtre, un bien MilaEvents/Altcom marqué `recommande:true` pourrait apparaître sur les
+  // pages de recommandation Altimmo.
+  const publicFilter = { statusAdmin: 'Validée', availability: 'Disponible', pole: 'Altimmo' };
 
   let properties = await Property.find({
     ...publicFilter,

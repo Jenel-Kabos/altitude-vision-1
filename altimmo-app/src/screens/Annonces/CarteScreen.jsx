@@ -13,6 +13,7 @@ import api from '../../services/api';
 import { cache } from '../../services/cacheService';
 import { SearchPanel } from '../../components';
 import { formatPriceShort, PRICE_MAX } from '../../constants/propertyTypes';
+import { DEFAULT_PROPERTY_FILTERS, buildPropertyQueryParams } from '../../utils/propertyQueryParams';
 import PrixFCFA from '../../components/PrixFCFA';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../../theme';
@@ -43,29 +44,14 @@ const DARK_MAP_STYLE = [
   { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#C8960C', opacity: 0.4 }] },
 ];
 
-// ─── Filtres par défaut ───────────────────────────────────────────────────────
-const DEFAULT_FILTERS = {
-  transaction:    'tous',
-  typeBien:       'tous',
-  priceRange:     [0, 500000000],
-  ville:          'Toutes',
-  arrondissement: 'Tous',
-};
+// Nomenclature canonique + construction de requête partagée (audit filtrage Altimmo) —
+// auparavant dupliquée avec ListeAnnoncesScreen.jsx, avec un `availability` hardcodé présent
+// uniquement ici (incohérence corrigée : le backend l'impose déjà systématiquement pour toute
+// route publique, l'envoyer depuis le client n'avait aucun effet).
+const DEFAULT_FILTERS = DEFAULT_PROPERTY_FILTERS;
 
-// ─── Construction de la query API depuis les filtres ─────────────────────────
 function buildQuery(filters) {
-  const params = new URLSearchParams({
-    limit: '200',
-    statusAdmin: 'Validée',
-    availability: 'Disponible',
-  });
-  if (filters.transaction !== 'tous')    params.set('status', filters.transaction);
-  if (filters.typeBien !== 'tous')       params.set('type', filters.typeBien);
-  if (filters.ville !== 'Toutes')        params.set('city', filters.ville);
-  if (filters.arrondissement !== 'Tous') params.set('arrondissement', filters.arrondissement);
-  if (filters.priceRange[0] > 0)         params.set('price[gte]', String(filters.priceRange[0]));
-  if (filters.priceRange[1] < 500000000) params.set('price[lte]', String(filters.priceRange[1]));
-  return params.toString();
+  return buildPropertyQueryParams(filters, { limit: 200 });
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -171,9 +157,9 @@ export default function CarteScreen({ navigation }) {
   // ─── Compteur de filtres actifs ───
   const activeFilterCount = useMemo(() => {
     let n = 0;
-    if (activeFilters.transaction !== 'tous')    n++;
-    if (activeFilters.typeBien !== 'tous')       n++;
-    if (activeFilters.ville !== 'Toutes')        n++;
+    if (activeFilters.offerType !== 'tous')    n++;
+    if (activeFilters.propertyType !== 'tous')       n++;
+    if (activeFilters.city !== 'Toutes')        n++;
     if (activeFilters.arrondissement !== 'Tous') n++;
     if (activeFilters.priceRange[0] > 0 || activeFilters.priceRange[1] < 500_000_000) n++;
     return n;
@@ -438,24 +424,24 @@ export default function CarteScreen({ navigation }) {
               contentContainerStyle={styles.chipsContent}
               pointerEvents="auto"
             >
-              {activeFilters.transaction !== 'tous' && (
+              {activeFilters.offerType !== 'tous' && (
                 <ActiveChip
-                  label={TRANSACTION_LABELS[activeFilters.transaction] || activeFilters.transaction}
-                  onRemove={() => setActiveFilters(prev => ({ ...prev, transaction: 'tous' }))}
+                  label={TRANSACTION_LABELS[activeFilters.offerType] || activeFilters.offerType}
+                  onRemove={() => setActiveFilters(prev => ({ ...prev, offerType: 'tous' }))}
                   c={c} styles={styles}
                 />
               )}
-              {activeFilters.typeBien !== 'tous' && (
+              {activeFilters.propertyType !== 'tous' && (
                 <ActiveChip
-                  label={activeFilters.typeBien}
-                  onRemove={() => setActiveFilters(prev => ({ ...prev, typeBien: 'tous' }))}
+                  label={activeFilters.propertyType}
+                  onRemove={() => setActiveFilters(prev => ({ ...prev, propertyType: 'tous' }))}
                   c={c} styles={styles}
                 />
               )}
-              {activeFilters.ville !== 'Toutes' && (
+              {activeFilters.city !== 'Toutes' && (
                 <ActiveChip
-                  label={activeFilters.ville}
-                  onRemove={() => setActiveFilters(prev => ({ ...prev, ville: 'Toutes', arrondissement: 'Tous' }))}
+                  label={activeFilters.city}
+                  onRemove={() => setActiveFilters(prev => ({ ...prev, city: 'Toutes', arrondissement: 'Tous' }))}
                   c={c} styles={styles}
                 />
               )}

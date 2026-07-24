@@ -9,16 +9,9 @@ import { Slider } from '@miblanchard/react-native-slider';
 import { useTheme } from '../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../theme';
 import { VILLES, getArrondissementsFor } from '../constants/locations';
-import { PROPERTY_TYPES_WITH_ALL } from '../constants/propertyTypes';
+import { PROPERTY_TYPES_WITH_ALL, OFFER_TYPES } from '../constants/propertyTypes';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
-
-const TRANSACTIONS = [
-  { value: 'vente',       label: 'Vente' },
-  { value: 'location',    label: 'Location' },
-  { value: 'hebergement', label: 'Hébergement' },
-  { value: 'tous',        label: 'Tous' },
-];
 
 const TYPES_BIEN = PROPERTY_TYPES_WITH_ALL.map(t => t.value);
 
@@ -36,10 +29,10 @@ const BUDGET_PRESETS = [
 ];
 
 const DEFAULT_FILTERS = {
-  transaction:    'tous',
-  typeBien:       'tous',
+  offerType:    'tous',
+  propertyType:       'tous',
   priceRange:     [PRICE_MIN, PRICE_MAX],
-  ville:          'Toutes',
+  city:          'Toutes',
   arrondissement: 'Tous',
 };
 
@@ -145,10 +138,10 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
 
-  const [transaction, setTransaction] = useState(initialFilters?.transaction ?? DEFAULT_FILTERS.transaction);
-  const [typeBien,    setTypeBien]    = useState(initialFilters?.typeBien    ?? DEFAULT_FILTERS.typeBien);
+  const [offerType, setOfferType] = useState(initialFilters?.offerType ?? DEFAULT_FILTERS.offerType);
+  const [propertyType,    setPropertyType]    = useState(initialFilters?.propertyType    ?? DEFAULT_FILTERS.propertyType);
   const [priceRange,  setPriceRange]  = useState(initialFilters?.priceRange  ?? DEFAULT_FILTERS.priceRange);
-  const [ville,       setVille]       = useState(initialFilters?.ville       ?? DEFAULT_FILTERS.ville);
+  const [city,       setCity]       = useState(initialFilters?.city       ?? DEFAULT_FILTERS.city);
   const [arrondissement, setArrondissement] = useState(initialFilters?.arrondissement ?? DEFAULT_FILTERS.arrondissement);
 
   // Champs texte budget (affichage + saisie)
@@ -161,10 +154,10 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
   // Synchronise le panel avec les filtres actifs à chaque ouverture (ex: quick-chips)
   useEffect(() => {
     if (visible && initialFilters) {
-      setTransaction(initialFilters.transaction ?? DEFAULT_FILTERS.transaction);
-      setTypeBien(initialFilters.typeBien    ?? DEFAULT_FILTERS.typeBien);
+      setOfferType(initialFilters.offerType ?? DEFAULT_FILTERS.offerType);
+      setPropertyType(initialFilters.propertyType    ?? DEFAULT_FILTERS.propertyType);
       setPriceRange(initialFilters.priceRange ?? DEFAULT_FILTERS.priceRange);
-      setVille(initialFilters.ville           ?? DEFAULT_FILTERS.ville);
+      setCity(initialFilters.city           ?? DEFAULT_FILTERS.city);
       setArrondissement(initialFilters.arrondissement ?? DEFAULT_FILTERS.arrondissement);
       setMinInput('');
       setMaxInput('');
@@ -176,14 +169,14 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
     setOpenDropdown(prev => prev === name ? null : name);
   }, []);
 
-  const arrondDisabled = ville === 'Toutes';
-  const arrondsList = useMemo(() => ['Tous', ...getArrondissementsFor(ville)], [ville]);
+  const arrondDisabled = city === 'Toutes';
+  const arrondsList = useMemo(() => ['Tous', ...getArrondissementsFor(city)], [city]);
 
   const typeItems = useMemo(() =>
     TYPES_BIEN.map(t => ({ value: t, label: t === 'tous' ? 'Tous les types' : t })),
   []);
 
-  const villeItems = useMemo(() =>
+  const cityItems = useMemo(() =>
     ['Toutes', ...VILLES].map(v => ({ value: v, label: v })),
   []);
 
@@ -226,17 +219,17 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
     }
   }, [maxInput, priceRange]);
 
-  const handleVilleSelect = useCallback((v) => {
-    setVille(v);
+  const handleCitySelect = useCallback((v) => {
+    setCity(v);
     setArrondissement('Tous');
     setOpenDropdown(null);
   }, []);
 
   const handleReset = useCallback(() => {
-    setTransaction(DEFAULT_FILTERS.transaction);
-    setTypeBien(DEFAULT_FILTERS.typeBien);
+    setOfferType(DEFAULT_FILTERS.offerType);
+    setPropertyType(DEFAULT_FILTERS.propertyType);
     setPriceRange(DEFAULT_FILTERS.priceRange);
-    setVille(DEFAULT_FILTERS.ville);
+    setCity(DEFAULT_FILTERS.city);
     setArrondissement(DEFAULT_FILTERS.arrondissement);
     setMinInput('');
     setMaxInput('');
@@ -244,18 +237,18 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
   }, []);
 
   const handleSearch = useCallback(() => {
-    onSearch?.({ transaction, typeBien, priceRange, ville, arrondissement });
-  }, [transaction, typeBien, priceRange, ville, arrondissement, onSearch]);
+    onSearch?.({ offerType, propertyType, priceRange, city, arrondissement });
+  }, [offerType, propertyType, priceRange, city, arrondissement, onSearch]);
 
   // Compter les filtres actifs pour le bouton CTA
   const activeCount = useMemo(() => {
     let n = 0;
-    if (transaction !== 'tous') n++;
-    if (typeBien !== 'tous') n++;
-    if (ville !== 'Toutes') n++;
+    if (offerType !== 'tous') n++;
+    if (propertyType !== 'tous') n++;
+    if (city !== 'Toutes') n++;
     if (!isPriceDefault) n++;
     return n;
-  }, [transaction, typeBien, ville, isPriceDefault]);
+  }, [offerType, propertyType, city, isPriceDefault]);
 
   // Label affiché au-dessus du slider
   const budgetLabel = isPriceDefault
@@ -315,12 +308,12 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
             {/* ─── Transaction ─── */}
             <Text style={styles.label}>TRANSACTION</Text>
             <View style={styles.rowChips}>
-              {TRANSACTIONS.map((t) => {
-                const active = transaction === t.value;
+              {OFFER_TYPES.map((t) => {
+                const active = offerType === t.value;
                 return (
                   <TouchableOpacity
                     key={t.value}
-                    onPress={() => setTransaction(t.value)}
+                    onPress={() => setOfferType(t.value)}
                     style={[styles.chip, active && styles.chipActive]}
                     activeOpacity={0.8}
                     accessibilityRole="button"
@@ -338,12 +331,12 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
             {/* ─── Type de bien ─── */}
             <DropdownField
               label="TYPE DE BIEN"
-              value={typeBien}
-              displayValue={typeBien === 'tous' ? 'Tous les types' : typeBien}
+              value={propertyType}
+              displayValue={propertyType === 'tous' ? 'Tous les types' : propertyType}
               items={typeItems}
               open={openDropdown === 'type'}
               onToggle={() => toggleDropdown('type')}
-              onSelect={(v) => { setTypeBien(v); setOpenDropdown(null); }}
+              onSelect={(v) => { setPropertyType(v); setOpenDropdown(null); }}
               styles={styles}
               c={c}
             />
@@ -351,12 +344,12 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
             {/* ─── Ville ─── */}
             <DropdownField
               label="VILLE"
-              value={ville}
-              displayValue={ville}
-              items={villeItems}
-              open={openDropdown === 'ville'}
-              onToggle={() => toggleDropdown('ville')}
-              onSelect={handleVilleSelect}
+              value={city}
+              displayValue={city}
+              items={cityItems}
+              open={openDropdown === 'city'}
+              onToggle={() => toggleDropdown('city')}
+              onSelect={handleCitySelect}
               styles={styles}
               c={c}
             />
@@ -574,7 +567,7 @@ const makeStyles = (c) => StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
-  // ─── Chips transaction ───
+  // ─── Chips offerType ───
   rowChips: {
     flexDirection: 'row',
     gap: spacing.sm,

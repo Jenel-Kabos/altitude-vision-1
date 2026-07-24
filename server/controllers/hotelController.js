@@ -25,6 +25,8 @@ const {
 } = require('./propertyController');
 const { assertOperationalHotelAccess, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
+const { buildExactCiRegexFilter } = require('../services/propertyFilterService');
+const { escapeRegex } = require('../utils/regexEscape');
 
 const fail = (res, statusCode, message, extra = {}) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...extra });
@@ -160,7 +162,11 @@ exports.getPublic = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.listPublic = async (req, res) => {
   try {
-    const { ville, search, page = 1, limit = 12 } = req.query;
+    // Nomenclature canonique `city` (alias legacy `ville` accepté — audit filtrage Altimmo) ;
+    // même filtre exact/insensible-casse/échappé que `propertyController.getAllProperties`
+    // (auparavant : égalité stricte sensible à la casse, incohérente avec les biens).
+    const { city, ville, search, page = 1, limit = 12 } = req.query;
+    const cityFilter = buildExactCiRegexFilter(city !== undefined ? city : ville);
     const hotels = await Hotel.find({ publicationStatus: 'publie', active: { $ne: false } })
       .select(PUBLIC_HOTEL_FIELDS)
       .populate({
@@ -169,8 +175,9 @@ exports.listPublic = async (req, res) => {
         match: {
           statusAdmin: 'Validée',
           availability: 'Disponible',
-          ...(ville ? { 'address.city': ville } : {}),
-          ...(search ? { title: new RegExp(search, 'i') } : {}),
+          ...(cityFilter ? { 'address.city': cityFilter } : {}),
+          // Échappé (escapeRegex) : évite le ReDoS sur cette route publique.
+          ...(search ? { title: new RegExp(escapeRegex(search), 'i') } : {}),
         },
       })
       .sort({ publishedAt: -1 });

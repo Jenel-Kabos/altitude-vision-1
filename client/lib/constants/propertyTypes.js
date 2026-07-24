@@ -21,13 +21,18 @@ export const PROPERTY_TYPES_WITH_ALL = [
   ...PROPERTY_TYPES,
 ];
 
-// Transactions — status enum MongoDB : 'vente' | 'location' | 'hebergement'
-export const TRANSACTIONS = [
+// Type d'offre — nomenclature canonique `offerType` (audit filtrage Altimmo), reflète
+// l'enum MongoDB `Property.status` : 'vente' | 'location' | 'hebergement'.
+export const OFFER_TYPES = [
   { value: 'tous',        label: 'Tous' },
   { value: 'vente',       label: 'Vente' },
   { value: 'location',    label: 'Location' },
   { value: 'hebergement', label: 'Hébergement' },
 ];
+
+// Alias rétrocompatible — conservé pour `PropertiesPage.jsx` (hors périmètre de
+// l'harmonisation `/immobilier`+`/immobilier/annonces`, ne pas casser).
+export const TRANSACTIONS = OFFER_TYPES;
 
 // Presets budget (identiques au mobile SearchPanel)
 export const BUDGET_PRESETS = [

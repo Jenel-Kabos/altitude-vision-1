@@ -15,6 +15,7 @@ const RatePlan = require('../models/RatePlan');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const { createFullAccommodation } = require('./accommodationService');
 const { ensureHotelManagerAssignment } = require('./hotel/hotelStaffAssignmentService');
+const { escapeRegex } = require('../utils/regexEscape');
 const logger = require('../utils/logger');
 
 const cleanupImages = (images = []) => Promise.all(images.map((url) => destroyFromCloudinary(url))).catch(() => {});
@@ -295,7 +296,7 @@ async function listHotelsForAdmin({ status, search, sort, page = 1, limit = 20, 
   let hotelsQuery = Hotel.find(query).populate({
     path: 'property',
     select: 'title images address owner price statusAdmin availability',
-    ...(search ? { match: { title: new RegExp(search, 'i') } } : {}),
+    ...(search ? { match: { title: new RegExp(escapeRegex(search), 'i') } } : {}),
   });
 
   const sortMap = { recent: { updatedAt: -1 }, ancien: { updatedAt: 1 } };
