@@ -119,22 +119,22 @@ describe('AltimmoAnnonces — validation prix', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-describe('AltimmoAnnonces — URL de redirection (bug corrigé)', () => {
+describe('AltimmoAnnonces — URL de redirection (audit filtrage Altimmo : correctif du bug)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll.mockResolvedValue({ properties: FAKE_PROPERTIES, total: FAKE_PROPERTIES.length });
   });
 
-  it('remplace l\'URL avec /altimmo/annonces (et non /immobilier/annonces)', async () => {
+  it('remplace l\'URL avec /immobilier/annonces (route réelle — /altimmo/annonces était un bug, corrigé)', async () => {
     render(<AltimmoAnnonces />);
     await waitFor(() => expect(screen.getAllByTestId('property-card')).toHaveLength(3));
 
-    // router.replace doit toujours être appelé avec le bon chemin
+    // router.replace doit toujours être appelé avec le bon chemin (route Next.js réelle)
     expect(mockReplace).toHaveBeenCalledWith(
-      expect.stringMatching(/^\/altimmo\/annonces/),
+      expect.stringMatching(/^\/immobilier\/annonces/),
     );
     expect(mockReplace).not.toHaveBeenCalledWith(
-      expect.stringMatching(/\/immobilier\/annonces/),
+      expect.stringMatching(/\/altimmo\/annonces/),
     );
   });
 });
@@ -154,8 +154,8 @@ describe('AltimmoAnnonces — paramètres envoyés au serveur', () => {
     await waitFor(() => expect(screen.getAllByTestId('property-card')).toHaveLength(3));
 
     expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({
-      transaction:    'tous',
-      type:           'tous',
+      offerType:      'tous',
+      propertyType:   'tous',
       city:           'Toutes',
       arrondissement: 'Tous',
       page:           1,
@@ -175,7 +175,7 @@ describe('AltimmoAnnonces — paramètres envoyés au serveur', () => {
     expect(mockGetAll).not.toHaveBeenCalled();
   });
 
-  it('envoie transaction=vente uniquement après avoir cliqué sur "Rechercher"', async () => {
+  it('envoie offerType=vente uniquement après avoir cliqué sur "Rechercher"', async () => {
     render(<AltimmoAnnonces />);
     await waitFor(() => expect(screen.getAllByTestId('property-card')).toHaveLength(3));
     await userEvent.click(screen.getByRole('button', { name: /Filtres/i }));
@@ -183,7 +183,7 @@ describe('AltimmoAnnonces — paramètres envoyés au serveur', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
 
     await waitFor(() => {
-      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ transaction: 'vente' }));
+      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ offerType: 'vente' }));
     });
   });
 
@@ -206,13 +206,13 @@ describe('AltimmoAnnonces — paramètres envoyés au serveur', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Vente' }));
     await userEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
     await waitFor(() => {
-      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ transaction: 'vente' }));
+      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ offerType: 'vente' }));
     });
 
     await userEvent.click(screen.getByRole('button', { name: 'Réinitialiser' }));
 
     await waitFor(() => {
-      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ transaction: 'tous' }));
+      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ offerType: 'tous' }));
     });
   });
 
@@ -257,7 +257,7 @@ describe('AltimmoAnnonces — pagination et fetch unique par changement', () => 
     await userEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
 
     await waitFor(() => {
-      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ transaction: 'vente', page: 1 }));
+      expect(mockGetAll).toHaveBeenCalledWith(expect.objectContaining({ offerType: 'vente', page: 1 }));
     });
     expect(mockGetAll).toHaveBeenCalledTimes(1);
   });

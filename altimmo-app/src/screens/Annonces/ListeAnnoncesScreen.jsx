@@ -15,6 +15,7 @@ import { getActivePublicites } from '../../services/publiciteService';
 import { cache } from '../../services/cacheService';
 import { useDebounce } from '../../hooks/useDebounce';
 import { PROPERTY_TYPES_WITH_ALL, formatPriceShort, PRICE_MAX } from '../../constants/propertyTypes';
+import { DEFAULT_PROPERTY_FILTERS, buildPropertyQueryParams } from '../../utils/propertyQueryParams';
 import {
   Screen, Card, PrixFCFA, RecommendedCarousel, SearchPanel,
   GreetingBar, AdCarousel,
@@ -37,35 +38,13 @@ const PAGE_SIZE = 15;
 
 const TRANSACTION_LABELS = { vente: 'Vente', location: 'Location', hebergement: 'Hébergement' };
 
-const DEFAULT_FILTERS = {
-  transaction:    'tous',
-  typeBien:       'tous',
-  priceRange:     [0, 500000000],
-  ville:          'Toutes',
-  arrondissement: 'Tous',
-};
+// Nomenclature canonique + construction de requête partagée (audit filtrage Altimmo) —
+// auparavant dupliquée ici et dans CarteScreen.jsx, avec un `availability` hardcodé présent
+// uniquement ici (incohérence corrigée : le backend l'impose déjà systématiquement pour toute
+// route publique, l'envoyer depuis le client n'avait aucun effet).
+const DEFAULT_FILTERS = DEFAULT_PROPERTY_FILTERS;
 
-
-const buildQuery = (filters, page) => {
-  const params = new URLSearchParams({
-    page: String(page),
-    limit: String(PAGE_SIZE),
-    statusAdmin: 'Validée',
-  });
-  if (filters.transaction !== 'tous')
-    params.set('status', filters.transaction); // lowercase: 'location' | 'vente' — correspond à l'enum MongoDB
-  if (filters.typeBien !== 'tous')
-    params.set('type', filters.typeBien);
-  if (filters.ville !== 'Toutes')
-    params.set('city', filters.ville);
-  if (filters.arrondissement !== 'Tous')
-    params.set('arrondissement', filters.arrondissement);
-  if (filters.priceRange[0] > 0)
-    params.set('price[gte]', String(filters.priceRange[0])); // APIFeatures convertit en { price: { $gte } }
-  if (filters.priceRange[1] < 500000000)
-    params.set('price[lte]', String(filters.priceRange[1])); // APIFeatures convertit en { price: { $lte } }
-  return params.toString();
-};
+const buildQuery = (filters, page) => buildPropertyQueryParams(filters, { page, limit: PAGE_SIZE });
 
 const IMG_LAYOUT = { length: CARD_IMG_W, offset: 0, index: 0 };
 const getCardImgLayout = (_, i) => ({ ...IMG_LAYOUT, offset: CARD_IMG_W * i, index: i });
@@ -278,9 +257,9 @@ export default function ListeAnnoncesScreen({ navigation }) {
   // Résumé des filtres actifs pour le bouton
   const activeFilterCount = useMemo(() => {
     let n = 0;
-    if (activeFilters.typeBien !== 'tous') n++;
-    if (activeFilters.transaction !== 'tous') n++;
-    if (activeFilters.ville !== 'Toutes') n++;
+    if (activeFilters.propertyType !== 'tous') n++;
+    if (activeFilters.offerType !== 'tous') n++;
+    if (activeFilters.city !== 'Toutes') n++;
     if (activeFilters.arrondissement !== 'Tous') n++;
     if (activeFilters.priceRange[0] > 0 || activeFilters.priceRange[1] < 500_000_000) n++;
     return n;
@@ -288,9 +267,9 @@ export default function ListeAnnoncesScreen({ navigation }) {
 
   const filterSummary = useMemo(() => {
     const parts = [];
-    if (activeFilters.typeBien !== 'tous') parts.push(activeFilters.typeBien);
-    if (activeFilters.transaction !== 'tous') parts.push(TRANSACTION_LABELS[activeFilters.transaction] || activeFilters.transaction);
-    if (activeFilters.ville !== 'Toutes') parts.push(activeFilters.ville);
+    if (activeFilters.propertyType !== 'tous') parts.push(activeFilters.propertyType);
+    if (activeFilters.offerType !== 'tous') parts.push(TRANSACTION_LABELS[activeFilters.offerType] || activeFilters.offerType);
+    if (activeFilters.city !== 'Toutes') parts.push(activeFilters.city);
     return parts.length > 0 ? parts.join(' · ') : 'Rechercher un bien';
   }, [activeFilters]);
 
@@ -491,24 +470,24 @@ export default function ListeAnnoncesScreen({ navigation }) {
           style={styles.activeChipsRow}
           contentContainerStyle={styles.activeChipsContent}
         >
-          {activeFilters.transaction !== 'tous' && (
+          {activeFilters.offerType !== 'tous' && (
             <ActiveChip
-              label={TRANSACTION_LABELS[activeFilters.transaction] || activeFilters.transaction}
-              onRemove={() => setActiveFilters(prev => ({ ...prev, transaction: 'tous' }))}
+              label={TRANSACTION_LABELS[activeFilters.offerType] || activeFilters.offerType}
+              onRemove={() => setActiveFilters(prev => ({ ...prev, offerType: 'tous' }))}
               c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
             />
           )}
-          {activeFilters.typeBien !== 'tous' && (
+          {activeFilters.propertyType !== 'tous' && (
             <ActiveChip
-              label={activeFilters.typeBien}
-              onRemove={() => setActiveFilters(prev => ({ ...prev, typeBien: 'tous' }))}
+              label={activeFilters.propertyType}
+              onRemove={() => setActiveFilters(prev => ({ ...prev, propertyType: 'tous' }))}
               c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
             />
           )}
-          {activeFilters.ville !== 'Toutes' && (
+          {activeFilters.city !== 'Toutes' && (
             <ActiveChip
-              label={activeFilters.ville}
-              onRemove={() => setActiveFilters(prev => ({ ...prev, ville: 'Toutes', arrondissement: 'Tous' }))}
+              label={activeFilters.city}
+              onRemove={() => setActiveFilters(prev => ({ ...prev, city: 'Toutes', arrondissement: 'Tous' }))}
               c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
             />
           )}
@@ -536,11 +515,11 @@ export default function ListeAnnoncesScreen({ navigation }) {
         contentContainerStyle={styles.quickFilterContent}
       >
         {PROPERTY_TYPES_WITH_ALL.map((item) => {
-          const active = activeFilters.typeBien === item.value;
+          const active = activeFilters.propertyType === item.value;
           return (
             <TouchableOpacity
               key={item.label}
-              onPress={() => setActiveFilters(prev => ({ ...prev, typeBien: item.value }))}
+              onPress={() => setActiveFilters(prev => ({ ...prev, propertyType: item.value }))}
               style={[styles.quickChip, active && styles.quickChipActive]}
               activeOpacity={0.8}
             >

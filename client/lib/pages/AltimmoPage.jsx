@@ -22,7 +22,7 @@ import AltimmoContact  from '../components/AltimmoContact';
 import { getLatestPropertiesByPole } from '../services/propertyService';
 import { getAltimmoReviews }         from '../services/reviewService';
 import { useAuth }                   from '../context/AuthContext';
-import { PROPERTY_TYPES_WITH_ALL }   from '../constants/propertyTypes';
+import { PROPERTY_TYPES_WITH_ALL, OFFER_TYPES, BUDGET_PRESETS } from '../constants/propertyTypes';
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
@@ -34,17 +34,19 @@ const SERVICES = [
     { icon: TrendingUp, title: 'Conseil en Investissement', desc: 'Bénéficiez de notre expertise pour des investissements judicieux et performants.',   slug: 'conseil-investissement', color: GOLD,      stat: '+50 projets'    },
 ];
 
-const TYPES_BIENS  = PROPERTY_TYPES_WITH_ALL;
-const TRANSACTIONS = [
-    { label: 'Vente',    value: 'vente'    },
-    { label: 'Location', value: 'location' },
-];
+const TYPES_BIENS = PROPERTY_TYPES_WITH_ALL;
+// Correctif audit filtrage Altimmo : cette liste locale ne comportait auparavant que
+// Vente/Location — "Hébergement" était invisible depuis la recherche de l'accueil alors
+// qu'il est pleinement supporté sur /immobilier/annonces. Dérivée de la même source
+// canonique `OFFER_TYPES` que la page annonces (plus d'option "tous" : un choix réel est
+// toujours requis ici, comme avant ce correctif).
+const TRANSACTIONS = OFFER_TYPES.filter((t) => t.value !== 'tous');
+// Correctif audit filtrage Altimmo : cette liste locale portait auparavant ses propres
+// tranches de prix, divergentes de `BUDGET_PRESETS` (constants partagées, également utilisées
+// par le mobile) — un seul jeu de presets partagé désormais, plus de doublon divergent.
 const BUDGETS = [
-    { label: 'Tous les budgets', min: '',          max: ''          },
-    { label: '< 50M FCFA',       min: '',          max: '50000000'  },
-    { label: '50M – 150M FCFA',  min: '50000000',  max: '150000000' },
-    { label: '150M – 500M FCFA', min: '150000000', max: '500000000' },
-    { label: '> 500M FCFA',      min: '500000000', max: ''          },
+    { label: 'Tous les budgets', min: '', max: '' },
+    ...BUDGET_PRESETS.map(({ label, min, max }) => ({ label, min: min || '', max: max || '' })),
 ];
 const ATOUTS = [
     { icon: ShieldCheck, label: 'Transactions sécurisées',   color: BLUE },
@@ -613,12 +615,14 @@ const AltimmoPage = () => {
     }, [searchOpen]);
 
     const handleSearch = ({ typeBien, transaction, budgetIdx }) => {
+        // Nomenclature canonique (audit filtrage Altimmo) : offerType/propertyType/minPrice/
+        // maxPrice — mêmes clés que celles lues par AltimmoAnnonces.jsx.
         const params = new URLSearchParams();
-        params.set('status', transaction);
-        if (typeBien !== 'Tous') params.set('type', typeBien);
+        params.set('offerType', transaction);
+        if (typeBien !== 'Tous') params.set('propertyType', typeBien);
         const budget = BUDGETS[budgetIdx];
-        if (budget.min) params.set('priceMin', budget.min);
-        if (budget.max) params.set('priceMax', budget.max);
+        if (budget.min) params.set('minPrice', budget.min);
+        if (budget.max) params.set('maxPrice', budget.max);
         router.push(`/immobilier/annonces?${params.toString()}`);
     };
 

@@ -18,6 +18,15 @@ export const PROPERTY_TYPES_WITH_ALL = [
   ...PROPERTY_TYPES,
 ];
 
+// Type d'offre — nomenclature canonique `offerType` (audit filtrage Altimmo), même contenu
+// que client/lib/constants/propertyTypes.js (source de vérité backend : Property.status).
+export const OFFER_TYPES = [
+  { value: 'vente',       label: 'Vente' },
+  { value: 'location',    label: 'Location' },
+  { value: 'hebergement', label: 'Hébergement' },
+  { value: 'tous',        label: 'Tous' },
+];
+
 export const PRICE_MAX = 500_000_000;
 
 // Formate un montant FCFA en notation courte (K / M)

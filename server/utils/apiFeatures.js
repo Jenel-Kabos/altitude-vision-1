@@ -1,5 +1,6 @@
 // server/utils/apiFeatures.js
 const logger = require('./logger');
+const { escapeRegex } = require('./regexEscape');
 
 class APIFeatures {
     constructor(query, queryString) {
@@ -30,7 +31,9 @@ class APIFeatures {
         
         // ⭐ ÉTAPE 1 : GESTION DE LA RECHERCHE TEXTUELLE GLOBALE
         if (this.queryString.search) {
-            const regex = new RegExp(this.queryString.search, 'i'); // 'i' pour insensible à la casse
+            // Échappé (escapeRegex) : évite le ReDoS et l'injection de motifs regex
+            // arbitraires depuis une entrée utilisateur sur une route publique.
+            const regex = new RegExp(escapeRegex(this.queryString.search), 'i');
             logger.info(`🔎 [APIFeatures] Recherche texte: /${this.queryString.search}/`);
             
             // Recherche dans le titre, la description, l'arrondissement et le type
