@@ -349,11 +349,16 @@ const createProperty = asyncHandler(async (req, res, next) => {
 });
 
 /**
- * @description Obtenir tous les biens (Public)
- * @route GET /api/properties
+ * Cœur de la recherche publique de biens (Vente/Location/Tous — jamais Hébergement seul avec
+ * catégorie réelle, voir `accommodationSearchService.searchPublicAccommodations` pour ça).
+ * Extrait de `getAllProperties` pour être réutilisé par le endpoint unifié
+ * `GET /api/altimmo/search` (`altimmoSearchController.js`) sans dupliquer la logique de filtre
+ * (audit filtrage Altimmo, correctif architecture du 2026-07-25).
+ *
+ * @returns {Promise<{properties: object[], total: number}>}
  */
-const getAllProperties = asyncHandler(async (req, res) => {
-  const isAdmin = req.user && req.user.role === 'Admin';
+async function runPropertySearch({ query, isAdmin }) {
+  const workingQuery = { ...query };
 
   // ── 1. Filtre de base passé directement à Property.find() ───────────────
   //    Ces champs NE passent PAS par APIFeatures.filter() (JSON.stringify
@@ -369,10 +374,13 @@ const getAllProperties = asyncHandler(async (req, res) => {
   //    → filtre Mongo sûr (regex ancrée/échappée pour city/arrondissement), voir
   //    propertyFilterService.js. Le reste (search, sort, page, limit, fields, et tout
   //    passthrough) continue d'être géré par APIFeatures exactement comme avant.
-  delete req.query.statusAdmin;
-  delete req.query.availability;
-  delete req.query.pole;
-  const { mongoFilter, remainingQuery } = buildPropertyMongoFilter(req.query);
+  delete workingQuery.statusAdmin;
+  delete workingQuery.availability;
+  delete workingQuery.pole;
+  // `accommodationType` n'a aucun sens sur Property (catégorie propre à Accommodation) —
+  // silencieusement ignoré ici si un client le fournit avec offerType=vente/location/tous.
+  delete workingQuery.accommodationType;
+  const { mongoFilter, remainingQuery } = buildPropertyMongoFilter(workingQuery);
   Object.assign(baseFilter, mongoFilter);
 
   const countFeatures = new APIFeatures(Property.find(baseFilter), { ...remainingQuery }).filter();
@@ -388,9 +396,10 @@ const getAllProperties = asyncHandler(async (req, res) => {
     countFeatures.query.countDocuments(),
   ]);
 
-  // Hébergement : filtre post-fetch — un hébergement non publié (Accommodation
-  // absente ou publicationStatus ≠ 'publie') n'apparaît jamais dans le listing
-  // public, même si Property est déjà 'Validée'/'Disponible'.
+  // Hébergement (cas `offerType` absent/'tous', mélangé avec Vente/Location) : filtre
+  // post-fetch — un hébergement non publié (Accommodation absente ou publicationStatus ≠
+  // 'publie') n'apparaît jamais dans le listing public, même si Property est déjà
+  // 'Validée'/'Disponible'.
   //
   // ⚠️ LIMITATION CONNUE (Sprint 2, TODO Sprint 3) — deux effets de bord :
   //   1. `total` (countDocuments, ligne ~243) compte TOUS les Property
@@ -407,7 +416,11 @@ const getAllProperties = asyncHandler(async (req, res) => {
   //   la logique de filtre() d'APIFeatures pour précalculer l'exclusion
   //   AVANT paginate() — dans les deux cas un risque de régression sur un
   //   endpoint public que le périmètre du Sprint 2 ne justifie pas. À
-  //   traiter au Sprint 3 si le volume d'hébergements le justifie.
+  //   traiter au Sprint 3 si le volume d'hébergements le justifie. Note
+  //   (2026-07-25) : `offerType=hebergement` seul passe désormais par
+  //   `accommodationSearchService.searchPublicAccommodations` (pagination
+  //   correcte, post-filtre) — cette limitation ne concerne plus que le cas
+  //   `offerType` absent/'tous' mélangeant Vente/Location/Hébergement.
   if (!isAdmin) {
     const hebergementIds = properties.filter((p) => p.status === 'hebergement').map((p) => p._id);
     if (hebergementIds.length > 0) {
@@ -419,7 +432,18 @@ const getAllProperties = asyncHandler(async (req, res) => {
     }
   }
 
-  logger.info(`📦 [getAllProperties] total=${total} results=${properties.length} baseFilter=${JSON.stringify(Object.keys(baseFilter))}`);
+  logger.info(`📦 [runPropertySearch] total=${total} results=${properties.length} baseFilter=${JSON.stringify(Object.keys(baseFilter))}`);
+
+  return { properties, total };
+}
+
+/**
+ * @description Obtenir tous les biens (Public)
+ * @route GET /api/properties
+ */
+const getAllProperties = asyncHandler(async (req, res) => {
+  const isAdmin = req.user && req.user.role === 'Admin';
+  const { properties, total } = await runPropertySearch({ query: req.query, isAdmin });
 
   res.status(200).json({
     status:  'success',
@@ -974,6 +998,7 @@ const getRecommendedProperties = asyncHandler(async (req, res) => {
 module.exports = {
   createProperty,
   getAllProperties,
+  runPropertySearch,
   getPendingProperties,
   getPendingPropertiesCount,
   getLatestProperties,

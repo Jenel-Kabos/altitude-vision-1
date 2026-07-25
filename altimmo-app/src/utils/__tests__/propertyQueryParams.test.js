@@ -55,4 +55,22 @@ describe('propertyQueryParams — buildPropertyQueryParams', () => {
     expect(mapParams.get('limit')).toBe('200');
     expect(mapParams.get('page')).toBeNull();
   });
+
+  describe('correctif architecture recherche Altimmo (2026-07-25) — propertyType/accommodationType mutuellement exclusifs', () => {
+    test('offerType=hebergement + accommodationType → accommodationType envoyé, propertyType jamais', () => {
+      const params = new URLSearchParams(buildPropertyQueryParams({
+        ...DEFAULT_PROPERTY_FILTERS, offerType: 'hebergement', accommodationType: 'villa_meublee', propertyType: 'Villa',
+      }));
+      expect(params.get('accommodationType')).toBe('villa_meublee');
+      expect(params.get('propertyType')).toBeNull();
+    });
+
+    test('offerType=vente + propertyType → propertyType envoyé, accommodationType jamais', () => {
+      const params = new URLSearchParams(buildPropertyQueryParams({
+        ...DEFAULT_PROPERTY_FILTERS, offerType: 'vente', propertyType: 'Villa', accommodationType: 'hotel',
+      }));
+      expect(params.get('propertyType')).toBe('Villa');
+      expect(params.get('accommodationType')).toBeNull();
+    });
+  });
 });

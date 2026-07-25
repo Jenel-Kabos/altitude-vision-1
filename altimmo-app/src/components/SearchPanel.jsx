@@ -10,10 +10,16 @@ import { useTheme } from '../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../theme';
 import { VILLES, getArrondissementsFor } from '../constants/locations';
 import { PROPERTY_TYPES_WITH_ALL, OFFER_TYPES } from '../constants/propertyTypes';
+import { ACCOMMODATION_TYPES_WITH_ALL } from '../constants/accommodation';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const TYPES_BIEN = PROPERTY_TYPES_WITH_ALL.map(t => t.value);
+// Correctif architecture recherche Altimmo (2026-07-25) : quand offerType==='hebergement', le
+// dropdown "type" doit proposer les vraies catégories d'hébergement, jamais les types de
+// biens Vente/Location (Terrain, Bureau, Commerce, Entrepôt n'ont aucun sens ici).
+const ACCOMMODATION_TYPE_VALUES = ACCOMMODATION_TYPES_WITH_ALL.map(t => t.value);
+const ACCOMMODATION_TYPE_LABELS = Object.fromEntries(ACCOMMODATION_TYPES_WITH_ALL.map(t => [t.value, t.label]));
 
 export const PRICE_MIN  = 0;
 export const PRICE_MAX  = 500_000_000;
@@ -31,6 +37,7 @@ const BUDGET_PRESETS = [
 const DEFAULT_FILTERS = {
   offerType:    'tous',
   propertyType:       'tous',
+  accommodationType:  'tous',
   priceRange:     [PRICE_MIN, PRICE_MAX],
   city:          'Toutes',
   arrondissement: 'Tous',
@@ -140,9 +147,20 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
 
   const [offerType, setOfferType] = useState(initialFilters?.offerType ?? DEFAULT_FILTERS.offerType);
   const [propertyType,    setPropertyType]    = useState(initialFilters?.propertyType    ?? DEFAULT_FILTERS.propertyType);
+  const [accommodationType, setAccommodationType] = useState(initialFilters?.accommodationType ?? DEFAULT_FILTERS.accommodationType);
   const [priceRange,  setPriceRange]  = useState(initialFilters?.priceRange  ?? DEFAULT_FILTERS.priceRange);
   const [city,       setCity]       = useState(initialFilters?.city       ?? DEFAULT_FILTERS.city);
   const [arrondissement, setArrondissement] = useState(initialFilters?.arrondissement ?? DEFAULT_FILTERS.arrondissement);
+
+  const isHebergement = offerType === 'hebergement';
+
+  // Correctif architecture recherche Altimmo (2026-07-25) : changer le type d'offre
+  // réinitialise IMMÉDIATEMENT le filtre secondaire incompatible.
+  const handleOfferTypeSelect = useCallback((value) => {
+    setOfferType(value);
+    if (value === 'hebergement') setPropertyType(DEFAULT_FILTERS.propertyType);
+    else setAccommodationType(DEFAULT_FILTERS.accommodationType);
+  }, []);
 
   // Champs texte budget (affichage + saisie)
   const [minInput, setMinInput] = useState('');
@@ -156,6 +174,7 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
     if (visible && initialFilters) {
       setOfferType(initialFilters.offerType ?? DEFAULT_FILTERS.offerType);
       setPropertyType(initialFilters.propertyType    ?? DEFAULT_FILTERS.propertyType);
+      setAccommodationType(initialFilters.accommodationType ?? DEFAULT_FILTERS.accommodationType);
       setPriceRange(initialFilters.priceRange ?? DEFAULT_FILTERS.priceRange);
       setCity(initialFilters.city           ?? DEFAULT_FILTERS.city);
       setArrondissement(initialFilters.arrondissement ?? DEFAULT_FILTERS.arrondissement);
@@ -174,6 +193,10 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
 
   const typeItems = useMemo(() =>
     TYPES_BIEN.map(t => ({ value: t, label: t === 'tous' ? 'Tous les types' : t })),
+  []);
+
+  const accommodationTypeItems = useMemo(() =>
+    ACCOMMODATION_TYPE_VALUES.map(v => ({ value: v, label: ACCOMMODATION_TYPE_LABELS[v] })),
   []);
 
   const cityItems = useMemo(() =>
@@ -228,6 +251,7 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
   const handleReset = useCallback(() => {
     setOfferType(DEFAULT_FILTERS.offerType);
     setPropertyType(DEFAULT_FILTERS.propertyType);
+    setAccommodationType(DEFAULT_FILTERS.accommodationType);
     setPriceRange(DEFAULT_FILTERS.priceRange);
     setCity(DEFAULT_FILTERS.city);
     setArrondissement(DEFAULT_FILTERS.arrondissement);
@@ -237,18 +261,25 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
   }, []);
 
   const handleSearch = useCallback(() => {
-    onSearch?.({ offerType, propertyType, priceRange, city, arrondissement });
-  }, [offerType, propertyType, priceRange, city, arrondissement, onSearch]);
+    // Mutuellement exclusifs (correctif architecture recherche Altimmo) : jamais les deux
+    // envoyés ensemble, même si l'un des deux states garde une ancienne valeur en mémoire.
+    onSearch?.({
+      offerType,
+      propertyType: isHebergement ? 'tous' : propertyType,
+      accommodationType: isHebergement ? accommodationType : 'tous',
+      priceRange, city, arrondissement,
+    });
+  }, [offerType, propertyType, accommodationType, isHebergement, priceRange, city, arrondissement, onSearch]);
 
   // Compter les filtres actifs pour le bouton CTA
   const activeCount = useMemo(() => {
     let n = 0;
     if (offerType !== 'tous') n++;
-    if (propertyType !== 'tous') n++;
+    if (isHebergement ? accommodationType !== 'tous' : propertyType !== 'tous') n++;
     if (city !== 'Toutes') n++;
     if (!isPriceDefault) n++;
     return n;
-  }, [offerType, propertyType, city, isPriceDefault]);
+  }, [offerType, propertyType, accommodationType, isHebergement, city, isPriceDefault]);
 
   // Label affiché au-dessus du slider
   const budgetLabel = isPriceDefault
@@ -313,7 +344,7 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
                 return (
                   <TouchableOpacity
                     key={t.value}
-                    onPress={() => setOfferType(t.value)}
+                    onPress={() => handleOfferTypeSelect(t.value)}
                     style={[styles.chip, active && styles.chipActive]}
                     activeOpacity={0.8}
                     accessibilityRole="button"
@@ -328,18 +359,35 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
               })}
             </View>
 
-            {/* ─── Type de bien ─── */}
-            <DropdownField
-              label="TYPE DE BIEN"
-              value={propertyType}
-              displayValue={propertyType === 'tous' ? 'Tous les types' : propertyType}
-              items={typeItems}
-              open={openDropdown === 'type'}
-              onToggle={() => toggleDropdown('type')}
-              onSelect={(v) => { setPropertyType(v); setOpenDropdown(null); }}
-              styles={styles}
-              c={c}
-            />
+            {/* ─── Type de bien (vente/location) ou Catégorie d'hébergement (hebergement) ───
+                Correctif architecture recherche Altimmo (2026-07-25) : jamais Terrain/Bureau/
+                Entrepôt proposés pour un hébergement, jamais de catégorie d'hébergement pour
+                vente/location. */}
+            {isHebergement ? (
+              <DropdownField
+                label="CATÉGORIE D'HÉBERGEMENT"
+                value={accommodationType}
+                displayValue={ACCOMMODATION_TYPE_LABELS[accommodationType] ?? accommodationType}
+                items={accommodationTypeItems}
+                open={openDropdown === 'type'}
+                onToggle={() => toggleDropdown('type')}
+                onSelect={(v) => { setAccommodationType(v); setOpenDropdown(null); }}
+                styles={styles}
+                c={c}
+              />
+            ) : (
+              <DropdownField
+                label="TYPE DE BIEN"
+                value={propertyType}
+                displayValue={propertyType === 'tous' ? 'Tous les types' : propertyType}
+                items={typeItems}
+                open={openDropdown === 'type'}
+                onToggle={() => toggleDropdown('type')}
+                onSelect={(v) => { setPropertyType(v); setOpenDropdown(null); }}
+                styles={styles}
+                c={c}
+              />
+            )}
 
             {/* ─── Ville ─── */}
             <DropdownField

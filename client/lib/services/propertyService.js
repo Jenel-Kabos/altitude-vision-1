@@ -72,6 +72,40 @@ export const getPropertiesWithFilters = async (params = {}) => {
   }
 };
 
+/**
+ * Recherche unifiée Altimmo (correctif architecture 2026-07-25) — utilisée par
+ * `AltimmoPage.jsx`/`AltimmoAnnonces.jsx`. Appelle `GET /api/altimmo/search`, qui choisit la
+ * source de données selon `offerType` : Property (vente/location/tous) ou Accommodation
+ * (hebergement, avec sa vraie catégorie `accommodationType`) — jamais les deux mélangés à tort.
+ * `propertyType` et `accommodationType` sont mutuellement exclusifs : n'envoyer que celui
+ * pertinent pour l'`offerType` sélectionné (le composant appelant s'en charge).
+ */
+export const searchAltimmo = async (params = {}) => {
+  try {
+    const qs = new URLSearchParams();
+    if (params.search)                                    qs.set('search', params.search.trim());
+    if (params.offerType && params.offerType !== 'tous')   qs.set('offerType', params.offerType);
+    if (params.propertyType && params.propertyType !== 'tous') qs.set('propertyType', params.propertyType);
+    if (params.accommodationType && params.accommodationType !== 'tous') qs.set('accommodationType', params.accommodationType);
+    if (params.city && params.city !== 'Toutes')          qs.set('city', params.city);
+    if (params.arrondissement && params.arrondissement !== 'Tous') qs.set('arrondissement', params.arrondissement);
+    if (params.minPrice > 0)                              qs.set('minPrice', String(params.minPrice));
+    if (params.maxPrice && params.maxPrice < 500_000_000) qs.set('maxPrice', String(params.maxPrice));
+    qs.set('page',  String(params.page  || 1));
+    qs.set('limit', String(params.limit || 12));
+    if (params.sort) qs.set('sort', params.sort);
+
+    const response = await api.get(`/altimmo/search?${qs.toString()}`);
+    return {
+      properties: response.data?.data?.properties || [],
+      total:      response.data?.data?.total || response.data?.total || 0,
+    };
+  } catch (error) {
+    console.error('❌ [propertyService] searchAltimmo:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
 export const getPropertyById = async (propertyId, config = {}) => {
   try {
     

@@ -28,7 +28,7 @@ const FAKE_PROPERTIES = [
 
 const { mockGetAll } = vi.hoisted(() => ({ mockGetAll: vi.fn() }));
 vi.mock('../../services/propertyService', () => ({
-  getPropertiesWithFilters: (...args) => mockGetAll(...args),
+  searchAltimmo: (...args) => mockGetAll(...args),
 }));
 
 // Mock PropertyCard → affiche simplement le titre

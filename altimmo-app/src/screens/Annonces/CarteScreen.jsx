@@ -13,6 +13,7 @@ import api from '../../services/api';
 import { cache } from '../../services/cacheService';
 import { SearchPanel } from '../../components';
 import { formatPriceShort, PRICE_MAX } from '../../constants/propertyTypes';
+import { ACCOMMODATION_TYPES_WITH_ALL } from '../../constants/accommodation';
 import { DEFAULT_PROPERTY_FILTERS, buildPropertyQueryParams } from '../../utils/propertyQueryParams';
 import PrixFCFA from '../../components/PrixFCFA';
 import { useTheme } from '../../context/ThemeContext';
@@ -158,7 +159,8 @@ export default function CarteScreen({ navigation }) {
   const activeFilterCount = useMemo(() => {
     let n = 0;
     if (activeFilters.offerType !== 'tous')    n++;
-    if (activeFilters.propertyType !== 'tous')       n++;
+    const secondary = activeFilters.offerType === 'hebergement' ? activeFilters.accommodationType : activeFilters.propertyType;
+    if (secondary !== 'tous')       n++;
     if (activeFilters.city !== 'Toutes')        n++;
     if (activeFilters.arrondissement !== 'Tous') n++;
     if (activeFilters.priceRange[0] > 0 || activeFilters.priceRange[1] < 500_000_000) n++;
@@ -172,7 +174,10 @@ export default function CarteScreen({ navigation }) {
     const KEY = `carte:${buildQuery(activeFilters)}`;
     const hit = cache.get(KEY);
     if (hit) { setAnnonces(hit); setLoading(false); return; }
-    api.get(`/properties?${buildQuery(activeFilters)}`)
+    // Correctif architecture recherche Altimmo (2026-07-25) : endpoint unifié (même route que
+    // le web et ListeAnnoncesScreen) — /properties ne peut jamais renvoyer un hébergement avec
+    // sa vraie catégorie.
+    api.get(`/altimmo/search?${buildQuery(activeFilters)}`)
       .then(res => {
         const data = res.data.data?.properties || res.data.properties || res.data.data || [];
         const withCoords = data.filter(
@@ -427,16 +432,26 @@ export default function CarteScreen({ navigation }) {
               {activeFilters.offerType !== 'tous' && (
                 <ActiveChip
                   label={TRANSACTION_LABELS[activeFilters.offerType] || activeFilters.offerType}
-                  onRemove={() => setActiveFilters(prev => ({ ...prev, offerType: 'tous' }))}
+                  onRemove={() => setActiveFilters(prev => ({ ...prev, offerType: 'tous', propertyType: 'tous', accommodationType: 'tous' }))}
                   c={c} styles={styles}
                 />
               )}
-              {activeFilters.propertyType !== 'tous' && (
-                <ActiveChip
-                  label={activeFilters.propertyType}
-                  onRemove={() => setActiveFilters(prev => ({ ...prev, propertyType: 'tous' }))}
-                  c={c} styles={styles}
-                />
+              {activeFilters.offerType === 'hebergement' ? (
+                activeFilters.accommodationType !== 'tous' && (
+                  <ActiveChip
+                    label={ACCOMMODATION_TYPES_WITH_ALL.find((t) => t.value === activeFilters.accommodationType)?.label || activeFilters.accommodationType}
+                    onRemove={() => setActiveFilters(prev => ({ ...prev, accommodationType: 'tous' }))}
+                    c={c} styles={styles}
+                  />
+                )
+              ) : (
+                activeFilters.propertyType !== 'tous' && (
+                  <ActiveChip
+                    label={activeFilters.propertyType}
+                    onRemove={() => setActiveFilters(prev => ({ ...prev, propertyType: 'tous' }))}
+                    c={c} styles={styles}
+                  />
+                )
               )}
               {activeFilters.city !== 'Toutes' && (
                 <ActiveChip

@@ -6,6 +6,10 @@ import * as propertyService from '../services/propertyService';
 // Audit filtrage Altimmo — nomenclature canonique (offerType/propertyType/city/
 // arrondissement/minPrice/maxPrice), fix de l'URL réécrite (/immobilier/annonces),
 // compatibilité des anciens noms d'URL (status/type/ville/priceMin/priceMax).
+//
+// Correctif architecture recherche Altimmo (2026-07-25) : offerType=hebergement doit changer
+// de source (searchAltimmo au lieu de getPropertiesWithFilters legacy) et le filtre secondaire
+// doit basculer vers accommodationType (catégories réelles), jamais propertyType.
 
 const replace = vi.fn();
 let currentSearchParams = new URLSearchParams();
@@ -31,7 +35,7 @@ vi.mock('../components/PropertySkeleton', () => ({
 }));
 
 vi.mock('../services/propertyService', () => ({
-  getPropertiesWithFilters: vi.fn(),
+  searchAltimmo: vi.fn(),
 }));
 
 const property = (overrides = {}) => ({ _id: 'P1', title: 'Bel appartement', ...overrides });
@@ -39,14 +43,14 @@ const property = (overrides = {}) => ({ _id: 'P1', title: 'Bel appartement', ...
 beforeEach(() => {
   vi.clearAllMocks();
   currentSearchParams = new URLSearchParams();
-  propertyService.getPropertiesWithFilters.mockResolvedValue({ properties: [property()], total: 1 });
+  propertyService.searchAltimmo.mockResolvedValue({ properties: [property()], total: 1 });
 });
 
 describe('AltimmoAnnonces — initialisation depuis l’URL (nomenclature canonique)', () => {
   test('lit offerType/propertyType/city/arrondissement/minPrice/maxPrice depuis l’URL et les transmet au service', async () => {
     currentSearchParams = new URLSearchParams('offerType=location&propertyType=Villa&city=Brazzaville&arrondissement=Bacongo&minPrice=100000&maxPrice=900000');
     render(<AltimmoAnnonces />);
-    await waitFor(() => expect(propertyService.getPropertiesWithFilters).toHaveBeenCalledWith(
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalledWith(
       expect.objectContaining({
         offerType: 'location', propertyType: 'Villa', city: 'Brazzaville', arrondissement: 'Bacongo',
         minPrice: 100000, maxPrice: 900000,
@@ -57,8 +61,16 @@ describe('AltimmoAnnonces — initialisation depuis l’URL (nomenclature canoni
   test('compatibilité legacy : status/type/ville/priceMin/priceMax (anciens liens partagés) sont toujours lus', async () => {
     currentSearchParams = new URLSearchParams('status=vente&type=Studio&ville=Dolisie&priceMin=50000&priceMax=200000');
     render(<AltimmoAnnonces />);
-    await waitFor(() => expect(propertyService.getPropertiesWithFilters).toHaveBeenCalledWith(
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalledWith(
       expect.objectContaining({ offerType: 'vente', propertyType: 'Studio', city: 'Dolisie', minPrice: 50000, maxPrice: 200000 }),
+    ));
+  });
+
+  test('offerType=hebergement dans l’URL lit accommodationType (pas propertyType)', async () => {
+    currentSearchParams = new URLSearchParams('offerType=hebergement&accommodationType=villa_meublee');
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalledWith(
+      expect.objectContaining({ offerType: 'hebergement', accommodationType: 'villa_meublee', propertyType: undefined }),
     ));
   });
 });
@@ -76,8 +88,8 @@ describe('AltimmoAnnonces — réécriture de l’URL', () => {
   test('mêmes critères = mêmes paramètres d’URL que ceux envoyés à l’API', async () => {
     currentSearchParams = new URLSearchParams('offerType=hebergement&city=Pointe-Noire');
     render(<AltimmoAnnonces />);
-    await waitFor(() => expect(propertyService.getPropertiesWithFilters).toHaveBeenCalled());
-    const [[apiParams]] = propertyService.getPropertiesWithFilters.mock.calls.slice(-1);
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalled());
+    const [[apiParams]] = propertyService.searchAltimmo.mock.calls.slice(-1);
     const lastUrl = replace.mock.calls.at(-1)[0];
     const urlParams = new URLSearchParams(lastUrl.split('?')[1] || '');
     expect(urlParams.get('offerType')).toBe(apiParams.offerType);
@@ -86,51 +98,110 @@ describe('AltimmoAnnonces — réécriture de l’URL', () => {
 });
 
 describe('AltimmoAnnonces — réinitialisation', () => {
-  test('le bouton "Réinitialiser" remet les filtres par défaut et refetch', async () => {
+  test('le bouton "Réinitialiser" remet les filtres par défaut et refetch (toutes les offres)', async () => {
     currentSearchParams = new URLSearchParams('offerType=vente&city=Brazzaville');
     render(<AltimmoAnnonces />);
-    await waitFor(() => expect(propertyService.getPropertiesWithFilters).toHaveBeenCalled());
-    propertyService.getPropertiesWithFilters.mockClear();
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalled());
+    propertyService.searchAltimmo.mockClear();
 
     fireEvent.click(screen.getByRole('button', { name: /Voir tous les biens/i }));
 
-    await waitFor(() => expect(propertyService.getPropertiesWithFilters).toHaveBeenCalledWith(
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalledWith(
       expect.objectContaining({ offerType: 'tous', propertyType: 'tous', city: 'Toutes', arrondissement: 'Tous' }),
     ));
   });
 });
 
 describe('AltimmoAnnonces — filtres combinés', () => {
-  test('type de bien + transaction combinés sont tous deux transmis à l’API', async () => {
+  test('type de bien + transaction combinés sont tous deux transmis à l’API (vente/location)', async () => {
     render(<AltimmoAnnonces />);
-    await waitFor(() => expect(propertyService.getPropertiesWithFilters).toHaveBeenCalled());
-    propertyService.getPropertiesWithFilters.mockClear();
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalled());
+    propertyService.searchAltimmo.mockClear();
 
     fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Hébergement' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Location' }));
     fireEvent.change(screen.getByLabelText('Type de bien'), { target: { value: 'Studio' } });
     fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
 
-    await waitFor(() => expect(propertyService.getPropertiesWithFilters).toHaveBeenCalledWith(
-      expect.objectContaining({ offerType: 'hebergement', propertyType: 'Studio' }),
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalledWith(
+      expect.objectContaining({ offerType: 'location', propertyType: 'Studio', accommodationType: undefined }),
     ));
+  });
+
+  test('offerType=hebergement + accommodationType combinés, jamais propertyType envoyé', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalled());
+    propertyService.searchAltimmo.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hébergement' }));
+    fireEvent.change(screen.getByLabelText("Catégorie d'hébergement"), { target: { value: 'villa_meublee' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalledWith(
+      expect.objectContaining({ offerType: 'hebergement', accommodationType: 'villa_meublee', propertyType: undefined }),
+    ));
+  });
+});
+
+describe('AltimmoAnnonces — filtre secondaire dépendant (correctif architecture 2026-07-25)', () => {
+  test('sélectionner Hébergement fait disparaître Terrain/Bureau/Commerce/Entrepôt et affiche les catégories d’hébergement', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+
+    expect(screen.getByLabelText('Type de bien')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Hébergement' }));
+
+    expect(screen.queryByLabelText('Type de bien')).not.toBeInTheDocument();
+    const accommodationSelect = screen.getByLabelText("Catégorie d'hébergement");
+    expect(accommodationSelect).toBeInTheDocument();
+    const optionLabels = Array.from(accommodationSelect.options).map((o) => o.textContent);
+    expect(optionLabels).not.toEqual(expect.arrayContaining(['Terrain', 'Bureau', 'Commerce', 'Entrepôt']));
+    expect(optionLabels).toEqual(expect.arrayContaining(['Villa meublée', 'Appartement meublé']));
+  });
+
+  test('revenir à Vente réaffiche Type de bien et masque la catégorie d’hébergement', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hébergement' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Vente' }));
+
+    expect(screen.getByLabelText('Type de bien')).toBeInTheDocument();
+    expect(screen.queryByLabelText("Catégorie d'hébergement")).not.toBeInTheDocument();
+  });
+
+  test('changer de type d’offre réinitialise immédiatement le filtre secondaire incompatible', async () => {
+    render(<AltimmoAnnonces />);
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+
+    fireEvent.change(screen.getByLabelText('Type de bien'), { target: { value: 'Villa' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Hébergement' }));
+    fireEvent.change(screen.getByLabelText("Catégorie d'hébergement"), { target: { value: 'hotel' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Vente' }));
+
+    // De retour sur Vente, le "Type de bien" doit être réinitialisé (pas resté sur "Villa"
+    // silencieusement, et surtout pas avoir conservé "hotel" qui n'existe pas dans cette liste).
+    expect(screen.getByLabelText('Type de bien').value).toBe('tous');
   });
 });
 
 describe('AltimmoAnnonces — pagination', () => {
   test('un changement de page conserve les filtres appliqués', async () => {
-    propertyService.getPropertiesWithFilters.mockResolvedValue({
+    propertyService.searchAltimmo.mockResolvedValue({
       properties: Array.from({ length: 12 }, (_, i) => property({ _id: `P${i}`, title: `Bien ${i}` })),
       total: 24,
     });
     currentSearchParams = new URLSearchParams('offerType=vente');
     render(<AltimmoAnnonces />);
-    await waitFor(() => expect(propertyService.getPropertiesWithFilters).toHaveBeenCalled());
-    propertyService.getPropertiesWithFilters.mockClear();
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalled());
+    propertyService.searchAltimmo.mockClear();
 
     fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
 
-    await waitFor(() => expect(propertyService.getPropertiesWithFilters).toHaveBeenCalledWith(
+    await waitFor(() => expect(propertyService.searchAltimmo).toHaveBeenCalledWith(
       expect.objectContaining({ offerType: 'vente', page: 2 }),
     ));
   });
@@ -138,7 +209,7 @@ describe('AltimmoAnnonces — pagination', () => {
 
 describe('AltimmoAnnonces — aucun résultat', () => {
   test('affiche un état vide explicite quand la recherche ne retourne aucun bien', async () => {
-    propertyService.getPropertiesWithFilters.mockResolvedValue({ properties: [], total: 0 });
+    propertyService.searchAltimmo.mockResolvedValue({ properties: [], total: 0 });
     render(<AltimmoAnnonces />);
     expect(await screen.findByText('Aucun bien trouvé')).toBeInTheDocument();
   });

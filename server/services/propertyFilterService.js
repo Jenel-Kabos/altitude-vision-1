@@ -91,4 +91,20 @@ function buildPropertyMongoFilter(rawQuery = {}) {
   return { mongoFilter, remainingQuery: query };
 }
 
-module.exports = { buildPropertyMongoFilter, buildExactCiRegexFilter };
+/**
+ * Résout `offerType` (canonique + alias legacy) sans construire de filtre — utilisé par le
+ * routeur de recherche unifié (`server/controllers/altimmoSearchController.js`) pour décider
+ * de la SOURCE de données (Property pour vente/location/tous, Accommodation pour hebergement)
+ * avant même de construire un filtre Mongo. Retourne `undefined` si absent/invalide.
+ */
+function resolveOfferType(rawQuery = {}) {
+  const raw = firstDefined(rawQuery, ['offerType', ...LEGACY_QUERY_PARAM_ALIASES.offerType]);
+  if (raw === undefined) return undefined;
+  const normalized = String(raw).trim().toLowerCase();
+  return OFFER_TYPES.includes(normalized) ? normalized : undefined;
+}
+
+module.exports = {
+  buildPropertyMongoFilter, buildExactCiRegexFilter, resolveOfferType,
+  firstDefined, toFiniteNumber,
+};

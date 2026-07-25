@@ -23,6 +23,7 @@ import { getLatestPropertiesByPole } from '../services/propertyService';
 import { getAltimmoReviews }         from '../services/reviewService';
 import { useAuth }                   from '../context/AuthContext';
 import { PROPERTY_TYPES_WITH_ALL, OFFER_TYPES, BUDGET_PRESETS } from '../constants/propertyTypes';
+import { ACCOMMODATION_TYPES } from '../constants/accommodation';
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
@@ -48,6 +49,10 @@ const BUDGETS = [
     { label: 'Tous les budgets', min: '', max: '' },
     ...BUDGET_PRESETS.map(({ label, min, max }) => ({ label, min: min || '', max: max || '' })),
 ];
+// Correctif architecture recherche Altimmo (2026-07-25) : quand "Hébergement" est sélectionné,
+// le champ "Type de bien" doit proposer les vraies catégories d'hébergement
+// (Accommodation.accommodationType), jamais Terrain/Bureau/Commerce/Entrepôt.
+const ACCOMMODATION_TYPES_WITH_ALL = [{ value: 'Tous', label: 'Toutes les catégories' }, ...ACCOMMODATION_TYPES];
 const ATOUTS = [
     { icon: ShieldCheck, label: 'Transactions sécurisées',   color: BLUE },
     { icon: Clock,       label: 'Réponse sous 24h',          color: GOLD },
@@ -513,6 +518,15 @@ const SearchPanel = ({ onClose, onSearch, anchorRef, panelRef }) => {
     const [transaction, setTransaction] = useState('vente');
     const [budgetIdx,   setBudgetIdx]   = useState(0);
     const [pos, setPos] = React.useState({ bottom: 0, left: 0, width: 0 });
+    const isHebergement = transaction === 'hebergement';
+
+    // Correctif architecture recherche Altimmo (2026-07-25) : changer le type d'offre
+    // réinitialise IMMÉDIATEMENT le filtre secondaire incompatible (jamais de valeur "Villa"
+    // envoyée en tant que catégorie d'hébergement, ni l'inverse).
+    const handleTransactionChange = (value) => {
+        setTransaction(value);
+        setTypeBien('Tous');
+    };
 
     React.useLayoutEffect(() => {
         if (!anchorRef?.current) return;
@@ -525,7 +539,7 @@ const SearchPanel = ({ onClose, onSearch, anchorRef, panelRef }) => {
         setPos({ bottom: bottomFromViewport, left: leftX, width: panelW });
     }, [anchorRef]);
 
-    const handleSubmit = () => { onSearch({ typeBien, transaction, budgetIdx }); onClose(); };
+    const handleSubmit = () => { onSearch({ typeBien, transaction, budgetIdx, isHebergement }); onClose(); };
 
     const panel = (
         <motion.div
@@ -562,8 +576,9 @@ const SearchPanel = ({ onClose, onSearch, anchorRef, panelRef }) => {
             </div>
             <div className="ai-panel-filters">
                 {[
-                    { label:'Transaction', value:transaction, setter:setTransaction,               options:TRANSACTIONS.map(t=>({v:t.value,l:t.label})) },
-                    { label:'Type de bien', value:typeBien,   setter:setTypeBien,                  options:TYPES_BIENS.map(t=>({v:t.value??t,l:t.label??t})) },
+                    { label:'Transaction', value:transaction, setter:handleTransactionChange,      options:TRANSACTIONS.map(t=>({v:t.value,l:t.label})) },
+                    { label: isHebergement ? "Catégorie d'hébergement" : 'Type de bien', value:typeBien, setter:setTypeBien,
+                      options: (isHebergement ? ACCOMMODATION_TYPES_WITH_ALL : TYPES_BIENS).map(t=>({v:t.value??t,l:t.label??t})) },
                     { label:'Budget',       value:budgetIdx,  setter:(v)=>setBudgetIdx(Number(v)), options:BUDGETS.map((b,i)=>({v:i,l:b.label})) },
                 ].map(({ label, value, setter, options }) => (
                     <div key={label} style={{ position:'relative' }}>
@@ -614,12 +629,16 @@ const AltimmoPage = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [searchOpen]);
 
-    const handleSearch = ({ typeBien, transaction, budgetIdx }) => {
-        // Nomenclature canonique (audit filtrage Altimmo) : offerType/propertyType/minPrice/
-        // maxPrice — mêmes clés que celles lues par AltimmoAnnonces.jsx.
+    const handleSearch = ({ typeBien, transaction, budgetIdx, isHebergement }) => {
+        // Nomenclature canonique (audit filtrage Altimmo) : offerType/propertyType|
+        // accommodationType/minPrice/maxPrice — mêmes clés que celles lues par
+        // AltimmoAnnonces.jsx. Correctif architecture recherche Altimmo (2026-07-25) :
+        // hebergement transmet accommodationType, jamais propertyType (et inversement).
         const params = new URLSearchParams();
         params.set('offerType', transaction);
-        if (typeBien !== 'Tous') params.set('propertyType', typeBien);
+        if (typeBien !== 'Tous') {
+            params.set(isHebergement ? 'accommodationType' : 'propertyType', typeBien);
+        }
         const budget = BUDGETS[budgetIdx];
         if (budget.min) params.set('minPrice', budget.min);
         if (budget.max) params.set('maxPrice', budget.max);

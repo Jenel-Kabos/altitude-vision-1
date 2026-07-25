@@ -334,6 +334,7 @@ const rentalMaintenanceRoutes = require('./routes/rentalMaintenanceRoutes');
 const tenantPortalRoutes = require('./routes/tenantPortalRoutes');
 const accommodationRoutes    = require('./routes/accommodationRoutes');
 const hotelRoutes            = require('./routes/hotelRoutes');
+const altimmoSearchRoutes    = require('./routes/altimmoSearchRoutes');
 const hotelReservationRoutes = require('./routes/hotelReservationRoutes');
 const housekeepingRoutes     = require('./routes/housekeepingRoutes');
 const inspectionRoutes       = require('./routes/inspectionRoutes');
@@ -372,6 +373,7 @@ app.use('/api/tenant-portal', tenantPortalRoutes);
 // 🛎️ Hébergement (meublés — Sprint 2)
 app.use('/api/accommodations', accommodationRoutes);
 app.use('/api/hotels', hotelRoutes);
+app.use('/api/altimmo', altimmoSearchRoutes);
 app.use('/api/hotel-reservations', hotelReservationRoutes);
 // 💰 Noyau financier F1 — routes staff protégées, sans fournisseur réel.
 app.use('/api/financial', financialRoutes);

@@ -13,6 +13,7 @@
 const CANONICAL_QUERY_PARAMS = {
   OFFER_TYPE: 'offerType',
   PROPERTY_TYPE: 'propertyType',
+  ACCOMMODATION_TYPE: 'accommodationType',
   CITY: 'city',
   ARRONDISSEMENT: 'arrondissement',
   MIN_PRICE: 'minPrice',
@@ -41,9 +42,20 @@ const PROPERTY_TYPES = [
   'Terrain', 'Bureau', 'Commerce', 'Studio', 'Entrepôt',
 ];
 
+// Miroir de l'enum réel de server/models/Accommodation.js (ACCOMMODATION_TYPES) — utilisé
+// UNIQUEMENT quand offerType === 'hebergement' (jamais mélangé avec PROPERTY_TYPES, qui ne
+// s'applique qu'à vente/location — correction du gap architectural identifié le 2026-07-25 :
+// la recherche « Hébergement » doit interroger Accommodation avec ses vraies catégories,
+// jamais Property.type). Voir test de parité dédié.
+const ACCOMMODATION_TYPES = [
+  'villa_meublee', 'maison_meublee', 'appartement_meuble', 'studio_meuble',
+  'residence_meublee', 'bungalow', 'hotel', 'residence_hoteliere', 'chambre_hotes', 'autre',
+];
+
 module.exports = {
   CANONICAL_QUERY_PARAMS,
   LEGACY_QUERY_PARAM_ALIASES,
   OFFER_TYPES,
   PROPERTY_TYPES,
+  ACCOMMODATION_TYPES,
 };
