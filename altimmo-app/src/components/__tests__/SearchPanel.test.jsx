@@ -28,18 +28,57 @@ describe('SearchPanel — nomenclature canonique + dépendances', () => {
     expect(screen.getByText('Hébergement')).toBeTruthy();
   });
 
-  test('sélection du type d’offre puis du type de bien, application → payload canonique offerType/propertyType', () => {
+  test('sélection Vente + type de bien, application → payload canonique offerType/propertyType (jamais accommodationType)', () => {
     const onSearch = jest.fn();
     render(<SearchPanel visible onClose={() => {}} onSearch={onSearch} />);
 
-    fireEvent.press(screen.getByText('Hébergement'));
+    fireEvent.press(screen.getByText('Vente'));
     fireEvent.press(screen.getByLabelText('Sélectionner type de bien'));
     fireEvent.press(screen.getByLabelText('Villa'));
 
     fireEvent.press(screen.getByLabelText(/Appliquer|Voir tous les biens/));
 
     expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({
-      offerType: 'hebergement', propertyType: 'Villa',
+      offerType: 'vente', propertyType: 'Villa', accommodationType: 'tous',
+    }));
+  });
+
+  test('correctif architecture recherche Altimmo (2026-07-25) : sélection Hébergement bascule le dropdown vers les catégories d’hébergement (jamais Terrain/Bureau/Entrepôt), application → accommodationType (jamais propertyType)', () => {
+    const onSearch = jest.fn();
+    render(<SearchPanel visible onClose={() => {}} onSearch={onSearch} />);
+
+    fireEvent.press(screen.getByText('Hébergement'));
+
+    expect(screen.queryByLabelText('Sélectionner type de bien')).toBeNull();
+    fireEvent.press(screen.getByLabelText("Sélectionner catégorie d'hébergement"));
+    expect(screen.queryByLabelText('Terrain')).toBeNull();
+    expect(screen.queryByLabelText('Bureau')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Villa meublée'));
+
+    fireEvent.press(screen.getByLabelText(/Appliquer|Voir tous les biens/));
+
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({
+      offerType: 'hebergement', accommodationType: 'villa_meublee', propertyType: 'tous',
+    }));
+  });
+
+  test('revenir à Vente après Hébergement réinitialise immédiatement le filtre secondaire incompatible', () => {
+    const onSearch = jest.fn();
+    render(<SearchPanel visible onClose={() => {}} onSearch={onSearch} />);
+
+    fireEvent.press(screen.getByLabelText('Sélectionner type de bien'));
+    fireEvent.press(screen.getByLabelText('Villa'));
+    fireEvent.press(screen.getByText('Hébergement'));
+    fireEvent.press(screen.getByLabelText("Sélectionner catégorie d'hébergement"));
+    fireEvent.press(screen.getByLabelText('Hôtel'));
+    fireEvent.press(screen.getByText('Vente'));
+
+    expect(screen.queryByLabelText("Sélectionner catégorie d'hébergement")).toBeNull();
+    expect(screen.getByLabelText('Sélectionner type de bien')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText(/Appliquer|Voir tous les biens/));
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({
+      offerType: 'vente', propertyType: 'tous', accommodationType: 'tous',
     }));
   });
 
@@ -71,7 +110,7 @@ describe('SearchPanel — nomenclature canonique + dépendances', () => {
     fireEvent.press(screen.getByLabelText(/Voir tous les biens/));
 
     expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({
-      offerType: 'tous', propertyType: 'tous', city: 'Toutes', arrondissement: 'Tous',
+      offerType: 'tous', propertyType: 'tous', accommodationType: 'tous', city: 'Toutes', arrondissement: 'Tous',
     }));
   });
 });

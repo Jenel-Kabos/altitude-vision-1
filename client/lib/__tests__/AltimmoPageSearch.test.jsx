@@ -51,4 +51,32 @@ describe('AltimmoPage — recherche accueil (nomenclature canonique + fix Héber
     expect(params.get('offerType')).toBe('hebergement');
     expect(params.get('status')).toBeNull();
   });
+
+  test('sélectionner Hébergement bascule le champ type vers les catégories d’hébergement (correctif architecture 2026-07-25)', async () => {
+    render(<AltimmoPage />);
+    fireEvent.click(document.querySelectorAll('.ai-search-pill')[0]);
+    await waitFor(() => expect(screen.getByText('Rechercher un bien', { selector: 'span' })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByDisplayValue('Vente'), { target: { value: 'hebergement' } });
+
+    expect(screen.queryByText('Type de bien')).not.toBeInTheDocument();
+    expect(screen.getByText("Catégorie d'hébergement")).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Terrain' })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Villa meublée' })).toBeInTheDocument();
+  });
+
+  test('envoie accommodationType (jamais propertyType) quand Hébergement + une catégorie sont sélectionnés', async () => {
+    render(<AltimmoPage />);
+    fireEvent.click(document.querySelectorAll('.ai-search-pill')[0]);
+    await waitFor(() => expect(screen.getByText('Rechercher un bien', { selector: 'span' })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByDisplayValue('Vente'), { target: { value: 'hebergement' } });
+    fireEvent.change(screen.getByDisplayValue('Toutes les catégories'), { target: { value: 'villa_meublee' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
+
+    const url = push.mock.calls.at(-1)[0];
+    const params = new URLSearchParams(url.split('?')[1]);
+    expect(params.get('accommodationType')).toBe('villa_meublee');
+    expect(params.get('propertyType')).toBeNull();
+  });
 });

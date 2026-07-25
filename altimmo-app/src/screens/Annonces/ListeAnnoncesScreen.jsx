@@ -15,6 +15,7 @@ import { getActivePublicites } from '../../services/publiciteService';
 import { cache } from '../../services/cacheService';
 import { useDebounce } from '../../hooks/useDebounce';
 import { PROPERTY_TYPES_WITH_ALL, formatPriceShort, PRICE_MAX } from '../../constants/propertyTypes';
+import { ACCOMMODATION_TYPES_WITH_ALL } from '../../constants/accommodation';
 import { DEFAULT_PROPERTY_FILTERS, buildPropertyQueryParams } from '../../utils/propertyQueryParams';
 import {
   Screen, Card, PrixFCFA, RecommendedCarousel, SearchPanel,
@@ -257,7 +258,8 @@ export default function ListeAnnoncesScreen({ navigation }) {
   // Résumé des filtres actifs pour le bouton
   const activeFilterCount = useMemo(() => {
     let n = 0;
-    if (activeFilters.propertyType !== 'tous') n++;
+    const secondary = activeFilters.offerType === 'hebergement' ? activeFilters.accommodationType : activeFilters.propertyType;
+    if (secondary !== 'tous') n++;
     if (activeFilters.offerType !== 'tous') n++;
     if (activeFilters.city !== 'Toutes') n++;
     if (activeFilters.arrondissement !== 'Tous') n++;
@@ -267,7 +269,13 @@ export default function ListeAnnoncesScreen({ navigation }) {
 
   const filterSummary = useMemo(() => {
     const parts = [];
-    if (activeFilters.propertyType !== 'tous') parts.push(activeFilters.propertyType);
+    if (activeFilters.offerType === 'hebergement') {
+      if (activeFilters.accommodationType !== 'tous') {
+        parts.push(ACCOMMODATION_TYPES_WITH_ALL.find((t) => t.value === activeFilters.accommodationType)?.label || activeFilters.accommodationType);
+      }
+    } else if (activeFilters.propertyType !== 'tous') {
+      parts.push(activeFilters.propertyType);
+    }
     if (activeFilters.offerType !== 'tous') parts.push(TRANSACTION_LABELS[activeFilters.offerType] || activeFilters.offerType);
     if (activeFilters.city !== 'Toutes') parts.push(activeFilters.city);
     return parts.length > 0 ? parts.join(' · ') : 'Rechercher un bien';
@@ -304,7 +312,11 @@ export default function ListeAnnoncesScreen({ navigation }) {
 
     try {
       const query = buildQuery(filters, pageNum);
-      const response = await api.get(`/properties?${query}`);
+      // Correctif architecture recherche Altimmo (2026-07-25) : endpoint unifié (même route
+      // que le web) — /properties ne peut jamais renvoyer un hébergement avec sa vraie
+      // catégorie ; /altimmo/search choisit la source (Property ou Accommodation) selon
+      // offerType.
+      const response = await api.get(`/altimmo/search?${query}`);
       const raw = response.data.data?.properties
         || response.data.properties
         || response.data.data
@@ -473,16 +485,26 @@ export default function ListeAnnoncesScreen({ navigation }) {
           {activeFilters.offerType !== 'tous' && (
             <ActiveChip
               label={TRANSACTION_LABELS[activeFilters.offerType] || activeFilters.offerType}
-              onRemove={() => setActiveFilters(prev => ({ ...prev, offerType: 'tous' }))}
+              onRemove={() => setActiveFilters(prev => ({ ...prev, offerType: 'tous', propertyType: 'tous', accommodationType: 'tous' }))}
               c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
             />
           )}
-          {activeFilters.propertyType !== 'tous' && (
-            <ActiveChip
-              label={activeFilters.propertyType}
-              onRemove={() => setActiveFilters(prev => ({ ...prev, propertyType: 'tous' }))}
-              c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
-            />
+          {activeFilters.offerType === 'hebergement' ? (
+            activeFilters.accommodationType !== 'tous' && (
+              <ActiveChip
+                label={ACCOMMODATION_TYPES_WITH_ALL.find((t) => t.value === activeFilters.accommodationType)?.label || activeFilters.accommodationType}
+                onRemove={() => setActiveFilters(prev => ({ ...prev, accommodationType: 'tous' }))}
+                c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
+              />
+            )
+          ) : (
+            activeFilters.propertyType !== 'tous' && (
+              <ActiveChip
+                label={activeFilters.propertyType}
+                onRemove={() => setActiveFilters(prev => ({ ...prev, propertyType: 'tous' }))}
+                c={c} chipStyle={styles.activeChip} textStyle={styles.activeChipText}
+              />
+            )
           )}
           {activeFilters.city !== 'Toutes' && (
             <ActiveChip
@@ -514,12 +536,20 @@ export default function ListeAnnoncesScreen({ navigation }) {
         style={styles.quickFilterRow}
         contentContainerStyle={styles.quickFilterContent}
       >
-        {PROPERTY_TYPES_WITH_ALL.map((item) => {
-          const active = activeFilters.propertyType === item.value;
+        {/* Correctif architecture recherche Altimmo (2026-07-25) : sous Hébergement, ces chips
+            rapides proposent les vraies catégories d'hébergement, jamais Terrain/Bureau/
+            Entrepôt (types de biens Vente/Location, dénués de sens ici). */}
+        {(activeFilters.offerType === 'hebergement' ? ACCOMMODATION_TYPES_WITH_ALL : PROPERTY_TYPES_WITH_ALL).map((item) => {
+          const isHebergementQuick = activeFilters.offerType === 'hebergement';
+          const active = isHebergementQuick
+            ? activeFilters.accommodationType === item.value
+            : activeFilters.propertyType === item.value;
           return (
             <TouchableOpacity
               key={item.label}
-              onPress={() => setActiveFilters(prev => ({ ...prev, propertyType: item.value }))}
+              onPress={() => setActiveFilters(prev => (isHebergementQuick
+                ? { ...prev, accommodationType: item.value }
+                : { ...prev, propertyType: item.value }))}
               style={[styles.quickChip, active && styles.quickChipActive]}
               activeOpacity={0.8}
             >

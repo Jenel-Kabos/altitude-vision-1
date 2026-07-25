@@ -8,11 +8,18 @@ import {
     SlidersHorizontal, Building2, Tag, AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
-import { getPropertiesWithFilters } from '../services/propertyService';
+import { searchAltimmo } from '../services/propertyService';
 import PropertyCard          from '../components/PropertyCard';
 import { PropertySkeletonGrid, PropertySkeletonList } from '../components/PropertySkeleton';
 import { VILLES, getArrondissementsFor } from '../constants/locations';
 import { PROPERTY_TYPES_WITH_ALL, OFFER_TYPES } from '../constants/propertyTypes';
+import { ACCOMMODATION_TYPES } from '../constants/accommodation';
+
+// Correctif architecture recherche Altimmo (2026-07-25) : quand offerType==='hebergement', le
+// filtre secondaire doit proposer les vraies catégories d'hébergement (Accommodation.
+// accommodationType), jamais les types de biens Vente/Location (Terrain, Bureau, Entrepôt...
+// n'ont aucun sens pour un hébergement).
+const ACCOMMODATION_TYPES_WITH_ALL = [{ value: 'tous', label: 'Tous les types' }, ...ACCOMMODATION_TYPES];
 
 // ─────────────────────────────────────────────────────────────
 const GOLD      = '#C8960C';
@@ -26,7 +33,7 @@ const VILLES_WITH_ALL = ['Toutes', ...VILLES];
 // Nomenclature canonique (audit filtrage Altimmo) : offerType/propertyType/city/
 // arrondissement/minPrice/maxPrice — mêmes clés que l'URL, le service API et le backend.
 const DEFAULT_FILTERS = {
-    search: '', offerType: 'tous', propertyType: 'tous',
+    search: '', offerType: 'tous', propertyType: 'tous', accommodationType: 'tous',
     city: 'Toutes', arrondissement: 'Tous',
     price: { min: '', max: '' },
 };
@@ -136,6 +143,7 @@ const AltimmoAnnonces = () => {
     const [draftSearch,       setDraftSearch]       = useState(readParam(searchParams, 'search', 'search', ''));
     const [draftOfferType,    setDraftOfferType]    = useState(readParam(searchParams, 'offerType', 'status', 'tous'));
     const [draftPropertyType, setDraftPropertyType] = useState(readParam(searchParams, 'propertyType', 'type', 'tous'));
+    const [draftAccommodationType, setDraftAccommodationType] = useState(searchParams.get('accommodationType') || 'tous');
     const [draftCity,         setDraftCity]         = useState(readParam(searchParams, 'city', 'ville', 'Toutes'));
     const [draftArr,          setDraftArr]          = useState(searchParams.get('arrondissement') || 'Tous');
     const [draftPrice,        setDraftPrice]        = useState({
@@ -146,6 +154,7 @@ const AltimmoAnnonces = () => {
     // ── État "appliqué" : seul déclencheur du fetch, mis à jour par "Rechercher" ──
     const [appliedFilters, setAppliedFilters] = useState({
         search: draftSearch, offerType: draftOfferType, propertyType: draftPropertyType,
+        accommodationType: draftAccommodationType,
         city: draftCity, arrondissement: draftArr, price: draftPrice,
     });
 
@@ -154,9 +163,21 @@ const AltimmoAnnonces = () => {
         setDraftArr('Tous');
     };
 
+    // Correctif architecture recherche Altimmo (2026-07-25) : changer le type d'offre
+    // réinitialise IMMÉDIATEMENT le filtre secondaire incompatible (propertyType si on passe à
+    // hebergement, accommodationType si on en sort) — jamais de valeur fantôme d'un filtre
+    // masqué qui resterait active en arrière-plan.
+    const handleOfferTypeChange = (offerType) => {
+        setDraftOfferType(offerType);
+        if (offerType === 'hebergement') setDraftPropertyType('tous');
+        else setDraftAccommodationType('tous');
+    };
+
+    const isHebergement = draftOfferType === 'hebergement';
+
     // Nombre total de biens Altimmo disponibles, indépendamment des filtres (affiché dans le hero).
     useEffect(() => {
-        getPropertiesWithFilters({ page: 1, limit: 1 })
+        searchAltimmo({ page: 1, limit: 1 })
             .then(({ total: t }) => setTotalAll(t))
             .catch(() => {});
     }, []);
@@ -167,16 +188,20 @@ const AltimmoAnnonces = () => {
         try {
             setLoading(true);
             setError(null);
-            const { properties: data, total: t } = await getPropertiesWithFilters({
-                search:         appliedFilters.search,
-                offerType:      appliedFilters.offerType,
-                propertyType:   appliedFilters.propertyType,
-                city:           appliedFilters.city,
-                arrondissement: appliedFilters.arrondissement,
-                minPrice:       Number(appliedFilters.price.min) || 0,
-                maxPrice:       Number(appliedFilters.price.max) || undefined,
-                page:           pageOverride ?? currentPage,
-                limit:          PROPERTIES_PER_PAGE,
+            const forHebergement = appliedFilters.offerType === 'hebergement';
+            const { properties: data, total: t } = await searchAltimmo({
+                search:            appliedFilters.search,
+                offerType:         appliedFilters.offerType,
+                // Mutuellement exclusifs (correctif architecture recherche Altimmo) : jamais
+                // les deux envoyés ensemble.
+                propertyType:      forHebergement ? undefined : appliedFilters.propertyType,
+                accommodationType: forHebergement ? appliedFilters.accommodationType : undefined,
+                city:              appliedFilters.city,
+                arrondissement:    appliedFilters.arrondissement,
+                minPrice:          Number(appliedFilters.price.min) || 0,
+                maxPrice:          Number(appliedFilters.price.max) || undefined,
+                page:              pageOverride ?? currentPage,
+                limit:             PROPERTIES_PER_PAGE,
             });
             setProperties(data);
             setTotal(t);
@@ -233,7 +258,11 @@ const AltimmoAnnonces = () => {
         const params = new URLSearchParams();
         if (appliedFilters.search)                     params.set('search',       appliedFilters.search);
         if (appliedFilters.offerType !== 'tous')       params.set('offerType',    appliedFilters.offerType);
-        if (appliedFilters.propertyType !== 'tous')    params.set('propertyType', appliedFilters.propertyType);
+        if (appliedFilters.offerType === 'hebergement') {
+            if (appliedFilters.accommodationType !== 'tous') params.set('accommodationType', appliedFilters.accommodationType);
+        } else if (appliedFilters.propertyType !== 'tous') {
+            params.set('propertyType', appliedFilters.propertyType);
+        }
         if (appliedFilters.city  !== 'Toutes')         params.set('city',         appliedFilters.city);
         if (appliedFilters.arrondissement !== 'Tous')  params.set('arrondissement', appliedFilters.arrondissement);
         if (appliedFilters.price.min)                  params.set('minPrice',     appliedFilters.price.min);
@@ -244,12 +273,13 @@ const AltimmoAnnonces = () => {
 
     const handleSearch = () => {
         setAppliedFilters({
-            search:         draftSearch,
-            offerType:      draftOfferType,
-            propertyType:   draftPropertyType,
-            city:           draftCity,
-            arrondissement: draftArr,
-            price:          draftPrice,
+            search:            draftSearch,
+            offerType:         draftOfferType,
+            propertyType:      draftPropertyType,
+            accommodationType: draftAccommodationType,
+            city:              draftCity,
+            arrondissement:    draftArr,
+            price:             draftPrice,
         });
     };
 
@@ -257,6 +287,7 @@ const AltimmoAnnonces = () => {
         setDraftSearch(DEFAULT_FILTERS.search);
         setDraftOfferType(DEFAULT_FILTERS.offerType);
         setDraftPropertyType(DEFAULT_FILTERS.propertyType);
+        setDraftAccommodationType(DEFAULT_FILTERS.accommodationType);
         setDraftCity(DEFAULT_FILTERS.city);
         setDraftArr(DEFAULT_FILTERS.arrondissement);
         setDraftPrice(DEFAULT_FILTERS.price);
@@ -264,7 +295,8 @@ const AltimmoAnnonces = () => {
     };
 
     const hasFilters = appliedFilters.search.trim() || appliedFilters.offerType !== 'tous' ||
-        appliedFilters.propertyType !== 'tous' || appliedFilters.city !== 'Toutes' ||
+        appliedFilters.propertyType !== 'tous' || appliedFilters.accommodationType !== 'tous' ||
+        appliedFilters.city !== 'Toutes' ||
         appliedFilters.arrondissement !== 'Tous' || appliedFilters.price.min || appliedFilters.price.max;
 
     const priceRangeInvalid = draftPrice.min && draftPrice.max &&
@@ -436,7 +468,7 @@ const AltimmoAnnonces = () => {
                                             </label>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                                                 {OFFER_TYPES.map(({ value, label }) => (
-                                                    <button key={value} onClick={() => setDraftOfferType(value)}
+                                                    <button key={value} onClick={() => handleOfferTypeChange(value)}
                                                         style={{
                                                             padding: '6px 14px', borderRadius: 0,
                                                             background: draftOfferType === value ? GOLD : 'transparent',
@@ -452,16 +484,31 @@ const AltimmoAnnonces = () => {
                                             </div>
                                         </div>
 
-                                        {/* Type de bien */}
-                                        <div>
-                                            <label htmlFor="filter-type" style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A8A7A', marginBottom: 10 }}>
-                                                Type de bien
-                                            </label>
-                                            <select id="filter-type" value={draftPropertyType} onChange={e => setDraftPropertyType(e.target.value)}
-                                                style={inputStyle} onFocus={inputFocus} onBlur={inputBlur}>
-                                                {PROPERTY_TYPES_WITH_ALL.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
-                                            </select>
-                                        </div>
+                                        {/* Type de bien (vente/location) ou Catégorie d'hébergement (hebergement) —
+                                            correctif architecture recherche Altimmo : jamais Terrain/Bureau/Entrepôt
+                                            proposés pour un hébergement, jamais de catégorie d'hébergement pour
+                                            vente/location. */}
+                                        {isHebergement ? (
+                                            <div>
+                                                <label htmlFor="filter-accommodation-type" style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A8A7A', marginBottom: 10 }}>
+                                                    Catégorie d'hébergement
+                                                </label>
+                                                <select id="filter-accommodation-type" value={draftAccommodationType} onChange={e => setDraftAccommodationType(e.target.value)}
+                                                    style={inputStyle} onFocus={inputFocus} onBlur={inputBlur}>
+                                                    {ACCOMMODATION_TYPES_WITH_ALL.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                                                </select>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <label htmlFor="filter-type" style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A8A7A', marginBottom: 10 }}>
+                                                    Type de bien
+                                                </label>
+                                                <select id="filter-type" value={draftPropertyType} onChange={e => setDraftPropertyType(e.target.value)}
+                                                    style={inputStyle} onFocus={inputFocus} onBlur={inputBlur}>
+                                                    {PROPERTY_TYPES_WITH_ALL.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                                                </select>
+                                            </div>
+                                        )}
 
                                         {/* Ville */}
                                         <div>
