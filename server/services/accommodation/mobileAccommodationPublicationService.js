@@ -30,11 +30,13 @@ const Property = require('../../models/Property');
 const Accommodation = require('../../models/Accommodation');
 const RatePlan = require('../../models/RatePlan');
 const Hotel = require('../../models/Hotel');
+const RoomCategory = require('../../models/RoomCategory');
 const { buildMobilePropertyData } = require('../../controllers/propertyMobileController');
 const { evaluateReadiness } = require('../accommodationService');
 const { logAction, buildAuteur } = require('../actionLogService');
 const { destroyFromCloudinary } = require('../../config/cloudinary');
 const { fail, MobileAccommodationError } = require('./mobileAccommodationError');
+const { analyzeHotelRoomCategories } = require('./hotelPublicationPayload');
 
 const MAX_ATTEMPTS = 5;
 const WINNER_WAIT_ATTEMPTS = 10;
@@ -70,15 +72,22 @@ function validatePayloadShape(payload) {
   if (!property.ville) errors.push('property.ville');
   if (!property.arrondissement) errors.push('property.arrondissement');
   if (!(Number(property.superficie) > 0)) errors.push('property.superficie');
+  const hotelAnalysis = payload?.publicationKind === 'hotel_establishment'
+    ? analyzeHotelRoomCategories(payload?.roomCategories)
+    : null;
   if (!(Number(property.prix) > 0)) errors.push('property.prix');
   if (!Array.isArray(property.photos) || property.photos.length === 0) errors.push('property.photos');
   if (!accommodation.accommodationType) errors.push('accommodation.accommodationType');
-  if (!(Number(ratePlan.amount) > 0)) errors.push('ratePlan.amount');
-  if (Number(property.prix) !== Number(ratePlan.amount)) errors.push('property.prix/ratePlan.amount');
+  if (payload?.publicationKind !== 'hotel_establishment' && !(Number(ratePlan.amount) > 0)) errors.push('ratePlan.amount');
+  if (payload?.publicationKind !== 'hotel_establishment' && Number(property.prix) !== Number(ratePlan.amount)) errors.push('property.prix/ratePlan.amount');
   if (!['furnished_accommodation', 'hotel_establishment'].includes(payload?.publicationKind)) errors.push('publicationKind');
   if (payload?.publicationKind === 'furnished_accommodation' && !furnishedTypes.includes(accommodation.accommodationType)) errors.push('accommodation.accommodationType');
   if (payload?.publicationKind === 'hotel_establishment' && !hotelTypes.includes(accommodation.accommodationType)) errors.push('accommodation.accommodationType');
   if (payload?.publicationKind === 'hotel_establishment' && !String(accommodation.hotel?.name || '').trim()) errors.push('accommodation.hotel.name');
+  if (hotelAnalysis) {
+    errors.push(...hotelAnalysis.errors);
+    if (Number(property.prix) !== hotelAnalysis.totals?.minNightlyRate) errors.push('property.prix/minNightlyRate');
+  }
 
   if (errors.length > 0) {
     fail(
@@ -107,7 +116,12 @@ async function findExistingPublication(publicationRequestId, userId) {
     );
   }
   const rate = await RatePlan.findOne({ accommodation: accommodation._id }).sort({ createdAt: -1 });
-  return { property: accommodation.property, accommodation, rate, idempotent: true };
+  const hotel = accommodation.hotel ? await Hotel.findById(accommodation.hotel) : null;
+  const categories = hotel ? await RoomCategory.find({ hotel: hotel._id }).sort({ displayOrder: 1 }) : [];
+  const categoryRates = categories.length
+    ? await RatePlan.find({ roomCategory: { $in: categories.map((category) => category._id) }, active: true })
+    : [];
+  return { property: accommodation.property, accommodation, rate: rate || categoryRates[0] || null, hotel, roomCategories: categories, categoryRates, idempotent: true };
 }
 
 async function waitForPublication(publicationRequestId, userId) {
@@ -160,6 +174,9 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
   if (existing) return existing;
 
   validatePayloadShape(payload);
+  const hotelAnalysis = payload.publicationKind === 'hotel_establishment'
+    ? analyzeHotelRoomCategories(payload.roomCategories)
+    : null;
 
   const uploadedImages = Array.isArray(payload.property.photos) ? payload.property.photos : [];
 
@@ -169,7 +186,11 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
       session.startTransaction();
 
       const propertyData = buildMobilePropertyData(
-        { ...payload.property, categorie: 'hebergement' },
+        {
+          ...payload.property,
+          prix: hotelAnalysis?.totals.minNightlyRate ?? payload.property.prix,
+          categorie: 'hebergement',
+        },
         ownerId,
       );
       const [property] = await Property.create([propertyData], { session });
@@ -182,6 +203,16 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
           starRating: payload.accommodation.hotel.starRating,
           hasReception: payload.accommodation.hotel.hasReception,
           hotelServices: payload.accommodation.hotel.hotelServices,
+          phone: payload.accommodation.hotel.phone,
+          email: payload.accommodation.hotel.email,
+          website: payload.accommodation.hotel.website,
+          gallery: payload.accommodation.hotel.gallery,
+          totalRooms: hotelAnalysis.totals.totalRooms,
+          totalCapacity: hotelAnalysis.totals.totalCapacity,
+          totalBeds: hotelAnalysis.totals.totalBeds,
+          minNightlyRate: hotelAnalysis.totals.minNightlyRate,
+          maxNightlyRate: hotelAnalysis.totals.maxNightlyRate,
+          currency: hotelAnalysis.totals.currency,
           manager: ownerId,
           property: property._id,
           createdBy: ownerId,
@@ -207,13 +238,35 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
         publicationRequestId,
       }], { session });
 
-      const [rate] = await RatePlan.create([{
-        accommodation: accommodation._id,
-        mode: payload.ratePlan.mode || 'nightly',
-        amount: payload.ratePlan.amount,
-        currency: payload.ratePlan.currency || 'XAF',
-        createdBy: ownerId,
-      }], { session });
+      let rate = null;
+      let roomCategories = [];
+      let categoryRates = [];
+      if (hotelAnalysis) {
+        roomCategories = await RoomCategory.create(hotelAnalysis.categories.map((category) => ({
+          hotel: hotel._id, name: category.name, code: category.code,
+          categoryType: category.categoryType, displayOrder: category.displayOrder,
+          description: category.description,
+          capacity: { maxAdults: category.maxAdults, maxChildren: category.maxChildren },
+          beds: category.beds, surface: category.surface, unitsAvailable: category.quantity,
+          amenities: category.amenities, gallery: category.gallery, createdBy: ownerId,
+        })), { session, ordered: true });
+        const rateDocuments = roomCategories.flatMap((category, index) => (
+          hotelAnalysis.categories[index].ratePlans.map((plan) => ({
+            roomCategory: category._id, rateType: plan.rateType,
+            amount: plan.amount, currency: plan.currency, createdBy: ownerId,
+          }))
+        ));
+        categoryRates = await RatePlan.create(rateDocuments, { session, ordered: true });
+        rate = categoryRates.find((plan) => plan.rateType === 'public') || categoryRates[0];
+      } else {
+        [rate] = await RatePlan.create([{
+          accommodation: accommodation._id,
+          mode: payload.ratePlan.mode || 'nightly',
+          amount: payload.ratePlan.amount,
+          currency: payload.ratePlan.currency || 'XAF',
+          createdBy: ownerId,
+        }], { session });
+      }
 
       const readiness = payload.publicationKind === 'hotel_establishment'
         ? {
@@ -257,7 +310,7 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
 
       await session.commitTransaction();
       session.endSession();
-      return { property, accommodation, rate, hotel, idempotent: false };
+      return { property, accommodation, rate, hotel, roomCategories, categoryRates, idempotent: false };
     } catch (error) {
       await session.abortTransaction().catch(() => {});
       session.endSession();

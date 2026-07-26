@@ -43,6 +43,21 @@ export const ACCOMMODATION_PROPERTY_TYPE_BY_CATEGORY = Object.freeze({
 // Accommodation.accommodationType, jamais dans ce type technique.
 export const HOTEL_PROPERTY_TYPE = 'Commerce';
 
+export const HOTEL_ROOM_CATEGORY_TYPES = [
+  ['standard', 'Standard'], ['superieure', 'Supérieure'], ['deluxe', 'Deluxe'],
+  ['premium', 'Premium'], ['suite_junior', 'Suite Junior'], ['suite', 'Suite'],
+  ['suite_presidentielle', 'Suite Présidentielle'], ['familiale', 'Familiale'],
+  ['twin', 'Twin'], ['double', 'Double'], ['simple', 'Simple'], ['autre', 'Autre'],
+].map(([value, label]) => ({ value, label }));
+
+export const HOTEL_RATE_TYPES = [
+  { value: 'public', label: 'Tarif public' },
+  { value: 'entreprise', label: 'Tarif entreprise' },
+  { value: 'weekend', label: 'Tarif week-end' },
+  { value: 'promotion', label: 'Promotion' },
+  { value: 'haute_saison', label: 'Haute saison' },
+];
+
 export const ACCOMMODATION_TYPES_WITH_ALL = [
   { value: 'tous', label: 'Toutes les catégories', icon: 'apps-outline' },
   ...ACCOMMODATION_TYPES,

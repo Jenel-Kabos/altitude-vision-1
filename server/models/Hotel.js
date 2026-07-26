@@ -93,6 +93,12 @@ const hotelSchema = new mongoose.Schema(
     },
     hasRestaurant: { type: Boolean, default: false }, // legacy, conservé (voir hasRestaurant/hasReception)
     hasReception: { type: Boolean, default: false },
+    totalRooms: { type: Number, min: 0, default: 0 },
+    totalCapacity: { type: Number, min: 0, default: 0 },
+    totalBeds: { type: Number, min: 0, default: 0 },
+    minNightlyRate: { type: Number, min: 0, default: 0 },
+    maxNightlyRate: { type: Number, min: 0, default: 0 },
+    currency: { type: String, default: 'XAF' },
 
     // Galerie enrichie (Sprint B2) — même structure que
     // Accommodation.gallery (Sprint B1) : métadonnées posées sur les URLs

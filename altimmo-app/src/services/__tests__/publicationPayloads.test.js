@@ -1,7 +1,7 @@
 import {
   buildSalePropertyPayload, buildRentalPropertyPayload,
   buildAccommodationPropertyPayload, buildAccommodationProfilePayload, buildAccommodationRatePayload,
-  buildHotelPropertyPayload, buildHotelProfilePayload,
+  buildHotelPropertyPayload, buildHotelProfilePayload, buildHotelRoomCategoriesPayload,
 } from '../publicationPayloads';
 
 const photoUrls = ['https://res.cloudinary.com/x/a.jpg', 'https://res.cloudinary.com/x/b.jpg'];
@@ -127,14 +127,25 @@ describe('builders Établissement hôtelier', () => {
     accommodationType: 'hotel', ville: 'Brazzaville', arrondissement: 'Poto-Poto',
     tarifNuit: '45000', capaciteAdultes: 80, starRating: '3', hasReception: true,
     hotelServices: { wifi: true, restaurant: false }, checkInTime: '14:00', checkOutTime: '11:00',
+    roomCategories: [
+      { clientKey: 'std', name: ' Standard ', code: 'std', categoryType: 'standard', quantity: 13, adultCapacity: 2, childCapacity: 0, beds: 1, ratePlans: [{ rateType: 'public', amount: '35000' }] },
+      { clientKey: 'ste', name: 'Suite', code: 'STE', categoryType: 'suite', quantity: 5, adultCapacity: 2, childCapacity: 1, beds: 2, ratePlans: [{ rateType: 'public', amount: '85000' }] },
+    ],
   };
 
-  test('utilise le type Property canonique existant et le même montant que RatePlan', () => {
+  test('utilise le type Property canonique et le tarif public minimum', () => {
     const property = buildHotelPropertyPayload(form, photoUrls);
     expect(property.type).toBe('Commerce');
-    expect(property.prix).toBe(buildAccommodationRatePayload(form).amount);
+    expect(property.prix).toBe(35000);
     expect(property.chambres).toBe(0);
     expect(property.bathrooms).toBe(0);
+  });
+
+  test('construit les catégories canoniques, quantités, capacités et RatePlan', () => {
+    const categories = buildHotelRoomCategoriesPayload(form);
+    expect(categories[0]).toMatchObject({ clientKey: 'std', name: 'Standard', code: 'STD', quantity: 13, adultCapacity: 2, beds: 1 });
+    expect(categories[0].ratePlans).toEqual([{ rateType: 'public', amount: 35000, currency: 'XAF' }]);
+    expect(categories[1].ratePlans[0].amount).toBe(85000);
   });
 
   test('n’envoie aucun champ résidentiel dans le profil hôtelier', () => {

@@ -131,7 +131,7 @@ exports.getOne = async (req, res) => {
 // sur Hotel, exposant sans nécessité des identifiants internes
 // (manager/createdBy/updatedBy/reviewedBy) et des champs de modération
 // (rejectionReason/suspensionReason) à un consommateur non authentifié.
-const PUBLIC_HOTEL_FIELDS = 'name brand description starRating phone email website contact services hotelServices hasRestaurant hasReception gallery property publicationStatus active';
+const PUBLIC_HOTEL_FIELDS = 'name brand description starRating phone email website contact services hotelServices hasRestaurant hasReception gallery property publicationStatus active totalRooms totalCapacity totalBeds minNightlyRate maxNightlyRate currency';
 
 exports.getPublic = async (req, res) => {
   try {
@@ -144,10 +144,16 @@ exports.getPublic = async (req, res) => {
       return fail(res, 404, 'Hôtel introuvable.');
     }
     const categories = await RoomCategory.find({ hotel: hotel._id, status: 'actif' });
+    categories.sort((left, right) => (left.displayOrder ?? 0) - (right.displayOrder ?? 0));
     const categoriesWithRates = await Promise.all(categories.map(async (cat) => ({
       ...cat.toObject(),
-      rates: await RatePlan.find({ roomCategory: cat._id, active: true }),
+      rates: await RatePlan.find({ roomCategory: cat._id, active: true }).sort({ amount: 1 }),
     })));
+    categoriesWithRates.sort((left, right) => {
+      const leftRate = left.rates.find((rate) => rate.rateType === 'public')?.amount ?? Number.MAX_SAFE_INTEGER;
+      const rightRate = right.rates.find((rate) => rate.rateType === 'public')?.amount ?? Number.MAX_SAFE_INTEGER;
+      return leftRate - rightRate;
+    });
     res.json({ status: 'success', data: { hotel, categories: categoriesWithRates } });
   } catch (error) {
     fail(res, 500, error.message);

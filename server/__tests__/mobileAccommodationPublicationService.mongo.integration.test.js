@@ -16,6 +16,8 @@ const Accommodation = require('../models/Accommodation');
 const RatePlan = require('../models/RatePlan');
 const User = require('../models/User');
 const ActionLog = require('../models/ActionLog');
+const Hotel = require('../models/Hotel');
+const RoomCategory = require('../models/RoomCategory');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
 
@@ -59,6 +61,26 @@ const basePayload = (overrides = {}) => ({
   },
 });
 
+const hotelPayload = (overrides = {}) => ({
+  publicationKind: 'hotel_establishment',
+  property: {
+    titre: 'Hôtel Inventaire', description: 'Établissement professionnel avec inventaire détaillé.',
+    type: 'Commerce', ville: 'Brazzaville', arrondissement: 'Bacongo', superficie: 1,
+    prix: 35000, bathrooms: 0, photos: ['https://res.cloudinary.test/hotel.jpg'],
+    ...overrides.property,
+  },
+  accommodation: {
+    accommodationType: 'hotel', capacity: { maxAdults: 41, maxChildren: 0 },
+    checkInTime: '14:00', checkOutTime: '11:00',
+    hotel: { name: 'Hôtel Inventaire', description: 'Deux catégories', phone: '+242060000000', hotelServices: { reception24h: true } },
+    ...overrides.accommodation,
+  },
+  roomCategories: overrides.roomCategories || [
+    { clientKey: 'std', name: 'Standard', code: 'STD', categoryType: 'standard', quantity: 13, adultCapacity: 2, childCapacity: 0, beds: 1, ratePlans: [{ rateType: 'public', amount: 35000, currency: 'XAF' }] },
+    { clientKey: 'ste', name: 'Suite', code: 'STE', categoryType: 'suite', quantity: 5, adultCapacity: 2, childCapacity: 1, beds: 2, ratePlans: [{ rateType: 'public', amount: 85000, currency: 'XAF' }] },
+  ],
+});
+
 const counts = async () => ({
   property: await Property.countDocuments(),
   accommodation: await Accommodation.countDocuments(),
@@ -70,6 +92,8 @@ beforeAll(async () => {
   await Accommodation.syncIndexes();
   await Property.syncIndexes();
   await RatePlan.syncIndexes();
+  await Hotel.syncIndexes();
+  await RoomCategory.syncIndexes();
 });
 afterEach(async () => { await clearFinancialMongo(); jest.clearAllMocks(); });
 afterAll(stopFinancialMongo);
@@ -88,6 +112,38 @@ describe('createFullMobileAccommodation — succès', () => {
     expect(String(result.rate.accommodation)).toBe(String(result.accommodation._id));
 
     expect(await counts()).toEqual({ property: 1, accommodation: 1, ratePlan: 1 });
+  });
+});
+
+describe('createFullMobileAccommodation — établissement hôtelier professionnel', () => {
+  test('crée Hotel, deux catégories, leurs tarifs et les totaux cohérents dans la transaction', async () => {
+    const user = await makeUser();
+    const result = await createFullMobileAccommodation({ user, payload: hotelPayload(), publicationRequestId: `hotel-${Date.now()}` });
+    expect(result.hotel).toMatchObject({ totalRooms: 18, totalCapacity: 41, totalBeds: 23, minNightlyRate: 35000, maxNightlyRate: 85000, currency: 'XAF' });
+    expect(result.roomCategories).toHaveLength(2);
+    expect(result.roomCategories.map((category) => [category.code, category.unitsAvailable])).toEqual([['STD', 13], ['STE', 5]]);
+    expect(result.categoryRates.map((rate) => rate.amount).sort((a, b) => a - b)).toEqual([35000, 85000]);
+    expect(result.property.price).toBe(35000);
+    expect(await RatePlan.countDocuments({ accommodation: result.accommodation._id })).toBe(0);
+  });
+
+  test('rollback complet si une catégorie est invalide', async () => {
+    const user = await makeUser();
+    const payload = hotelPayload({ roomCategories: [{ ...hotelPayload().roomCategories[0], quantity: 0 }] });
+    await expect(createFullMobileAccommodation({ user, payload, publicationRequestId: `hotel-invalid-${Date.now()}` }))
+      .rejects.toMatchObject({ statusCode: 400 });
+    expect(await Promise.all([Property.countDocuments(), Accommodation.countDocuments(), Hotel.countDocuments(), RoomCategory.countDocuments(), RatePlan.countDocuments()])).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  test('retry idempotent ne duplique ni catégorie ni tarif', async () => {
+    const user = await makeUser();
+    const publicationRequestId = `hotel-retry-${Date.now()}`;
+    const first = await createFullMobileAccommodation({ user, payload: hotelPayload(), publicationRequestId });
+    const retry = await createFullMobileAccommodation({ user, payload: hotelPayload(), publicationRequestId });
+    expect(String(retry.hotel._id)).toBe(String(first.hotel._id));
+    expect(retry.roomCategories).toHaveLength(2);
+    expect(await RoomCategory.countDocuments()).toBe(2);
+    expect(await RatePlan.countDocuments()).toBe(2);
   });
 });
 

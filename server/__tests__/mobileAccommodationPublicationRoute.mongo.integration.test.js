@@ -20,6 +20,7 @@ const Accommodation = require('../models/Accommodation');
 const RatePlan = require('../models/RatePlan');
 const Hotel = require('../models/Hotel');
 const ActionLog = require('../models/ActionLog');
+const RoomCategory = require('../models/RoomCategory');
 const accommodationRoutes = require('../routes/accommodationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 
@@ -75,6 +76,16 @@ const hotelPayload = (accommodationType = 'hotel') => basePayload({
     hotel: { name: 'Hôtel Panorama', starRating: 3, hasReception: true, hotelServices: { wifi: true } },
   },
   ratePlan: { amount: 45000 },
+  roomCategories: [],
+});
+
+const professionalHotelPayload = (accommodationType = 'hotel') => ({
+  ...hotelPayload(accommodationType),
+  roomCategories: [
+    { clientKey: 'std', name: 'Standard', code: 'STD', categoryType: 'standard', quantity: 13, adultCapacity: 2, childCapacity: 0, beds: 1, ratePlans: [{ rateType: 'public', amount: 35000, currency: 'XAF' }] },
+    { clientKey: 'ste', name: 'Suite', code: 'STE', categoryType: 'suite', quantity: 5, adultCapacity: 2, childCapacity: 1, beds: 2, ratePlans: [{ rateType: 'public', amount: 85000, currency: 'XAF' }] },
+  ],
+  property: { ...hotelPayload(accommodationType).property, prix: 35000 },
 });
 
 beforeAll(async () => {
@@ -105,17 +116,45 @@ describe('POST /api/accommodations/mobile/full', () => {
     const res = await request(app)
       .post('/api/accommodations/mobile/full')
       .set('Authorization', `Bearer ${signToken(user._id)}`)
-      .send(hotelPayload(type));
+      .send(professionalHotelPayload(type));
 
     expect(res.statusCode).toBe(201);
     const [property, accommodation, rate, hotel] = await Promise.all([
       Property.findOne(), Accommodation.findOne(), RatePlan.findOne(), Hotel.findOne(),
     ]);
     expect(property.type).toBe('Commerce');
-    expect(property.price).toBe(rate.amount);
+    expect(property.price).toBe(35000);
+    expect(rate.amount).toBe(35000);
     expect(accommodation.accommodationType).toBe(type);
     expect(accommodation.hotel.toString()).toBe(hotel._id.toString());
     expect(accommodation.occupancyMode).toBe('room_based');
+    expect(hotel).toMatchObject({ totalRooms: 18, totalCapacity: 41, minNightlyRate: 35000, maxNightlyRate: 85000 });
+    expect(await RoomCategory.countDocuments({ hotel: hotel._id })).toBe(2);
+  });
+
+  test.each([
+    ['aucune catégorie', [], 'roomCategories'],
+    ['quantité nulle', [{ ...professionalHotelPayload().roomCategories[0], quantity: 0 }], 'roomCategories.0.quantity'],
+    ['tarif absent', [{ ...professionalHotelPayload().roomCategories[0], ratePlans: [] }], 'roomCategories.0.ratePlans'],
+    ['codes dupliqués', [professionalHotelPayload().roomCategories[0], { ...professionalHotelPayload().roomCategories[1], code: 'STD' }], 'roomCategories.1.code'],
+  ])('400 — hôtel refusé : %s', async (_label, roomCategories, field) => {
+    const user = await makeUser();
+    const res = await request(app).post('/api/accommodations/mobile/full')
+      .set('Authorization', `Bearer ${signToken(user._id)}`)
+      .send({ ...professionalHotelPayload(), roomCategories });
+    expect(res.statusCode).toBe(400);
+    expect(res.body.fields).toContain(field);
+    expect(await Hotel.countDocuments()).toBe(0);
+  });
+
+  test('400 — Property.prix divergent du tarif minimum', async () => {
+    const user = await makeUser();
+    const payload = professionalHotelPayload();
+    payload.property.prix = 99999;
+    const res = await request(app).post('/api/accommodations/mobile/full')
+      .set('Authorization', `Bearer ${signToken(user._id)}`).send(payload);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.fields).toContain('property.prix/minNightlyRate');
   });
 
   test('400 — famille et accommodationType incohérents : rollback avant transaction', async () => {

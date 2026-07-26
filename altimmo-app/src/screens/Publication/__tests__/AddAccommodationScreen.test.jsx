@@ -80,7 +80,28 @@ describe('AddAccommodationScreen', () => {
     expect(screen.getByLabelText('Résidence hôtelière')).toBeTruthy();
     expect(screen.queryByLabelText('Villa meublée')).toBeNull();
     expect(screen.queryByLabelText('Studio meublé')).toBeNull();
-    expect(screen.getByLabelText("Nom de l'établissement")).toBeTruthy();
+    expect(screen.getByLabelText("Nom de l'hôtel")).toBeTruthy();
+  });
+
+  test('le wizard hôtelier ajoute, duplique et supprime une catégorie avec inventaire recalculé', () => {
+    render(<AddAccommodationScreen navigation={navigation} route={{ params: { publicationKind: 'hotel_establishment' } }} />);
+    fireEvent.changeText(screen.getByLabelText("Nom de l'hôtel"), 'Hôtel Test');
+    fireEvent.changeText(screen.getByLabelText('Description commerciale'), 'Configuration professionnelle');
+    fireEvent.press(screen.getByText('Continuer'));
+    fireEvent.press(screen.getByLabelText('Brazzaville'));
+    fireEvent.press(screen.getByLabelText('Bacongo'));
+    fireEvent.changeText(screen.getByLabelText('Téléphone principal'), '+242060000000');
+    fireEvent.press(screen.getByText('Continuer'));
+    fireEvent.press(screen.getByText('Continuer'));
+    expect(screen.getByText('0 chambres · 0 catégories')).toBeTruthy();
+    fireEvent.press(screen.getByText('＋ Ajouter une catégorie'));
+    fireEvent.changeText(screen.getByLabelText('Nom commercial'), 'Standard');
+    fireEvent.changeText(screen.getByLabelText('Code court'), 'STD');
+    expect(screen.getByText('1 chambres · 1 catégories')).toBeTruthy();
+    fireEvent.press(screen.getByText('Dupliquer'));
+    expect(screen.getByText('2 chambres · 2 catégories')).toBeTruthy();
+    fireEvent.press(screen.getAllByText('Supprimer')[1]);
+    expect(screen.getByText('1 chambres · 1 catégories')).toBeTruthy();
   });
 
   test("n'affiche jamais Terrain, Bureau, Commerce ou Entrepôt dans la sélection Type de bien", () => {
