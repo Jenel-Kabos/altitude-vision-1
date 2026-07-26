@@ -84,7 +84,7 @@ export async function creerAnnonce(payload) {
 // une toute nouvelle publication (jamais pour rejouer un échec).
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function createFullAccommodationMobile({ publicationRequestId, publicationKind, property, accommodation, ratePlan }) {
+export async function createFullAccommodationMobile({ publicationRequestId, publicationKind, property, accommodation, ratePlan, roomCategories }) {
   try {
     const res = await api.post('/accommodations/mobile/full', {
       publicationRequestId,
@@ -92,9 +92,13 @@ export async function createFullAccommodationMobile({ publicationRequestId, publ
       property,
       accommodation,
       ratePlan,
+      roomCategories,
     });
     const data = res.data?.data || {};
-    return { property: data.property, accommodation: data.accommodation, rate: data.rate };
+    return {
+      property: data.property, accommodation: data.accommodation, rate: data.rate,
+      hotel: data.hotel, roomCategories: data.roomCategories, categoryRates: data.categoryRates,
+    };
   } catch (err) {
     const message = err.response?.data?.message
       || err.response?.data?.error

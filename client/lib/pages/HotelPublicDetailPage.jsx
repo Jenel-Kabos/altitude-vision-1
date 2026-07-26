@@ -48,6 +48,13 @@ const HotelPublicDetailPage = () => {
           {Array.from({ length: hotel.starRating }).map((_, i) => <Star key={i} size={16} fill={GOLD} stroke={GOLD} />)}
         </p>
       )}
+      {hotel.minNightlyRate > 0 && (
+        <p className="mt-3 font-semibold" style={{ color: BLUE }}>
+          {hotel.minNightlyRate === hotel.maxNightlyRate
+            ? `À partir de ${formatCurrencyXAF(hotel.minNightlyRate)} / nuit`
+            : `${formatCurrencyXAF(hotel.minNightlyRate)} à ${formatCurrencyXAF(hotel.maxNightlyRate)} / nuit`}
+        </p>
+      )}
 
       {images.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-6">
@@ -82,7 +89,7 @@ const HotelPublicDetailPage = () => {
             {categories.map((cat) => (
               <div key={cat._id} className="border rounded-lg p-4">
                 <h3 className="font-semibold">{cat.name}</h3>
-                <p className="text-sm text-gray-500">{cat.capacity?.maxAdults || 0} adulte(s) · {cat.beds} lit(s){cat.surface ? ` · ${cat.surface} m²` : ''}</p>
+                <p className="text-sm text-gray-500">{cat.unitsAvailable} unité(s) · {cat.capacity?.maxAdults || 0} adulte(s) · {cat.beds} lit(s){cat.surface ? ` · ${cat.surface} m²` : ''}</p>
                 {cat.rates?.length > 0 && (
                   <ul className="mt-2 text-sm">
                     {cat.rates.map((r) => (

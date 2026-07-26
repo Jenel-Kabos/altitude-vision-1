@@ -29,6 +29,15 @@ const roomCategorySchema = new mongoose.Schema(
     },
 
     name: { type: String, required: [true, 'Le nom de la catégorie est requis.'], trim: true },
+    // Optionnel pour les catégories historiques créées avant le formulaire professionnel ;
+    // le nouveau flux mobile l'impose avant écriture.
+    code: { type: String, trim: true, uppercase: true, default: null },
+    categoryType: {
+      type: String,
+      enum: ['standard', 'superieure', 'deluxe', 'premium', 'suite_junior', 'suite', 'suite_presidentielle', 'familiale', 'twin', 'double', 'simple', 'autre'],
+      default: 'standard',
+    },
+    displayOrder: { type: Number, min: 0, default: 0 },
     description: { type: String, trim: true, default: '' },
 
     capacity: {
@@ -84,6 +93,10 @@ const roomCategorySchema = new mongoose.Schema(
 );
 
 roomCategorySchema.index({ hotel: 1, status: 1 });
+roomCategorySchema.index(
+  { hotel: 1, code: 1 },
+  { unique: true, partialFilterExpression: { code: { $type: 'string' } } },
+);
 
 const RoomCategory = mongoose.model('RoomCategory', roomCategorySchema);
 

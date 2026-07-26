@@ -7,6 +7,7 @@
 import {
   ACCOMMODATION_PROPERTY_TYPE_BY_CATEGORY, HOTEL_PROPERTY_TYPE,
 } from '../constants/accommodation';
+import { getHotelCategoryTotals } from '../utils/hotelPublication';
 
 const toNumber = (v, fallback = 0) => {
   const n = Number(v);
@@ -97,11 +98,12 @@ export function buildFurnishedAccommodationProfilePayload(form) {
 }
 
 export function buildHotelPropertyPayload(form, photoUrls) {
+  const totals = getHotelCategoryTotals(form.roomCategories);
   return buildBasePropertyPayload({
     ...form,
     titre: form.establishmentName,
     type: HOTEL_PROPERTY_TYPE,
-    prix: form.tarifNuit,
+    prix: totals.minNightlyRate,
     surface: form.surface || 1,
     bedrooms: 0,
     bathrooms: 0,
@@ -112,18 +114,38 @@ export function buildHotelProfilePayload(form) {
   return stripEmpty({
     accommodationType: form.accommodationType,
     furnished: true,
-    capacity: { maxAdults: toNumber(form.capaciteAdultes, 1), maxChildren: 0 },
+    capacity: { maxAdults: Math.max(1, getHotelCategoryTotals(form.roomCategories).totalCapacity), maxChildren: 0 },
     checkInTime: form.checkInTime || undefined,
     checkOutTime: form.checkOutTime || undefined,
     hotel: stripEmpty({
       name: form.establishmentName?.trim(),
       description: form.description?.trim(),
       starRating: numberOrUndefined(form.starRating),
+      phone: form.hotelPhone?.trim(),
+      email: form.hotelEmail?.trim(),
+      website: form.hotelWebsite?.trim(),
+      gallery: Array.isArray(form.hotelGallery)
+        ? form.hotelGallery.map((url, index) => ({ url, type: 'photo', isCover: index === 0, order: index }))
+        : undefined,
       hasReception: Boolean(form.hasReception),
       hotelServices: form.hotelServices && typeof form.hotelServices === 'object'
         ? form.hotelServices : undefined,
     }),
   });
+}
+
+export function buildHotelRoomCategoriesPayload(form) {
+  return (form.roomCategories || []).map((category, index) => ({
+    clientKey: category.clientKey,
+    name: category.name?.trim(), code: category.code?.trim().toUpperCase(),
+    categoryType: category.categoryType, quantity: toNumber(category.quantity),
+    adultCapacity: toNumber(category.adultCapacity), childCapacity: toNumber(category.childCapacity),
+    beds: toNumber(category.beds), surface: numberOrUndefined(category.surface),
+    amenities: category.amenities || {}, gallery: category.gallery || [], displayOrder: index,
+    ratePlans: (category.ratePlans || []).map((rate) => ({
+      rateType: rate.rateType, amount: toNumber(rate.amount), currency: 'XAF',
+    })),
+  }));
 }
 
 // Alias rétro-compatible pour les imports existants hors du nouveau formulaire.

@@ -20,6 +20,7 @@ import { createFullAccommodationMobile, uploadToCloudinary } from '../../service
 import { useDraftAnnonce } from '../../hooks/useDraftAnnonce';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts, fontSize, spacing } from '../../theme';
+import HotelEstablishmentScreen from './HotelEstablishmentScreen';
 
 // Terrain/Bureau/Commerce/Entrepôt n'ont aucun sens pour un hébergement meublé
 // (mission §6) — Property.type reste néanmoins requis par le schéma backend même
@@ -50,7 +51,7 @@ const HOTEL_SERVICES = [
   ['navette', 'Navette'], ['spa', 'Spa'], ['salleSport', 'Salle de sport'],
 ];
 
-export default function AddAccommodationScreen({ navigation, route }) {
+function FurnishedAccommodationScreen({ navigation, route }) {
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { loadDraft, saveDraft, clearDraft } = useDraftAnnonce('hebergement');
@@ -288,6 +289,13 @@ export default function AddAccommodationScreen({ navigation, route }) {
       />
     </Screen>
   );
+}
+
+export default function AddAccommodationScreen(props) {
+  if (props.route?.params?.publicationKind === 'hotel_establishment') {
+    return <HotelEstablishmentScreen {...props} />;
+  }
+  return <FurnishedAccommodationScreen {...props} />;
 }
 
 const makeStyles = (c) => StyleSheet.create({
