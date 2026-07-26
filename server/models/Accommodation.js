@@ -228,8 +228,22 @@ const accommodationSchema = new mongoose.Schema(
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
+    // Clé d'idempotence de la publication mobile atomique (correctif robustesse
+    // 2026-07 — voir mobileAccommodationPublicationService.js). Générée une seule
+    // fois par l'app mobile au début d'une tentative de publication et conservée
+    // pendant les retries : l'index unique (sparse — n'affecte jamais les
+    // Accommodation créés par les autres parcours, qui n'ont pas ce champ) est la
+    // garantie ultime contre le double-doublon en cas de requêtes concurrentes
+    // avec la même clé, au-delà de la vérification applicative.
+    publicationRequestId: { type: String, default: null },
   },
   { timestamps: true },
+);
+
+accommodationSchema.index(
+  { publicationRequestId: 1 },
+  { unique: true, sparse: true },
 );
 
 // Invariant occupancyMode ⟺ accommodationType, appliqué à CHAQUE validation

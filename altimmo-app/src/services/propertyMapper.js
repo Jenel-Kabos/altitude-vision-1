@@ -2,6 +2,8 @@
 // Le backend reste la source de vérité : ce module ne fait qu'interpréter
 // de façon cohérente des champs déjà renvoyés par l'API, sans inventer de règle.
 
+import api from './api';
+
 const HEBERGEMENT_KEYWORDS = ['hebergement', 'hébergement'];
 const LOCATION_KEYWORDS = ['location', 'louer', 'rent', 'renting'];
 const VENTE_KEYWORDS    = ['vente', 'vendre', 'sale', 'sell'];
@@ -212,4 +214,98 @@ export function resolveContactErrorMessage(err) {
   if (err?.response?.data?.message) return err.response.data.message;
   if (err?.request) return 'Connexion impossible. Vérifiez votre réseau puis réessayez.';
   return "Impossible d'ouvrir la messagerie.";
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Correctif crash mobile DetailAnnonceScreen (2026-07) — convention canonique
+// de navigation vers l'écran détail, compatible avec les anciens formats.
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Normalise les params de navigation vers `DetailAnnonce` en une forme canonique
+ * `{ resourceType: 'property'|'accommodation', resourceId, item }`, quel que soit le format
+ * d'origine :
+ *  - canonique : `{ resourceType, resourceId, item }` ;
+ *  - historique : `{ annonce }` (objet complet — Liste/Carte/Favoris/Recommandations) ;
+ *  - deep-link : `{ propertyId }` (AppNavigator, linking `annonces/:propertyId`) ;
+ *  - notification push : `{ id }` (propertyController.js, notification `new_property`) ;
+ *  - futur (anticipé) : `{ accommodationId }`.
+ * Retourne `{ resourceType: null, resourceId: null, item: null }` si rien d'exploitable
+ * n'est trouvé — l'appelant doit alors afficher un écran d'erreur, jamais planter.
+ */
+export function resolveDetailParams(params = {}) {
+  if (params.resourceType && params.resourceId) {
+    return { resourceType: params.resourceType, resourceId: params.resourceId, item: params.item || null };
+  }
+  if (params.annonce) {
+    // Un objet "annonce" historique est toujours Property-shaped (voir
+    // accommodationSearchService.js : un item hébergement porte `_id` = Property._id
+    // + `accommodationId` séparé) — jamais une Accommodation brute.
+    const item = params.annonce;
+    const id = item._id || item.id;
+    return { resourceType: 'property', resourceId: id || null, item };
+  }
+  if (params.propertyId) return { resourceType: 'property', resourceId: params.propertyId, item: null };
+  if (params.accommodationId) return { resourceType: 'accommodation', resourceId: params.accommodationId, item: null };
+  if (params.id) return { resourceType: 'property', resourceId: params.id, item: null };
+  return { resourceType: null, resourceId: null, item: null };
+}
+
+/**
+ * Charge le détail d'une annonce à partir de sa convention canonique. `resourceType='property'`
+ * couvre Vente/Location ET Hébergement (un item hébergement de `/altimmo/search` est toujours
+ * un Property avec `accommodationType` attaché) ; `resourceType='accommodation'` cible
+ * `GET /accommodations/public/:id` (utilisé uniquement quand seul un `accommodationId` est
+ * connu, sans le `_id` Property correspondant).
+ * Lance une erreur explicite (jamais silencieuse) si `resourceType`/`resourceId` manquent, ou
+ * si l'API répond une erreur (404 incluse) — à charge de l'appelant d'afficher l'état d'erreur.
+ */
+export async function fetchAnnonceDetail({ resourceType, resourceId }) {
+  if (!resourceType || !resourceId) {
+    const err = new Error('Identifiant de bien manquant ou invalide.');
+    err.isMissingIdentifier = true;
+    throw err;
+  }
+  const url = resourceType === 'accommodation'
+    ? `/accommodations/public/${resourceId}`
+    : `/properties/${resourceId}`;
+  const res = await api.get(url);
+  const property = res.data?.data?.property;
+  if (!property) {
+    const err = new Error('Bien introuvable.');
+    err.isMissingIdentifier = true;
+    throw err;
+  }
+  return property;
+}
+
+const RATE_MODE_PRICE_LABELS = { nightly: '/ nuit', weekly: '/ semaine', monthly: '/ mois', yearly: '/ an' };
+
+/**
+ * Prix affichable, jamais inventé : vente → `price` ; location → `price` (loyer, même champ
+ * que vente côté modèle) ; hébergement → tarif réel le plus pertinent
+ * (`accommodation.rates`, priorité nightly) si disponible, sinon `price`. Si aucune valeur
+ * positive n'est trouvée, `hasPrice=false` — l'appelant doit alors afficher "Prix sur
+ * demande", jamais 0 FCFA.
+ */
+export function getDisplayPrice(property) {
+  if (!property) return { amount: 0, hasPrice: false, suffix: '' };
+  const listingType = normalizeListingType(property);
+
+  if (listingType === 'hebergement') {
+    const rates = property.accommodation?.rates;
+    if (Array.isArray(rates) && rates.length > 0) {
+      const preferredOrder = ['nightly', 'weekly', 'monthly', 'yearly'];
+      const best = preferredOrder.map((mode) => rates.find((r) => r.mode === mode)).find(Boolean) || rates[0];
+      if (best && Number(best.amount) > 0) {
+        return { amount: Number(best.amount), hasPrice: true, suffix: RATE_MODE_PRICE_LABELS[best.mode] || '' };
+      }
+    }
+    const fallback = Number(property.price || 0);
+    return fallback > 0 ? { amount: fallback, hasPrice: true, suffix: '' } : { amount: 0, hasPrice: false, suffix: '' };
+  }
+
+  const amount = Number(property.price || property.prix || 0);
+  if (amount <= 0) return { amount: 0, hasPrice: false, suffix: '' };
+  return { amount, hasPrice: true, suffix: listingType === 'location' ? '/ mois' : '' };
 }

@@ -67,3 +67,40 @@ export async function creerAnnonce(payload) {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Hébergement (Accommodation) — correctif robustesse 2026-07. L'ancien parcours
+// enchaînait 4 appels HTTP indépendants (Property → Accommodation → RatePlan →
+// submit) depuis le mobile ; un échec en cours de route pouvait laisser des
+// données partielles en base sans reprise fiable. Remplacé par un appel unique
+// vers une route backend atomique (transaction Mongo) et idempotente :
+// POST /accommodations/mobile/full. Le mobile ne fait plus d'orchestration
+// métier — il envoie tout le payload en une fois et laisse le backend garantir
+// l'atomicité et l'unicité (voir mobileAccommodationPublicationService.js).
+//
+// `publicationRequestId` doit être généré une seule fois par tentative de
+// publication (côté écran) et réutilisé à l'identique pour chaque retry — voir
+// AddAccommodationScreen.jsx. Une nouvelle valeur ne doit être générée que pour
+// une toute nouvelle publication (jamais pour rejouer un échec).
+// ─────────────────────────────────────────────────────────────────────────
+
+export async function createFullAccommodationMobile({ publicationRequestId, property, accommodation, ratePlan }) {
+  try {
+    const res = await api.post('/accommodations/mobile/full', {
+      publicationRequestId,
+      property,
+      accommodation,
+      ratePlan,
+    });
+    const data = res.data?.data || {};
+    return { property: data.property, accommodation: data.accommodation, rate: data.rate };
+  } catch (err) {
+    const message = err.response?.data?.message
+      || err.response?.data?.error
+      || 'Erreur lors de la publication de l\'hébergement';
+    const wrapped = new Error(message);
+    wrapped.code = err.response?.data?.code;
+    wrapped.isNetworkError = !err.response;
+    throw wrapped;
+  }
+}

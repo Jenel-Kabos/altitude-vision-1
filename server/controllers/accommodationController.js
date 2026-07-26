@@ -4,7 +4,7 @@ const Accommodation = require('../models/Accommodation');
 const RatePlan = require('../models/RatePlan');
 const Property = require('../models/Property');
 const {
-  evaluateReadiness, serializeAccommodation,
+  evaluateReadiness, serializeAccommodation, isPubliclyVisible,
   createFullAccommodation, updateFullAccommodation,
   computeCompletionScore, duplicateAccommodation, deleteAccommodation,
   listAccommodationsForAdmin,
@@ -17,6 +17,7 @@ const {
   parseNumericField,
 } = require('./propertyController');
 const { destroyFromCloudinary } = require('../config/cloudinary');
+const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
 
 const fail = (res, statusCode, message, extra = {}) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...extra });
@@ -241,6 +242,35 @@ async function buildPropertyData(req, ownerId) {
 }
 
 // ─────────────────────────────────────────────
+// POST /api/accommodations/mobile/full — publication mobile atomique et
+// idempotente (Property + Accommodation + RatePlan + soumission en une seule
+// transaction Mongo, correctif robustesse 2026-07). Contrôleur volontairement
+// mince : toute la logique vit dans mobileAccommodationPublicationService.js
+// (réutilisée telle quelle par de futurs points d'entrée si besoin).
+// ─────────────────────────────────────────────
+exports.createFullMobile = async (req, res) => {
+  const { publicationRequestId, property, accommodation, ratePlan } = req.body || {};
+  try {
+    const result = await createFullMobileAccommodation({
+      user: req.user,
+      payload: { property, accommodation, ratePlan },
+      publicationRequestId,
+    });
+    return res.status(result.idempotent ? 200 : 201).json({
+      status: 'success',
+      data: {
+        property: result.property,
+        accommodation: serializeAccommodation(result.accommodation, result.rate ? [result.rate] : []),
+        rate: result.rate,
+      },
+    });
+  } catch (error) {
+    const statusCode = error.statusCode || (error.name === 'ValidationError' ? 400 : 500);
+    return fail(res, statusCode, error.message, error.code ? { code: error.code, ...error.extra } : {});
+  }
+};
+
+// ─────────────────────────────────────────────
 // POST /api/accommodations — propriétaire crée le profil hébergement
 // ─────────────────────────────────────────────
 exports.create = async (req, res) => {
@@ -308,6 +338,40 @@ exports.mine = async (req, res) => {
       };
     }));
     res.json({ status: 'success', data: { accommodations: withScore } });
+  } catch (error) {
+    fail(res, 500, error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// GET /api/accommodations/public/:id — détail public (correctif crash mobile
+// DetailAnnonceScreen, 2026-07 : aucune route de détail Accommodation publique
+// n'existait auparavant — cf. mission). Lecture seule, aucune authentification.
+// Mêmes règles de visibilité que la recherche publique (isPubliclyVisible) :
+// Accommodation publiée + active, Property validée + disponible.
+// ─────────────────────────────────────────────
+exports.getPublic = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const accommodation = await Accommodation.findOne({
+      _id: req.params.id, publicationStatus: 'publie', active: { $ne: false },
+    }).populate('property');
+    if (!accommodation || !isPubliclyVisible(accommodation.property, accommodation)) {
+      return fail(res, 404, 'Hébergement introuvable.');
+    }
+    const rates = await getActiveRates(accommodation._id);
+    const property = accommodation.property.toObject ? accommodation.property.toObject() : accommodation.property;
+    res.json({
+      status: 'success',
+      data: {
+        property: {
+          ...property,
+          accommodationType: accommodation.accommodationType,
+          accommodationId: accommodation._id,
+          accommodation: serializeAccommodation(accommodation, rates),
+        },
+      },
+    });
   } catch (error) {
     fail(res, 500, error.message);
   }

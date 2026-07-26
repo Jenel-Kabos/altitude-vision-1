@@ -8,7 +8,7 @@ import {
   Menu, X, LayoutDashboard, Building, LogOut,
   UserCircle, Heart, MessageCircle, UserPlus,
   LogIn, ChevronDown, Home, Phone, Newspaper, ArrowUpRight, Smartphone,
-  CreditCard, Calendar, Landmark, KeyRound, Palmtree,
+  CreditCard, Calendar, Landmark, KeyRound, Palmtree, LayoutGrid,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getConversationsUnreadCount } from '../../services/unreadCountService';
@@ -20,14 +20,20 @@ const NAV_LINKS = [
   {
     // Sprint 0 (architecture Altimmo) — remplace l'ancien lien générique
     // "Toutes les annonces" par une navigation par intention métier. Chaque
-    // route réutilise le listing existant (AltimmoAnnonces) via ?status=
-    // (et ?type= pour Séjourner) — voir server/docs/ARCHITECTURE_ALTIMMO_V2.md.
+    // route réutilise le listing existant (AltimmoAnnonces) via ?offerType=
+    // (nomenclature canonique, voir audit filtrage Altimmo) — voir
+    // server/docs/ARCHITECTURE_ALTIMMO_V2.md. Acheter/Louer pointent
+    // directement vers le listing filtré (les anciennes routes vanity
+    // /immobilier/acheter,louer n'étaient qu'une redirection serveur vers ce
+    // même listing) ; Séjourner conserve sa page de contenu dédiée
+    // (SejournerLandingPage), distincte d'une simple redirection.
     to: '/immobilier',    label: 'Altimmo',     Icon: Building,
     children: [
-      { to: '/immobilier/acheter',   label: 'Acheter',    Icon: Landmark, desc: 'Maisons, appartements, terrains…' },
-      { to: '/immobilier/louer',     label: 'Louer',      Icon: KeyRound, desc: 'Location longue durée avec bail' },
-      { to: '/immobilier/sejourner', label: 'Séjourner',  Icon: Palmtree, desc: 'Meublés à la nuitée & hôtels' },
-      { to: '/altimmo/application',  label: 'App Altimmo', Icon: null,    desc: "Télécharger l'app" },
+      { to: '/immobilier',                              label: 'Immobilier', Icon: LayoutGrid, desc: 'Découvrir toutes nos offres' },
+      { to: '/immobilier/annonces?offerType=vente',      label: 'Acheter',    Icon: Landmark, desc: 'Maisons, appartements, terrains…' },
+      { to: '/immobilier/annonces?offerType=location',   label: 'Louer',      Icon: KeyRound, desc: 'Location longue durée avec bail' },
+      { to: '/immobilier/sejourner',                     label: 'Séjourner',  Icon: Palmtree, desc: 'Meublés à la nuitée & hôtels' },
+      { to: '/altimmo/application',                      label: 'App Altimmo', Icon: null,    desc: "Télécharger l'app" },
     ],
   },
   { to: '/evenementiel',  label: 'Mila Events', Icon: null      },
@@ -506,6 +512,7 @@ const Header = () => {
                             <Link
                               key={child.to}
                               href={child.to}
+                              onClick={() => setMobile(false)}
                               style={{
                                 display: 'flex', alignItems: 'center', gap: '10px',
                                 padding: '12px 14px', borderRadius: '6px',

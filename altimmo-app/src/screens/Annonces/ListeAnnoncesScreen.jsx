@@ -371,7 +371,10 @@ export default function ListeAnnoncesScreen({ navigation }) {
   }, [hasMore, loadingMore, loading, page, activeFilters, chargerPage]);
 
   const handlePressItem = useCallback((item) => {
-    navigation.navigate('DetailAnnonce', { annonce: item });
+    // Convention canonique de navigation détail (correctif crash mobile) — `item` reste
+    // transmis pour un affichage immédiat, `resourceId` (Property._id) permet le
+    // rafraîchissement/rechargement même pour un item hébergement (accommodationType attaché).
+    navigation.navigate('DetailAnnonce', { resourceType: 'property', resourceId: item._id || item.id, item });
   }, [navigation]);
 
   const onSearchSubmit = useCallback((filters) => {
@@ -393,7 +396,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
 
   // ─── Callbacks stables (AVANT tout return conditionnel) ───
   const onPressRecommended = useCallback(
-    (item) => navigation.navigate('DetailAnnonce', { annonce: item }),
+    (item) => navigation.navigate('DetailAnnonce', { resourceType: 'property', resourceId: item._id || item.id, item }),
     [navigation],
   );
   const onPressNotifications = useCallback(

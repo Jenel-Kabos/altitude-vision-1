@@ -151,7 +151,7 @@ export default function FavorisScreen({ navigation }) {
   const renderItem = useCallback(({ item }) => (
     <FavCard
       item={item}
-      onPress={() => navigation.navigate('DetailAnnonce', { annonce: item })}
+      onPress={() => navigation.navigate('DetailAnnonce', { resourceType: 'property', resourceId: item._id || item.id, item })}
       styles={styles}
       c={c}
     />

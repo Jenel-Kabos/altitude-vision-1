@@ -1,10 +1,14 @@
 const express = require('express');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/accommodationController');
-const { ROLES_ALTIMMO } = require('../utils/roles');
+const { ROLES_ALTIMMO, STAFF_CM } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
 
 const router = express.Router();
+
+// Public (correctif crash mobile DetailAnnonceScreen) — AVANT auth.protect.
+router.get('/public/:id', ctrl.getPublic);
+
 router.use(auth.protect);
 
 // Staff (dashboard admin) — création/édition complète Property+Accommodation+
@@ -14,6 +18,12 @@ router.post('/admin', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 
 router.put('/admin/:propertyId', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.updateFull);
 router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), ctrl.listAdmin);
 router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), ctrl.pending);
+
+// Mobile — publication atomique et idempotente (correctif robustesse 2026-07,
+// Property + Accommodation + RatePlan + soumission en une transaction). Mêmes
+// rôles que POST /api/properties/mobile (seule route qui crée une Property
+// depuis l'app) — jamais ouverte à un rôle qui ne peut pas publier de bien.
+router.post('/mobile/full', auth.restrictTo(...STAFF_CM, 'Proprietaire'), ctrl.createFullMobile);
 
 // Propriétaire
 router.get('/mine', ctrl.mine);

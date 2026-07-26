@@ -19,7 +19,10 @@ import { useTheme } from '../../context/ThemeContext';
 import { Screen, PrixFCFA } from '../../components';
 import HeartFavoriteButton from '../../components/HeartFavoriteButton';
 import { fonts, fontSize, spacing, radius } from '../../theme';
-import { getPropertyPermissions, extractConversation, resolveContactErrorMessage } from '../../services/propertyMapper';
+import {
+  getPropertyPermissions, extractConversation, resolveContactErrorMessage,
+  resolveDetailParams, fetchAnnonceDetail, getDisplayPrice,
+} from '../../services/propertyMapper';
 import { formatDateFR, formatTimeHHmm, isFutureDateTime, buildVisitPayload, fetchAvailability } from '../../services/visiteService';
 
 const { width } = Dimensions.get('window');
@@ -125,7 +128,16 @@ const CommentItem = React.memo(function CommentItem({ review, formatDate, styles
 // ─── Écran principal ──────────────────────────────────────────────────────────
 
 export default function DetailAnnonceScreen({ route, navigation }) {
-  const [annonce, setAnnonce]           = useState(route.params.annonce);
+  // Correctif crash mobile (2026-07) — convention canonique de navigation
+  // { resourceType, resourceId, item } compatible avec les anciens formats
+  // ({ annonce }, { propertyId }, { id } deep-link/notification, { accommodationId }
+  // anticipé). Voir propertyMapper.resolveDetailParams.
+  const { resourceType, resourceId, item: initialItem } = useMemo(
+    () => resolveDetailParams(route.params), [route.params],
+  );
+  const [annonce, setAnnonce]           = useState(initialItem);
+  const [loading, setLoading]           = useState(!initialItem);
+  const [loadError, setLoadError]       = useState(null);
   const { user }                        = useAuth();
   const { themeColors: c }              = useTheme();
   const styles                          = useMemo(() => makeStyles(c), [c]);
@@ -178,17 +190,25 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     }, 4000);
     return () => clearInterval(timer);
   }, [photos?.length, playingIndex]);
-  const prix        = useMemo(() => annonce.price  || annonce.prix   || 0,  [annonce]);
-  const title       = useMemo(() => annonce.title  || annonce.titre  || 'Bien immobilier', [annonce]);
-  const description = useMemo(() => annonce.description || '', [annonce]);
-  const typeLabel   = useMemo(() => annonce.type || '', [annonce]);
+  // Correctif crash (2026-07) — `annonce` peut être `undefined` pendant le chargement
+  // (navigation par identifiant seul, sans objet transmis) : chaque lecture est
+  // volontairement défensive (`annonce?.x`) ICI, mais l'écran ne rend son contenu qu'après
+  // le gate loading/error ci-dessous — le `?.` seul ne "résout" rien, il évite juste le crash
+  // pendant les rendus (inévitables, règles des hooks) qui précèdent ce gate.
+  const displayPrice = useMemo(() => getDisplayPrice(annonce), [annonce]);
+  const prix         = displayPrice.amount;
+  const hasPrice      = displayPrice.hasPrice;
+  const priceSuffix   = displayPrice.suffix;
+  const title       = useMemo(() => annonce?.title  || annonce?.titre  || 'Bien immobilier', [annonce]);
+  const description = useMemo(() => annonce?.description || '', [annonce]);
+  const typeLabel   = useMemo(() => annonce?.type || '', [annonce]);
   const isLocation  = useMemo(() => {
     const loc = 'location';
-    return [annonce.transactionType, annonce.status, annonce.category, annonce.type, annonce.listingType]
+    return [annonce?.transactionType, annonce?.status, annonce?.category, annonce?.type, annonce?.listingType]
       .some(v => v?.toLowerCase() === loc);
   }, [annonce]);
   const isHebergement = useMemo(
-    () => [annonce.status, annonce.category].some(v => v?.toLowerCase() === 'hebergement'),
+    () => [annonce?.status, annonce?.category].some(v => v?.toLowerCase() === 'hebergement'),
     [annonce],
   );
 
@@ -196,27 +216,27 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   // sinon formule par défaut (cohérente avec le web — PropertyDetailPage.jsx).
   // Hébergement n'a pas de règle d'honoraires liée à un mandat — pas de formule.
   const honoraires  = useMemo(() => {
-    if (annonce.honoraires != null) return annonce.honoraires;
+    if (annonce?.honoraires != null) return annonce.honoraires;
     if (isHebergement) return 0;
     return isLocation ? Math.round(prix * 0.8) : Math.round(prix * 0.1);
   }, [annonce, isLocation, isHebergement, prix]);
-  const fraisVisite = useMemo(() => annonce.fraisVisite ?? 0, [annonce]);
+  const fraisVisite = useMemo(() => annonce?.fraisVisite ?? 0, [annonce]);
 
   const addressText = useMemo(() => {
-    const arr  = annonce.address?.arrondissement || annonce.location?.neighborhood || '';
-    const city = annonce.address?.city           || annonce.location?.city          || annonce.city || '';
+    const arr  = annonce?.address?.arrondissement || annonce?.location?.neighborhood || '';
+    const city = annonce?.address?.city           || annonce?.location?.city          || annonce?.city || '';
     return [arr, city].filter(Boolean).join(' · ');
   }, [annonce]);
 
-  const surface     = useMemo(() => annonce.surface   || annonce.area     || 0, [annonce]);
-  const bedrooms    = useMemo(() => annonce.bedrooms  || annonce.chambres || 0, [annonce]);
-  const bathrooms   = useMemo(() => annonce.bathrooms || 0, [annonce]);
-  const livingRooms = useMemo(() => annonce.livingRooms || 0, [annonce]);
-  const kitchens    = useMemo(() => annonce.kitchens    || 0, [annonce]);
+  const surface     = useMemo(() => annonce?.surface   || annonce?.area     || 0, [annonce]);
+  const bedrooms    = useMemo(() => annonce?.bedrooms  || annonce?.chambres || 0, [annonce]);
+  const bathrooms   = useMemo(() => annonce?.bathrooms || 0, [annonce]);
+  const livingRooms = useMemo(() => annonce?.livingRooms || 0, [annonce]);
+  const kitchens    = useMemo(() => annonce?.kitchens    || 0, [annonce]);
   const floor       = useMemo(() =>
-    annonce.floor != null ? annonce.floor : (annonce.etage ?? null), [annonce]);
-  const commodites  = useMemo(() => annonce.amenities || annonce.commodites || [], [annonce]);
-  const reviews     = useMemo(() => annonce.reviews  || annonce.comments   || [], [annonce]);
+    annonce?.floor != null ? annonce.floor : (annonce?.etage ?? null), [annonce]);
+  const commodites  = useMemo(() => annonce?.amenities || annonce?.commodites || [], [annonce]);
+  const reviews     = useMemo(() => annonce?.reviews  || annonce?.comments   || [], [annonce]);
 
   // Permissions d'action (contact / visite) — calculées côté client à partir
   // des champs backend (owner, availability, statusAdmin, isPublished).
@@ -224,12 +244,12 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   const permissions = useMemo(() => getPropertyPermissions(annonce, user), [annonce, user]);
 
   // Agent / propriétaire
-  const agentName   = useMemo(() => annonce.owner?.name || annonce.agent?.name || null, [annonce]);
-  const agentPhoto  = useMemo(() => annonce.owner?.photo || annonce.agent?.photo || null, [annonce]);
+  const agentName   = useMemo(() => annonce?.owner?.name || annonce?.agent?.name || null, [annonce]);
+  const agentPhoto  = useMemo(() => annonce?.owner?.photo || annonce?.agent?.photo || null, [annonce]);
 
   // Engagement
-  const viewsCount  = useMemo(() => annonce.views  || 0, [annonce]);
-  const sharesCount = useMemo(() => annonce.shares || 0, [annonce]);
+  const viewsCount  = useMemo(() => annonce?.views  || 0, [annonce]);
+  const sharesCount = useMemo(() => annonce?.shares || 0, [annonce]);
 
   // Features visibles
   const featureItems = useMemo(() => {
@@ -255,24 +275,49 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   [showAllComments, reviews]);
   const hasMoreComments = reviews.length > COMMENTS_MAX;
 
-  // ─── API ───
+  // ─── Chargement du détail ───
+  // Couvre les 4 chemins de navigation (mission) : objet `annonce` historique déjà présent
+  // (affiché immédiatement, rafraîchi en tâche de fond), `propertyId`/`id` (deep-link,
+  // notification push), `accommodationId` (anticipé). `resourceType='property'` couvre aussi
+  // bien Vente/Location que Hébergement (un item hébergement de /altimmo/search est toujours
+  // un Property avec `accommodationType` attaché — voir accommodationSearchService.js côté
+  // serveur), donc `GET /properties/:id` suffit dans l'immense majorité des cas ;
+  // `resourceType='accommodation'` cible `GET /accommodations/public/:id` (nouvelle route
+  // publique, correctif backend justifié : aucune n'existait avant).
   useEffect(() => {
-    api.get(`/properties/${annonce._id}`)
-      .then(res => {
-        const full = res.data?.data?.property || res.data?.property;
-        if (full) setAnnonce(full);
+    let cancelled = false;
+    if (!resourceType || !resourceId) {
+      if (!initialItem) { setLoadError('missing-identifier'); setLoading(false); }
+      return undefined;
+    }
+    if (!initialItem) setLoading(true);
+    fetchAnnonceDetail({ resourceType, resourceId })
+      .then((full) => {
+        if (cancelled) return;
+        setAnnonce(full);
+        setLoadError(null);
       })
-      .catch(() => {});
-  }, [annonce._id]);
+      .catch((err) => {
+        if (cancelled) return;
+        // Un objet déjà affiché (navigation historique) reste visible même si le
+        // rafraîchissement en tâche de fond échoue — comportement historique préservé.
+        if (!initialItem) {
+          setLoadError(err.response?.status === 404 ? 'not-found' : 'fetch-error');
+        }
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resourceType, resourceId]);
 
   // Même source que le web (PropertyDetailPage.jsx) : le compteur et l'état
   // "aimé" viennent de Property.likes[], jamais de la collection Like générique
   // (POST /likes) — ces deux systèmes ne sont pas synchronisés entre eux.
   useEffect(() => {
-    const likes = Array.isArray(annonce.likes) ? annonce.likes : [];
+    const likes = Array.isArray(annonce?.likes) ? annonce.likes : [];
     setLikesCount(likes.length);
     setFavori(!!user?._id && likes.some(id => (id?._id || id)?.toString() === user._id.toString()));
-  }, [annonce.likes, user?._id]);
+  }, [annonce?.likes, user?._id]);
 
   // ─── Actions ───
   const toggleFavori = useCallback(async () => {
@@ -282,17 +327,17 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     setFavori(next);
     setLikesCount(n => next ? n + 1 : Math.max(0, n - 1));
     try {
-      await api.post(`/properties/${annonce._id}/like`);
+      await api.post(`/properties/${annonce?._id}/like`);
     } catch {
       setFavori(!next);
       setLikesCount(n => next ? Math.max(0, n - 1) : n + 1);
       Alert.alert('Erreur', 'Impossible de mettre à jour vos favoris.');
     }
-  }, [annonce._id, favori, isLoggedIn, navigation]);
+  }, [annonce?._id, favori, isLoggedIn, navigation]);
 
   const partagerBien = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const webLink = `https://altitudevision.agency/annonces/${annonce._id}`;
+    const webLink = `https://altitudevision.agency/annonces/${annonce?._id}`;
     try {
       await Share.share({
         title:   title,
@@ -305,18 +350,18 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       // envoyé le contenu au destinataire. Ce compteur mesure donc les
       // "ouvertures/lancements de partage", pas les envois confirmés — même
       // convention que le web (PropertyDetailPage.jsx).
-      api.post(`/properties/${annonce._id}/share`).catch(() => {});
+      api.post(`/properties/${annonce?._id}/share`).catch(() => {});
     } catch { /* annulé */ }
-  }, [annonce._id, title, addressText, prix]);
+  }, [annonce?._id, title, addressText, prix]);
 
   const envoyerCommentaire = useCallback(async () => {
     if (!commentaire.trim()) return;
     if (!isLoggedIn) { navigation.navigate('Login'); return; }
     setEnvoi(true);
     try {
-      await api.post(`/properties/${annonce._id}/reviews`, { comment: commentaire, rating: 5 });
+      await api.post(`/properties/${annonce?._id}/reviews`, { comment: commentaire, rating: 5 });
       setCommentaire('');
-      const res = await api.get(`/properties/${annonce._id}`);
+      const res = await api.get(`/properties/${annonce?._id}`);
       const full = res.data?.data?.property || res.data?.property;
       if (full) setAnnonce(full);
     } catch {
@@ -324,7 +369,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     } finally {
       setEnvoi(false);
     }
-  }, [annonce._id, commentaire, isLoggedIn, navigation]);
+  }, [annonce?._id, commentaire, isLoggedIn, navigation]);
 
   const demanderVisite = useCallback(() => {
     if (!isLoggedIn) { navigation.navigate('Login'); return; }
@@ -352,7 +397,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     setRdvSlotsLoading(true);
     setRdvSlotsError(null);
     try {
-      const data = await fetchAvailability(annonce._id, date);
+      const data = await fetchAvailability(annonce?._id, date);
       setRdvSlots(data);
     } catch {
       setRdvSlots(null);
@@ -360,7 +405,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     } finally {
       setRdvSlotsLoading(false);
     }
-  }, [annonce._id]);
+  }, [annonce?._id]);
 
   const onChangeRdvDate = useCallback((event, selected) => {
     setRdvDatePickerVisible(Platform.OS === 'ios');
@@ -379,7 +424,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   const soumettreRdv = useCallback(async () => {
     if (rdvSubmittingRef.current) return;
-    if (!annonce._id) {
+    if (!annonce?._id) {
       Alert.alert('Erreur', 'Bien invalide.');
       return;
     }
@@ -401,12 +446,12 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       const dateLabel  = formatDateFR(rdvDate);
       const heureLabel = formatTimeHHmm(rdvHeure);
       const convRes = await api.post('/conversations/start', {
-        propertyId: annonce._id,
+        propertyId: annonce?._id,
         message: `Demande de visite le ${dateLabel} à ${heureLabel}. Tél: ${rdvTelephone}${rdvMessage ? '. ' + rdvMessage : ''}`,
       });
       const conversation = extractConversation(convRes);
       await api.post('/visites', buildVisitPayload({
-        propertyId: annonce._id,
+        propertyId: annonce?._id,
         conversationId: conversation?._id,
         selectedDate: rdvDate,
         selectedTime: rdvHeure,
@@ -438,7 +483,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       rdvSubmittingRef.current = false;
       setRdvLoading(false);
     }
-  }, [annonce._id, rdvDate, rdvHeure, rdvTelephone, rdvMessage, rdvConsent, navigation]);
+  }, [annonce?._id, rdvDate, rdvHeure, rdvTelephone, rdvMessage, rdvConsent, navigation]);
 
   const closeRdvModal = useCallback(() => {
     setRdvModalVisible(false);
@@ -455,7 +500,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     setContactLoading(true);
     try {
       const convRes = await api.post('/conversations/start', {
-        propertyId: annonce._id,
+        propertyId: annonce?._id,
         message: `Bonjour, je suis intéressé(e) par : ${title}`,
       });
       const conversation = extractConversation(convRes);
@@ -469,7 +514,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     } finally {
       setContactLoading(false);
     }
-  }, [annonce._id, title, isLoggedIn, navigation, permissions, contactLoading]);
+  }, [annonce?._id, title, isLoggedIn, navigation, permissions, contactLoading]);
 
   const onGalleryScroll = useCallback((e) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -510,7 +555,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     setSignalEnvoi(true);
     try {
       await api.post('/signalements', {
-        propertyId: annonce._id,
+        propertyId: annonce?._id,
         raison:     signalRaison,
         details:    signalDetails.trim(),
       });
@@ -527,7 +572,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
     } finally {
       setSignalEnvoi(false);
     }
-  }, [signalRaison, signalDetails, annonce._id, isLoggedIn, navigation]);
+  }, [signalRaison, signalDetails, annonce?._id, isLoggedIn, navigation]);
 
   const galleryKeyExtractor = useCallback((_, i) => String(i), []);
 
@@ -552,6 +597,43 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       />
     );
   }, [playingIndex, styles]);
+
+  // ─── Garde de rendu (correctif crash 2026-07) ───
+  // Toujours placé APRÈS tous les hooks (règles des hooks respectées — aucun hook n'est
+  // appelé conditionnellement) : tant que `annonce` n'est pas chargée, on n'affiche jamais le
+  // contenu détaillé (qui lit `annonce.price`, `.title`, `.images`, etc.), seulement un état
+  // de chargement ou d'erreur explicite avec retour arrière.
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.root, styles.centerState]}>
+        <ActivityIndicator size="large" color={c.gold} />
+        <Text style={styles.centerStateText}>Chargement de l'annonce…</Text>
+      </SafeAreaView>
+    );
+  }
+  if (loadError || !annonce) {
+    const message = loadError === 'not-found'
+      ? "Cette annonce est introuvable ou n'est plus disponible."
+      : loadError === 'missing-identifier'
+        ? 'Impossible d’ouvrir cette annonce : identifiant manquant.'
+        : "Impossible de charger cette annonce. Vérifiez votre connexion puis réessayez.";
+    return (
+      <SafeAreaView style={[styles.root, styles.centerState]}>
+        <Ionicons name="alert-circle-outline" size={40} color={c.textMuted} />
+        <Text style={styles.centerStateText}>{message}</Text>
+        <TouchableOpacity
+          style={styles.centerStateBtn}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
+          <Ionicons name="arrow-back" size={16} color={c.gold} />
+          <Text style={styles.centerStateBtnText}>Retour</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -645,10 +727,17 @@ export default function DetailAnnonceScreen({ route, navigation }) {
             {/* Divider */}
             <View style={styles.heroDivider} />
 
-            {/* Prix */}
+            {/* Prix — jamais inventé : "Prix sur demande" si aucune valeur positive
+                n'est disponible (vente/location/hébergement), voir getDisplayPrice. */}
             <View style={styles.priceRow}>
-              <PrixFCFA montant={prix} style={styles.priceFlex} />
-              {isLocation && <Text style={styles.priceSuffix}> / mois</Text>}
+              {hasPrice ? (
+                <>
+                  <PrixFCFA montant={prix} style={styles.priceFlex} />
+                  {priceSuffix ? <Text style={styles.priceSuffix}> {priceSuffix}</Text> : null}
+                </>
+              ) : (
+                <Text style={styles.priceOnRequest}>Prix sur demande</Text>
+              )}
             </View>
           </Animated.View>
 
@@ -1376,6 +1465,20 @@ const makeStyles = (c) => {
     root:          { flex: 1, backgroundColor: c.bg },
     scrollContent: { padding: 0, paddingBottom: 120 },
 
+    // ── États chargement / erreur (correctif crash 2026-07) ──
+    centerState: {
+      flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32,
+    },
+    centerStateText: {
+      fontFamily: fonts.body, fontSize: fontSize.sm, color: c.textMuted, textAlign: 'center',
+    },
+    centerStateBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8,
+      paddingHorizontal: 18, paddingVertical: 10, borderRadius: radius.sm,
+      borderWidth: 1, borderColor: c.border,
+    },
+    centerStateBtnText: { fontFamily: fonts.bodyMedium, fontSize: fontSize.sm, color: c.gold },
+
     // ── Galerie ──
     galleryWrap: {
       width,
@@ -1537,6 +1640,11 @@ const makeStyles = (c) => {
       fontSize: fontSize.sm,
       color: c.textMuted,
       marginLeft: 2,
+    },
+    priceOnRequest: {
+      fontFamily: fonts.display,
+      fontSize: fontSize.display,
+      color: c.textMuted,
     },
 
     // ── Engagement bar ──

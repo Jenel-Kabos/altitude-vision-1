@@ -1,3 +1,9 @@
+jest.mock('../api', () => ({
+  __esModule: true,
+  default: { get: jest.fn() },
+}));
+
+import api from '../api';
 import {
   normalizeListingType,
   isPropertyOwner,
@@ -6,6 +12,9 @@ import {
   getRentalConditions,
   extractConversation,
   resolveContactErrorMessage,
+  resolveDetailParams,
+  fetchAnnonceDetail,
+  getDisplayPrice,
 } from '../propertyMapper';
 
 describe('normalizeListingType', () => {
@@ -270,5 +279,109 @@ describe('resolveContactErrorMessage', () => {
   test('retombe sur un message générique sans exposer l\'erreur Axios brute', () => {
     const err = { message: 'AxiosError: Network Error at line 42 in internal module' };
     expect(resolveContactErrorMessage(err)).toBe("Impossible d'ouvrir la messagerie.");
+  });
+});
+
+describe('resolveDetailParams', () => {
+  test('convention canonique déjà fournie : passe-plat', () => {
+    const item = { _id: 'p1' };
+    expect(resolveDetailParams({ resourceType: 'accommodation', resourceId: 'a1', item }))
+      .toEqual({ resourceType: 'accommodation', resourceId: 'a1', item });
+  });
+
+  test('navigation historique { annonce } : objet complet, resourceType toujours "property"', () => {
+    const annonce = { _id: 'p1', price: 100000 };
+    expect(resolveDetailParams({ annonce })).toEqual({ resourceType: 'property', resourceId: 'p1', item: annonce });
+  });
+
+  test('navigation historique { annonce } avec "id" plutôt que "_id"', () => {
+    const annonce = { id: 'p2' };
+    expect(resolveDetailParams({ annonce })).toEqual({ resourceType: 'property', resourceId: 'p2', item: annonce });
+  });
+
+  test('deep-link { propertyId } seul : pas d\'item, resourceType "property"', () => {
+    expect(resolveDetailParams({ propertyId: 'p3' })).toEqual({ resourceType: 'property', resourceId: 'p3', item: null });
+  });
+
+  test('{ accommodationId } seul : resourceType "accommodation"', () => {
+    expect(resolveDetailParams({ accommodationId: 'a2' })).toEqual({ resourceType: 'accommodation', resourceId: 'a2', item: null });
+  });
+
+  test('notification push { id } seul : traité comme "property"', () => {
+    expect(resolveDetailParams({ id: 'p4' })).toEqual({ resourceType: 'property', resourceId: 'p4', item: null });
+  });
+
+  test('aucun identifiant exploitable : tout à null (pas de crash)', () => {
+    expect(resolveDetailParams({})).toEqual({ resourceType: null, resourceId: null, item: null });
+    expect(resolveDetailParams(undefined)).toEqual({ resourceType: null, resourceId: null, item: null });
+  });
+});
+
+describe('fetchAnnonceDetail', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('appelle GET /properties/:id pour resourceType="property"', async () => {
+    api.get.mockResolvedValueOnce({ data: { data: { property: { _id: 'p1' } } } });
+    const result = await fetchAnnonceDetail({ resourceType: 'property', resourceId: 'p1' });
+    expect(api.get).toHaveBeenCalledWith('/properties/p1');
+    expect(result).toEqual({ _id: 'p1' });
+  });
+
+  test('appelle GET /accommodations/public/:id pour resourceType="accommodation"', async () => {
+    api.get.mockResolvedValueOnce({ data: { data: { property: { _id: 'p1', accommodationId: 'a1' } } } });
+    await fetchAnnonceDetail({ resourceType: 'accommodation', resourceId: 'a1' });
+    expect(api.get).toHaveBeenCalledWith('/accommodations/public/a1');
+  });
+
+  test('lève une erreur explicite si resourceType/resourceId manquent (jamais un appel API silencieux)', async () => {
+    await expect(fetchAnnonceDetail({ resourceType: null, resourceId: null })).rejects.toThrow();
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
+  test('lève une erreur si la réponse ne contient pas de property (ex. 404)', async () => {
+    api.get.mockResolvedValueOnce({ data: { data: {} } });
+    await expect(fetchAnnonceDetail({ resourceType: 'property', resourceId: 'p1' })).rejects.toThrow();
+  });
+
+  test('propage l\'erreur (ex. 404 HTTP) à l\'appelant sans la masquer', async () => {
+    const err = { response: { status: 404 } };
+    api.get.mockRejectedValueOnce(err);
+    await expect(fetchAnnonceDetail({ resourceType: 'property', resourceId: 'p1' })).rejects.toBe(err);
+  });
+});
+
+describe('getDisplayPrice', () => {
+  test('propriété absente : pas de prix, jamais de crash', () => {
+    expect(getDisplayPrice(undefined)).toEqual({ amount: 0, hasPrice: false, suffix: '' });
+  });
+
+  test('vente : prix brut, sans suffixe', () => {
+    expect(getDisplayPrice({ status: 'vente', price: 50000000 })).toEqual({ amount: 50000000, hasPrice: true, suffix: '' });
+  });
+
+  test('location : prix avec suffixe "/ mois"', () => {
+    expect(getDisplayPrice({ status: 'location', price: 250000 })).toEqual({ amount: 250000, hasPrice: true, suffix: '/ mois' });
+  });
+
+  test('prix absent ou nul : hasPrice=false ("Prix sur demande" côté écran), jamais 0 affiché comme un vrai prix', () => {
+    expect(getDisplayPrice({ status: 'vente', price: 0 })).toEqual({ amount: 0, hasPrice: false, suffix: '' });
+    expect(getDisplayPrice({ status: 'location' })).toEqual({ amount: 0, hasPrice: false, suffix: '' });
+  });
+
+  test('hébergement : priorise le tarif nightly de accommodation.rates', () => {
+    const property = {
+      status: 'hebergement',
+      price: 999999,
+      accommodation: { rates: [{ mode: 'monthly', amount: 400000 }, { mode: 'nightly', amount: 35000 }] },
+    };
+    expect(getDisplayPrice(property)).toEqual({ amount: 35000, hasPrice: true, suffix: '/ nuit' });
+  });
+
+  test('hébergement sans rates : retombe sur price si positif', () => {
+    expect(getDisplayPrice({ status: 'hebergement', price: 30000 })).toEqual({ amount: 30000, hasPrice: true, suffix: '' });
+  });
+
+  test('hébergement sans rates ni price : "Prix sur demande", jamais inventé', () => {
+    expect(getDisplayPrice({ status: 'hebergement' })).toEqual({ amount: 0, hasPrice: false, suffix: '' });
   });
 });
