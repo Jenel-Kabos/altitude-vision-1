@@ -35,11 +35,19 @@ describe('Accommodation model — occupancyMode ⟺ accommodationType (Sprint H�
   });
 
   test.each(['residence_hoteliere', 'chambre_hotes'])(
-    "%s (établissement de type hôtelier mais hors périmètre Hotel) reste en 'entire_place'",
+    "%s est un établissement Hotel en 'room_based'",
+    async (type) => {
+      const acc = base({ accommodationType: type, hotel: HOTEL_ID });
+      await expect(acc.validate()).resolves.toBeUndefined();
+      expect(acc.occupancyMode).toBe('room_based');
+    },
+  );
+
+  test.each(['hotel', 'residence_hoteliere', 'chambre_hotes'])(
+    '%s sans référence Hotel est rejeté',
     async (type) => {
       const acc = base({ accommodationType: type });
-      await expect(acc.validate()).resolves.toBeUndefined();
-      expect(acc.occupancyMode).toBe('entire_place');
+      await expect(acc.validate()).rejects.toThrow();
     },
   );
 

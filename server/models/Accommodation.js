@@ -51,7 +51,7 @@ const AMENITY_CATEGORIES = ['cuisine', 'salon', 'internet', 'exterieur', 'parkin
 // Types pour lesquels une référence Hotel est acceptée/pertinente. Les
 // logements meublés "entiers" classiques n'ont jamais de Hotel rattaché
 // (voir accommodationController.buildAccommodationData).
-const HOTEL_ACCOMMODATION_TYPES = ['hotel'];
+const HOTEL_ACCOMMODATION_TYPES = ['hotel', 'residence_hoteliere', 'chambre_hotes', 'autre'];
 
 const accommodationSchema = new mongoose.Schema(
   {

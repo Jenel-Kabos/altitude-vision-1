@@ -35,10 +35,13 @@ describe('ChoixTypeAnnonceScreen — parcours d\'entrée (mission §2)', () => {
     expect(navigate).toHaveBeenCalledWith('AddRentalProperty');
   });
 
-  test('sélectionner "Proposer un hébergement" ouvre AddAccommodation', () => {
+  test('sélectionner "Proposer un hébergement" affiche les deux familles puis ouvre le bon parcours', () => {
     const navigate = jest.fn();
     render(<ChoixTypeAnnonceScreen navigation={{ navigate }} />);
     fireEvent.press(screen.getByText('Proposer un hébergement'));
-    expect(navigate).toHaveBeenCalledWith('AddAccommodation');
+    expect(screen.getByText('Logement meublé')).toBeTruthy();
+    expect(screen.getByText('Établissement hôtelier')).toBeTruthy();
+    fireEvent.press(screen.getByText('Établissement hôtelier'));
+    expect(navigate).toHaveBeenCalledWith('AddAccommodation', { publicationKind: 'hotel_establishment' });
   });
 });

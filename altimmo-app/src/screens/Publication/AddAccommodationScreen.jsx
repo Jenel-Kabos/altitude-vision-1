@@ -6,13 +6,15 @@ import Input from '../../components/Input';
 import {
   StepHeader, StepFooter, ChipMultiSelect, PhotoManager, SummaryRow, Counter,
 } from '../../components/publication';
-import { PROPERTY_TYPES } from '../../constants/propertyTypes';
 import { VILLES, getArrondissementsFor } from '../../constants/locations';
-import { ACCOMMODATION_TYPES } from '../../constants/accommodation';
-import { ACCOMMODATION_AMENITY_GROUPS } from '../../constants/accommodationAmenities';
-import { accommodationSchema } from '../../utils/publicationValidation';
 import {
-  buildAccommodationPropertyPayload, buildAccommodationProfilePayload, buildAccommodationRatePayload,
+  FURNISHED_ACCOMMODATION_TYPES, HOTEL_ACCOMMODATION_TYPES,
+} from '../../constants/accommodation';
+import { ACCOMMODATION_AMENITY_GROUPS } from '../../constants/accommodationAmenities';
+import { furnishedAccommodationSchema, hotelAccommodationSchema } from '../../utils/publicationValidation';
+import {
+  buildFurnishedAccommodationPropertyPayload, buildFurnishedAccommodationProfilePayload,
+  buildHotelPropertyPayload, buildHotelProfilePayload, buildAccommodationRatePayload,
 } from '../../services/publicationPayloads';
 import { createFullAccommodationMobile, uploadToCloudinary } from '../../services/annonceService';
 import { useDraftAnnonce } from '../../hooks/useDraftAnnonce';
@@ -23,10 +25,6 @@ import { fonts, fontSize, spacing } from '../../theme';
 // (mission §6) — Property.type reste néanmoins requis par le schéma backend même
 // pour un bien "hebergement" (voir buildBasePropertyData), donc on restreint la liste
 // plutôt que de la masquer entièrement.
-const ACCOMMODATION_PROPERTY_TYPES = PROPERTY_TYPES.filter(
-  (t) => !['Terrain', 'Bureau', 'Commerce', 'Entrepôt'].includes(t.value),
-);
-
 const STEP_TITLES = {
   info: 'Type et informations',
   location: 'Localisation',
@@ -37,18 +35,29 @@ const STEP_TITLES = {
 };
 
 const baseForm = {
-  titre: '', description: '', type: '', accommodationType: '',
+  titre: '', establishmentName: '', description: '', accommodationType: '',
   ville: '', arrondissement: '', rue: '', surface: '',
   bedrooms: 0, bathrooms: 1, capaciteAdultes: 2, capaciteEnfants: 0, beds: 0,
   checkInTime: '14:00', checkOutTime: '11:00',
   tarifNuit: '', securityDeposit: '', cleaningFee: '',
   accommodationAmenities: {},
+  starRating: '', hasReception: false, hotelServices: {},
 };
 
-export default function AddAccommodationScreen({ navigation }) {
+const HOTEL_SERVICES = [
+  ['reception24h', 'Réception 24h/24'], ['restaurant', 'Restaurant'], ['parking', 'Parking'],
+  ['wifi', 'Wi-Fi'], ['piscine', 'Piscine'], ['salleConference', 'Salle de réunion'],
+  ['navette', 'Navette'], ['spa', 'Spa'], ['salleSport', 'Salle de sport'],
+];
+
+export default function AddAccommodationScreen({ navigation, route }) {
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { loadDraft, saveDraft, clearDraft } = useDraftAnnonce('hebergement');
+  const publicationKind = route?.params?.publicationKind || 'furnished_accommodation';
+  const isHotel = publicationKind === 'hotel_establishment';
+  const schema = isHotel ? hotelAccommodationSchema : furnishedAccommodationSchema;
+  const accommodationTypes = isHotel ? HOTEL_ACCOMMODATION_TYPES : FURNISHED_ACCOMMODATION_TYPES;
 
   // Clé d'idempotence de la publication (correctif robustesse 2026-07) — générée
   // une seule fois par tentative de publication (un seul mount de cet écran) et
@@ -85,7 +94,7 @@ export default function AddAccommodationScreen({ navigation }) {
 
   useEffect(() => { saveDraft(form); }, [form, saveDraft]);
 
-  const step = accommodationSchema.steps[stepIndex];
+  const step = schema.steps[stepIndex];
 
   const setField = useCallback((key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -112,11 +121,16 @@ export default function AddAccommodationScreen({ navigation }) {
       const uploaded = await Promise.all(photos.map((p) => (p.url ? Promise.resolve(p.url) : uploadToCloudinary(p.uri))));
       setPhotos((prev) => prev.map((p, i) => (p.url ? p : { ...p, url: uploaded[i] })));
 
-      const propertyPayload = buildAccommodationPropertyPayload(form, uploaded);
-      const accommodationPayload = buildAccommodationProfilePayload(form);
+      const propertyPayload = isHotel
+        ? buildHotelPropertyPayload(form, uploaded)
+        : buildFurnishedAccommodationPropertyPayload(form, uploaded);
+      const accommodationPayload = isHotel
+        ? buildHotelProfilePayload(form)
+        : buildFurnishedAccommodationProfilePayload(form);
       const ratePayload = buildAccommodationRatePayload(form);
       await createFullAccommodationMobile({
         publicationRequestId: form.publicationRequestId,
+        publicationKind,
         property: propertyPayload,
         accommodation: accommodationPayload,
         ratePlan: ratePayload,
@@ -138,27 +152,27 @@ export default function AddAccommodationScreen({ navigation }) {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, photos, form, clearDraft, navigation]);
+  }, [submitting, photos, form, clearDraft, navigation, isHotel, publicationKind]);
 
   const goNext = useCallback(() => {
-    const stepErrors = accommodationSchema.validateStep(step, { form, photos });
+    const stepErrors = schema.validateStep(step, { form, photos });
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
       return;
     }
-    if (stepIndex === accommodationSchema.steps.length - 1) {
+    if (stepIndex === schema.steps.length - 1) {
       handlePublish();
       return;
     }
     setStepIndex((i) => i + 1);
-  }, [step, form, photos, stepIndex, handlePublish]);
+  }, [step, form, photos, stepIndex, handlePublish, schema]);
 
   return (
     <Screen scroll avoidKeyboard>
       <StepHeader
         title={STEP_TITLES[step]}
         stepIndex={stepIndex}
-        stepCount={accommodationSchema.steps.length}
+        stepCount={schema.steps.length}
         onBack={goBack}
       />
 
@@ -166,18 +180,19 @@ export default function AddAccommodationScreen({ navigation }) {
         <View>
           <ChipMultiSelect
             label="Catégorie d'hébergement"
-            options={ACCOMMODATION_TYPES}
+            options={accommodationTypes}
             value={form.accommodationType}
             onChange={(v) => setField('accommodationType', v)}
             error={errors.accommodationType}
           />
-          <ChipMultiSelect
-            label="Type de bien"
-            options={ACCOMMODATION_PROPERTY_TYPES}
-            value={form.type}
-            onChange={(v) => setField('type', v)}
+          <Input
+            label={isHotel ? "Nom de l'établissement" : 'Titre'}
+            placeholder={isHotel ? 'Ex: Hôtel Panorama' : 'Ex: Villa meublée avec piscine'}
+            value={isHotel ? form.establishmentName : form.titre}
+            onChangeText={(v) => setField(isHotel ? 'establishmentName' : 'titre', v)}
+            error={isHotel ? errors.establishmentName : errors.titre}
+            style={styles.field}
           />
-          <Input label="Titre" placeholder="Ex: Villa meublée avec piscine" value={form.titre} onChangeText={(v) => setField('titre', v)} error={errors.titre} style={styles.field} />
           <Input label="Description" placeholder="Décrivez l'hébergement…" multiline value={form.description} onChangeText={(v) => setField('description', v)} error={errors.description} style={styles.field} />
         </View>
       )}
@@ -192,6 +207,25 @@ export default function AddAccommodationScreen({ navigation }) {
 
       {step === 'features' && (
         <View>
+          {isHotel ? (
+            <>
+              <Text style={styles.summaryTitle}>Capacité hôtelière</Text>
+              <Counter label="Capacité globale" value={form.capaciteAdultes} onChange={(v) => setField('capaciteAdultes', v)} min={1} error={errors.capaciteAdultes} />
+              <ChipMultiSelect label="Classement (optionnel)" options={[1, 2, 3, 4, 5].map((v) => ({ value: String(v), label: `${v} étoile${v > 1 ? 's' : ''}` }))} value={String(form.starRating)} onChange={(v) => setField('starRating', v)} />
+              <Text style={styles.summaryTitle}>Services</Text>
+              <ChipMultiSelect
+                label="Services de l'établissement"
+                options={HOTEL_SERVICES.map(([value, label]) => ({ value, label }))}
+                value={Object.keys(form.hotelServices || {}).filter((key) => form.hotelServices[key])}
+                onChange={(values) => setField('hotelServices', Object.fromEntries(HOTEL_SERVICES.map(([key]) => [key, values.includes(key)])))}
+                multiple
+              />
+              <Text style={styles.summaryTitle}>Arrivée et départ</Text>
+              <Input label="Heure d'arrivée" value={form.checkInTime} onChangeText={(v) => setField('checkInTime', v)} style={styles.field} />
+              <Input label="Heure de départ" value={form.checkOutTime} onChangeText={(v) => setField('checkOutTime', v)} style={styles.field} />
+            </>
+          ) : (
+          <>
           <Input label="Surface (m²)" keyboardType="numeric" value={String(form.surface)} onChangeText={(v) => setField('surface', v)} error={errors.surface} style={styles.field} />
           <Counter label="Chambres" value={form.bedrooms} onChange={(v) => setField('bedrooms', v)} />
           <Counter label="Salles de bain" value={form.bathrooms} onChange={(v) => setField('bathrooms', v)} min={1} error={errors.bathrooms} />
@@ -213,14 +247,16 @@ export default function AddAccommodationScreen({ navigation }) {
               multiple
             />
           ))}
+          </>
+          )}
         </View>
       )}
 
       {step === 'price' && (
         <View>
-          <Input label="Tarif par nuit (FCFA)" keyboardType="numeric" value={String(form.tarifNuit)} onChangeText={(v) => setField('tarifNuit', v)} error={errors.tarifNuit} style={styles.field} />
-          <Input label="Caution de séjour (optionnel)" keyboardType="numeric" value={String(form.securityDeposit)} onChangeText={(v) => setField('securityDeposit', v)} style={styles.field} />
-          <Input label="Frais de ménage (optionnel)" keyboardType="numeric" value={String(form.cleaningFee)} onChangeText={(v) => setField('cleaningFee', v)} style={styles.field} />
+          <Input label={isHotel ? 'Tarif de base par nuit (FCFA)' : 'Tarif par nuit (FCFA)'} keyboardType="numeric" value={String(form.tarifNuit)} onChangeText={(v) => setField('tarifNuit', v)} error={errors.tarifNuit} style={styles.field} />
+          {!isHotel && <Input label="Caution de séjour (optionnel)" keyboardType="numeric" value={String(form.securityDeposit)} onChangeText={(v) => setField('securityDeposit', v)} style={styles.field} />}
+          {!isHotel && <Input label="Frais de ménage (optionnel)" keyboardType="numeric" value={String(form.cleaningFee)} onChangeText={(v) => setField('cleaningFee', v)} style={styles.field} />}
         </View>
       )}
 
@@ -231,10 +267,13 @@ export default function AddAccommodationScreen({ navigation }) {
       {step === 'summary' && (
         <View>
           <Text style={styles.summaryTitle}>Récapitulatif</Text>
-          <SummaryRow label="Catégorie" value={ACCOMMODATION_TYPES.find((t) => t.value === form.accommodationType)?.label} />
-          <SummaryRow label="Titre" value={form.titre} />
+          <SummaryRow label="Catégorie" value={accommodationTypes.find((t) => t.value === form.accommodationType)?.label} />
+          <SummaryRow label={isHotel ? 'Nom' : 'Titre'} value={isHotel ? form.establishmentName : form.titre} />
           <SummaryRow label="Ville" value={[form.arrondissement, form.ville].filter(Boolean).join(' · ')} />
-          <SummaryRow label="Surface" value={form.surface ? `${form.surface} m²` : ''} />
+          {!isHotel && <SummaryRow label="Surface" value={form.surface ? `${form.surface} m²` : ''} />}
+          {!isHotel && <SummaryRow label="Chambres" value={String(form.bedrooms)} />}
+          {isHotel && <SummaryRow label="Classement" value={form.starRating ? `${form.starRating} étoile(s)` : 'Non classé'} />}
+          {isHotel && <SummaryRow label="Arrivée / départ" value={`${form.checkInTime} / ${form.checkOutTime}`} />}
           <SummaryRow label="Capacité" value={`${form.capaciteAdultes} adulte(s), ${form.capaciteEnfants} enfant(s)`} />
           <SummaryRow label="Tarif" value={form.tarifNuit ? `${form.tarifNuit} FCFA / nuit` : ''} />
           <SummaryRow label="Photos" value={`${photos.length} photo(s)`} />
@@ -244,7 +283,7 @@ export default function AddAccommodationScreen({ navigation }) {
       <StepFooter
         onBack={goBack}
         onNext={goNext}
-        isLast={stepIndex === accommodationSchema.steps.length - 1}
+        isLast={stepIndex === schema.steps.length - 1}
         loading={submitting}
       />
     </Screen>

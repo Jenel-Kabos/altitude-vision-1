@@ -25,13 +25,23 @@ const CHOICES = [
     icon: 'bed-outline',
     title: 'Proposer un hébergement',
     description: 'Hôtel, résidence meublée, appartement meublé…',
-    screen: 'AddAccommodation',
+    children: [
+      {
+        key: 'furnished_accommodation', icon: 'home-outline', title: 'Logement meublé',
+        description: 'Appartement, maison, villa, studio ou bungalow meublé',
+      },
+      {
+        key: 'hotel_establishment', icon: 'business-outline', title: 'Établissement hôtelier',
+        description: "Hôtel, résidence hôtelière ou chambre d'hôtes",
+      },
+    ],
   },
 ];
 
 export default function ChoixTypeAnnonceScreen({ navigation }) {
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const [expanded, setExpanded] = React.useState(null);
 
   return (
     <Screen scroll>
@@ -39,13 +49,24 @@ export default function ChoixTypeAnnonceScreen({ navigation }) {
       <Text style={styles.subtitle}>Choisissez le type d'annonce à créer</Text>
       <View style={styles.list}>
         {CHOICES.map((choice) => (
-          <SelectableCard
-            key={choice.key}
-            icon={choice.icon}
-            title={choice.title}
-            description={choice.description}
-            onPress={() => navigation.navigate(choice.screen)}
-          />
+          <React.Fragment key={choice.key}>
+            <SelectableCard
+              icon={choice.icon}
+              title={choice.title}
+              description={choice.description}
+              onPress={() => choice.children ? setExpanded(expanded === choice.key ? null : choice.key) : navigation.navigate(choice.screen)}
+            />
+            {expanded === choice.key && choice.children?.map((child) => (
+              <View key={child.key} style={styles.childCard}>
+                <SelectableCard
+                  icon={child.icon}
+                  title={child.title}
+                  description={child.description}
+                  onPress={() => navigation.navigate('AddAccommodation', { publicationKind: child.key })}
+                />
+              </View>
+            ))}
+          </React.Fragment>
         ))}
       </View>
     </Screen>
@@ -66,4 +87,5 @@ const makeStyles = (c) => StyleSheet.create({
     marginBottom: spacing.lg,
   },
   list: { gap: spacing.sm },
+  childCard: { marginLeft: spacing.md },
 });

@@ -67,11 +67,20 @@ describe('AddAccommodationScreen', () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
 
-  test('propose les catégories Accommodation réelles (villa/studio meublés/hôtel…)', () => {
+  test('le parcours meublé propose villa/studio mais jamais hôtel', () => {
     render(<AddAccommodationScreen navigation={navigation} />);
     expect(screen.getByLabelText('Villa meublée')).toBeTruthy();
     expect(screen.getByLabelText('Studio meublé')).toBeTruthy();
+    expect(screen.queryByLabelText('Hôtel')).toBeNull();
+  });
+
+  test('le parcours hôtelier propose Hôtel/Résidence hôtelière mais aucun logement meublé', () => {
+    render(<AddAccommodationScreen navigation={navigation} route={{ params: { publicationKind: 'hotel_establishment' } }} />);
     expect(screen.getByLabelText('Hôtel')).toBeTruthy();
+    expect(screen.getByLabelText('Résidence hôtelière')).toBeTruthy();
+    expect(screen.queryByLabelText('Villa meublée')).toBeNull();
+    expect(screen.queryByLabelText('Studio meublé')).toBeNull();
+    expect(screen.getByLabelText("Nom de l'établissement")).toBeTruthy();
   });
 
   test("n'affiche jamais Terrain, Bureau, Commerce ou Entrepôt dans la sélection Type de bien", () => {

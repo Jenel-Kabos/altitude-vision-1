@@ -4,6 +4,10 @@
 // normalise nombres/booléens et supprime les valeurs vides — jamais de champ cascade
 // depuis une valeur d'affichage libre.
 
+import {
+  ACCOMMODATION_PROPERTY_TYPE_BY_CATEGORY, HOTEL_PROPERTY_TYPE,
+} from '../constants/accommodation';
+
 const toNumber = (v, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
@@ -67,11 +71,15 @@ export function buildRentalPropertyPayload(form, photoUrls) {
 // Hébergement — 3 payloads distincts pour les 3 appels API successifs
 // (POST /properties/mobile → POST /accommodations → POST /accommodations/:id/rate-plans).
 // ─────────────────────────────────────────────────────────────────────────
-export function buildAccommodationPropertyPayload(form, photoUrls) {
-  return buildBasePropertyPayload(form, photoUrls, 'hebergement');
+export function buildFurnishedAccommodationPropertyPayload(form, photoUrls) {
+  return buildBasePropertyPayload({
+    ...form,
+    type: ACCOMMODATION_PROPERTY_TYPE_BY_CATEGORY[form.accommodationType],
+    prix: form.tarifNuit,
+  }, photoUrls, 'hebergement');
 }
 
-export function buildAccommodationProfilePayload(form) {
+export function buildFurnishedAccommodationProfilePayload(form) {
   return stripEmpty({
     accommodationType: form.accommodationType,
     furnished: form.furnished !== false,
@@ -87,6 +95,40 @@ export function buildAccommodationProfilePayload(form) {
       : undefined,
   });
 }
+
+export function buildHotelPropertyPayload(form, photoUrls) {
+  return buildBasePropertyPayload({
+    ...form,
+    titre: form.establishmentName,
+    type: HOTEL_PROPERTY_TYPE,
+    prix: form.tarifNuit,
+    surface: form.surface || 1,
+    bedrooms: 0,
+    bathrooms: 0,
+  }, photoUrls, 'hebergement');
+}
+
+export function buildHotelProfilePayload(form) {
+  return stripEmpty({
+    accommodationType: form.accommodationType,
+    furnished: true,
+    capacity: { maxAdults: toNumber(form.capaciteAdultes, 1), maxChildren: 0 },
+    checkInTime: form.checkInTime || undefined,
+    checkOutTime: form.checkOutTime || undefined,
+    hotel: stripEmpty({
+      name: form.establishmentName?.trim(),
+      description: form.description?.trim(),
+      starRating: numberOrUndefined(form.starRating),
+      hasReception: Boolean(form.hasReception),
+      hotelServices: form.hotelServices && typeof form.hotelServices === 'object'
+        ? form.hotelServices : undefined,
+    }),
+  });
+}
+
+// Alias rétro-compatible pour les imports existants hors du nouveau formulaire.
+export const buildAccommodationPropertyPayload = buildFurnishedAccommodationPropertyPayload;
+export const buildAccommodationProfilePayload = buildFurnishedAccommodationProfilePayload;
 
 export function buildAccommodationRatePayload(form) {
   return {

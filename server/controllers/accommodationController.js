@@ -249,11 +249,11 @@ async function buildPropertyData(req, ownerId) {
 // (réutilisée telle quelle par de futurs points d'entrée si besoin).
 // ─────────────────────────────────────────────
 exports.createFullMobile = async (req, res) => {
-  const { publicationRequestId, property, accommodation, ratePlan } = req.body || {};
+  const { publicationRequestId, publicationKind, property, accommodation, ratePlan } = req.body || {};
   try {
     const result = await createFullMobileAccommodation({
       user: req.user,
-      payload: { property, accommodation, ratePlan },
+      payload: { publicationKind, property, accommodation, ratePlan },
       publicationRequestId,
     });
     return res.status(result.idempotent ? 200 : 201).json({

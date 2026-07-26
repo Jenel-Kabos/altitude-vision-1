@@ -7,6 +7,8 @@ const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
+const Hotel = require('../models/Hotel');
+const RatePlan = require('../models/RatePlan');
 const { search } = require('../controllers/altimmoSearchController');
 
 jest.setTimeout(120000);
@@ -21,12 +23,31 @@ const baseProperty = (overrides = {}) => ({
 });
 
 const makeAccommodation = async (accommodationType, propertyOverrides = {}, accommodationOverrides = {}) => {
-  const property = await Property.create(baseProperty({ status: 'hebergement', ...propertyOverrides }));
+  const isHotelEstablishment = Accommodation.HOTEL_ACCOMMODATION_TYPES.includes(accommodationType);
+  const property = await Property.create(baseProperty({
+    status: 'hebergement',
+    ...(isHotelEstablishment ? { type: 'Commerce' } : {}),
+    ...propertyOverrides,
+  }));
+  const creatorId = ownerId();
+  const hotel = isHotelEstablishment ? await Hotel.create({
+    name: property.title,
+    description: property.description,
+    manager: creatorId,
+    property: property._id,
+    publicationStatus: 'publie',
+    createdBy: creatorId,
+  }) : null;
   const accommodation = await Accommodation.create({
-    property: property._id, accommodationType, publicationStatus: 'publie', createdBy: ownerId(),
+    property: property._id, accommodationType, hotel: hotel?._id,
+    publicationStatus: 'publie', createdBy: creatorId,
     ...accommodationOverrides,
   });
-  return { property, accommodation };
+  const ratePlan = await RatePlan.create({
+    accommodation: accommodation._id, mode: 'nightly', amount: property.price,
+    currency: 'XAF', createdBy: creatorId,
+  });
+  return { property, accommodation, hotel, ratePlan };
 };
 
 const callSearch = async (query) => {
@@ -79,6 +100,32 @@ describe('GET /api/altimmo/search — offerType=hebergement (source Accommodatio
     expect(data.properties).toHaveLength(1);
     expect(data.properties[0].title).toBe('Villa');
     expect(data.properties[0].accommodationType).toBe('villa_meublee');
+  });
+
+  test('les deux familles sont liées selon leur modèle et recherchables séparément', async () => {
+    const hotel = await makeAccommodation('hotel', { title: 'Hôtel Central' });
+    const residence = await makeAccommodation('residence_hoteliere', { title: 'Résidence Marina' });
+    const appartement = await makeAccommodation('appartement_meuble', { title: 'Appartement Centre' });
+    const villa = await makeAccommodation('villa_meublee', { title: 'Villa Fleuve' });
+
+    expect(hotel.hotel).toBeTruthy();
+    expect(residence.hotel).toBeTruthy();
+    expect(appartement.hotel).toBeNull();
+    expect(villa.hotel).toBeNull();
+    expect(await RatePlan.countDocuments()).toBe(4);
+
+    const all = await callSearch({ offerType: 'hebergement' });
+    expect(all.data.properties).toHaveLength(4);
+    const onlyHotels = await callSearch({ offerType: 'hebergement', accommodationType: 'hotel' });
+    expect(onlyHotels.data.properties.map((p) => p.title)).toEqual(['Hôtel Central']);
+    const onlyApartments = await callSearch({ offerType: 'hebergement', accommodationType: 'appartement_meuble' });
+    expect(onlyApartments.data.properties.map((p) => p.title)).toEqual(['Appartement Centre']);
+  });
+
+  test('propertyType=Commerce sous Vente ne retourne jamais un hôtel technique Commerce', async () => {
+    await makeAccommodation('hotel', { title: 'Hôtel Commerce Technique' });
+    const { data } = await callSearch({ offerType: 'vente', propertyType: 'Commerce' });
+    expect(data.properties).toEqual([]);
   });
 
   test('propertyType est ignoré pour offerType=hebergement (jamais d’erreur, jamais de faux filtre)', async () => {
