@@ -18,6 +18,7 @@ export default function Button({
   disabled = false,
   icon,
   style,
+  testID,
 }) {
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -58,6 +59,7 @@ export default function Button({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      testID={testID}
       style={containerStyle}
     >
       {loading

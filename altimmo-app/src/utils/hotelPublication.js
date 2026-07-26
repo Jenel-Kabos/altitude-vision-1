@@ -21,22 +21,43 @@ export function getHotelCategoryTotals(categories = []) {
   };
 }
 
-export function validateHotelCategories(categories = []) {
+const VALID_CATEGORY_TYPES = new Set([
+  'standard', 'superieure', 'deluxe', 'premium', 'suite_junior', 'suite',
+  'suite_presidentielle', 'familiale', 'twin', 'double', 'simple', 'autre',
+]);
+
+export function validateHotelRoomCategories(categories = []) {
   const errors = {};
-  if (!categories.length) return { roomCategories: 'Ajoutez au moins une catégorie de chambres' };
-  const codes = new Set();
+  if (!categories.length) return { roomCategories: 'Ajoutez au moins une catégorie de chambre.' };
+  const codeIndexes = new Map();
   categories.forEach((category, index) => {
     const prefix = `roomCategories.${index}`;
     const code = String(category.code || '').trim().toUpperCase();
     if (!String(category.name || '').trim()) errors[`${prefix}.name`] = 'Nom requis';
     if (!code) errors[`${prefix}.code`] = 'Code requis';
-    else if (codes.has(code)) errors[`${prefix}.code`] = 'Ce code est déjà utilisé';
-    codes.add(code);
+    else if (codeIndexes.has(code)) {
+      errors[`roomCategories.${codeIndexes.get(code)}.code`] = 'Le code de catégorie doit être unique.';
+      errors[`${prefix}.code`] = 'Le code de catégorie doit être unique.';
+    } else codeIndexes.set(code, index);
+    if (!VALID_CATEGORY_TYPES.has(category.categoryType)) errors[`${prefix}.categoryType`] = 'Type de catégorie requis';
     if (!Number.isInteger(Number(category.quantity)) || Number(category.quantity) < 1) errors[`${prefix}.quantity`] = 'Minimum 1 unité';
     if (!Number.isInteger(Number(category.adultCapacity)) || Number(category.adultCapacity) < 1) errors[`${prefix}.adultCapacity`] = 'Capacité adulte requise';
     if (!Number.isInteger(Number(category.beds)) || Number(category.beds) < 1) errors[`${prefix}.beds`] = 'Minimum 1 lit';
+    if (String(category.surface ?? '').trim() && !(Number(category.surface) > 0)) errors[`${prefix}.surface`] = 'La surface doit être positive';
+  });
+  return errors;
+}
+
+export function validateHotelRates(categories = []) {
+  const errors = {};
+  categories.forEach((category, index) => {
+    const prefix = `roomCategories.${index}`;
     const publicRate = (category.ratePlans || []).find((rate) => rate.rateType === 'public');
     if (!publicRate || !(Number(publicRate.amount) > 0)) errors[`${prefix}.ratePlans`] = 'Tarif public requis';
   });
   return errors;
+}
+
+export function validateHotelCategories(categories = []) {
+  return { ...validateHotelRoomCategories(categories), ...validateHotelRates(categories) };
 }
