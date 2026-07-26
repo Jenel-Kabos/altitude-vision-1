@@ -17,11 +17,16 @@ export const colorsDark = {
   text:         '#F0EDE8',
   textSub:      '#A8A29E',
   textMuted:    '#6B7280',
+  placeholder:  '#9CA3AF',
+  onAccent:     '#0A0A0A',
+  disabledText: '#8B909A',
 
   // Borders
   border:         '#2D3039',
   borderGold:     'rgba(212, 160, 23, 0.30)',
   borderGoldFull: '#D4A017',
+  inputBorder:    '#454954',
+  focusRing:      '#D4A017',
 
   // Semantic
   success:      '#4ADE80',
@@ -33,4 +38,7 @@ export const colorsDark = {
   overlay:      'rgba(0, 0, 0, 0.7)',
   goldMuted:    '#2D2208',
   blueMuted:    '#0D2040',
+  shadow:       '#000000',
+  dangerMuted:  '#3A1B1F',
+  successMuted: '#183322',
 };

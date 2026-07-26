@@ -110,7 +110,9 @@ export default function VirementScreen({ route, navigation }) {
             onChangeText={setReference}
             style={styles.input}
             placeholder="Ex: VIR-20240701-DUPONT"
-            placeholderTextColor={c.textMuted}
+            placeholderTextColor={c.placeholder}
+            cursorColor={c.gold}
+            selectionColor={c.borderGold}
           />
 
           <Text style={styles.label}>Notes (optionnel)</Text>
@@ -121,7 +123,9 @@ export default function VirementScreen({ route, navigation }) {
             multiline
             numberOfLines={3}
             placeholder="Informations complémentaires…"
-            placeholderTextColor={c.textMuted}
+            placeholderTextColor={c.placeholder}
+            cursorColor={c.gold}
+            selectionColor={c.borderGold}
             textAlignVertical="top"
           />
 
@@ -140,9 +144,9 @@ export default function VirementScreen({ route, navigation }) {
           disabled={loading || !reference.trim()}
           style={[styles.ctaBtn, (loading || !reference.trim()) && styles.ctaBtnDisabled]}
         >
-          {loading ? <ActivityIndicator size="small" color="#0A0A0A" /> : (
+          {loading ? <ActivityIndicator size="small" color={c.onAccent} /> : (
             <>
-              <Ionicons name="send-outline" size={17} color="#0A0A0A" />
+              <Ionicons name="send-outline" size={17} color={c.onAccent} />
               <Text style={styles.ctaBtnText}>Envoyer la preuve</Text>
             </>
           )}
@@ -186,5 +190,5 @@ const makeStyles = (c) => StyleSheet.create({
   cta:         { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: c.bg, borderTopWidth: 1, borderTopColor: c.border, padding: spacing.lg },
   ctaBtn:      { backgroundColor: c.gold, borderRadius: radius.md, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   ctaBtnDisabled: { opacity: 0.45 },
-  ctaBtnText:  { fontFamily: fonts.bodyBold, fontSize: fontSize.md, color: '#0A0A0A' },
+  ctaBtnText:  { fontFamily: fonts.bodyBold, fontSize: fontSize.md, color: c.onAccent },
 });

@@ -391,7 +391,9 @@ export default function PublierBienScreen({ navigation, route }) {
           focused === name && styles.inputFocused,
         ]}
         placeholder={opts.placeholder}
-        placeholderTextColor={c.textMuted}
+        placeholderTextColor={c.placeholder}
+        cursorColor={c.gold}
+        selectionColor={c.borderGold}
         value={form[name]}
         onChangeText={(v) => setField(name, v)}
         onFocus={() => setFocused(name)}
@@ -421,6 +423,8 @@ export default function PublierBienScreen({ navigation, route }) {
         </TouchableOpacity>
         <TextInput
           style={styles.numberInput}
+          cursorColor={c.gold}
+          selectionColor={c.borderGold}
           value={String(form[name])}
           onChangeText={(v) => setField(name, Math.max(0, Number(v.replace(/[^0-9]/g, '')) || 0))}
           keyboardType="numeric"
@@ -602,7 +606,9 @@ export default function PublierBienScreen({ navigation, route }) {
               <TextInput
                 style={styles.priceInput}
                 placeholder="0"
-                placeholderTextColor={c.textMuted}
+                placeholderTextColor={c.placeholder}
+                cursorColor={c.gold}
+                selectionColor={c.borderGold}
                 value={form.prix}
                 onChangeText={(v) => setField('prix', v.replace(/[^0-9]/g, ''))}
                 onFocus={() => setFocused('prix')}
@@ -862,7 +868,9 @@ export default function PublierBienScreen({ navigation, route }) {
                       value={manualLat}
                       onChangeText={v => { setManualLat(v); applyManualCoords(v, manualLng); }}
                       placeholder="-4.26340"
-                      placeholderTextColor={c.textMuted}
+                      placeholderTextColor={c.placeholder}
+                      cursorColor={c.gold}
+                      selectionColor={c.borderGold}
                       keyboardType="decimal-pad"
                       style={styles.input}
                       accessibilityLabel="Latitude"
@@ -875,7 +883,9 @@ export default function PublierBienScreen({ navigation, route }) {
                       value={manualLng}
                       onChangeText={v => { setManualLng(v); applyManualCoords(manualLat, v); }}
                       placeholder="15.24290"
-                      placeholderTextColor={c.textMuted}
+                      placeholderTextColor={c.placeholder}
+                      cursorColor={c.gold}
+                      selectionColor={c.borderGold}
                       keyboardType="decimal-pad"
                       style={styles.input}
                       accessibilityLabel="Longitude"

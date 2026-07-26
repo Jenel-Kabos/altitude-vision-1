@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Keyboard, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import Screen from '../../components/Screen';
 import Input from '../../components/Input';
@@ -7,7 +7,7 @@ import { ChipMultiSelect, Counter, PhotoManager, StepFooter, StepHeader, Summary
 import { HOTEL_ACCOMMODATION_TYPES, HOTEL_ROOM_CATEGORY_TYPES, HOTEL_RATE_TYPES } from '../../constants/accommodation';
 import { ACCOMMODATION_AMENITY_GROUPS } from '../../constants/accommodationAmenities';
 import { VILLES, getArrondissementsFor } from '../../constants/locations';
-import { createHotelRoomCategory, getHotelCategoryTotals, validateHotelCategories } from '../../utils/hotelPublication';
+import { createHotelRoomCategory, getHotelCategoryTotals, validateHotelCategories, validateHotelRates, validateHotelRoomCategories } from '../../utils/hotelPublication';
 import { buildHotelProfilePayload, buildHotelPropertyPayload, buildHotelRoomCategoriesPayload } from '../../services/publicationPayloads';
 import { createFullAccommodationMobile, uploadToCloudinary } from '../../services/annonceService';
 import { useDraftAnnonce } from '../../hooks/useDraftAnnonce';
@@ -100,7 +100,9 @@ export default function HotelEstablishmentScreen({ navigation }) {
       if (!form.arrondissement) next.arrondissement = 'Arrondissement requis';
       if (!form.hotelPhone.trim()) next.hotelPhone = 'Téléphone principal requis';
     }
-    if (step === 'categories' || step === 'rates' || step === 'summary') Object.assign(next, validateHotelCategories(form.roomCategories));
+    if (step === 'categories') Object.assign(next, validateHotelRoomCategories(form.roomCategories));
+    if (step === 'rates') Object.assign(next, validateHotelRates(form.roomCategories));
+    if (step === 'summary') Object.assign(next, validateHotelCategories(form.roomCategories));
     if (step === 'photos' && !photos.length) next.photos = 'Ajoutez au moins une photo générale';
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -128,9 +130,14 @@ export default function HotelEstablishmentScreen({ navigation }) {
     } finally { setSubmitting(false); }
   }, [clearDraft, form, navigation, photos, submitting]);
   const next = useCallback(() => {
-    if (!validateStep()) return;
-    if (stepIndex === STEPS.length - 1) { publish(); return; }
-    setStepIndex((value) => value + 1);
+    Keyboard.dismiss();
+    try {
+      if (!validateStep()) return;
+      if (stepIndex === STEPS.length - 1) { publish(); return; }
+      setStepIndex((value) => Math.min(value + 1, STEPS.length - 1));
+    } catch (error) {
+      setErrors({ step: 'Impossible de vérifier cette étape. Veuillez réessayer.' });
+    }
   }, [publish, stepIndex, validateStep]);
   const back = useCallback(() => {
     if (stepIndex === 0) navigation.goBack(); else setStepIndex((value) => value - 1);
@@ -158,12 +165,13 @@ export default function HotelEstablishmentScreen({ navigation }) {
       <Input label="Site web (optionnel)" value={form.hotelWebsite} onChangeText={(value) => setField('hotelWebsite', value)} style={styles.field} />
     </View>}
     {step === 'inventory' && <View><Text style={styles.heading}>Capacité calculée automatiquement</Text><Text style={styles.help}>Les totaux proviennent des quantités, capacités et lits déclarés dans chaque catégorie. Ils ne sont jamais saisis deux fois.</Text></View>}
-    {step === 'categories' && <View>
+    {errors.step && <Text testID="hotel-step-global-error" accessibilityLiveRegion="polite" style={styles.error}>{errors.step}</Text>}
+    {step === 'categories' && <View testID="hotel-step-4">
       {form.roomCategories.map((category, index) => <CategoryCard key={category.clientKey} category={category} index={index} errors={errors} styles={styles} update={updateCategory} duplicate={duplicateCategory} remove={removeCategory} move={moveCategory} />)}
-      {errors.roomCategories && <Text style={styles.error}>{errors.roomCategories}</Text>}
+      {errors.roomCategories && <Text testID="hotel-step-global-error" accessibilityLiveRegion="polite" style={styles.error}>{errors.roomCategories}</Text>}
       <ActionButton label="＋ Ajouter une catégorie" onPress={addCategory} styles={styles} />
     </View>}
-    {step === 'rates' && <View>{form.roomCategories.map((category, index) => <RateCard key={category.clientKey} category={category} index={index} update={updateCategory} error={errors[`roomCategories.${index}.ratePlans`]} styles={styles} />)}</View>}
+    {step === 'rates' && <View testID="hotel-step-5">{form.roomCategories.map((category, index) => <RateCard key={category.clientKey} category={category} index={index} update={updateCategory} error={errors[`roomCategories.${index}.ratePlans`]} styles={styles} />)}</View>}
     {step === 'services' && <ChipMultiSelect label="Services de l'établissement" options={HOTEL_SERVICES.map(([value, label]) => ({ value, label }))} value={Object.keys(form.hotelServices).filter((key) => form.hotelServices[key])} onChange={(values) => setField('hotelServices', Object.fromEntries(HOTEL_SERVICES.map(([key]) => [key, values.includes(key)])))} multiple />}
     {step === 'policies' && <View><Input label="Heure de check-in" value={form.checkInTime} onChangeText={(value) => setField('checkInTime', value)} style={styles.field} /><Input label="Heure de check-out" value={form.checkOutTime} onChangeText={(value) => setField('checkOutTime', value)} style={styles.field} /></View>}
     {step === 'photos' && <PhotoManager photos={photos} onChange={setPhotos} error={errors.photos} />}
@@ -175,22 +183,24 @@ export default function HotelEstablishmentScreen({ navigation }) {
       {form.roomCategories.map((category) => <SummaryRow key={category.clientKey} label={`${category.name} (${category.code})`} value={`${category.quantity} unité(s) · ${category.adultCapacity + category.childCapacity} pers./chambre · ${Number(category.ratePlans[0]?.amount || 0).toLocaleString('fr-FR')} FCFA`} />)}
       <SummaryRow label="Arrivée / départ" value={`${form.checkInTime} / ${form.checkOutTime}`} /><SummaryRow label="Photos" value={`${photos.length} photo(s)`} />
     </View>}
-    <StepFooter onBack={back} onNext={next} isLast={stepIndex === STEPS.length - 1} loading={submitting} />
+    <StepFooter onBack={back} onNext={next} nextTestID="hotel-continue-button" isLast={stepIndex === STEPS.length - 1} loading={submitting} />
   </Screen>;
 }
 
 function CategoryCard({ category, index, errors, styles, update, duplicate, remove, move }) {
   const error = (field) => errors[`roomCategories.${index}.${field}`];
-  return <View style={styles.categoryCard}>
+  const hasError = Object.keys(errors).some((key) => key.startsWith(`roomCategories.${index}.`));
+  return <View testID={`room-category-card-${category.clientKey}`} style={[styles.categoryCard, hasError && styles.categoryCardError]}>
+    {hasError && <Text testID={`room-category-error-${category.clientKey}`} accessibilityLiveRegion="polite" style={styles.error}>Corrigez les informations signalées dans cette catégorie.</Text>}
     <Text style={styles.heading}>Catégorie {index + 1}</Text>
-    <ChipMultiSelect label="Type" options={HOTEL_ROOM_CATEGORY_TYPES} value={category.categoryType} onChange={(value) => update(index, { categoryType: value })} />
+    <ChipMultiSelect label="Type" options={HOTEL_ROOM_CATEGORY_TYPES} value={category.categoryType} onChange={(value) => update(index, { categoryType: value })} error={error('categoryType')} />
     <Input label="Nom commercial" value={category.name} onChangeText={(value) => update(index, { name: value })} error={error('name')} style={styles.field} />
     <Input label="Code court" autoCapitalize="characters" value={category.code} onChangeText={(value) => update(index, { code: value.toUpperCase() })} error={error('code')} style={styles.field} />
     <Counter label="Nombre d'unités" value={Number(category.quantity)} onChange={(value) => update(index, { quantity: value })} min={1} error={error('quantity')} />
     <Counter label="Adultes par chambre" value={Number(category.adultCapacity)} onChange={(value) => update(index, { adultCapacity: value })} min={1} error={error('adultCapacity')} />
     <Counter label="Enfants par chambre" value={Number(category.childCapacity)} onChange={(value) => update(index, { childCapacity: value })} min={0} />
     <Counter label="Lits par chambre" value={Number(category.beds)} onChange={(value) => update(index, { beds: value })} min={1} error={error('beds')} />
-    <Input label="Surface moyenne (m², optionnel)" keyboardType="numeric" value={String(category.surface)} onChangeText={(value) => update(index, { surface: value })} style={styles.field} />
+    <Input label="Surface moyenne (m², optionnel)" keyboardType="numeric" value={String(category.surface)} onChangeText={(value) => update(index, { surface: value })} error={error('surface')} style={styles.field} />
     {ACCOMMODATION_AMENITY_GROUPS.slice(1, 3).map((group) => <ChipMultiSelect key={group.key} label={group.label} options={group.options.map((value) => ({ value, label: value }))} value={category.amenities?.[group.key] || []} onChange={(values) => update(index, { amenities: { ...category.amenities, [group.key]: values } })} multiple />)}
     <View style={styles.actionRow}><SmallAction label="↑" onPress={() => move(index, -1)} styles={styles} /><SmallAction label="↓" onPress={() => move(index, 1)} styles={styles} /><SmallAction label="Dupliquer" onPress={() => duplicate(index)} styles={styles} /><SmallAction label="Supprimer" onPress={() => remove(index)} styles={styles} danger /></View>
   </View>;
@@ -210,11 +220,12 @@ const ActionButton = ({ label, onPress, styles }) => <TouchableOpacity accessibi
 const SmallAction = ({ label, onPress, styles, danger }) => <TouchableOpacity accessibilityRole="button" onPress={onPress} style={styles.smallAction}><Text style={[styles.smallActionText, danger && styles.danger]}>{label}</Text></TouchableOpacity>;
 const makeStyles = (c) => StyleSheet.create({
   field: { marginBottom: spacing.sm }, heading: { fontFamily: fonts.bodyBold, fontSize: fontSize.md, color: c.text, marginBottom: spacing.sm },
-  help: { fontFamily: fonts.body, color: c.textSecondary, lineHeight: 21 }, error: { color: c.error || '#B42318', marginBottom: spacing.sm },
-  totalCard: { backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, borderRadius: 14, padding: spacing.md, marginBottom: spacing.md },
-  totalStrong: { fontFamily: fonts.bodyBold, color: c.text, fontSize: fontSize.md }, totalText: { color: c.textSecondary, marginTop: 4 },
-  categoryCard: { borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: spacing.md, marginBottom: spacing.md, backgroundColor: c.surface },
+  help: { fontFamily: fonts.body, color: c.textSub, lineHeight: 21 }, error: { color: c.error, marginBottom: spacing.sm },
+  totalCard: { backgroundColor: c.bgCard, borderColor: c.border, borderWidth: 1, borderRadius: 14, padding: spacing.md, marginBottom: spacing.md },
+  totalStrong: { fontFamily: fonts.bodyBold, color: c.text, fontSize: fontSize.md }, totalText: { color: c.textSub, marginTop: 4 },
+  categoryCard: { borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: spacing.md, marginBottom: spacing.md, backgroundColor: c.bgCard },
+  categoryCardError: { borderColor: c.error, borderWidth: 2 },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, smallAction: { borderWidth: 1, borderColor: c.border, borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
-  smallActionText: { color: c.primary, fontFamily: fonts.bodyBold }, danger: { color: c.error || '#B42318' },
-  primaryAction: { backgroundColor: c.primary, borderRadius: 12, padding: spacing.md, alignItems: 'center', marginBottom: spacing.md }, primaryActionText: { color: '#FFF', fontFamily: fonts.bodyBold },
+  smallActionText: { color: c.gold, fontFamily: fonts.bodyBold }, danger: { color: c.error },
+  primaryAction: { backgroundColor: c.gold, borderRadius: 12, padding: spacing.md, alignItems: 'center', marginBottom: spacing.md }, primaryActionText: { color: c.onAccent, fontFamily: fonts.bodyBold },
 });

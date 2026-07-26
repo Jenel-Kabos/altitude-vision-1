@@ -145,7 +145,9 @@ export default function EditProfileScreen({ navigation }) {
                     autoCorrect={false}
                     autoFocus
                     placeholder="Jean Dupont"
-                    placeholderTextColor={c.textMuted}
+                    placeholderTextColor={c.placeholder}
+                    cursorColor={c.gold}
+                    selectionColor={c.borderGold}
                     returnKeyType={emailVerified ? 'next' : 'next'}
                     onSubmitEditing={() => emailVerified ? phoneRef.current?.focus() : emailRef.current?.focus()}
                     accessibilityLabel="Nom complet"
@@ -182,7 +184,9 @@ export default function EditProfileScreen({ navigation }) {
                       autoCorrect={false}
                       autoComplete="email"
                       placeholder="vous@exemple.com"
-                      placeholderTextColor={c.textMuted}
+                      placeholderTextColor={c.placeholder}
+                      cursorColor={c.gold}
+                      selectionColor={c.borderGold}
                       returnKeyType="next"
                       onSubmitEditing={() => phoneRef.current?.focus()}
                       accessibilityLabel="Adresse email"
@@ -207,7 +211,9 @@ export default function EditProfileScreen({ navigation }) {
                     autoCorrect={false}
                     autoComplete="tel"
                     placeholder="+242 06 000 00 00"
-                    placeholderTextColor={c.textMuted}
+                    placeholderTextColor={c.placeholder}
+                    cursorColor={c.gold}
+                    selectionColor={c.borderGold}
                     returnKeyType="done"
                     onSubmitEditing={enregistrer}
                     accessibilityLabel="Numéro de téléphone"

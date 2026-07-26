@@ -5,7 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { spacing } from '../../theme';
 
 export default function StepFooter({
-  onBack, onNext, isLast = false, loading = false, nextLabel, backLabel = 'Précédent',
+  onBack, onNext, isLast = false, loading = false, nextLabel, backLabel = 'Précédent', nextTestID,
 }) {
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -23,6 +23,7 @@ export default function StepFooter({
           onPress={onNext}
           variant="primary"
           loading={loading}
+          testID={nextTestID}
         />
       </View>
     </View>

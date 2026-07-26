@@ -17,11 +17,16 @@ export const colors = {
   text:         '#1A1A1A',
   textSub:      '#666666',
   textMuted:    '#999999',
+  placeholder:  '#737373',
+  onAccent:     '#0A0A0A',
+  disabledText: '#777777',
 
   // Borders
   border:         '#F0F0EE',
   borderGold:     'rgba(200, 150, 12, 0.35)',
   borderGoldFull: '#C8960C',
+  inputBorder:    '#D8D8D3',
+  focusRing:      '#C8960C',
 
   // Semantic
   success:      '#3B6D11',
@@ -35,4 +40,7 @@ export const colors = {
 
   // Semantic (suite)
   warning:       '#F59E0B',
+  shadow:        '#000000',
+  dangerMuted:   '#FCE8E8',
+  successMuted:  '#EAF4DF',
 };

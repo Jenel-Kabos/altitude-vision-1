@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { colors, spacing } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing } from '../../theme';
 
 export default function Card({ children, padding = spacing.lg, style }) {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={[styles.card, { padding }, style]}>
       {children}
@@ -10,13 +13,13 @@ export default function Card({ children, padding = spacing.lg, style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   card: {
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
+    borderColor: c.border,
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 8,

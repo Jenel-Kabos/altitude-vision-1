@@ -118,7 +118,9 @@ export default function ForgotPasswordScreen({ navigation }) {
                       autoComplete="email"
                       autoFocus
                       placeholder="vous@exemple.com"
-                      placeholderTextColor={c.textMuted}
+                      placeholderTextColor={c.placeholder}
+                      cursorColor={c.gold}
+                      selectionColor={c.borderGold}
                       returnKeyType="send"
                       onSubmitEditing={envoyerLien}
                       accessibilityLabel="Adresse email"

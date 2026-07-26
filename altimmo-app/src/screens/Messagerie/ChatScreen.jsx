@@ -490,7 +490,9 @@ export default function ChatScreen({ route, navigation }) {
           <TextInput
             style={styles.input}
             placeholder="Message..."
-            placeholderTextColor={c.textMuted}
+            placeholderTextColor={c.placeholder}
+            cursorColor={c.gold}
+            selectionColor={c.borderGold}
             value={text}
             onChangeText={onTyping}
             multiline

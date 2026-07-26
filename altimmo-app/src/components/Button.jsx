@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   TouchableOpacity,
+  View,
   Text,
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { colors, radius, fonts, fontSize, spacing } from '../theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
+import { radius, fonts, fontSize, spacing } from '../theme';
 
 export default function Button({
   label,
@@ -13,17 +16,27 @@ export default function Button({
   variant = 'primary',
   loading = false,
   disabled = false,
+  icon,
   style,
+  testID,
 }) {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const isPrimary = variant === 'primary';
   const isOutline = variant === 'outline';
   const isGhost   = variant === 'ghost';
+  const isSecondary = variant === 'secondary';
+  const isDanger = variant === 'danger';
+  const isSuccess = variant === 'success';
 
   const containerStyle = [
     styles.base,
     isPrimary && styles.primary,
     isOutline && styles.outline,
     isGhost   && styles.ghost,
+    isSecondary && styles.secondary,
+    isDanger && styles.danger,
+    isSuccess && styles.success,
     (disabled || loading) && styles.disabled,
     style,
   ];
@@ -32,25 +45,34 @@ export default function Button({
     styles.label,
     isPrimary && styles.labelPrimary,
     (isOutline || isGhost) && styles.labelGold,
+    isSecondary && styles.labelSecondary,
+    (isDanger || isSuccess) && styles.labelStatus,
   ];
 
-  const spinnerColor = isPrimary ? '#000' : colors.gold;
+  const spinnerColor = isPrimary ? c.onAccent : isDanger || isSuccess ? c.bg : c.gold;
 
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      testID={testID}
       style={containerStyle}
     >
       {loading
         ? <ActivityIndicator color={spinnerColor} />
-        : <Text style={textStyle}>{label}</Text>}
+        : <View style={styles.content}>
+          {icon ? <Ionicons name={icon} size={18} color={StyleSheet.flatten(textStyle).color} /> : null}
+          <Text style={textStyle}>{label}</Text>
+        </View>}
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   base: {
     borderRadius: radius.xs,
     paddingHorizontal: spacing.md,
@@ -60,27 +82,33 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   primary: {
-    backgroundColor: colors.gold,
+    backgroundColor: c.gold,
   },
   outline: {
     borderWidth: 1,
-    borderColor: colors.gold,
+    borderColor: c.gold,
     backgroundColor: 'transparent',
   },
   ghost: {
     backgroundColor: 'transparent',
   },
+  secondary: { backgroundColor: c.bgCardAlt, borderWidth: 1, borderColor: c.inputBorder },
+  danger: { backgroundColor: c.error },
+  success: { backgroundColor: c.success },
   disabled: {
     opacity: 0.5,
   },
+  content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   label: {
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.md,
   },
   labelPrimary: {
-    color: colors.black,
+    color: c.onAccent,
   },
   labelGold: {
-    color: colors.gold,
+    color: c.gold,
   },
+  labelSecondary: { color: c.text },
+  labelStatus: { color: c.bg },
 });

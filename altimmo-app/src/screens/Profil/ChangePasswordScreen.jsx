@@ -46,7 +46,9 @@ function PasswordField({ label, value, onChangeText, show, onToggleShow,
           autoCorrect={false}
           autoComplete={autoComplete || 'password'}
           placeholder={placeholder}
-          placeholderTextColor={c.textMuted}
+          placeholderTextColor={c.placeholder}
+          cursorColor={c.gold}
+          selectionColor={c.borderGold}
           returnKeyType={returnKeyType || 'done'}
           onSubmitEditing={onSubmitEditing}
           accessibilityLabel={label}

@@ -49,7 +49,9 @@ function PasswordField({ label, value, onChangeText, show, onToggleShow, placeho
           autoCorrect={false}
           autoComplete="password"
           placeholder={placeholder}
-          placeholderTextColor={c.textMuted}
+          placeholderTextColor={c.placeholder}
+          cursorColor={c.gold}
+          selectionColor={c.borderGold}
           returnKeyType={returnKeyType || 'done'}
           onSubmitEditing={onSubmitEditing}
           accessibilityLabel={label}
@@ -391,7 +393,9 @@ export default function RegisterScreen({ navigation }) {
                       autoCorrect={false}
                       autoFocus
                       placeholder="Jean Dupont"
-                      placeholderTextColor={c.textMuted}
+                      placeholderTextColor={c.placeholder}
+                      cursorColor={c.gold}
+                      selectionColor={c.borderGold}
                       returnKeyType="next"
                       onSubmitEditing={() => emailRef.current?.focus()}
                       accessibilityLabel="Nom complet"
@@ -414,7 +418,9 @@ export default function RegisterScreen({ navigation }) {
                       autoCorrect={false}
                       autoComplete="email"
                       placeholder="vous@exemple.com"
-                      placeholderTextColor={c.textMuted}
+                      placeholderTextColor={c.placeholder}
+                      cursorColor={c.gold}
+                      selectionColor={c.borderGold}
                       returnKeyType="next"
                       onSubmitEditing={() => passRef.current?.focus()}
                       accessibilityLabel="Adresse email"
