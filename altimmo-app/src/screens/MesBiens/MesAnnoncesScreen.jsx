@@ -379,7 +379,7 @@ export default function MesAnnoncesScreen({ navigation }) {
       {/* Bouton ajouter */}
       <TouchableOpacity
         style={styles.addBtn}
-        onPress={() => navigation.navigate('PublierBien', {})}
+        onPress={() => navigation.navigate('ChoixTypeAnnonce')}
         activeOpacity={0.85}
         accessibilityRole="button"
         accessibilityLabel="Publier une annonce"
@@ -406,7 +406,7 @@ export default function MesAnnoncesScreen({ navigation }) {
       <Text style={styles.navTitle}>Mes annonces</Text>
       <TouchableOpacity
         style={styles.addIconBtn}
-        onPress={() => navigation.navigate('PublierBien', {})}
+        onPress={() => navigation.navigate('ChoixTypeAnnonce')}
         activeOpacity={0.8}
         accessibilityRole="button"
         accessibilityLabel="Publier une annonce"
@@ -443,7 +443,7 @@ export default function MesAnnoncesScreen({ navigation }) {
             title="Aucun bien publié"
             subtitle="Ajoutez votre premier bien pour le mettre en vitrine."
             actionLabel="Publier un bien"
-            onAction={() => navigation.navigate('PublierBien', {})}
+            onAction={() => navigation.navigate('ChoixTypeAnnonce')}
           />
         }
       />

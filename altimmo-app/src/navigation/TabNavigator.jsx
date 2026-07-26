@@ -15,7 +15,7 @@ import NotificationsScreen  from '../screens/Notifications/NotificationsScreen';
 import MessagerieStack      from './stacks/MessagerieStack';
 import ProfilStack          from './stacks/ProfilStack';
 import VisitesScreen        from '../screens/Visites/VisitesScreen';
-import PublierBienScreen    from '../screens/Publication/PublierBienScreen';
+import PublicationStack     from './stacks/PublicationStack';
 
 const Tab   = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -58,7 +58,7 @@ export default function TabNavigator() {
       {canAdd && (
         <Tab.Screen
           name="Publier"
-          component={PublierBienScreen}
+          component={PublicationStack}
           options={{ tabBarAccessibilityLabel: 'Publier un bien' }}
         />
       )}

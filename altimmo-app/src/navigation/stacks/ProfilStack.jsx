@@ -4,6 +4,10 @@ import EditProfileScreen    from '../../screens/Profil/EditProfileScreen';
 import ChangePasswordScreen from '../../screens/Profil/ChangePasswordScreen';
 import MesAnnoncesScreen    from '../../screens/MesBiens/MesAnnoncesScreen';
 import PublierBienScreen    from '../../screens/Publication/PublierBienScreen';
+import ChoixTypeAnnonceScreen  from '../../screens/Publication/ChoixTypeAnnonceScreen';
+import AddSalePropertyScreen   from '../../screens/Publication/AddSalePropertyScreen';
+import AddRentalPropertyScreen from '../../screens/Publication/AddRentalPropertyScreen';
+import AddAccommodationScreen  from '../../screens/Publication/AddAccommodationScreen';
 import FavorisScreen        from '../../screens/Profil/FavorisScreen';
 import TransactionsScreen   from '../../screens/Profil/TransactionsScreen';
 import PaiementScreen       from '../../screens/Paiements/PaiementScreen';
@@ -21,6 +25,10 @@ export default function ProfilStack() {
       <Stack.Screen name="ChangePassword"  component={ChangePasswordScreen} />
       <Stack.Screen name="MesAnnonces"     component={MesAnnoncesScreen} />
       <Stack.Screen name="PublierBien"     component={PublierBienScreen} />
+      <Stack.Screen name="ChoixTypeAnnonce"   component={ChoixTypeAnnonceScreen} />
+      <Stack.Screen name="AddSaleProperty"    component={AddSalePropertyScreen} />
+      <Stack.Screen name="AddRentalProperty"  component={AddRentalPropertyScreen} />
+      <Stack.Screen name="AddAccommodation"   component={AddAccommodationScreen} />
       <Stack.Screen name="Favoris"         component={FavorisScreen} />
       <Stack.Screen name="Transactions"    component={TransactionsScreen} />
       <Stack.Screen name="PaiementCancel"  component={TransactionsScreen} />

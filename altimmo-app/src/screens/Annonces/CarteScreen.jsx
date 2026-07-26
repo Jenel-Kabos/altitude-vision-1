@@ -242,7 +242,13 @@ export default function CarteScreen({ navigation }) {
 
   const handleDismiss   = useCallback(() => setSelected(null), []);
   const handleCardPress = useCallback(() => {
-    if (selected) navigation.navigate('Annonces', { screen: 'DetailAnnonce', params: { annonce: selected } });
+    // Convention canonique de navigation détail (correctif crash mobile).
+    if (selected) {
+      navigation.navigate('Annonces', {
+        screen: 'DetailAnnonce',
+        params: { resourceType: 'property', resourceId: selected._id || selected.id, item: selected },
+      });
+    }
   }, [selected, navigation]);
 
   const onSearchSubmit = useCallback((filters) => {
