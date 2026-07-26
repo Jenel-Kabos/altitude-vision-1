@@ -94,7 +94,7 @@ export const rentalPropertySchema = {
 // Bathrooms est obligatoire ici (>0) : Accommodation.submit() l'exige côté backend
 // (PROPERTY_REQUIRED_FIELDS dans accommodationService.js, jamais assoupli côté mobile).
 // ─────────────────────────────────────────────────────────────────────────
-export const accommodationSchema = {
+export const furnishedAccommodationSchema = {
   steps: ['info', 'location', 'features', 'price', 'photos', 'summary'],
   validateStep(stepId, { form, photos }) {
     const e = {};
@@ -121,5 +121,29 @@ export const accommodationSchema = {
     return e;
   },
 };
+
+export const hotelAccommodationSchema = {
+  steps: ['info', 'location', 'features', 'price', 'photos', 'summary'],
+  validateStep(stepId, { form, photos }) {
+    const e = {};
+    if (stepId === 'info') {
+      if (!isNonEmptyString(form.establishmentName)) e.establishmentName = "Nom de l'établissement requis";
+      if (!isNonEmptyString(form.description)) e.description = 'Description requise';
+      if (!form.accommodationType) e.accommodationType = 'Choisissez une catégorie hôtelière';
+    }
+    if (stepId === 'location') {
+      if (!isNonEmptyString(form.ville)) e.ville = 'Ville requise';
+      if (!isNonEmptyString(form.arrondissement)) e.arrondissement = 'Arrondissement requis';
+    }
+    if (stepId === 'features' && !isPositiveNumber(form.capaciteAdultes)) {
+      e.capaciteAdultes = 'Capacité globale requise';
+    }
+    if (stepId === 'price' && !isPositiveNumber(form.tarifNuit)) e.tarifNuit = 'Tarif de base valide requis';
+    if (stepId === 'photos' && (!photos || photos.length === 0)) e.photos = 'Ajoutez au moins une photo';
+    return e;
+  },
+};
+
+export const accommodationSchema = furnishedAccommodationSchema;
 
 export { NO_BEDROOMS_TYPES, NO_BATHROOMS_TYPES };

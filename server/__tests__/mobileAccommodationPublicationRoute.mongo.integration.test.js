@@ -18,6 +18,7 @@ const User = require('../models/User');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
 const RatePlan = require('../models/RatePlan');
+const Hotel = require('../models/Hotel');
 const ActionLog = require('../models/ActionLog');
 const accommodationRoutes = require('../routes/accommodationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
@@ -43,6 +44,7 @@ const makeUser = (overrides = {}) => {
 
 const basePayload = (overrides = {}) => ({
   publicationRequestId: overrides.publicationRequestId || `req-http-${Date.now()}-${Math.random()}`,
+  publicationKind: overrides.publicationKind || 'furnished_accommodation',
   property: {
     titre: 'Villa meublée avec piscine',
     description: 'Description suffisamment longue pour la validation du modèle Property.',
@@ -57,6 +59,22 @@ const basePayload = (overrides = {}) => ({
     ...overrides.accommodation,
   },
   ratePlan: { mode: 'nightly', amount: 35000, currency: 'XAF', ...overrides.ratePlan },
+});
+
+const hotelPayload = (accommodationType = 'hotel') => basePayload({
+  publicationKind: 'hotel_establishment',
+  property: {
+    titre: 'Hôtel Panorama', description: 'Établissement hôtelier au centre-ville.',
+    type: 'Commerce', ville: 'Brazzaville', arrondissement: 'Poto-Poto',
+    superficie: 1, prix: 45000, chambres: 0, bathrooms: 0,
+    photos: ['https://res.cloudinary.test/hotel.jpg'],
+  },
+  accommodation: {
+    accommodationType, capacity: { maxAdults: 80, maxChildren: 0 },
+    checkInTime: '14:00', checkOutTime: '11:00',
+    hotel: { name: 'Hôtel Panorama', starRating: 3, hasReception: true, hotelServices: { wifi: true } },
+  },
+  ratePlan: { amount: 45000 },
 });
 
 beforeAll(async () => {
@@ -80,6 +98,34 @@ describe('POST /api/accommodations/mobile/full', () => {
     expect(await Property.countDocuments()).toBe(1);
     expect(await Accommodation.countDocuments()).toBe(1);
     expect(await RatePlan.countDocuments()).toBe(1);
+  });
+
+  test.each(['hotel', 'residence_hoteliere'])('201 — établissement %s : Hotel créé, type/prix/tarif cohérents', async (type) => {
+    const user = await makeUser();
+    const res = await request(app)
+      .post('/api/accommodations/mobile/full')
+      .set('Authorization', `Bearer ${signToken(user._id)}`)
+      .send(hotelPayload(type));
+
+    expect(res.statusCode).toBe(201);
+    const [property, accommodation, rate, hotel] = await Promise.all([
+      Property.findOne(), Accommodation.findOne(), RatePlan.findOne(), Hotel.findOne(),
+    ]);
+    expect(property.type).toBe('Commerce');
+    expect(property.price).toBe(rate.amount);
+    expect(accommodation.accommodationType).toBe(type);
+    expect(accommodation.hotel.toString()).toBe(hotel._id.toString());
+    expect(accommodation.occupancyMode).toBe('room_based');
+  });
+
+  test('400 — famille et accommodationType incohérents : rollback avant transaction', async () => {
+    const user = await makeUser();
+    const res = await request(app)
+      .post('/api/accommodations/mobile/full')
+      .set('Authorization', `Bearer ${signToken(user._id)}`)
+      .send(basePayload({ accommodation: { accommodationType: 'hotel' } }));
+    expect(res.statusCode).toBe(400);
+    expect(await Property.countDocuments()).toBe(0);
   });
 
   test('200 — retry avec la même publicationRequestId : réponse idempotente stable, aucun doublon', async () => {

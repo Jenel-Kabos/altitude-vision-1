@@ -31,6 +31,7 @@ const makeUser = (overrides = {}) => {
 };
 
 const basePayload = (overrides = {}) => ({
+  publicationKind: 'furnished_accommodation',
   property: {
     titre: 'Villa meublée avec piscine',
     description: 'Description suffisamment longue pour la validation du modèle Property.',

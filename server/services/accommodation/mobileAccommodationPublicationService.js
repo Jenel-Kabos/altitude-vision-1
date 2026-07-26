@@ -29,6 +29,7 @@ const mongoose = require('mongoose');
 const Property = require('../../models/Property');
 const Accommodation = require('../../models/Accommodation');
 const RatePlan = require('../../models/RatePlan');
+const Hotel = require('../../models/Hotel');
 const { buildMobilePropertyData } = require('../../controllers/propertyMobileController');
 const { evaluateReadiness } = require('../accommodationService');
 const { logAction, buildAuteur } = require('../actionLogService');
@@ -60,6 +61,8 @@ function validatePayloadShape(payload) {
   const accommodation = payload?.accommodation || {};
   const ratePlan = payload?.ratePlan || {};
   const errors = [];
+  const furnishedTypes = ['villa_meublee', 'maison_meublee', 'appartement_meuble', 'studio_meuble', 'residence_meublee', 'bungalow'];
+  const hotelTypes = ['hotel', 'residence_hoteliere', 'chambre_hotes', 'autre'];
 
   if (!String(property.titre || '').trim()) errors.push('property.titre');
   if (!String(property.description || '').trim()) errors.push('property.description');
@@ -71,6 +74,11 @@ function validatePayloadShape(payload) {
   if (!Array.isArray(property.photos) || property.photos.length === 0) errors.push('property.photos');
   if (!accommodation.accommodationType) errors.push('accommodation.accommodationType');
   if (!(Number(ratePlan.amount) > 0)) errors.push('ratePlan.amount');
+  if (Number(property.prix) !== Number(ratePlan.amount)) errors.push('property.prix/ratePlan.amount');
+  if (!['furnished_accommodation', 'hotel_establishment'].includes(payload?.publicationKind)) errors.push('publicationKind');
+  if (payload?.publicationKind === 'furnished_accommodation' && !furnishedTypes.includes(accommodation.accommodationType)) errors.push('accommodation.accommodationType');
+  if (payload?.publicationKind === 'hotel_establishment' && !hotelTypes.includes(accommodation.accommodationType)) errors.push('accommodation.accommodationType');
+  if (payload?.publicationKind === 'hotel_establishment' && !String(accommodation.hotel?.name || '').trim()) errors.push('accommodation.hotel.name');
 
   if (errors.length > 0) {
     fail(
@@ -166,6 +174,22 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
       );
       const [property] = await Property.create([propertyData], { session });
 
+      let hotel = null;
+      if (payload.publicationKind === 'hotel_establishment') {
+        [hotel] = await Hotel.create([{
+          name: payload.accommodation.hotel.name,
+          description: payload.accommodation.hotel.description,
+          starRating: payload.accommodation.hotel.starRating,
+          hasReception: payload.accommodation.hotel.hasReception,
+          hotelServices: payload.accommodation.hotel.hotelServices,
+          manager: ownerId,
+          property: property._id,
+          createdBy: ownerId,
+          publicationStatus: 'soumis',
+          submittedAt: new Date(),
+        }], { session });
+      }
+
       const [accommodation] = await Accommodation.create([{
         accommodationType: payload.accommodation.accommodationType,
         furnished: payload.accommodation.furnished !== false,
@@ -177,6 +201,7 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
         securityDeposit: payload.accommodation.securityDeposit,
         cleaningFee: payload.accommodation.cleaningFee,
         amenities: payload.accommodation.amenities,
+        hotel: hotel?._id,
         property: property._id,
         createdBy: ownerId,
         publicationRequestId,
@@ -190,7 +215,23 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
         createdBy: ownerId,
       }], { session });
 
-      const readiness = evaluateReadiness(accommodation, property);
+      const readiness = payload.publicationKind === 'hotel_establishment'
+        ? {
+          ready: Boolean(accommodation.accommodationType)
+            && Number(accommodation.capacity?.maxAdults) > 0
+            && Boolean(accommodation.checkInTime)
+            && Boolean(accommodation.checkOutTime)
+            && Boolean(hotel),
+          missingFields: ['accommodationType', 'capacity', 'checkInTime', 'checkOutTime', 'hotel']
+            .filter((field) => ({
+              accommodationType: Boolean(accommodation.accommodationType),
+              capacity: Number(accommodation.capacity?.maxAdults) > 0,
+              checkInTime: Boolean(accommodation.checkInTime),
+              checkOutTime: Boolean(accommodation.checkOutTime),
+              hotel: Boolean(hotel),
+            }[field]) === false),
+        }
+        : evaluateReadiness(accommodation, property);
       if (!readiness.ready) {
         fail(
           'MOBILE_ACCOMMODATION_NOT_READY',
@@ -216,7 +257,7 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
 
       await session.commitTransaction();
       session.endSession();
-      return { property, accommodation, rate, idempotent: false };
+      return { property, accommodation, rate, hotel, idempotent: false };
     } catch (error) {
       await session.abortTransaction().catch(() => {});
       session.endSession();

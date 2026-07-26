@@ -84,10 +84,11 @@ export async function creerAnnonce(payload) {
 // une toute nouvelle publication (jamais pour rejouer un échec).
 // ─────────────────────────────────────────────────────────────────────────
 
-export async function createFullAccommodationMobile({ publicationRequestId, property, accommodation, ratePlan }) {
+export async function createFullAccommodationMobile({ publicationRequestId, publicationKind, property, accommodation, ratePlan }) {
   try {
     const res = await api.post('/accommodations/mobile/full', {
       publicationRequestId,
+      publicationKind,
       property,
       accommodation,
       ratePlan,

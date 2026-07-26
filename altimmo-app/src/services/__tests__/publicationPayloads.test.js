@@ -1,6 +1,7 @@
 import {
   buildSalePropertyPayload, buildRentalPropertyPayload,
   buildAccommodationPropertyPayload, buildAccommodationProfilePayload, buildAccommodationRatePayload,
+  buildHotelPropertyPayload, buildHotelProfilePayload,
 } from '../publicationPayloads';
 
 const photoUrls = ['https://res.cloudinary.com/x/a.jpg', 'https://res.cloudinary.com/x/b.jpg'];
@@ -92,6 +93,12 @@ describe('buildAccommodationPropertyPayload / buildAccommodationProfilePayload /
     expect(buildAccommodationPropertyPayload(form, photoUrls).categorie).toBe('hebergement');
   });
 
+  test('la catégorie pilote un Property.type canonique et le tarif unique alimente Property.prix', () => {
+    const payload = buildAccommodationPropertyPayload({ ...form, type: '', tarifNuit: '35000' }, photoUrls);
+    expect(payload.type).toBe('Villa');
+    expect(payload.prix).toBe(35000);
+  });
+
   test('le profil Accommodation normalise capacity en objet {maxAdults,maxChildren}', () => {
     const payload = buildAccommodationProfilePayload(form);
     expect(payload.capacity).toEqual({ maxAdults: 4, maxChildren: 2 });
@@ -111,5 +118,31 @@ describe('buildAccommodationPropertyPayload / buildAccommodationProfilePayload /
 
   test('le tarif est toujours envoyé en mode nightly (seul mode câblé côté backend mobile)', () => {
     expect(buildAccommodationRatePayload(form)).toEqual({ mode: 'nightly', amount: 35000, currency: 'XAF' });
+  });
+});
+
+describe('builders Établissement hôtelier', () => {
+  const form = {
+    establishmentName: ' Hôtel Panorama ', description: 'Centre-ville',
+    accommodationType: 'hotel', ville: 'Brazzaville', arrondissement: 'Poto-Poto',
+    tarifNuit: '45000', capaciteAdultes: 80, starRating: '3', hasReception: true,
+    hotelServices: { wifi: true, restaurant: false }, checkInTime: '14:00', checkOutTime: '11:00',
+  };
+
+  test('utilise le type Property canonique existant et le même montant que RatePlan', () => {
+    const property = buildHotelPropertyPayload(form, photoUrls);
+    expect(property.type).toBe('Commerce');
+    expect(property.prix).toBe(buildAccommodationRatePayload(form).amount);
+    expect(property.chambres).toBe(0);
+    expect(property.bathrooms).toBe(0);
+  });
+
+  test('n’envoie aucun champ résidentiel dans le profil hôtelier', () => {
+    const profile = buildHotelProfilePayload({ ...form, beds: 12, securityDeposit: 50000, accommodationAmenities: { cuisine: ['Four'] } });
+    expect(profile.hotel.name).toBe('Hôtel Panorama');
+    expect(profile.hotel.starRating).toBe(3);
+    expect(profile.beds).toBeUndefined();
+    expect(profile.securityDeposit).toBeUndefined();
+    expect(profile.amenities).toBeUndefined();
   });
 });
