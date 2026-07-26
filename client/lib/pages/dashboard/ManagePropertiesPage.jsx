@@ -15,6 +15,7 @@ import SalePropertyForm from "../../components/dashboard/SalePropertyForm";
 import RentalPropertyForm from "../../components/dashboard/RentalPropertyForm";
 import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
 import PropertyWizard from "../../components/dashboard/PropertyWizard";
+import { HOTEL_ACCOMMODATION_TYPES } from "../../constants/accommodation";
 import Image from 'next/image';
 
 // Libellés d'affichage pour le titre de la modale "Ajouter" — le choix
@@ -678,10 +679,10 @@ const ManagePropertiesPage = () => {
                 {/* Sprint B2 — "Hôtel" ouvre désormais HotelPropertyForm (domaine
                     Hôtellerie dédié), jamais PropertyForm. Tous les autres types
                     d'hébergement (Sprint B1, inchangés) restent sur PropertyForm. */}
-                {addChoice === 'hebergement' && formData.accommodationType === 'hotel' && (
-                  <HotelPropertyForm onSuccess={() => { resetForm(); fetchProperties(); }} onCancel={resetForm} />
+                {addChoice === 'hebergement' && HOTEL_ACCOMMODATION_TYPES.includes(formData.accommodationType) && (
+                  <HotelPropertyForm accommodationType={formData.accommodationType} onSuccess={() => { resetForm(); fetchProperties(); }} onCancel={resetForm} />
                 )}
-                {addChoice === 'hebergement' && formData.accommodationType !== 'hotel' && (
+                {addChoice === 'hebergement' && !HOTEL_ACCOMMODATION_TYPES.includes(formData.accommodationType) && (
                   <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
                     enableHebergement errors={errors} />
                 )}

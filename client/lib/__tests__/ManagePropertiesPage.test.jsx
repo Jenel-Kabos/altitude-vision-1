@@ -132,6 +132,18 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     expect(await screen.findByLabelText("Nom de l'hôtel")).toBeInTheDocument();
   });
 
+  test.each(["Chambre d'hôtes", 'Résidence hôtelière'])(
+    '%s utilise aussi HotelPropertyForm conformément au contrat room_based',
+    async (label) => {
+      render(<ManagePropertiesPage />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+      fireEvent.click(await screen.findByRole('button', { name: /Hébergement/i }));
+      fireEvent.click(screen.getByRole('button', { name: label }));
+      expect(await screen.findByLabelText("Nom de l'hôtel")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Type d'hébergement")).not.toBeInTheDocument();
+    },
+  );
+
   test("PropertyWizard étape 2 — le bouton Retour ramène à l'étape 1 sans perdre le contexte", async () => {
     render(<ManagePropertiesPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));

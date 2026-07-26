@@ -27,6 +27,7 @@ const { assertOperationalHotelAccess, listAccessibleHotels } = require('../servi
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 const { buildExactCiRegexFilter } = require('../services/propertyFilterService');
 const { escapeRegex } = require('../utils/regexEscape');
+const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
 
 const fail = (res, statusCode, message, extra = {}) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...extra });
@@ -288,6 +289,53 @@ function buildHotelDataFromBody(req) {
 // ─────────────────────────────────────────────
 exports.createFull = async (req, res) => {
   try {
+    // H-W1 — le nouveau formulaire Web envoie le même contrat métier que le
+    // Mobile. L'URL historique /hotels/(admin|mine) reste disponible, mais
+    // devient un adaptateur multipart (upload des photos) vers l'unique
+    // service transactionnel de publication.
+    if (req.body.publicationPayload) {
+      let payload;
+      try {
+        payload = typeof req.body.publicationPayload === 'string'
+          ? JSON.parse(req.body.publicationPayload)
+          : req.body.publicationPayload;
+      } catch (_error) {
+        return fail(res, 400, 'Payload de publication hôtelier invalide.');
+      }
+      const uploadedImages = await uploadFilesToCloudinary(req.files);
+      payload = {
+        ...payload,
+        property: { ...payload.property, photos: uploadedImages },
+        accommodation: {
+          ...payload.accommodation,
+          hotel: {
+            ...payload.accommodation?.hotel,
+            gallery: uploadedImages.map((url, index) => ({ url, type: 'photo', isCover: index === 0, order: index })),
+          },
+        },
+      };
+      try {
+        const result = await createFullMobileAccommodation({
+          user: req.user,
+          payload,
+          publicationRequestId: req.body.publicationRequestId || payload.publicationRequestId,
+        });
+        return res.status(result.idempotent ? 200 : 201).json({
+          status: 'success',
+          data: {
+            property: result.property,
+            accommodation: result.accommodation,
+            rate: result.rate,
+            hotel: result.hotel,
+            roomCategories: result.roomCategories,
+            categoryRates: result.categoryRates,
+            idempotent: result.idempotent,
+          },
+        });
+      } catch (error) {
+        return fail(res, error.statusCode || (error.name === 'ValidationError' ? 400 : 500), error.message, error.code ? { code: error.code, ...error.extra } : {});
+      }
+    }
     if (!req.body.name || !req.body.name.trim()) {
       return fail(res, 422, "Le nom de l'hôtel est requis.");
     }
@@ -309,9 +357,13 @@ exports.createFull = async (req, res) => {
     }
 
     const hotelData = buildHotelDataFromBody(req);
+    const accommodationType = req.body.accommodationType || 'hotel';
+    if (!Accommodation.HOTEL_ACCOMMODATION_TYPES.includes(accommodationType)) {
+      return fail(res, 422, "Type d'établissement hôtelier invalide.");
+    }
     let result;
     try {
-      result = await createFullHotel({ propertyData, hotelData, actingUser: req.user });
+      result = await createFullHotel({ propertyData, hotelData, accommodationType, actingUser: req.user });
     } catch (error) {
       return fail(res, error.statusCode || 500, error.message);
     }

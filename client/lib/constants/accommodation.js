@@ -14,7 +14,6 @@ export const INDEPENDENT_ACCOMMODATION_TYPES = [
   { value: "villa_meublee", label: "Villa meublée" },
   { value: "maison_meublee", label: "Maison meublée" },
   { value: "studio_meuble", label: "Studio meublé" },
-  { value: "chambre_hotes", label: "Chambre d'hôtes" },
   { value: "residence_meublee", label: "Résidence meublée" },
 ];
 
@@ -22,6 +21,7 @@ export const ACCOMMODATION_TYPES = [
   ...INDEPENDENT_ACCOMMODATION_TYPES,
   { value: "hotel", label: "Hôtel" },
   { value: "residence_hoteliere", label: "Résidence hôtelière" },
+  { value: "chambre_hotes", label: "Chambre d'hôtes" },
   { value: "autre", label: "Autre" },
 ];
 
@@ -85,7 +85,7 @@ export const INCLUDED_SERVICES = [
 // Sous-ensemble de ACCOMMODATION_TYPES exigeant un rattachement à un
 // établissement Hotel (voir server/models/Accommodation.js
 // HOTEL_ACCOMMODATION_TYPES).
-export const HOTEL_ACCOMMODATION_TYPES = ["hotel"];
+export const HOTEL_ACCOMMODATION_TYPES = ["hotel", "residence_hoteliere", "chambre_hotes", "autre"];
 
 export const CANCELLATION_POLICIES = [
   { value: "flexible", label: "Flexible" },

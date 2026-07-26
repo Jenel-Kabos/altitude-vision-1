@@ -9,11 +9,17 @@
 // (liées une fois l'hôtel créé) — ce formulaire couvre uniquement
 // Informations/Services/Galerie/Publication.
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { VILLES, getArrondissementsFor } from "../../constants/locations";
-import { HOTEL_SERVICES } from "../../constants/hotel";
+import { HOTEL_RATE_TYPES, HOTEL_SERVICES } from "../../constants/hotel";
+import { ACCOMMODATION_TYPES, AMENITY_CATEGORIES } from "../../constants/accommodation";
+import {
+  ROOM_CATEGORY_TYPES, buildHotelPublicationPayload, createHotelRoomCategory,
+  getHotelCategoryTotals, validateHotelCategories, validateHotelRates,
+  validateHotelRoomCategories,
+} from "../../utils/hotelPublication";
 import {
   createFullHotel, updateFullHotel, createMyHotel, updateMyHotel, submitHotel,
 } from "../../services/hotelService";
@@ -41,6 +47,7 @@ const emptyForm = (initial = {}) => ({
 const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400";
 
 const HotelPropertyForm = ({
+  accommodationType = "hotel",
   hotelId = null,
   initialProperty = null,
   initialHotel = null,
@@ -56,6 +63,10 @@ const HotelPropertyForm = ({
   const [existingImages, setExistingImages] = useState(initialExistingImages);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  if (!hotelId) {
+    return <HotelCreationWizard accommodationType={accommodationType} scope={scope} onSuccess={onSuccess} onCancel={onCancel} />;
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -144,6 +155,7 @@ const HotelPropertyForm = ({
       if (website) data.append("website", website);
       data.append("contact", JSON.stringify({ responsable: contactResponsable, horaires: contactHoraires, languesParlees: [] }));
       data.append("hotelServicesStructured", JSON.stringify(hotelServicesStructured));
+      data.append("accommodationType", accommodationType);
 
       const create = scope === "owner" ? createMyHotel : createFullHotel;
       const update = scope === "owner" ? updateMyHotel : updateFullHotel;
@@ -333,5 +345,129 @@ const HotelPropertyForm = ({
     </form>
   );
 };
+
+const CREATION_STEPS = [
+  'Informations générales', 'Localisation', 'Capacité générale', 'Catégories de chambres',
+  'Tarifs', 'Services', 'Politiques', 'Photos', 'Vérification',
+];
+
+const newCreationForm = (accommodationType) => ({
+  publicationRequestId: globalThis.crypto?.randomUUID?.() || `hotel-${Date.now()}`,
+  accommodationType, name: '', description: '', starRating: '', phone: '', email: '', website: '',
+  address: { city: 'Brazzaville', arrondissement: '', street: '' }, latitude: -4.266, longitude: 15.283,
+  surface: 1, checkInTime: '14:00', checkOutTime: '11:00', houseRules: [], hotelServices: {},
+  roomCategories: [], images: [],
+});
+
+function HotelCreationWizard({ accommodationType, scope, onSuccess, onCancel }) {
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState(() => newCreationForm(accommodationType));
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const totals = useMemo(() => getHotelCategoryTotals(form.roomCategories), [form.roomCategories]);
+  const setField = (key, value) => setForm((previous) => ({ ...previous, [key]: value }));
+  const updateCategory = (index, patchValue) => setForm((previous) => ({
+    ...previous,
+    roomCategories: previous.roomCategories.map((category, current) => current === index ? { ...category, ...patchValue } : category),
+  }));
+  const addCategory = () => setForm((previous) => ({ ...previous, roomCategories: [...previous.roomCategories, createHotelRoomCategory(previous.roomCategories.length)] }));
+  const removeCategory = (index) => setForm((previous) => ({ ...previous, roomCategories: previous.roomCategories.filter((_, current) => current !== index) }));
+  const duplicateCategory = (index) => setForm((previous) => {
+    const source = previous.roomCategories[index];
+    const clone = { ...source, clientKey: globalThis.crypto?.randomUUID?.() || `category-${Date.now()}`, name: `${source.name} (copie)`, code: `${source.code}2`, ratePlans: source.ratePlans.map((rate) => ({ ...rate })) };
+    return { ...previous, roomCategories: [...previous.roomCategories.slice(0, index + 1), clone, ...previous.roomCategories.slice(index + 1)] };
+  });
+  const moveCategory = (index, direction) => setForm((previous) => {
+    const target = index + direction;
+    if (target < 0 || target >= previous.roomCategories.length) return previous;
+    const roomCategories = [...previous.roomCategories];
+    [roomCategories[index], roomCategories[target]] = [roomCategories[target], roomCategories[index]];
+    return { ...previous, roomCategories };
+  });
+  const validateStep = () => {
+    const next = {};
+    if (step === 0) {
+      if (!form.name.trim()) next.name = "Nom de l'établissement requis";
+      if (!form.description.trim()) next.description = 'Description requise';
+    }
+    if (step === 1) {
+      if (!form.address.city) next.city = 'Ville requise';
+      if (!form.address.arrondissement) next.arrondissement = 'Arrondissement requis';
+      if (!form.phone.trim()) next.phone = 'Téléphone requis';
+    }
+    if (step === 3) Object.assign(next, validateHotelRoomCategories(form.roomCategories));
+    if (step === 4) Object.assign(next, validateHotelRates(form.roomCategories));
+    if (step === 7 && !form.images.length) next.images = 'Ajoutez au moins une photo';
+    if (step === 8) Object.assign(next, validateHotelCategories(form.roomCategories));
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+  const next = () => { if (validateStep()) setStep((current) => Math.min(current + 1, CREATION_STEPS.length - 1)); };
+  const submit = async () => {
+    if (!validateStep() || loading) return;
+    setLoading(true);
+    try {
+      const payload = buildHotelPublicationPayload(form);
+      const data = new FormData();
+      data.append('publicationRequestId', form.publicationRequestId);
+      data.append('publicationPayload', JSON.stringify(payload));
+      form.images.forEach((image) => data.append('images', image));
+      const result = await (scope === 'owner' ? createMyHotel : createFullHotel)(data);
+      toast.success('Hôtel complet créé et soumis avec ses catégories et tarifs.');
+      onSuccess?.(result);
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message || "Impossible de créer l'établissement.");
+    } finally { setLoading(false); }
+  };
+
+  return <div className="space-y-5">
+    <ol aria-label="Étapes du formulaire" className="grid grid-cols-3 gap-1 text-xs text-gray-500">{CREATION_STEPS.map((label, index) => <li key={label} className={index === step ? 'font-semibold text-gray-900' : ''}>{label}</li>)}</ol>
+    <div className="flex items-center justify-between"><div><p className="text-xs uppercase tracking-wide text-gray-500">Étape {step + 1}/9</p><h3 className="text-xl font-semibold">{CREATION_STEPS[step]}</h3></div><span className="text-sm text-gray-500">{totals.totalRooms} chambres · {totals.minNightlyRate.toLocaleString('fr-FR')} XAF min.</span></div>
+    {step === 0 && <div className="grid grid-cols-2 gap-3">
+      <select aria-label="Type d'établissement" className={inputClass} value={form.accommodationType} onChange={(event) => setField('accommodationType', event.target.value)}>{ACCOMMODATION_TYPES.filter((type) => ['hotel', 'residence_hoteliere', 'chambre_hotes', 'autre'].includes(type.value)).map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select>
+      <select aria-label="Classement" className={inputClass} value={form.starRating} onChange={(event) => setField('starRating', event.target.value)}><option value="">Non classé</option>{[1,2,3,4,5].map((value) => <option key={value} value={value}>{value} étoile(s)</option>)}</select>
+      <Field label="Nom de l'hôtel" value={form.name} onChange={(value) => setField('name', value)} error={errors.name} />
+      <Field label="Téléphone" value={form.phone} onChange={(value) => setField('phone', value)} />
+      <div className="col-span-2"><Field label="Description" value={form.description} onChange={(value) => setField('description', value)} textarea error={errors.description} /></div>
+    </div>}
+    {step === 1 && <div className="grid grid-cols-2 gap-3">
+      <select aria-label="Ville" className={inputClass} value={form.address.city} onChange={(event) => setForm((previous) => ({ ...previous, address: { ...previous.address, city: event.target.value, arrondissement: '' } }))}>{VILLES.map((city) => <option key={city}>{city}</option>)}</select>
+      <select aria-label="Arrondissement" className={inputClass} value={form.address.arrondissement} onChange={(event) => setForm((previous) => ({ ...previous, address: { ...previous.address, arrondissement: event.target.value } }))}><option value="">Sélectionner</option>{getArrondissementsFor(form.address.city).map((value) => <option key={value}>{value}</option>)}</select>
+      <Field label="Adresse complète" value={form.address.street} onChange={(value) => setForm((previous) => ({ ...previous, address: { ...previous.address, street: value } }))} />
+      <Field label="Téléphone principal" value={form.phone} onChange={(value) => setField('phone', value)} error={errors.phone} />
+      <Field label="Email professionnel" value={form.email} onChange={(value) => setField('email', value)} /><Field label="Site web" value={form.website} onChange={(value) => setField('website', value)} />
+      {(errors.city || errors.arrondissement) && <p className="col-span-2 text-sm text-red-600">{errors.city || errors.arrondissement}</p>}
+    </div>}
+    {step === 2 && <div className="rounded-lg border p-4"><p className="font-medium">Capacité calculée automatiquement</p><p className="text-sm text-gray-600">{totals.totalRooms} chambres · {totals.totalCapacity} personnes · {totals.totalBeds} lits. Ces valeurs proviennent des catégories et ne sont jamais saisies deux fois.</p></div>}
+    {step === 3 && <div className="space-y-4">{form.roomCategories.map((category, index) => <CategoryEditor key={category.clientKey} category={category} index={index} errors={errors} update={updateCategory} remove={removeCategory} duplicate={duplicateCategory} move={moveCategory} />)}{errors.roomCategories && <p className="text-sm text-red-600">{errors.roomCategories}</p>}<button type="button" onClick={addCategory} className="rounded bg-blue-600 px-3 py-2 text-white">Ajouter une catégorie</button></div>}
+    {step === 4 && <div className="space-y-4">{form.roomCategories.map((category, index) => <RateEditor key={category.clientKey} category={category} index={index} error={errors[`roomCategories.${index}.ratePlans`]} update={updateCategory} />)}</div>}
+    {step === 5 && <div className="grid grid-cols-2 gap-2">{HOTEL_SERVICES.map((service) => <label key={service.key} className="flex gap-2 rounded border p-3"><input type="checkbox" checked={Boolean(form.hotelServices[service.key])} onChange={() => setField('hotelServices', { ...form.hotelServices, [service.key]: !form.hotelServices[service.key] })} />{service.label}</label>)}</div>}
+    {step === 6 && <div className="grid grid-cols-2 gap-3"><Field label="Heure de check-in" value={form.checkInTime} onChange={(value) => setField('checkInTime', value)} /><Field label="Heure de check-out" value={form.checkOutTime} onChange={(value) => setField('checkOutTime', value)} /></div>}
+    {step === 7 && <div><label className="block text-sm font-medium mb-1">Photos de l'hôtel</label><input aria-label="Photos de l'hôtel" type="file" multiple accept="image/*" onChange={(event) => setField('images', Array.from(event.target.files))} /><p className="text-sm text-gray-500 mt-2">{form.images.length} photo(s) sélectionnée(s)</p>{errors.images && <p className="text-sm text-red-600">{errors.images}</p>}</div>}
+    {step === 8 && <div className="rounded-lg border p-4 space-y-2"><p><strong>{form.name}</strong> · {form.address.arrondissement}, {form.address.city}</p><p>{totals.totalRooms} chambres · {totals.totalCapacity} personnes · {totals.totalBeds} lits</p><p>{totals.minNightlyRate.toLocaleString('fr-FR')} à {totals.maxNightlyRate.toLocaleString('fr-FR')} XAF / nuit</p>{form.roomCategories.map((category) => <p key={category.clientKey}>{category.name} ({category.code}) — {category.quantity} unité(s) — {Number(category.ratePlans.find((rate) => rate.rateType === 'public')?.amount || 0).toLocaleString('fr-FR')} XAF</p>)}</div>}
+    <div className="flex gap-2 border-t pt-4"><button type="button" onClick={() => step ? setStep(step - 1) : onCancel?.()} className="px-4 py-2 text-gray-600">Retour</button>{step < 8 ? <button type="button" onClick={next} className="rounded bg-gold px-4 py-2 text-white">Continuer</button> : <button type="button" disabled={loading} onClick={submit} className="rounded bg-gold px-4 py-2 text-white disabled:opacity-50">{loading ? 'Publication…' : "Publier l'hôtel"}</button>}</div>
+  </div>;
+}
+
+function Field({ label, value, onChange, error, textarea = false }) {
+  const Element = textarea ? 'textarea' : 'input';
+  return <label className="block text-sm font-medium">{label}<Element aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className={`${inputClass} mt-1`} rows={textarea ? 4 : undefined} />{error && <span className="text-xs text-red-600">{error}</span>}</label>;
+}
+
+function CategoryEditor({ category, index, errors, update, remove, duplicate, move }) {
+  const error = (field) => errors[`roomCategories.${index}.${field}`];
+  return <div className="rounded-lg border p-4 space-y-3"><div className="flex justify-between"><strong>Catégorie {index + 1}</strong><div className="flex gap-2"><button type="button" onClick={() => move(index, -1)}>↑</button><button type="button" onClick={() => move(index, 1)}>↓</button><button type="button" onClick={() => duplicate(index)}>Dupliquer</button><button type="button" className="text-red-600" onClick={() => remove(index)}>Supprimer</button></div></div><div className="grid grid-cols-2 gap-3">
+    <select aria-label={`Type catégorie ${index + 1}`} className={inputClass} value={category.categoryType} onChange={(event) => update(index, { categoryType: event.target.value })}>{ROOM_CATEGORY_TYPES.map((value) => <option key={value} value={value}>{value}</option>)}</select>
+    <Field label={`Nom catégorie ${index + 1}`} value={category.name} onChange={(value) => update(index, { name: value })} error={error('name')} /><Field label={`Code catégorie ${index + 1}`} value={category.code} onChange={(value) => update(index, { code: value.toUpperCase() })} error={error('code')} />
+    {[['Nombre de chambres','quantity'],['Adultes par chambre','adultCapacity'],['Enfants par chambre','childCapacity'],['Lits par chambre','beds'],['Surface moyenne','surface']].map(([label,key]) => <Field key={key} label={`${label} ${index + 1}`} value={String(category[key])} onChange={(value) => update(index, { [key]: value })} error={error(key)} />)}
+  </div>{AMENITY_CATEGORIES.slice(1,3).map((group) => <div key={group.key}><p className="text-sm font-medium">{group.label}</p><div className="flex flex-wrap gap-2">{group.options.map((option) => <label key={option} className="text-sm"><input type="checkbox" checked={(category.amenities[group.key] || []).includes(option)} onChange={() => { const values = category.amenities[group.key] || []; update(index, { amenities: { ...category.amenities, [group.key]: values.includes(option) ? values.filter((value) => value !== option) : [...values, option] } }); }} /> {option}</label>)}</div></div>)}</div>;
+}
+
+function RateEditor({ category, index, error, update }) {
+  const rates = category.ratePlans || [];
+  const updateRate = (rateIndex, patchValue) => update(index, { ratePlans: rates.map((rate, current) => current === rateIndex ? { ...rate, ...patchValue } : rate) });
+  const addRate = () => { const type = HOTEL_RATE_TYPES.find((candidate) => !rates.some((rate) => rate.rateType === candidate.value)); if (type) update(index, { ratePlans: [...rates, { rateType: type.value, amount: '', currency: 'XAF' }] }); };
+  return <div className="rounded-lg border p-4"><strong>{category.name}</strong>{rates.map((rate, rateIndex) => <div key={`${rate.rateType}-${rateIndex}`} className="mt-2 grid grid-cols-2 gap-3"><select aria-label={`Type tarif ${category.name} ${rateIndex + 1}`} className={inputClass} value={rate.rateType} onChange={(event) => updateRate(rateIndex, { rateType: event.target.value })}>{HOTEL_RATE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select><Field label={`Tarif ${category.name} ${rateIndex + 1}`} value={String(rate.amount)} onChange={(value) => updateRate(rateIndex, { amount: value })} /></div>)}{error && <p className="text-sm text-red-600">{error}</p>}<button type="button" className="mt-2 text-blue-600" onClick={addRate}>Ajouter un tarif</button></div>;
+}
 
 export default HotelPropertyForm;

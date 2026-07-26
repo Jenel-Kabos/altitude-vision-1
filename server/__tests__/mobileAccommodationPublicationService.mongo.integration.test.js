@@ -145,6 +145,24 @@ describe('createFullMobileAccommodation — établissement hôtelier professionn
     expect(await RoomCategory.countDocuments()).toBe(2);
     expect(await RatePlan.countDocuments()).toBe(2);
   });
+
+  test('équivalence H-W1 — les payloads sémantiques Web et Mobile créent les mêmes documents métier', async () => {
+    const [webUser, mobileUser] = await Promise.all([makeUser(), makeUser()]);
+    const web = await createFullMobileAccommodation({ user: webUser, payload: hotelPayload(), publicationRequestId: `web-${Date.now()}` });
+    const mobile = await createFullMobileAccommodation({ user: mobileUser, payload: hotelPayload(), publicationRequestId: `mobile-${Date.now()}` });
+    const snapshot = async (result) => {
+      const categories = await RoomCategory.find({ hotel: result.hotel._id }).sort({ displayOrder: 1 }).lean();
+      const rates = await RatePlan.find({ roomCategory: { $in: categories.map((category) => category._id) } }).lean();
+      return {
+        property: { title: result.property.title, type: result.property.type, status: result.property.status, price: result.property.price, address: result.property.address },
+        accommodation: { accommodationType: result.accommodation.accommodationType, capacity: result.accommodation.capacity, checkInTime: result.accommodation.checkInTime, checkOutTime: result.accommodation.checkOutTime, occupancyMode: result.accommodation.occupancyMode },
+        hotel: { name: result.hotel.name, totalRooms: result.hotel.totalRooms, totalCapacity: result.hotel.totalCapacity, totalBeds: result.hotel.totalBeds, minNightlyRate: result.hotel.minNightlyRate, maxNightlyRate: result.hotel.maxNightlyRate, currency: result.hotel.currency },
+        categories: categories.map((category) => ({ name: category.name, code: category.code, categoryType: category.categoryType, unitsAvailable: category.unitsAvailable, capacity: category.capacity, beds: category.beds, displayOrder: category.displayOrder })),
+        rates: rates.map((rate) => ({ categoryCode: categories.find((category) => String(category._id) === String(rate.roomCategory)).code, rateType: rate.rateType, amount: rate.amount, currency: rate.currency })).sort((left, right) => left.categoryCode.localeCompare(right.categoryCode)),
+      };
+    };
+    expect(await snapshot(web)).toEqual(await snapshot(mobile));
+  });
 });
 
 describe('createFullMobileAccommodation — rollback complet à chaque étape', () => {
