@@ -120,7 +120,9 @@ export default function LoginScreen({ navigation }) {
                   autoComplete="email"
                   autoFocus
                   placeholder="vous@exemple.com"
-                  placeholderTextColor={c.textMuted}
+                  placeholderTextColor={c.placeholder}
+                  cursorColor={c.gold}
+                  selectionColor={c.borderGold}
                   returnKeyType="next"
                   onSubmitEditing={() => passRef.current?.focus()}
                   accessibilityLabel="Adresse email"
@@ -148,7 +150,9 @@ export default function LoginScreen({ navigation }) {
                   autoCorrect={false}
                   autoComplete="password"
                   placeholder="Votre mot de passe"
-                  placeholderTextColor={c.textMuted}
+                  placeholderTextColor={c.placeholder}
+                  cursorColor={c.gold}
+                  selectionColor={c.borderGold}
                   returnKeyType="done"
                   onSubmitEditing={handleLogin}
                   accessibilityLabel="Mot de passe"

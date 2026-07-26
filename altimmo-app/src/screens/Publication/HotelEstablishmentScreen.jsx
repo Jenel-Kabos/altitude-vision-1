@@ -210,11 +210,11 @@ const ActionButton = ({ label, onPress, styles }) => <TouchableOpacity accessibi
 const SmallAction = ({ label, onPress, styles, danger }) => <TouchableOpacity accessibilityRole="button" onPress={onPress} style={styles.smallAction}><Text style={[styles.smallActionText, danger && styles.danger]}>{label}</Text></TouchableOpacity>;
 const makeStyles = (c) => StyleSheet.create({
   field: { marginBottom: spacing.sm }, heading: { fontFamily: fonts.bodyBold, fontSize: fontSize.md, color: c.text, marginBottom: spacing.sm },
-  help: { fontFamily: fonts.body, color: c.textSecondary, lineHeight: 21 }, error: { color: c.error || '#B42318', marginBottom: spacing.sm },
-  totalCard: { backgroundColor: c.surface, borderColor: c.border, borderWidth: 1, borderRadius: 14, padding: spacing.md, marginBottom: spacing.md },
-  totalStrong: { fontFamily: fonts.bodyBold, color: c.text, fontSize: fontSize.md }, totalText: { color: c.textSecondary, marginTop: 4 },
-  categoryCard: { borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: spacing.md, marginBottom: spacing.md, backgroundColor: c.surface },
+  help: { fontFamily: fonts.body, color: c.textSub, lineHeight: 21 }, error: { color: c.error, marginBottom: spacing.sm },
+  totalCard: { backgroundColor: c.bgCard, borderColor: c.border, borderWidth: 1, borderRadius: 14, padding: spacing.md, marginBottom: spacing.md },
+  totalStrong: { fontFamily: fonts.bodyBold, color: c.text, fontSize: fontSize.md }, totalText: { color: c.textSub, marginTop: 4 },
+  categoryCard: { borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: spacing.md, marginBottom: spacing.md, backgroundColor: c.bgCard },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, smallAction: { borderWidth: 1, borderColor: c.border, borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
-  smallActionText: { color: c.primary, fontFamily: fonts.bodyBold }, danger: { color: c.error || '#B42318' },
-  primaryAction: { backgroundColor: c.primary, borderRadius: 12, padding: spacing.md, alignItems: 'center', marginBottom: spacing.md }, primaryActionText: { color: '#FFF', fontFamily: fonts.bodyBold },
+  smallActionText: { color: c.gold, fontFamily: fonts.bodyBold }, danger: { color: c.error },
+  primaryAction: { backgroundColor: c.gold, borderRadius: 12, padding: spacing.md, alignItems: 'center', marginBottom: spacing.md }, primaryActionText: { color: c.onAccent, fontFamily: fonts.bodyBold },
 });

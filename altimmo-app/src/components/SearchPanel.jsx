@@ -451,7 +451,9 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
                   <TextInput
                     style={[styles.budgetInputField, { color: c.text }]}
                     placeholder="0"
-                    placeholderTextColor={c.textMuted}
+                    placeholderTextColor={c.placeholder}
+                    cursorColor={c.gold}
+                    selectionColor={c.borderGold}
                     value={minInput}
                     onChangeText={setMinInput}
                     onBlur={commitMin}
@@ -476,7 +478,9 @@ export default function SearchPanel({ visible, onClose, onSearch, initialFilters
                   <TextInput
                     style={[styles.budgetInputField, { color: c.text }]}
                     placeholder="500M"
-                    placeholderTextColor={c.textMuted}
+                    placeholderTextColor={c.placeholder}
+                    cursorColor={c.gold}
+                    selectionColor={c.borderGold}
                     value={maxInput}
                     onChangeText={setMaxInput}
                     onBlur={commitMax}
@@ -563,7 +567,7 @@ const makeStyles = (c) => StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '92%',
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -638,7 +642,7 @@ const makeStyles = (c) => StyleSheet.create({
     color: c.text,
   },
   chipTextActive: {
-    color: '#0A0A0A',
+    color: c.onAccent,
     fontFamily: fonts.bodyBold,
   },
 
@@ -724,7 +728,7 @@ const makeStyles = (c) => StyleSheet.create({
     color: c.text,
   },
   presetChipTextActive: {
-    color: '#0A0A0A',
+    color: c.onAccent,
     fontFamily: fonts.bodyBold,
   },
 
@@ -832,6 +836,6 @@ const makeStyles = (c) => StyleSheet.create({
   ctaText: {
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.md,
-    color: '#0A0A0A',
+    color: c.onAccent,
   },
 });

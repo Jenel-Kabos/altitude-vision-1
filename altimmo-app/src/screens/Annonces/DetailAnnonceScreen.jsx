@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   FlatList, Dimensions, Alert, Share,
   TextInput, Modal, ScrollView, Pressable,
-  ActivityIndicator, Switch, Platform,
+  ActivityIndicator, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -16,7 +16,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Screen, PrixFCFA } from '../../components';
+import { Screen, PrixFCFA, FormSwitch } from '../../components';
 import HeartFavoriteButton from '../../components/HeartFavoriteButton';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 import {
@@ -988,7 +988,9 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                 <TextInput
                   style={styles.commentInput}
                   placeholder="Votre avis…"
-                  placeholderTextColor={c.textMuted}
+                  placeholderTextColor={c.placeholder}
+                  cursorColor={c.gold}
+                  selectionColor={c.borderGold}
                   value={commentaire}
                   onChangeText={setCommentaire}
                   multiline
@@ -1218,7 +1220,9 @@ export default function DetailAnnonceScreen({ route, navigation }) {
               <TextInput
                 style={styles.signalInput}
                 placeholder="Décrivez le problème…"
-                placeholderTextColor={c.textMuted}
+                placeholderTextColor={c.placeholder}
+                cursorColor={c.gold}
+                selectionColor={c.borderGold}
                 value={signalDetails}
                 onChangeText={setSignalDetails}
                 multiline
@@ -1406,7 +1410,9 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                   <TextInput
                     style={styles.rdvInput}
                     placeholder="+242 06 XXX XX XX"
-                    placeholderTextColor={c.textMuted}
+                    placeholderTextColor={c.placeholder}
+                    cursorColor={c.gold}
+                    selectionColor={c.borderGold}
                     value={rdvTelephone}
                     onChangeText={setRdvTelephone}
                     keyboardType="phone-pad"
@@ -1416,7 +1422,9 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                   <TextInput
                     style={[styles.rdvInput, styles.rdvTextarea]}
                     placeholder="Précisions sur la visite..."
-                    placeholderTextColor={c.textMuted}
+                    placeholderTextColor={c.placeholder}
+                    cursorColor={c.gold}
+                    selectionColor={c.borderGold}
                     value={rdvMessage}
                     onChangeText={setRdvMessage}
                     multiline
@@ -1424,7 +1432,11 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                     textAlignVertical="top"
                   />
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 12 }}>
-                    <Switch value={rdvConsent} onValueChange={setRdvConsent} trackColor={{ true: c.gold }} />
+                    <FormSwitch
+                      value={rdvConsent}
+                      onValueChange={setRdvConsent}
+                      accessibilityLabel="Consentement pour être contacté"
+                    />
                     <Text style={{ flex: 1, color: c.textSub, fontFamily: fonts.body, fontSize: fontSize.sm }}>
                       J’accepte d’être contacté par Altimmo pour organiser ce rendez-vous de visite.
                     </Text>

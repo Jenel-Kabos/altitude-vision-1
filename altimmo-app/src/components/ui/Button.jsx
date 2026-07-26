@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Pressable, Text, ActivityIndicator, View, StyleSheet,
 } from 'react-native';
@@ -9,7 +9,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { typography, spacing } from '../../theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -24,12 +25,14 @@ export default function Button({
   size = 'md',
   style,
 }) {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const isPrimary = variant === 'primary';
   const isOutline = variant === 'outline';
   const isSm = size === 'sm';
 
-  const bgColor = isPrimary ? colors.gold : 'transparent';
-  const fgColor = isPrimary ? '#000' : colors.gold;
+  const bgColor = isPrimary ? c.gold : 'transparent';
+  const fgColor = isPrimary ? c.onAccent : c.gold;
 
   const scale = useSharedValue(1);
 
@@ -69,7 +72,7 @@ export default function Button({
         isSm && styles.btnSm,
         {
           backgroundColor: bgColor,
-          borderColor: isOutline ? colors.gold : 'transparent',
+          borderColor: isOutline ? c.gold : 'transparent',
           borderWidth: isOutline ? 1.5 : 0,
         },
         fullWidth && styles.fullWidth,
@@ -99,7 +102,7 @@ export default function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   btn: {
     borderRadius: 12,
     paddingVertical: spacing.md,

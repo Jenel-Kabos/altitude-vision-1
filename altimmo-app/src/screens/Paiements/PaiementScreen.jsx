@@ -26,7 +26,7 @@ const fmt = (n) => Number(n || 0).toLocaleString('fr-FR');
 
 // ─── Carte opérateur ──────────────────────────────────────────────────────────
 
-const OperatorCard = memo(function OperatorCard({ op, selected, onSelect, styles }) {
+const OperatorCard = memo(function OperatorCard({ op, selected, onSelect, styles, checkColor }) {
   const handlePress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onSelect(op.id);
@@ -48,7 +48,7 @@ const OperatorCard = memo(function OperatorCard({ op, selected, onSelect, styles
         <Text style={[styles.methodLabel, selected && styles.methodLabelSelected]}>{op.label}</Text>
       </View>
       <View style={[styles.methodCheck, selected && styles.methodCheckSelected]}>
-        {selected && <Ionicons name="checkmark" size={14} color="#0A0A0A" />}
+        {selected && <Ionicons name="checkmark" size={14} color={checkColor} />}
       </View>
     </TouchableOpacity>
   );
@@ -229,6 +229,7 @@ export default function PaiementScreen({ route, navigation }) {
                     selected={operator === op.id}
                     onSelect={handleOperator}
                     styles={styles}
+                    checkColor={c.onAccent}
                   />
                 ))}
               </View>
@@ -239,7 +240,9 @@ export default function PaiementScreen({ route, navigation }) {
                 value={phone}
                 onChangeText={handlePhone}
                 placeholder="242XXXXXXXXX"
-                placeholderTextColor={c.textMuted}
+                placeholderTextColor={c.placeholder}
+                cursorColor={c.gold}
+                selectionColor={c.borderGold}
                 keyboardType="number-pad"
                 maxLength={12}
                 editable={!isFormDisabled}
@@ -251,7 +254,9 @@ export default function PaiementScreen({ route, navigation }) {
                 value={firstName}
                 onChangeText={setFirstName}
                 placeholder="Votre prénom"
-                placeholderTextColor={c.textMuted}
+                placeholderTextColor={c.placeholder}
+                cursorColor={c.gold}
+                selectionColor={c.borderGold}
                 editable={!isFormDisabled}
               />
 
@@ -261,7 +266,9 @@ export default function PaiementScreen({ route, navigation }) {
                 value={lastName}
                 onChangeText={setLastName}
                 placeholder="Votre nom"
-                placeholderTextColor={c.textMuted}
+                placeholderTextColor={c.placeholder}
+                cursorColor={c.gold}
+                selectionColor={c.borderGold}
                 editable={!isFormDisabled}
               />
 
@@ -341,10 +348,10 @@ export default function PaiementScreen({ route, navigation }) {
             accessibilityState={{ disabled: isFormDisabled }}
           >
             {loading ? (
-              <ActivityIndicator size="small" color="#0A0A0A" />
+              <ActivityIndicator size="small" color={c.onAccent} />
             ) : (
               <>
-                <Ionicons name="shield-checkmark-outline" size={18} color="#0A0A0A" />
+                <Ionicons name="shield-checkmark-outline" size={18} color={c.onAccent} />
                 <Text style={styles.ctaText}>Payer {montantFmt} FCFA</Text>
               </>
             )}
@@ -613,6 +620,6 @@ const makeStyles = (c) => StyleSheet.create({
   ctaText: {
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.md,
-    color: '#0A0A0A',
+    color: c.onAccent,
   },
 });

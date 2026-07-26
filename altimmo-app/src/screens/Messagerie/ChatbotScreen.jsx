@@ -119,14 +119,14 @@ export default function ChatbotScreen({ navigation }) {
                 accessibilityState={{ selected }}
               >
                 <View style={[styles.topicIcon, selected && styles.topicIconSelected]}>
-                  <Ionicons name={t.icon} size={20} color={selected ? '#0A0A0A' : c.gold} />
+                  <Ionicons name={t.icon} size={20} color={selected ? c.onAccent : c.gold} />
                 </View>
                 <Text style={[styles.topicLabel, selected && styles.topicLabelSelected]}>
                   {t.label}
                 </Text>
                 {selected && (
                   <View style={styles.topicCheck}>
-                    <Ionicons name="checkmark" size={12} color="#0A0A0A" />
+                    <Ionicons name="checkmark" size={12} color={c.onAccent} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -141,7 +141,9 @@ export default function ChatbotScreen({ navigation }) {
             <TextInput
               style={styles.customInput}
               placeholder="Décrivez votre projet, vos critères, vos questions…"
-              placeholderTextColor={c.textMuted}
+              placeholderTextColor={c.placeholder}
+              cursorColor={c.gold}
+              selectionColor={c.borderGold}
               value={customMsg}
               onChangeText={setCustomMsg}
               multiline
@@ -160,8 +162,8 @@ export default function ChatbotScreen({ navigation }) {
           activeOpacity={0.85}
         >
           {loading
-            ? <ActivityIndicator size="small" color="#0A0A0A" />
-            : <Ionicons name="chatbubbles-outline" size={18} color="#0A0A0A" />
+            ? <ActivityIndicator size="small" color={c.onAccent} />
+            : <Ionicons name="chatbubbles-outline" size={18} color={c.onAccent} />
           }
           <Text style={styles.ctaBtnText}>
             {loading ? 'Connexion…' : 'Démarrer la conversation'}
@@ -317,7 +319,7 @@ const makeStyles = (c) => StyleSheet.create({
   },
   topicLabelSelected: {
     fontFamily: fonts.bodyBold,
-    color: '#0A0A0A',
+    color: c.onAccent,
   },
   topicCheck: {
     width: 22, height: 22, borderRadius: 11,
@@ -363,7 +365,7 @@ const makeStyles = (c) => StyleSheet.create({
   ctaBtnText: {
     fontFamily: fonts.bodyBold,
     fontSize: 15,
-    color: '#0A0A0A',
+    color: c.onAccent,
   },
   disclaimer: {
     fontFamily: fonts.body,

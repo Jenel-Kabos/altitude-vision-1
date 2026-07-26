@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, Switch, Linking, Share, Platform,
+  ScrollView, Alert, Linking, Share, Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { colors, fonts, fontSize, typography, spacing, radius } from '../../them
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
+import FormSwitch from '../../components/FormSwitch';
 
 const ROLE_COLOR = {
   admin:         colors.error,
@@ -44,13 +45,10 @@ function MenuRow({ icon, label, onPress, danger, toggle, toggleVal, onToggle, st
       </View>
       <Text style={[styles.menuLabel, danger && { color: c.error }]}>{label}</Text>
       {toggle ? (
-        <Switch
+        <FormSwitch
           value={toggleVal}
           onValueChange={onToggle}
-          trackColor={{ false: c.border, true: c.gold }}
-          thumbColor="#FFFFFF"
-          accessibilityRole="switch"
-          accessibilityState={{ checked: toggleVal }}
+          accessibilityLabel={label}
         />
       ) : (
         <Ionicons name="chevron-forward" size={16} color={c.textMuted} />

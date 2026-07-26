@@ -5,6 +5,7 @@ export { default as PrixFCFA } from './PrixFCFA';
 export { default as Chip } from './Chip';
 export { default as Input } from './Input';
 export { default as Checkbox } from './Checkbox';
+export { default as FormSwitch } from './FormSwitch';
 export { default as HouseIcon } from './HouseIcon';
 export { default as RecommendedCarousel } from './RecommendedCarousel';
 export { default as SearchPanel } from './SearchPanel';
