@@ -8,21 +8,13 @@ import {
 import { PROPERTY_TYPES } from '../../constants/propertyTypes';
 import { VILLES, getArrondissementsFor } from '../../constants/locations';
 import { AMENITIES } from '../../constants/amenities';
+import { TENANT_PROFILES, REQUIRED_DOCUMENTS } from '../../constants/rentalProperty';
 import { rentalPropertySchema, getPropertyVisibleFields, sanitizePropertyFieldsForType } from '../../utils/publicationValidation';
 import { buildRentalPropertyPayload } from '../../services/publicationPayloads';
 import { creerAnnonce, uploadToCloudinary } from '../../services/annonceService';
 import { useDraftAnnonce } from '../../hooks/useDraftAnnonce';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts, fontSize, spacing } from '../../theme';
-
-// Enums Property.profilsLocataireRecherches / documentsRequis (server/models/Property.js) —
-// non exportés d'une constante partagée : ces listes n'existent nulle part ailleurs dans
-// le code mobile (l'ancien PublierBienScreen les codait déjà en dur localement).
-const TENANT_PROFILES = ['Salarié', 'Étudiant', 'Indépendant/Affairiste', 'Fonctionnaire', 'Retraité'];
-const REQUIRED_DOCUMENTS = [
-  'CNI', 'Justificatif de revenus', '2 derniers bulletins de salaire',
-  'Caution bancaire', 'Attestation de travail', 'Quittance de loyer précédente',
-];
 
 const STEP_TITLES = {
   info: 'Informations générales',

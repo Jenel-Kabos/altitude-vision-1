@@ -11,6 +11,7 @@ import {
   ACCOMMODATION_TYPES, LEGACY_ACCOMMODATION_TYPES, CANCELLATION_POLICIES, HOTEL_ACCOMMODATION_TYPES,
   AMENITY_CATEGORIES, INCLUDED_SERVICES,
 } from "../../constants/accommodation";
+import { TENANT_PROFILES, REQUIRED_DOCUMENTS } from "../../constants/rentalProperty";
 import { getHotels } from "../../services/accommodationService";
 
 // ✅ Préfixe les URLs relatives avec l'URL du backend.
@@ -25,16 +26,6 @@ const getImageUrl = (url) => {
   const normalized = url.replace(/\\/g, "/").replace(/^\//, "");
   return `${API_URL}/${normalized}`;
 };
-
-const TENANT_PROFILES = ['Salarié', 'Étudiant', 'Indépendant/Affairiste', 'Fonctionnaire', 'Retraité'];
-const REQUIRED_DOCUMENTS = [
-  'CNI',
-  'Justificatif de revenus',
-  '2 derniers bulletins de salaire',
-  'Caution bancaire',
-  'Attestation de travail',
-  'Quittance de loyer précédente',
-];
 
 const PropertyForm = ({
   formData,

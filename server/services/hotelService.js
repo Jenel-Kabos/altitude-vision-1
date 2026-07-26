@@ -166,11 +166,11 @@ async function ensureManagerGovernanceAtomic({ hotel, actingUser, accommodation,
 /**
  * Création complète d'un hôtel (Property + Hotel + Accommodation-adaptateur)
  * — réutilise `accommodationService.createFullAccommodation` (déjà testé,
- * gère la compensation orpheline) en forçant accommodationType='hotel'.
+ * gère la compensation orpheline) avec le type d'établissement canonique.
  */
-async function createFullHotel({ propertyData, hotelData, actingUser }) {
+async function createFullHotel({ propertyData, hotelData, accommodationType = 'hotel', actingUser }) {
   const accommodationData = {
-    accommodationType: 'hotel',
+    accommodationType,
     checkInTime: '14:00',
     checkOutTime: '11:00',
   };

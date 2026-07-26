@@ -24,6 +24,7 @@ function buildMobilePropertyData(body, ownerId) {
     kitchens,
     ville,
     arrondissement,
+    rue,
     type,
     categorie,
     photos,
@@ -77,6 +78,7 @@ function buildMobilePropertyData(body, ownerId) {
     address: {
       city: ville,
       arrondissement,
+      street: typeof rue === 'string' ? rue.trim() : '',
     },
     type,
     status:

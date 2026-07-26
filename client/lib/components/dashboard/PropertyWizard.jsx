@@ -39,6 +39,7 @@ export const HEBERGEMENT_TYPE_OPTIONS = [
   { value: "residence_meublee", label: "Résidence meublée", Icon: Building },
   { value: "chambre_hotes", label: "Chambre d'hôtes", Icon: Users },
   { value: "hotel", label: "Hôtel", Icon: HotelIcon },
+  { value: "residence_hoteliere", label: "Résidence hôtelière", Icon: HotelIcon },
 ];
 
 const CardGrid = ({ children }) => (
