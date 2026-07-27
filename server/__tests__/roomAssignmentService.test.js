@@ -29,14 +29,13 @@ const USER_ID = '507f1f77bcf86cd799439012';
 /** Simule fidèlement la collection RoomAssignment avec ses contraintes d'unicité partielle. */
 function makeAssignmentStore() {
   const activeByRoom = new Map(); // roomId -> assignment
-  const activeByReservation = new Map(); // reservationId -> assignment
+  const activeByReservation = new Map(); // reservationId -> assignment[]
   let seq = 0;
 
   RoomAssignment.create = jest.fn(async (data) => {
     const roomKey = String(data.room);
     const resKey = String(data.reservation);
     if (activeByRoom.has(roomKey)) { const e = new Error('duplicate'); e.code = 11000; throw e; }
-    if (activeByReservation.has(resKey)) { const e = new Error('duplicate'); e.code = 11000; throw e; }
     seq += 1;
     const doc = {
       _id: `ASSIGN-${seq}`, reservation: data.reservation, room: data.room,
@@ -50,19 +49,20 @@ function makeAssignmentStore() {
     doc.save = jest.fn(async () => {
       if (doc.releasedAt) {
         if (activeByRoom.get(roomKey) === doc) activeByRoom.delete(roomKey);
-        if (activeByReservation.get(resKey) === doc) activeByReservation.delete(resKey);
+        activeByReservation.set(resKey, (activeByReservation.get(resKey) || []).filter((item) => item !== doc));
       }
     });
     activeByRoom.set(roomKey, doc);
-    activeByReservation.set(resKey, doc);
+    activeByReservation.set(resKey, [...(activeByReservation.get(resKey) || []), doc]);
     return doc;
   });
 
   RoomAssignment.findOne = jest.fn(async (query) => {
     if (query.room) return activeByRoom.get(String(query.room)) || null;
-    if (query.reservation) return activeByReservation.get(String(query.reservation)) || null;
+    if (query.reservation) return (activeByReservation.get(String(query.reservation)) || [])[0] || null;
     return null;
   });
+  RoomAssignment.countDocuments = jest.fn(async (query) => (activeByReservation.get(String(query.reservation)) || []).length);
 
   return { activeByRoom, activeByReservation };
 }
@@ -124,24 +124,24 @@ describe('roomAssignmentService — garde-fou multi-chambres (correctif §3) —
     Room.findById = jest.fn().mockResolvedValue(room());
   });
 
-  test('affectation refusée si roomsCount > 1', async () => {
-    await expect(assignRoom({ reservationId: RESERVATION_ID, roomId: ROOM_ID, reservation: reservation({ roomsCount: 3 }), actingUser: { id: USER_ID } }))
-      .rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('affectation multiple') });
+  test('affectation autorisée jusqu’à roomsCount', async () => {
+    const result = await assignRoom({ reservationId: RESERVATION_ID, roomId: ROOM_ID, reservation: reservation({ roomsCount: 3 }), actingUser: { id: USER_ID } });
+    expect(result.room).toBe(ROOM_ID);
   });
 
-  test('affectation refusée si roomsCount === 0 (donnée incohérente, jamais traitée comme mono-chambre)', async () => {
+  test('affectation refusée si roomsCount === 0', async () => {
     await expect(assignRoom({ reservationId: RESERVATION_ID, roomId: ROOM_ID, reservation: reservation({ roomsCount: 0 }), actingUser: { id: USER_ID } }))
       .rejects.toMatchObject({ statusCode: 409 });
   });
 
-  test('changement de chambre refusé si roomsCount > 1', async () => {
+  test('changement de chambre autorisé pour une réservation multi-chambres', async () => {
     // Affectation initiale mono-chambre (roomsCount:1), puis la réservation
     // passée à changeRoom simule un roomsCount incohérent/modifié à 2 —
     // le changement doit être bloqué avant toute écriture.
     await assignRoom({ reservationId: RESERVATION_ID, roomId: ROOM_ID, reservation: reservation(), actingUser: { id: USER_ID } });
     Room.findById = jest.fn().mockResolvedValue(room({ _id: OTHER_ROOM_ID }));
-    await expect(changeRoom({ reservationId: RESERVATION_ID, newRoomId: OTHER_ROOM_ID, reservation: reservation({ roomsCount: 2 }), actingUser: { id: USER_ID } }))
-      .rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('affectation multiple') });
+    const changed = await changeRoom({ reservationId: RESERVATION_ID, oldRoomId: ROOM_ID, newRoomId: OTHER_ROOM_ID, reservation: reservation({ roomsCount: 2 }), actingUser: { id: USER_ID } });
+    expect(changed.room).toBe(OTHER_ROOM_ID);
   });
 
   test('réservation roomsCount = 1 reste pleinement fonctionnelle (non-régression)', async () => {
@@ -260,7 +260,7 @@ describe('roomAssignmentService — changeRoom / releaseRoom — TEST DATA', () 
     Room.findByIdAndUpdate = jest.fn().mockResolvedValue({ _id: ROOM_ID, status: 'available' });
   });
 
-  test('changeRoom réserve la nouvelle chambre AVANT de libérer l\'ancienne', async () => {
+  test('changeRoom libère l’ancienne chambre avant de créer la nouvelle affectation', async () => {
     await assignRoom({ reservationId: RESERVATION_ID, roomId: ROOM_ID, reservation: reservation(), actingUser: { id: USER_ID } });
     Room.findById = jest.fn().mockResolvedValue(room({ _id: OTHER_ROOM_ID }));
     const callOrder = [];
@@ -268,11 +268,12 @@ describe('roomAssignmentService — changeRoom / releaseRoom — TEST DATA', () 
       callOrder.push('assign-new');
       return { _id: 'NEW', reservation: data.reservation, room: data.room, releasedAt: null, save: jest.fn() };
     });
-    const originalSave = store.activeByReservation.get(RESERVATION_ID).save;
-    store.activeByReservation.get(RESERVATION_ID).save = jest.fn(async () => { callOrder.push('release-old'); return originalSave(); });
+    const current = store.activeByReservation.get(RESERVATION_ID)[0];
+    const originalSave = current.save;
+    current.save = jest.fn(async () => { callOrder.push('release-old'); return originalSave(); });
 
     await changeRoom({ reservationId: RESERVATION_ID, newRoomId: OTHER_ROOM_ID, reservation: reservation(), actingUser: { id: USER_ID }, reason: 'x' });
-    expect(callOrder).toEqual(['assign-new', 'release-old']);
+    expect(callOrder).toEqual(['release-old', 'assign-new']);
   });
 
   test("changeRoom refuse si la nouvelle chambre est indisponible — l'ancienne affectation reste intacte", async () => {
@@ -280,7 +281,7 @@ describe('roomAssignmentService — changeRoom / releaseRoom — TEST DATA', () 
     Room.findById = jest.fn().mockResolvedValue(room({ _id: OTHER_ROOM_ID, status: 'occupied' }));
     await expect(changeRoom({ reservationId: RESERVATION_ID, newRoomId: OTHER_ROOM_ID, reservation: reservation(), actingUser: { id: USER_ID } }))
       .rejects.toMatchObject({ statusCode: 409 });
-    expect(store.activeByReservation.get(RESERVATION_ID).releasedAt).toBeNull();
+    expect(store.activeByReservation.get(RESERVATION_ID)[0].releasedAt).toBeNull();
   });
 
   test('releaseRoom libère l\'affectation active et remet la chambre à "available" par défaut', async () => {

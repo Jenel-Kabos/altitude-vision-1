@@ -60,6 +60,11 @@ const hotelReservationSchema = new mongoose.Schema(
     sequenceNumber: { type: Number },
     reference: { type: String, unique: true, index: true },
 
+    // C/D.1 — clé fournie par le client et empreinte métier associée. Les
+    // anciennes réservations restent valides grâce à l'index partiel.
+    reservationRequestId: { type: String, trim: true, maxlength: 128, default: null },
+    reservationRequestHash: { type: String, select: false, default: null },
+
     hotel: { type: mongoose.Schema.Types.ObjectId, ref: 'Hotel', required: true },
     roomCategory: { type: mongoose.Schema.Types.ObjectId, ref: 'RoomCategory', required: true },
     ratePlan: { type: mongoose.Schema.Types.ObjectId, ref: 'RatePlan', default: null },
@@ -105,6 +110,13 @@ const hotelReservationSchema = new mongoose.Schema(
       rateType: { type: String, default: null },
       amount: { type: Number, default: null },
       currency: { type: String, default: null },
+      nightlyRates: [{
+        date: { type: Date, required: true },
+        amount: { type: Number, required: true, min: 0 },
+        periodId: { type: mongoose.Schema.Types.ObjectId, default: null },
+        periodLabel: { type: String, trim: true, default: '' },
+        priority: { type: Number, default: null },
+      }],
     },
 
     status: { type: String, enum: RESERVATION_STATUSES, default: 'pending' },
@@ -116,6 +128,11 @@ const hotelReservationSchema = new mongoose.Schema(
 
     // Sprint C §11 — expiration simple des demandes en attente.
     pendingExpiresAt: { type: Date, default: null },
+    actualCheckInAt: { type: Date, default: null },
+    actualCheckOutAt: { type: Date, default: null },
+    assignmentVersion: { type: Number, default: 0, select: false },
+    requiresRoomReassignment: { type: Boolean, default: false, index: true },
+    reassignmentReason: { type: String, trim: true, maxlength: 300, default: '' },
 
     // PAS `required` : une demande publique peut venir d'un visiteur sans
     // compte (mission §8, "Un visiteur... peut... soumettre une demande") —
@@ -139,6 +156,10 @@ hotelReservationSchema.index({ hotel: 1, status: 1 });
 hotelReservationSchema.index({ roomCategory: 1, checkInDate: 1, checkOutDate: 1 });
 hotelReservationSchema.index({ guestUser: 1, createdAt: -1 });
 hotelReservationSchema.index({ status: 1, pendingExpiresAt: 1 }); // utilisé par le job d'expiration (voir hotelReservationExpiryService)
+hotelReservationSchema.index(
+  { hotel: 1, reservationRequestId: 1 },
+  { unique: true, partialFilterExpression: { reservationRequestId: { $type: 'string' } } },
+);
 
 // Nuits dérivées + validation stricte de l'ordre des dates (mission §4).
 hotelReservationSchema.pre('validate', function computeNights(next) {

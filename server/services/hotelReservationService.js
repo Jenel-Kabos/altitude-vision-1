@@ -6,6 +6,8 @@
 // Toute opération qui touche l'inventaire délègue à hotelAvailabilityService
 // — aucune logique de stock dupliquée ici.
 
+const crypto = require('crypto');
+const mongoose = require('mongoose');
 const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
 const RatePlan = require('../models/RatePlan');
@@ -13,9 +15,11 @@ const HotelReservation = require('../models/HotelReservation');
 const {
   assertNotPast, assertAvailability, reserveInventory, releaseInventory, getNightDates,
 } = require('./hotelAvailabilityService');
-const { releaseRoom } = require('./roomAssignmentService');
+const roomAssignmentService = require('./roomAssignmentService');
 const { notify } = require('./notificationService');
+const { notifyReservationGuest } = require('./hotelReservationNotificationService');
 const logger = require('../utils/logger');
+const { isTransactionUnavailable } = require('./finance/financialTransactionService');
 
 // Durée par défaut avant expiration d'une demande 'pending' — volontairement
 // simple (mission §11 : "ne pas créer un système complexe"). Documentée
@@ -30,15 +34,30 @@ const PENDING_EXPIRY_HOURS = 48;
 /**
  * @returns {Promise<{unitPrice, subtotal, taxes, fees, discount, totalAmount, currency, rateSnapshot}>}
  */
-async function computeReservationPricing({ roomCategoryId, ratePlanId, nights, roomsCount }) {
-  const rate = await RatePlan.findOne({ _id: ratePlanId, roomCategory: roomCategoryId, active: true });
+async function computeReservationPricing({ roomCategoryId, ratePlanId, nights, roomsCount, nightDates = null, session = null }) {
+  const rateQuery = RatePlan.findOne({ _id: ratePlanId, roomCategory: roomCategoryId, active: true });
+  const rate = await (session ? rateQuery.session(session) : rateQuery);
   if (!rate) {
     const err = new Error("Le tarif sélectionné n'est plus disponible pour cette catégorie.");
     err.statusCode = 422;
     throw err;
   }
+  const dates = nightDates || Array.from({ length: nights }, () => null);
+  const nightlyRates = dates.map((date) => {
+    const applicable = date ? (rate.seasonalPeriods || [])
+      .filter((period) => new Date(period.startDate) <= date && date < new Date(period.endDate))
+      .sort((a, b) => b.priority - a.priority)[0] : null;
+    return {
+      date, amount: applicable?.amount ?? rate.amount,
+      periodId: applicable?._id || null, periodLabel: applicable?.label || '',
+      priority: applicable ? applicable.priority : null,
+    };
+  });
+  const subtotal = nightlyRates.reduce((sum, nightly) => sum + nightly.amount, 0) * roomsCount;
+  // `unitPrice` reste compatible avec les consommateurs historiques : il
+  // représente le tarif de base. Le détail réellement facturé est figé
+  // nuit par nuit dans le snapshot.
   const unitPrice = rate.amount;
-  const subtotal = unitPrice * nights * roomsCount;
   // Taxes/frais/remise : aucune structure de taxation ou de code promo
   // n'existe ailleurs dans ce codebase à ce jour (confirmé par l'audit
   // initial — voir HOTEL_RESERVATIONS_V1.md §"Tarification") — conservés à
@@ -50,8 +69,42 @@ async function computeReservationPricing({ roomCategoryId, ratePlanId, nights, r
   return {
     unitPrice, subtotal, taxes, fees, discount, totalAmount,
     currency: rate.currency,
-    rateSnapshot: { rateType: rate.rateType, amount: rate.amount, currency: rate.currency },
+    rateSnapshot: { rateType: rate.rateType, amount: rate.amount, currency: rate.currency, nightlyRates },
   };
+}
+
+function reservationFingerprint(payload) {
+  const normalized = {
+    hotel: String(payload.hotelId), roomCategory: String(payload.roomCategoryId), ratePlan: String(payload.ratePlanId || ''),
+    checkInDate: new Date(payload.checkInDate).toISOString(), checkOutDate: new Date(payload.checkOutDate).toISOString(),
+    roomsCount: Number(payload.roomsCount), adults: Number(payload.adults), children: Number(payload.children),
+    guestUser: payload.guestUserId ? String(payload.guestUserId) : null,
+    guest: {
+      firstName: String(payload.guest?.firstName || '').trim(), lastName: String(payload.guest?.lastName || '').trim(),
+      email: String(payload.guest?.email || '').trim().toLowerCase(), phone: String(payload.guest?.phone || '').trim(),
+      country: String(payload.guest?.country || '').trim(),
+    },
+    specialRequests: String(payload.specialRequests || '').trim(),
+    pricing: payload.pricing,
+  };
+  return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
+function idempotencyConflict() {
+  const error = new Error("Cette clé d’idempotence a déjà été utilisée avec une réservation différente.");
+  error.code = 'RESERVATION_IDEMPOTENCY_CONFLICT'; error.statusCode = 409;
+  return error;
+}
+
+async function findIdempotentReservation(hotelId, reservationRequestId, requestHash, session = null) {
+  if (!reservationRequestId) return null;
+  const query = HotelReservation.findOne({ hotel: hotelId, reservationRequestId }).select('+reservationRequestHash');
+  const existing = await (session ? query.session(session) : query);
+  if (!existing) return null;
+  if (existing.reservationRequestHash !== requestHash) throw idempotencyConflict();
+  existing.$locals = existing.$locals || {};
+  existing.$locals.idempotent = true;
+  return existing;
 }
 
 // ─────────────────────────────────────────────
@@ -66,7 +119,7 @@ async function computeReservationPricing({ roomCategoryId, ratePlanId, nights, r
 async function createReservation({
   hotelId, roomCategoryId, ratePlanId, guest, guestUserId,
   checkInDate, checkOutDate, roomsCount = 1, adults = 1, children = 0,
-  specialRequests = '', source, actingUser = {}, allowPast = false,
+  specialRequests = '', source, actingUser = {}, allowPast = false, reservationRequestId = null,
 }) {
   const hotel = await Hotel.findById(hotelId);
   if (!hotel) { const err = new Error('Hôtel introuvable.'); err.statusCode = 404; throw err; }
@@ -76,30 +129,43 @@ async function createReservation({
   if (category.status !== 'actif') { const err = new Error("Cette catégorie de chambres n'est plus disponible."); err.statusCode = 422; throw err; }
 
   assertNotPast(checkInDate, { allowPast });
-  // Vérification "de confort" (message clair) avant la tentative atomique
-  // réelle — la garantie anti-surbooking vient de reserveInventory (§5),
-  // jamais de cette seule assertion.
-  await assertAvailability({ roomCategoryId, checkInDate, checkOutDate, roomsCount });
-
   const nightDates = getNightDates(checkInDate, checkOutDate);
   const pricing = await computeReservationPricing({
-    roomCategoryId, ratePlanId, nights: nightDates.length, roomsCount,
+    roomCategoryId, ratePlanId, nights: nightDates.length, roomsCount, nightDates,
   });
 
-  const reserveResult = await reserveInventory({
-    hotelId, roomCategoryId, checkInDate, checkOutDate, roomsCount, actingUserId: actingUser?.id || null,
-  });
-  if (!reserveResult.ok) {
-    const err = new Error('Certaines dates ne sont plus disponibles pour cette catégorie.');
-    err.statusCode = 409;
-    err.unavailableDates = reserveResult.unavailableDates;
-    throw err;
+  const normalizedRequestId = String(reservationRequestId || '').trim() || null;
+  if (normalizedRequestId && normalizedRequestId.length > 128) {
+    const error = new Error("La clé d’idempotence est invalide."); error.code = 'RESERVATION_IDEMPOTENCY_KEY_INVALID'; error.statusCode = 422; throw error;
   }
+  const requestHash = normalizedRequestId ? reservationFingerprint({
+    hotelId, roomCategoryId, ratePlanId, guest, guestUserId, checkInDate, checkOutDate,
+    roomsCount, adults, children, specialRequests, pricing,
+  }) : null;
+  const alreadyCreated = await findIdempotentReservation(hotelId, normalizedRequestId, requestHash);
+  if (alreadyCreated) return alreadyCreated;
+  // Vérification de confort après la résolution d'idempotence : un retry
+  // valide doit retrouver sa réservation même si celle-ci occupe désormais
+  // le dernier stock.
+  await assertAvailability({ roomCategoryId, checkInDate, checkOutDate, roomsCount });
 
-  let reservation;
-  try {
-    reservation = await HotelReservation.create({
+  const createCore = async (session = null) => {
+    const concurrentExisting = await findIdempotentReservation(hotelId, normalizedRequestId, requestHash, session);
+    if (concurrentExisting) return concurrentExisting;
+
+    const reserveResult = await reserveInventory({
+      hotelId, roomCategoryId, checkInDate, checkOutDate, roomsCount, actingUserId: actingUser?.id || null, session,
+    });
+    if (!reserveResult.ok) {
+      const err = new Error('Certaines dates ne sont plus disponibles pour cette catégorie.');
+      err.code = 'RESERVATION_INVENTORY_UNAVAILABLE'; err.statusCode = 409; err.unavailableDates = reserveResult.unavailableDates;
+      throw err;
+    }
+
+    const data = {
       hotel: hotelId,
+      reservationRequestId: normalizedRequestId,
+      reservationRequestHash: requestHash,
       roomCategory: roomCategoryId,
       ratePlan: ratePlanId,
       guestUser: guestUserId || null,
@@ -113,17 +179,54 @@ async function createReservation({
       pendingExpiresAt: new Date(Date.now() + PENDING_EXPIRY_HOURS * 3600 * 1000),
       createdBy: actingUser?.id || null,
       statusHistory: [{ from: null, to: 'pending', changedBy: actingUser?.id || null, reason: '' }],
-    });
-  } catch (error) {
+    };
+    try {
+      const reservation = session ? (await HotelReservation.create([data], { session }))[0] : await HotelReservation.create(data);
+      reservation.$locals = reservation.$locals || {};
+      reservation.$locals.idempotent = false;
+      return reservation;
+    } catch (error) {
+      if (error.code === 11000 && normalizedRequestId && !session) {
+        await releaseInventory({ roomCategoryId, checkInDate, checkOutDate, roomsCount }).catch((releaseError) => {
+          logger.error('Compensation inventaire échouée après conflit idempotent HotelReservation', releaseError);
+        });
+        const existing = await findIdempotentReservation(hotelId, normalizedRequestId, requestHash);
+        if (existing) return existing;
+      }
+      if (error.code === 11000 && normalizedRequestId) throw error;
     // Compensation — l'inventaire déjà réservé ne doit jamais rester
     // orphelin si l'écriture de la réservation échoue.
-    await releaseInventory({ roomCategoryId, checkInDate, checkOutDate, roomsCount }).catch((releaseError) => {
+      if (!session) await releaseInventory({ roomCategoryId, checkInDate, checkOutDate, roomsCount }).catch((releaseError) => {
       logger.error('Compensation inventaire échouée après échec de création HotelReservation', releaseError);
-    });
-    throw error;
-  }
+      });
+      throw error;
+    }
+  };
 
-  notifyNewReservation(reservation, hotel).catch(() => {});
+  let reservation;
+  if (normalizedRequestId) {
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => { reservation = await createCore(session); });
+    } catch (error) {
+      if (error.code === 11000) {
+        reservation = await findIdempotentReservation(hotelId, normalizedRequestId, requestHash);
+        if (!reservation) throw error;
+      } else if (isTransactionUnavailable(error)) {
+        logger.warn('hotel.reservation.transaction_unavailable', { hotelId, reservationRequestId: normalizedRequestId });
+        reservation = await createCore(null);
+      } else throw error;
+    } finally { await session.endSession(); }
+  } else reservation = await createCore(null);
+
+  if (!reservation.$locals?.idempotent) {
+    // Effets post-commit attendus : la réponse ne part pas alors qu'une
+    // notification persistée est encore en course avec un retry/cleanup.
+    await Promise.allSettled([
+      notifyNewReservation(reservation, hotel),
+      notifyReservationGuest({ reservation, eventKey: 'created', type: 'hotel_reservation_created', title: 'Demande de réservation reçue', body: `Votre demande ${reservation.reference} a bien été enregistrée.` }),
+    ]);
+  }
   return reservation;
 }
 
@@ -185,11 +288,16 @@ async function transitionStatus(reservation, { to, actingUser, reason = '' }) {
     // stade n'a jamais été occupée — libération directe vers 'available'.
     // `releaseRoom` lève une 404 s'il n'existe aucune affectation active —
     // cas normal (aucune chambre n'avait encore été affectée), ignoré ici.
-    await releaseRoom({
-      reservationId: reservation._id, actingUser, reason: `Réservation ${to}`, nextRoomStatus: 'available',
-    }).catch((err) => {
-      if (err.statusCode !== 404) throw err;
-    });
+    if (roomAssignmentService.releaseAllRooms) {
+      await roomAssignmentService.releaseAllRooms({
+        reservationId: reservation._id, actingUser, reason: `Réservation ${to}`, nextRoomStatus: 'available',
+      });
+    } else {
+      // Compatibilité des adaptateurs et doubles de tests antérieurs C/D.
+      await roomAssignmentService.releaseRoom({
+        reservationId: reservation._id, actingUser, reason: `Réservation ${to}`, nextRoomStatus: 'available',
+      }).catch((err) => { if (err.statusCode !== 404) throw err; });
+    }
   }
 
   reservation.status = to;
@@ -204,8 +312,6 @@ async function transitionStatus(reservation, { to, actingUser, reason = '' }) {
 }
 
 async function notifyStatusChange(reservation, status) {
-  const recipient = reservation.guestUser;
-  if (!recipient) return; // demande "invité" sans compte — rien à notifier côté client
   const copy = {
     confirmed: { type: 'hotel_reservation_confirmed', title: '✅ Réservation confirmée', body: `Votre réservation ${reservation.reference} est confirmée.` },
     rejected: { type: 'hotel_reservation_rejected', title: '❌ Réservation non confirmée', body: `Votre demande ${reservation.reference} n'a pas été confirmée.` },
@@ -213,7 +319,7 @@ async function notifyStatusChange(reservation, status) {
     expired: { type: 'hotel_reservation_expired', title: '⌛ Demande expirée', body: `Votre demande ${reservation.reference} a expiré faute de confirmation.` },
   }[status];
   if (!copy) return;
-  await notify({ recipient, ...copy, data: { reservationId: String(reservation._id), screen: 'MesReservations' } });
+  await notifyReservationGuest({ reservation, eventKey: `status:${status}`, ...copy });
 }
 
 // ─────────────────────────────────────────────
@@ -282,18 +388,21 @@ async function updateReservation(reservation, changes, actingUser) {
     ratePlanId: changes.ratePlanId || reservation.ratePlan,
     nights: nightDates.length,
     roomsCount: reservation.roomsCount,
+    nightDates,
   });
   Object.assign(reservation, pricing);
   if (changes.ratePlanId) reservation.ratePlan = changes.ratePlanId;
 
   reservation.updatedBy = actingUser?.id || null;
   await reservation.save();
+  notifyReservationGuest({ reservation, eventKey: `modified:${reservation.updatedAt?.toISOString?.() || Date.now()}`, type: 'hotel_reservation_modified', title: 'Réservation modifiée', body: `Votre réservation ${reservation.reference} a été modifiée.` }).catch(() => {});
   return reservation;
 }
 
 module.exports = {
   PENDING_EXPIRY_HOURS,
   computeReservationPricing,
+  reservationFingerprint,
   createReservation,
   assertTransitionAllowed,
   transitionStatus,

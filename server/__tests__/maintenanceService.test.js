@@ -1,6 +1,9 @@
 // __tests__/maintenanceService.test.js — Sprint E
 
 jest.mock('../models/MaintenanceTicket');
+jest.mock('../models/Room');
+jest.mock('../models/RoomAssignment');
+jest.mock('../models/HotelReservation');
 jest.mock('../services/notificationService', () => ({
   notify: jest.fn().mockResolvedValue(), notifyStaff: jest.fn().mockResolvedValue(),
 }));
@@ -8,6 +11,9 @@ jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 
 const MaintenanceTicket = require('../models/MaintenanceTicket');
+const Room = require('../models/Room');
+const RoomAssignment = require('../models/RoomAssignment');
+const HotelReservation = require('../models/HotelReservation');
 const { notify, notifyStaff } = require('../services/notificationService');
 const {
   createTicket, assignTicket, startWork, resolveTicket, closeTicket,
@@ -35,7 +41,13 @@ const openTicket = (overrides = {}) => ({
 });
 
 describe('maintenanceService.createTicket — TEST DATA', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    Room.findOne = jest.fn().mockResolvedValue({ _id: ROOM_ID, hotel: HOTEL_ID, roomCategory: '807f1f77bcf86cd799439066', status: 'available' });
+    Room.findOneAndUpdate = jest.fn().mockResolvedValue({ _id: ROOM_ID, status: 'out_of_service' });
+    RoomAssignment.find = jest.fn().mockResolvedValue([]);
+    HotelReservation.updateMany = jest.fn().mockResolvedValue({ modifiedCount: 0 });
+  });
 
   test('crée un ticket "open" et notifie le staff', async () => {
     MaintenanceTicket.create = jest.fn().mockResolvedValue(openTicket());
@@ -44,6 +56,7 @@ describe('maintenanceService.createTicket — TEST DATA', () => {
       description: 'Fuite au lavabo', actingUser: { id: USER_ID },
     });
     expect(ticket.status).toBe('open');
+    expect(Room.findOneAndUpdate).toHaveBeenCalledWith(expect.objectContaining({ _id: ROOM_ID }), expect.objectContaining({ $set: expect.objectContaining({ status: 'out_of_service' }) }), expect.any(Object));
     expect(notifyStaff).toHaveBeenCalledWith(expect.objectContaining({ type: 'maintenance_ticket_created' }));
   });
 });

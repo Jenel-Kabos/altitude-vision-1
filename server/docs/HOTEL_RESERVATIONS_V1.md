@@ -1,5 +1,8 @@
 # Réservations hôtelières v1 (Sprint C) — inventaire et disponibilités
 
+> Finalisation C/D.1.1, parcours Mobile public et preuves de certification :
+> voir [SPRINT_CD11_CERTIFICATION.md](./SPRINT_CD11_CERTIFICATION.md).
+
 **Statut : Sprint C — moteur initial de réservation.** Disponibilité par
 catégorie, création/modification/annulation, prévention du surbooking,
 expiration des demandes non confirmées. **Aucune chambre physique, aucun
@@ -179,6 +182,13 @@ réel (voir §11, limite assumée).
 
 ## 6. Tarification
 
+Depuis C/D.1.2, un `RatePlan` hôtelier peut contenir des
+`seasonalPeriods` datées (`startDate` incluse, `endDate` exclue), chacune
+avec un montant et une priorité. Le moteur résout le prix de chaque nuit ;
+la priorité la plus forte gagne sur un chevauchement et un chevauchement de
+priorité identique est refusé. Une nuit hors période utilise `RatePlan.amount`.
+Le détail immuable est persisté dans `rateSnapshot.nightlyRates`.
+
 `hotelReservationService.computeReservationPricing()` — **toujours**
 recalculée côté serveur, jamais confiance à un total envoyé par le client
 (aucun champ de prix n'est même lu depuis les paramètres d'entrée de
@@ -327,3 +337,22 @@ donnée personnelle, et **aucune route publique ne liste les réservations**.
   par identifiant texte, pas encore de sélecteur en cascade — UX à
   améliorer dans un sprint dédié.
 - **Aucune vue calendrier** (mission §14 : volontairement une vue tabulaire).
+
+## 15. Addendum C/D.1 — contrat désormais applicable
+
+Les limites historiques ci-dessus sont levées par C/D.1. Les clients Web et
+Mobile envoient une `reservationRequestId` générée avant l'appel. L'index unique partiel
+`{ hotel, reservationRequestId }` et l'empreinte métier stable garantissent
+qu'un rejeu identique retourne la réservation existante sans reprendre de
+stock ; un rejeu différent retourne `RESERVATION_IDEMPOTENCY_CONFLICT`.
+
+`roomsCount > 1` est pris en charge de bout en bout : plusieurs affectations
+actives, auto-affectation déterministe (étage puis numéro), check-in et
+check-out atomiques. Les dates contractuelles sont conservées ;
+`actualCheckInAt` et `actualCheckOutAt` enregistrent le réel, et un départ
+anticipé libère les nuits futures sans appliquer de politique financière.
+
+Les clients Web et Mobile utilisent le même contrat backend. Pour un invité
+authentifié, les événements sont internes ; pour une réservation anonyme,
+l'email snapshot est utilisé. La collection d'événements empêche les doubles
+notifications lors des retries.

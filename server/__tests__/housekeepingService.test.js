@@ -151,6 +151,7 @@ describe('housekeepingService â€” assignTask/startTask/completeTask/cancelTask â
     expect(Room.findOneAndUpdate).toHaveBeenCalledWith(
       { _id: ROOM_ID, status: 'cleaning' },
       expect.objectContaining({ $set: expect.objectContaining({ status: 'inspection' }) }),
+      { new: true },
     );
     expect(notifyStaff).toHaveBeenCalledWith(expect.objectContaining({ type: 'housekeeping_task_completed' }));
   });

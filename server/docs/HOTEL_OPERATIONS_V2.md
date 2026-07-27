@@ -1,5 +1,8 @@
 # Opérations hôtelières v2 (Sprint E) — housekeeping, inspection, maintenance
 
+> État de certification et limites de recette C/D.1.1 :
+> voir [SPRINT_CD11_CERTIFICATION.md](./SPRINT_CD11_CERTIFICATION.md).
+
 **Statut : Sprint E — moteur opérationnel d'exploitation des chambres.**
 Ferme la boucle ouverte par le Sprint D : après un check-out,
 `Room.status = 'cleaning'` restait un cul-de-sac — aucun mécanisme ne
@@ -279,6 +282,19 @@ Sprint D ne sont pas modifiés au-delà de l'intégration strictement
 nécessaire (génération automatique de la tâche de ménage au check-out).
 `Room` et `RoomInventory` restent découplés (Sprint D, §1.3 de
 HOTEL_OPERATIONS_V1.md, inchangé).
+
+## 13. Addendum C/D.1 — inventaire physique et commercial
+
+`RoomInventory` demeure le stock commercial daté. `Room` demeure l'unité
+physique. Une chambre `out_of_service` alimente désormais
+`physicalBlockedUnits`, séparé du blocage manuel `blockedUnits`, afin de ne
+pas détruire la capacité nominale. Le rejet d'inspection bloque le stock et
+la validation qui suit un hors-service le restitue.
+
+Le calendrier Web fournit semaine/mois, filtres, réservations, états
+d'affectation, arrivées/départs et actions d'inventaire. Le Mobile fournit le
+parcours client et une exploitation propriétaire simplifiée (affectation
+manuelle/automatique, changement, check-in/out et stop-sell).
 
 ## 12. Diagramme
 

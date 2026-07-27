@@ -1,5 +1,8 @@
 # Opérations hôtelières v1 (Sprint D) — chambres, affectation, check-in/check-out
 
+> Transactions opérationnelles, verrou distribué, scénario multichambre et
+> recette C/D.1.1 : voir [SPRINT_CD11_CERTIFICATION.md](./SPRINT_CD11_CERTIFICATION.md).
+
 **Statut : Sprint D — exploitation physique de l'établissement.** Transforme
 une réservation (Sprint C, abstraite/nuitée-par-catégorie) en séjour réel :
 chambres physiques, affectation chambre↔réservation, arrivée, départ, statut
@@ -565,3 +568,23 @@ détecté par l'exécution complète de la suite avant validation finale.
 - `Room` et `RoomInventory` toujours découplés (§1.3, inchangé).
 - Ménage automatique, maintenance, minibar, facturation, paiement, OTA/
   Channel Manager, clés électroniques : toujours hors périmètre.
+
+## 18. Addendum C/D.1 — opérations multi-chambres
+
+La contrainte unique active porte uniquement sur `Room`. Une réservation peut
+avoir jusqu'à `roomsCount` affectations actives ; les états dérivés sont
+`unassigned`, `partially_assigned` et `fully_assigned`. Le changement libère
+l'ancienne affectation avant de créer la nouvelle dans la même transaction.
+Avant l'arrivée l'ancienne chambre redevient `available`; pendant le séjour
+elle passe à `cleaning` et la nouvelle à `occupied`.
+
+Check-in, check-out, affectations, changement et tâches de ménage utilisent
+le mécanisme transactionnel commun. Le mode `auto` retombe sur le fallback
+contrôlé uniquement lorsque la topologie MongoDB ne fournit pas les
+transactions. Un check-out partiel n'est pas exposé.
+
+Le calendrier sécurisé `/api/hotels/:hotelId/inventory/calendar` est limité
+à 62 jours. Les routes `inventory/range` et `inventory/rebuild` permettent le
+blocage, le stop-sell et la reconstruction journalisée. Le script
+`scripts/audit-hotel-cd1-migration.js` est en dry-run par défaut et refuse
+l'application si des conflits d'affectation sont détectés.

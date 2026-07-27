@@ -5,27 +5,34 @@
 // délèguent tous deux à ce service (mission : "empêcher les doubles
 // affectations").
 //
-// Anti-concurrence : même stratégie que hotelAvailabilityService.js
-// (Sprint C) — pas de transaction MongoDB (aucun précédent, voir audit),
-// mais une création atomique protégée par l'index unique partiel
-// {room, releasedAt:null} ET {reservation, releasedAt:null} (voir
-// RoomAssignment.js). Une tentative de double affectation concurrente lève
-// une erreur de clé dupliquée (E11000), interceptée ici et convertie en 409
-// métier propre — jamais une stack trace exposée à l'appelant.
+// Anti-concurrence : transaction MongoDB lorsque disponible, verrou local
+// contrôlé en fallback et index unique partiel sur la chambre active.
 
 const Room = require('../models/Room');
 const RoomAssignment = require('../models/RoomAssignment');
+const HotelReservation = require('../models/HotelReservation');
+const { runFinancialOperation } = require('./finance/financialTransactionService');
+const { createTask } = require('./housekeepingService');
 
 function fail(message, statusCode) {
   const err = new Error(message);
   err.statusCode = statusCode;
   return err;
 }
+function businessFail(code, message, statusCode = 409) { const error = fail(message, statusCode); error.code = code; return error; }
+const withSession = (query, session) => (session ? query.session(session) : query);
+const reservationLocks = new Map();
+async function withReservationLock(reservationId, operation) {
+  const key = String(reservationId); const previous = reservationLocks.get(key) || Promise.resolve();
+  let release; const current = new Promise((resolve) => { release = resolve; }); const tail = previous.then(() => current); reservationLocks.set(key, tail);
+  await previous;
+  try { return await operation(); } finally { release(); if (reservationLocks.get(key) === tail) reservationLocks.delete(key); }
+}
 
 /** Chambres candidates à une affectation — actives, disponibles, de la bonne catégorie. */
-async function getAvailableRooms({ hotelId, roomCategoryId, includeReserved = false }) {
+async function getAvailableRooms({ hotelId, roomCategoryId, includeReserved = false, session = null }) {
   const statuses = includeReserved ? ['available', 'reserved'] : ['available'];
-  return Room.find({ hotel: hotelId, roomCategory: roomCategoryId, active: true, status: { $in: statuses } }).sort({ roomNumber: 1 });
+  return withSession(Room.find({ hotel: hotelId, roomCategory: roomCategoryId, active: true, status: { $in: statuses } }).sort({ floor: 1, roomNumber: 1 }), session);
 }
 
 /**
@@ -34,23 +41,10 @@ async function getAvailableRooms({ hotelId, roomCategoryId, includeReserved = fa
  * active — c'est aux deux appelants de décider (assignRoom l'interdit,
  * changeRoom le présuppose puisque c'est justement son cas d'usage).
  */
-// Correctif — garde-fou multi-chambres (mission §3 du correctif) : le
-// Sprint D ne gère qu'UN SEUL RoomAssignment par réservation. Tant que
-// l'affectation multi-chambres n'est pas développée, toute réservation dont
-// `roomsCount !== 1` doit être exclue de l'affectation/changement/check-in
-// — jamais forcée à 1, jamais plusieurs RoomAssignment créés en silence.
-function assertSingleRoom(reservation) {
-  if (reservation.roomsCount !== 1) {
-    throw fail(
-      'Cette réservation comporte plusieurs chambres et nécessite une affectation multiple, non encore prise en charge.',
-      409,
-    );
-  }
-}
+function assertSingleRoom() { return true; } // compatibilité API historique
 
-async function createAssignment({ reservationId, roomId, reservation, actingUser, reason = '' }) {
-  assertSingleRoom(reservation);
-  const room = await Room.findById(roomId);
+async function createAssignment({ reservationId, roomId, reservation, actingUser, reason = '', session = null }) {
+  const room = await withSession(Room.findById(roomId), session);
   if (!room) throw fail('Chambre introuvable.', 404);
   if (!room.active) throw fail("Cette chambre n'est plus active.", 422);
   if (String(room.hotel) !== String(reservation.hotel)) throw fail("Cette chambre n'appartient pas à cet hôtel.", 422);
@@ -63,19 +57,24 @@ async function createAssignment({ reservationId, roomId, reservation, actingUser
 
   let assignment;
   try {
-    assignment = await RoomAssignment.create({
-      reservation: reservationId, room: roomId, assignedBy: actingUser?.id || null, reason,
-    });
+    const roomFilter = { _id: roomId, status: { $in: ['available', 'reserved'] } };
+    if (session) roomFilter.active = true;
+    const roomUpdate = { $set: { status: 'reserved', updatedBy: actingUser?.id || null } };
+    const updatedRoom = session
+      ? await Room.findOneAndUpdate(roomFilter, roomUpdate, { new: true, session })
+      : await Room.findOneAndUpdate(roomFilter, roomUpdate);
+    if (!updatedRoom) throw businessFail('ROOM_ASSIGNMENT_CONFLICT', "Cette chambre vient de devenir indisponible.");
+    const data = { reservation: reservationId, room: roomId, assignedBy: actingUser?.id || null, reason };
+    assignment = session ? (await RoomAssignment.create([data], { session }))[0] : await RoomAssignment.create(data);
   } catch (error) {
     // E11000 : une autre requête concurrente vient d'affecter cette même
     // chambre (ou cette même réservation) entre notre vérification et cette
     // écriture — l'index unique partiel a fait son travail, jamais de
     // double affectation silencieuse.
-    if (error.code === 11000) throw fail('Cette chambre vient déjà d\'être affectée à une autre réservation.', 409);
+    if (error.code === 11000) throw businessFail('ROOM_ASSIGNMENT_CONFLICT', 'Cette chambre vient déjà d\'être affectée à une autre réservation.');
     throw error;
   }
 
-  await Room.findOneAndUpdate({ _id: roomId, status: { $in: ['available', 'reserved'] } }, { $set: { status: 'reserved', updatedBy: actingUser?.id || null } });
   return assignment;
 }
 
@@ -86,40 +85,66 @@ async function createAssignment({ reservationId, roomId, reservation, actingUser
  * vers 'reserved' — jamais 'occupied' ici : seul le check-in occupe
  * réellement la chambre.
  */
-async function assignRoom({ reservationId, roomId, reservation, actingUser, reason = '' }) {
-  const existingForReservation = await RoomAssignment.findOne({ reservation: reservationId, releasedAt: null });
-  if (existingForReservation) {
-    throw fail('Cette réservation a déjà une chambre affectée — utilisez le changement de chambre.', 409);
-  }
-  return createAssignment({ reservationId, roomId, reservation, actingUser, reason });
+async function assignRoomCore({ reservationId, roomId, reservation, actingUser, reason = '', session }) {
+  const activeCount = await withSession(RoomAssignment.countDocuments({ reservation: reservationId, releasedAt: null }), session);
+  if (activeCount >= reservation.roomsCount) throw businessFail('ROOM_ASSIGNMENT_LIMIT_REACHED', 'Toutes les chambres requises sont déjà affectées.');
+  if (session) await HotelReservation.updateOne({ _id: reservationId }, { $inc: { assignmentVersion: 1 } }, { session });
+  return createAssignment({ reservationId, roomId, reservation, actingUser, reason, session });
+}
+async function assignRoom(args) {
+  const execute = () => runFinancialOperation({ operationName: 'hotel.room_assignment.create', transactionMode: args.transactionMode || 'fallback' }, ({ session }) => assignRoomCore({ ...args, session }));
+  return (args.transactionMode || 'fallback') === 'fallback' ? withReservationLock(args.reservationId, execute) : execute();
+}
+
+async function autoAssignRooms({ reservationId, reservation, actingUser, reason = '', transactionMode = 'auto' }) {
+  return runFinancialOperation({ operationName: 'hotel.room_assignment.auto', transactionMode }, async ({ session }) => {
+    const existing = await withSession(RoomAssignment.find({ reservation: reservationId, releasedAt: null }), session);
+    const missing = reservation.roomsCount - existing.length;
+    if (missing <= 0) return existing;
+    const rooms = await getAvailableRooms({ hotelId: reservation.hotel, roomCategoryId: reservation.roomCategory, session });
+    const already = new Set(existing.map((item) => String(item.room)));
+    const candidates = rooms.filter((room) => !already.has(String(room._id))).slice(0, missing);
+    if (candidates.length !== missing) throw businessFail('RESERVATION_MULTI_ROOM_ASSIGNMENT_INCOMPLETE', 'Le nombre de chambres physiques disponibles est insuffisant.');
+    const created = [];
+    for (const room of candidates) { // ordre étage puis numéro : déterministe
+      // eslint-disable-next-line no-await-in-loop
+      created.push(await createAssignment({ reservationId, roomId: room._id, reservation, actingUser, reason: reason || 'Affectation automatique', session }));
+    }
+    return [...existing, ...created];
+  });
 }
 
 /**
- * Change la chambre d'une réservation : la NOUVELLE chambre est affectée
- * AVANT que l'ancienne soit libérée (même principe que
- * hotelReservationService.updateReservation, Sprint C — jamais de fenêtre
- * où la réservation n'a temporairement aucune chambre couverte pendant
- * qu'une autre requête pourrait s'insérer).
+ * Change une chambre : validation de la cible, libération historisée de
+ * l'ancienne puis création de la nouvelle affectation dans la transaction.
  */
-async function changeRoom({ reservationId, newRoomId, reservation, actingUser, reason = '' }) {
-  const current = await RoomAssignment.findOne({ reservation: reservationId, releasedAt: null });
-  if (!current) throw fail('Aucune chambre actuellement affectée à cette réservation.', 404);
-  if (String(current.room) === String(newRoomId)) throw fail('La réservation est déjà dans cette chambre.', 422);
-
-  const wasOccupied = reservation.status === 'checked_in';
-  const newAssignment = await createAssignment({ reservationId, roomId: newRoomId, reservation, actingUser, reason });
-
-  // Si le client était déjà présent (checked_in), la nouvelle chambre passe
-  // directement en 'occupied' (le client y est physiquement transféré) — la
-  // règle "jamais occupied sans check-in" ne s'applique qu'à la PREMIÈRE
-  // occupation d'une réservation, pas à un changement de chambre en cours de
-  // séjour.
-  if (wasOccupied) {
-    await Room.findOneAndUpdate({ _id: newRoomId, status: 'reserved' }, { $set: { status: 'occupied' } });
-  }
-
-  await releaseRoomAssignment(current, { actingUser, reason: reason || 'Changement de chambre', nextRoomStatus: wasOccupied ? 'cleaning' : 'available' });
-  return newAssignment;
+async function changeRoom({ reservationId, oldRoomId = null, newRoomId, reservation, actingUser, reason = '', transactionMode = 'fallback' }) {
+  return runFinancialOperation({ operationName: 'hotel.room_assignment.change', transactionMode }, async ({ session }) => {
+    const filter = { reservation: reservationId, releasedAt: null };
+    if (oldRoomId) filter.room = oldRoomId;
+    const current = await withSession(RoomAssignment.findOne(filter), session);
+    if (!current) throw businessFail('ROOM_CHANGE_CONFLICT', 'Aucune affectation active correspondante.', 404);
+    if (String(current.room) === String(newRoomId)) throw businessFail('ROOM_CHANGE_CONFLICT', 'La réservation est déjà dans cette chambre.', 422);
+    const newRoom = await withSession(Room.findById(newRoomId), session);
+    if (!newRoom || !newRoom.active || String(newRoom.hotel) !== String(reservation.hotel)) throw businessFail('ROOM_NOT_OPERATIONAL', 'La nouvelle chambre est introuvable ou hors de cet hôtel.', 422);
+    if (String(newRoom.roomCategory) !== String(reservation.roomCategory)) throw businessFail('ROOM_CATEGORY_MISMATCH', 'La nouvelle chambre ne correspond pas à la catégorie réservée.', 422);
+    if (newRoom.status !== 'available') throw businessFail('ROOM_CHANGE_CONFLICT', 'La nouvelle chambre n’est pas disponible.');
+    const wasOccupied = reservation.status === 'checked_in';
+    await releaseRoomAssignment(current, { actingUser, reason: reason || 'Changement de chambre', nextRoomStatus: wasOccupied ? 'cleaning' : 'available', session });
+    const replacement = await createAssignment({ reservationId, roomId: newRoomId, reservation, actingUser, reason, session });
+    if (wasOccupied) {
+      await Room.updateOne({ _id: newRoomId, status: 'reserved' }, { $set: { status: 'occupied' } }, { session });
+      await createTask({ roomId: current.room, hotelId: reservation.hotel, reservationId, type: 'refresh', priority: 'high', notes: 'Nettoyage après changement de chambre en cours de séjour', actingUser, session, notifyAfterCreate: false });
+    }
+    if (reservation.requiresRoomReassignment) {
+      await HotelReservation.updateOne(
+        { _id: reservationId },
+        { $set: { requiresRoomReassignment: false, reassignmentReason: '' } },
+        session ? { session } : undefined,
+      );
+    }
+    return replacement;
+  });
 }
 
 /** Libère une affectation déjà chargée — usage interne (changeRoom/checkOutService). */
@@ -146,12 +171,26 @@ async function releaseRoom({ reservationId, actingUser, reason = '', nextRoomSta
   return releaseRoomAssignment(assignment, { actingUser, reason, nextRoomStatus, session });
 }
 
+async function releaseAllRooms({ reservationId, actingUser, reason = '', nextRoomStatus = 'available', session }) {
+  const assignments = await withSession(RoomAssignment.find({ reservation: reservationId, releasedAt: null }), session);
+  const released = [];
+  for (const assignment of assignments) {
+    // eslint-disable-next-line no-await-in-loop
+    released.push(await releaseRoomAssignment(assignment, { actingUser, reason, nextRoomStatus, session }));
+  }
+  return released;
+}
+
 async function getActiveAssignment(reservationId, { session } = {}) {
   const query = RoomAssignment.findOne({ reservation: reservationId, releasedAt: null }).populate('room');
   return session ? query.session(session) : query;
 }
+async function getActiveAssignments(reservationId, { session } = {}) {
+  const query = RoomAssignment.find({ reservation: reservationId, releasedAt: null }).sort({ assignedAt: 1 }).populate('room');
+  return session ? query.session(session) : query;
+}
 
 module.exports = {
-  getAvailableRooms, assignRoom, changeRoom, releaseRoom, releaseRoomAssignment, getActiveAssignment,
+  getAvailableRooms, createAssignment, assignRoom, autoAssignRooms, changeRoom, releaseRoom, releaseAllRooms, releaseRoomAssignment, getActiveAssignment, getActiveAssignments,
   assertSingleRoom,
 };

@@ -232,9 +232,10 @@ exports.upsertRate = async (req, res) => {
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
-    const { rateType, amount, currency } = req.body;
+    const { rateType, amount, currency, seasonalPeriods = [] } = req.body;
     if (!RatePlan.RATE_TYPES.includes(rateType)) return fail(res, 422, 'Type de tarif invalide.');
     if (!(Number(amount) > 0)) return fail(res, 422, 'Un montant positif est requis.');
+    if (!Array.isArray(seasonalPeriods) || seasonalPeriods.length > 50) return fail(res, 422, 'Périodes tarifaires invalides.');
 
     await RatePlan.updateMany(
       { roomCategory: category._id, rateType, active: true },
@@ -245,6 +246,10 @@ exports.upsertRate = async (req, res) => {
       rateType,
       amount,
       currency: currency || 'XAF',
+      seasonalPeriods: seasonalPeriods.map((period) => ({
+        label: period.label, startDate: period.startDate, endDate: period.endDate,
+        amount: Number(period.amount), priority: Number(period.priority || 0),
+      })),
       createdBy: req.user.id,
     });
     res.status(201).json({ status: 'success', data: { rate } });

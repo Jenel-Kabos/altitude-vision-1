@@ -12,7 +12,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { toast } from "react-hot-toast";
-import { getRooms, assignRoom, changeRoom } from "../services/hotelService";
+import { getRooms, assignRoom, autoAssignRooms, changeRoom } from "../services/hotelService";
 import {
   checkInHotelReservation, checkOutHotelReservation, getCheckoutFinancialReadiness, getReservationRoomAssignment,
 } from "../services/hotelReservationService";
@@ -21,7 +21,9 @@ const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
   const [open, setOpen] = useState(false);
   const [rooms, setRooms] = useState([]);
   const [selectedRoomId, setSelectedRoomId] = useState("");
+  const [selectedOldRoomId, setSelectedOldRoomId] = useState("");
   const [assignment, setAssignment] = useState(null);
+  const [assignments, setAssignments] = useState([]);
   const [loadingAssignment, setLoadingAssignment] = useState(true);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [financialReadiness, setFinancialReadiness] = useState(null);
@@ -29,16 +31,16 @@ const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
 
   const hotelId = reservation.hotel?._id || reservation.hotel;
   const roomCategoryId = reservation.roomCategory?._id || reservation.roomCategory;
-  // Correctif — garde-fou multi-chambres (mission §3) : le backend refuse
-  // déjà ces opérations, mais l'interface ne doit jamais laisser croire
-  // qu'elles sont possibles pour ce type de réservation.
-  const isMultiRoom = reservation.roomsCount !== undefined && reservation.roomsCount !== 1;
+  const isMultiRoom = Number(reservation.roomsCount || 1) > 1;
 
   const loadAssignment = useCallback(async () => {
     setLoadingAssignment(true);
     try {
       const data = await getReservationRoomAssignment(reservation._id);
-      setAssignment(data);
+      const list = data?.activeRoomAssignments || (data?.activeRoomAssignment ? [data.activeRoomAssignment] : data?.room ? [data] : []);
+      setAssignments(list);
+      setAssignment(list[0] || null);
+      setSelectedOldRoomId((current) => current || list[0]?.room?._id || list[0]?.room?.id || "");
     } catch (err) {
       // Silencieux : une 403/404 ponctuelle ne doit pas polluer l'écran de
       // liste, l'action reste tentable et remontera son propre message.
@@ -70,12 +72,13 @@ const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
   };
 
   const handleToggle = () => {
-    if (isMultiRoom) {
-      toast.error("Cette réservation comporte plusieurs chambres et nécessite une affectation multiple, non encore prise en charge.");
-      return;
-    }
     if (!open) loadRooms();
     setOpen((o) => !o);
+  };
+
+  const handleAutoAssign = async () => {
+    try { await autoAssignRooms({ reservationId: reservation._id }); toast.success("Affectation automatique terminée."); await refresh(); }
+    catch (err) { toast.error(err.response?.data?.message || "Affectation automatique impossible."); }
   };
 
   const handleAssign = async () => {
@@ -93,7 +96,7 @@ const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
   const handleChange = async () => {
     if (!selectedRoomId) { toast.error("Sélectionnez une nouvelle chambre."); return; }
     try {
-      await changeRoom({ reservationId: reservation._id, newRoomId: selectedRoomId });
+      await changeRoom({ reservationId: reservation._id, oldRoomId: selectedOldRoomId || undefined, newRoomId: selectedRoomId });
       toast.success("Chambre changée.");
       setOpen(false);
       await refresh();
@@ -103,12 +106,8 @@ const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
   };
 
   const handleCheckIn = async () => {
-    if (isMultiRoom) {
-      toast.error("Cette réservation comporte plusieurs chambres et nécessite une affectation multiple, non encore prise en charge.");
-      return;
-    }
     try {
-      await checkInHotelReservation(reservation._id, { roomId: selectedRoomId || undefined });
+      await checkInHotelReservation(reservation._id, { roomId: selectedRoomId || undefined, autoAssign: isMultiRoom });
       toast.success("Check-in effectué.");
       await refresh();
     } catch (err) {
@@ -138,19 +137,19 @@ const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
   return (
     <div className="mt-2 border-t pt-2">
       {isMultiRoom && (
-        <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 mb-2">
-          Réservation multi-chambres ({reservation.roomsCount} chambres) — affectation individuelle non prise en charge dans cette version.
+        <p className="text-xs text-blue-700 bg-blue-50 rounded px-2 py-1 mb-2">
+          Réservation multi-chambres : {assignments.length}/{reservation.roomsCount} affectée(s).
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
         {loadingAssignment ? (
           <span className="text-xs text-gray-400">Chargement de l'affectation...</span>
-        ) : assignment ? (
+        ) : assignments.length ? (
           <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded font-medium">
-            Chambre affectée : {assignment.room?.roomNumber}
+            Chambre{assignments.length > 1 ? "s" : ""} affectée{assignments.length > 1 ? "s" : ""} : {assignments.map((item) => item.room?.roomNumber).filter(Boolean).join(", ")}
           </span>
         ) : null}
-        {reservation.status === "confirmed" && !isMultiRoom && (
+        {reservation.status === "confirmed" && (
           <>
             <button onClick={handleToggle} className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded text-sm">
               {assignment ? "Changer chambre" : "Affecter chambre"}
@@ -158,6 +157,7 @@ const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
             <button onClick={handleCheckIn} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
               Check-in
             </button>
+            <button onClick={handleAutoAssign} className="bg-indigo-600 text-white px-3 py-1.5 rounded text-sm">Affectation auto</button>
           </>
         )}
         {reservation.status === "checked_in" && (
@@ -170,6 +170,9 @@ const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
 
       {open && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
+          {assignments.length > 1 && <select aria-label="Choisir la chambre à remplacer" value={selectedOldRoomId} onChange={(e) => setSelectedOldRoomId(e.target.value)} className="p-2 border rounded text-sm">
+            {assignments.map((item) => <option key={item.id || item._id} value={item.room?._id || item.room?.id}>Remplacer {item.room?.roomNumber}</option>)}
+          </select>}
           <select aria-label="Choisir une chambre disponible" value={selectedRoomId} onChange={(e) => setSelectedRoomId(e.target.value)} className="p-2 border rounded text-sm">
             <option value="">{loadingRooms ? "Chargement..." : "Chambre disponible..."}</option>
             {rooms.map((r) => <option key={r._id} value={r._id}>{r.roomNumber}{r.roomCategory?.name ? ` — ${r.roomCategory.name}` : ""}</option>)}

@@ -6,13 +6,14 @@
 // tarif réel — voir hotelReservationService.computeReservationPricing).
 // Le bouton ne dit jamais "Payer" : aucun paiement n'est géré dans ce sprint.
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { getHotelAvailability, createPublicHotelReservation } from "../services/hotelReservationService";
 import { HOTEL_RATE_TYPES } from "../constants/hotel";
 import { formatCurrencyXAF } from "../utils/normalizePropertyDetail";
 
 const HotelBookingWidget = ({ hotelId, categories = [] }) => {
+  const requestIdRef = useRef(null);
   const bookableCategories = categories.filter((c) => c.rates?.length > 0);
 
   const [categoryId, setCategoryId] = useState(bookableCategories[0]?._id || "");
@@ -75,12 +76,14 @@ const HotelBookingWidget = ({ hotelId, categories = [] }) => {
     if (!guest.firstName || !guest.lastName || !guest.email) { toast.error("Prénom, nom et email sont requis."); return; }
     setSubmitting(true);
     try {
+      if (!requestIdRef.current) requestIdRef.current = globalThis.crypto?.randomUUID?.() || `reservation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const reservation = await createPublicHotelReservation(hotelId, {
         roomCategoryId: categoryId, ratePlanId: rateId,
         checkInDate, checkOutDate, roomsCount: Number(roomsCount), adults: Number(adults), children: Number(children),
-        guest, specialRequests,
+        guest, specialRequests, reservationRequestId: requestIdRef.current,
       });
       setSubmitted(reservation.reference);
+      requestIdRef.current = null;
       toast.success("Votre demande a bien été envoyée !");
     } catch (err) {
       if (err.response?.status === 409) {

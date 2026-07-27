@@ -25,6 +25,14 @@ const mongoose = require('mongoose');
 const RATE_MODES = ['nightly', 'weekly', 'monthly', 'yearly'];
 const RATE_TYPES = ['public', 'entreprise', 'weekend', 'promotion', 'haute_saison'];
 
+const seasonalPeriodSchema = new mongoose.Schema({
+  label: { type: String, trim: true, maxlength: 80, default: '' },
+  startDate: { type: Date, required: true },
+  endDate: { type: Date, required: true },
+  amount: { type: Number, required: true, min: 0 },
+  priority: { type: Number, default: 0, min: 0 },
+}, { _id: true });
+
 const ratePlanSchema = new mongoose.Schema(
   {
     // Pas de `index: true` ici : l'index composé ci-dessous (accommodation+
@@ -62,6 +70,11 @@ const ratePlanSchema = new mongoose.Schema(
     },
     currency: { type: String, default: 'XAF' },
     active: { type: Boolean, default: true },
+    // C29 — périodes inclusives au départ et exclusives à la fin. Elles
+    // restent dans le RatePlan existant afin de ne pas créer un second
+    // moteur tarifaire. Une nuit sans période applicable retombe sur
+    // `amount`; la priorité la plus élevée gagne en cas de chevauchement.
+    seasonalPeriods: { type: [seasonalPeriodSchema], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true },
@@ -78,6 +91,24 @@ ratePlanSchema.pre('validate', function enforceExactlyOneTarget(next) {
       'accommodation',
       "Un RatePlan doit référencer exactement une cible : (accommodation + mode) OU (roomCategory + rateType), jamais les deux.",
     );
+  }
+  const periods = this.seasonalPeriods || [];
+  periods.forEach((period) => {
+    if (period.startDate && period.endDate && period.endDate <= period.startDate) {
+      this.invalidate('seasonalPeriods', 'La fin d’une période tarifaire doit être postérieure à son début.');
+    }
+  });
+  // Deux périodes qui se chevauchent avec la même priorité rendraient la
+  // résolution ambiguë. Les chevauchements restent permis uniquement si la
+  // priorité tranche explicitement.
+  for (let i = 0; i < periods.length; i += 1) {
+    for (let j = i + 1; j < periods.length; j += 1) {
+      const a = periods[i]; const b = periods[j];
+      const overlaps = a.startDate < b.endDate && b.startDate < a.endDate;
+      if (overlaps && a.priority === b.priority) {
+        this.invalidate('seasonalPeriods', 'Deux périodes tarifaires qui se chevauchent doivent avoir des priorités différentes.');
+      }
+    }
   }
   next();
 });

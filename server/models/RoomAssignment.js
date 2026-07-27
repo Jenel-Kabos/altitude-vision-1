@@ -1,9 +1,8 @@
 // server/models/RoomAssignment.js — Sprint D (opérations hôtelières)
 //
 // Relie une HotelReservation à une Room physique. Une réservation ne
-// possède au maximum qu'UNE SEULE affectation ACTIVE (releasedAt: null) à
-// la fois dans ce sprint — le multi-room est explicitement hors périmètre
-// (mission §3). L'historique complet (affectations passées, changements de
+// peut posséder plusieurs affectations actives (une par chambre réservée).
+// L'historique complet (affectations passées, changements de
 // chambre) est conservé : `releasedAt` marque la fin d'une affectation,
 // jamais une suppression physique du document.
 
@@ -25,9 +24,8 @@ const roomAssignmentSchema = new mongoose.Schema(
 
 // Contrôle central anti-double-affectation (mission §4) : au niveau BASE DE
 // DONNÉES, pas seulement applicatif — une Room ne peut avoir qu'UNE
-// affectation active (releasedAt: null) à la fois, et une réservation ne
-// peut avoir qu'UNE affectation active à la fois (cohérent avec "au maximum
-// une chambre" §3). Les affectations libérées (releasedAt renseigné) ne
+// affectation active (releasedAt: null) à la fois. Une réservation peut en
+// posséder plusieurs, jusqu'à `roomsCount`. Les affectations libérées ne
 // sont jamais concernées par cette contrainte — l'historique s'accumule
 // librement. Index partiel : `$type` (et non `$exists`) car `releasedAt` a
 // une valeur par défaut `null` toujours présente (voir le même choix pour
@@ -36,10 +34,7 @@ roomAssignmentSchema.index(
   { room: 1 },
   { unique: true, partialFilterExpression: { releasedAt: { $type: 'null' } } },
 );
-roomAssignmentSchema.index(
-  { reservation: 1 },
-  { unique: true, partialFilterExpression: { releasedAt: { $type: 'null' } } },
-);
+roomAssignmentSchema.index({ reservation: 1, releasedAt: 1, assignedAt: 1 });
 
 const RoomAssignment = mongoose.model('RoomAssignment', roomAssignmentSchema);
 

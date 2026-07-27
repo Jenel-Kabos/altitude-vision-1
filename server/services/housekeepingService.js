@@ -14,6 +14,7 @@
 const Room = require('../models/Room');
 const HousekeepingTask = require('../models/HousekeepingTask');
 const { notify, notifyStaff } = require('./notificationService');
+const { runFinancialOperation } = require('./finance/financialTransactionService');
 
 function fail(message, statusCode) {
   const err = new Error(message);
@@ -109,8 +110,9 @@ async function startTask({ taskId, actingUser }) {
  * 'inspection' — le pont central du Sprint E entre nettoyage et
  * inspection (mission : objectif du sprint).
  */
-async function completeTask({ taskId, actingUser }) {
-  const task = await HousekeepingTask.findById(taskId);
+async function completeTaskCore({ taskId, actingUser, session }) {
+  const query = HousekeepingTask.findById(taskId);
+  const task = await (session ? query.session(session) : query);
   if (!task) throw fail('Tâche de ménage introuvable.', 404);
   assertTransition(task.status, 'completed');
 
@@ -118,24 +120,32 @@ async function completeTask({ taskId, actingUser }) {
   task.open = false;
   task.completedAt = new Date();
   task.updatedBy = actingUser?.id || null;
-  await task.save();
+  await task.save({ session });
 
   // Transition atomique de la chambre — garde par statut courant, jamais
   // une écriture aveugle (une chambre déjà déplacée entre-temps par une
   // autre opération n'est jamais écrasée silencieusement).
-  await Room.findOneAndUpdate(
+  const room = await Room.findOneAndUpdate(
     { _id: task.room, status: 'cleaning' },
     { $set: { status: 'inspection', updatedBy: actingUser?.id || null } },
+    session ? { new: true, session } : { new: true },
   );
+  if (!room) throw fail("La chambre n'est plus en état de nettoyage.", 409);
+
+  return { task, room };
+}
+
+async function completeTask({ taskId, actingUser, transactionMode = 'fallback' }) {
+  const result = await runFinancialOperation({ operationName: 'hotel.housekeeping.complete', transactionMode }, ({ session }) => completeTaskCore({ taskId, actingUser, session }));
 
   await notifyStaff({
     type: 'housekeeping_task_completed',
     title: '✅ Nettoyage terminé',
     body: 'Un nettoyage est terminé et la chambre attend son inspection.',
-    data: { taskId: String(task._id), roomId: String(task.room) },
+    data: { taskId: String(result.task._id), roomId: String(result.task.room) },
   }).catch(() => {});
 
-  return task;
+  return result.task;
 }
 
 async function cancelTask({ taskId, actingUser, reason = '' }) {

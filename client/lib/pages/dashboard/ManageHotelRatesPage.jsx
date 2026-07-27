@@ -25,6 +25,7 @@ const ManageHotelRatesPage = () => {
   const [loading, setLoading] = useState(true);
   const [inputs, setInputs] = useState({});
   const [showHistory, setShowHistory] = useState({});
+  const [seasonalPeriods, setSeasonalPeriods] = useState({});
 
   const load = async () => {
     if (!hotelId) return;
@@ -50,13 +51,17 @@ const ManageHotelRatesPage = () => {
     const amount = Number(inputs[`${categoryId}_${rateType}`]);
     if (!amount || amount <= 0) { toast.error("Montant invalide."); return; }
     try {
-      await upsertRoomCategoryRate(categoryId, { rateType, amount });
+      await upsertRoomCategoryRate(categoryId, { rateType, amount, seasonalPeriods: seasonalPeriods[`${categoryId}_${rateType}`] || [] });
       toast.success("Tarif enregistré.");
       load();
     } catch (err) {
       toast.error(err.response?.data?.message || "Erreur lors de l'enregistrement.");
     }
   };
+
+  const addSeason = (key) => setSeasonalPeriods((state) => ({ ...state, [key]: [...(state[key] || []), { label: '', startDate: '', endDate: '', amount: '', priority: 0 }] }));
+  const updateSeason = (key, index, patch) => setSeasonalPeriods((state) => ({ ...state, [key]: (state[key] || []).map((period, position) => position === index ? { ...period, ...patch } : period) }));
+  const removeSeason = (key, index) => setSeasonalPeriods((state) => ({ ...state, [key]: (state[key] || []).filter((_, position) => position !== index) }));
 
   const handleArchive = async (categoryId, rateId) => {
     try {
@@ -92,14 +97,15 @@ const ManageHotelRatesPage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {HOTEL_RATE_TYPES.map((rt) => {
                     const currentRate = active.find((r) => r.rateType === rt.value);
+                    const rateKey = `${cat._id}_${rt.value}`;
                     return (
-                      <div key={rt.value} className="flex items-center gap-2">
-                        <label className="text-xs text-gray-500 w-32">{rt.label}</label>
+                      <div key={rt.value} className="rounded border p-3 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2"><label className="text-xs text-gray-500 w-32">{rt.label}</label>
                         {currentRate && <span className="text-sm font-medium">{currentRate.amount} {currentRate.currency}</span>}
                         <input
-                          type="number" min="0" placeholder="FCFA"
-                          value={inputs[`${cat._id}_${rt.value}`] ?? ""}
-                          onChange={(e) => setInputs((prev) => ({ ...prev, [`${cat._id}_${rt.value}`]: e.target.value }))}
+                          aria-label={`Tarif de base ${rt.label}`} type="number" min="0" placeholder="FCFA"
+                          value={inputs[rateKey] ?? ""}
+                          onChange={(e) => setInputs((prev) => ({ ...prev, [rateKey]: e.target.value }))}
                           className="w-24 p-1.5 border rounded text-sm"
                         />
                         <button onClick={() => handleSave(cat._id, rt.value)} className="text-xs bg-gray-800 text-white px-2 py-1.5 rounded">OK</button>
@@ -107,7 +113,16 @@ const ManageHotelRatesPage = () => {
                           <button onClick={() => handleArchive(cat._id, currentRate._id)} className="text-xs bg-red-100 text-red-700 px-2 py-1.5 rounded">
                             Archiver
                           </button>
-                        )}
+                        )}</div>
+                        {(currentRate?.seasonalPeriods || []).length > 0 && <p className="text-xs text-gray-600">{currentRate.seasonalPeriods.length} période(s) datée(s) active(s).</p>}
+                        {(seasonalPeriods[rateKey] || []).map((period, index) => <div key={`${rateKey}_${index}`} className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                          <input aria-label={`Nom période ${rt.label} ${index + 1}`} placeholder="Nom" value={period.label} onChange={(event) => updateSeason(rateKey, index, { label: event.target.value })} className="border rounded p-1 text-xs" />
+                          <input aria-label={`Début période ${rt.label} ${index + 1}`} type="date" value={period.startDate} onChange={(event) => updateSeason(rateKey, index, { startDate: event.target.value })} className="border rounded p-1 text-xs" />
+                          <input aria-label={`Fin période ${rt.label} ${index + 1}`} type="date" value={period.endDate} onChange={(event) => updateSeason(rateKey, index, { endDate: event.target.value })} className="border rounded p-1 text-xs" />
+                          <input aria-label={`Montant période ${rt.label} ${index + 1}`} type="number" min="0" placeholder="FCFA" value={period.amount} onChange={(event) => updateSeason(rateKey, index, { amount: event.target.value })} className="border rounded p-1 text-xs" />
+                          <div className="flex gap-1"><input aria-label={`Priorité période ${rt.label} ${index + 1}`} type="number" min="0" value={period.priority} onChange={(event) => updateSeason(rateKey, index, { priority: event.target.value })} className="w-16 border rounded p-1 text-xs" /><button type="button" aria-label={`Supprimer période ${rt.label} ${index + 1}`} onClick={() => removeSeason(rateKey, index)} className="text-red-700">×</button></div>
+                        </div>)}
+                        <button type="button" onClick={() => addSeason(rateKey)} className="text-xs text-blue-700 underline">Ajouter une période datée</button>
                       </div>
                     );
                   })}

@@ -1,7 +1,9 @@
 const HotelReservation = require('../models/HotelReservation');
-const { releaseRoom, getActiveAssignment } = require('./roomAssignmentService');
+const roomAssignmentService = require('./roomAssignmentService');
+const { normalizeDate, releaseInventory } = require('./hotelAvailabilityService');
 const { createTask } = require('./housekeepingService');
-const { notify, notifyStaff } = require('./notificationService');
+const { notifyStaff } = require('./notificationService');
+const { notifyReservationGuest } = require('./hotelReservationNotificationService');
 const { runFinancialOperation } = require('./finance/financialTransactionService');
 const { evaluateHotelCheckoutFinancialReadiness } = require('./finance/hotelCheckoutFinancialReadinessService');
 const authz = require('./finance/financialAuthorizationService');
@@ -36,16 +38,31 @@ async function performCheckOutCore({ reservationId, reservationSeed, actingUser,
     await authz.authorizeFinancialAction({ user: actingUser, capability: authz.CAPABILITIES.HOTEL_CHECKOUT_OVERRIDE, establishmentId: reservation.hotel });
     logger.info('hotel_checkout.financial_override_requested', { reservationId, hotelId: reservation.hotel, actorId: actorId(actingUser) });
   }
-  const assignment = await getActiveAssignment(reservation._id, { session });
-  let room = null;
-  if (assignment) {
-    const released = await releaseRoom({ reservationId: reservation._id, actingUser, reason, nextRoomStatus: 'cleaning', session });
-    room = released.room;
-    try { await createTask({ roomId: room._id, hotelId: reservation.hotel, reservationId: reservation._id, type: 'checkout_cleaning', priority: 'normal', actingUser, session, notifyAfterCreate: false }); }
-    catch (error) { if (error.statusCode !== 409) throw error; }
+  let assignments;
+  if (roomAssignmentService.getActiveAssignments) assignments = await roomAssignmentService.getActiveAssignments(reservation._id, { session });
+  if (!Array.isArray(assignments)) {
+    const legacy = await roomAssignmentService.getActiveAssignment(reservation._id, { session });
+    assignments = legacy ? [legacy] : [];
+  }
+  let released = [];
+  if (assignments.length && roomAssignmentService.releaseAllRooms) released = await roomAssignmentService.releaseAllRooms({ reservationId: reservation._id, actingUser, reason, nextRoomStatus: 'cleaning', session });
+  if (assignments.length && !Array.isArray(released)) released = [await roomAssignmentService.releaseRoom({ reservationId: reservation._id, actingUser, reason, nextRoomStatus: 'cleaning', session })];
+  const rooms = released.map((item) => item.room);
+  for (const room of rooms) {
+    try { // eslint-disable-next-line no-await-in-loop
+      await createTask({ roomId: room._id, hotelId: reservation.hotel, reservationId: reservation._id, type: 'checkout_cleaning', priority: 'normal', actingUser, session, notifyAfterCreate: false });
+    } catch (error) { if (error.statusCode !== 409) throw error; }
+  }
+  const room = rooms[0] || null;
+  const actualCheckOutAt = new Date();
+  const actualDay = normalizeDate(actualCheckOutAt);
+  const contractStart = reservation.checkInDate ? normalizeDate(reservation.checkInDate) : actualDay;
+  const releaseFrom = new Date(Math.max(actualDay.getTime(), contractStart.getTime()));
+  if (reservation.checkOutDate && releaseFrom < normalizeDate(reservation.checkOutDate)) {
+    await releaseInventory({ roomCategoryId: reservation.roomCategory, checkInDate: releaseFrom, checkOutDate: reservation.checkOutDate, roomsCount: reservation.roomsCount, session });
   }
   const from = reservation.status;
-  reservation.status = 'checked_out'; reservation.updatedBy = actorId(actingUser);
+  reservation.status = 'checked_out'; reservation.actualCheckOutAt = actualCheckOutAt; reservation.updatedBy = actorId(actingUser);
   reservation.statusHistory.push({ from, to: 'checked_out', changedBy: actorId(actingUser), changedAt: new Date(), reason });
   await reservation.save({ session });
   if (!readiness.allowed && requestedOverride) {
@@ -54,15 +71,15 @@ async function performCheckOutCore({ reservationId, reservationSeed, actingUser,
     overrideApplied = true; overrideAuditId = entry._id;
     logger.info('hotel_checkout.financial_override_applied', { reservationId, hotelId: reservation.hotel, actorId: actorId(actingUser), blockerCodes: readiness.blockers.map(({ code }) => code) });
   }
-  return { reservation, room, readiness, overrideApplied, overrideAuditId };
+  return { reservation, room, rooms, readiness, overrideApplied, overrideAuditId };
 }
 
 async function performCheckOut({ reservation, reservationId, actingUser, reason = '', financialOverride, transactionMode = 'fallback' }) {
   const id = reservationId || reservation?._id;
   const result = await runFinancialOperation({ operationName: 'hotel.checkout.financial', transactionMode }, ({ session }) => performCheckOutCore({ reservationId: id, reservationSeed: reservation, actingUser, reason, financialOverride, session }));
-  if (result.room) await notifyStaff({ type: 'housekeeping_task_created', title: '🧹 Nouvelle tâche de ménage', body: 'Une tâche de ménage (checkout_cleaning) a été créée.', data: { roomId: String(result.room._id) } }).catch((error) => logger.error('hotel_checkout.post_commit_effect_failed', { reservationId: id, effect: 'housekeeping_notification', errorCode: error.code }));
-  if (result.reservation.guestUser) await notify({ recipient: result.reservation.guestUser, type: 'hotel_reservation_checked_out', title: '👋 Check-out effectué', body: `Votre séjour ${result.reservation.reference} est terminé. Merci de votre visite !`, data: { reservationId: String(id), screen: 'MesReservationsHotel' } }).catch((error) => logger.error('hotel_checkout.post_commit_effect_failed', { reservationId: id, effect: 'guest_notification', errorCode: error.code }));
+  if (result.rooms.length) await notifyStaff({ type: 'housekeeping_task_created', title: '🧹 Nouvelles tâches de ménage', body: `${result.rooms.length} tâche(s) de ménage ont été créées.`, data: { roomIds: result.rooms.map((room) => String(room._id)) } }).catch((error) => logger.error('hotel_checkout.post_commit_effect_failed', { reservationId: id, effect: 'housekeeping_notification', errorCode: error.code }));
+  await notifyReservationGuest({ reservation: result.reservation, eventKey: 'checked_out', type: 'hotel_reservation_checked_out', title: '👋 Check-out effectué', body: `Votre séjour ${result.reservation.reference} est terminé. Merci de votre visite !` }).catch((error) => logger.error('hotel_checkout.post_commit_effect_failed', { reservationId: id, effect: 'guest_notification', errorCode: error.code }));
   logger.info('hotel_checkout.completed', { reservationId: id, hotelId: result.reservation.hotel, actorId: actorId(actingUser), overrideApplied: result.overrideApplied });
-  return { reservation: result.reservation, room: result.room, financialCheckout: { status: result.overrideApplied ? 'overridden' : result.readiness.status, warnings: result.readiness.warnings, overrideApplied: result.overrideApplied, overrideAuditId: result.overrideAuditId } };
+  return { reservation: result.reservation, room: result.room, rooms: result.rooms, financialCheckout: { status: result.overrideApplied ? 'overridden' : result.readiness.status, warnings: result.readiness.warnings, overrideApplied: result.overrideApplied, overrideAuditId: result.overrideAuditId } };
 }
 module.exports = { performCheckOut, validateOverride };

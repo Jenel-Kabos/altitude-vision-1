@@ -12,6 +12,8 @@ const RoomAssignment = require('../models/RoomAssignment');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { assertOperationalHotelAccess } = require('../services/hotel/hotelAccessScopeService');
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
+const { syncPhysicalInventoryBlock } = require('../services/hotelAvailabilityService');
+const { runFinancialOperation } = require('../services/finance/financialTransactionService');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
@@ -137,6 +139,7 @@ exports.update = async (req, res) => {
       if (!category) return fail(res, 404, "Catégorie de chambres introuvable pour cet hôtel.");
       room.roomCategory = roomCategoryId;
     }
+    const previousStatus = room.status;
     if (status) {
       // Contrôle final §7 : une transition de statut manuelle (dashboard)
       // respecte la même table que le cycle automatique (check-in/out).
@@ -149,7 +152,11 @@ exports.update = async (req, res) => {
     room.updatedBy = req.user.id;
 
     try {
-      await room.save();
+      await runFinancialOperation({ operationName: 'hotel.room.status_update', transactionMode: mongoose.connection.readyState ? 'auto' : 'fallback' }, async ({ session }) => {
+        await room.save({ session });
+        if (previousStatus !== 'out_of_service' && room.status === 'out_of_service') await syncPhysicalInventoryBlock({ roomCategoryId: room.roomCategory, delta: 1, session });
+        if (previousStatus === 'out_of_service' && room.status !== 'out_of_service') await syncPhysicalInventoryBlock({ roomCategoryId: room.roomCategory, delta: -1, session });
+      });
     } catch (error) {
       if (error.code === 11000) return fail(res, 409, 'Ce numéro de chambre existe déjà pour cet hôtel.');
       if (error.name === 'ValidationError') return fail(res, 422, error.message);

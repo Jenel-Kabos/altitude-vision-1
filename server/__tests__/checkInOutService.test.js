@@ -51,6 +51,8 @@ const confirmedReservation = (overrides = {}) => ({
 describe('checkInService.performCheckIn — TEST DATA', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    roomAssignmentService.getActiveAssignments.mockResolvedValue(undefined);
+    roomAssignmentService.releaseAllRooms.mockResolvedValue(undefined);
     FinancialDocument.findOne.mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
     createHotelInvoiceDraftFromReservation.mockResolvedValue({ _id: 'f07f1f77bcf86cd799439010', status: 'draft' });
   });
@@ -132,25 +134,21 @@ describe('checkInService.performCheckIn — TEST DATA', () => {
   });
 
   // Correctif — garde-fou multi-chambres (§3) : performCheckIn délègue le
-  // contrôle à roomAssignmentService.assertSingleRoom (source de vérité
-  // unique, déjà testée en profondeur dans roomAssignmentService.test.js).
-  // Ici on vérifie seulement le CÂBLAGE : l'appel a bien lieu, et une
-  // exception levée par ce garde-fou est bien propagée sans être avalée.
-  describe('garde-fou multi-chambres (câblage)', () => {
-    test('assertSingleRoom est appelé avec la réservation avant toute autre opération', async () => {
-      const reservation = confirmedReservation({ roomsCount: 1 });
-      roomAssignmentService.getActiveAssignment.mockResolvedValue({ room: { _id: ROOM_ID, status: 'reserved', roomNumber: '101' } });
-      Room.findOneAndUpdate = jest.fn().mockResolvedValue({ _id: ROOM_ID, status: 'occupied', roomNumber: '101' });
-      await performCheckIn({ reservation, actingUser: { id: USER_ID } });
-      expect(roomAssignmentService.assertSingleRoom).toHaveBeenCalledWith(reservation);
+  describe('check-in multi-chambres', () => {
+    test('refuse une affectation partielle', async () => {
+      const reservation = confirmedReservation({ roomsCount: 2 });
+      roomAssignmentService.getActiveAssignments.mockResolvedValue([{ room: { _id: ROOM_ID, status: 'reserved', roomNumber: '101' } }]);
+      await expect(performCheckIn({ reservation, actingUser: { id: USER_ID } })).rejects.toMatchObject({ code: 'CHECKIN_ASSIGNMENT_INCOMPLETE', statusCode: 422 });
     });
 
-    test('une exception de assertSingleRoom (roomsCount > 1) est propagée, check-in refusé', async () => {
-      const reservation = confirmedReservation({ roomsCount: 3 });
-      const err = Object.assign(new Error('Cette réservation comporte plusieurs chambres et nécessite une affectation multiple, non encore prise en charge.'), { statusCode: 409 });
-      roomAssignmentService.assertSingleRoom.mockImplementation(() => { throw err; });
-      await expect(performCheckIn({ reservation, actingUser: { id: USER_ID } })).rejects.toBe(err);
-      expect(roomAssignmentService.getActiveAssignment).not.toHaveBeenCalled();
+    test('occupe toutes les chambres lorsque l’affectation est complète', async () => {
+      const reservation = confirmedReservation({ roomsCount: 2 });
+      const rooms = [{ _id: ROOM_ID, status: 'reserved', roomNumber: '101' }, { _id: 'b07f1f77bcf86cd799439088', status: 'reserved', roomNumber: '102' }];
+      roomAssignmentService.getActiveAssignments.mockResolvedValue(rooms.map((room) => ({ room })));
+      Room.updateMany = jest.fn().mockResolvedValue({ modifiedCount: 2 });
+      const result = await performCheckIn({ reservation, actingUser: { id: USER_ID } });
+      expect(result.rooms).toHaveLength(2);
+      expect(result.reservation.status).toBe('checked_in');
     });
   });
 });
@@ -158,6 +156,8 @@ describe('checkInService.performCheckIn — TEST DATA', () => {
 describe('checkOutService.performCheckOut — TEST DATA', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    roomAssignmentService.getActiveAssignments.mockResolvedValue(undefined);
+    roomAssignmentService.releaseAllRooms.mockResolvedValue(undefined);
     housekeepingService.createTask.mockResolvedValue({});
     evaluateHotelCheckoutFinancialReadiness.mockResolvedValue({ allowed: true, status: 'ready', blockers: [], warnings: [], financialSnapshot: {} });
     financialAuthz.authorizeFinancialAction.mockResolvedValue({});

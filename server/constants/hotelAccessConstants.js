@@ -21,6 +21,8 @@ const HOTEL_OPERATIONAL_CAPABILITIES = Object.freeze({
   ROOM_MANAGE: 'hotel.room.manage',
   ROOM_ASSIGNMENT_VIEW: 'hotel.room_assignment.view',
   ROOM_ASSIGNMENT_MANAGE: 'hotel.room_assignment.manage',
+  INVENTORY_VIEW: 'hotel.inventory.view',
+  INVENTORY_MANAGE: 'hotel.inventory.manage',
   HOUSEKEEPING_VIEW: 'hotel.housekeeping.view',
   HOUSEKEEPING_MANAGE: 'hotel.housekeeping.manage',
   HOUSEKEEPING_COMPLETE: 'hotel.housekeeping.complete',
@@ -56,14 +58,14 @@ const DEFAULT_CAPABILITIES_BY_ASSIGNMENT_ROLE = Object.freeze({
   hotel_manager: [
     OP.HOTEL_VIEW, OP.HOTEL_MANAGE, OP.RESERVATION_VIEW, OP.RESERVATION_CREATE, OP.RESERVATION_UPDATE, OP.RESERVATION_CANCEL,
     OP.CHECKIN_EXECUTE, OP.CHECKOUT_EXECUTE, OP.ROOM_VIEW, OP.ROOM_MANAGE,
-    OP.ROOM_ASSIGNMENT_VIEW, OP.ROOM_ASSIGNMENT_MANAGE,
+    OP.ROOM_ASSIGNMENT_VIEW, OP.ROOM_ASSIGNMENT_MANAGE, OP.INVENTORY_VIEW, OP.INVENTORY_MANAGE,
     OP.HOUSEKEEPING_VIEW, OP.HOUSEKEEPING_MANAGE, OP.INSPECTION_VIEW, OP.MAINTENANCE_VIEW,
     'financial.document.view', 'financial.payment.view', 'financial.ledger.view', 'financial.reconciliation.view',
     'hotel.checkout.financial.view', 'financial.document.pdf.download', 'financial.document.delivery.view',
     'financial.hotel.dashboard.view', 'financial.hotel.dashboard.alerts.view',
     OP.STAFF_ASSIGNMENT_VIEW,
   ],
-  reception: [OP.HOTEL_VIEW, OP.RESERVATION_VIEW, OP.RESERVATION_CREATE, OP.RESERVATION_UPDATE, OP.CHECKIN_EXECUTE, OP.CHECKOUT_EXECUTE, OP.ROOM_VIEW, OP.ROOM_ASSIGNMENT_VIEW, OP.ROOM_ASSIGNMENT_MANAGE],
+  reception: [OP.HOTEL_VIEW, OP.RESERVATION_VIEW, OP.RESERVATION_CREATE, OP.RESERVATION_UPDATE, OP.CHECKIN_EXECUTE, OP.CHECKOUT_EXECUTE, OP.ROOM_VIEW, OP.ROOM_ASSIGNMENT_VIEW, OP.ROOM_ASSIGNMENT_MANAGE, OP.INVENTORY_VIEW],
   housekeeping: [OP.HOTEL_VIEW, OP.HOUSEKEEPING_VIEW, OP.HOUSEKEEPING_MANAGE, OP.HOUSEKEEPING_COMPLETE, OP.ROOM_VIEW],
   inspector: [OP.HOTEL_VIEW, OP.INSPECTION_VIEW, OP.INSPECTION_MANAGE, OP.INSPECTION_APPROVE, OP.INSPECTION_REJECT, OP.ROOM_VIEW],
   maintenance: [OP.HOTEL_VIEW, OP.MAINTENANCE_VIEW, OP.MAINTENANCE_MANAGE, OP.MAINTENANCE_CLOSE, OP.ROOM_VIEW],
@@ -75,7 +77,7 @@ const DEFAULT_CAPABILITIES_BY_ASSIGNMENT_ROLE = Object.freeze({
     'financial.document.pdf.generate', 'financial.document.pdf.download', 'financial.document.email.send', 'financial.document.delivery.view',
     'financial.hotel.dashboard.view', 'financial.hotel.dashboard.alerts.view',
   ],
-  viewer: [OP.HOTEL_VIEW, OP.RESERVATION_VIEW, OP.ROOM_VIEW, 'financial.hotel.dashboard.view'],
+  viewer: [OP.HOTEL_VIEW, OP.RESERVATION_VIEW, OP.ROOM_VIEW, OP.INVENTORY_VIEW, 'financial.hotel.dashboard.view'],
 });
 
 module.exports = {

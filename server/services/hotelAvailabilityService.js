@@ -1,10 +1,8 @@
 // server/services/hotelAvailabilityService.js — Sprint C
 //
-// Service central de disponibilité/inventaire hôtelier. Aucune transaction
-// MongoDB ici : confirmé par grep (voir propertyTransactionService.js),
-// aucun précédent dans ce codebase et aucune garantie que l'infrastructure
-// MongoDB de ce projet tourne en replica set (requis pour
-// session.startTransaction()). Stratégie retenue à la place :
+// Service central de disponibilité/inventaire hôtelier. Les écritures
+// acceptent une session MongoDB fournie par les workflows transactionnels ;
+// les mises à jour conditionnelles restent sûres en fallback standalone.
 //
 //   1. Chaque NUIT est un document RoomInventory séparé (clé unique
 //      {roomCategory, date}) — la MISE À JOUR ATOMIQUE d'un seul document
@@ -24,6 +22,8 @@
 
 const RoomCategory = require('../models/RoomCategory');
 const RoomInventory = require('../models/RoomInventory');
+const Room = require('../models/Room');
+const mongoose = require('mongoose');
 const logger = require('../utils/logger');
 
 // ─────────────────────────────────────────────
@@ -104,15 +104,19 @@ async function getAvailability({ roomCategoryId, checkInDate, checkOutDate, room
     date: { $in: nightDates },
   });
   const byDate = new Map(existing.map((doc) => [doc.date.getTime(), doc]));
+  const currentPhysicalBlockedUnits = mongoose.connection.readyState
+    ? await Room.countDocuments({ roomCategory: roomCategoryId, active: true, status: 'out_of_service' })
+    : 0;
 
   const nights = nightDates.map((date) => {
     const doc = byDate.get(date.getTime());
     const totalUnits = doc ? doc.totalUnits : category.unitsAvailable;
     const blockedUnits = doc ? doc.blockedUnits : 0;
+    const physicalBlockedUnits = doc ? doc.physicalBlockedUnits || 0 : currentPhysicalBlockedUnits;
     const reservedUnits = doc ? doc.reservedUnits : 0;
     const isClosed = doc ? doc.isClosed : false;
     const stopSell = doc ? doc.stopSell : false;
-    const availableUnits = Math.max(0, totalUnits - blockedUnits - reservedUnits);
+    const availableUnits = Math.max(0, totalUnits - blockedUnits - physicalBlockedUnits - reservedUnits);
     const sufficient = category.status === 'actif' && !isClosed && !stopSell && availableUnits >= roomsCount;
     return { date, totalUnits, availableUnits, isClosed, stopSell, sufficient };
   });
@@ -138,8 +142,9 @@ async function assertAvailability(params) {
 // ─────────────────────────────────────────────
 
 /** Upsert atomique — jamais de course sur la CRÉATION du document grâce à l'index unique {roomCategory, date}. */
-async function ensureInventoryExists(hotelId, roomCategoryId, dates, category) {
-  const cat = category || (await RoomCategory.findById(roomCategoryId));
+async function ensureInventoryExists(hotelId, roomCategoryId, dates, category, { session } = {}) {
+  const categoryQuery = RoomCategory.findById(roomCategoryId);
+  const cat = category || (await (session ? categoryQuery.session(session) : categoryQuery));
   if (!cat) {
     const err = new Error('Catégorie de chambres introuvable.');
     err.statusCode = 404;
@@ -149,17 +154,20 @@ async function ensureInventoryExists(hotelId, roomCategoryId, dates, category) {
   // n'a besoin de connaître que la catégorie) — jamais `null` en base, le
   // schéma RoomInventory l'exige.
   const resolvedHotelId = hotelId || cat.hotel;
+  const physicalBlockedUnits = mongoose.connection.readyState
+    ? await Room.countDocuments({ roomCategory: roomCategoryId, active: true, status: 'out_of_service' })
+    : 0;
   await Promise.all(dates.map((date) =>
     RoomInventory.findOneAndUpdate(
       { roomCategory: roomCategoryId, date },
       {
         $setOnInsert: {
           hotel: resolvedHotelId, roomCategory: roomCategoryId, date,
-          totalUnits: cat.unitsAvailable, blockedUnits: 0, reservedUnits: 0,
+          totalUnits: cat.unitsAvailable, blockedUnits: 0, physicalBlockedUnits, reservedUnits: 0,
           isClosed: false, stopSell: false,
         },
       },
-      { upsert: true, new: true },
+      { upsert: true, new: true, session },
     ).catch((error) => {
       // E11000 possible si deux requêtes concurrentes créent le même
       // document en même temps (l'une gagne, l'autre échoue sur l'index
@@ -179,15 +187,16 @@ async function ensureInventoryExists(hotelId, roomCategoryId, dates, category) {
  *
  * @returns {Promise<{ok: true, nights: Date[]} | {ok: false, conflictDate: Date, unavailableDates: Date[]}>}
  */
-async function reserveInventory({ hotelId, roomCategoryId, checkInDate, checkOutDate, roomsCount = 1, actingUserId = null }) {
+async function reserveInventory({ hotelId, roomCategoryId, checkInDate, checkOutDate, roomsCount = 1, actingUserId = null, session = null }) {
   const nightDates = getNightDates(checkInDate, checkOutDate);
-  const category = await RoomCategory.findById(roomCategoryId);
+  const categoryQuery = RoomCategory.findById(roomCategoryId);
+  const category = await (session ? categoryQuery.session(session) : categoryQuery);
   if (!category) {
     const err = new Error('Catégorie de chambres introuvable.');
     err.statusCode = 404;
     throw err;
   }
-  await ensureInventoryExists(hotelId, roomCategoryId, nightDates, category);
+  await ensureInventoryExists(hotelId, roomCategoryId, nightDates, category, { session });
 
   const reservedSoFar = [];
   for (const date of nightDates) {
@@ -204,19 +213,19 @@ async function reserveInventory({ hotelId, roomCategoryId, checkInDate, checkOut
         $expr: {
           $lte: [
             { $add: ['$reservedUnits', roomsCount] },
-            { $subtract: ['$totalUnits', '$blockedUnits'] },
+            { $subtract: ['$totalUnits', { $add: ['$blockedUnits', { $ifNull: ['$physicalBlockedUnits', 0] }] }] },
           ],
         },
       },
       { $inc: { reservedUnits: roomsCount }, $set: { updatedBy: actingUserId } },
-      { new: true },
+      { new: true, session },
     );
 
     if (!updated) {
       // Échec sur cette nuit : compensation des nuits déjà réservées par CET
       // appel (jamais celles d'autres réservations) avant de remonter l'échec.
       // eslint-disable-next-line no-await-in-loop
-      await releaseInventoryDates(roomCategoryId, reservedSoFar, roomsCount);
+      await releaseInventoryDates(roomCategoryId, reservedSoFar, roomsCount, { session });
       const unavailable = await getAvailability({ roomCategoryId, checkInDate, checkOutDate, roomsCount });
       return { ok: false, conflictDate: date, unavailableDates: unavailable.unavailableDates };
     }
@@ -227,20 +236,21 @@ async function reserveInventory({ hotelId, roomCategoryId, checkInDate, checkOut
 }
 
 /** Libère `roomsCount` unités sur une liste de dates déjà normalisées (usage interne : compensation). */
-async function releaseInventoryDates(roomCategoryId, dates, roomsCount) {
+async function releaseInventoryDates(roomCategoryId, dates, roomsCount, { session } = {}) {
   await Promise.all(dates.map((date) =>
     RoomInventory.findOneAndUpdate(
       { roomCategory: roomCategoryId, date, reservedUnits: { $gte: roomsCount } },
       { $inc: { reservedUnits: -roomsCount } },
+      { session },
     ).catch((error) => {
       logger.error(`Libération d'inventaire échouée (roomCategory=${roomCategoryId}, date=${date.toISOString()})`, error);
     })));
 }
 
 /** Libère le stock d'une réservation existante (annulation/rejet/expiration/modification). */
-async function releaseInventory({ roomCategoryId, checkInDate, checkOutDate, roomsCount = 1 }) {
+async function releaseInventory({ roomCategoryId, checkInDate, checkOutDate, roomsCount = 1, session = null }) {
   const nightDates = getNightDates(checkInDate, checkOutDate);
-  await releaseInventoryDates(roomCategoryId, nightDates, roomsCount);
+  await releaseInventoryDates(roomCategoryId, nightDates, roomsCount, { session });
 }
 
 /**
@@ -255,9 +265,20 @@ async function rebuildInventory({ roomCategoryId, from, to }) {
   return { nights: nightDates.length };
 }
 
+async function syncPhysicalInventoryBlock({ roomCategoryId, delta, from = new Date(), session = null }) {
+  if (!mongoose.connection.readyState) return { modifiedCount: 0 };
+  const date = normalizeDate(from);
+  await RoomInventory.updateMany(
+    { roomCategory: roomCategoryId, date: { $gte: date } },
+    delta > 0 ? { $inc: { physicalBlockedUnits: delta } } : [{ $set: { physicalBlockedUnits: { $max: [0, { $add: [{ $ifNull: ['$physicalBlockedUnits', 0] }, delta] }] } } }],
+    { session },
+  );
+}
+
 module.exports = {
   normalizeDate, getNightDates, isPastDate, assertNotPast,
   getAvailability, assertAvailability,
   reserveInventory, releaseInventory, rebuildInventory,
   ensureInventoryExists,
+  syncPhysicalInventoryBlock,
 };

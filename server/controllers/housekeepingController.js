@@ -149,7 +149,7 @@ exports.complete = async (req, res) => {
     if (error === 404) return fail(res, 404, 'Tâche introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
 
-    const updated = await housekeepingService.completeTask({ taskId: task._id, actingUser: req.user });
+    const updated = await housekeepingService.completeTask({ taskId: task._id, actingUser: req.user, transactionMode: 'auto' });
 
     logAction({
       action: 'Tâche de ménage terminée', description: `Tâche ${updated._id} terminée — chambre en attente d'inspection`, module: 'Altimmo',

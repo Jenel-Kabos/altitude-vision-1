@@ -517,6 +517,17 @@ describe('Tarifs par catégorie — un seul actif par type (Sprint B2)', () => {
     );
   });
 
+  test('201 — C29 transmet les périodes datées et leur priorité au RatePlan', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    RoomCategory.findById = jest.fn().mockResolvedValue({ _id: CATEGORY_ID, hotel: HOTEL_ID });
+    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, manager: OWNER_ID });
+    RatePlan.updateMany = jest.fn().mockResolvedValue({}); RatePlan.create = jest.fn().mockResolvedValue({ _id: 'rate-seasonal' });
+    const seasonalPeriods = [{ label: 'Réveillon', startDate: '2026-12-31', endDate: '2027-01-02', amount: 85000, priority: 20 }];
+    const res = await request(app).post(`/api/hotels/room-categories/${CATEGORY_ID}/rate-plans`).set('Authorization', `Bearer ${makeToken(OWNER_ID)}`).send({ rateType: 'public', amount: 35000, seasonalPeriods });
+    expect(res.statusCode).toBe(201);
+    expect(RatePlan.create).toHaveBeenCalledWith(expect.objectContaining({ seasonalPeriods: [expect.objectContaining({ label: 'Réveillon', amount: 85000, priority: 20 })] }));
+  });
+
   test('200 — archiver un tarif le désactive (historique conservé)', async () => {
     mockUserAuth(OWNER_ID, 'Proprietaire');
     RoomCategory.findById = jest.fn().mockResolvedValue({ _id: CATEGORY_ID, hotel: HOTEL_ID });
