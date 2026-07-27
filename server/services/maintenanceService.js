@@ -7,7 +7,12 @@
 // traçabilité vers l'inspection qui a déclenché la mise hors service.
 
 const MaintenanceTicket = require('../models/MaintenanceTicket');
+const Room = require('../models/Room');
+const RoomAssignment = require('../models/RoomAssignment');
+const HotelReservation = require('../models/HotelReservation');
 const { notify, notifyStaff } = require('./notificationService');
+const { syncPhysicalInventoryBlock } = require('./hotelAvailabilityService');
+const { runFinancialOperation } = require('./finance/financialTransactionService');
 
 function fail(message, statusCode) {
   const err = new Error(message);
@@ -22,22 +27,33 @@ function assertTransition(current, next) {
   }
 }
 
-async function createTicket({
-  roomId, hotelId, inspectionId = null, category, priority = 'normal', description, actingUser,
-}) {
-  const ticket = await MaintenanceTicket.create({
-    room: roomId, hotel: hotelId, inspection: inspectionId, category, priority, description,
-    createdBy: actingUser?.id || null,
-  });
+async function createTicketCore({ roomId, hotelId, inspectionId, category, priority, description, actingUser, session }) {
+  const roomQuery = Room.findOne({ _id: roomId, hotel: hotelId }); const room = await (session ? roomQuery.session(session) : roomQuery);
+  if (!room) throw fail('Chambre introuvable pour cet hôtel.', 404);
+  const wasBlocked = room.status === 'out_of_service';
+  if (!wasBlocked) {
+    const updated = await Room.findOneAndUpdate({ _id: roomId, hotel: hotelId, status: { $ne: 'out_of_service' } }, { $set: { status: 'out_of_service', updatedBy: actingUser?.id || null } }, { new: true, session });
+    if (!updated) throw fail('La chambre vient de changer d’état.', 409);
+    await syncPhysicalInventoryBlock({ roomCategoryId: room.roomCategory, delta: 1, session });
+  }
+  const assignmentQuery = RoomAssignment.find({ room: roomId, releasedAt: null }); const assignments = await (session ? assignmentQuery.session(session) : assignmentQuery);
+  if (assignments.length) await HotelReservation.updateMany({ _id: { $in: assignments.map((item) => item.reservation) }, status: { $in: ['pending', 'confirmed', 'checked_in'] } }, { $set: { requiresRoomReassignment: true, reassignmentReason: 'Chambre hors service — réaffectation requise' } }, { session });
+  const data = { room: roomId, hotel: hotelId, inspection: inspectionId, category, priority, description, createdBy: actingUser?.id || null };
+  const ticket = session ? (await MaintenanceTicket.create([data], { session }))[0] : await MaintenanceTicket.create(data);
+  return { ticket, impactedReservations: assignments.map((item) => item.reservation) };
+}
+
+async function createTicket({ roomId, hotelId, inspectionId = null, category, priority = 'normal', description, actingUser, transactionMode = 'fallback' }) {
+  const result = await runFinancialOperation({ operationName: 'hotel.maintenance.create', transactionMode }, ({ session }) => createTicketCore({ roomId, hotelId, inspectionId, category, priority, description, actingUser, session }));
 
   await notifyStaff({
     type: 'maintenance_ticket_created',
     title: '🔧 Ticket de maintenance créé',
     body: `Un ticket de maintenance (${category}) a été créé.`,
-    data: { ticketId: String(ticket._id), roomId: String(roomId) },
+    data: { ticketId: String(result.ticket._id), roomId: String(roomId), impactedReservations: result.impactedReservations.map(String) },
   }).catch(() => {});
 
-  return ticket;
+  return result.ticket;
 }
 
 async function assignTicket({ ticketId, assignedToUserId, actingUser }) {

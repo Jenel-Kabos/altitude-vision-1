@@ -13,7 +13,7 @@ export const getHotelAvailability = async (hotelId, { roomCategoryId, checkInDat
 
 export const createPublicHotelReservation = async (hotelId, payload) => {
   const res = await api.post(`/hotels/${hotelId}/reservations`, payload);
-  return res.data.data.reservation;
+  return Object.assign(res.data.data.reservation, { idempotent: Boolean(res.data.data.idempotent) });
 };
 
 // Client connecté — "Mes réservations"
@@ -40,7 +40,7 @@ export const getOwnerHotelReservations = async (params = {}) => {
 
 export const createOwnerHotelReservation = async (payload) => {
   const res = await api.post('/hotel-reservations/owner', payload);
-  return res.data.data.reservation;
+  return Object.assign(res.data.data.reservation, { idempotent: Boolean(res.data.data.idempotent) });
 };
 
 export const updateHotelReservation = async (id, payload) => {
@@ -71,8 +71,8 @@ export const getPendingHotelReservations = async () => {
 
 // ── Sprint D — check-in / check-out (jamais accessible au client) ──
 
-export const checkInHotelReservation = async (id, { roomId, reason } = {}) => {
-  const res = await api.patch(`/hotel-reservations/${id}/check-in`, { roomId, reason });
+export const checkInHotelReservation = async (id, { roomId, roomIds, autoAssign, reason } = {}) => {
+  const res = await api.patch(`/hotel-reservations/${id}/check-in`, { roomId, roomIds, autoAssign, reason });
   return res.data.data; // { reservation, room }
 };
 
@@ -86,5 +86,5 @@ export const getCheckoutFinancialReadiness = async (id) => { const res = await a
 // rechargement), remplace la dépendance exclusive à l'état local post-action.
 export const getReservationRoomAssignment = async (id) => {
   const res = await api.get(`/hotel-reservations/${id}/room-assignment`);
-  return res.data.data.activeRoomAssignment; // null | { id, room:{id,roomNumber,floor,status,roomCategory}, assignedAt }
+  return res.data.data;
 };

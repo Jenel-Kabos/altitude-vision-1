@@ -119,6 +119,7 @@ const RoomsPage = () => {
         <button onClick={() => setView("floors")} className={`px-3 py-1.5 rounded text-sm font-medium ${view === "floors" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
           Plan d'étage
         </button>
+        <Link href={`/dashboard/hotels/${hotelId}/inventory`} className="px-3 py-1.5 rounded text-sm font-medium bg-indigo-100 text-indigo-800">Calendrier d’inventaire</Link>
         {!creating && (
           <button onClick={() => setCreating(true)} className="ml-auto bg-gold text-white px-3 py-1.5 rounded text-sm">
             + Nouvelle chambre

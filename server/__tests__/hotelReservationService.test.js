@@ -66,7 +66,26 @@ describe('computeReservationPricing — tarification recalculée côté serveur 
   test('rateSnapshot capture rateType/amount/currency (historisation, mission §6)', async () => {
     RatePlan.findOne = jest.fn().mockResolvedValue({ amount: 50000, currency: 'XAF', rateType: 'weekend', active: true });
     const pricing = await computeReservationPricing({ roomCategoryId: CATEGORY_ID, ratePlanId: RATE_ID, nights: 1, roomsCount: 1 });
-    expect(pricing.rateSnapshot).toEqual({ rateType: 'weekend', amount: 50000, currency: 'XAF' });
+    expect(pricing.rateSnapshot).toEqual({
+      rateType: 'weekend', amount: 50000, currency: 'XAF',
+      nightlyRates: [{ date: null, amount: 50000, periodId: null, periodLabel: '', priority: null }],
+    });
+  });
+
+  test('C29 calcule chaque nuit, traverse deux périodes et fige le détail tarifaire', async () => {
+    RatePlan.findOne = jest.fn().mockResolvedValue({
+      amount: 35000, currency: 'XAF', rateType: 'public', active: true,
+      seasonalPeriods: [
+        { _id: 'period-low', label: 'Vacances', startDate: new Date('2026-12-20'), endDate: new Date('2027-01-05'), amount: 50000, priority: 10 },
+        { _id: 'period-high', label: 'Réveillon', startDate: new Date('2026-12-31'), endDate: new Date('2027-01-02'), amount: 85000, priority: 20 },
+      ],
+    });
+    const nightDates = [new Date('2026-12-30'), new Date('2026-12-31'), new Date('2027-01-01'), new Date('2027-01-02'), new Date('2027-01-05')];
+    const pricing = await computeReservationPricing({ roomCategoryId: CATEGORY_ID, ratePlanId: RATE_ID, nights: 5, roomsCount: 2, nightDates });
+    expect(pricing.rateSnapshot.nightlyRates.map(({ amount }) => amount)).toEqual([50000, 85000, 85000, 50000, 35000]);
+    expect(pricing.rateSnapshot.nightlyRates[1]).toMatchObject({ periodId: 'period-high', periodLabel: 'Réveillon', priority: 20 });
+    expect(pricing.subtotal).toBe((50000 + 85000 + 85000 + 50000 + 35000) * 2);
+    expect(pricing.totalAmount).toBe(pricing.subtotal);
   });
 });
 

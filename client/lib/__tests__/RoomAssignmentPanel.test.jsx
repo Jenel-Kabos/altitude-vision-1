@@ -137,11 +137,12 @@ describe('RoomAssignmentPanel — correctif (affectation persistante + garde-fou
     expect(await screen.findByText(/Chambre affectée : 101/)).toBeInTheDocument();
   });
 
-  test('réservation multi-chambres : affiche une erreur et bloque affecter/check-in', async () => {
+  test('réservation multi-chambres : affiche la progression et permet l’affectation', async () => {
     render(<RoomAssignmentPanel reservation={reservation({ roomsCount: 3 })} onChanged={vi.fn()} />);
-    expect(await screen.findByText((content, el) => el.tagName === 'P' && el.textContent.includes('affectation individuelle non prise en charge'))).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Affecter chambre' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Check-in' })).not.toBeInTheDocument();
+    expect(await screen.findByText(/0\/3 affectée/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Affecter chambre' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Check-in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Affectation auto' })).toBeInTheDocument();
   });
 
   test('réservation checked_in : propose uniquement Check-out', async () => {

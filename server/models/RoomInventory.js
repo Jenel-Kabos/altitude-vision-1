@@ -21,6 +21,7 @@ const roomInventorySchema = new mongoose.Schema(
 
     totalUnits: { type: Number, required: true, min: 0 },
     blockedUnits: { type: Number, default: 0, min: 0 },
+    physicalBlockedUnits: { type: Number, default: 0, min: 0 },
     reservedUnits: { type: Number, default: 0, min: 0 },
 
     isClosed: { type: Boolean, default: false },
@@ -44,7 +45,7 @@ roomInventorySchema.index({ hotel: 1, date: 1 });
 // possible avec totalUnits/blockedUnits/reservedUnits. Jamais négatif
 // (mission §3).
 roomInventorySchema.virtual('availableUnits').get(function computeAvailableUnits() {
-  return Math.max(0, this.totalUnits - this.blockedUnits - this.reservedUnits);
+  return Math.max(0, this.totalUnits - this.blockedUnits - this.physicalBlockedUnits - this.reservedUnits);
 });
 
 const RoomInventory = mongoose.model('RoomInventory', roomInventorySchema);

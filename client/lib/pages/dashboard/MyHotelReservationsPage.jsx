@@ -4,7 +4,7 @@
 // de calendrier — mission §14) : liste, recherche, filtres hôtel/statut,
 // détail, confirmer/rejeter/annuler, création manuelle.
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import {
   getOwnerHotelReservations, confirmHotelReservation, rejectHotelReservation, cancelHotelReservation,
@@ -18,6 +18,7 @@ import HotelFinancialDocumentPanel from "../../components/HotelFinancialDocument
 const STATUS_TABS = [{ value: "", label: "Tous" }, ...RESERVATION_STATUSES];
 
 const MyHotelReservationsPage = () => {
+  const createRequestIdRef = useRef(null);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -72,8 +73,10 @@ const MyHotelReservationsPage = () => {
       return;
     }
     try {
-      await createOwnerHotelReservation(form);
+      if (!createRequestIdRef.current) createRequestIdRef.current = globalThis.crypto?.randomUUID?.() || `reservation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      await createOwnerHotelReservation({ ...form, reservationRequestId: createRequestIdRef.current });
       toast.success("Réservation créée.");
+      createRequestIdRef.current = null;
       setCreating(false);
       load();
     } catch (err) {

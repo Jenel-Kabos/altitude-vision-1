@@ -17,7 +17,7 @@ const {
 } = require('../services/hotelReservationService');
 const { performCheckIn } = require('../services/checkInService');
 const { performCheckOut } = require('../services/checkOutService');
-const { getActiveAssignment } = require('../services/roomAssignmentService');
+const { getActiveAssignments } = require('../services/roomAssignmentService');
 const { evaluateHotelCheckoutFinancialReadiness } = require('../services/finance/hotelCheckoutFinancialReadinessService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { resolveHotelAccessScope, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
@@ -142,7 +142,7 @@ exports.createPublicReservation = async (req, res) => {
 
     const {
       roomCategoryId, ratePlanId, checkInDate, checkOutDate,
-      roomsCount, adults, children, guest, specialRequests,
+      roomsCount, adults, children, guest, specialRequests, reservationRequestId,
     } = req.body;
     if (!guest?.firstName || !guest?.lastName || !guest?.email) {
       return fail(res, 422, 'Prénom, nom et email du client sont requis.');
@@ -156,6 +156,7 @@ exports.createPublicReservation = async (req, res) => {
       adults: Number(adults) || 1,
       children: Number(children) || 0,
       specialRequests,
+      reservationRequestId,
       source: 'public_web',
       actingUser: req.user || {},
     });
@@ -170,7 +171,8 @@ exports.createPublicReservation = async (req, res) => {
       req,
     });
 
-    res.status(201).json({ status: 'success', data: { reservation } });
+    const idempotent = Boolean(reservation.$locals?.idempotent);
+    res.status(idempotent ? 200 : 201).json({ status: 'success', data: { reservation, idempotent } });
   } catch (error) {
     if (error.statusCode === 409) {
       logAction({
@@ -240,8 +242,14 @@ exports.getRoomAssignment = async (req, res) => {
       return res.json({ status: 'success', data: { activeRoomAssignment: null } });
     }
 
-    const assignment = await getActiveAssignment(reservation._id);
-    res.json({ status: 'success', data: { activeRoomAssignment: projectRoomAssignment(assignment) } });
+    let assignments = await getActiveAssignments(reservation._id);
+    if (!Array.isArray(assignments)) {
+      const assignment = await require('../services/roomAssignmentService').getActiveAssignment(reservation._id);
+      assignments = assignment ? [assignment] : [];
+    }
+    const projected = assignments.map(projectRoomAssignment);
+    const assignmentState = projected.length === 0 ? 'unassigned' : projected.length < reservation.roomsCount ? 'partially_assigned' : 'fully_assigned';
+    res.json({ status: 'success', data: { activeRoomAssignment: projected[0] || null, activeRoomAssignments: projected, assignmentState } });
   } catch (error) {
     fail(res, error.statusCode || 500, error.message);
   }
@@ -336,7 +344,7 @@ exports.ownerCreate = async (req, res) => {
 
     const {
       roomCategoryId, ratePlanId, checkInDate, checkOutDate,
-      roomsCount, adults, children, guest, specialRequests, allowPast,
+      roomsCount, adults, children, guest, specialRequests, allowPast, reservationRequestId,
     } = req.body;
     if (!guest?.firstName || !guest?.lastName || !guest?.email) {
       return fail(res, 422, 'Prénom, nom et email du client sont requis.');
@@ -350,6 +358,7 @@ exports.ownerCreate = async (req, res) => {
       adults: Number(adults) || 1,
       children: Number(children) || 0,
       specialRequests,
+      reservationRequestId,
       source: isStaff && !isOwner ? 'admin_dashboard' : 'owner_dashboard',
       actingUser: req.user,
       // Privilège admin explicite (mission §4) — jamais activé pour un
@@ -367,7 +376,8 @@ exports.ownerCreate = async (req, res) => {
       req,
     });
 
-    res.status(201).json({ status: 'success', data: { reservation } });
+    const idempotent = Boolean(reservation.$locals?.idempotent);
+    res.status(idempotent ? 200 : 201).json({ status: 'success', data: { reservation, idempotent } });
   } catch (error) {
     if (error.statusCode === 409) return fail(res, 409, error.message, { unavailableDates: error.unavailableDates });
     fail(res, error.statusCode || 500, error.message);
@@ -447,16 +457,17 @@ exports.checkIn = async (req, res) => {
     const access = await assertReservationAccess(req, reservation);
     if (!access || access.role === 'guest') { logDenied(req, 'Check-in'); return fail(res, 403, 'Accès refusé.'); }
 
-    const { roomId, reason } = req.body;
-    const result = await performCheckIn({ reservation, roomId, actingUser: req.user, reason: reason || '' });
+    const { roomId, roomIds, autoAssign, reason } = req.body;
+    const result = await performCheckIn({ reservation, roomId, roomIds, autoAssign: Boolean(autoAssign), actingUser: req.user, reason: reason || '', transactionMode: 'auto' });
 
     logAction({
-      action: 'Check-in effectué', description: `${result.reservation.reference} — check-in (chambre ${result.room.roomNumber})`, module: 'Altimmo',
+      action: 'Check-in effectué', description: `${result.reservation.reference} — check-in (${(result.rooms || (result.room ? [result.room] : [])).length} chambre(s))`, module: 'Altimmo',
       typeAction: 'MODIFICATION', auteur: buildAuteur(req.user),
       cible: { id: String(result.reservation._id), type: 'HotelReservation', nom: result.reservation.reference }, req,
     });
 
-    res.json({ status: 'success', data: { reservation: result.reservation, room: result.room, financialDocument: result.financialDocument } });
+    const rooms = result.rooms || (result.room ? [result.room] : []);
+    res.json({ status: 'success', data: { reservation: result.reservation, rooms, room: result.room || rooms[0] || null, financialDocument: result.financialDocument } });
   } catch (error) {
     fail(res, error.statusCode || 500, error.message);
   }
@@ -478,7 +489,7 @@ exports.checkOut = async (req, res) => {
       cible: { id: String(result.reservation._id), type: 'HotelReservation', nom: result.reservation.reference }, req,
     });
 
-    res.json({ status: 'success', data: { reservation: result.reservation, room: result.room, financialCheckout: result.financialCheckout } });
+    res.json({ status: 'success', data: { reservation: result.reservation, rooms: result.rooms, room: result.room, financialCheckout: result.financialCheckout } });
   } catch (error) {
     fail(res, error.statusCode || 500, error.message, { ...(error.code ? { code: error.code } : {}), ...(error.financialReadiness ? { financialReadiness: error.financialReadiness } : {}) });
   }

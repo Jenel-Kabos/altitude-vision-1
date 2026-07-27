@@ -1,0 +1,23 @@
+import * as Crypto from 'expo-crypto';
+import api from './api';
+
+export const newReservationRequestId = () => Crypto.randomUUID();
+export const searchPublicHotels = async (params = {}) => (await api.get('/hotels/public', { params })).data.data;
+export const getPublicHotel = async (id) => (await api.get(`/hotels/public/${id}`)).data.data;
+export const getHotelAvailability = async (hotelId, params) => (await api.get(`/hotels/${hotelId}/availability`, { params })).data.data;
+export const createHotelReservation = async (hotelId, payload) => (await api.post(`/hotels/${hotelId}/reservations`, payload)).data.data;
+export const getMyHotelReservations = async () => (await api.get('/hotel-reservations/mine')).data.data.reservations;
+export const getHotelReservation = async (id) => (await api.get(`/hotel-reservations/${id}`)).data.data.reservation;
+export const updateHotelReservation = async (id, payload) => (await api.patch(`/hotel-reservations/${id}`, payload)).data.data.reservation;
+export const cancelHotelReservation = async (id, reason) => (await api.patch(`/hotel-reservations/${id}/cancel`, { reason })).data.data.reservation;
+export const getOwnerHotelReservations = async (params = {}) => (await api.get('/hotel-reservations/owner', { params })).data.data;
+export const getAccessibleHotels = async () => (await api.get('/hotels/accessible')).data.data.hotels;
+export const getReservationAssignments = async (id) => (await api.get(`/hotel-reservations/${id}/room-assignment`)).data.data;
+export const getHotelRooms = async (hotelId, params = {}) => (await api.get(`/hotels/${hotelId}/rooms`, { params })).data.data.rooms;
+export const assignHotelRoom = async (reservationId, roomId) => (await api.post('/hotels/room-assignments', { reservationId, roomId })).data.data.assignment;
+export const autoAssignHotelRooms = async (reservationId) => (await api.post('/hotels/room-assignments/auto', { reservationId })).data.data;
+export const changeHotelRoom = async (reservationId, oldRoomId, newRoomId, reason) => (await api.patch('/hotels/room-assignments/change', { reservationId, oldRoomId, newRoomId, reason })).data.data.assignment;
+export const checkInHotelReservation = async (id, payload = {}) => (await api.patch(`/hotel-reservations/${id}/check-in`, payload)).data.data;
+export const checkOutHotelReservation = async (id, payload = {}) => (await api.patch(`/hotel-reservations/${id}/check-out`, payload)).data.data;
+export const getHotelInventory = async (hotelId, params) => (await api.get(`/hotels/${hotelId}/inventory/calendar`, { params })).data.data;
+export const updateHotelInventory = async (hotelId, payload) => (await api.patch(`/hotels/${hotelId}/inventory/range`, payload)).data.data;

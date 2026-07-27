@@ -1,0 +1,16 @@
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import Screen from '../../components/Screen'; import Button from '../../components/Button';
+import { useTheme } from '../../context/ThemeContext'; import { fonts, fontSize, spacing, radius } from '../../theme';
+import { getHotelReservation, getReservationAssignments } from '../../services/hotelReservationService';
+
+export default function HotelReservationDetailScreen({ route }) {
+  const { themeColors: c } = useTheme(); const styles = useMemo(() => makeStyles(c), [c]); const [reservation, setReservation] = useState(null); const [assignmentData, setAssignmentData] = useState(null); const [loading, setLoading] = useState(false);
+  const load = useCallback(async () => { setLoading(true); try { const item = await getHotelReservation(route.params.reservationId); setReservation(item); setAssignmentData(await getReservationAssignments(item._id)); } catch (error) { Alert.alert('Erreur', error.response?.data?.message || 'Détail indisponible.'); } finally { setLoading(false); } }, [route.params.reservationId]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+  if (!reservation) return <Screen><Button label="Charger" loading={loading} onPress={load} /></Screen>;
+  const rooms = assignmentData?.activeRoomAssignments || [];
+  return <Screen scroll style={styles.content}><Text accessibilityRole="header" style={styles.title}>{reservation.reference}</Text><View style={styles.card}><Text style={styles.status}>{reservation.status}</Text><Text style={styles.text}>{reservation.hotel?.name}</Text><Text style={styles.text}>Arrivée : {new Date(reservation.checkInDate).toLocaleString('fr-FR')}</Text><Text style={styles.text}>Départ prévu : {new Date(reservation.checkOutDate).toLocaleString('fr-FR')}</Text>{reservation.actualCheckInAt && <Text style={styles.text}>Arrivée réelle : {new Date(reservation.actualCheckInAt).toLocaleString('fr-FR')}</Text>}{reservation.actualCheckOutAt && <Text style={styles.text}>Départ réel : {new Date(reservation.actualCheckOutAt).toLocaleString('fr-FR')}</Text>}<Text style={styles.text}>{reservation.roomsCount} chambre(s) · {reservation.adults} adulte(s)</Text><Text style={styles.amount}>{Number(reservation.totalAmount || 0).toLocaleString('fr-FR')} FCFA</Text></View><View style={styles.card}><Text style={styles.subtitle}>Chambres</Text><Text style={styles.text}>{assignmentData?.assignmentState || 'unassigned'}</Text>{rooms.map((item) => <Text key={item.id} style={styles.text}>Chambre {item.room?.roomNumber} · étage {item.room?.floor}</Text>)}</View><Button label="Actualiser" variant="outline" loading={loading} onPress={load} /></Screen>;
+}
+const makeStyles = (c) => StyleSheet.create({ content: { gap: spacing.md }, title: { color: c.text, fontFamily: fonts.display, fontSize: fontSize.xl }, card: { backgroundColor: c.bgCard, borderColor: c.border, borderWidth: 1, borderRadius: radius.sm, padding: spacing.md, gap: spacing.xs }, subtitle: { color: c.text, fontFamily: fonts.bodyBold, fontSize: fontSize.md }, status: { color: c.gold, fontFamily: fonts.bodyBold }, text: { color: c.textSub, fontFamily: fonts.body }, amount: { color: c.text, fontFamily: fonts.bodyBold, fontSize: fontSize.lg } });

@@ -7,8 +7,8 @@
 
 const mongoose = require('mongoose');
 const HotelReservation = require('../models/HotelReservation');
-const { assignRoom, changeRoom, releaseRoom } = require('../services/roomAssignmentService');
-const { notify } = require('../services/notificationService');
+const { assignRoom, autoAssignRooms, changeRoom, releaseRoom } = require('../services/roomAssignmentService');
+const { notifyReservationGuest } = require('../services/hotelReservationNotificationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { assertOperationalHotelAccess } = require('../services/hotel/hotelAccessScopeService');
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
@@ -29,11 +29,7 @@ async function loadReservationWithAccess(req, reservationId) {
 }
 
 async function notifyGuestRoomEvent(reservation, type, title, body) {
-  if (!reservation.guestUser) return;
-  await notify({
-    recipient: reservation.guestUser, type, title, body,
-    data: { reservationId: String(reservation._id), screen: 'MesReservationsHotel' },
-  }).catch(() => {});
+  await notifyReservationGuest({ reservation, eventKey: type, type, title, body }).catch(() => {});
 }
 
 // ─────────────────────────────────────────────
@@ -48,7 +44,7 @@ exports.assign = async (req, res) => {
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que les réservations de vos propres hôtels.");
     if (!mongoose.isValidObjectId(roomId)) return fail(res, 422, 'Chambre invalide.');
 
-    const assignment = await assignRoom({ reservationId, roomId, reservation, actingUser: req.user, reason: reason || '' });
+    const assignment = await assignRoom({ reservationId, roomId, reservation, actingUser: req.user, reason: reason || '', transactionMode: 'auto' });
 
     logAction({
       action: 'Chambre affectée', description: `Réservation ${reservation.reference} → chambre affectée`, module: 'Altimmo',
@@ -63,19 +59,31 @@ exports.assign = async (req, res) => {
   }
 };
 
+exports.autoAssign = async (req, res) => {
+  try {
+    const { reservationId, reason } = req.body;
+    const { error, reservation } = await loadReservationWithAccess(req, reservationId);
+    if (error) return fail(res, error, error === 403 ? 'Accès refusé.' : 'Réservation introuvable.');
+    const assignments = await autoAssignRooms({ reservationId, reservation, actingUser: req.user, reason, transactionMode: 'auto' });
+    logAction({ action: 'Affectation automatique', description: `${assignments.length}/${reservation.roomsCount} chambre(s) affectée(s)`, module: 'Altimmo', typeAction: 'MODIFICATION', auteur: buildAuteur(req.user), cible: { id: String(reservation._id), type: 'HotelReservation', nom: reservation.reference }, req });
+    await notifyGuestRoomEvent(reservation, 'hotel_rooms_assigned', '🛏️ Chambres affectées', `Les chambres de votre réservation ${reservation.reference} ont été affectées.`);
+    return res.json({ status: 'success', data: { assignments, assignmentState: assignments.length === reservation.roomsCount ? 'fully_assigned' : 'partially_assigned' } });
+  } catch (error) { return fail(res, error.statusCode || 500, error.message); }
+};
+
 // ─────────────────────────────────────────────
 // PATCH /api/hotels/room-assignments/change — changer de chambre
 // ─────────────────────────────────────────────
 exports.change = async (req, res) => {
   try {
-    const { reservationId, newRoomId, reason } = req.body;
+    const { reservationId, oldRoomId, newRoomId, reason } = req.body;
     const { error, reservation } = await loadReservationWithAccess(req, reservationId);
     if (error === 400) return fail(res, 400, 'Identifiant invalide.');
     if (error === 404) return fail(res, 404, 'Réservation introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que les réservations de vos propres hôtels.");
     if (!mongoose.isValidObjectId(newRoomId)) return fail(res, 422, 'Chambre invalide.');
 
-    const assignment = await changeRoom({ reservationId, newRoomId, reservation, actingUser: req.user, reason: reason || '' });
+    const assignment = await changeRoom({ reservationId, oldRoomId, newRoomId, reservation, actingUser: req.user, reason: reason || '', transactionMode: 'auto' });
 
     logAction({
       action: 'Chambre changée', description: `Réservation ${reservation.reference} → changement de chambre`, module: 'Altimmo',

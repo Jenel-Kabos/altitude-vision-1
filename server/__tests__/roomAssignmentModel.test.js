@@ -40,11 +40,10 @@ describe('RoomAssignment model — TEST DATA', () => {
     expect(idx[1].partialFilterExpression).toBeDefined();
   });
 
-  test("un index unique partiel {reservation} sur affectations actives est déclaré (une seule chambre par réservation, mission §3)", () => {
+  test("un index non unique permet plusieurs chambres actives par réservation", () => {
     const indexes = RoomAssignment.schema.indexes();
-    const idx = indexes.find(([keys]) => Object.keys(keys).length === 1 && keys.reservation === 1);
+    const idx = indexes.find(([keys]) => keys.reservation === 1 && keys.releasedAt === 1 && keys.assignedAt === 1);
     expect(idx).toBeDefined();
-    expect(idx[1].unique).toBe(true);
-    expect(idx[1].partialFilterExpression).toBeDefined();
+    expect(idx[1].unique).not.toBe(true);
   });
 });

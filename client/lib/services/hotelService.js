@@ -172,12 +172,30 @@ export const assignRoom = async ({ reservationId, roomId, reason }) => {
   return res.data.data.assignment;
 };
 
-export const changeRoom = async ({ reservationId, newRoomId, reason }) => {
-  const res = await api.patch('/hotels/room-assignments/change', { reservationId, newRoomId, reason });
+export const changeRoom = async ({ reservationId, oldRoomId, newRoomId, reason }) => {
+  const res = await api.patch('/hotels/room-assignments/change', { reservationId, oldRoomId, newRoomId, reason });
   return res.data.data.assignment;
+};
+
+export const autoAssignRooms = async ({ reservationId, reason }) => {
+  const res = await api.post('/hotels/room-assignments/auto', { reservationId, reason });
+  return res.data.data;
 };
 
 export const releaseRoom = async ({ reservationId, reason }) => {
   const res = await api.patch('/hotels/room-assignments/release', { reservationId, reason });
+  return res.data.data;
+};
+
+export const getHotelInventoryCalendar = async (hotelId, params, config = {}) => {
+  const res = await api.get(`/hotels/${hotelId}/inventory/calendar`, { params, ...config });
+  return res.data.data;
+};
+export const updateHotelInventoryRange = async (hotelId, data) => {
+  const res = await api.patch(`/hotels/${hotelId}/inventory/range`, data);
+  return res.data.data;
+};
+export const rebuildHotelInventory = async (hotelId, data) => {
+  const res = await api.post(`/hotels/${hotelId}/inventory/rebuild`, data);
   return res.data.data;
 };

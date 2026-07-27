@@ -89,7 +89,7 @@ exports.create = async (req, res) => {
 
     const ticket = await maintenanceService.createTicket({
       roomId, hotelId, inspectionId: inspectionId || null, category,
-      priority: priority || 'normal', description, actingUser: req.user,
+      priority: priority || 'normal', description, actingUser: req.user, transactionMode: 'auto',
     });
 
     logAction({

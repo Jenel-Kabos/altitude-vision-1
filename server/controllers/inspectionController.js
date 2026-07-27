@@ -50,7 +50,7 @@ exports.create = async (req, res) => {
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
 
     const inspection = await inspectionService.createInspection({
-      roomId, housekeepingTaskId, inspectorId: req.user.id, notes: notes || '', actingUser: req.user,
+      roomId, housekeepingTaskId, inspectorId: req.user.id, notes: notes || '', actingUser: req.user, transactionMode: 'auto',
     });
 
     logAction({
@@ -75,7 +75,7 @@ exports.approve = async (req, res) => {
     if (error === 404) return fail(res, 404, 'Inspection introuvable.');
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
 
-    const result = await inspectionService.approveInspection({ inspectionId: req.params.id, actingUser: req.user });
+    const result = await inspectionService.approveInspection({ inspectionId: req.params.id, actingUser: req.user, transactionMode: 'auto' });
 
     logAction({
       action: 'Inspection approuvée', description: `Inspection approuvée — chambre ${result.room.roomNumber} remise en service`, module: 'Altimmo',
@@ -100,7 +100,7 @@ exports.reject = async (req, res) => {
     if (error === 403) return fail(res, 403, 'Vous ne pouvez gérer que vos propres hôtels.');
 
     const result = await inspectionService.rejectInspection({
-      inspectionId: req.params.id, actingUser: req.user, notes: req.body?.notes || '',
+      inspectionId: req.params.id, actingUser: req.user, notes: req.body?.notes || '', transactionMode: 'auto',
     });
 
     logAction({

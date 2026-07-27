@@ -26,6 +26,7 @@ const roomInspectionSchema = new mongoose.Schema(
     result: { type: String, enum: ROOM_INSPECTION_RESULTS, default: null },
     notes: { type: String, trim: true, default: '' },
     inspectedAt: { type: Date, default: null },
+    fromOutOfService: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

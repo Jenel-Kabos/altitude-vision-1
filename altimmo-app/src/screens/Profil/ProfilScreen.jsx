@@ -238,6 +238,8 @@ export default function ProfilScreen({ navigation }) {
                 onPress={() => navigation.navigate('Visites')}
                 styles={styles} c={c}
               />
+              <View style={styles.menuSep} />
+              <MenuRow icon="key-outline" label="Opérations hôtelières" onPress={() => navigation.navigate('HotelOperations')} styles={styles} c={c} />
             </View>
           </Animated.View>
         )}
@@ -259,6 +261,8 @@ export default function ProfilScreen({ navigation }) {
               onPress={() => navigation.navigate('Transactions')}
               styles={styles} c={c}
             />
+            <View style={styles.menuSep} />
+            <MenuRow icon="bed-outline" label="Mes réservations hôtel" onPress={() => navigation.navigate('MyHotelReservations')} styles={styles} c={c} />
           </View>
         </Animated.View>
 

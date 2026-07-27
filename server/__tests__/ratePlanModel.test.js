@@ -59,6 +59,26 @@ describe('RatePlan model — Sprint B2 (roomCategory/rateType additif) — TEST 
     expect(errors.amount).toBeDefined();
   });
 
+  test('accepte des périodes saisonnières qui se chevauchent si leur priorité tranche', async () => {
+    const rate = base({ roomCategory: ROOM_CATEGORY_ID, rateType: 'public', seasonalPeriods: [
+      { label: 'Saison', startDate: '2026-12-20', endDate: '2027-01-05', amount: 50000, priority: 10 },
+      { label: 'Réveillon', startDate: '2026-12-31', endDate: '2027-01-02', amount: 85000, priority: 20 },
+    ] });
+    await expect(rate.validate()).resolves.toBeUndefined();
+  });
+
+  test('refuse une période inversée et un chevauchement de priorité identique', async () => {
+    const reversed = base({ roomCategory: ROOM_CATEGORY_ID, rateType: 'public', seasonalPeriods: [
+      { startDate: '2027-01-02', endDate: '2027-01-01', amount: 50000, priority: 1 },
+    ] });
+    await expect(reversed.validate()).rejects.toThrow(/postérieure/);
+    const ambiguous = base({ roomCategory: ROOM_CATEGORY_ID, rateType: 'public', seasonalPeriods: [
+      { startDate: '2026-12-20', endDate: '2027-01-05', amount: 50000, priority: 10 },
+      { startDate: '2026-12-31', endDate: '2027-01-02', amount: 85000, priority: 10 },
+    ] });
+    await expect(ambiguous.validate()).rejects.toThrow(/priorités différentes/);
+  });
+
   test('RATE_TYPES et RATE_MODES sont exposés en statique', () => {
     expect(RatePlan.RATE_TYPES).toEqual(['public', 'entreprise', 'weekend', 'promotion', 'haute_saison']);
     expect(RatePlan.RATE_MODES).toEqual(['nightly', 'weekly', 'monthly', 'yearly']);

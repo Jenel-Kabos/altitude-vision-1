@@ -6,6 +6,7 @@ const roomCtrl = require('../controllers/roomController');
 const roomAssignmentCtrl = require('../controllers/roomAssignmentController');
 const reservationCtrl = require('../controllers/hotelReservationController');
 const staffCtrl = require('../controllers/hotelStaffAssignmentController');
+const inventoryCtrl = require('../controllers/hotelInventoryController');
 const { requireHotelCapability } = require('../middleware/hotelAccessMiddleware');
 const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
 const { ROLES_ALTIMMO } = require('../utils/roles');
@@ -82,9 +83,16 @@ router.post('/:hotelId/rooms', roomCtrl.create);
 router.patch('/rooms/:id', roomCtrl.update);
 router.delete('/rooms/:id', roomCtrl.remove);
 
+const inventoryView = requireHotelCapability(HOTEL_OPERATIONAL_CAPABILITIES.INVENTORY_VIEW, (req) => req.params.hotelId);
+const inventoryManage = requireHotelCapability(HOTEL_OPERATIONAL_CAPABILITIES.INVENTORY_MANAGE, (req) => req.params.hotelId);
+router.get('/:hotelId/inventory/calendar', inventoryView, inventoryCtrl.calendar);
+router.patch('/:hotelId/inventory/range', inventoryManage, inventoryCtrl.updateRange);
+router.post('/:hotelId/inventory/rebuild', inventoryManage, inventoryCtrl.rebuild);
+
 // Sprint D — affectation de chambre (accès résolu via l'hôtel de la
 // réservation, jamais un :hotelId d'URL — voir roomAssignmentController).
 router.post('/room-assignments', roomAssignmentCtrl.assign);
+router.post('/room-assignments/auto', roomAssignmentCtrl.autoAssign);
 router.patch('/room-assignments/change', roomAssignmentCtrl.change);
 router.patch('/room-assignments/release', roomAssignmentCtrl.release);
 
