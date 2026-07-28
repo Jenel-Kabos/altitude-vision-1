@@ -51,7 +51,7 @@ describe('RentalTenantsPage — Sprint GL-B2 — TEST DATA', () => {
   test('message vide quand aucun locataire', async () => {
     getLocataireDossiers.mockResolvedValue({ locataires: [], total: 0 });
     render(<RentalTenantsPage />);
-    expect(await screen.findByText(/Aucun locataire/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Aucun locataire' })).toBeInTheDocument();
   });
 
   test('erreur de chargement affiche un toast', async () => {

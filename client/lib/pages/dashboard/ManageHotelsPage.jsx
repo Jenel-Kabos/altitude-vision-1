@@ -9,6 +9,11 @@ import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { getHotelsAdmin, reviewHotel } from "../../services/hotelService";
 import { HOTEL_PUBLICATION_STATUSES } from "../../constants/hotel";
+import { Building2 } from "lucide-react";
+import {
+  DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination,
+  DashboardState, DashboardToolbar,
+} from "../../components/dashboard/DashboardUI";
 
 const STATUS_TABS = [{ value: "tous", label: "Tous" }, ...HOTEL_PUBLICATION_STATUSES];
 const SORT_OPTIONS = [
@@ -71,11 +76,12 @@ const ManageHotelsPage = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <h2 className="text-2xl font-bold mb-1">Gestion hôtelière — Établissements</h2>
-      <p className="text-sm text-gray-500 mb-4">Tous les établissements hôteliers, quel que soit leur statut de publication.</p>
+    <DashboardPage>
+      <DashboardPageHeader icon={Building2} title="Gestion hôtelière — Établissements"
+        description="Tous les établissements hôteliers, quel que soit leur statut de publication." />
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <DashboardToolbar>
+      <div className="flex flex-wrap gap-2 w-full">
         {STATUS_TABS.map((tab) => (
           <button key={tab.value} onClick={() => { setStatus(tab.value); setPage(1); }}
             className={`px-3 py-1.5 rounded text-sm font-medium ${status === tab.value ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
@@ -84,22 +90,23 @@ const ManageHotelsPage = () => {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-4">
+      <div className="flex flex-wrap gap-3 w-full">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un titre..."
           aria-label="Rechercher" className="flex-1 min-w-[200px] px-3 py-2 border rounded text-sm" />
         <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Trier par" className="px-3 py-2 border rounded text-sm">
           {SORT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
       </div>
+      </DashboardToolbar>
 
       {loading ? (
-        <p className="text-center text-gray-500 py-8">Chargement...</p>
+        <DashboardState type="loading" title="Chargement des établissements…" />
       ) : data.hotels.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">Aucun établissement pour ces critères.</p>
+        <DashboardState title="Aucun établissement" description="Aucun établissement ne correspond aux critères sélectionnés." />
       ) : (
         <div className="space-y-3">
           {data.hotels.map((hotel) => (
-            <div key={hotel._id} className="border rounded p-4">
+            <DashboardCard key={hotel._id}>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <h3 className="font-semibold">{hotel.name}</h3>
@@ -147,19 +154,16 @@ const ManageHotelsPage = () => {
               {hotel.publicationStatus === "rejete" && hotel.rejectionReason && (
                 <p className="text-xs text-red-600 mt-2">Motif du rejet : {hotel.rejectionReason}</p>
               )}
-            </div>
+            </DashboardCard>
           ))}
         </div>
       )}
 
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1.5 border rounded text-sm disabled:opacity-40">Précédent</button>
-          <span className="text-sm text-gray-500 self-center">Page {page} / {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1.5 border rounded text-sm disabled:opacity-40">Suivant</button>
-        </div>
+        <DashboardPagination page={page} totalPages={totalPages}
+          onPrevious={() => setPage((p) => p - 1)} onNext={() => setPage((p) => p + 1)} />
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

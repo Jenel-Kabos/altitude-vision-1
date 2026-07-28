@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
+import { Wrench } from "lucide-react";
 import {
   getHousekeepingTasks, assignHousekeepingTask, startHousekeepingTask,
   completeHousekeepingTask, cancelHousekeepingTask,
@@ -14,6 +15,9 @@ import { createInspection, approveInspection, rejectInspection } from "../../ser
 import {
   HOUSEKEEPING_STATUSES, HOUSEKEEPING_STATUS_CLASSES, HOUSEKEEPING_PRIORITIES, PRIORITY_CLASSES,
 } from "../../constants/housekeeping";
+import {
+  DashboardPage, DashboardPageHeader, DashboardCard, DashboardState,
+} from "../../components/dashboard/DashboardUI";
 
 const HousekeepingDashboardPage = () => {
   const [tasks, setTasks] = useState([]);
@@ -105,9 +109,8 @@ const HousekeepingDashboardPage = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <h2 className="text-2xl font-bold mb-1">Ménage</h2>
-      <p className="text-sm text-gray-500 mb-4">Tâches de nettoyage en cours et à venir.</p>
+    <DashboardPage>
+      <DashboardPageHeader icon={Wrench} title="Ménage" description="Tâches de nettoyage en cours et à venir." />
 
       <div className="flex flex-wrap gap-2 mb-4">
         <input placeholder="ID Hôtel (optionnel)" value={filters.hotelId}
@@ -123,11 +126,11 @@ const HousekeepingDashboardPage = () => {
       </div>
 
       {loading ? (
-        <p className="text-center text-gray-500 py-8">Chargement...</p>
+        <DashboardState type="loading" title="Chargement des tâches de ménage…" />
       ) : tasks.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">Aucune tâche de ménage pour ces critères.</p>
+        <DashboardState title="Aucune tâche de ménage" description="Aucune tâche de ménage pour ces critères." />
       ) : (
-        <div className="overflow-x-auto">
+        <DashboardCard className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b">
@@ -193,9 +196,9 @@ const HousekeepingDashboardPage = () => {
               ))}
             </tbody>
           </table>
-        </div>
+        </DashboardCard>
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

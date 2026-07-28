@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import api from '@/lib/services/api';
 import toast from '@/lib/utils/toast';
+import { Users } from 'lucide-react';
+import { DashboardPage, DashboardPageHeader, DashboardState, DashboardTableContainer } from '../../components/dashboard/DashboardUI';
 
 const UserManagementPage = () => {
   const [users, setUsers] = useState([]);
@@ -64,15 +66,15 @@ const UserManagementPage = () => {
     }
   };
 
-  if (loading) return <p>Chargement des utilisateurs...</p>;
-  if (error) return <p className="text-red-500">{error}</p>;
-  if (users.length === 0) return <p>Aucun utilisateur trouvé.</p>;
+  if (loading) return <DashboardState type="loading" title="Chargement des utilisateurs…" />;
+  if (error) return <DashboardState type="error" title="Utilisateurs indisponibles" description={error} />;
+  if (users.length === 0) return <DashboardState title="Aucun utilisateur" description="Aucun compte ne correspond à cette vue." />;
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Gestion des utilisateurs</h1>
+    <DashboardPage>
+      <DashboardPageHeader icon={Users} title="Gestion des utilisateurs" description="Vérifiez les comptes, rôles et droits d’accès." />
 
-      <div className="overflow-x-auto">
+      <DashboardTableContainer label="Liste des utilisateurs">
         <table className="min-w-full table-auto border border-gray-200">
           <thead>
             <tr className="bg-gray-100">
@@ -125,7 +127,7 @@ const UserManagementPage = () => {
             ))}
           </tbody>
         </table>
-      </div>
+      </DashboardTableContainer>
 
       {/* Modal confirmation suppression */}
       {selectedUser && (
@@ -152,7 +154,7 @@ const UserManagementPage = () => {
           </div>
         </div>
       )}
-    </div>
+    </DashboardPage>
   );
 };
 
