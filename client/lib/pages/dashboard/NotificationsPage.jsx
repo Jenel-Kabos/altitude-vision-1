@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     Bell, CheckCheck, Trash2, Home, Calendar, ArrowLeftRight,
     MessageSquare, FileText, CreditCard, FileSignature, Shield,
-    AlertCircle, RefreshCw,
+    AlertCircle,
 } from 'lucide-react';
 import {
     getNotifications, markRead, markAllRead, clearRead, deleteNotification,
 } from '../../services/notificationService';
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState, DashboardToolbar } from '../../components/dashboard/DashboardUI';
 
 // ─── Config icônes par type ───────────────────────────────────────────────────
 
@@ -141,22 +142,14 @@ export default function NotificationsPage() {
     const hasRead = notifications.some((n) => n.read);
 
     return (
-        <div className="max-w-2xl mx-auto px-4 py-8">
+        <DashboardPage>
 
             {/* ─── Header ─── */}
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                        <Bell className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-semibold text-gray-900">Notifications</h1>
-                        {unreadCount > 0 && (
-                            <p className="text-sm text-gray-500">{unreadCount} non lue{unreadCount > 1 ? 's' : ''}</p>
-                        )}
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
+            <DashboardPageHeader
+                icon={Bell}
+                title="Notifications"
+                description={unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : 'Retrouvez toutes vos alertes et activités récentes.'}
+                actions={<div className="flex items-center gap-2">
                     {unreadCount > 0 && (
                         <button
                             onClick={handleMarkAllRead}
@@ -175,11 +168,11 @@ export default function NotificationsPage() {
                             Nettoyer
                         </button>
                     )}
-                </div>
-            </div>
+                </div>}
+            />
 
             {/* ─── Filtres ─── */}
-            <div className="flex gap-2 mb-6">
+            <DashboardToolbar><div className="flex gap-2">
                 {FILTERS.map((f) => (
                     <button
                         key={f.key}
@@ -198,33 +191,19 @@ export default function NotificationsPage() {
                         )}
                     </button>
                 ))}
-            </div>
+            </div></DashboardToolbar>
 
             {error && (
-                <p role="alert" className="mb-4 text-sm text-red-600">{error}</p>
+                <DashboardState type="error" title="Notifications indisponibles" description={error} />
             )}
 
             {/* ─── Liste ─── */}
             {loading ? (
-                <div className="flex justify-center py-16">
-                    <RefreshCw className="w-6 h-6 text-gray-300 animate-spin" />
-                </div>
+                <DashboardState type="loading" title="Chargement des notifications" />
             ) : notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-                    <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center">
-                        <Bell className="w-7 h-7 text-amber-400" />
-                    </div>
-                    <p className="font-medium text-gray-700">
-                        {filter === 'unread' ? 'Aucune notification non lue' : 'Aucune notification'}
-                    </p>
-                    <p className="text-sm text-gray-400 max-w-xs">
-                        {filter === 'unread'
-                            ? 'Vous êtes à jour !'
-                            : 'Vos alertes de visites, transactions et messages apparaîtront ici.'}
-                    </p>
-                </div>
+                <DashboardState title={filter === 'unread' ? 'Aucune notification non lue' : 'Aucune notification'} description={filter === 'unread' ? 'Vous êtes à jour !' : 'Vos alertes de visites, transactions et messages apparaîtront ici.'} />
             ) : (
-                <div className="space-y-1">
+                <DashboardCard className="space-y-1">
                     {notifications.map((notif) => {
                         const cfg = TYPE_CONFIG[notif.type] || DEFAULT_CONFIG;
                         const Icon = cfg.icon;
@@ -284,8 +263,8 @@ export default function NotificationsPage() {
                             Charger plus
                         </button>
                     )}
-                </div>
+                </DashboardCard>
             )}
-        </div>
+        </DashboardPage>
     );
 }

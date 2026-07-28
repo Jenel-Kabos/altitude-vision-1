@@ -13,6 +13,8 @@ import {
   getRoomCategories, getRoomCategoryRates, upsertRoomCategoryRate, archiveRoomCategoryRate,
 } from "../../services/hotelService";
 import { HOTEL_RATE_TYPES } from "../../constants/hotel";
+import { BadgeDollarSign } from "lucide-react";
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState } from "../../components/dashboard/DashboardUI";
 
 const ManageHotelRatesPage = () => {
   const params = useParams();
@@ -73,16 +75,14 @@ const ManageHotelRatesPage = () => {
     }
   };
 
-  if (loading) return <p className="text-center mt-10">Chargement...</p>;
+  if (loading) return <DashboardState type="loading" title="Chargement des tarifs…" />;
 
   return (
-    <div className="max-w-5xl mx-auto p-6 bg-white rounded shadow-md">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold">Tarifs par catégorie</h2>
-        <Link href={`/dashboard/hotels/${hotelId}`} className="text-sm text-blue-600 underline">← Retour à l'établissement</Link>
-      </div>
+    <DashboardPage>
+      <DashboardPageHeader icon={BadgeDollarSign} title="Tarifs par catégorie" description="Configurez les tarifs publics et les périodes datées de chaque catégorie."
+        actions={<Link href={`/dashboard/hotels/${hotelId}`} className="text-sm text-blue-600 underline">← Retour à l'établissement</Link>} />
 
-      {categories.length === 0 && <p className="text-gray-500">Aucune catégorie de chambres — créez-en une d'abord.</p>}
+      {categories.length === 0 && <DashboardState title="Aucune catégorie de chambres" description="Créez d’abord une catégorie pour pouvoir définir ses tarifs." />}
 
       <div className="space-y-6">
         {categories
@@ -92,14 +92,14 @@ const ManageHotelRatesPage = () => {
             const active = rates.filter((r) => r.active);
             const archived = rates.filter((r) => !r.active);
             return (
-              <div key={cat._id} className="border rounded p-4">
+              <DashboardCard key={cat._id}>
                 <h3 className="font-semibold mb-3">{cat.name}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {HOTEL_RATE_TYPES.map((rt) => {
                     const currentRate = active.find((r) => r.rateType === rt.value);
                     const rateKey = `${cat._id}_${rt.value}`;
                     return (
-                      <div key={rt.value} className="rounded border p-3 space-y-2">
+                      <DashboardCard key={rt.value} className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2"><label className="text-xs text-gray-500 w-32">{rt.label}</label>
                         {currentRate && <span className="text-sm font-medium">{currentRate.amount} {currentRate.currency}</span>}
                         <input
@@ -123,7 +123,7 @@ const ManageHotelRatesPage = () => {
                           <div className="flex gap-1"><input aria-label={`Priorité période ${rt.label} ${index + 1}`} type="number" min="0" value={period.priority} onChange={(event) => updateSeason(rateKey, index, { priority: event.target.value })} className="w-16 border rounded p-1 text-xs" /><button type="button" aria-label={`Supprimer période ${rt.label} ${index + 1}`} onClick={() => removeSeason(rateKey, index)} className="text-red-700">×</button></div>
                         </div>)}
                         <button type="button" onClick={() => addSeason(rateKey)} className="text-xs text-blue-700 underline">Ajouter une période datée</button>
-                      </div>
+                      </DashboardCard>
                     );
                   })}
                 </div>
@@ -142,11 +142,11 @@ const ManageHotelRatesPage = () => {
                     )}
                   </div>
                 )}
-              </div>
+              </DashboardCard>
             );
           })}
       </div>
-    </div>
+    </DashboardPage>
   );
 };
 

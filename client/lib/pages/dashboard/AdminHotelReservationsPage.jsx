@@ -11,6 +11,8 @@ import { formatCurrencyXAF } from "../../utils/normalizePropertyDetail";
 import { toast } from "react-hot-toast";
 import RoomAssignmentPanel from "../../components/RoomAssignmentPanel";
 import HotelFinancialDocumentPanel from "../../components/HotelFinancialDocumentPanel";
+import { CalendarCheck2 } from "lucide-react";
+import { DashboardPage, DashboardPageHeader, DashboardPagination, DashboardState, DashboardTableContainer, DashboardToolbar } from "../../components/dashboard/DashboardUI";
 
 const STATUS_TABS = [{ value: "", label: "Tous" }, ...RESERVATION_STATUSES];
 
@@ -45,28 +47,26 @@ const AdminHotelReservationsPage = () => {
   const totalPages = Math.max(1, Math.ceil((data.total || 0) / limit));
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <h2 className="text-2xl font-bold mb-1">Réservations hôtelières</h2>
-      <p className="text-sm text-gray-500 mb-4">Toutes les réservations, tous établissements confondus.</p>
+    <DashboardPage>
+      <DashboardPageHeader icon={CalendarCheck2} title="Réservations hôtelières" description="Toutes les réservations, tous établissements confondus." />
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <DashboardToolbar>
         {STATUS_TABS.map((tab) => (
           <button key={tab.value || 'tous'} onClick={() => { setStatus(tab.value); setPage(1); }}
             className={`px-3 py-1.5 rounded text-sm font-medium ${status === tab.value ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
             {tab.label}
           </button>
         ))}
-      </div>
-
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une référence..."
         aria-label="Rechercher" className="w-full mb-4 px-3 py-2 border rounded text-sm" />
+      </DashboardToolbar>
 
       {loading ? (
-        <p className="text-center text-gray-500 py-8">Chargement...</p>
+        <DashboardState type="loading" title="Chargement des réservations…" />
       ) : data.reservations.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">Aucune réservation pour ces critères.</p>
+        <DashboardState title="Aucune réservation" description="Aucune réservation ne correspond aux critères sélectionnés." />
       ) : (
-        <div className="overflow-x-auto">
+        <DashboardTableContainer label="Liste des réservations hôtelières">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b">
@@ -126,17 +126,13 @@ const AdminHotelReservationsPage = () => {
               ))}
             </tbody>
           </table>
-        </div>
+        </DashboardTableContainer>
       )}
 
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1.5 border rounded text-sm disabled:opacity-40">Précédent</button>
-          <span className="text-sm text-gray-500 self-center">Page {page} / {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1.5 border rounded text-sm disabled:opacity-40">Suivant</button>
-        </div>
+        <DashboardPagination page={page} totalPages={totalPages} onPrevious={() => setPage((p) => p - 1)} onNext={() => setPage((p) => p + 1)} />
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

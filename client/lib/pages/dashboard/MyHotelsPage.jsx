@@ -12,6 +12,8 @@ import {
 } from "../../services/hotelService";
 import { HOTEL_PUBLICATION_STATUSES } from "../../constants/hotel";
 import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
+import { Hotel } from "lucide-react";
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState } from "../../components/dashboard/DashboardUI";
 
 const STATUS_CLASSES = {
   brouillon: "bg-gray-100 text-gray-700",
@@ -82,36 +84,34 @@ const MyHotelsPage = () => {
     }
   };
 
-  if (loading) return <p className="text-center mt-10">Chargement...</p>;
+  if (loading) return <DashboardState type="loading" title="Chargement de vos hôtels…" />;
 
   return (
-    <div className="max-w-5xl mx-auto p-6 bg-white rounded shadow-md">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold">Mes hôtels</h2>
-        {!creating && (
+    <DashboardPage>
+      <DashboardPageHeader icon={Hotel} title="Mes hôtels" description="Gérez vos établissements, leurs catégories et leurs tarifs."
+        actions={!creating && (
           <button onClick={() => setCreating(true)} className="bg-gold text-white px-3 py-1.5 rounded text-sm">
             + Ajouter un hôtel
           </button>
-        )}
-      </div>
+        )} />
 
       {creating && (
-        <div className="bg-gray-50 border rounded p-4 mb-6">
+        <DashboardCard className="mb-6">
           <HotelPropertyForm
             scope="owner"
             onSuccess={() => { setCreating(false); load(); }}
             onCancel={() => setCreating(false)}
           />
-        </div>
+        </DashboardCard>
       )}
 
       {hotels.length === 0 && !creating && (
-        <p className="text-gray-500">Aucun hôtel pour le moment. Cliquez sur « Ajouter un hôtel » pour commencer.</p>
+        <DashboardState title="Aucun hôtel" description="Ajoutez votre premier établissement pour commencer." />
       )}
 
       <div className="space-y-3">
         {hotels.map((hotel) => (
-          <div key={hotel._id} className="border rounded p-4">
+          <DashboardCard key={hotel._id}>
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h3 className="text-lg font-semibold">{hotel.name}</h3>
@@ -154,10 +154,10 @@ const MyHotelsPage = () => {
               <button onClick={() => handleDuplicate(hotel._id)} className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded text-sm">Dupliquer</button>
               <button onClick={() => handleDelete(hotel._id)} className="bg-red-600 text-white px-3 py-1.5 rounded text-sm">Supprimer</button>
             </div>
-          </div>
+          </DashboardCard>
         ))}
       </div>
-    </div>
+    </DashboardPage>
   );
 };
 

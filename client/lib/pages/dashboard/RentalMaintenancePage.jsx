@@ -9,10 +9,14 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
+import { Wrench } from "lucide-react";
 import {
   getRentalMaintenanceTickets, createRentalMaintenanceTicket, assignRentalMaintenanceTicket, scheduleRentalMaintenanceTicket,
   startRentalMaintenanceWork, resolveRentalMaintenanceTicket, closeRentalMaintenanceTicket,
 } from "../../services/rentalMaintenanceService";
+import {
+  DashboardPage, DashboardPageHeader, DashboardCard, DashboardState,
+} from "../../components/dashboard/DashboardUI";
 
 const CATEGORIES = [
   { v: 'plomberie', l: 'Plomberie' }, { v: 'electricite', l: 'Électricité' }, { v: 'structure', l: 'Structure' },
@@ -99,53 +103,60 @@ const RentalMaintenancePage = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-        <h2 className="text-2xl font-bold">Maintenance locative</h2>
-        <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">Vue d'ensemble Gestion Locative</Link>
-      </div>
-      <p className="text-sm text-gray-500 mb-4">Tickets de maintenance sur les biens en gestion locative — distinct de la maintenance hôtelière.</p>
+    <DashboardPage>
+      <DashboardPageHeader
+        icon={Wrench}
+        title="Maintenance locative"
+        description="Tickets de maintenance sur les biens en gestion locative — distinct de la maintenance hôtelière."
+        actions={(
+          <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
+            Vue d'ensemble Gestion Locative
+          </Link>
+        )}
+      />
 
       {!creating ? (
-        <button onClick={() => setCreating(true)} className="mb-4 bg-gold text-white px-3 py-1.5 rounded text-sm">
+        <button onClick={() => setCreating(true)} className="mb-4 bg-gold text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
           + Nouveau ticket
         </button>
       ) : (
-        <form onSubmit={handleCreate} className="bg-gray-50 border rounded p-4 mb-4 space-y-2">
+        <DashboardCard className="mb-4">
+          <form onSubmit={handleCreate} className="space-y-2">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
             <input placeholder="ID du bien (Property)" value={form.propertyId}
-              onChange={(e) => setForm((f) => ({ ...f, propertyId: e.target.value }))} className="p-2 border rounded text-sm" />
-            <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="p-2 border rounded text-sm">
+              onChange={(e) => setForm((f) => ({ ...f, propertyId: e.target.value }))} className="p-2 border rounded-lg text-sm" />
+            <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} className="p-2 border rounded-lg text-sm">
               {CATEGORIES.map((c) => <option key={c.v} value={c.v}>{c.l}</option>)}
             </select>
             <input type="number" placeholder="Coût estimé" value={form.estimatedCost}
-              onChange={(e) => setForm((f) => ({ ...f, estimatedCost: e.target.value }))} className="p-2 border rounded text-sm" />
+              onChange={(e) => setForm((f) => ({ ...f, estimatedCost: e.target.value }))} className="p-2 border rounded-lg text-sm" />
           </div>
           <textarea placeholder="Description du problème" value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="w-full p-2 border rounded text-sm" rows={2} />
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="w-full p-2 border rounded-lg text-sm" rows={2} />
           <div className="flex gap-2">
-            <button type="submit" className="bg-gold text-white px-3 py-1.5 rounded text-sm">Créer</button>
+            <button type="submit" className="bg-gold text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">Créer</button>
             <button type="button" onClick={() => setCreating(false)} className="text-gray-600 text-sm">Annuler</button>
           </div>
-        </form>
+          </form>
+        </DashboardCard>
       )}
 
       <div className="flex flex-wrap gap-2 mb-4">
         {[{ v: '', l: 'Tous' }, { v: 'ouvert', l: 'Ouvert' }, { v: 'assigne', l: 'Assigné' }, { v: 'planifie', l: 'Planifié' }, { v: 'en_cours', l: 'En cours' }, { v: 'resolu', l: 'Résolu' }, { v: 'cloture', l: 'Clôturé' }].map((s) => (
-          <button key={s.v} onClick={() => setStatus(s.v)} className={`px-3 py-1.5 rounded text-sm font-medium ${status === s.v ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
+          <button key={s.v} onClick={() => setStatus(s.v)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${status === s.v ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
             {s.l}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <p className="text-center text-gray-500 py-8">Chargement...</p>
+        <DashboardState type="loading" title="Chargement des tickets…" />
       ) : tickets.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">Aucun ticket de maintenance pour ces critères.</p>
+        <DashboardState title="Aucun ticket" description="Aucun ticket de maintenance pour ces critères." />
       ) : (
         <div className="space-y-3">
           {tickets.map((t) => (
-            <div key={t._id} className="border rounded p-4">
+            <DashboardCard key={t._id}>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <h3 className="font-semibold">{t.property?.title || 'Bien'}</h3>
@@ -186,11 +197,11 @@ const RentalMaintenancePage = () => {
                   <button onClick={() => handleClose(t._id)} className="bg-gray-500 text-white px-2 py-1 rounded text-xs">Clôturer</button>
                 )}
               </div>
-            </div>
+            </DashboardCard>
           ))}
         </div>
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

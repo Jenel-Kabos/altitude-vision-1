@@ -10,9 +10,13 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
+import { Clock } from "lucide-react";
 import {
   getRentalManagement, runRentalAction, acknowledgeNotice, cancelNotice, startNotice,
 } from "../../services/gestionLocativeService";
+import {
+  DashboardPage, DashboardPageHeader, DashboardCard, DashboardState,
+} from "../../components/dashboard/DashboardUI";
 
 const joursRestants = (plannedExitAt) => {
   if (!plannedExitAt) return null;
@@ -76,43 +80,50 @@ const RentalNoticesPage = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-        <h2 className="text-2xl font-bold">Préavis</h2>
-        <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">Vue d'ensemble Gestion Locative</Link>
-      </div>
-      <p className="text-sm text-gray-500 mb-4">Sorties programmées en cours — dates saisies manuellement, jamais de délai légal codé en dur.</p>
+    <DashboardPage>
+      <DashboardPageHeader
+        icon={Clock}
+        title="Préavis"
+        description="Sorties programmées en cours — dates saisies manuellement, jamais de délai légal codé en dur."
+        actions={(
+          <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
+            Vue d'ensemble Gestion Locative
+          </Link>
+        )}
+      />
 
       {!creating ? (
-        <button onClick={() => setCreating(true)} className="mb-4 bg-gold text-white px-3 py-1.5 rounded text-sm">
+        <button onClick={() => setCreating(true)} className="mb-4 bg-gold text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
           + Démarrer un préavis
         </button>
       ) : (
-        <form onSubmit={handleCreate} className="bg-gray-50 border rounded p-4 mb-4 space-y-2">
+        <DashboardCard className="mb-4 space-y-2">
+          <form onSubmit={handleCreate} className="space-y-2">
           <p className="text-xs text-gray-500">ID du dossier de gestion locative (bien occupé) et date de sortie prévue.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <input placeholder="ID dossier (RentalManagement)" value={form.rentalManagementId}
-              onChange={(e) => setForm((f) => ({ ...f, rentalManagementId: e.target.value }))} className="p-2 border rounded text-sm" />
+              onChange={(e) => setForm((f) => ({ ...f, rentalManagementId: e.target.value }))} className="p-2 border rounded-lg text-sm" />
             <input type="date" value={form.plannedExitAt}
-              onChange={(e) => setForm((f) => ({ ...f, plannedExitAt: e.target.value }))} className="p-2 border rounded text-sm" />
+              onChange={(e) => setForm((f) => ({ ...f, plannedExitAt: e.target.value }))} className="p-2 border rounded-lg text-sm" />
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="bg-gold text-white px-3 py-1.5 rounded text-sm">Créer</button>
+            <button type="submit" className="bg-gold text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">Créer</button>
             <button type="button" onClick={() => setCreating(false)} className="text-gray-600 text-sm">Annuler</button>
           </div>
-        </form>
+          </form>
+        </DashboardCard>
       )}
 
       {loading ? (
-        <p className="text-center text-gray-500 py-8">Chargement...</p>
+        <DashboardState type="loading" title="Chargement des préavis…" />
       ) : notices.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">Aucun préavis en cours.</p>
+        <DashboardState title="Aucun préavis" description="Aucun préavis en cours." />
       ) : (
         <div className="space-y-3">
           {notices.map((n) => {
             const jours = joursRestants(n.plannedExitAt);
             return (
-              <div key={n._id} className="border rounded p-4">
+              <DashboardCard key={n._id}>
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <h3 className="font-semibold">{n.property?.title || 'Bien'}</h3>
@@ -137,12 +148,12 @@ const RentalNoticesPage = () => {
                   <button onClick={() => handleCancel(n._id)} className="bg-gray-500 text-white px-3 py-1.5 rounded text-sm">Annuler le préavis</button>
                   <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline self-center">Documents →</Link>
                 </div>
-              </div>
+              </DashboardCard>
             );
           })}
         </div>
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

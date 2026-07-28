@@ -10,10 +10,21 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
+import { CreditCard, Wallet, AlertTriangle, Clock, RefreshCw } from "lucide-react";
 import {
   getPaiementsPage, getPaiementsStats, marquerPaiementPaye, calculerPenalites,
 } from "../../services/gestionLocativeService";
 import { formatCurrencyXAF } from "../../utils/normalizePropertyDetail";
+import {
+  DashboardPage, DashboardPageHeader, DashboardToolbar, DashboardCard, DashboardState, DashboardPagination,
+} from "../../components/dashboard/DashboardUI";
+
+const KPI_ITEMS = [
+  { key: 'totalAttendu', label: 'Attendu', Icon: Wallet, color: '#2563EB', format: (s) => formatCurrencyXAF(s.totalAttendu) },
+  { key: 'totalEncaisse', label: (s) => `Encaissé (${s.tauxEncaissement}%)`, Icon: CreditCard, color: '#16A34A', format: (s) => formatCurrencyXAF(s.totalEncaisse) },
+  { key: 'totalImpaye', label: 'Impayé', Icon: AlertTriangle, color: '#DC2626', format: (s) => formatCurrencyXAF(s.totalImpaye) },
+  { key: 'nbImpayes', label: 'Échéances impayées', Icon: Clock, color: '#6B7280', format: (s) => s.nbImpayes },
+];
 
 const STATUT_CLASSES = {
   'payé': 'bg-green-100 text-green-800',
@@ -80,52 +91,56 @@ const RentalPaymentsPage = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-        <h2 className="text-2xl font-bold">Paiements locatifs</h2>
-        <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">Vue d'ensemble Gestion Locative</Link>
-      </div>
-      <p className="text-sm text-gray-500 mb-4">Loyers et échéances par bail — distinct des paiements de visite et hôteliers.</p>
+    <DashboardPage>
+      <DashboardPageHeader
+        icon={CreditCard}
+        title="Paiements locatifs"
+        description="Loyers et échéances par bail — distinct des paiements de visite et hôteliers."
+        actions={(
+          <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
+            Vue d'ensemble Gestion Locative
+          </Link>
+        )}
+      />
 
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
-          <div className="border rounded p-3 bg-blue-50">
-            <div className="text-lg font-bold">{formatCurrencyXAF(stats.totalAttendu)}</div>
-            <div className="text-xs text-gray-500">Attendu</div>
-          </div>
-          <div className="border rounded p-3 bg-green-50">
-            <div className="text-lg font-bold">{formatCurrencyXAF(stats.totalEncaisse)}</div>
-            <div className="text-xs text-gray-500">Encaissé ({stats.tauxEncaissement}%)</div>
-          </div>
-          <div className="border rounded p-3 bg-red-50">
-            <div className="text-lg font-bold">{formatCurrencyXAF(stats.totalImpaye)}</div>
-            <div className="text-xs text-gray-500">Impayé</div>
-          </div>
-          <div className="border rounded p-3 bg-gray-50">
-            <div className="text-lg font-bold">{stats.nbImpayes}</div>
-            <div className="text-xs text-gray-500">Échéances impayées</div>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          {KPI_ITEMS.map(({ key, label, Icon, color, format }) => (
+            <DashboardCard key={key} className="flex items-center gap-3">
+              <span className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${color}18` }}>
+                <Icon size={17} style={{ color }} />
+              </span>
+              <div>
+                <p className="text-2xl font-bold leading-none" style={{ color, fontFamily: "'Cormorant Garamond', serif" }}>{format(stats)}</p>
+                <p className="text-xs mt-1 text-gray-500">{typeof label === 'function' ? label(stats) : label}</p>
+              </div>
+            </DashboardCard>
+          ))}
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        {[{ v: '', l: 'Tous' }, { v: 'payé', l: 'Payé' }, { v: 'partiel', l: 'Partiel' }, { v: 'en_retard', l: 'En retard' }, { v: 'impayé', l: 'Impayé' }].map((s) => (
-          <button key={s.v} onClick={() => { setStatut(s.v); setPage(1); }}
-            className={`px-3 py-1.5 rounded text-sm font-medium ${statut === s.v ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
-            {s.l}
+      <DashboardToolbar label="Filtrer les paiements">
+        <div className="flex flex-wrap gap-2 items-center w-full">
+          {[{ v: '', l: 'Tous' }, { v: 'payé', l: 'Payé' }, { v: 'partiel', l: 'Partiel' }, { v: 'en_retard', l: 'En retard' }, { v: 'impayé', l: 'Impayé' }].map((s) => (
+            <button key={s.v} onClick={() => { setStatut(s.v); setPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${statut === s.v ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+              {s.l}
+            </button>
+          ))}
+          <button onClick={handleRecalculerPenalites}
+            className="ml-auto inline-flex items-center gap-1.5 bg-gold text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+            <RefreshCw size={14} />
+            Recalculer les pénalités
           </button>
-        ))}
-        <button onClick={handleRecalculerPenalites} className="ml-auto bg-gold text-white px-3 py-1.5 rounded text-sm">
-          Recalculer les pénalités
-        </button>
-      </div>
+        </div>
+      </DashboardToolbar>
 
       {loading ? (
-        <p className="text-center text-gray-500 py-8">Chargement...</p>
+        <DashboardState type="loading" title="Chargement des paiements…" />
       ) : data.paiements.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">Aucun paiement pour ces critères.</p>
+        <DashboardState title="Aucun paiement" description="Aucun paiement pour ces critères." />
       ) : (
-        <div className="overflow-x-auto">
+        <DashboardCard className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b">
@@ -167,17 +182,18 @@ const RentalPaymentsPage = () => {
               ))}
             </tbody>
           </table>
-        </div>
+        </DashboardCard>
       )}
 
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1.5 border rounded text-sm disabled:opacity-40">Précédent</button>
-          <span className="text-sm text-gray-500 self-center">Page {page} / {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1.5 border rounded text-sm disabled:opacity-40">Suivant</button>
-        </div>
+        <DashboardPagination
+          page={page}
+          totalPages={totalPages}
+          onPrevious={() => setPage((p) => p - 1)}
+          onNext={() => setPage((p) => p + 1)}
+        />
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

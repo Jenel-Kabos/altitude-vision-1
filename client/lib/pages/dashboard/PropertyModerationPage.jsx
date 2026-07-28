@@ -6,6 +6,7 @@ import api from '../../services/api';
 import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
 import toast from '@/lib/utils/toast';
 import Image from 'next/image';
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState, DashboardToolbar } from '../../components/dashboard/DashboardUI';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api';
 const getImageUrl = (url) => {
@@ -82,39 +83,16 @@ const PropertyModerationPage = () => {
     }
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4" />
-        <p className="text-gray-600 text-lg">Chargement des annonces en attente…</p>
-      </div>
-    </div>
-  );
+  if (loading) return <DashboardState type="loading" title="Chargement des annonces en attente…" />;
 
-  if (error) return (
-    <div className="p-6">
-      <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded">
-        <p className="font-bold">Erreur</p>
-        <p>{error}</p>
-      </div>
-    </div>
-  );
+  if (error) return <DashboardState type="error" title="Annonces indisponibles" description={error} />;
 
-  if (properties.length === 0) return (
-    <div className="p-6">
-      <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded">
-        <p className="font-bold flex items-center">
-          <CheckCircle2 className="mr-2" /> Aucune annonce en attente de validation
-        </p>
-        <p className="mt-2">Toutes les annonces ont été traitées !</p>
-      </div>
-    </div>
-  );
+  if (properties.length === 0) return <DashboardState title="Aucune annonce en attente" description="Toutes les annonces ont été traitées." />;
 
   return (
-    <div className="p-6">
+    <DashboardPage>
+      <DashboardPageHeader icon={CheckCircle2} title="Modération des biens immobiliers" description="Examinez et traitez les annonces en attente de validation." />
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">Modération des Biens Immobiliers</h1>
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -132,7 +110,7 @@ const PropertyModerationPage = () => {
         </div>
 
         {/* Filtres */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <DashboardToolbar>
           <Filter className="text-gray-600" size={20} />
           <span className="text-gray-600 font-medium">Filtrer par pôle :</span>
           {poles.map(pole => (
@@ -150,23 +128,18 @@ const PropertyModerationPage = () => {
               )}
             </button>
           ))}
-        </div>
+        </DashboardToolbar>
       </div>
 
       {/* Liste */}
       {filteredProperties.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <p className="text-gray-500 text-lg">
-            Aucune annonce {selectedPole !== 'Tous' && `pour ${selectedPole}`} en attente.
-          </p>
-        </div>
+        <DashboardState title="Aucune annonce" description={`Aucune annonce ${selectedPole !== 'Tous' ? `pour ${selectedPole} ` : ''}en attente.`} />
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredProperties.map(property => {
             const pole = POLE_COLORS[property.pole] || POLE_COLORS.Altimmo;
             return (
-              <div key={property._id} onClick={() => setSelectedProperty(property)}
-                className="border rounded-lg shadow-md p-4 flex flex-col cursor-pointer hover:shadow-xl transition-all bg-white">
+              <DashboardCard key={property._id} onClick={() => setSelectedProperty(property)} className="flex flex-col cursor-pointer">
                 <div className="relative mb-3 h-48">
                   <Image src={getImageUrl(property.images?.[0]) || '/placeholder.png'} alt={property.title} fill
                     sizes="(max-width: 768px) 100vw, 33vw"
@@ -189,7 +162,7 @@ const PropertyModerationPage = () => {
                 <button className="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
                   <Eye size={18} /> Voir les détails
                 </button>
-              </div>
+              </DashboardCard>
             );
           })}
         </div>
@@ -320,7 +293,7 @@ const PropertyModerationPage = () => {
           </div>
         </div>
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

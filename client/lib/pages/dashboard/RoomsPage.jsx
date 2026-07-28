@@ -11,6 +11,8 @@ import {
   getRooms, createRoom, updateRoom, deleteRoom, getRoomCategories,
 } from "../../services/hotelService";
 import { ROOM_STATUSES, ROOM_STATUS_CLASSES, ROOM_STATUS_TRANSITIONS } from "../../constants/room";
+import { BedDouble } from "lucide-react";
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState, DashboardTableContainer, DashboardToolbar } from "../../components/dashboard/DashboardUI";
 
 const emptyForm = () => ({ roomNumber: "", roomCategoryId: "", floor: 0, wing: "", notes: "" });
 
@@ -102,17 +104,14 @@ const RoomsPage = () => {
 
   const floorOptions = useMemo(() => [...new Set(rooms.map((r) => r.floor ?? 0))].sort((a, b) => a - b), [rooms]);
 
-  if (loading && rooms.length === 0) return <p className="text-center mt-10">Chargement...</p>;
+  if (loading && rooms.length === 0) return <DashboardState type="loading" title="Chargement des chambres…" />;
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-        <h2 className="text-2xl font-bold">Chambres</h2>
-        <Link href={`/dashboard/hotels/${hotelId}`} className="text-sm text-blue-600 underline">← Retour à l'établissement</Link>
-      </div>
-      <p className="text-sm text-gray-500 mb-4">Chambres physiques de cet établissement — statut, catégorie, affectation en cours.</p>
+    <DashboardPage>
+      <DashboardPageHeader icon={BedDouble} title="Chambres" description="Chambres physiques de cet établissement — statut, catégorie et affectation en cours."
+        actions={<Link href={`/dashboard/hotels/${hotelId}`} className="text-sm text-blue-600 underline">← Retour à l'établissement</Link>} />
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <DashboardToolbar label="Vues et actions des chambres">
         <button onClick={() => setView("table")} className={`px-3 py-1.5 rounded text-sm font-medium ${view === "table" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
           Tableau des chambres
         </button>
@@ -125,10 +124,10 @@ const RoomsPage = () => {
             + Nouvelle chambre
           </button>
         )}
-      </div>
+      </DashboardToolbar>
 
       {creating && (
-        <div className="bg-gray-50 border rounded p-4 mb-4 space-y-3">
+        <DashboardCard className="mb-4 space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <input placeholder="Numéro" aria-label="Numéro de chambre" value={form.roomNumber}
               onChange={(e) => setForm((p) => ({ ...p, roomNumber: e.target.value }))} className="p-2 border rounded text-sm" />
@@ -145,10 +144,10 @@ const RoomsPage = () => {
             <button onClick={handleCreate} className="bg-gold text-white px-3 py-1.5 rounded text-sm">Enregistrer</button>
             <button onClick={() => { setCreating(false); setForm(emptyForm()); }} className="text-gray-600 text-sm">Annuler</button>
           </div>
-        </div>
+        </DashboardCard>
       )}
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <DashboardToolbar>
         <select aria-label="Filtrer par étage" value={filters.floor} onChange={(e) => setFilters((p) => ({ ...p, floor: e.target.value }))} className="p-2 border rounded text-sm">
           <option value="">Tous les étages</option>
           {floorOptions.map((f) => <option key={f} value={f}>Étage {f}</option>)}
@@ -161,12 +160,12 @@ const RoomsPage = () => {
           <option value="">Tous les statuts</option>
           {ROOM_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
-      </div>
+      </DashboardToolbar>
 
       {rooms.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">Aucune chambre pour ces critères.</p>
+        <DashboardState title="Aucune chambre" description="Aucune chambre ne correspond aux critères sélectionnés." />
       ) : view === "table" ? (
-        <div className="overflow-x-auto">
+        <DashboardTableContainer label="Liste des chambres">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b">
@@ -209,7 +208,7 @@ const RoomsPage = () => {
               ))}
             </tbody>
           </table>
-        </div>
+        </DashboardTableContainer>
       ) : (
         <div className="space-y-6">
           {roomsByFloor.map(([floor, list]) => (
@@ -227,7 +226,7 @@ const RoomsPage = () => {
           ))}
         </div>
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

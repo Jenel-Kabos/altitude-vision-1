@@ -4,6 +4,7 @@ import Image from 'next/image';
 import api from '@/lib/services/api';
 import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
 import toast from '@/lib/utils/toast';
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState, DashboardToolbar } from '../../components/dashboard/DashboardUI';
 
 const ModerationPage = () => {
   const [properties, setProperties] = useState([]);
@@ -73,47 +74,17 @@ const ModerationPage = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Chargement des annonces en attente...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <DashboardState type="loading" title="Chargement des annonces en attente…" />;
 
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded">
-          <p className="font-bold">Erreur</p>
-          <p>{error}</p>
-        </div>
-      </div>
-    );
-  }
+  if (error) return <DashboardState type="error" title="Annonces indisponibles" description={error} />;
 
-  if (properties.length === 0) {
-    return (
-      <div className="p-6">
-        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded">
-          <p className="font-bold flex items-center">
-            <CheckCircle2 className="mr-2" />
-            Aucune annonce en attente de validation
-          </p>
-          <p className="mt-2">Toutes les annonces ont été traitées !</p>
-        </div>
-      </div>
-    );
-  }
+  if (properties.length === 0) return <DashboardState title="Aucune annonce en attente" description="Toutes les annonces ont été traitées." />;
 
   return (
-    <div className="p-6">
+    <DashboardPage>
+      <DashboardPageHeader icon={CheckCircle2} title="Modération des annonces" description="Examinez et traitez les publications en attente." />
       {/* En-tête avec statistiques */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">Modération des Annonces</h1>
         
         {/* Statistiques */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -136,7 +107,7 @@ const ModerationPage = () => {
         </div>
 
         {/* Filtres par pôle */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <DashboardToolbar>
           <Filter className="text-gray-600" size={20} />
           <span className="text-gray-600 font-medium">Filtrer par pôle :</span>
           {poles.map((pole) => (
@@ -157,22 +128,22 @@ const ModerationPage = () => {
               )}
             </button>
           ))}
-        </div>
+        </DashboardToolbar>
       </div>
 
       {/* Liste des propriétés */}
       {filteredProperties.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
+        <DashboardState title="Aucune annonce pour ce filtre">
           <p className="text-gray-500 text-lg">
             Aucune annonce {selectedPole !== 'Tous' && `pour ${selectedPole}`} en attente de validation.
           </p>
-        </div>
+        </DashboardState>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredProperties.map((property) => (
-            <div
+            <DashboardCard
               key={property._id}
-              className="border rounded-lg shadow-md p-4 flex flex-col cursor-pointer hover:shadow-xl transition-all duration-300 bg-white"
+              className="flex flex-col cursor-pointer"
               onClick={() => setSelectedProperty(property)}
             >
               <div className="relative mb-3 h-48">
@@ -205,7 +176,7 @@ const ModerationPage = () => {
                 <Eye size={18} />
                 Voir les détails
               </button>
-            </div>
+            </DashboardCard>
           ))}
         </div>
       )}
@@ -295,7 +266,7 @@ const ModerationPage = () => {
           </div>
         </div>
       )}
-    </div>
+    </DashboardPage>
   );
 };
 
