@@ -12,6 +12,8 @@ import {
   duplicateRoomCategory, activateRoomCategory, deactivateRoomCategory,
 } from "../../services/hotelService";
 import { ROOM_CATEGORY_SUGGESTIONS } from "../../constants/hotel";
+import { Layers3 } from "lucide-react";
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState } from "../../components/dashboard/DashboardUI";
 
 const emptyForm = () => ({
   name: "", description: "", maxAdults: 2, maxChildren: 0, beds: 1, surface: "", unitsAvailable: 1,
@@ -119,14 +121,12 @@ const ManageRoomCategoriesPage = () => {
     }
   };
 
-  if (loading) return <p className="text-center mt-10">Chargement...</p>;
+  if (loading) return <DashboardState type="loading" title="Chargement des catégories…" />;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded shadow-md">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold">Catégories de chambres</h2>
-        <Link href={`/dashboard/hotels/${hotelId}`} className="text-sm text-blue-600 underline">← Retour à l'établissement</Link>
-      </div>
+    <DashboardPage>
+      <DashboardPageHeader icon={Layers3} title="Catégories de chambres" description="Structurez les capacités et caractéristiques des chambres."
+        actions={<Link href={`/dashboard/hotels/${hotelId}`} className="text-sm text-blue-600 underline">← Retour à l'établissement</Link>} />
 
       {!creating && (
         <button onClick={() => setCreating(true)} className="mb-4 bg-gold text-white px-3 py-1.5 rounded text-sm">
@@ -135,7 +135,7 @@ const ManageRoomCategoriesPage = () => {
       )}
 
       {creating && (
-        <div className="bg-gray-50 border rounded p-4 mb-4 space-y-3">
+        <DashboardCard className="mb-4 space-y-3">
           <div>
             <label className="block text-xs font-medium mb-1">Nom de la catégorie</label>
             <input list="room-category-suggestions" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
@@ -175,14 +175,14 @@ const ManageRoomCategoriesPage = () => {
             <button onClick={handleCreate} className="bg-gold text-white px-3 py-1.5 rounded text-sm">Enregistrer</button>
             <button onClick={() => { setCreating(false); setForm(emptyForm()); }} className="text-gray-600 text-sm">Annuler</button>
           </div>
-        </div>
+        </DashboardCard>
       )}
 
-      {categories.length === 0 && !creating && <p className="text-gray-500">Aucune catégorie pour cet hôtel.</p>}
+      {categories.length === 0 && !creating && <DashboardState title="Aucune catégorie" description="Créez la première catégorie de chambres de cet hôtel." />}
 
       <div className="space-y-3">
         {categories.map((cat) => (
-          <div key={cat._id} className="border rounded p-4">
+          <DashboardCard key={cat._id}>
             {editingId === cat._id ? (
               <div className="space-y-2">
                 <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} aria-label="Nom" className="w-full p-2 border rounded text-sm" />
@@ -215,10 +215,10 @@ const ManageRoomCategoriesPage = () => {
                 </div>
               </>
             )}
-          </div>
+          </DashboardCard>
         ))}
       </div>
-    </div>
+    </DashboardPage>
   );
 };
 

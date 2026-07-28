@@ -14,6 +14,8 @@ import { RESERVATION_STATUSES, RESERVATION_STATUS_CLASSES } from "../../constant
 import { formatCurrencyXAF } from "../../utils/normalizePropertyDetail";
 import RoomAssignmentPanel from "../../components/RoomAssignmentPanel";
 import HotelFinancialDocumentPanel from "../../components/HotelFinancialDocumentPanel";
+import { CalendarCheck2 } from "lucide-react";
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
 
 const STATUS_TABS = [{ value: "", label: "Tous" }, ...RESERVATION_STATUSES];
 
@@ -92,19 +94,21 @@ const MyHotelReservationsPage = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="text-2xl font-bold">Mes réservations</h2>
-        {!creating && (
+    <DashboardPage>
+      <DashboardPageHeader
+        icon={CalendarCheck2}
+        title="Mes réservations"
+        description="Réservations reçues pour vos établissements hôteliers."
+        actions={!creating && (
           <button onClick={() => setCreating(true)} className="bg-gold text-white px-3 py-1.5 rounded text-sm">
             + Réservation manuelle
           </button>
         )}
-      </div>
-      <p className="text-sm text-gray-500 mb-4">Réservations reçues pour vos établissements hôteliers.</p>
+      />
 
       {creating && (
-        <form onSubmit={handleCreate} className="bg-gray-50 border rounded p-4 mb-6 space-y-3">
+        <DashboardCard className="mb-6">
+        <form onSubmit={handleCreate} className="space-y-3">
           <p className="text-xs text-gray-500">Renseignez les identifiants de l'hôtel, de la catégorie et du tarif (visibles depuis la fiche établissement).</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <input placeholder="ID Hôtel" value={form.hotelId} onChange={(e) => setForm((f) => ({ ...f, hotelId: e.target.value }))} className="p-2 border rounded text-sm" />
@@ -127,9 +131,11 @@ const MyHotelReservationsPage = () => {
             <button type="button" onClick={() => setCreating(false)} className="text-gray-600 text-sm">Annuler</button>
           </div>
         </form>
+        </DashboardCard>
       )}
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <DashboardToolbar>
+      <div className="flex flex-wrap gap-2">
         {STATUS_TABS.map((tab) => (
           <button key={tab.value || 'tous'} onClick={() => { setStatus(tab.value); setPage(1); }}
             className={`px-3 py-1.5 rounded text-sm font-medium ${status === tab.value ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
@@ -139,16 +145,17 @@ const MyHotelReservationsPage = () => {
       </div>
 
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une référence..."
-        aria-label="Rechercher" className="w-full mb-4 px-3 py-2 border rounded text-sm" />
+        aria-label="Rechercher" className="w-full px-3 py-2 border rounded text-sm" />
+      </DashboardToolbar>
 
       {loading ? (
-        <p className="text-center text-gray-500 py-8">Chargement...</p>
+        <DashboardState type="loading" title="Chargement des réservations" />
       ) : data.reservations.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">Aucune réservation pour ces critères.</p>
+        <DashboardState title="Aucune réservation" description="Aucune réservation ne correspond à ces critères." />
       ) : (
         <div className="space-y-3">
           {data.reservations.map((r) => (
-            <div key={r._id} className="border rounded p-4">
+            <DashboardCard key={r._id}>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <h3 className="font-semibold">{r.reference} — {r.hotel?.name}</h3>
@@ -189,19 +196,15 @@ const MyHotelReservationsPage = () => {
                   <HotelFinancialDocumentPanel reservation={r} canManage={false} />
                 </>
               )}
-            </div>
+            </DashboardCard>
           ))}
         </div>
       )}
 
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1.5 border rounded text-sm disabled:opacity-40">Précédent</button>
-          <span className="text-sm text-gray-500 self-center">Page {page} / {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1.5 border rounded text-sm disabled:opacity-40">Suivant</button>
-        </div>
+        <DashboardPagination page={page} totalPages={totalPages} onPrevious={() => setPage((p) => p - 1)} onNext={() => setPage((p) => p + 1)} />
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

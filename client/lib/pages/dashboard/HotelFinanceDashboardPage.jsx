@@ -4,6 +4,8 @@ import { toast } from 'react-hot-toast';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import * as dashboardService from '../../services/hotelFinancialDashboardService';
 import { getAccessibleHotels } from '../../services/hotelAccessService';
+import { Landmark } from 'lucide-react';
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination, DashboardState, DashboardTableContainer, DashboardToolbar } from '../../components/dashboard/DashboardUI';
 
 const money = (minor) => `${Number(minor || 0).toLocaleString('fr-FR')} XAF`;
 const SEVERITY_LABEL = { critical: 'Critique', warning: 'Avertissement', info: 'Info' };
@@ -21,10 +23,10 @@ const QUICK_RANGES = [
 function KpiCard({ label, value, hint, tone = 'default' }) {
   const toneClass = tone === 'warning' ? 'border-amber-300 bg-amber-50' : tone === 'critical' ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white';
   return (
-    <div className={`rounded border p-3 ${toneClass}`} title={hint}>
+    <DashboardCard className={toneClass} title={hint}>
       <div className="text-[11px] uppercase tracking-wide text-gray-500">{label}</div>
       <div className="mt-1 text-lg font-semibold text-gray-900">{value}</div>
-    </div>
+    </DashboardCard>
   );
 }
 
@@ -95,13 +97,10 @@ export default function HotelFinanceDashboardPage() {
   const applyQuickRange = (range) => { setDateFrom(isoDate(range.from())); setDateTo(isoDate(range.to())); };
 
   return (
-    <div className="p-4 text-sm" data-testid="hotel-finance-dashboard">
-      <header className="mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Dashboard financier hôtelier</h1>
-        <p className="text-xs text-gray-500">Lecture du Financial Core — facturation, encaissements, allocations et anomalies.</p>
-      </header>
+    <DashboardPage data-testid="hotel-finance-dashboard">
+      <DashboardPageHeader icon={Landmark} title="Dashboard financier hôtelier" description="Lecture du Financial Core — facturation, encaissements, allocations et anomalies." />
 
-      <section className="mb-4 flex flex-wrap items-end gap-3 rounded border bg-gray-50 p-3">
+      <DashboardToolbar className="flex-wrap items-end">
         <div>
           <label className="block text-[11px] text-gray-500" htmlFor="hotel-finance-hotel-id">Hôtel</label>
           <select id="hotel-finance-hotel-id" className="rounded border px-2 py-1 text-xs" value={hotelId} onChange={(e) => setHotelId(e.target.value)} disabled={!hotelsLoaded || (accessibleHotels.length <= 1 && !globalAccess)}>
@@ -126,10 +125,11 @@ export default function HotelFinanceDashboardPage() {
         <button type="button" className="ml-auto rounded bg-gray-800 px-3 py-1 text-xs text-white" onClick={() => load(alertsPage)} disabled={loading}>
           {loading ? 'Chargement…' : 'Rafraîchir'}
         </button>
-      </section>
+      </DashboardToolbar>
 
-      {error && <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-red-700" role="alert">{error}</div>}
+      {error && <DashboardState type="error" title="Dashboard financier indisponible" description={error} />}
       {!error && partial && <div className="mb-4 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">Données partielles : certaines sections n’ont pas pu être chargées.</div>}
+      {!error && loading && !summary && <DashboardState type="loading" title="Chargement des données financières" />}
 
       {!error && summary && (
         <>
@@ -162,7 +162,7 @@ export default function HotelFinanceDashboardPage() {
       )}
 
       {!error && trends && (
-        <section className="mb-4 rounded border bg-white p-3">
+        <DashboardCard className="mb-4">
           <h2 className="mb-2 text-xs font-semibold uppercase text-gray-600">Tendances ({trends.granularity})</h2>
           {trends.points.length === 0 ? (
             <p className="text-xs text-gray-500">Aucune facture émise sur cette période.</p>
@@ -181,11 +181,11 @@ export default function HotelFinanceDashboardPage() {
               </ResponsiveContainer>
             </div>
           )}
-        </section>
+        </DashboardCard>
       )}
 
       {!error && breakdown && (
-        <section className="mb-4 rounded border bg-white p-3">
+        <DashboardCard className="mb-4">
           <h2 className="mb-2 text-xs font-semibold uppercase text-gray-600">Répartition par statut</h2>
           {breakdown.rows.length === 0 ? (
             <p className="text-xs text-gray-500">Aucune facture émise sur cette période.</p>
@@ -202,25 +202,25 @@ export default function HotelFinanceDashboardPage() {
               </ResponsiveContainer>
             </div>
           )}
-        </section>
+        </DashboardCard>
       )}
 
       {!error && aging && (
-        <section className="mb-4 rounded border bg-white p-3">
+        <DashboardCard className="mb-4">
           <h2 className="mb-2 text-xs font-semibold uppercase text-gray-600">Vieillissement des créances (depuis émission)</h2>
-          <table className="w-full text-left text-xs">
+          <DashboardTableContainer label="Vieillissement des créances"><table className="w-full text-left text-xs">
             <thead><tr className="text-gray-500"><th className="py-1">Ancienneté</th><th>Factures</th><th>Solde restant</th></tr></thead>
             <tbody>
               {aging.buckets.map((bucket) => (
                 <tr key={bucket.bucket} className="border-t"><td className="py-1">{bucket.bucket.replace('_', '–')} jours</td><td>{bucket.documentCount}</td><td>{money(bucket.outstandingMinor)}</td></tr>
               ))}
             </tbody>
-          </table>
-        </section>
+          </table></DashboardTableContainer>
+        </DashboardCard>
       )}
 
       {!error && alerts && (
-        <section className="mb-4 rounded border bg-white p-3">
+        <DashboardCard className="mb-4">
           <h2 className="mb-2 text-xs font-semibold uppercase text-gray-600">Alertes opérationnelles</h2>
           {alerts.alerts.length === 0 ? (
             <p className="text-xs text-gray-500">Aucune anomalie financière détectée.</p>
@@ -237,15 +237,9 @@ export default function HotelFinanceDashboardPage() {
               ))}
             </ul>
           )}
-          <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
-            <span>Page {alerts.pagination.page} / {Math.max(1, Math.ceil(alerts.pagination.total / alerts.pagination.limit))} ({alerts.pagination.total} alertes)</span>
-            <div className="flex gap-2">
-              <button type="button" className="rounded border px-2 py-1 disabled:opacity-40" disabled={alertsPage <= 1} onClick={() => setAlertsPage((p) => Math.max(1, p - 1))}>Précédent</button>
-              <button type="button" className="rounded border px-2 py-1 disabled:opacity-40" disabled={alertsPage * alerts.pagination.limit >= alerts.pagination.total} onClick={() => setAlertsPage((p) => p + 1)}>Suivant</button>
-            </div>
-          </div>
-        </section>
+          <DashboardPagination page={alerts.pagination.page} totalPages={Math.max(1, Math.ceil(alerts.pagination.total / alerts.pagination.limit))} onPrevious={() => setAlertsPage((p) => Math.max(1, p - 1))} onNext={() => setAlertsPage((p) => p + 1)} />
+        </DashboardCard>
       )}
-    </div>
+    </DashboardPage>
   );
 }

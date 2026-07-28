@@ -13,6 +13,8 @@ import {
 import { createInspection, approveInspection, rejectInspection } from "../../services/inspectionService";
 import { MAINTENANCE_CATEGORIES, MAINTENANCE_STATUSES, MAINTENANCE_STATUS_CLASSES } from "../../constants/maintenance";
 import { PRIORITY_CLASSES, HOUSEKEEPING_PRIORITIES } from "../../constants/housekeeping";
+import { Wrench } from "lucide-react";
+import { DashboardPage, DashboardPageHeader, DashboardState, DashboardTableContainer, DashboardToolbar } from "../../components/dashboard/DashboardUI";
 
 const MaintenanceDashboardPage = () => {
   const [tickets, setTickets] = useState([]);
@@ -101,11 +103,10 @@ const MaintenanceDashboardPage = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <h2 className="text-2xl font-bold mb-1">Maintenance</h2>
-      <p className="text-sm text-gray-500 mb-4">Tickets de maintenance ouverts sur les chambres.</p>
+    <DashboardPage>
+      <DashboardPageHeader icon={Wrench} title="Maintenance" description="Tickets de maintenance ouverts sur les chambres." />
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <DashboardToolbar>
         <input placeholder="ID Hôtel (optionnel)" value={filters.hotelId}
           onChange={(e) => setFilters((f) => ({ ...f, hotelId: e.target.value }))} className="p-2 border rounded text-sm" />
         <select aria-label="Filtrer par statut" value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} className="p-2 border rounded text-sm">
@@ -120,14 +121,14 @@ const MaintenanceDashboardPage = () => {
           <option value="">Toutes les catégories</option>
           {MAINTENANCE_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
-      </div>
+      </DashboardToolbar>
 
       {loading ? (
-        <p className="text-center text-gray-500 py-8">Chargement...</p>
+        <DashboardState type="loading" title="Chargement des interventions…" />
       ) : tickets.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">Aucun ticket de maintenance pour ces critères.</p>
+        <DashboardState title="Aucune intervention" description="Aucun ticket de maintenance ne correspond aux critères sélectionnés." />
       ) : (
-        <div className="overflow-x-auto">
+        <DashboardTableContainer label="Tickets de maintenance">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b">
@@ -187,9 +188,9 @@ const MaintenanceDashboardPage = () => {
               ))}
             </tbody>
           </table>
-        </div>
+        </DashboardTableContainer>
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

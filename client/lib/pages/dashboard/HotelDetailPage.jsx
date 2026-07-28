@@ -12,6 +12,8 @@ import {
 } from "../../services/hotelService";
 import { HOTEL_PUBLICATION_STATUSES } from "../../constants/hotel";
 import { ROOM_STATUSES, ROOM_STATUS_CLASSES } from "../../constants/room";
+import { Hotel } from "lucide-react";
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
 
 const STATUS_CLASSES = {
   brouillon: "bg-gray-100 text-gray-700",
@@ -57,8 +59,8 @@ const HotelDetailPage = () => {
 
   useEffect(() => { load(); loadRoomCounts(); }, [hotelId]);
 
-  if (loading) return <p className="text-center mt-10">Chargement...</p>;
-  if (!data?.hotel) return <p className="text-center mt-10 text-gray-500">Établissement introuvable.</p>;
+  if (loading) return <DashboardState type="loading" title="Chargement de l’établissement…" />;
+  if (!data?.hotel) return <DashboardState title="Établissement introuvable" description="Cet établissement n’est pas disponible ou n’existe plus." />;
 
   const { hotel, completion } = data;
 
@@ -103,13 +105,9 @@ const HotelDetailPage = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded shadow-md">
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-        <div>
-          <h2 className="text-2xl font-bold">{hotel.name}</h2>
-          <p className="text-sm text-gray-500">{hotel.property?.address?.city}</p>
-        </div>
-        <div className="flex items-center gap-2">
+    <DashboardPage>
+      <DashboardPageHeader icon={Hotel} title={hotel.name} description={hotel.property?.address?.city}
+        actions={<div className="flex items-center gap-2">
           <span className={`text-xs font-semibold px-2 py-1 rounded ${STATUS_CLASSES[hotel.publicationStatus] || "bg-gray-100"}`}>
             {HOTEL_PUBLICATION_STATUSES.find((s) => s.value === hotel.publicationStatus)?.label || hotel.publicationStatus}
           </span>
@@ -119,21 +117,20 @@ const HotelDetailPage = () => {
             </span>
           )}
           {hotel.active === false && <span className="text-xs font-semibold px-2 py-1 rounded bg-gray-200 text-gray-600">Désactivé</span>}
-        </div>
-      </div>
+        </div>} />
 
       {roomCounts && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6">
           {['available', 'occupied', 'cleaning', 'inspection', 'out_of_service'].map((statusValue) => (
-            <div key={statusValue} className={`border rounded p-3 ${ROOM_STATUS_CLASSES[statusValue]}`}>
+            <DashboardCard key={statusValue} className={ROOM_STATUS_CLASSES[statusValue]}>
               <div className="text-2xl font-bold">{roomCounts[statusValue] || 0}</div>
               <div className="text-xs font-medium">{ROOM_STATUSES.find((s) => s.value === statusValue)?.label}</div>
-            </div>
+            </DashboardCard>
           ))}
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 mb-6">
+      <DashboardToolbar label="Actions de l’établissement">
         <Link href={`/dashboard/hotels/${hotelId}/room-categories`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
           Catégories de chambres
         </Link>
@@ -153,7 +150,7 @@ const HotelDetailPage = () => {
         )}
         <button onClick={handleDuplicate} className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded text-sm">Dupliquer</button>
         <button onClick={handleDelete} className="bg-red-600 text-white px-3 py-1.5 rounded text-sm">Supprimer</button>
-      </div>
+      </DashboardToolbar>
 
       {completion && !completion.complete && (
         <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800">
@@ -164,7 +161,7 @@ const HotelDetailPage = () => {
 
       {hotel.rejectionReason && <p className="text-sm text-red-600 mt-3">Motif du rejet : {hotel.rejectionReason}</p>}
       {hotel.suspensionReason && <p className="text-sm text-orange-700 mt-3">Motif de suspension : {hotel.suspensionReason}</p>}
-    </div>
+    </DashboardPage>
   );
 };
 

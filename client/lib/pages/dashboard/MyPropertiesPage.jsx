@@ -10,6 +10,8 @@ import {
 } from "../../services/propertyService";
 import PropertyForm from "../../components/dashboard/PropertyForm";
 import confirm from '@/lib/utils/confirm';
+import { Building2 } from 'lucide-react';
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState } from '../../components/dashboard/DashboardUI';
 
 const MyPropertiesPage = () => {
   const [properties, setProperties] = useState([]);
@@ -153,14 +155,14 @@ const MyPropertiesPage = () => {
     setExistingImages([]);
   };
 
-  if (loading && properties.length === 0) return <p className="text-center mt-10">Chargement...</p>;
+  if (loading && properties.length === 0) return <DashboardState type="loading" title="Chargement de vos biens…" />;
 
   return (
-    <div className="max-w-5xl mx-auto p-6 bg-white rounded shadow-md">
-      <h2 className="text-2xl font-bold mb-6">Mes Biens Immobiliers</h2>
+    <DashboardPage>
+      <DashboardPageHeader icon={Building2} title="Mes biens immobiliers" description="Ajoutez, modifiez et suivez vos annonces immobilières." />
 
       {/* Formulaire */}
-      <div className="mb-8 border p-4 rounded bg-gray-50">
+      <DashboardCard className="mb-8">
         <h3 className="text-xl font-semibold mb-4">{editingProperty ? "Modifier le bien" : "Ajouter un nouveau bien"}</h3>
         <PropertyForm
           formData={formData}
@@ -178,14 +180,14 @@ const MyPropertiesPage = () => {
             Annuler
           </button>
         )}
-      </div>
+      </DashboardCard>
 
       {/* Liste des propriétés */}
       {properties.length === 0 && !loading ? (
-        <p>Aucun bien disponible.</p>
+        <DashboardState title="Aucun bien disponible" description="Ajoutez votre premier bien avec le formulaire ci-dessus." />
       ) : (
         properties.map((property) => (
-          <div key={property._id} className="border p-4 mb-4 rounded">
+          <DashboardCard key={property._id} className="mb-4">
             <h3 className="text-xl font-semibold">{property.title}</h3>
             <p>{property.description}</p>
             <p>Prix : {property.price} FCFA</p>
@@ -201,10 +203,10 @@ const MyPropertiesPage = () => {
               <button onClick={() => handleEditClick(property)} className="bg-gold text-white px-3 py-1 rounded">Modifier</button>
               <button onClick={() => handleDelete(property._id)} className="bg-red-600 text-white px-3 py-1 rounded">Supprimer</button>
             </div>
-          </div>
+          </DashboardCard>
         ))
       )}
-    </div>
+    </DashboardPage>
   );
 };
 

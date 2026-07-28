@@ -3,6 +3,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import * as staffService from '../../services/hotelAccessService';
+import { UsersRound } from 'lucide-react';
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination, DashboardState, DashboardTableContainer, DashboardToolbar } from '../../components/dashboard/DashboardUI';
 
 const ROLE_LABEL = {
   hotel_manager: 'Manager hôtel', reception: 'Réception', housekeeping: 'Housekeeping',
@@ -69,13 +71,10 @@ export default function HotelStaffAssignmentsPage() {
   };
 
   return (
-    <div className="p-4 text-sm" data-testid="hotel-staff-assignments">
-      <header className="mb-4">
-        <h1 className="text-xl font-semibold text-gray-900">Personnel rattaché à l’hôtel</h1>
-        <p className="text-xs text-gray-500">Gouvernance des accès — rôle local, capacités et période de validité par utilisateur.</p>
-      </header>
+    <DashboardPage data-testid="hotel-staff-assignments">
+      <DashboardPageHeader icon={UsersRound} title="Personnel rattaché à l’hôtel" description="Gouvernance des accès — rôle local, capacités et période de validité par utilisateur." />
 
-      <form onSubmit={create} className="mb-4 flex flex-wrap items-end gap-3 rounded border bg-gray-50 p-3">
+      <DashboardCard className="mb-4"><form onSubmit={create} className="flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-[11px] text-gray-500" htmlFor="staff-user-id">Utilisateur (identifiant)</label>
           <input id="staff-user-id" required className="rounded border px-2 py-1 text-xs" value={form.userId} onChange={(e) => setForm({ ...form, userId: e.target.value.trim() })} />
@@ -91,21 +90,22 @@ export default function HotelStaffAssignmentsPage() {
           <input id="staff-until" type="date" className="rounded border px-2 py-1 text-xs" value={form.validUntil} onChange={(e) => setForm({ ...form, validUntil: e.target.value })} />
         </div>
         <button type="submit" disabled={busy === 'create'} className="rounded bg-gray-800 px-3 py-1 text-xs text-white disabled:opacity-40">Rattacher</button>
-      </form>
+      </form></DashboardCard>
 
-      <div className="mb-3 flex items-center gap-2">
+      <DashboardToolbar><div className="flex items-center gap-2">
         <label className="text-[11px] text-gray-500" htmlFor="staff-status-filter">Statut</label>
         <select id="staff-status-filter" className="rounded border px-2 py-1 text-xs" value={statusFilter} onChange={(e) => { setPage(1); setStatusFilter(e.target.value); }}>
           <option value="">Tous</option>
           {Object.entries(STATUS_LABEL).filter(([v]) => v !== 'pending' && v !== 'expired').map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-      </div>
+      </div></DashboardToolbar>
 
-      {error && <div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-red-700">{error}</div>}
-      {!error && loading && <p className="text-xs text-gray-500">Chargement…</p>}
-      {!error && !loading && assignments.length === 0 && <p className="text-xs text-gray-500">Aucun membre du personnel rattaché.</p>}
+      {error && <DashboardState type="error" title="Personnel indisponible" description={error} />}
+      {!error && loading && <DashboardState type="loading" title="Chargement du personnel" />}
+      {!error && !loading && assignments.length === 0 && <DashboardState title="Aucun personnel rattaché" description="Aucune affectation ne correspond aux critères actuels." />}
 
       {!error && assignments.length > 0 && (
+        <DashboardTableContainer label="Personnel rattaché à l’hôtel">
         <table className="w-full text-left text-xs">
           <thead><tr className="text-gray-500"><th className="py-1">Utilisateur</th><th>Rôle</th><th>Statut</th><th>Validité</th><th>Actions</th></tr></thead>
           <tbody>
@@ -124,15 +124,10 @@ export default function HotelStaffAssignmentsPage() {
             ))}
           </tbody>
         </table>
+        </DashboardTableContainer>
       )}
 
-      <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
-        <span>Page {page} / {Math.max(1, Math.ceil(total / 20))} ({total} rattachements)</span>
-        <div className="flex gap-2">
-          <button type="button" className="rounded border px-2 py-1 disabled:opacity-40" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Précédent</button>
-          <button type="button" className="rounded border px-2 py-1 disabled:opacity-40" disabled={page * 20 >= total} onClick={() => setPage((p) => p + 1)}>Suivant</button>
-        </div>
-      </div>
-    </div>
+      <DashboardPagination page={page} totalPages={Math.max(1, Math.ceil(total / 20))} onPrevious={() => setPage((p) => Math.max(1, p - 1))} onNext={() => setPage((p) => p + 1)} />
+    </DashboardPage>
   );
 }
