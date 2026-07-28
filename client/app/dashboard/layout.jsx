@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useAuth } from '@/lib/context/AuthContext';
 import AdminDashboard from "@/lib/pages/dashboard/AdminDashboard";
 import { Loader2 } from 'lucide-react';
+import './dashboard.css';
 
 const ALLOWED_ROLES = [
   'Admin',

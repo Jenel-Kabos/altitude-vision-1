@@ -8,9 +8,11 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
+import { Users } from "lucide-react";
 import { getLocataireDossiers } from "../../services/gestionLocativeService";
 import { formatCurrencyXAF } from "../../utils/normalizePropertyDetail";
 import TenantLinkManagement from "../../components/dashboard/TenantLinkManagement";
+import { DashboardPage, DashboardPageHeader, DashboardState } from "../../components/dashboard/DashboardUI";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('fr-FR') : '—');
 
@@ -44,22 +46,25 @@ const RentalTenantsPage = () => {
   const totalPages = Math.max(1, Math.ceil((data.total || 0) / limit));
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-        <h2 className="text-2xl font-bold">Locataires</h2>
-        <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
-          Vue d'ensemble Gestion Locative
-        </Link>
-      </div>
-      <p className="text-sm text-gray-500 mb-4">Locataires enregistrés, bail et situation de paiement.</p>
+    <DashboardPage>
+      <DashboardPageHeader
+        icon={Users}
+        title="Locataires"
+        description="Locataires enregistrés, bail et situation de paiement."
+        actions={(
+          <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
+            Vue d'ensemble Gestion Locative
+          </Link>
+        )}
+      />
 
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un nom, email, téléphone..."
         aria-label="Rechercher" className="w-full mb-4 px-3 py-2 border rounded text-sm" />
 
       {loading ? (
-        <p className="text-center text-gray-500 py-8">Chargement...</p>
+        <DashboardState type="loading" title="Chargement des locataires…" />
       ) : data.locataires.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">Aucun locataire pour ces critères.</p>
+        <DashboardState title="Aucun locataire" description="Aucun locataire pour ces critères." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -152,7 +157,7 @@ const RentalTenantsPage = () => {
         </div>
       )}
       <TenantLinkManagement />
-    </div>
+    </DashboardPage>
   );
 };
 

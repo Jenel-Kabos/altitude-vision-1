@@ -210,7 +210,7 @@ const AdminDashboard = ({ children }) => {
   }, [sidebarOpen]);
 
   return (
-    <div className="flex min-h-screen" style={{ background: '#F1F5F9' }}>
+    <div className="dashboard-shell flex min-h-screen">
 
       {/* Overlay mobile */}
       {sidebarOpen && (
@@ -381,10 +381,10 @@ const AdminDashboard = ({ children }) => {
       </aside>
 
       {/* ── Contenu principal ────────────────────────────────── */}
-      <main className="flex-1 flex flex-col min-h-screen">
+      <main className="dashboard-content flex-1 flex flex-col min-h-screen">
 
         {/* Topbar mobile */}
-        <div className="md:hidden grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2 bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
+        <div className="dashboard-mobile-topbar md:hidden grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2 bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
           <button onClick={() => setSidebarOpen(true)}
             ref={menuButtonRef}
             className="min-h-11 min-w-11 p-2 rounded-xl hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 text-gray-600 transition-all"
@@ -400,7 +400,7 @@ const AdminDashboard = ({ children }) => {
           <div className="w-11" aria-hidden="true" />
         </div>
 
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+        <div className="dashboard-content-inner flex-1 p-4 md:p-6 overflow-y-auto">
           {children}
         </div>
       </main>
