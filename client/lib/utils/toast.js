@@ -26,7 +26,7 @@ function showToast(message, type = 'info', duration = 4000) {
     padding:12px 16px; border-radius:8px;
     font-family:system-ui,sans-serif; font-size:14px; line-height:1.4;
     box-shadow:0 4px 24px rgba(0,0,0,0.35);
-    max-width:360px; word-break:break-word;
+    max-width:420px; word-break:break-word; white-space:pre-line;
     opacity:0; transform:translateX(16px);
     transition:opacity 0.22s,transform 0.22s;
     pointer-events:none;
