@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, MapPin } from "lucide-react";
 import toast from "@/lib/utils/toast";
 import { getPendingAccommodations, reviewAccommodation } from "../../services/accommodationService";
 import { ACCOMMODATION_TYPES, INCLUDED_SERVICES } from "../../constants/accommodation";
+import { getPublicationErrorMessage } from "../../utils/publicationError";
 
 // Sprint B1 — réutilise la liste de référence partagée (constants/accommodation.js)
 // au lieu d'un mapping local dupliqué et incomplet (l'ancien ne couvrait ni
@@ -16,6 +17,7 @@ const AccommodationModerationPage = () => {
   const [loading, setLoading] = useState(true);
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [validatingId, setValidatingId] = useState(null);
 
   const fetchAccommodations = async () => {
     setLoading(true);
@@ -32,12 +34,16 @@ const AccommodationModerationPage = () => {
   useEffect(() => { fetchAccommodations(); }, []);
 
   const handleValidate = async (id) => {
+    if (validatingId) return;
+    setValidatingId(id);
     try {
       await reviewAccommodation(id, "validate");
       setAccommodations((prev) => prev.filter((a) => a._id !== id));
       toast.success("Hébergement validé et publié.");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Une erreur est survenue.");
+      toast.error(getPublicationErrorMessage(err, "cet hébergement") || err.response?.data?.message || "Une erreur est survenue.");
+    } finally {
+      setValidatingId(null);
     }
   };
 
@@ -146,10 +152,10 @@ const AccommodationModerationPage = () => {
               ) : (
                 <div className="flex gap-2 mt-3">
                   <button
-                    onClick={() => handleValidate(acc._id)}
+                    onClick={() => handleValidate(acc._id)} disabled={Boolean(validatingId)}
                     className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded text-sm"
                   >
-                    <CheckCircle2 size={15} /> Valider
+                    <CheckCircle2 size={15} /> {validatingId === acc._id ? "Publication…" : "Valider"}
                   </button>
                   <button
                     onClick={() => setRejectingId(acc._id)}

@@ -105,29 +105,35 @@ function hasAnyIncludedService(services) {
  * @param {Array} rates — tarifs actifs (au moins un requis pour la catégorie "tarifs")
  */
 function computeCompletionScore(accommodation, property, rates = []) {
-  const informationsOk = Boolean(property?.title)
-    && Boolean(property?.description)
-    && Boolean(accommodation?.accommodationType)
-    && Number(accommodation?.capacity?.maxAdults) > 0
-    && Number.isFinite(property?.bedrooms)
-    && Number(property?.bathrooms) > 0;
-
-  const photosOk = (property?.images?.length || 0) >= 3;
-  const tarifsOk = (rates || []).some((rate) => rate.active !== false && Number(rate.amount) > 0);
-  const equipementsOk = hasAnyAmenity(accommodation?.amenities);
-  const reglesOk = Boolean(accommodation?.checkInTime) && Boolean(accommodation?.checkOutTime);
-  const servicesOk = hasAnyIncludedService(accommodation?.includedServices);
+  const checks = {
+    title: { label: 'Titre', valid: Boolean(property?.title) },
+    description: { label: 'Description', valid: Boolean(property?.description) },
+    accommodationType: { label: "Type d’hébergement", valid: Boolean(accommodation?.accommodationType) },
+    capacity: { label: 'Capacité', valid: Number(accommodation?.capacity?.maxAdults) > 0 },
+    bedrooms: { label: 'Nombre de chambres', valid: Number.isFinite(property?.bedrooms) },
+    bathrooms: { label: 'Nombre de salles de bain', valid: Number(property?.bathrooms) > 0 },
+    images: { label: 'Photos (3 minimum)', valid: (property?.images?.length || 0) >= 3 },
+    rates: { label: 'Tarif', valid: (rates || []).some((rate) => rate.active !== false && Number(rate.amount) > 0) },
+    amenities: { label: 'Équipements', valid: hasAnyAmenity(accommodation?.amenities) },
+    checkInTime: { label: "Heure d’arrivée", valid: Boolean(accommodation?.checkInTime) },
+    checkOutTime: { label: 'Heure de départ', valid: Boolean(accommodation?.checkOutTime) },
+    includedServices: { label: 'Services inclus', valid: hasAnyIncludedService(accommodation?.includedServices) },
+  };
+  const valid = (...fields) => fields.every((field) => checks[field].valid);
 
   const breakdown = {
-    informations: informationsOk ? COMPLETION_WEIGHTS.informations : 0,
-    photos: photosOk ? COMPLETION_WEIGHTS.photos : 0,
-    tarifs: tarifsOk ? COMPLETION_WEIGHTS.tarifs : 0,
-    equipements: equipementsOk ? COMPLETION_WEIGHTS.equipements : 0,
-    regles: reglesOk ? COMPLETION_WEIGHTS.regles : 0,
-    services: servicesOk ? COMPLETION_WEIGHTS.services : 0,
+    informations: valid('title', 'description', 'accommodationType', 'capacity', 'bedrooms', 'bathrooms') ? COMPLETION_WEIGHTS.informations : 0,
+    photos: valid('images') ? COMPLETION_WEIGHTS.photos : 0,
+    tarifs: valid('rates') ? COMPLETION_WEIGHTS.tarifs : 0,
+    equipements: valid('amenities') ? COMPLETION_WEIGHTS.equipements : 0,
+    regles: valid('checkInTime', 'checkOutTime') ? COMPLETION_WEIGHTS.regles : 0,
+    services: valid('includedServices') ? COMPLETION_WEIGHTS.services : 0,
   };
   const score = Object.values(breakdown).reduce((sum, v) => sum + v, 0);
-  return { score, breakdown, complete: score === 100 };
+  const missingFields = Object.entries(checks)
+    .filter(([, check]) => !check.valid)
+    .map(([field, check]) => ({ field, label: check.label }));
+  return { score, breakdown, complete: score === 100, missingFields };
 }
 
 function serializeAccommodation(doc, rates = []) {

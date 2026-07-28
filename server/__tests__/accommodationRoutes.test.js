@@ -273,6 +273,11 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
       .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
       .send({});
     expect(res.statusCode).toBe(422);
+    expect(res.body.code).toBe('ACCOMMODATION_INCOMPLETE');
+    expect(res.body.missingFields).toEqual(expect.arrayContaining([
+      { field: 'rates', label: 'Tarif' },
+      { field: 'amenities', label: 'Équipements' },
+    ]));
     expect(res.body.completion.complete).toBe(false);
     expect(acc.publicationStatus).toBe('soumis');
   });

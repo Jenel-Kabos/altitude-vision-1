@@ -9,12 +9,14 @@ import { CheckCircle2, XCircle, MapPin } from "lucide-react";
 import toast from "@/lib/utils/toast";
 import { getPendingHotels, reviewHotel } from "../../services/hotelService";
 import { HOTEL_SERVICES, HOTEL_RATE_TYPES } from "../../constants/hotel";
+import { getPublicationErrorMessage } from "../../utils/publicationError";
 
 const HotelModerationPage = () => {
   const [hotels, setHotels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [validatingId, setValidatingId] = useState(null);
 
   const fetchHotels = async () => {
     setLoading(true);
@@ -31,13 +33,16 @@ const HotelModerationPage = () => {
   useEffect(() => { fetchHotels(); }, []);
 
   const handleValidate = async (id) => {
+    if (validatingId) return;
+    setValidatingId(id);
     try {
       await reviewHotel(id, "validate");
       setHotels((prev) => prev.filter((h) => h._id !== id));
       toast.success("Hôtel validé et publié.");
     } catch (err) {
-      const comp = err.response?.data?.completion;
-      toast.error(comp ? `Incomplet (${comp.score}%).` : (err.response?.data?.message || "Une erreur est survenue."));
+      toast.error(getPublicationErrorMessage(err, "cet hôtel") || err.response?.data?.message || "Une erreur est survenue.");
+    } finally {
+      setValidatingId(null);
     }
   };
 
@@ -125,8 +130,8 @@ const HotelModerationPage = () => {
                 </div>
               ) : (
                 <div className="flex gap-2 mt-3">
-                  <button onClick={() => handleValidate(hotel._id)} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded text-sm">
-                    <CheckCircle2 size={15} /> Valider
+                  <button onClick={() => handleValidate(hotel._id)} disabled={Boolean(validatingId)} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded text-sm disabled:opacity-50">
+                    <CheckCircle2 size={15} /> {validatingId === hotel._id ? "Publication…" : "Valider"}
                   </button>
                   <button onClick={() => setRejectingId(hotel._id)} className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-1.5 rounded text-sm">
                     <XCircle size={15} /> Rejeter
