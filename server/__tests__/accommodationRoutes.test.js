@@ -383,7 +383,10 @@ describe('GET /api/accommodations/status/pending — file de modération staff',
     expect(res.statusCode).toBe(200);
     expect(res.body.data.accommodations).toHaveLength(1);
     expect(res.body.data.accommodations[0].completion).toBeDefined();
-    expect(Accommodation.find).toHaveBeenCalledWith({ publicationStatus: 'soumis' });
+    expect(Accommodation.find).toHaveBeenCalledWith({
+      publicationStatus: 'soumis',
+      $and: [{ $or: [{ hotel: null }, { hotel: { $exists: false } }] }],
+    });
   });
 });
 

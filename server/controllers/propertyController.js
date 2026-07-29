@@ -460,7 +460,8 @@ const getAllProperties = asyncHandler(async (req, res) => {
 const getPendingProperties = asyncHandler(async (req, res) => {
   logger.info('📡 [Admin] Récupération des annonces en attente...');
 
-  const properties = await Property.find({ statusAdmin: 'En attente' })
+  const { classicPropertyModerationFilter } = require('../services/moderationClassificationService');
+  const properties = await Property.find(classicPropertyModerationFilter({ statusAdmin: 'En attente' }))
     .populate('owner', 'name email photo role phone')
     .sort('-createdAt');
 
@@ -474,7 +475,8 @@ const getPendingProperties = asyncHandler(async (req, res) => {
 });
 
 const getPendingPropertiesCount = asyncHandler(async (_req, res) => {
-  const unreadCount = await Property.countDocuments({ statusAdmin: 'En attente' });
+  const { classicPropertyModerationFilter } = require('../services/moderationClassificationService');
+  const unreadCount = await Property.countDocuments(classicPropertyModerationFilter({ statusAdmin: 'En attente' }));
   res.status(200).json({ status: 'success', data: { unreadCount } });
 });
 

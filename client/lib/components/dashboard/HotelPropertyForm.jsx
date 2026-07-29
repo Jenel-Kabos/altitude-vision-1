@@ -9,17 +9,17 @@
 // (liées une fois l'hôtel créé) — ce formulaire couvre uniquement
 // Informations/Services/Galerie/Publication.
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import { getPropertyFormConfig } from "../../utils/propertyFormConfig";
+import { firstHotelWizardError, getHotelWizardFieldMeta, validateHotelWizard } from "../../utils/hotelWizardValidation";
 import { VILLES, getArrondissementsFor } from "../../constants/locations";
 import { HOTEL_RATE_TYPES, HOTEL_SERVICES } from "../../constants/hotel";
 import { ACCOMMODATION_TYPES, AMENITY_CATEGORIES } from "../../constants/accommodation";
 import {
   ROOM_CATEGORY_TYPES, buildHotelPublicationPayload, createHotelRoomCategory,
-  getHotelCategoryTotals, validateHotelCategories, validateHotelRates,
-  validateHotelRoomCategories,
+  getHotelCategoryTotals,
 } from "../../utils/hotelPublication";
 import {
   createFullHotel, updateFullHotel, createMyHotel, updateMyHotel, submitHotel,
@@ -340,7 +340,7 @@ const HotelPropertyForm = ({
 
       <div className="flex gap-2 border-t pt-4">
         <button type="submit" disabled={loading} className="bg-gold text-white px-4 py-2 rounded font-medium disabled:opacity-50">
-          {loading ? "Enregistrement..." : "Enregistrer l'hôtel"}
+          {loading ? "Enregistrement..." : completion?.complete ? "Enregistrer les modifications" : "Enregistrer le brouillon"}
         </button>
         {onCancel && <button type="button" onClick={onCancel} className="text-gray-600 px-4 py-2">Annuler</button>}
       </div>
@@ -366,6 +366,7 @@ function HotelCreationWizard({ accommodationType, scope, onSuccess, onCancel }) 
   const [form, setForm] = useState(() => newCreationForm(accommodationType));
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
   const totals = useMemo(() => getHotelCategoryTotals(form.roomCategories), [form.roomCategories]);
   const setField = (key, value) => setForm((previous) => ({ ...previous, [key]: value }));
   const updateCategory = (index, patchValue) => setForm((previous) => ({
@@ -386,27 +387,25 @@ function HotelCreationWizard({ accommodationType, scope, onSuccess, onCancel }) 
     [roomCategories[index], roomCategories[target]] = [roomCategories[target], roomCategories[index]];
     return { ...previous, roomCategories };
   });
-  const validateStep = () => {
-    const next = {};
-    if (step === 0) {
-      if (!form.name.trim()) next.name = "Nom de l'établissement requis";
-      if (!form.description.trim()) next.description = 'Description requise';
-    }
-    if (step === 1) {
-      if (!form.address.city) next.city = 'Ville requise';
-      if (!form.address.arrondissement) next.arrondissement = 'Arrondissement requis';
-      if (!form.phone.trim()) next.phone = 'Téléphone requis';
-    }
-    if (step === 3) Object.assign(next, validateHotelRoomCategories(form.roomCategories));
-    if (step === 4) Object.assign(next, validateHotelRates(form.roomCategories));
-    if (step === 7 && !form.images.length) next.images = 'Ajoutez au moins une photo';
-    if (step === 8) Object.assign(next, validateHotelCategories(form.roomCategories));
+  const showErrors = (next) => {
     setErrors(next);
-    return Object.keys(next).length === 0;
+    const first = firstHotelWizardError(next);
+    if (first) {
+      setStep(first.step);
+      setTimeout(() => document.querySelector('[aria-invalid="true"]')?.focus(), 0);
+    }
+    return !first;
   };
+  const validateStep = () => showErrors(validateHotelWizard(form, step));
   const next = () => { if (validateStep()) setStep((current) => Math.min(current + 1, CREATION_STEPS.length - 1)); };
   const submit = async () => {
-    if (!validateStep() || loading) return;
+    if (loading || submittingRef.current) return;
+    const allErrors = validateHotelWizard(form);
+    if (!showErrors(allErrors)) {
+      toast.error(`L’hôtel ne peut pas être enregistré. Veuillez compléter ${Object.keys(allErrors).length} champ(s) obligatoire(s).`);
+      return;
+    }
+    submittingRef.current = true;
     setLoading(true);
     try {
       const payload = buildHotelPublicationPayload(form);
@@ -418,15 +417,28 @@ function HotelCreationWizard({ accommodationType, scope, onSuccess, onCancel }) 
       toast.success('Hôtel complet créé et soumis avec ses catégories et tarifs.');
       onSuccess?.(result);
     } catch (error) {
+      const missingFields = error.response?.data?.missingFields;
+      if (error.response?.status === 422 && Array.isArray(missingFields)) {
+        const aliases = {
+          'property.titre': 'name', 'accommodation.hotel.name': 'name',
+          'property.description': 'description', 'accommodation.hotel.description': 'description',
+          'property.ville': 'city', 'property.arrondissement': 'arrondissement',
+          'accommodation.hotel.phone': 'phone', 'property.photos': 'images',
+          'accommodation.hotel.hotelServices': 'hotelServices',
+        };
+        const backendErrors = Object.fromEntries(missingFields.map(({ field, label }) => [aliases[field] || field, `${label || 'Ce champ'} est obligatoire.`]));
+        showErrors(backendErrors);
+      }
       toast.error(error.response?.data?.message || error.message || "Impossible de créer l'établissement.");
-    } finally { setLoading(false); }
+    } finally { submittingRef.current = false; setLoading(false); }
   };
 
   const createConfig = getPropertyFormConfig({ transactionType: 'hebergement', accommodationType, propertyType: 'Hôtel', mode: 'create' });
   const CreateIcon = createConfig.Icon;
   return <div className="space-y-5">
     <div className={`rounded-2xl bg-gradient-to-r ${createConfig.tone} p-4 text-white shadow-sm`}><div className="flex items-center gap-3"><span className="rounded-xl bg-white/20 p-2"><CreateIcon className="h-6 w-6" /></span><div><p className="text-xs font-semibold uppercase tracking-wider text-white/80">Création · Établissement hôtelier</p><h2 className="text-xl font-bold">{createConfig.title}</h2></div></div><p className="mt-3 text-sm text-white/90">Renseignez l’établissement, ses catégories de chambres, ses tarifs, ses services, ses politiques et ses médias.</p></div>
-    <ol aria-label="Étapes du formulaire" className="grid grid-cols-3 gap-1 text-xs text-gray-500">{CREATION_STEPS.map((label, index) => <li key={label} className={index === step ? 'font-semibold text-gray-900' : ''}>{label}</li>)}</ol>
+    {Object.keys(errors).length > 0 && <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800"><strong>L’hôtel ne peut pas être enregistré.</strong><ul className="mt-1 list-disc pl-5">{Object.entries(errors).map(([field, message]) => <li key={field}>{getHotelWizardFieldMeta(field).label} — {message}</li>)}</ul></div>}
+    <ol aria-label="Étapes du formulaire" className="grid grid-cols-3 gap-1 text-xs text-gray-500">{CREATION_STEPS.map((label, index) => { const hasError = Object.keys(errors).some((field) => getHotelWizardFieldMeta(field).step === index); return <li key={label} aria-current={index === step ? 'step' : undefined} className={hasError ? 'font-semibold text-red-700' : index === step ? 'font-semibold text-gray-900' : ''}>{hasError ? '⚠ ' : index < step ? '✓ ' : ''}{label}</li>; })}</ol>
     <div className="flex items-center justify-between"><div><p className="text-xs uppercase tracking-wide text-gray-500">Étape {step + 1}/9</p><h3 className="text-xl font-semibold">{CREATION_STEPS[step]}</h3></div><span className="text-sm text-gray-500">{totals.totalRooms} chambres · {totals.minNightlyRate.toLocaleString('fr-FR')} XAF min.</span></div>
     {step === 0 && <div className="grid grid-cols-2 gap-3">
       <select aria-label="Type d'établissement" className={inputClass} value={form.accommodationType} onChange={(event) => setField('accommodationType', event.target.value)}>{ACCOMMODATION_TYPES.filter((type) => ['hotel', 'residence_hoteliere', 'chambre_hotes', 'autre'].includes(type.value)).map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select>
@@ -436,8 +448,8 @@ function HotelCreationWizard({ accommodationType, scope, onSuccess, onCancel }) 
       <div className="col-span-2"><Field label="Description" value={form.description} onChange={(value) => setField('description', value)} textarea error={errors.description} /></div>
     </div>}
     {step === 1 && <div className="grid grid-cols-2 gap-3">
-      <select aria-label="Ville" className={inputClass} value={form.address.city} onChange={(event) => setForm((previous) => ({ ...previous, address: { ...previous.address, city: event.target.value, arrondissement: '' } }))}>{VILLES.map((city) => <option key={city}>{city}</option>)}</select>
-      <select aria-label="Arrondissement" className={inputClass} value={form.address.arrondissement} onChange={(event) => setForm((previous) => ({ ...previous, address: { ...previous.address, arrondissement: event.target.value } }))}><option value="">Sélectionner</option>{getArrondissementsFor(form.address.city).map((value) => <option key={value}>{value}</option>)}</select>
+      <select aria-label="Ville" aria-invalid={Boolean(errors.city)} className={`${inputClass} ${errors.city ? 'border-red-500 bg-red-50' : ''}`} value={form.address.city} onChange={(event) => setForm((previous) => ({ ...previous, address: { ...previous.address, city: event.target.value, arrondissement: '' } }))}>{VILLES.map((city) => <option key={city}>{city}</option>)}</select>
+      <select aria-label="Arrondissement" aria-invalid={Boolean(errors.arrondissement)} className={`${inputClass} ${errors.arrondissement ? 'border-red-500 bg-red-50' : ''}`} value={form.address.arrondissement} onChange={(event) => setForm((previous) => ({ ...previous, address: { ...previous.address, arrondissement: event.target.value } }))}><option value="">Sélectionner</option>{getArrondissementsFor(form.address.city).map((value) => <option key={value}>{value}</option>)}</select>
       <Field label="Adresse complète" value={form.address.street} onChange={(value) => setForm((previous) => ({ ...previous, address: { ...previous.address, street: value } }))} />
       <Field label="Téléphone principal" value={form.phone} onChange={(value) => setField('phone', value)} error={errors.phone} />
       <Field label="Email professionnel" value={form.email} onChange={(value) => setField('email', value)} /><Field label="Site web" value={form.website} onChange={(value) => setField('website', value)} />
@@ -446,17 +458,18 @@ function HotelCreationWizard({ accommodationType, scope, onSuccess, onCancel }) 
     {step === 2 && <div className="rounded-lg border p-4"><p className="font-medium">Capacité calculée automatiquement</p><p className="text-sm text-gray-600">{totals.totalRooms} chambres · {totals.totalCapacity} personnes · {totals.totalBeds} lits. Ces valeurs proviennent des catégories et ne sont jamais saisies deux fois.</p></div>}
     {step === 3 && <div className="space-y-4">{form.roomCategories.map((category, index) => <CategoryEditor key={category.clientKey} category={category} index={index} errors={errors} update={updateCategory} remove={removeCategory} duplicate={duplicateCategory} move={moveCategory} />)}{errors.roomCategories && <p className="text-sm text-red-600">{errors.roomCategories}</p>}<button type="button" onClick={addCategory} className="rounded bg-blue-600 px-3 py-2 text-white">Ajouter une catégorie</button></div>}
     {step === 4 && <div className="space-y-4">{form.roomCategories.map((category, index) => <RateEditor key={category.clientKey} category={category} index={index} error={errors[`roomCategories.${index}.ratePlans`]} update={updateCategory} />)}</div>}
-    {step === 5 && <div className="grid grid-cols-2 gap-2">{HOTEL_SERVICES.map((service) => <label key={service.key} className="flex gap-2 rounded border p-3"><input type="checkbox" checked={Boolean(form.hotelServices[service.key])} onChange={() => setField('hotelServices', { ...form.hotelServices, [service.key]: !form.hotelServices[service.key] })} />{service.label}</label>)}</div>}
+    {step === 5 && <div><div className={`grid grid-cols-2 gap-2 rounded ${errors.hotelServices ? 'border border-red-500 bg-red-50 p-2' : ''}`}>{HOTEL_SERVICES.map((service) => <label key={service.key} className="flex gap-2 rounded border p-3"><input type="checkbox" checked={Boolean(form.hotelServices[service.key])} onChange={() => setField('hotelServices', { ...form.hotelServices, [service.key]: !form.hotelServices[service.key] })} />{service.label}</label>)}</div>{errors.hotelServices && <p className="mt-1 text-sm text-red-600">{errors.hotelServices}</p>}</div>}
     {step === 6 && <div className="grid grid-cols-2 gap-3"><Field label="Heure de check-in" value={form.checkInTime} onChange={(value) => setField('checkInTime', value)} /><Field label="Heure de check-out" value={form.checkOutTime} onChange={(value) => setField('checkOutTime', value)} /></div>}
-    {step === 7 && <div><label className="block text-sm font-medium mb-1">Photos de l'hôtel</label><input aria-label="Photos de l'hôtel" type="file" multiple accept="image/*" onChange={(event) => setField('images', Array.from(event.target.files))} /><p className="text-sm text-gray-500 mt-2">{form.images.length} photo(s) sélectionnée(s)</p>{errors.images && <p className="text-sm text-red-600">{errors.images}</p>}</div>}
+    {step === 7 && <div><label className="block text-sm font-medium mb-1">Photos de l'hôtel</label><input aria-label="Photos de l'hôtel" aria-invalid={Boolean(errors.images)} type="file" multiple accept="image/*" className={errors.images ? 'rounded border border-red-500 bg-red-50 p-2' : ''} onChange={(event) => setField('images', Array.from(event.target.files))} /><p className="text-sm text-gray-500 mt-2">{form.images.length} photo(s) sélectionnée(s)</p>{errors.images && <p className="text-sm text-red-600">{errors.images}</p>}</div>}
     {step === 8 && <div className="rounded-lg border p-4 space-y-2"><p><strong>{form.name}</strong> · {form.address.arrondissement}, {form.address.city}</p><p>{totals.totalRooms} chambres · {totals.totalCapacity} personnes · {totals.totalBeds} lits</p><p>{totals.minNightlyRate.toLocaleString('fr-FR')} à {totals.maxNightlyRate.toLocaleString('fr-FR')} XAF / nuit</p>{form.roomCategories.map((category) => <p key={category.clientKey}>{category.name} ({category.code}) — {category.quantity} unité(s) — {Number(category.ratePlans.find((rate) => rate.rateType === 'public')?.amount || 0).toLocaleString('fr-FR')} XAF</p>)}</div>}
-    <div className="flex gap-2 border-t pt-4"><button type="button" onClick={() => step ? setStep(step - 1) : onCancel?.()} className="px-4 py-2 text-gray-600">Retour</button>{step < 8 ? <button type="button" onClick={next} className="rounded bg-gold px-4 py-2 text-white">Continuer</button> : <button type="button" disabled={loading} onClick={submit} className="rounded bg-gold px-4 py-2 text-white disabled:opacity-50">{loading ? 'Publication…' : "Publier l'hôtel"}</button>}</div>
+    <div className="flex gap-2 border-t pt-4"><button type="button" onClick={() => step ? setStep(step - 1) : onCancel?.()} className="px-4 py-2 text-gray-600">Retour</button>{step < 8 ? <button type="button" onClick={next} className="rounded bg-gold px-4 py-2 text-white">Continuer</button> : <button type="button" disabled={loading} onClick={submit} className="rounded bg-gold px-4 py-2 text-white disabled:opacity-50">{loading ? 'Enregistrement…' : "Créer et soumettre l'hôtel"}</button>}</div>
   </div>;
 }
 
 function Field({ label, value, onChange, error, textarea = false }) {
   const Element = textarea ? 'textarea' : 'input';
-  return <label className="block text-sm font-medium">{label}<Element aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} className={`${inputClass} mt-1`} rows={textarea ? 4 : undefined} />{error && <span className="text-xs text-red-600">{error}</span>}</label>;
+  const errorId = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-error`;
+  return <label className="block text-sm font-medium">{label}<Element aria-label={label} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} value={value} onChange={(event) => onChange(event.target.value)} className={`${inputClass} mt-1 ${error ? 'border-red-500 bg-red-50' : ''}`} rows={textarea ? 4 : undefined} />{error && <span id={errorId} className="text-xs text-red-600">{error}</span>}</label>;
 }
 
 function CategoryEditor({ category, index, errors, update, remove, duplicate, move }) {

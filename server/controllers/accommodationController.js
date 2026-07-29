@@ -470,7 +470,8 @@ exports.submit = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.pending = async (req, res) => {
   try {
-    const accommodations = await Accommodation.find({ publicationStatus: 'soumis' })
+    const { accommodationModerationFilter } = require('../services/moderationClassificationService');
+    const accommodations = await Accommodation.find(accommodationModerationFilter({ publicationStatus: 'soumis' }))
       .populate('property', 'title images address owner bedrooms bathrooms')
       .sort({ submittedAt: 1 });
     const withScore = await Promise.all(accommodations.map(async (a) => {

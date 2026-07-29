@@ -84,12 +84,32 @@ function validatePayloadShape(payload) {
   if (payload?.publicationKind === 'furnished_accommodation' && !furnishedTypes.includes(accommodation.accommodationType)) errors.push('accommodation.accommodationType');
   if (payload?.publicationKind === 'hotel_establishment' && !hotelTypes.includes(accommodation.accommodationType)) errors.push('accommodation.accommodationType');
   if (payload?.publicationKind === 'hotel_establishment' && !String(accommodation.hotel?.name || '').trim()) errors.push('accommodation.hotel.name');
+  if (payload?.publicationKind === 'hotel_establishment' && !String(accommodation.hotel?.description || '').trim()) errors.push('accommodation.hotel.description');
+  if (payload?.publicationKind === 'hotel_establishment' && !String(accommodation.hotel?.phone || '').trim()) errors.push('accommodation.hotel.phone');
+  if (payload?.publicationKind === 'hotel_establishment' && !Object.values(accommodation.hotel?.hotelServices || {}).some(Boolean)) errors.push('accommodation.hotel.hotelServices');
   if (hotelAnalysis) {
     errors.push(...hotelAnalysis.errors);
     if (Number(property.prix) !== hotelAnalysis.totals?.minNightlyRate) errors.push('property.prix/minNightlyRate');
   }
 
   if (errors.length > 0) {
+    if (payload?.publicationKind === 'hotel_establishment') {
+      const meta = (field) => {
+        if (field === 'accommodation.hotel.name' || field === 'property.titre') return { label: "Nom de l’hôtel", step: 'general' };
+        if (field === 'accommodation.hotel.description' || field === 'property.description') return { label: 'Description', step: 'general' };
+        if (field === 'accommodation.hotel.phone') return { label: 'Téléphone', step: 'location' };
+        if (field === 'property.ville') return { label: 'Ville', step: 'location' };
+        if (field === 'property.arrondissement') return { label: 'Arrondissement', step: 'location' };
+        if (field === 'property.photos') return { label: 'Photos', step: 'photos' };
+        if (field === 'accommodation.hotel.hotelServices') return { label: 'Services', step: 'services' };
+        if (field.includes('ratePlans') || field.includes('minNightlyRate')) return { label: 'Tarifs', step: 'rates' };
+        if (field.startsWith('roomCategories')) return { label: 'Catégories de chambres', step: 'roomCategories' };
+        return { label: field, step: 'general' };
+      };
+      fail('HOTEL_INCOMPLETE', 'Cet hôtel est incomplet et ne peut pas être enregistré.', 422, {
+        missingFields: [...new Set(errors)].map((field) => ({ field, ...meta(field) })),
+      });
+    }
     fail(
       'MOBILE_ACCOMMODATION_VALIDATION_ERROR',
       `Payload de publication invalide ou incomplet : ${errors.join(', ')}.`,
