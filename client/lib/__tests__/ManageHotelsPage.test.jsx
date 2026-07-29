@@ -13,6 +13,7 @@ vi.mock('../services/hotelService', () => ({
   reviewHotel: vi.fn(),
 }));
 vi.mock('../components/dashboard/HotelPropertyForm', () => ({ default: () => <div>FORMULAIRE HÔTEL TEST DATA</div> }));
+vi.mock('../services/dashboardAnalyticsService', () => ({ getDashboardAnalytics: vi.fn().mockResolvedValue({ kpis: {} }) }));
 
 const hotel = (overrides = {}) => ({
   _id: 'HOTEL-1',

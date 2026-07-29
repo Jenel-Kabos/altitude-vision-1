@@ -40,6 +40,10 @@ const USER_LINKS = {
   hotel_reservation_pending: '/mes-hotels/reservations', hotel_reservation_confirmed: '/mes-reservations-hotel',
   hotel_reservation_rejected: '/mes-reservations-hotel', hotel_reservation_cancelled: '/mes-reservations-hotel',
   hotel_reservation_expired: '/mes-reservations-hotel',
+  accommodation_reservation_pending: '/dashboard/hebergements', accommodation_reservation_confirmed: '/profile',
+  accommodation_reservation_cancelled: '/profile', accommodation_reservation_checked_in: '/profile', accommodation_reservation_checked_out: '/profile',
+  accommodation_arrival_reminder: '/profile', accommodation_checkin_today: '/profile', accommodation_checkout_today: '/profile',
+  accommodation_payment_received: '/profile', accommodation_payment_due: '/profile', accommodation_payment_completed: '/profile',
   // Sprint E — notifications individuelles (via notify() direct, pas
   // notifyStaff) : employé assigné à une tâche/un ticket.
   housekeeping_task_assigned: '/dashboard/housekeeping', maintenance_ticket_assigned: '/dashboard/maintenance',

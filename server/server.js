@@ -31,9 +31,11 @@ connectDB();
 // ============================================================
 const cron = require('node-cron');
 const { syncFacebook } = require('./scripts/sync-facebook');
+const scheduledJobsDisabled = process.env.DISABLE_SCHEDULED_JOBS === '1';
+const schedule = scheduledJobsDisabled ? () => ({ stop() {} }) : cron.schedule.bind(cron);
 
 // 🔄 Tâches de démarrage une fois MongoDB connecté (un seul handler)
-mongoose.connection.once('open', async () => {
+if (!scheduledJobsDisabled) mongoose.connection.once('open', async () => {
   // Sync Facebook
   try {
     await syncFacebook();
@@ -54,7 +56,7 @@ mongoose.connection.once('open', async () => {
 });
 
 // ⏰ Sync automatique toutes les heures
-cron.schedule('0 * * * *', async () => {
+schedule('0 * * * *', async () => {
   logger.info('⏰ [CRON] Démarrage synchronisation Facebook...');
   try {
     await syncFacebook();
@@ -86,7 +88,7 @@ logger.info('⏰ [CRON] Planificateur Facebook activé (toutes les heures)');
 const { pollZohoInbox } = require('./services/zohoImapService');
 
 // ⏰ Polling toutes les 5 minutes
-cron.schedule('*/5 * * * *', async () => {
+schedule('*/5 * * * *', async () => {
     logger.info('⏰ [CRON] Démarrage polling IMAP Zoho...');
     try {
         const stats = await pollZohoInbox();
@@ -98,6 +100,18 @@ cron.schedule('*/5 * * * *', async () => {
     }
 });
 
+// Rappels des séjours en hébergement indépendant. Le service porte toute la
+// logique de fuseau et d'idempotence ; le serveur ne fait que le déclencher.
+const { processAccommodationReservationReminders } = require('./services/accommodationReservationReminderService');
+schedule('*/15 * * * *', async () => {
+  try {
+    const result = await processAccommodationReservationReminders();
+    if (result.sent) logger.info(`⏰ [CRON Hébergements] ${result.sent} rappel(s) envoyé(s)`);
+  } catch (error) {
+    logger.error(`❌ [CRON Hébergements] ${error.message}`);
+  }
+});
+
 logger.info('⏰ [CRON] Polling IMAP Zoho activé (toutes les 5 minutes)');
 
 // ============================================================
@@ -106,7 +120,7 @@ logger.info('⏰ [CRON] Polling IMAP Zoho activé (toutes les 5 minutes)');
 const { verifierPaiementsEnRetard } = require('./services/alerteService');
 const { runRentalFinancialAutomations } = require('./services/rentalFinancialAutomationService');
 
-cron.schedule('0 6 * * *', async () => {
+schedule('0 6 * * *', async () => {
   logger.info('⏰ [CRON] Vérification paiements en retard...');
   try {
     const result = await verifierPaiementsEnRetard();
@@ -126,7 +140,7 @@ logger.info('⏰ [CRON] Vérification pénalités locatives activée (6h quotidi
 // ============================================================
 const { processVisitAutomation } = require('./services/visiteAutomationService');
 
-cron.schedule('*/5 * * * *', async () => {
+schedule('*/5 * * * *', async () => {
   try {
     const result = await processVisitAutomation();
     if (result.reminders || result.expired) logger.info(`⏰ [CRON Visites] ${result.reminders} rappel(s), ${result.expired} expiration(s)`);
@@ -145,7 +159,7 @@ logger.info('⏰ [CRON] Rappels de visites activés (toutes les 5 minutes)');
 // ============================================================
 const { processReservationExpiry } = require('./services/hotelReservationExpiryService');
 
-cron.schedule('*/5 * * * *', async () => {
+schedule('*/5 * * * *', async () => {
   try {
     const result = await processReservationExpiry();
     if (result.expired) logger.info(`⏰ [CRON Réservations Hôtel] ${result.expired} expiration(s)`);
@@ -342,6 +356,8 @@ const maintenanceRoutes      = require('./routes/maintenanceRoutes');
 const salePropertyRoutes     = require('./routes/salePropertyRoutes');
 const rentalPropertyRoutes   = require('./routes/rentalPropertyRoutes');
 const financialRoutes        = require('./routes/financialRoutes');
+const dashboardAnalyticsRoutes = require('./routes/dashboardAnalyticsRoutes');
+const accommodationReservationRoutes = require('./routes/accommodationReservationRoutes');
 
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
@@ -377,6 +393,8 @@ app.use('/api/altimmo', altimmoSearchRoutes);
 app.use('/api/hotel-reservations', hotelReservationRoutes);
 // 💰 Noyau financier F1 — routes staff protégées, sans fournisseur réel.
 app.use('/api/financial', financialRoutes);
+app.use('/api/dashboard-analytics', dashboardAnalyticsRoutes);
+app.use('/api/accommodation-reservations', accommodationReservationRoutes);
 // 🧹 Housekeeping / Inspection / Maintenance (Sprint E)
 app.use('/api/housekeeping', housekeepingRoutes);
 app.use('/api/inspections', inspectionRoutes);

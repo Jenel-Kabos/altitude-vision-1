@@ -42,7 +42,8 @@ async function scanFinancialConsistency(scope = {}) {
   for (const document of documents) {
     const documentAllocations = active.filter((item) => same(item.financialDocument, document._id));
     const allocated = sum(documentAllocations, 'amountMinor');
-    const expected = { amountAllocatedMinor: allocated, balanceMinor: document.totalMinor - allocated, paymentStatus: derivePaymentStatus(document.totalMinor, allocated) };
+    const refunded = document.refundedAmountMinor || 0; const netAllocated = Math.max(0, allocated - refunded);
+    const expected = { amountAllocatedMinor: allocated, refundedAmountMinor: refunded, balanceMinor: document.totalMinor - netAllocated, paymentStatus: derivePaymentStatus(document.totalMinor, netAllocated) };
     const actual = { amountAllocatedMinor: document.amountAllocatedMinor, balanceMinor: document.balanceMinor, paymentStatus: document.paymentStatus };
     if (Object.keys(expected).some((key) => expected[key] !== actual[key])) issues.push(issue('FINANCIAL_DOCUMENT_AGGREGATE_MISMATCH', 'FinancialDocument', document._id, { repairable: true, actual, expected }));
     const documentLines = lines.filter((line) => same(line.financialDocument, document._id));
@@ -60,11 +61,11 @@ async function scanFinancialConsistency(scope = {}) {
   for (const payment of payments) {
     const paymentAllocations = active.filter((item) => same(item.financialPayment, payment._id));
     const allocated = sum(paymentAllocations, 'amountMinor');
-    const expected = { allocatedAmountMinor: allocated, availableAmountMinor: payment.amountMinor - payment.refundedAmountMinor - allocated };
+    const expected = { allocatedAmountMinor: allocated, availableAmountMinor: payment.amountMinor - allocated };
     const actual = { allocatedAmountMinor: payment.allocatedAmountMinor, availableAmountMinor: payment.availableAmountMinor };
     if (Object.keys(expected).some((key) => expected[key] !== actual[key])) issues.push(issue('FINANCIAL_PAYMENT_AGGREGATE_MISMATCH', 'FinancialPayment', payment._id, { repairable: true, actual, expected }));
     if (expected.availableAmountMinor < 0 || allocated > payment.amountMinor) issues.push(issue('FINANCIAL_PAYMENT_OVERALLOCATED', 'FinancialPayment', payment._id, { severity: CRITICAL }));
-    if (paymentAllocations.length && payment.status !== 'succeeded') issues.push(issue('FINANCIAL_UNCONFIRMED_PAYMENT_ACTIVE_ALLOCATION', 'FinancialPayment', payment._id, { severity: CRITICAL }));
+    if (paymentAllocations.length && !['succeeded', 'partially_refunded', 'refunded'].includes(payment.status)) issues.push(issue('FINANCIAL_UNCONFIRMED_PAYMENT_ACTIVE_ALLOCATION', 'FinancialPayment', payment._id, { severity: CRITICAL }));
     if (payment.refundedAmountMinor > payment.amountMinor || (payment.status === 'refunded' && payment.refundedAmountMinor !== payment.amountMinor)) issues.push(issue('FINANCIAL_REFUND_AMOUNT_MISMATCH', 'FinancialPayment', payment._id, { severity: CRITICAL }));
     if (payment.status === 'succeeded' && !hasLedger('payment.confirmed', payment._id)) issues.push(issue('FINANCIAL_PAYMENT_LEDGER_MISSING', 'FinancialPayment', payment._id, { severity: HIGH }));
   }

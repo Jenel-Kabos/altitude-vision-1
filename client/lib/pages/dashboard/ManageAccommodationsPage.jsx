@@ -11,6 +11,9 @@ import { getAccommodationsAdmin, reviewAccommodation } from "../../services/acco
 import { getPublicationErrorMessage } from "../../utils/publicationError";
 import { ACCOMMODATION_TYPES, PUBLICATION_STATUSES } from "../../constants/accommodation";
 import AccommodationPropertyForm from "../../components/dashboard/AccommodationPropertyForm";
+import DashboardKpis from "../../components/dashboard/DashboardKpis";
+import { getDashboardAnalytics } from "../../services/dashboardAnalyticsService";
+import AccommodationReservationsPanel from "../../components/dashboard/AccommodationReservationsPanel";
 
 const STATUS_TABS = [{ value: "tous", label: "Tous" }, ...PUBLICATION_STATUSES];
 
@@ -43,6 +46,7 @@ const ManageAccommodationsPage = () => {
   const [reasonInputs, setReasonInputs] = useState({});
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [analytics, setAnalytics] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -57,6 +61,7 @@ const ManageAccommodationsPage = () => {
   };
 
   useEffect(() => { load(); }, [status, type, sort, page]);
+  useEffect(() => { getDashboardAnalytics('accommodations').then(setAnalytics).catch(() => setAnalytics({ kpis: {} })); }, []);
   useEffect(() => {
     const timeout = setTimeout(() => { setPage(1); load(); }, 300);
     return () => clearTimeout(timeout);
@@ -94,6 +99,19 @@ const ManageAccommodationsPage = () => {
         Tous les hébergements indépendants (villas, appartements, studios, maisons, chambres d'hôtes,
         résidences meublées), quel que soit leur statut de publication.
       </p>
+
+      <DashboardKpis items={[
+        { key: 'total', label: 'Hébergements', value: analytics?.kpis?.total }, { key: 'published', label: 'Publiés', value: analytics?.kpis?.published },
+        { key: 'drafts', label: 'Brouillons', value: analytics?.kpis?.drafts }, { key: 'unavailable', label: 'Indisponibles', value: analytics?.kpis?.unavailable },
+        { key: 'maintenance', label: 'Maintenance', value: analytics?.kpis?.maintenance },
+        { key: 'today', label: "Réservations aujourd'hui", value: analytics?.kpis?.reservationsToday }, { key: 'week', label: 'Réservations semaine', value: analytics?.kpis?.reservationsWeek },
+        { key: 'checkins', label: 'Arrivées du jour', value: analytics?.kpis?.checkInsToday }, { key: 'checkouts', label: 'Départs du jour', value: analytics?.kpis?.checkOutsToday },
+        { key: 'occupancy', label: 'Occupation mensuelle', value: `${analytics?.kpis?.occupancyRate || 0}%` }, { key: 'nights', label: 'Nuitées réservées', value: analytics?.kpis?.reservedNights },
+        { key: 'bookedMonth', label: 'Valeur réservée ce mois', value: analytics?.kpis?.bookedValueMonth, format: 'money' }, { key: 'grossCollected', label: 'Montant brut encaissé', value: analytics?.kpis?.grossAmountCollected, format: 'money' },
+        { key: 'remaining', label: 'Solde à encaisser', value: analytics?.kpis?.remainingAmount, format: 'money' }, { key: 'refunded', label: 'Montant remboursé', value: analytics?.kpis?.refundedAmount, format: 'money' },
+        { key: 'netCollected', label: 'Montant net encaissé', value: analytics?.kpis?.netAmountCollected, format: 'money' }, { key: 'refundPending', label: 'Remboursements en attente', value: analytics?.kpis?.pendingRefunds }, { key: 'refundFailed', label: 'Remboursements échoués', value: analytics?.kpis?.failedRefunds },
+        { key: 'paid', label: 'Réservations payées', value: analytics?.kpis?.paidReservations }, { key: 'partial', label: 'Paiements partiels', value: analytics?.kpis?.partiallyPaidReservations }, { key: 'unpaid', label: 'Réservations impayées', value: analytics?.kpis?.unpaidReservations },
+      ]} loading={!analytics} note={analytics?.occupancyFormula} />
 
       {(creating || editing) && <div className="mb-6 border rounded-xl p-4">
         <AccommodationPropertyForm accommodation={editing} onSuccess={() => { setCreating(false); setEditing(null); load(); }} onCancel={() => { setCreating(false); setEditing(null); }} />
@@ -218,6 +236,7 @@ const ManageAccommodationsPage = () => {
           </button>
         </div>
       )}
+      <AccommodationReservationsPanel accommodations={data.accommodations} onChanged={() => getDashboardAnalytics('accommodations').then(setAnalytics)} />
     </div>
   );
 };

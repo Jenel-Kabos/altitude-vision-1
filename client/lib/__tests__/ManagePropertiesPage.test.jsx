@@ -49,6 +49,7 @@ vi.mock('../services/rentalPropertyService', () => ({
   createFullRentalProperty: vi.fn(),
   updateFullRentalProperty: vi.fn(),
 }));
+vi.mock('../services/dashboardAnalyticsService', () => ({ getDashboardAnalytics: vi.fn().mockResolvedValue({ kpis: {} }) }));
 
 // Sprint A — cliquer "Ajouter" ouvre désormais un sélecteur métier
 // (Vente/Location/Hébergement) avant tout formulaire.

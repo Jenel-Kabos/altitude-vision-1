@@ -1,0 +1,98 @@
+const Property = require('../models/Property');
+const Accommodation = require('../models/Accommodation');
+const Hotel = require('../models/Hotel');
+const Transaction = require('../models/Transaction');
+const Visite = require('../models/Visite');
+const RentalManagement = require('../models/RentalManagement');
+const Contrat = require('../models/Contrat');
+const Paiement = require('../models/Paiement');
+const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
+const HotelReservation = require('../models/HotelReservation');
+const Room = require('../models/Room');
+const HousekeepingTask = require('../models/HousekeepingTask');
+const MaintenanceTicket = require('../models/MaintenanceTicket');
+const AccommodationReservation = require('../models/AccommodationReservation');
+const AccommodationNightLock = require('../models/AccommodationNightLock');
+const FinancialDocument = require('../models/FinancialDocument');
+const PaymentAllocation = require('../models/PaymentAllocation');
+const FinancialRefund = require('../models/FinancialRefund');
+const { ROLES_ALTIMMO, ROLES_GL } = require('../utils/roles');
+
+const dayBounds = () => { const start = new Date(); start.setHours(0, 0, 0, 0); const end = new Date(start); end.setDate(end.getDate() + 1); return { start, end }; };
+const periodStarts = () => { const { start: today, end: tomorrow } = dayBounds(); const month = new Date(today.getFullYear(), today.getMonth(), 1); const year = new Date(today.getFullYear(), 0, 1); return { today, tomorrow, month, year }; };
+
+async function sales() {
+  const now = new Date();
+  const ids = await Property.find({ status: 'vente' }).distinct('_id');
+  const [properties, visits, transactions, recent] = await Promise.all([
+    Property.aggregate([{ $match: { status: 'vente' } }, { $group: { _id: null, total: { $sum: 1 }, published: { $sum: { $cond: [{ $eq: ['$statusAdmin', 'Validée'] }, 1, 0] } }, drafts: { $sum: { $cond: [{ $ne: ['$statusAdmin', 'Validée'] }, 1, 0] } }, sold: { $sum: { $cond: [{ $eq: ['$availability', 'Vendu'] }, 1, 0] } }, active: { $sum: { $cond: [{ $eq: ['$availability', 'Disponible'] }, 1, 0] } } } }]),
+    Visite.countDocuments({ property: { $in: ids }, scheduledStartAt: { $gte: now }, statut: { $nin: ['Terminée', 'Annulée'] } }),
+    Transaction.aggregate([{ $match: { transactionType: 'vente' } }, { $group: { _id: null, pendingOffers: { $sum: { $cond: [{ $in: ['$status', ['En cours', 'Paiement en attente']] }, 1, 0] } }, salesAmount: { $sum: { $cond: [{ $eq: ['$status', 'Réussie'] }, '$finalAmount', 0] } }, commissions: { $sum: { $cond: [{ $eq: ['$status', 'Réussie'] }, '$commission.agencyNet', 0] } } } }]),
+    Transaction.find({ transactionType: 'vente', status: 'Réussie' }).sort({ transactionDate: -1 }).limit(5).select('property finalAmount commission.agencyNet transactionDate').populate('property', 'title').lean(),
+  ]);
+  return { kpis: { ...(properties[0] || { total: 0, published: 0, drafts: 0, sold: 0, active: 0 }), scheduledVisits: visits, ...(transactions[0] || { pendingOffers: 0, salesAmount: 0, commissions: 0 }) }, recent };
+}
+
+async function rentals() {
+  const now = new Date(); const soon = new Date(now.getTime() + 30 * 86400000);
+  const [management, contracts, payments, maintenance] = await Promise.all([
+    RentalManagement.aggregate([{ $match: { managementActivated: true } }, { $group: { _id: null, available: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'disponible'] }, 1, 0] } }, occupied: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'occupe'] }, 1, 0] } }, notices: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'preavis'] }, 1, 0] } } } }]),
+    Contrat.aggregate([{ $match: { type: 'location' } }, { $group: { _id: null, activeContracts: { $sum: { $cond: [{ $eq: ['$statut', 'actif'] }, 1, 0] } }, expiringContracts: { $sum: { $cond: [{ $and: [{ $eq: ['$statut', 'actif'] }, { $gte: ['$dateFinBail', now] }, { $lte: ['$dateFinBail', soon] }] }, 1, 0] } } } }]),
+    Paiement.aggregate([{ $group: { _id: null, rentCollected: { $sum: { $ifNull: ['$montantRecu', 0] } }, unpaidRent: { $sum: { $cond: [{ $in: ['$statut', ['impayé', 'en_retard', 'partiel']] }, { $max: [{ $subtract: [{ $ifNull: ['$montantTotal', '$montant'] }, { $ifNull: ['$montantRecu', 0] }] }, 0] }, 0] } }, penalties: { $sum: { $cond: ['$penaliteAppliquee', '$penaliteMontant', 0] } } } }]),
+    RentalMaintenanceTicket.countDocuments({ status: { $in: RentalMaintenanceTicket.OPEN_RENTAL_MAINTENANCE_STATUSES } }),
+  ]);
+  return { kpis: { ...(management[0] || { available: 0, occupied: 0, notices: 0 }), ...(contracts[0] || { activeContracts: 0, expiringContracts: 0 }), ...(payments[0] || { rentCollected: 0, unpaidRent: 0, penalties: 0 }), maintenance } };
+}
+
+async function accommodations() {
+  const { today, tomorrow, month, year } = periodStarts(); const week = new Date(today.getTime() + 7 * 86400000); const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const independent = { $or: [{ hotel: null }, { hotel: { $exists: false } }] };
+  const publishedIds = await Accommodation.find({ ...independent, publicationStatus: 'publie' }).distinct('_id');
+  const [rows, reservationRows, reservationNights, blockedNights, documents, allocations, refunds] = await Promise.all([
+    Accommodation.aggregate([{ $match: independent }, { $lookup: { from: 'properties', localField: 'property', foreignField: '_id', as: 'property' } }, { $unwind: '$property' }, { $group: { _id: null, total: { $sum: 1 }, published: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'publie'] }, 1, 0] } }, drafts: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'brouillon'] }, 1, 0] } }, unavailable: { $sum: { $cond: [{ $ne: ['$property.availability', 'Disponible'] }, 1, 0] } }, maintenance: { $sum: { $cond: [{ $eq: ['$property.availability', 'En maintenance'] }, 1, 0] } } } }]),
+    AccommodationReservation.aggregate([{ $match: { accommodation: { $in: publishedIds }, status: { $in: ['confirmed', 'checked_in', 'checked_out'] } } }, { $group: { _id: null,
+      reservationsToday: { $sum: { $cond: [{ $and: [{ $lt: ['$checkInDate', tomorrow] }, { $gt: ['$checkOutDate', today] }] }, 1, 0] } },
+      reservationsWeek: { $sum: { $cond: [{ $and: [{ $lt: ['$checkInDate', week] }, { $gt: ['$checkOutDate', today] }] }, 1, 0] } },
+      checkInsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$checkInDate', today] }, { $lt: ['$checkInDate', tomorrow] }] }, 1, 0] } },
+      checkOutsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$checkOutDate', today] }, { $lt: ['$checkOutDate', tomorrow] }] }, 1, 0] } },
+      bookedValueToday: { $sum: { $cond: [{ $gte: ['$pricingSnapshot.confirmedAt', today] }, '$total', 0] } }, bookedValueMonth: { $sum: { $cond: [{ $gte: ['$pricingSnapshot.confirmedAt', month] }, '$total', 0] } }, bookedValueYear: { $sum: { $cond: [{ $gte: ['$pricingSnapshot.confirmedAt', year] }, '$total', 0] } },
+      amountCollected: { $sum: '$amountPaid' }, reservedNights: { $sum: '$nights' },
+    } }]),
+    AccommodationNightLock.countDocuments({ accommodation: { $in: publishedIds }, sourceType: 'reservation', date: { $gte: month, $lt: nextMonth } }),
+    AccommodationNightLock.countDocuments({ accommodation: { $in: publishedIds }, sourceType: 'block', date: { $gte: month, $lt: nextMonth } }),
+    FinancialDocument.aggregate([{ $match: { domain: 'real_estate', establishmentType: 'Accommodation', establishmentId: { $in: publishedIds }, subjectType: 'AccommodationReservation', status: { $ne: 'cancelled' } } }, { $group: { _id: null, remainingAmount: { $sum: '$balanceMinor' }, paidReservations: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0] } }, partiallyPaidReservations: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'partially_paid'] }, 1, 0] } }, unpaidReservations: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'unpaid'] }, 1, 0] } } } }]),
+    PaymentAllocation.aggregate([{ $match: { domain: 'real_estate', establishmentType: 'Accommodation', establishmentId: { $in: publishedIds }, status: 'active' } }, { $group: { _id: null, amountCollected: { $sum: '$amountMinor' } } }]),
+    FinancialRefund.aggregate([{ $match: { domain: 'real_estate', establishmentType: 'Accommodation', establishmentId: { $in: publishedIds } } }, { $group: { _id: null, refundedAmount: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, '$amountMinor', 0] } }, pendingRefunds: { $sum: { $cond: [{ $in: ['$status', ['requested', 'approved', 'processing']] }, 1, 0] } }, failedRefunds: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } } } }]),
+  ]);
+  const base = rows[0] || { total: 0, published: 0, drafts: 0, unavailable: 0, maintenance: 0 }; const daysInMonth = Math.round((nextMonth - month) / 86400000);
+  const availableNights = Math.max(0, publishedIds.length * daysInMonth - blockedNights); const occupancyRate = availableNights ? Math.round((reservationNights / availableNights) * 10000) / 100 : 0;
+  const reservationStats = reservationRows[0] || { reservationsToday: 0, reservationsWeek: 0, checkInsToday: 0, checkOutsToday: 0, bookedValueToday: 0, bookedValueMonth: 0, bookedValueYear: 0, reservedNights: 0 };
+  delete reservationStats.amountCollected;
+  const gross = allocations[0]?.amountCollected || 0; const refundStats = refunds[0] || { refundedAmount: 0, pendingRefunds: 0, failedRefunds: 0 };
+  return { kpis: { ...base, ...reservationStats, ...(documents[0] || { remainingAmount: 0, paidReservations: 0, partiallyPaidReservations: 0, unpaidReservations: 0 }), amountCollected: gross, grossAmountCollected: gross, ...refundStats, netAmountCollected: Math.max(0, gross - refundStats.refundedAmount), occupancyRate },
+    occupancyFormula: 'Nuits verrouillées par réservation sur le mois / (hébergements publiés × jours du mois − nuits bloquées manuellement) × 100.', revenueBasis: 'Valeur réservée et montant encaissé sont exposés séparément.' };
+}
+
+async function hotels() {
+  const { today, tomorrow, month, year } = periodStarts();
+  const activeReservation = ['confirmed', 'checked_in', 'checked_out'];
+  const [activeHotels, rooms, reservations, housekeeping, maintenance, revenue] = await Promise.all([
+    Hotel.countDocuments({ status: 'actif' }),
+    Room.aggregate([{ $match: { active: true } }, { $group: { _id: null, availableRooms: { $sum: { $cond: [{ $eq: ['$status', 'available'] }, 1, 0] } }, occupiedRooms: { $sum: { $cond: [{ $eq: ['$status', 'occupied'] }, 1, 0] } } } }]),
+    HotelReservation.aggregate([{ $group: { _id: null, reservations: { $sum: { $cond: [{ $in: ['$status', activeReservation] }, 1, 0] } }, checkInsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$checkInDate', today] }, { $lt: ['$checkInDate', tomorrow] }, { $in: ['$status', activeReservation] }] }, 1, 0] } }, checkOutsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$checkOutDate', today] }, { $lt: ['$checkOutDate', tomorrow] }, { $in: ['$status', activeReservation] }] }, 1, 0] } } } }]),
+    HousekeepingTask.countDocuments({ status: { $in: ['pending', 'assigned', 'in_progress'] } }),
+    MaintenanceTicket.countDocuments({ status: { $in: MaintenanceTicket.OPEN_MAINTENANCE_STATUSES } }),
+    HotelReservation.aggregate([{ $match: { status: { $in: activeReservation } } }, { $group: { _id: null, dailyRevenue: { $sum: { $cond: [{ $gte: ['$createdAt', today] }, '$totalAmount', 0] } }, monthlyRevenue: { $sum: { $cond: [{ $gte: ['$createdAt', month] }, '$totalAmount', 0] } }, annualRevenue: { $sum: { $cond: [{ $gte: ['$createdAt', year] }, '$totalAmount', 0] } } } }]),
+  ]);
+  return { kpis: { activeHotels, ...(rooms[0] || { availableRooms: 0, occupiedRooms: 0 }), ...(reservations[0] || { reservations: 0, checkInsToday: 0, checkOutsToday: 0 }), housekeeping, maintenance, ...(revenue[0] || { dailyRevenue: 0, monthlyRevenue: 0, annualRevenue: 0 }) }, revenueBasis: 'Valeur des réservations confirmées, non assimilée aux encaissements.' };
+}
+
+exports.getModuleAnalytics = async (req, res) => {
+  try {
+    const handlers = { sales, rentals, accommodations, hotels };
+    if (!handlers[req.params.module]) return res.status(404).json({ status: 'fail', message: 'Module analytics inconnu.' });
+    const allowedRoles = req.params.module === 'rentals' ? ROLES_GL : ROLES_ALTIMMO;
+    if (!allowedRoles.includes(req.user?.role)) return res.status(403).json({ status: 'fail', message: 'Accès refusé à ce module.' });
+    res.json({ status: 'success', data: await handlers[req.params.module]() });
+  } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
+};

@@ -6,8 +6,8 @@ const FINANCIAL_PAYMENT_METHODS = ['cash', 'bank_transfer', 'card', 'mobile_mone
 const FINANCIAL_PAYMENT_STATUSES_DERIVED = ['unpaid', 'partially_paid', 'paid', 'overpaid'];
 const FINANCIAL_ALLOCATION_STATUSES = ['active', 'reversed'];
 const FINANCIAL_CURRENCIES = ['XAF', 'EUR', 'USD'];
-const FINANCIAL_ESTABLISHMENT_TYPES = ['Hotel'];
-const FINANCIAL_SUBJECT_TYPES = ['HotelReservation'];
+const FINANCIAL_ESTABLISHMENT_TYPES = ['Hotel', 'Accommodation'];
+const FINANCIAL_SUBJECT_TYPES = ['HotelReservation', 'AccommodationReservation'];
 const FINANCIAL_LINE_TYPES = ['accommodation', 'discount', 'tax', 'fee', 'extra', 'adjustment'];
 
 module.exports = {

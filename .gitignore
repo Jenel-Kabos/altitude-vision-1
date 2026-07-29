@@ -13,6 +13,8 @@ client/dist/
 client/.next/
 client/.env
 client/.env.local
+client/playwright-report/
+client/test-results/
 
 # Fichiers système
 .DS_Store

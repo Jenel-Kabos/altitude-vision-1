@@ -49,7 +49,7 @@ async function allocatePaymentToDocumentCore({ paymentId, documentId, amountMino
     fail('FINANCIAL_DOCUMENT_OVERPAYMENT', 'Solde déjà alloué par une opération concurrente.', 409);
   }
   await financialCheckpoint(faultInjector, 'allocation.after_document_reservation', { businessOperationKey });
-  reservedDocument.paymentStatus = derivePaymentStatus(reservedDocument.totalMinor, reservedDocument.amountAllocatedMinor); await reservedDocument.save({ session });
+  reservedDocument.paymentStatus = derivePaymentStatus(reservedDocument.totalMinor, reservedDocument.amountAllocatedMinor - (reservedDocument.refundedAmountMinor || 0)); await reservedDocument.save({ session });
   await financialCheckpoint(faultInjector, 'allocation.before_create', { businessOperationKey });
   let allocation;
   const allocationData = { financialPayment: paymentId, financialDocument: documentId, domain: document.domain, establishmentType: document.establishmentType, establishmentId: document.establishmentId, currency: document.currency, amountMinor, businessOperationKey, allocatedBy: actor.id || actor._id, metadata: { payloadHash } };
@@ -78,7 +78,7 @@ async function reversePaymentAllocationCore({ allocationId, reason, businessOper
   const payment = await FinancialPayment.findByIdAndUpdate(allocation.financialPayment, { $inc: { availableAmountMinor: allocation.amountMinor, allocatedAmountMinor: -allocation.amountMinor } }, { new: true, session });
   await financialCheckpoint(faultInjector, 'reversal.before_document_restore', { businessOperationKey, allocationId });
   const document = await FinancialDocument.findByIdAndUpdate(allocation.financialDocument, { $inc: { balanceMinor: allocation.amountMinor, amountAllocatedMinor: -allocation.amountMinor } }, { new: true, session });
-  document.paymentStatus = derivePaymentStatus(document.totalMinor, document.amountAllocatedMinor); await document.save({ session });
+  document.paymentStatus = derivePaymentStatus(document.totalMinor, document.amountAllocatedMinor - (document.refundedAmountMinor || 0)); await document.save({ session });
   await financialCheckpoint(faultInjector, 'reversal.before_ledger', { businessOperationKey, allocationId });
   const ledgerData = { eventType: 'payment.allocation_reversed', domain: allocation.domain, establishmentType: allocation.establishmentType, establishmentId: allocation.establishmentId, entityType: 'PaymentAllocation', entityId: allocation._id, actorType: 'user', actorId: actor.id || actor._id, amountMinor: -allocation.amountMinor, currency: allocation.currency, businessOperationKey, previousState: { status: 'active' }, newState: { status: 'reversed', reason } };
   await (session ? appendFinancialLedgerEntry(ledgerData, { session }) : appendFinancialLedgerEntry(ledgerData));

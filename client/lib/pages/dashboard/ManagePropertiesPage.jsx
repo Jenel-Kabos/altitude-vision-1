@@ -18,6 +18,8 @@ import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
 import PropertyWizard from "../../components/dashboard/PropertyWizard";
 import { HOTEL_ACCOMMODATION_TYPES } from "../../constants/accommodation";
 import Image from 'next/image';
+import DashboardKpis from '../../components/dashboard/DashboardKpis';
+import { getDashboardAnalytics } from '../../services/dashboardAnalyticsService';
 
 // Libellés d'affichage pour le titre de la modale "Ajouter" — le choix
 // métier lui-même est piloté par PropertyWizard.jsx (Sprint 0, point
@@ -56,6 +58,7 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
   const [editingProperty, setEditingProperty] = useState(null);
   const [editFullData, setEditFullData]     = useState(null); // { property, sale? , rental? }
   const [editLoading, setEditLoading]       = useState(false);
+  const [analytics, setAnalytics] = useState(null);
 
   const emptyForm = {
     title: "", description: "", price: "", honoraires: "", fraisVisite: 0,
@@ -85,6 +88,11 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
   const [errors, setErrors]           = useState({});
 
   useEffect(() => { fetchProperties(); }, []);
+  useEffect(() => {
+    const module = section === 'vente' ? 'sales' : section === 'location' ? 'rentals' : null;
+    if (!module) return;
+    getDashboardAnalytics(module).then(setAnalytics).catch(() => setAnalytics({ kpis: {} }));
+  }, [section]);
 
   useEffect(() => {
     let list = statusFilter ? properties.filter((p) => p.status === statusFilter) : properties;
@@ -622,6 +630,20 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
             <p className="text-sm sm:text-lg text-gray-600 font-medium mt-1">Gérez le patrimoine immobilier de <span className="font-bold text-blue-600">Altimmo</span></p>
           </div>
         </div>
+
+        {section === 'vente' && <DashboardKpis items={[
+          { key: 'active', label: 'Biens actifs', value: analytics?.kpis?.active }, { key: 'drafts', label: 'Brouillons', value: analytics?.kpis?.drafts },
+          { key: 'published', label: 'Publiés', value: analytics?.kpis?.published }, { key: 'sold', label: 'Vendus', value: analytics?.kpis?.sold },
+          { key: 'visits', label: 'Visites programmées', value: analytics?.kpis?.scheduledVisits }, { key: 'offers', label: 'Offres en attente', value: analytics?.kpis?.pendingOffers },
+          { key: 'sales', label: 'Chiffre des ventes', value: analytics?.kpis?.salesAmount, format: 'money' }, { key: 'commissions', label: 'Commissions', value: analytics?.kpis?.commissions, format: 'money' },
+        ]} loading={!analytics} />}
+        {section === 'location' && <DashboardKpis items={[
+          { key: 'available', label: 'Disponibles', value: analytics?.kpis?.available }, { key: 'occupied', label: 'Occupés', value: analytics?.kpis?.occupied },
+          { key: 'contracts', label: 'Contrats actifs', value: analytics?.kpis?.activeContracts }, { key: 'expiring', label: 'Contrats à échéance', value: analytics?.kpis?.expiringContracts },
+          { key: 'collected', label: 'Loyers encaissés', value: analytics?.kpis?.rentCollected, format: 'money' }, { key: 'unpaid', label: 'Loyers impayés', value: analytics?.kpis?.unpaidRent, format: 'money' },
+          { key: 'penalties', label: 'Pénalités', value: analytics?.kpis?.penalties, format: 'money' }, { key: 'maintenance', label: 'Maintenance', value: analytics?.kpis?.maintenance },
+          { key: 'notices', label: 'Préavis', value: analytics?.kpis?.notices },
+        ]} loading={!analytics} />}
 
         {/* Barre */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-100 mb-6">

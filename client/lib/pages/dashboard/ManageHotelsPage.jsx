@@ -12,6 +12,8 @@ import { getPublicationErrorMessage } from "../../utils/publicationError";
 import { HOTEL_PUBLICATION_STATUSES } from "../../constants/hotel";
 import { Building2 } from "lucide-react";
 import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
+import DashboardKpis from "../../components/dashboard/DashboardKpis";
+import { getDashboardAnalytics } from "../../services/dashboardAnalyticsService";
 import {
   DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination,
   DashboardState, DashboardToolbar,
@@ -42,6 +44,7 @@ const ManageHotelsPage = () => {
   const [reasonInputs, setReasonInputs] = useState({});
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -56,6 +59,7 @@ const ManageHotelsPage = () => {
   };
 
   useEffect(() => { load(); }, [status, sort, page]);
+  useEffect(() => { getDashboardAnalytics('hotels').then(setAnalytics).catch(() => setAnalytics({ kpis: {} })); }, []);
   useEffect(() => {
     const timeout = setTimeout(() => { setPage(1); load(); }, 300);
     return () => clearTimeout(timeout);
@@ -97,6 +101,15 @@ const ManageHotelsPage = () => {
         initialHotel={editing} existingImages={editing?.property?.images || editing?.gallery || []}
         onSuccess={() => { setCreating(false); setEditing(null); load(); }} onCancel={() => { setCreating(false); setEditing(null); }}
       /></DashboardCard>}
+
+      <DashboardKpis items={[
+        { key: 'hotels', label: 'Hôtels actifs', value: analytics?.kpis?.activeHotels }, { key: 'available', label: 'Chambres disponibles', value: analytics?.kpis?.availableRooms },
+        { key: 'occupied', label: 'Chambres occupées', value: analytics?.kpis?.occupiedRooms }, { key: 'reservations', label: 'Réservations', value: analytics?.kpis?.reservations },
+        { key: 'checkin', label: 'Check-in du jour', value: analytics?.kpis?.checkInsToday }, { key: 'checkout', label: 'Check-out du jour', value: analytics?.kpis?.checkOutsToday },
+        { key: 'housekeeping', label: 'Housekeeping', value: analytics?.kpis?.housekeeping }, { key: 'maintenance', label: 'Maintenance', value: analytics?.kpis?.maintenance },
+        { key: 'daily', label: 'Réservations du jour', value: analytics?.kpis?.dailyRevenue, format: 'money' }, { key: 'monthly', label: 'Réservations du mois', value: analytics?.kpis?.monthlyRevenue, format: 'money' },
+        { key: 'annual', label: 'Réservations annuelles', value: analytics?.kpis?.annualRevenue, format: 'money' },
+      ]} loading={!analytics} note={analytics?.revenueBasis} />
 
       <DashboardToolbar>
       <div className="flex flex-wrap gap-2 w-full">

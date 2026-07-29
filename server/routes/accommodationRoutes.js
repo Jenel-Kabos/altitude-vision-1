@@ -5,9 +5,11 @@ const { ROLES_ALTIMMO, STAFF_CM } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
 
 const router = express.Router();
+const reservationCtrl = require('../controllers/accommodationReservationController');
 
 // Public (correctif crash mobile DetailAnnonceScreen) — AVANT auth.protect.
 router.get('/public/:id', ctrl.getPublic);
+router.get('/:id/availability', reservationCtrl.availability);
 
 router.use(auth.protect);
 
@@ -38,6 +40,10 @@ router.patch('/:id/reactivate', ctrl.reactivate);
 router.get('/:id/rate-plans', ctrl.listRates);
 router.post('/:id/rate-plans', ctrl.upsertRate);
 router.delete('/:id/rate-plans/:rateId', ctrl.deactivateRate);
+router.get('/:id/availability-blocks', reservationCtrl.listBlocks);
+router.get('/:id/reservation-calendar', reservationCtrl.calendar);
+router.post('/:id/availability-blocks', reservationCtrl.createBlock);
+router.delete('/:id/availability-blocks/:blockId', reservationCtrl.deleteBlock);
 
 // Staff — même convention que GET/PATCH /api/properties/:id/:action
 // (validate|reject|suspend|unsuspend) — placée en dernier pour ne jamais

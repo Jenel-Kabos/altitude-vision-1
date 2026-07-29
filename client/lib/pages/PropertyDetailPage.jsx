@@ -22,6 +22,7 @@ import CommentList from '../components/comments/CommentList';
 import Breadcrumb from '../components/Breadcrumb';
 import ContactModal from '../components/ContactModal';
 import SignalerAnnonceModal from '../components/SignalerAnnonceModal';
+import PublicAccommodationBookingForm from '../components/PublicAccommodationBookingForm';
 import { formatCurrencyXAF, propertyDetailError } from '../utils/normalizePropertyDetail';
 import { INCLUDED_SERVICES, CANCELLATION_POLICIES } from '../constants/accommodation';
 
@@ -1434,6 +1435,10 @@ const PropertyDetailPage = () => {
 
               {/* Contact */}
               <div className="pdp-sidebar-body">
+                {accommodation && !accommodation.hotel && (
+                  <PublicAccommodationBookingForm accommodation={accommodation} user={user} />
+                )}
+                {!accommodation && <>
                 <p className="pdp-sidebar-intro">Intéressé par ce bien ?</p>
                 <p className="pdp-sidebar-sub">
                   Contactez notre agent pour organiser une visite.
@@ -1455,6 +1460,7 @@ const PropertyDetailPage = () => {
                   <Calendar size={18} />
                   {canRequestVisit ? 'Planifier une visite' : 'Visite indisponible'}
                 </button>
+                </>}
 
                 <a href="tel:+242068002151" className="pdp-cta-tel">
                   <Phone size={13} /> +242 06 800 21 51

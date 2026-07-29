@@ -15,6 +15,8 @@ vi.mock('../services/accommodationService', () => ({
   updateFullAccommodation: vi.fn(),
 }));
 vi.mock('../components/dashboard/AccommodationPropertyForm', () => ({ default: () => <div>FORMULAIRE HÉBERGEMENT TEST DATA</div> }));
+vi.mock('../services/dashboardAnalyticsService', () => ({ getDashboardAnalytics: vi.fn().mockResolvedValue({ kpis: {} }) }));
+vi.mock('../components/dashboard/AccommodationReservationsPanel', () => ({ default: () => <div>RÉSERVATIONS HÉBERGEMENTS TEST DATA</div> }));
 
 const acc = (overrides = {}) => ({
   _id: 'ACC-1',

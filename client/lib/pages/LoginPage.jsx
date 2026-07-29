@@ -17,6 +17,8 @@ const LoginPage = () => {
 
   const router = useRouter();
   const auth   = useAuth();
+  const requestedRedirect = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('redirect') : null;
+  const safeRedirect = requestedRedirect?.startsWith('/') && !requestedRedirect.startsWith('//') ? requestedRedirect : null;
 
   // 🔴 Redirection à l'ouverture gérée par PublicAuthRoute.jsx
 
@@ -40,11 +42,11 @@ const LoginPage = () => {
       if (user && token) {
         auth.login(user, token);
         const COLLAB_ROLES = ['Collaborateur','Secretaire','GestionnaireImmobilier','CommunityManager','Communicant'];
-        const targetPath =
+        const targetPath = safeRedirect || (
           user.role === 'Admin'              ? '/dashboard'
           : COLLAB_ROLES.includes(user.role) ? '/dashboard'
           : user.role === 'Proprietaire'     ? '/mes-biens'
-          : '/';
+          : '/');
         router.replace(targetPath);
       } else {
         setError('Connexion réussie mais impossible de récupérer les informations utilisateur.');
@@ -208,7 +210,7 @@ const LoginPage = () => {
 
               {/* Google */}
               <button type="button"
-                onClick={() => signIn('google', { callbackUrl: '/auth/google-redirect' })}
+                onClick={() => signIn('google', { callbackUrl: safeRedirect || '/auth/google-redirect' })}
                 className="w-full flex items-center justify-center gap-3 border border-gray-200
                            rounded-xl py-3 px-4 hover:bg-gray-50 bg-white transition-colors
                            font-medium text-gray-600 text-sm mb-3"

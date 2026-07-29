@@ -1,0 +1,18 @@
+import api from './api';
+export const listAccommodationReservations = async (params = {}) => (await api.get('/accommodation-reservations', { params })).data?.data;
+export const getAccommodationReservation = async (id) => (await api.get(`/accommodation-reservations/${id}`)).data?.data?.reservation;
+export const createAccommodationReservation = async (data) => (await api.post('/accommodation-reservations', data)).data?.data?.reservation;
+export const transitionAccommodationReservation = async (id, action, data = {}) => (await api.post(`/accommodation-reservations/${id}/${action}`, data)).data?.data?.reservation;
+export const getAccommodationAvailability = async (id, params = {}) => (await api.get(`/accommodations/${id}/availability`, { params })).data?.data;
+export const createAccommodationBlock = async (id, data) => (await api.post(`/accommodations/${id}/availability-blocks`, data)).data?.data?.block;
+export const listAccommodationBlocks = async (id) => (await api.get(`/accommodations/${id}/availability-blocks`)).data?.data?.blocks || [];
+export const deleteAccommodationBlock = async (id, blockId) => api.delete(`/accommodations/${id}/availability-blocks/${blockId}`);
+export const getAccommodationReservationCalendar = async (id, params) => (await api.get(`/accommodations/${id}/reservation-calendar`, { params })).data?.data;
+export const getAccommodationReservationFinancialSummary = async (id) => (await api.get(`/accommodation-reservations/${id}/financial-summary`)).data?.data;
+export const createAccommodationPayment = async (id, data, idempotencyKey) => (await api.post(`/accommodation-reservations/${id}/payments`, data, { headers: { 'Idempotency-Key': idempotencyKey } })).data?.data;
+export const confirmAccommodationPayment = async (paymentId, idempotencyKey) => (await api.post(`/accommodation-reservations/payments/${paymentId}/confirm`, {}, { headers: { 'Idempotency-Key': idempotencyKey } })).data?.data;
+export const getAccommodationRefundableSummary = async (id) => (await api.get(`/accommodation-reservations/${id}/refundable-summary`)).data?.data;
+export const requestAccommodationRefund = async (id, data, key) => (await api.post(`/accommodation-reservations/${id}/refunds`, data, { headers: { 'Idempotency-Key': key } })).data?.data;
+export const approveAccommodationRefund = async (id, key) => (await api.post(`/accommodation-reservations/refunds/${id}/approve`, {}, { headers: { 'Idempotency-Key': key } })).data?.data;
+export const completeAccommodationRefund = async (id, data, key) => (await api.post(`/accommodation-reservations/refunds/${id}/complete`, data, { headers: { 'Idempotency-Key': key } })).data?.data;
+export const cancelAccommodationRefund = async (id, reason, key) => (await api.post(`/accommodation-reservations/refunds/${id}/cancel`, { reason }, { headers: { 'Idempotency-Key': key } })).data?.data;

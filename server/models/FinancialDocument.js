@@ -9,13 +9,13 @@ const schema = new mongoose.Schema({
   subjectType: { type: String, enum: C.FINANCIAL_SUBJECT_TYPES, required: true }, subjectId: { type: ObjectId, required: true },
   customer: snapshot, seller: snapshot,
   issueDate: Date, dueDate: Date, servicePeriodStart: Date, servicePeriodEnd: Date,
-  subtotalMinor: { type: Number, default: 0 }, discountTotalMinor: { type: Number, default: 0 }, taxTotalMinor: { type: Number, default: 0 }, feesTotalMinor: { type: Number, default: 0 }, totalMinor: { type: Number, default: 0 }, amountAllocatedMinor: { type: Number, default: 0 }, balanceMinor: { type: Number, default: 0 },
+  subtotalMinor: { type: Number, default: 0 }, discountTotalMinor: { type: Number, default: 0 }, taxTotalMinor: { type: Number, default: 0 }, feesTotalMinor: { type: Number, default: 0 }, totalMinor: { type: Number, default: 0 }, amountAllocatedMinor: { type: Number, default: 0 }, refundedAmountMinor: { type: Number, default: 0 }, balanceMinor: { type: Number, default: 0 },
   notes: { type: String, trim: true, maxlength: 2000 }, metadata: { type: mongoose.Schema.Types.Mixed, default: {} }, businessOperationKey: { type: String, required: true, maxlength: 200 },
   issuedAt: Date, issuedBy: { type: ObjectId, ref: 'User' }, cancelledAt: Date, cancelledBy: { type: ObjectId, ref: 'User' }, cancellationReason: String,
   guestAccess: { tokenHash: { type: String, select: false }, expiresAt: Date, revokedAt: Date, scope: [{ type: String, enum: ['view', 'download', 'pay'] }], createdAt: Date, lastAccessAt: Date },
   createdBy: { type: ObjectId, ref: 'User', required: true }, updatedBy: { type: ObjectId, ref: 'User' },
 }, { timestamps: true });
-['subtotalMinor', 'discountTotalMinor', 'taxTotalMinor', 'feesTotalMinor', 'totalMinor', 'amountAllocatedMinor', 'balanceMinor'].forEach((path) => {
+['subtotalMinor', 'discountTotalMinor', 'taxTotalMinor', 'feesTotalMinor', 'totalMinor', 'amountAllocatedMinor', 'refundedAmountMinor', 'balanceMinor'].forEach((path) => {
   schema.path(path).validate(Number.isSafeInteger, `${path} doit être un entier sûr.`);
   schema.path(path).validate((value) => value >= 0, `${path} ne peut pas être négatif.`);
 });
