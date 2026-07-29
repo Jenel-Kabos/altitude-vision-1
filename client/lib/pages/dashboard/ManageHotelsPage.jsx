@@ -8,6 +8,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { getHotelsAdmin, reviewHotel } from "../../services/hotelService";
+import { getPublicationErrorMessage } from "../../utils/publicationError";
 import { HOTEL_PUBLICATION_STATUSES } from "../../constants/hotel";
 import { Building2 } from "lucide-react";
 import {
@@ -36,6 +37,7 @@ const ManageHotelsPage = () => {
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ hotels: [], total: 0 });
   const [loading, setLoading] = useState(true);
+  const [validatingId, setValidatingId] = useState(null);
   const [reasonInputs, setReasonInputs] = useState({});
 
   const load = async () => {
@@ -60,18 +62,21 @@ const ManageHotelsPage = () => {
   const totalPages = Math.max(1, Math.ceil((data.total || 0) / PAGE_SIZE));
 
   const handleAction = async (id, action) => {
+    if (action === "validate" && validatingId) return;
     const reason = reasonInputs[id];
     if ((action === "reject" || action === "suspend") && !reason?.trim()) {
       toast.error("Un motif est requis pour cette action.");
       return;
     }
     try {
+      if (action === "validate") setValidatingId(id);
       await reviewHotel(id, action, reason ? { reason } : {});
       toast.success("Action effectuée.");
       load();
     } catch (err) {
-      const completion = err.response?.data?.completion;
-      toast.error(completion ? `Incomplet (${completion.score}%) — impossible de publier.` : (err.response?.data?.message || "Erreur lors de l'action."));
+      toast.error(getPublicationErrorMessage(err, "cet hôtel") || err.response?.data?.message || "Erreur lors de l'action.");
+    } finally {
+      if (action === "validate") setValidatingId(null);
     }
   };
 
@@ -127,7 +132,7 @@ const ManageHotelsPage = () => {
 
               {hotel.publicationStatus === "soumis" && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button onClick={() => handleAction(hotel._id, "validate")} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm">Valider</button>
+                  <button onClick={() => handleAction(hotel._id, "validate")} disabled={Boolean(validatingId)} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm disabled:opacity-50">{validatingId === hotel._id ? "Publication…" : "Valider"}</button>
                   <input placeholder="Motif de rejet" value={reasonInputs[hotel._id] || ""}
                     onChange={(e) => setReasonInputs((prev) => ({ ...prev, [hotel._id]: e.target.value }))}
                     className="px-2 py-1.5 border rounded text-sm" />

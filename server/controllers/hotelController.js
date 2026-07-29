@@ -542,7 +542,9 @@ exports.reviewDecision = async (req, res) => {
     if (action === 'validate') {
       const completion = await getHotelCompletion(hotel, hotel.property);
       if (!completion.complete) {
-        return fail(res, 422, 'Cet hôtel est incomplet et ne peut pas être publié.', { completion });
+        return fail(res, 422, 'Cet hôtel est incomplet et ne peut pas être publié.', {
+          code: 'HOTEL_INCOMPLETE', completion, missingFields: completion.missingFields,
+        });
       }
     }
 

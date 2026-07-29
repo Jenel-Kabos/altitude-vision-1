@@ -59,25 +59,29 @@ function hasAnyHotelService(hotelServices) {
  * @param {Array} categoryRateCounts — nombre de RatePlan actifs par catégorie (même longueur que categories)
  */
 function computeHotelCompletionScore(hotel, property, categories = [], categoryRateCounts = []) {
-  const informationsOk = Boolean(hotel?.name)
-    && Boolean(hotel?.description)
-    && Boolean(hotel?.phone)
-    && Boolean(property?.address?.city);
-
-  const galerieOk = (hotel?.gallery?.length || 0) > 0 || (property?.images?.length || 0) >= 3;
-  const servicesOk = hasAnyHotelService(hotel?.hotelServices);
-  const categoriesOk = categories.length > 0;
-  const tarifsOk = categories.length > 0 && categoryRateCounts.every((count) => count > 0);
+  const checks = {
+    name: { label: "Nom de l’hôtel", valid: Boolean(hotel?.name) },
+    description: { label: 'Description', valid: Boolean(hotel?.description) },
+    phone: { label: 'Téléphone', valid: Boolean(hotel?.phone) },
+    address: { label: 'Adresse', valid: Boolean(property?.address?.city) },
+    gallery: { label: 'Photos', valid: (hotel?.gallery?.length || 0) > 0 || (property?.images?.length || 0) >= 3 },
+    hotelServices: { label: 'Services', valid: hasAnyHotelService(hotel?.hotelServices) },
+    roomCategories: { label: 'Catégories de chambres', valid: categories.length > 0 },
+    ratePlans: { label: 'Tarifs des catégories', valid: categories.length > 0 && categoryRateCounts.every((count) => count > 0) },
+  };
 
   const breakdown = {
-    informations: informationsOk ? HOTEL_COMPLETION_WEIGHTS.informations : 0,
-    galerie: galerieOk ? HOTEL_COMPLETION_WEIGHTS.galerie : 0,
-    services: servicesOk ? HOTEL_COMPLETION_WEIGHTS.services : 0,
-    categories: categoriesOk ? HOTEL_COMPLETION_WEIGHTS.categories : 0,
-    tarifs: tarifsOk ? HOTEL_COMPLETION_WEIGHTS.tarifs : 0,
+    informations: ['name', 'description', 'phone', 'address'].every((field) => checks[field].valid) ? HOTEL_COMPLETION_WEIGHTS.informations : 0,
+    galerie: checks.gallery.valid ? HOTEL_COMPLETION_WEIGHTS.galerie : 0,
+    services: checks.hotelServices.valid ? HOTEL_COMPLETION_WEIGHTS.services : 0,
+    categories: checks.roomCategories.valid ? HOTEL_COMPLETION_WEIGHTS.categories : 0,
+    tarifs: checks.ratePlans.valid ? HOTEL_COMPLETION_WEIGHTS.tarifs : 0,
   };
   const score = Object.values(breakdown).reduce((sum, v) => sum + v, 0);
-  return { score, breakdown, complete: score === 100 };
+  const missingFields = Object.entries(checks)
+    .filter(([, check]) => !check.valid)
+    .map(([field, check]) => ({ field, label: check.label }));
+  return { score, breakdown, complete: score === 100, missingFields };
 }
 
 /**

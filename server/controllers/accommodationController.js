@@ -543,7 +543,9 @@ exports.reviewDecision = async (req, res) => {
       const rates = await getActiveRates(accommodation._id);
       const completion = computeCompletionScore(accommodation, accommodation.property, rates);
       if (!completion.complete) {
-        return fail(res, 422, 'Cet hébergement est incomplet et ne peut pas être publié.', { completion });
+        return fail(res, 422, 'Cet hébergement est incomplet et ne peut pas être publié.', {
+          code: 'ACCOMMODATION_INCOMPLETE', completion, missingFields: completion.missingFields,
+        });
       }
     }
 

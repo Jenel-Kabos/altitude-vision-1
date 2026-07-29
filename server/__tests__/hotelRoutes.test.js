@@ -188,6 +188,11 @@ describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/sus
       .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
       .send({});
     expect(res.statusCode).toBe(422);
+    expect(res.body.code).toBe('HOTEL_INCOMPLETE');
+    expect(res.body.missingFields).toEqual(expect.arrayContaining([
+      { field: 'roomCategories', label: 'Catégories de chambres' },
+      { field: 'ratePlans', label: 'Tarifs des catégories' },
+    ]));
     expect(res.body.completion.complete).toBe(false);
     expect(hotel.publicationStatus).toBe('soumis');
   });

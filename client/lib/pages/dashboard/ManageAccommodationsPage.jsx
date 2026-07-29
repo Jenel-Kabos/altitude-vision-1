@@ -9,6 +9,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { getAccommodationsAdmin, reviewAccommodation } from "../../services/accommodationService";
+import { getPublicationErrorMessage } from "../../utils/publicationError";
 import { ACCOMMODATION_TYPES, PUBLICATION_STATUSES } from "../../constants/accommodation";
 
 const STATUS_TABS = [{ value: "tous", label: "Tous" }, ...PUBLICATION_STATUSES];
@@ -38,6 +39,7 @@ const ManageAccommodationsPage = () => {
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ accommodations: [], total: 0 });
   const [loading, setLoading] = useState(true);
+  const [validatingId, setValidatingId] = useState(null);
   const [reasonInputs, setReasonInputs] = useState({});
 
   const load = async () => {
@@ -62,21 +64,22 @@ const ManageAccommodationsPage = () => {
   const totalPages = Math.max(1, Math.ceil((data.total || 0) / PAGE_SIZE));
 
   const handleAction = async (id, action) => {
+    if (action === "validate" && validatingId) return;
     const reason = reasonInputs[id];
     if ((action === "reject" || action === "suspend") && !reason?.trim()) {
       toast.error("Un motif est requis pour cette action.");
       return;
     }
     try {
+      if (action === "validate") setValidatingId(id);
       await reviewAccommodation(id, action, reason ? { reason } : {});
       toast.success("Action effectuée.");
       load();
     } catch (err) {
-      const completion = err.response?.data?.completion;
-      const msg = completion
-        ? `Incomplet (${completion.score}%) — impossible de publier.`
-        : (err.response?.data?.message || "Erreur lors de l'action.");
+      const msg = getPublicationErrorMessage(err, "cet hébergement") || err.response?.data?.message || "Erreur lors de l'action.";
       toast.error(msg);
+    } finally {
+      if (action === "validate") setValidatingId(null);
     }
   };
 
@@ -150,8 +153,8 @@ const ManageAccommodationsPage = () => {
 
               {acc.publicationStatus === "soumis" && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button onClick={() => handleAction(acc._id, "validate")} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm">
-                    Valider
+                  <button onClick={() => handleAction(acc._id, "validate")} disabled={Boolean(validatingId)} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm disabled:opacity-50">
+                    {validatingId === acc._id ? "Publication…" : "Valider"}
                   </button>
                   <input
                     placeholder="Motif de rejet"
