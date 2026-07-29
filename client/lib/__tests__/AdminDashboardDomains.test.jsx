@@ -36,9 +36,9 @@ describe('AdminDashboard — domaines métier Altimmo (Sprint 0) — TEST DATA',
     expect(screen.getByText('Hôtellerie')).toBeInTheDocument();
 
     expect(screen.getByRole('link', { name: /Toutes les annonces/i })).toHaveAttribute('href', '/dashboard/properties');
-    expect(screen.getByRole('link', { name: /^Vente$/i })).toHaveAttribute('href', '/dashboard/properties?status=vente');
-    expect(screen.getByRole('link', { name: /^Location$/i })).toHaveAttribute('href', '/dashboard/properties?status=location');
-    expect(screen.getByRole('link', { name: /^Hébergement$/i })).toHaveAttribute('href', '/dashboard/properties?status=hebergement');
+    expect(screen.getByRole('link', { name: /^Ventes$/i })).toHaveAttribute('href', '/dashboard/sales');
+    expect(screen.getByRole('link', { name: /^Locations$/i })).toHaveAttribute('href', '/dashboard/rentals');
+    expect(screen.getByRole('link', { name: /^Hébergements$/i })).toHaveAttribute('href', '/dashboard/hebergements');
     expect(screen.getByRole('link', { name: /Propriétaires/i })).toHaveAttribute('href', '/dashboard/proprietaires');
 
     expect(screen.getByRole('link', { name: /^Baux$/i })).toHaveAttribute('href', '/dashboard/gestion-locative/baux');

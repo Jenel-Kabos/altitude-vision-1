@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { getAllProperties, getPropertyById, deleteProperty, updateProperty, addProperty, toggleRecommande } from "../../services/propertyService";
 import { createFullAccommodation, updateFullAccommodation } from "../../services/accommodationService";
 import { useAuth } from '../../context/AuthContext';
 import {
-  PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle,
+  PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle, Eye,
   ArrowLeft, ArrowRight, Building2, MapPin, Maximize2, Bed, Bath, Sparkles, Send,
 } from "lucide-react";
 import PropertyForm from "../../components/dashboard/PropertyForm";
@@ -25,7 +26,7 @@ const BUSINESS_TYPE_LABELS = { vente: 'Vente', location: 'Location', hebergement
 
 const PROPERTIES_PER_PAGE = 8;
 
-const ManagePropertiesPage = () => {
+const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
   const { canEdit, canDelete, user } = useAuth();
   const canAddProperty = ['Admin', 'CommunityManager', 'Collaborateur'].includes(user?.role);
   // Sprint 0 (architecture Altimmo) — pré-filtre lu depuis l'URL
@@ -34,7 +35,7 @@ const ManagePropertiesPage = () => {
   // change aucun appel API : getAllProperties() renvoie toujours tout,
   // exactement comme avant ce sprint.
   const searchParams = useSearchParams();
-  const statusFilter = searchParams?.get('status') ?? null;
+  const statusFilter = section || searchParams?.get('status') || null;
   const [properties, setProperties]         = useState([]);
   const [filteredProperties, setFiltered]   = useState([]);
   const [loading, setLoading]               = useState(false);
@@ -102,7 +103,7 @@ const ManagePropertiesPage = () => {
   const fetchProperties = async () => {
     setLoading(true);
     try {
-      const res = await getAllProperties();
+      const res = await getAllProperties({ dashboardClassification: true });
       // `filteredProperties` est dérivé exclusivement par l'effet de filtrage
       // ci-dessous (searchTerm + statusFilter) — ne pas le fixer ici en
       // parallèle, sous peine de courte-circuiter le filtre ?status= au
@@ -146,6 +147,21 @@ const ManagePropertiesPage = () => {
         ...(accommodationType ? { accommodationType } : {}),
       }));
     }
+  };
+
+  const openCreate = () => {
+    setAddChoice(['vente', 'location', 'hebergement'].includes(section) ? section : null);
+    if (section === 'hebergement') setFormData((prev) => ({ ...prev, status: 'hebergement' }));
+    setShowAddModal(true);
+  };
+
+  const ownerHref = (property) => {
+    const classification = property.dashboardClassification;
+    if (classification?.family === 'vente') return `/dashboard/sales?focus=${property._id}`;
+    if (classification?.family === 'location') return `/dashboard/rentals?focus=${property._id}`;
+    if (classification?.family === 'accommodation') return `/dashboard/hebergements?accommodationId=${classification.accommodationId}`;
+    if (classification?.family === 'hotel') return `/dashboard/hotels/${classification.hotelId}`;
+    return `/dashboard/properties?focus=${property._id}&classification=ambiguous`;
   };
 
   // Point d'entrée unique du bouton "Modifier" — détermine quel formulaire
@@ -514,9 +530,9 @@ const ManagePropertiesPage = () => {
           <div className="space-y-1 text-sm text-gray-500 mb-4">
             <div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-red-500" /><span className="line-clamp-1">{property.address?.city || 'Non spécifié'}</span></div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center"><Maximize2 className="w-4 h-4 mr-1 text-blue-500" /><span>{property.surface} m²</span></div>
-              <div className="flex items-center"><Bed className="w-4 h-4 mr-1 text-indigo-500" /><span>{property.bedrooms}</span></div>
-              <div className="flex items-center"><Bath className="w-4 h-4 mr-1 text-cyan-500" /><span>{property.bathrooms}</span></div>
+              {Number(property.surface) > 0 && <div className="flex items-center"><Maximize2 className="w-4 h-4 mr-1 text-blue-500" /><span>{property.surface} m²</span></div>}
+              {Number(property.bedrooms) > 0 && <div className="flex items-center"><Bed className="w-4 h-4 mr-1 text-indigo-500" /><span>{property.bedrooms}</span></div>}
+              {Number(property.bathrooms) > 0 && <div className="flex items-center"><Bath className="w-4 h-4 mr-1 text-cyan-500" /><span>{property.bathrooms}</span></div>}
             </div>
           </div>
           {property.amenities?.length > 0 && (
@@ -529,7 +545,7 @@ const ManagePropertiesPage = () => {
               )}
             </div>
           )}
-          {canEdit && (
+          {!readOnly && canEdit && (
             <button
               onClick={() => handleToggleRecommande(property._id, property.recommande)}
               title={property.statusAdmin !== 'Validée' ? 'Pas encore validé — ne s\'affichera côté public qu\'une fois validé.' : ''}
@@ -543,13 +559,18 @@ const ManagePropertiesPage = () => {
             </button>
           )}
           <div className="flex gap-2">
-            {canEdit && (
+            {readOnly && (
+              <Link href={ownerHref(property)} className="flex-1 p-2.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all flex items-center justify-center gap-2 font-semibold">
+                <Eye className="w-5 h-5" /> Voir
+              </Link>
+            )}
+            {!readOnly && canEdit && (
               <button onClick={() => handleEditClick(property)}
                 className="flex-1 p-2.5 text-blue-600 hover:text-white bg-blue-50 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center" title="Modifier">
                 <Edit className="w-5 h-5" />
               </button>
             )}
-            {canDelete && (
+            {!readOnly && canDelete && (
               <button onClick={() => handleDelete(property._id)}
                 className="flex-1 p-2.5 text-red-600 hover:text-white bg-red-50 hover:bg-gradient-to-r hover:from-red-600 hover:to-pink-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center" title="Supprimer">
                 <Trash2 className="w-5 h-5" />
@@ -611,8 +632,8 @@ const ManagePropertiesPage = () => {
                 onChange={(e) => setSearchTerm(e.target.value)} aria-label="Rechercher un bien immobilier"
                 className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all" />
             </div>
-            {canAddProperty && (
-              <button onClick={() => setShowAddModal(true)}
+            {!readOnly && canAddProperty && (
+              <button onClick={openCreate}
                 className="flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all hover:scale-105">
                 <PlusCircle className="w-5 h-5" /> Ajouter
               </button>
@@ -627,7 +648,7 @@ const ManagePropertiesPage = () => {
               <div className="p-4 bg-blue-100 rounded-full text-blue-600"><Home className="w-12 h-12" /></div>
             </div>
             <p className="text-lg font-bold text-gray-700 mb-1">Aucun bien trouvé</p>
-            <p className="text-sm text-gray-500">Cliquez sur <span className="font-semibold text-blue-600">Ajouter</span> pour créer le premier.</p>
+            <p className="text-sm text-gray-500">{readOnly ? 'Aucune annonce ne correspond à votre recherche.' : 'Utilisez le bouton Ajouter pour créer la première.'}</p>
           </div>
         ) : (
           <>
@@ -652,7 +673,7 @@ const ManagePropertiesPage = () => {
         )}
 
         {/* Modal Ajouter */}
-        {showAddModal && (
+        {!readOnly && showAddModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto animate-fadeIn">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-2 sm:my-10 max-h-[calc(100dvh-1rem)] sm:max-h-[85vh] flex flex-col animate-slideUp">
               <div className="p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white/95 z-20 rounded-t-2xl">

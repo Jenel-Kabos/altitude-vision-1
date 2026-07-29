@@ -44,10 +44,9 @@ const NAV_SECTIONS = [
     label: 'Immobilier',
     links: [
       { to: '/dashboard/properties',               end: true,  Icon: Home,       label: 'Toutes les annonces', accent: BLUE, roles: ROLES_ALTIMMO },
-      { to: '/dashboard/properties?status=vente',       end: false, Icon: Landmark,   label: 'Vente',               accent: BLUE, roles: ROLES_ALTIMMO },
-      { to: '/dashboard/properties?status=location',    end: false, Icon: KeyRound,   label: 'Location',            accent: BLUE, roles: ROLES_ALTIMMO },
-      { to: '/dashboard/properties?status=hebergement', end: false, Icon: Palmtree,   label: 'Hébergement',         accent: BLUE, roles: ROLES_ALTIMMO },
-      { to: '/dashboard/hebergements',       end: false, Icon: Palmtree,   label: 'Gestion hébergements', accent: GOLD, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/sales',              end: true,  Icon: Landmark,   label: 'Ventes',               accent: BLUE, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/rentals',            end: true,  Icon: KeyRound,   label: 'Locations',            accent: BLUE, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/hebergements',       end: true,  Icon: Palmtree,   label: 'Hébergements',         accent: GOLD, roles: ROLES_ALTIMMO },
       { to: '/dashboard/estimations',        end: false, Icon: Calculator, label: 'Estimations',  accent: GOLD, roles: ROLES_ESTIM, badge: 'estimations' },
       { to: '/dashboard/devis',              end: false, Icon: FileText,   label: 'Devis locatif', accent: GOLD, roles: ROLES_ESTIM },
       { to: '/dashboard/visites',            end: false, Icon: Calendar,   label: 'Visites',       accent: GOLD, roles: ALL_STAFF, badge: 'visites' },

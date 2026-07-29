@@ -9,7 +9,7 @@ const apiFormHeaders = () => ({}); // On simule la fonction
  */
 export const getAllProperties = async (options = {}) => {
   try {
-    const { pole, status, limit, page, sort, type } = options;
+    const { pole, status, limit, page, sort, type, dashboardClassification } = options;
     let query = '?';
     if (pole) query += `pole=${encodeURIComponent(pole)}&`;
     if (status) query += `status=${encodeURIComponent(status)}&`;
@@ -17,6 +17,7 @@ export const getAllProperties = async (options = {}) => {
     if (limit) query += `limit=${limit}&`;
     if (page) query += `page=${page}&`;
     if (sort) query += `sort=${encodeURIComponent(sort)}&`;
+    if (dashboardClassification) query += 'dashboardClassification=1&';
     if (query.endsWith('&') || query.endsWith('?')) query = query.slice(0, -1);
 
     

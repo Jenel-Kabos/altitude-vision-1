@@ -9,6 +9,7 @@ const { logAction, buildAuteur } = require('../services/actionLogService');
 const logger = require('../utils/logger');
 const { notify, notifyMany } = require('../services/notificationService');
 const Accommodation = require('../models/Accommodation');
+const Hotel = require('../models/Hotel');
 const RatePlan = require('../models/RatePlan');
 const { isPubliclyVisible } = require('../services/accommodationService');
 const { buildPropertyMongoFilter } = require('../services/propertyFilterService');
@@ -443,7 +444,32 @@ async function runPropertySearch({ query, isAdmin }) {
  */
 const getAllProperties = asyncHandler(async (req, res) => {
   const isAdmin = req.user && req.user.role === 'Admin';
-  const { properties, total } = await runPropertySearch({ query: req.query, isAdmin });
+  const includeDashboardClassification = req.query.dashboardClassification === '1';
+  const query = { ...req.query };
+  delete query.dashboardClassification;
+  let { properties, total } = await runPropertySearch({ query, isAdmin });
+
+  if (includeDashboardClassification && properties.length) {
+    const { classifyDashboardListing } = require('../services/moderationClassificationService');
+    const propertyIds = properties.map(({ _id }) => _id);
+    const accommodations = await Accommodation.find({ property: { $in: propertyIds } })
+      .select('_id property accommodationType hotel').lean();
+    const accommodationByProperty = new Map(accommodations.map((item) => [String(item.property), item]));
+    const referencedHotelIds = accommodations.map((item) => item.hotel).filter(Boolean);
+    const hotels = await Hotel.find({
+      $or: [{ _id: { $in: referencedHotelIds } }, { property: { $in: propertyIds } }],
+    }).select('_id property').lean();
+    const hotelById = new Map(hotels.map((item) => [String(item._id), item]));
+    const hotelByProperty = new Map(hotels.filter((item) => item.property).map((item) => [String(item.property), item]));
+
+    properties = properties.map((property) => {
+      const plain = property.toObject ? property.toObject() : property;
+      const accommodation = accommodationByProperty.get(String(property._id)) || null;
+      const hotel = (accommodation?.hotel && hotelById.get(String(accommodation.hotel)))
+        || hotelByProperty.get(String(property._id)) || null;
+      return { ...plain, dashboardClassification: classifyDashboardListing({ property, accommodation, hotel }) };
+    });
+  }
 
   res.status(200).json({
     status:  'success',

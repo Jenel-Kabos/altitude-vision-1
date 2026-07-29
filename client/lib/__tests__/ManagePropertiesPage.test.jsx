@@ -81,6 +81,37 @@ const addFakeImage = () => {
   fireEvent.change(input, { target: { files: [file] } });
 };
 
+describe('Dashboard annonces — séparation des responsabilités', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSearchParams.mockReturnValue(new URLSearchParams());
+  });
+
+  test('Toutes les annonces reste en consultation et oriente vers la rubrique métier', async () => {
+    getAllProperties.mockResolvedValue([{
+      _id: 'SALE-1', title: 'Villa TEST DATA', description: 'Vente', status: 'vente',
+      type: 'Villa', price: 150000000, address: { city: 'Brazzaville' }, images: [],
+      dashboardClassification: { family: 'vente', propertyId: 'SALE-1' },
+    }]);
+    render(<ManagePropertiesPage readOnly />);
+
+    expect(await screen.findByText('Villa TEST DATA')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ajouter' })).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Modifier')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Supprimer')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Voir/i })).toHaveAttribute('href', '/dashboard/sales?focus=SALE-1');
+  });
+
+  test('la rubrique Ventes ouvre directement le formulaire Vente', async () => {
+    getAllProperties.mockResolvedValue([]);
+    render(<ManagePropertiesPage section="vente" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+
+    expect(await screen.findByText('Ajouter — Vente')).toBeInTheDocument();
+    expect(screen.queryByText('Quel type d’annonce souhaitez-vous publier ?')).not.toBeInTheDocument();
+  });
+});
+
 describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA', () => {
   beforeEach(() => {
     vi.clearAllMocks();
