@@ -7,6 +7,7 @@ import LoadingSpinner from '../../components/UI/LoadingSpinner.jsx';
 import Image from 'next/image';
 import { VILLES, getArrondissementsFor } from '../../constants/locations';
 import { PROPERTY_TYPES } from '../../constants/propertyTypes';
+import { BedDouble, Home, KeyRound, Map, ShoppingBag, Tag } from 'lucide-react';
 
 const EditPropertyPage = () => {
   const params = useParams();
@@ -201,10 +202,23 @@ const EditPropertyPage = () => {
 
   if (loading && !formData.title) return <LoadingSpinner />;
 
+  const isLand = formData.type === 'Terrain';
+  const isCommercial = ['Commerce', 'Bureau', 'Entrepôt'].includes(formData.type);
+  const editProfile = formData.status === 'location'
+    ? { title: 'Modifier une location', icon: KeyRound, tone: 'from-blue-600 to-cyan-500', price: 'Loyer mensuel (FCFA)', help: 'Indiquez le montant du loyer mensuel.' }
+    : formData.status === 'hebergement'
+      ? { title: 'Modifier un hébergement', icon: BedDouble, tone: 'from-violet-600 to-fuchsia-500', price: 'Tarif par nuit (FCFA)', help: 'Indiquez le tarif de référence pour une nuit.' }
+      : { title: 'Modifier une vente', icon: Tag, tone: 'from-amber-600 to-orange-500', price: 'Prix de vente (FCFA)', help: 'Saisissez le prix de vente demandé.' };
+  const EditIcon = editProfile.icon;
+  const TypeIcon = isLand ? Map : isCommercial ? ShoppingBag : Home;
+
   return (
     <div className="container mx-auto py-12 px-4">
       <div className="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-md">
-        <h1 className="text-3xl font-bold text-primary mb-6">Modifier le bien</h1>
+        <div className={`mb-6 rounded-2xl bg-gradient-to-r ${editProfile.tone} p-5 text-white shadow-sm`}>
+          <div className="flex items-center gap-3"><span className="rounded-xl bg-white/20 p-2"><EditIcon className="h-6 w-6" /></span><div><p className="text-xs font-semibold uppercase tracking-wider text-white/80">{formData.type}</p><h1 className="text-2xl font-bold">{editProfile.title}</h1></div><TypeIcon className="ml-auto h-7 w-7 text-white/70" /></div>
+          <p className="mt-3 text-sm text-white/90">{isLand ? 'Priorité à la superficie, la localisation et aux informations foncières disponibles.' : isCommercial ? 'Priorité à la surface professionnelle, l’accès, le stationnement et les équipements.' : editProfile.help}</p>
+        </div>
         
         <form onSubmit={submitHandler} className="space-y-4">
           {error && <p className="bg-red-100 text-red-700 p-3 rounded">{error}</p>}
@@ -234,7 +248,7 @@ const EditPropertyPage = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Prix *</label>
+            <label className="block text-sm font-medium mb-2">{editProfile.price} *</label>
             <input
               type="number"
               name="price"
@@ -243,6 +257,7 @@ const EditPropertyPage = () => {
               className="w-full p-3 border rounded-lg"
               required
             />
+            <p className="text-xs text-gray-500 mt-1">{editProfile.help}</p>
           </div>
 
           <div>

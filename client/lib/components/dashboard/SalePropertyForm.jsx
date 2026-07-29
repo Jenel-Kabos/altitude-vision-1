@@ -13,6 +13,7 @@ import { VILLES, getArrondissementsFor } from "../../constants/locations";
 import { PROPERTY_TYPES } from "../../constants/propertyTypes";
 import { LEGAL_STATUSES } from "../../constants/saleProperty";
 import { createFullSaleProperty, updateFullSaleProperty } from "../../services/salePropertyService";
+import { Home, Map, ShoppingBag, Tag } from "lucide-react";
 
 const emptyForm = (initial = {}) => ({
   title: initial.title || "",
@@ -161,6 +162,13 @@ const SalePropertyForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {propertyId && (() => {
+        const TypeIcon = formData.type === 'Terrain' ? Map : ['Commerce', 'Bureau', 'Entrepôt'].includes(formData.type) ? ShoppingBag : Home;
+        return <div className="rounded-2xl bg-gradient-to-r from-amber-600 to-orange-500 p-4 text-white shadow-sm">
+          <div className="flex items-center gap-3"><span className="rounded-xl bg-white/20 p-2"><Tag className="h-6 w-6" /></span><div><p className="text-xs font-semibold uppercase tracking-wider text-white/80">Modification · {formData.type}</p><h2 className="text-xl font-bold">Modifier une vente</h2></div><TypeIcon className="ml-auto h-7 w-7 text-white/70" /></div>
+          <p className="mt-3 text-sm text-white/90">{formData.type === 'Terrain' ? 'Mettez en avant la superficie, la situation juridique et le potentiel du terrain.' : 'Vérifiez en priorité le prix de vente, la négociation, la situation juridique et la disponibilité.'}</p>
+        </div>;
+      })()}
       {propertyId && (
         <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
           Type de transaction : <span className="font-semibold">Vente</span> — non modifiable en édition.

@@ -171,6 +171,7 @@ const MyPropertiesPage = () => {
           setExistingImages={setExistingImages}
           onSubmit={handleFormSubmit}
           loading={loading}
+          isEditing={Boolean(editingProperty)}
         />
         {editingProperty && (
           <button

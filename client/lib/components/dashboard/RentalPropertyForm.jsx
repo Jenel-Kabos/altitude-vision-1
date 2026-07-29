@@ -12,6 +12,7 @@ import { VILLES, getArrondissementsFor } from "../../constants/locations";
 import { PROPERTY_TYPES } from "../../constants/propertyTypes";
 import { TENANT_PROFILES, REQUIRED_DOCUMENTS } from "../../constants/rentalProperty";
 import { createFullRentalProperty, updateFullRentalProperty } from "../../services/rentalPropertyService";
+import { Home, KeyRound, ShoppingBag } from "lucide-react";
 
 const emptyForm = (initial = {}) => ({
   title: initial.title || "",
@@ -191,6 +192,13 @@ const RentalPropertyForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {propertyId && (() => {
+        const TypeIcon = ['Commerce', 'Bureau', 'Entrepôt'].includes(formData.type) ? ShoppingBag : Home;
+        return <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 p-4 text-white shadow-sm">
+          <div className="flex items-center gap-3"><span className="rounded-xl bg-white/20 p-2"><KeyRound className="h-6 w-6" /></span><div><p className="text-xs font-semibold uppercase tracking-wider text-white/80">Modification · {formData.type}</p><h2 className="text-xl font-bold">Modifier une location</h2></div><TypeIcon className="ml-auto h-7 w-7 text-white/70" /></div>
+          <p className="mt-3 text-sm text-white/90">Vérifiez en priorité le loyer mensuel, les charges, la caution, la disponibilité et les conditions du bail.</p>
+        </div>;
+      })()}
       {propertyId && (
         <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
           Type de transaction : <span className="font-semibold">Location</span> — non modifiable en édition.

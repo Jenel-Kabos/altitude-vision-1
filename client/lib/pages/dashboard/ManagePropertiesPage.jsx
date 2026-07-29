@@ -698,7 +698,7 @@ const ManagePropertiesPage = () => {
               <div className="p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white/95 z-20 rounded-t-2xl">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl text-white"><Edit className="w-6 h-6" /></div>
-                  <h2 className="pr-10 text-xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Modifier le bien</h2>
+                  <h2 className="pr-10 text-xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Modifier {editingProperty?.status === 'vente' ? 'une vente' : editingProperty?.status === 'location' ? 'une location' : HOTEL_ACCOMMODATION_TYPES.includes(formData.accommodationType) ? 'un hôtel' : 'un hébergement'}</h2>
                   <button onClick={resetForm} disabled={loadingSubmit}
                     className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition"><X className="w-6 h-6" /></button>
                 </div>
@@ -707,7 +707,7 @@ const ManagePropertiesPage = () => {
                 {editingProperty?.status === 'hebergement' && (
                   <PropertyForm formData={formData} setFormData={setFormData} onSubmit={handleSubmit} loading={loadingSubmit}
                     existingImages={existingImages} setExistingImages={setExistingImages}
-                    enableHebergement errors={errors} />
+                    enableHebergement errors={errors} isEditing />
                 )}
                 {editingProperty?.status !== 'hebergement' && editLoading && (
                   <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>

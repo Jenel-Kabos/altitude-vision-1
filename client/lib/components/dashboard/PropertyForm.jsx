@@ -3,6 +3,7 @@
 import React, { useRef, useMemo, useEffect, useState } from "react";
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
+import { BedDouble, Building2, Home, KeyRound, Map, ShoppingBag, Tag } from 'lucide-react';
 
 const MapLeaflet = dynamic(() => import('./MapLeaflet'), { ssr: false });
 import { VILLES, getArrondissementsFor } from "../../constants/locations";
@@ -42,6 +43,7 @@ const PropertyForm = ({
   // inchangée pour eux.
   enableHebergement = false,
   errors = {},
+  isEditing = false,
 }) => {
   const fileInputRef = useRef(null);
 
@@ -86,6 +88,16 @@ const PropertyForm = ({
   const [hotels, setHotels] = useState([]);
   const [hotelsLoading, setHotelsLoading] = useState(false);
   const isHotelType = enableHebergement && HOTEL_ACCOMMODATION_TYPES.includes(formData.accommodationType);
+  const propertyType = formData.type || 'Bien immobilier';
+  const isLand = propertyType === 'Terrain';
+  const isCommercial = ['Commerce', 'Bureau', 'Entrepôt'].includes(propertyType);
+  const transactionProfile = formData.status === 'location'
+    ? { label: 'Location', icon: KeyRound, tone: 'from-blue-600 to-cyan-500', priceLabel: 'Loyer mensuel (FCFA)', priceHelp: 'Indiquez le montant du loyer mensuel demandé.' }
+    : formData.status === 'hebergement'
+      ? { label: isHotelType ? 'Hôtel' : 'Hébergement', icon: isHotelType ? Building2 : BedDouble, tone: 'from-violet-600 to-fuchsia-500', priceLabel: 'Tarif par nuit (FCFA)', priceHelp: 'Indiquez le tarif de référence pour une nuit.' }
+      : { label: 'Vente', icon: Tag, tone: 'from-amber-600 to-orange-500', priceLabel: 'Prix de vente (FCFA)', priceHelp: 'Saisissez le prix de vente demandé.' };
+  const TypeIcon = isLand ? Map : isCommercial ? ShoppingBag : Home;
+  const TransactionIcon = transactionProfile.icon;
 
   // Valeurs historiques (residence_meublee/bungalow) : jamais proposées à la
   // création, mais réinjectées si c'est la valeur déjà en base pour l'annonce
@@ -209,7 +221,26 @@ const PropertyForm = ({
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
 
+      <div className={`rounded-2xl bg-gradient-to-r ${transactionProfile.tone} p-4 text-white shadow-sm`}>
+        <div className="flex items-center gap-3">
+          <span className="rounded-xl bg-white/20 p-2"><TransactionIcon className="h-6 w-6" /></span>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/80">{isEditing ? 'Modification' : 'Annonce'} · {propertyType}</p>
+            <h2 className="text-xl font-bold">{isEditing ? 'Modifier' : 'Configurer'} {transactionProfile.label === 'Hôtel' ? 'un hôtel' : transactionProfile.label === 'Vente' ? 'une vente' : transactionProfile.label === 'Location' ? 'une location' : 'un hébergement'}</h2>
+          </div>
+          <TypeIcon className="ml-auto h-7 w-7 text-white/70" aria-hidden="true" />
+        </div>
+        <p className="mt-3 text-sm text-white/90">
+          {isLand ? 'Mettez en avant la superficie, la localisation, la construction possible et les informations foncières disponibles.'
+            : isCommercial ? 'Présentez clairement la surface professionnelle, l’accès, le stationnement et les équipements adaptés à l’activité.'
+            : formData.status === 'location' ? 'Priorité au loyer, à la disponibilité, à la caution et aux conditions de bail.'
+            : formData.status === 'hebergement' ? 'Priorité à la capacité, aux horaires, aux services, aux équipements et aux conditions de séjour.'
+            : 'Priorité au prix de vente, à la disponibilité, aux caractéristiques et à la qualité de présentation.'}
+        </p>
+      </div>
+
       {/* ------------------ SECTION INFOS DE BASE ------------------ */}
+      <h3 className="text-lg font-semibold border-b pb-2">Informations générales</h3>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Titre *</label>
         <input
@@ -238,7 +269,7 @@ const PropertyForm = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Prix (FCFA) *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{transactionProfile.priceLabel} *</label>
         <input
           name="price"
           type="number"
@@ -249,6 +280,7 @@ const PropertyForm = ({
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
           required
         />
+        <p className="text-xs text-gray-500 mt-1">{transactionProfile.priceHelp}</p>
       </div>
 
       <div>
@@ -353,7 +385,8 @@ const PropertyForm = ({
 
       {/* ------------------ SECTION ADRESSE ------------------ */}
       <div className="border-t pt-4 mt-4">
-        <h3 className="text-lg font-semibold mb-3">Adresse</h3>
+        <h3 className="text-lg font-semibold mb-1">Localisation</h3>
+        <p className="text-xs text-gray-500 mb-3">Renseignez précisément la zone pour faciliter la recherche et les visites.</p>
 
         <div className="space-y-3">
           <div>
@@ -420,7 +453,8 @@ const PropertyForm = ({
 
       {/* ------------------ SECTION CARACTÉRISTIQUES ------------------ */}
       <div className="border-t pt-4 mt-4">
-        <h3 className="text-lg font-semibold mb-3">Caractéristiques Détaillées</h3>
+        <h3 className="text-lg font-semibold mb-1">{isLand ? 'Caractéristiques du terrain' : isCommercial ? 'Caractéristiques professionnelles' : 'Caractéristiques du bien'}</h3>
+        <p className="text-xs text-gray-500 mb-3">{isLand ? 'La superficie et le type de construction renseignent le potentiel du terrain.' : isCommercial ? 'Décrivez les volumes et aménagements utiles à une activité professionnelle.' : 'Décrivez les volumes et la configuration du logement.'}</p>
 
         <div className="grid grid-cols-3 gap-3 mb-3">
           <div>
