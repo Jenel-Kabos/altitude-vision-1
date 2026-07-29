@@ -94,4 +94,12 @@ describe('MyHotelsPage — Sprint B2 (dashboard propriétaire) — TEST DATA', (
     fireEvent.click(await screen.findByRole('button', { name: /Ajouter un hôtel/i }));
     expect(await screen.findByLabelText("Nom de l'hôtel")).toBeInTheDocument();
   });
+
+  test("cliquer 'Modifier la fiche' ouvre le même HotelPropertyForm prérempli en mode édition", async () => {
+    getMyHotels.mockResolvedValue([hotel({ description: 'Vue sur le fleuve', phone: '+242060000000' })]);
+    render(<MyHotelsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Modifier la fiche' }));
+    expect(await screen.findByText('Modifier un hôtel')).toBeInTheDocument();
+    expect(screen.getByLabelText("Nom de l'hôtel")).toHaveValue('Hôtel Le Panorama');
+  });
 });

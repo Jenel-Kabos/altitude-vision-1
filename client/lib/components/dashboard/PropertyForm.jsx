@@ -3,7 +3,6 @@
 import React, { useRef, useMemo, useEffect, useState } from "react";
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import { BedDouble, Building2, Home, KeyRound, Map, ShoppingBag, Tag } from 'lucide-react';
 
 const MapLeaflet = dynamic(() => import('./MapLeaflet'), { ssr: false });
 import { VILLES, getArrondissementsFor } from "../../constants/locations";
@@ -14,6 +13,7 @@ import {
 } from "../../constants/accommodation";
 import { TENANT_PROFILES, REQUIRED_DOCUMENTS } from "../../constants/rentalProperty";
 import { getHotels } from "../../services/accommodationService";
+import { getPropertyFormConfig } from "../../utils/propertyFormConfig";
 
 // ✅ Préfixe les URLs relatives avec l'URL du backend.
 // file.path retourne "uploads/events/photo.jpg" (sans slash ni domaine),
@@ -88,16 +88,8 @@ const PropertyForm = ({
   const [hotels, setHotels] = useState([]);
   const [hotelsLoading, setHotelsLoading] = useState(false);
   const isHotelType = enableHebergement && HOTEL_ACCOMMODATION_TYPES.includes(formData.accommodationType);
-  const propertyType = formData.type || 'Bien immobilier';
-  const isLand = propertyType === 'Terrain';
-  const isCommercial = ['Commerce', 'Bureau', 'Entrepôt'].includes(propertyType);
-  const transactionProfile = formData.status === 'location'
-    ? { label: 'Location', icon: KeyRound, tone: 'from-blue-600 to-cyan-500', priceLabel: 'Loyer mensuel (FCFA)', priceHelp: 'Indiquez le montant du loyer mensuel demandé.' }
-    : formData.status === 'hebergement'
-      ? { label: isHotelType ? 'Hôtel' : 'Hébergement', icon: isHotelType ? Building2 : BedDouble, tone: 'from-violet-600 to-fuchsia-500', priceLabel: 'Tarif par nuit (FCFA)', priceHelp: 'Indiquez le tarif de référence pour une nuit.' }
-      : { label: 'Vente', icon: Tag, tone: 'from-amber-600 to-orange-500', priceLabel: 'Prix de vente (FCFA)', priceHelp: 'Saisissez le prix de vente demandé.' };
-  const TypeIcon = isLand ? Map : isCommercial ? ShoppingBag : Home;
-  const TransactionIcon = transactionProfile.icon;
+  const transactionProfile = getPropertyFormConfig({ transactionType: formData.status, propertyType: formData.type, accommodationType: formData.accommodationType, mode: isEditing ? 'edit' : 'create' });
+  const { TypeIcon, Icon: TransactionIcon, isLand, isCommercial, propertyType } = transactionProfile;
 
   // Valeurs historiques (residence_meublee/bungalow) : jamais proposées à la
   // création, mais réinjectées si c'est la valeur déjà en base pour l'annonce
@@ -226,16 +218,12 @@ const PropertyForm = ({
           <span className="rounded-xl bg-white/20 p-2"><TransactionIcon className="h-6 w-6" /></span>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-white/80">{isEditing ? 'Modification' : 'Annonce'} · {propertyType}</p>
-            <h2 className="text-xl font-bold">{isEditing ? 'Modifier' : 'Configurer'} {transactionProfile.label === 'Hôtel' ? 'un hôtel' : transactionProfile.label === 'Vente' ? 'une vente' : transactionProfile.label === 'Location' ? 'une location' : 'un hébergement'}</h2>
+            <h2 className="text-xl font-bold">{transactionProfile.title}</h2>
           </div>
           <TypeIcon className="ml-auto h-7 w-7 text-white/70" aria-hidden="true" />
         </div>
         <p className="mt-3 text-sm text-white/90">
-          {isLand ? 'Mettez en avant la superficie, la localisation, la construction possible et les informations foncières disponibles.'
-            : isCommercial ? 'Présentez clairement la surface professionnelle, l’accès, le stationnement et les équipements adaptés à l’activité.'
-            : formData.status === 'location' ? 'Priorité au loyer, à la disponibilité, à la caution et aux conditions de bail.'
-            : formData.status === 'hebergement' ? 'Priorité à la capacité, aux horaires, aux services, aux équipements et aux conditions de séjour.'
-            : 'Priorité au prix de vente, à la disponibilité, aux caractéristiques et à la qualité de présentation.'}
+          {transactionProfile.contextHelp}
         </p>
       </div>
 
@@ -1202,7 +1190,7 @@ const PropertyForm = ({
         disabled={loading || (formData.images.length === 0 && existingImages.length === 0)}
         className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold transition-colors"
       >
-        {loading ? "Sauvegarde en cours..." : "Enregistrer le bien"}
+        {loading ? "Sauvegarde en cours..." : isEditing ? "Enregistrer les modifications" : "Ajouter le bien"}
       </button>
 
       {formData.images.length === 0 && existingImages.length === 0 && (

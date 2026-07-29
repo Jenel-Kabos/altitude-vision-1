@@ -207,7 +207,7 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     // revient en arrière sur le <select>.
     fireEvent.change(screen.getByLabelText("Type d'hébergement"), { target: { value: '' } });
 
-    fireEvent.click(screen.getByText('Enregistrer le bien'));
+    fireEvent.click(screen.getByText('Ajouter le bien'));
 
     expect(await screen.findByText("Le type d'hébergement est requis.")).toBeInTheDocument();
     expect(createFullAccommodation).not.toHaveBeenCalled();
@@ -227,7 +227,7 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     fireEvent.change(screen.getByLabelText('Capacité maximale en adultes'), { target: { value: '4' } });
     fireEvent.change(screen.getByLabelText('Prix par nuit'), { target: { value: '35000' } });
 
-    fireEvent.click(screen.getByText('Enregistrer le bien'));
+    fireEvent.click(screen.getByText('Ajouter le bien'));
 
     await waitFor(() => expect(createFullAccommodation).toHaveBeenCalledTimes(1));
     const sentFormData = createFullAccommodation.mock.calls[0][0];
@@ -257,7 +257,7 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     fireEvent.click(screen.getByLabelText('Ménage'));
     fireEvent.click(screen.getByLabelText('Animaux acceptés'));
 
-    fireEvent.click(screen.getByText('Enregistrer le bien'));
+    fireEvent.click(screen.getByText('Ajouter le bien'));
 
     await waitFor(() => expect(createFullAccommodation).toHaveBeenCalledTimes(1));
     const sentFormData = createFullAccommodation.mock.calls[0][0];

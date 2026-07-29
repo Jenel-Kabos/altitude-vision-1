@@ -27,6 +27,7 @@ const MyHotelsPage = () => {
   const [hotels, setHotels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [editingHotel, setEditingHotel] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -89,7 +90,7 @@ const MyHotelsPage = () => {
   return (
     <DashboardPage>
       <DashboardPageHeader icon={Hotel} title="Mes hôtels" description="Gérez vos établissements, leurs catégories et leurs tarifs."
-        actions={!creating && (
+        actions={!creating && !editingHotel && (
           <button onClick={() => setCreating(true)} className="bg-gold text-white px-3 py-1.5 rounded text-sm">
             + Ajouter un hôtel
           </button>
@@ -105,7 +106,23 @@ const MyHotelsPage = () => {
         </DashboardCard>
       )}
 
-      {hotels.length === 0 && !creating && (
+      {editingHotel && (
+        <DashboardCard className="mb-6">
+          <HotelPropertyForm
+            scope="owner"
+            hotelId={editingHotel._id}
+            accommodationType={editingHotel.accommodationType || 'hotel'}
+            initialProperty={editingHotel.property}
+            initialHotel={editingHotel}
+            existingImages={editingHotel.property?.images || editingHotel.gallery || []}
+            completion={editingHotel.completion}
+            onSuccess={() => { setEditingHotel(null); load(); }}
+            onCancel={() => setEditingHotel(null)}
+          />
+        </DashboardCard>
+      )}
+
+      {hotels.length === 0 && !creating && !editingHotel && (
         <DashboardState title="Aucun hôtel" description="Ajoutez votre premier établissement pour commencer." />
       )}
 
@@ -135,6 +152,9 @@ const MyHotelsPage = () => {
             )}
 
             <div className="flex flex-wrap gap-2 mt-3">
+              <button onClick={() => { setCreating(false); setEditingHotel(hotel); }} className="bg-gold text-white px-3 py-1.5 rounded text-sm">
+                Modifier la fiche
+              </button>
               <Link href={`/dashboard/hotels/${hotel._id}/room-categories`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
                 Catégories
               </Link>

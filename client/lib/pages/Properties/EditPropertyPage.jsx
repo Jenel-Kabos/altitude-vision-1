@@ -1,506 +1,83 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { getPropertyById, updateProperty } from '../../services/propertyService';
 import LoadingSpinner from '../../components/UI/LoadingSpinner.jsx';
-import Image from 'next/image';
-import { VILLES, getArrondissementsFor } from '../../constants/locations';
-import { PROPERTY_TYPES } from '../../constants/propertyTypes';
-import { BedDouble, Home, KeyRound, Map, ShoppingBag, Tag } from 'lucide-react';
+import PropertyForm from '../../components/dashboard/PropertyForm';
+import { createEmptyPropertyForm, mapPropertyToFormValues } from '../../utils/propertyFormValues';
 
 const EditPropertyPage = () => {
-  const params = useParams();
+  const { id } = useParams() || {};
   const router = useRouter();
-  const id = params?.id;
-
-  // 🔑 CORRECTION : Structure alignée avec le modèle
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    price: '',
-    honoraires: '',
-    fraisVisite: 0,
-    pole: 'Altimmo',
-    status: 'vente',
-    type: 'Appartement',
-    address: {
-      street: '',
-      arrondissement: '',
-      city: 'Brazzaville'
-    },
-    surface: '',
-    bedrooms: '',
-    bathrooms: '',
-    livingRooms: '',
-    kitchens: '',
-    constructionType: 'Non spécifié',
-    amenities: '',
-    latitude: -4.266,
-    longitude: 15.283,
-    images: []
-  });
-
+  const [formData, setFormData] = useState(createEmptyPropertyForm);
   const [existingImages, setExistingImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Empêche l'auto-calcul d'écraser les honoraires déjà saisis en base au chargement,
-  // ou modifiés manuellement par l'admin depuis.
-  const honorairesTouchedRef = useRef(false);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
-    const fetchProperty = async () => {
-      try {
-        const property = await getPropertyById(id);
-
-        honorairesTouchedRef.current = property.honoraires !== null && property.honoraires !== undefined;
-
-        setFormData({
-          title: property.title || '',
-          description: property.description || '',
-          price: property.price || '',
-          honoraires: property.honoraires ?? '',
-          fraisVisite: property.fraisVisite ?? 0,
-          pole: property.pole || 'Altimmo',
-          status: property.status || 'vente',
-          type: property.type || 'Appartement',
-          address: {
-            street: property.address?.street || '',
-            arrondissement: property.address?.arrondissement || '',
-            city: property.address?.city || 'Brazzaville'
-          },
-          surface: property.surface || '',
-          bedrooms: property.bedrooms || '',
-          bathrooms: property.bathrooms || '',
-          livingRooms: property.livingRooms || '',
-          kitchens: property.kitchens || '',
-          constructionType: property.constructionType || 'Non spécifié',
-          amenities: property.amenities ? property.amenities.join(', ') : '',
-          latitude: property.latitude || property.location?.coordinates[1] || -4.266,
-          longitude: property.longitude || property.location?.coordinates[0] || 15.283,
-          images: []
-        });
-        
+    let cancelled = false;
+    getPropertyById(id)
+      .then((property) => {
+        if (cancelled) return;
+        setFormData(mapPropertyToFormValues(property));
         setExistingImages(property.images || []);
-      } catch (err) {
-        setError('Impossible de charger les données du bien.');
-        toast.error('Erreur lors du chargement du bien');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProperty();
+        loadedRef.current = true;
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Impossible de charger les données du bien.');
+          toast.error('Erreur lors du chargement du bien');
+        }
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [id]);
 
-  // Calcul auto des honoraires au changement de price/status, sauf si déjà saisis
-  // manuellement (en base au chargement, ou modifiés depuis dans ce formulaire).
-  useEffect(() => {
-    if (honorairesTouchedRef.current) return;
-    if (!formData.price || !formData.status) return;
-    // Hébergement n'a pas de règle d'honoraires définie (pas de bail) — pas d'auto-calcul.
-    if (formData.status === 'hebergement') return;
-    const rate = formData.status === 'location' ? 0.8 : 0.1;
-    const calculated = Math.round(Number(formData.price) * rate);
-    setFormData((prev) => ({ ...prev, honoraires: calculated }));
-  }, [formData.price, formData.status]);
-
-  const handleChange = (e) => {
-    if (e.target.name === 'honoraires') {
-      honorairesTouchedRef.current = true;
-    }
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  // 🔑 CORRECTION : Gestion de l'adresse imbriquée
-  const handleAddressChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        [name]: value
-      }
-    }));
-  };
-
-  const handleCityChange = (e) => {
-    const newCity = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        city: newCity,
-        arrondissement: getArrondissementsFor(newCity).includes(prev.address.arrondissement)
-          ? prev.address.arrondissement
-          : ''
-      }
-    }));
-  };
-
-  const handleImageChange = (e) => {
-    const newFiles = Array.from(e.target.files);
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, ...newFiles]
-    }));
-  };
-
-  const submitHandler = async (e) => {
-    e.preventDefault();
+  const submitHandler = async (event) => {
+    event.preventDefault();
+    if (!loadedRef.current || loading) return;
     setLoading(true);
     setError('');
-
     try {
       const data = new FormData();
-
-      const { images, latitude, longitude, address, amenities, ...otherFields } = formData;
-      
-      // Champs principaux
-      Object.entries(otherFields).forEach(([k, v]) => {
-        if (v !== "" && v !== null && v !== undefined) {
-          data.append(k, v);
-        }
+      const { images, latitude, longitude, address, amenities, ...fields } = formData;
+      Object.entries(fields).forEach(([key, value]) => {
+        if (value !== '' && value !== null && value !== undefined) data.append(key, value);
       });
-
-      // Coordonnées
       data.append('latitude', latitude);
       data.append('longitude', longitude);
-
-      // Adresse en JSON
-      data.append("address", JSON.stringify(address));
-
-      // Amenities
+      data.append('address', JSON.stringify(address));
       const amenitiesArray = typeof amenities === 'string'
-        ? amenities.split(",").map(a => a.trim()).filter(Boolean)
+        ? amenities.split(',').map((item) => item.trim()).filter(Boolean)
         : (Array.isArray(amenities) ? amenities : []);
-      data.append("amenities", JSON.stringify(amenitiesArray));
-
-      // Location
-      data.append("location", JSON.stringify({ 
-        type: "Point", 
-        coordinates: [longitude, latitude] 
-      }));
-
-      // Images existantes
-      existingImages.forEach(url => data.append("existingImages", url));
-
-      // Nouvelles images
-      images.forEach(file => data.append("images", file));
-
+      data.append('amenities', JSON.stringify(amenitiesArray));
+      data.append('location', JSON.stringify({ type: 'Point', coordinates: [longitude, latitude] }));
+      existingImages.forEach((url) => data.append('existingImages', url));
+      images.forEach((file) => data.append('images', file));
       await updateProperty(id, data);
       toast.success('Bien mis à jour avec succès !');
       router.push(`/immobilier/property/${id}`);
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || 'La mise à jour a échoué.';
-      setError(errorMessage);
-      toast.error(errorMessage);
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || 'La mise à jour a échoué.';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading && !formData.title) return <LoadingSpinner />;
-
-  const isLand = formData.type === 'Terrain';
-  const isCommercial = ['Commerce', 'Bureau', 'Entrepôt'].includes(formData.type);
-  const editProfile = formData.status === 'location'
-    ? { title: 'Modifier une location', icon: KeyRound, tone: 'from-blue-600 to-cyan-500', price: 'Loyer mensuel (FCFA)', help: 'Indiquez le montant du loyer mensuel.' }
-    : formData.status === 'hebergement'
-      ? { title: 'Modifier un hébergement', icon: BedDouble, tone: 'from-violet-600 to-fuchsia-500', price: 'Tarif par nuit (FCFA)', help: 'Indiquez le tarif de référence pour une nuit.' }
-      : { title: 'Modifier une vente', icon: Tag, tone: 'from-amber-600 to-orange-500', price: 'Prix de vente (FCFA)', help: 'Saisissez le prix de vente demandé.' };
-  const EditIcon = editProfile.icon;
-  const TypeIcon = isLand ? Map : isCommercial ? ShoppingBag : Home;
+  if (loading && !loadedRef.current) return <LoadingSpinner />;
 
   return (
     <div className="container mx-auto py-12 px-4">
-      <div className="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-md">
-        <div className={`mb-6 rounded-2xl bg-gradient-to-r ${editProfile.tone} p-5 text-white shadow-sm`}>
-          <div className="flex items-center gap-3"><span className="rounded-xl bg-white/20 p-2"><EditIcon className="h-6 w-6" /></span><div><p className="text-xs font-semibold uppercase tracking-wider text-white/80">{formData.type}</p><h1 className="text-2xl font-bold">{editProfile.title}</h1></div><TypeIcon className="ml-auto h-7 w-7 text-white/70" /></div>
-          <p className="mt-3 text-sm text-white/90">{isLand ? 'Priorité à la superficie, la localisation et aux informations foncières disponibles.' : isCommercial ? 'Priorité à la surface professionnelle, l’accès, le stationnement et les équipements.' : editProfile.help}</p>
-        </div>
-        
-        <form onSubmit={submitHandler} className="space-y-4">
-          {error && <p className="bg-red-100 text-red-700 p-3 rounded">{error}</p>}
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Titre *</label>
-            <input 
-              type="text" 
-              name="title" 
-              value={formData.title} 
-              onChange={handleChange} 
-              className="w-full p-3 border rounded-lg" 
-              required 
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Description *</label>
-            <textarea 
-              name="description" 
-              value={formData.description} 
-              onChange={handleChange} 
-              className="w-full p-3 border rounded-lg" 
-              rows="5" 
-              required 
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">{editProfile.price} *</label>
-            <input
-              type="number"
-              name="price"
-              value={formData.price}
-              onChange={handleChange}
-              className="w-full p-3 border rounded-lg"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">{editProfile.help}</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Honoraires d'agence (FCFA) *</label>
-            <input
-              type="number"
-              name="honoraires"
-              value={formData.honoraires || ''}
-              onChange={handleChange}
-              placeholder="Calculé automatiquement"
-              className="w-full p-3 border rounded-lg"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              {formData.status === 'location'
-                ? 'Pré-rempli à 80% du loyer mensuel'
-                : formData.status === 'hebergement'
-                ? "Sans lien avec un bail — à renseigner manuellement si applicable"
-                : 'Pré-rempli à 10% du prix de vente'}
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Frais de visite (FCFA)</label>
-            <input
-              type="number"
-              name="fraisVisite"
-              value={formData.fraisVisite ?? 0}
-              onChange={handleChange}
-              placeholder="0 = visite gratuite"
-              className="w-full p-3 border rounded-lg"
-            />
-            <p className="text-xs text-gray-500 mt-1">Laisser à 0 si la visite est gratuite</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Type *</label>
-            <select
-              name="type"
-              value={formData.type || ''}
-              onChange={handleChange}
-              className="w-full p-3 border rounded-lg"
-              required
-            >
-              <option value="">Sélectionner...</option>
-              {PROPERTY_TYPES.map((t) => (
-                <option key={t.value ?? t} value={t.value ?? t}>{t.label ?? t}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-2">Surface (m²)</label>
-              <input
-                type="number"
-                name="surface"
-                value={formData.surface || ''}
-                onChange={handleChange}
-                className="w-full p-3 border rounded-lg"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Chambres</label>
-              <input
-                type="number"
-                name="bedrooms"
-                value={formData.bedrooms || ''}
-                onChange={handleChange}
-                className="w-full p-3 border rounded-lg"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Salles de bain</label>
-              <input
-                type="number"
-                name="bathrooms"
-                value={formData.bathrooms || ''}
-                onChange={handleChange}
-                className="w-full p-3 border rounded-lg"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-2">Salon</label>
-              <input
-                type="number"
-                name="livingRooms"
-                value={formData.livingRooms || ''}
-                onChange={handleChange}
-                className="w-full p-3 border rounded-lg"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Cuisine</label>
-              <input
-                type="number"
-                name="kitchens"
-                value={formData.kitchens || ''}
-                onChange={handleChange}
-                className="w-full p-3 border rounded-lg"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Type de construction</label>
-              <select
-                name="constructionType"
-                value={formData.constructionType}
-                onChange={handleChange}
-                className="w-full p-3 border rounded-lg"
-              >
-                <option value="Non spécifié">Non spécifié</option>
-                <option value="Béton armé">Béton armé</option>
-                <option value="Briques/Parpaings">Briques/Parpaings</option>
-                <option value="Bois">Bois</option>
-                <option value="Autre">Autre</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Équipements</label>
-            <input
-              type="text"
-              name="amenities"
-              value={formData.amenities || ''}
-              onChange={handleChange}
-              placeholder="Ex : Climatisation, Parking, Wifi (séparés par des virgules)"
-              className="w-full p-3 border rounded-lg"
-            />
-            <p className="text-xs text-gray-500 mt-1">Séparez les équipements par des virgules</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Ville *</label>
-            <select
-              name="city"
-              value={formData.address.city || ''}
-              onChange={handleCityChange}
-              className="w-full p-3 border rounded-lg"
-              required
-            >
-              <option value="">Sélectionner...</option>
-              {VILLES.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Arrondissement *</label>
-            <select
-              name="arrondissement"
-              value={formData.address.arrondissement || ''}
-              onChange={handleAddressChange}
-              disabled={!formData.address.city}
-              className="w-full p-3 border rounded-lg disabled:bg-gray-100 disabled:cursor-not-allowed"
-              required
-            >
-              <option value="">Sélectionner...</option>
-              {getArrondissementsFor(formData.address.city).map(a => (
-                <option key={a} value={a}>{a}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Rue</label>
-            <input
-              type="text"
-              name="street"
-              value={formData.address.street}
-              onChange={handleAddressChange}
-              className="w-full p-3 border rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Type de transaction</label>
-            <select 
-              name="status" 
-              value={formData.status} 
-              onChange={handleChange} 
-              className="w-full p-3 border rounded-lg"
-            >
-              <option value="location">Location</option>
-              <option value="vente">Vente</option>
-              <option value="hebergement">Hébergement (meublé)</option>
-            </select>
-          </div>
-
-          {formData.status === 'hebergement' && (
-            <div className="bg-blue-50 border border-blue-200 text-blue-800 text-sm p-3 rounded-lg">
-              Ce bien est un hébergement meublé (séjour de courte/moyenne durée). Le type d'hébergement,
-              la capacité d'accueil et les tarifs se configurent depuis l'espace « Mes hébergements »
-              après l'enregistrement de ce bien.
-            </div>
-          )}
-
-          {/* Images existantes */}
-          {existingImages.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium mb-2">Images actuelles</label>
-              <div className="flex flex-wrap gap-3">
-                {existingImages.map((img, i) => (
-                  <div key={i} className="relative w-24 h-24">
-                    <Image src={img} alt={`Image ${i}`} fill className="object-cover rounded" sizes="96px" />
-                    <button 
-                      type="button" 
-                      onClick={() => setExistingImages(existingImages.filter((_, idx) => idx !== i))}
-                      className="absolute top-0 right-0 bg-red-600 text-white text-xs rounded-full w-5 h-5"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Nouvelles images */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Ajouter de nouvelles images</label>
-            <input 
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleImageChange}
-              className="w-full p-3 border rounded-lg"
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            disabled={loading} 
-            className="w-full bg-gold text-dark font-bold py-3 px-6 rounded hover:bg-gold-light transition duration-300 disabled:bg-gray-400"
-          >
-            {loading ? 'Mise à jour...' : 'Enregistrer'}
-          </button>
-        </form>
+      <div className="max-w-4xl mx-auto bg-white p-4 sm:p-8 rounded-2xl shadow-md">
+        {error && <p className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</p>}
+        <PropertyForm formData={formData} setFormData={setFormData}
+          existingImages={existingImages} setExistingImages={setExistingImages}
+          onSubmit={submitHandler} loading={loading} isEditing />
       </div>
     </div>
   );

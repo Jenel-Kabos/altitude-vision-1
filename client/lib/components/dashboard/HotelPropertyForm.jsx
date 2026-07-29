@@ -12,7 +12,7 @@
 import React, { useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
-import { Building2 } from "lucide-react";
+import { getPropertyFormConfig } from "../../utils/propertyFormConfig";
 import { VILLES, getArrondissementsFor } from "../../constants/locations";
 import { HOTEL_RATE_TYPES, HOTEL_SERVICES } from "../../constants/hotel";
 import { ACCOMMODATION_TYPES, AMENITY_CATEGORIES } from "../../constants/accommodation";
@@ -191,10 +191,7 @@ const HotelPropertyForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-500 p-4 text-white shadow-sm">
-        <div className="flex items-center gap-3"><span className="rounded-xl bg-white/20 p-2"><Building2 className="h-6 w-6" /></span><div><p className="text-xs font-semibold uppercase tracking-wider text-white/80">Modification · Établissement hôtelier</p><h2 className="text-xl font-bold">Modifier un hôtel</h2></div></div>
-        <p className="mt-3 text-sm text-white/90">Vérifiez en priorité l’identité de l’établissement, les étoiles, les services, les horaires, les photos et les informations de contact.</p>
-      </div>
+      {(() => { const config = getPropertyFormConfig({ transactionType: 'hebergement', accommodationType, propertyType: 'Hôtel', mode: 'edit' }); const Icon = config.Icon; return <div className={`rounded-2xl bg-gradient-to-r ${config.tone} p-4 text-white shadow-sm`}><div className="flex items-center gap-3"><span className="rounded-xl bg-white/20 p-2"><Icon className="h-6 w-6" /></span><div><p className="text-xs font-semibold uppercase tracking-wider text-white/80">Modification · Établissement hôtelier</p><h2 className="text-xl font-bold">{config.title}</h2></div></div><p className="mt-3 text-sm text-white/90">Vérifiez l’identité, le classement, les services, les horaires, les photos et le contact. Les catégories et tarifs restent gérés dans leurs modules dédiés.</p></div>; })()}
       {/* ------------------ SECTION INFORMATIONS ------------------ */}
       <div>
         <h3 className="text-lg font-semibold mb-3">Informations</h3>
@@ -425,7 +422,10 @@ function HotelCreationWizard({ accommodationType, scope, onSuccess, onCancel }) 
     } finally { setLoading(false); }
   };
 
+  const createConfig = getPropertyFormConfig({ transactionType: 'hebergement', accommodationType, propertyType: 'Hôtel', mode: 'create' });
+  const CreateIcon = createConfig.Icon;
   return <div className="space-y-5">
+    <div className={`rounded-2xl bg-gradient-to-r ${createConfig.tone} p-4 text-white shadow-sm`}><div className="flex items-center gap-3"><span className="rounded-xl bg-white/20 p-2"><CreateIcon className="h-6 w-6" /></span><div><p className="text-xs font-semibold uppercase tracking-wider text-white/80">Création · Établissement hôtelier</p><h2 className="text-xl font-bold">{createConfig.title}</h2></div></div><p className="mt-3 text-sm text-white/90">Renseignez l’établissement, ses catégories de chambres, ses tarifs, ses services, ses politiques et ses médias.</p></div>
     <ol aria-label="Étapes du formulaire" className="grid grid-cols-3 gap-1 text-xs text-gray-500">{CREATION_STEPS.map((label, index) => <li key={label} className={index === step ? 'font-semibold text-gray-900' : ''}>{label}</li>)}</ol>
     <div className="flex items-center justify-between"><div><p className="text-xs uppercase tracking-wide text-gray-500">Étape {step + 1}/9</p><h3 className="text-xl font-semibold">{CREATION_STEPS[step]}</h3></div><span className="text-sm text-gray-500">{totals.totalRooms} chambres · {totals.minNightlyRate.toLocaleString('fr-FR')} XAF min.</span></div>
     {step === 0 && <div className="grid grid-cols-2 gap-3">
