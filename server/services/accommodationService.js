@@ -457,15 +457,25 @@ async function deleteAccommodation({ accommodation, property }) {
  * Hébergement) car les statuts filtrés ici (brouillon/soumis/publié/
  * suspendu/rejeté) sont propres à Accommodation, pas à Property.statusAdmin.
  */
-async function listAccommodationsForAdmin({ status, type, search, sort, page = 1, limit = 20 }) {
+async function listAccommodationsForAdmin({ status, type, city, availability, search, sort, page = 1, limit = 20, independentOnly = false, validatedOnly = false, activeOnly = false }) {
   const query = {};
   if (status && status !== 'tous') query.publicationStatus = status;
   if (type && type !== 'tous') query.accommodationType = type;
+  if (independentOnly) {
+    query.accommodationType = { $ne: 'hotel' };
+    query.hotel = null;
+  }
+  if (activeOnly) query.active = { $ne: false };
 
   let accommodationsQuery = Accommodation.find(query).populate({
     path: 'property',
     select: 'title images address owner bedrooms bathrooms price statusAdmin availability',
-    ...(search ? { match: { title: new RegExp(escapeRegex(search), 'i') } } : {}),
+    ...((search || city || availability || validatedOnly) ? { match: {
+      ...(search ? { title: new RegExp(escapeRegex(search), 'i') } : {}),
+      ...(city ? { 'address.city': new RegExp(escapeRegex(city), 'i') } : {}),
+      ...(availability ? { availability } : {}),
+      ...(validatedOnly ? { statusAdmin: 'Validée' } : {}),
+    } } : {}),
   });
 
   const sortMap = {
@@ -477,7 +487,7 @@ async function listAccommodationsForAdmin({ status, type, search, sort, page = 1
   accommodationsQuery = accommodationsQuery.sort(sortMap[sort] || sortMap.recent);
 
   let accommodations = await accommodationsQuery;
-  if (search) accommodations = accommodations.filter((acc) => acc.property); // match null → exclu
+  if (search || city || availability || validatedOnly) accommodations = accommodations.filter((acc) => acc.property); // match null → exclu
 
   if (sort === 'prix_asc') accommodations.sort((a, b) => (a.property?.price || 0) - (b.property?.price || 0));
   if (sort === 'prix_desc') accommodations.sort((a, b) => (b.property?.price || 0) - (a.property?.price || 0));

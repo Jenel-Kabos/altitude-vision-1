@@ -9,7 +9,7 @@ import { createFullAccommodation, updateFullAccommodation } from "../../services
 import { useAuth } from '../../context/AuthContext';
 import {
   PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle, Eye,
-  ArrowLeft, ArrowRight, Building2, MapPin, Maximize2, Bed, Bath, Sparkles, Send,
+  ArrowLeft, ArrowRight, Building2, Sparkles, Send,
 } from "lucide-react";
 import PropertyForm from "../../components/dashboard/PropertyForm";
 import SalePropertyForm from "../../components/dashboard/SalePropertyForm";
@@ -17,8 +17,9 @@ import RentalPropertyForm from "../../components/dashboard/RentalPropertyForm";
 import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
 import PropertyWizard from "../../components/dashboard/PropertyWizard";
 import { HOTEL_ACCOMMODATION_TYPES } from "../../constants/accommodation";
-import Image from 'next/image';
 import DashboardKpis from '../../components/dashboard/DashboardKpis';
+import PropertyManagementCard from '../../components/dashboard/PropertyManagementCard';
+import { formatCurrencyXAF } from '../../utils/normalizePropertyDetail';
 import { getDashboardAnalytics } from '../../services/dashboardAnalyticsService';
 
 // Libellés d'affichage pour le titre de la modale "Ajouter" — le choix
@@ -513,36 +514,9 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
     );
   };
 
-  const ALTIMMO_FALLBACK = 'https://placehold.co/600x400/3B82F6/FFFFFF?text=Altimmo';
-
   // ── PropertyCard ───────────────────────────────────────────
   const PropertyCard = ({ property }) => {
-    const [imgSrc, setImgSrc] = useState(property.images?.[0] || ALTIMMO_FALLBACK);
-    return (
-      <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 group animate-slideUp">
-        <div className="relative h-48 overflow-hidden">
-          <Image src={imgSrc} alt={property.title} fill
-            sizes="(max-width: 768px) 100vw, 33vw"
-            className="object-cover group-hover:scale-110 transition duration-300"
-            onError={() => setImgSrc(ALTIMMO_FALLBACK)} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-          <span className="absolute top-2 left-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">{property.type || 'Bien'}</span>
-          <span className="absolute top-2 right-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
-            {{ vente: 'Vente', location: 'Location', hebergement: 'Hébergement' }[property.status] || 'Vente'}
-          </span>
-          <div className="absolute bottom-2 left-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">{property.price} FCFA</div>
-        </div>
-        <div className="p-4">
-          <h3 className="text-lg font-bold text-gray-800 mb-2 line-clamp-1">{property.title}</h3>
-          <p className="text-sm text-gray-600 mb-3 line-clamp-2">{property.description}</p>
-          <div className="space-y-1 text-sm text-gray-500 mb-4">
-            <div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-red-500" /><span className="line-clamp-1">{property.address?.city || 'Non spécifié'}</span></div>
-            <div className="flex items-center gap-4">
-              {Number(property.surface) > 0 && <div className="flex items-center"><Maximize2 className="w-4 h-4 mr-1 text-blue-500" /><span>{property.surface} m²</span></div>}
-              {Number(property.bedrooms) > 0 && <div className="flex items-center"><Bed className="w-4 h-4 mr-1 text-indigo-500" /><span>{property.bedrooms}</span></div>}
-              {Number(property.bathrooms) > 0 && <div className="flex items-center"><Bath className="w-4 h-4 mr-1 text-cyan-500" /><span>{property.bathrooms}</span></div>}
-            </div>
-          </div>
+    return <PropertyManagementCard property={property} description={property.description} priceLabel={formatCurrencyXAF(property.price || 0)} badges={[{ label: property.type || 'Bien' }, { label: ({ vente: 'Vente', location: 'Location', hebergement: 'Hébergement' }[property.status] || 'Vente'), className: 'bg-gradient-to-r from-green-600 to-emerald-600' }]} footer={<>
           {property.amenities?.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-1">
               {property.amenities.slice(0, 3).map((a, i) => (
@@ -566,7 +540,7 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
               {property.recommande ? '★ Recommandé' : 'Recommander'}
             </button>
           )}
-          <div className="flex gap-2">
+          </>} actions={<>
             {readOnly && (
               <Link href={ownerHref(property)} className="flex-1 p-2.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all flex items-center justify-center gap-2 font-semibold">
                 <Eye className="w-5 h-5" /> Voir
@@ -584,10 +558,7 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
                 <Trash2 className="w-5 h-5" />
               </button>
             )}
-          </div>
-        </div>
-      </div>
-    );
+          </>} />;
   };
 
   if (loading) return (

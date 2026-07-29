@@ -493,8 +493,13 @@ exports.pending = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.listAdmin = async (req, res) => {
   try {
-    const { status, type, search, sort, page, limit } = req.query;
-    const result = await listAccommodationsForAdmin({ status, type, search, sort, page, limit });
+    const { status, type, city, availability, search, sort, page, limit } = req.query;
+    const result = await listAccommodationsForAdmin({
+      status, type, city, availability, search, sort, page, limit,
+      independentOnly: req.query.independentOnly === 'true',
+      validatedOnly: req.query.validatedOnly === 'true',
+      activeOnly: req.query.activeOnly === 'true',
+    });
     const accommodations = await Promise.all(result.accommodations.map(async (a) => {
       const rates = await getActiveRates(a._id);
       return {

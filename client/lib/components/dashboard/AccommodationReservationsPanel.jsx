@@ -7,9 +7,9 @@ import AccommodationRefundPanel from './AccommodationRefundPanel';
 const money = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', maximumFractionDigits: 0 });
 const ACTIONS = { pending: [['Confirmer', 'confirm'], ['Annuler', 'cancel']], confirmed: [['Check-in', 'check-in'], ['Annuler', 'cancel']], checked_in: [['Check-out', 'check-out']] };
 
-export default function AccommodationReservationsPanel({ accommodations = [], onChanged }) {
-  const [tab, setTab] = useState('reservations'); const [reservations, setReservations] = useState([]); const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ accommodation: '', checkInDate: '', checkOutDate: '', adults: 1, children: 0, specialRequests: '' });
+export default function AccommodationReservationsPanel({ accommodations = [], onChanged, initialTab = 'reservations', initialAccommodationId = '' }) {
+  const [tab, setTab] = useState(initialTab); const [reservations, setReservations] = useState([]); const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({ accommodation: initialAccommodationId, checkInDate: '', checkOutDate: '', adults: 1, children: 0, specialRequests: '' });
   const [availability, setAvailability] = useState(null); const [blocks, setBlocks] = useState([]); const [block, setBlock] = useState({ startDate: '', endDate: '', type: 'owner_block', reason: '' });
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1)); const [calendar, setCalendar] = useState({ reservations: [], blocks: [] });
   const [selectionStart, setSelectionStart] = useState(null); const [detail, setDetail] = useState(null); const [detailLoading, setDetailLoading] = useState(false);

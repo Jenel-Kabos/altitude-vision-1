@@ -1,11 +1,181 @@
-const { spawn } = require('child_process');
-const path = require('path'); const http = require('http'); const mongoose = require('mongoose'); const { MongoMemoryServer } = require('mongodb-memory-server');
-const root = path.resolve(__dirname, '../..'); const serverDir = path.join(root, 'server'); const clientDir = path.join(root, 'client');
-const ids = { owner:'66e200000000000000000001', guest:'66e200000000000000000002', property:'66e200000000000000000003', accommodation:'66e200000000000000000004' };
-let mongo; const children = [];
-const waitFor = (url, timeout=120000) => new Promise((resolve,reject) => { const started=Date.now(); const retry=()=>Date.now()-started>timeout?reject(new Error(`E2E_TIMEOUT ${url}`)):setTimeout(poll,500); const poll=()=>http.get(url,(response)=>{response.resume(); response.statusCode<500?resolve():retry();}).on('error',retry); poll(); });
-async function seed(uri) { process.env.MONGO_URI=uri; await mongoose.connect(uri); const User=require('../models/User'); const Property=require('../models/Property'); const Accommodation=require('../models/Accommodation'); const RatePlan=require('../models/RatePlan'); await User.create([{_id:ids.owner,name:'Propriétaire E2E',email:'owner-e2e@example.test',password:'E2eOwner!2026',passwordConfirm:'E2eOwner!2026',role:'Proprietaire',isEmailVerified:true},{_id:ids.guest,name:'Client E2E',email:'client-e2e@example.test',password:'E2eClient!2026',passwordConfirm:'E2eClient!2026',role:'Client',isEmailVerified:true}]); await Property.create({_id:ids.property,title:'Villa E2E Brazzaville',description:'Hébergement entièrement fictif réservé à la recette automatisée Playwright.',pole:'Altimmo',type:'Villa',status:'hebergement',price:35000,address:{arrondissement:'Bacongo',city:'Brazzaville'},latitude:-4.26,longitude:15.28,images:['https://placehold.co/1200x800?text=E2E'],surface:100,bedrooms:2,bathrooms:1,statusAdmin:'Validée',availability:'Disponible',owner:ids.owner}); await Accommodation.create({_id:ids.accommodation,property:ids.property,accommodationType:'villa_meublee',publicationStatus:'publie',active:true,capacity:{maxAdults:4,maxChildren:2},cleaningFee:5000,minimumStay:1,createdBy:ids.owner}); await RatePlan.create({accommodation:ids.accommodation,mode:'nightly',amount:35000,currency:'XAF',active:true,createdBy:ids.owner}); await mongoose.disconnect(); }
-function start(command,args,cwd,env){const child=spawn(command,args,{cwd,env:{...process.env,...env},stdio:'inherit'});children.push(child);return child;}
-async function shutdown(){children.forEach((child)=>child.kill('SIGTERM'));if(mongo)await mongo.stop();process.exit();}
-async function main(){mongo=await MongoMemoryServer.create();const uri=mongo.getUri('altitude_e2e');await seed(uri);start('npm',['start'],serverDir,{MONGO_URI:uri,PORT:'5000',NODE_ENV:'e2e',FRONTEND_URL:'http://localhost:3000',JWT_SECRET:'e2e-jwt-secret-not-for-production',JWT_EXPIRES_IN:'1h',DISABLE_SCHEDULED_JOBS:'1'});await waitFor('http://localhost:5000/api/health');start('npm',['run','dev','--','--hostname','localhost','--port','3000'],clientDir,{NEXT_PUBLIC_API_URL:'http://localhost:5000/api'});await waitFor('http://localhost:3000');console.log(`E2E_READY property=${ids.property}`);}
-process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);main().catch(async(error)=>{console.error(error);await shutdown();});
+const { spawn } = require("child_process");
+const path = require("path");
+const http = require("http");
+const mongoose = require("mongoose");
+const { MongoMemoryServer } = require("mongodb-memory-server");
+const root = path.resolve(__dirname, "../..");
+const serverDir = path.join(root, "server");
+const clientDir = path.join(root, "client");
+const ids = {
+  owner: "66e200000000000000000001",
+  guest: "66e200000000000000000002",
+  property: "66e200000000000000000003",
+  accommodation: "66e200000000000000000004",
+};
+let mongo;
+const children = [];
+const waitFor = (url, timeout = 120000) =>
+  new Promise((resolve, reject) => {
+    const started = Date.now();
+    const retry = () =>
+      Date.now() - started > timeout
+        ? reject(new Error(`E2E_TIMEOUT ${url}`))
+        : setTimeout(poll, 500);
+    const poll = () =>
+      http
+        .get(url, (response) => {
+          response.resume();
+          response.statusCode < 500 ? resolve() : retry();
+        })
+        .on("error", retry);
+    poll();
+  });
+async function seed(uri) {
+  process.env.MONGO_URI = uri;
+  await mongoose.connect(uri);
+  const User = require("../models/User");
+  const Property = require("../models/Property");
+  const Accommodation = require("../models/Accommodation");
+  const RatePlan = require("../models/RatePlan");
+  await User.create([
+    {
+      _id: ids.owner,
+      name: "Administrateur E2E",
+      email: "owner-e2e@example.test",
+      password: "E2eOwner!2026",
+      passwordConfirm: "E2eOwner!2026",
+      role: "Admin",
+      isEmailVerified: true,
+    },
+    {
+      _id: ids.guest,
+      name: "Client E2E",
+      email: "client-e2e@example.test",
+      password: "E2eClient!2026",
+      passwordConfirm: "E2eClient!2026",
+      role: "Client",
+      isEmailVerified: true,
+    },
+  ]);
+  await Property.create([
+    {
+      _id: ids.property,
+      title: "Villa E2E Brazzaville",
+      description:
+        "Hébergement entièrement fictif réservé à la recette automatisée Playwright.",
+      pole: "Altimmo",
+      type: "Villa",
+      status: "hebergement",
+      price: 35000,
+      address: { arrondissement: "Bacongo", city: "Brazzaville" },
+      latitude: -4.26,
+      longitude: 15.28,
+      images: ["https://placehold.co/1200x800/png?text=E2E"],
+      surface: 100,
+      bedrooms: 2,
+      bathrooms: 1,
+      statusAdmin: "Validée",
+      availability: "Disponible",
+      owner: ids.owner,
+    },
+    {
+      title: "Appartement Vente E2E",
+      description: "Bien fictif de comparaison visuelle.",
+      pole: "Altimmo",
+      type: "Appartement",
+      status: "vente",
+      price: 95000000,
+      address: { arrondissement: "Centre-ville", city: "Brazzaville" },
+      latitude: -4.27,
+      longitude: 15.29,
+      images: ["https://placehold.co/1200x800/png?text=Vente"],
+      surface: 120,
+      bedrooms: 3,
+      bathrooms: 2,
+      statusAdmin: "Validée",
+      availability: "Disponible",
+      owner: ids.owner,
+    },
+    {
+      title: "Maison Location E2E",
+      description: "Bien fictif de comparaison visuelle.",
+      pole: "Altimmo",
+      type: "Maison",
+      status: "location",
+      price: 450000,
+      address: { arrondissement: "Moungali", city: "Brazzaville" },
+      latitude: -4.25,
+      longitude: 15.27,
+      images: ["https://placehold.co/1200x800/png?text=Location"],
+      surface: 90,
+      bedrooms: 2,
+      bathrooms: 1,
+      statusAdmin: "Validée",
+      availability: "Disponible",
+      owner: ids.owner,
+    },
+  ]);
+  await Accommodation.create({
+    _id: ids.accommodation,
+    property: ids.property,
+    accommodationType: "villa_meublee",
+    publicationStatus: "publie",
+    active: true,
+    capacity: { maxAdults: 4, maxChildren: 2 },
+    cleaningFee: 5000,
+    minimumStay: 1,
+    createdBy: ids.owner,
+  });
+  await RatePlan.create({
+    accommodation: ids.accommodation,
+    mode: "nightly",
+    amount: 35000,
+    currency: "XAF",
+    active: true,
+    createdBy: ids.owner,
+  });
+  await mongoose.disconnect();
+}
+function start(command, args, cwd, env) {
+  const child = spawn(command, args, {
+    cwd,
+    env: { ...process.env, ...env },
+    stdio: "inherit",
+  });
+  children.push(child);
+  return child;
+}
+async function shutdown() {
+  children.forEach((child) => child.kill("SIGTERM"));
+  if (mongo) await mongo.stop();
+  process.exit();
+}
+async function main() {
+  mongo = await MongoMemoryServer.create();
+  const uri = mongo.getUri("altitude_e2e");
+  await seed(uri);
+  start("npm", ["start"], serverDir, {
+    MONGO_URI: uri,
+    PORT: "5000",
+    NODE_ENV: "e2e",
+    FRONTEND_URL: "http://localhost:3000",
+    JWT_SECRET: "e2e-jwt-secret-not-for-production",
+    JWT_EXPIRES_IN: "1h",
+    DISABLE_SCHEDULED_JOBS: "1",
+  });
+  await waitFor("http://localhost:5000/api/health");
+  start(
+    "npm",
+    ["run", "dev", "--", "--hostname", "localhost", "--port", "3000"],
+    clientDir,
+    { NEXT_PUBLIC_API_URL: "http://localhost:5000/api" },
+  );
+  await waitFor("http://localhost:3000");
+  console.log(`E2E_READY property=${ids.property}`);
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+main().catch(async (error) => {
+  console.error(error);
+  await shutdown();
+});

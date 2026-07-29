@@ -1,93 +1,89 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { toast } from 'react-hot-toast';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ManageAccommodationsPage from '../pages/dashboard/ManageAccommodationsPage';
-import { getAccommodationsAdmin, reviewAccommodation } from '../services/accommodationService';
-
-// Sprint B1 — dashboard admin "Tous les hébergements" : filtres par statut,
-// actions rapides (valider/rejeter/suspendre/réactiver).
+import { deactivateAccommodation, getAccommodationsAdmin } from '../services/accommodationService';
 
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { role: 'Admin' }, canEdit: true }) }));
 vi.mock('next/link', () => ({ default: ({ children, href }) => <a href={href}>{children}</a> }));
-vi.mock('../services/accommodationService', () => ({
-  getAccommodationsAdmin: vi.fn(),
-  reviewAccommodation: vi.fn(),
-  createFullAccommodation: vi.fn(),
-  updateFullAccommodation: vi.fn(),
-}));
+vi.mock('../services/accommodationService', () => ({ getAccommodationsAdmin: vi.fn(), deactivateAccommodation: vi.fn(), createFullAccommodation: vi.fn(), updateFullAccommodation: vi.fn() }));
 vi.mock('../components/dashboard/AccommodationPropertyForm', () => ({ default: () => <div>FORMULAIRE HÉBERGEMENT TEST DATA</div> }));
 vi.mock('../services/dashboardAnalyticsService', () => ({ getDashboardAnalytics: vi.fn().mockResolvedValue({ kpis: {} }) }));
-vi.mock('../components/dashboard/AccommodationReservationsPanel', () => ({ default: () => <div>RÉSERVATIONS HÉBERGEMENTS TEST DATA</div> }));
+vi.mock('../components/dashboard/AccommodationReservationsPanel', () => ({ default: ({ initialTab, initialAccommodationId }) => <div>OPÉRATIONS {initialTab} {initialAccommodationId}</div> }));
 
-const acc = (overrides = {}) => ({
-  _id: 'ACC-1',
-  accommodationType: 'villa_meublee',
-  publicationStatus: 'soumis',
-  property: { title: 'Villa Test', address: { city: 'Brazzaville' } },
-  completion: { score: 100, complete: true },
-  ...overrides,
-});
+const validatedAccommodation = {
+  _id: 'ACC-1', accommodationType: 'villa_meublee', publicationStatus: 'publie',
+  property: { _id: 'PROPERTY-1', title: 'Villa Test', price: 35000, statusAdmin: 'Validée', address: { city: 'Brazzaville' } },
+};
 
-describe('ManageAccommodationsPage — Sprint B1 (dashboard admin) — TEST DATA', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    getAccommodationsAdmin.mockResolvedValue({ accommodations: [acc()], total: 1, page: 1, limit: 20 });
-  });
+describe('ManageAccommodationsPage — gestion des hébergements validés', () => {
+  beforeEach(() => { vi.clearAllMocks(); getAccommodationsAdmin.mockResolvedValue({ accommodations: [validatedAccommodation], total: 1 }); });
 
-  test('affiche les hébergements retournés par le service admin avec leur statut', async () => {
+  test('Mes biens est la vue d’entrée et demande uniquement les hébergements indépendants validés', async () => {
     render(<ManageAccommodationsPage />);
     expect(await screen.findByText('Villa Test')).toBeInTheDocument();
-    expect(screen.getAllByText('En attente').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Mes biens' })).toHaveAttribute('aria-current', 'page');
+    expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ status: 'publie', independentOnly: true, validatedOnly: true, activeOnly: true }));
+    expect(screen.queryByRole('button', { name: /Valider|Rejeter|Suspendre/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId('accommodation-grid')).toHaveClass('grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-4');
+    expect(screen.getByText(/35.000 XAF \/ nuit/)).toBeInTheDocument();
+    expect(screen.getByText('Publié')).toBeInTheDocument();
   });
 
-  test('Ajouter un hébergement ouvre exclusivement le formulaire hébergement', async () => {
+  test('expose la recherche et les filtres métier sans filtre de modération', async () => {
+    render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
+    fireEvent.change(screen.getByPlaceholderText('Rechercher un hébergement…'), { target: { value: 'Villa' } });
+    fireEvent.change(screen.getByLabelText('Ville'), { target: { value: 'Pointe-Noire' } });
+    fireEvent.change(screen.getByLabelText('Disponibilité'), { target: { value: 'Maintenance' } });
+    fireEvent.change(screen.getByLabelText('Trier par'), { target: { value: 'prix_desc' } });
+    await waitFor(() => expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ search: 'Villa', city: 'Pointe-Noire', availability: 'Maintenance', sort: 'prix_desc' })));
+    expect(screen.queryByLabelText(/modération/i)).not.toBeInTheDocument();
+  });
+
+  test('affiche un skeleton structuré pendant le chargement', () => {
+    getAccommodationsAdmin.mockReturnValue(new Promise(() => {}));
     render(<ManageAccommodationsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter un hébergement' }));
+    expect(screen.getByRole('status', { name: 'Chargement des hébergements' }).children).toHaveLength(8);
+  });
+
+  test('affiche l’état vide et l’action autorisée', async () => {
+    getAccommodationsAdmin.mockResolvedValue({ accommodations: [], total: 0 });
+    render(<ManageAccommodationsPage />);
+    expect(await screen.findByText('Aucun hébergement validé')).toBeInTheDocument();
+    expect(screen.getByText(/apparaîtront ici après leur validation/)).toBeInTheDocument();
+  });
+
+  test('affiche une erreur accessible et permet de réessayer', async () => {
+    getAccommodationsAdmin.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ accommodations: [validatedAccommodation], total: 1 });
+    render(<ManageAccommodationsPage />);
+    const alert = await screen.findByRole('alert');
+    fireEvent.click(within(alert).getByRole('button', { name: 'Réessayer' }));
+    expect(await screen.findByText('Villa Test')).toBeInTheDocument();
+  });
+
+  test('conserve les vues opérationnelles et cible le bien choisi', async () => {
+    render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
+    const sections = screen.getByRole('navigation', { name: 'Sections Hébergements' });
+    fireEvent.click(within(sections).getByRole('button', { name: 'Réservations' }));
+    expect(screen.getByText('OPÉRATIONS reservations')).toBeInTheDocument();
+    fireEvent.click(within(sections).getByRole('button', { name: 'Mes biens' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Calendrier' }));
+    expect(screen.getByText('OPÉRATIONS calendar ACC-1')).toBeInTheDocument();
+    expect(screen.getByText(/Filtre actif : Villa Test/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Effacer' }));
+    expect(screen.queryByText(/Filtre actif/)).not.toBeInTheDocument();
+  });
+
+  test('permet la modification avec le formulaire existant', async () => {
+    render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
+    fireEvent.click(screen.getByRole('button', { name: 'Modifier' }));
     expect(screen.getByText('FORMULAIRE HÉBERGEMENT TEST DATA')).toBeInTheDocument();
   });
 
-  test('cliquer sur un onglet de statut relance la requête avec le bon filtre', async () => {
-    render(<ManageAccommodationsPage />);
-    await screen.findByText('Villa Test');
-    fireEvent.click(screen.getByRole('button', { name: 'Publié' }));
-    await waitFor(() => expect(getAccommodationsAdmin).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'publie' }),
-    ));
-  });
-
-  test('valider un hébergement soumis appelle reviewAccommodation("validate")', async () => {
-    reviewAccommodation.mockResolvedValue({});
-    render(<ManageAccommodationsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Valider' }));
-    await waitFor(() => expect(reviewAccommodation).toHaveBeenCalledWith('ACC-1', 'validate', {}));
-  });
-
-  test('rejeter sans motif affiche une erreur et n\'appelle pas le service', async () => {
-    render(<ManageAccommodationsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Rejeter' }));
-    expect(toast.error).toHaveBeenCalled();
-    expect(reviewAccommodation).not.toHaveBeenCalled();
-  });
-
-  test('suspendre un hébergement publié exige un motif', async () => {
-    getAccommodationsAdmin.mockResolvedValue({
-      accommodations: [acc({ publicationStatus: 'publie' })], total: 1, page: 1, limit: 20,
-    });
-    reviewAccommodation.mockResolvedValue({});
-    render(<ManageAccommodationsPage />);
-    const input = await screen.findByPlaceholderText('Motif de suspension');
-    fireEvent.change(input, { target: { value: 'Signalement' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Suspendre' }));
-    await waitFor(() => expect(reviewAccommodation).toHaveBeenCalledWith('ACC-1', 'suspend', { reason: 'Signalement' }));
-  });
-
-  test('un hébergement suspendu propose "Réactiver"', async () => {
-    getAccommodationsAdmin.mockResolvedValue({
-      accommodations: [acc({ publicationStatus: 'suspendu', suspensionReason: 'Litige' })], total: 1, page: 1, limit: 20,
-    });
-    reviewAccommodation.mockResolvedValue({});
-    render(<ManageAccommodationsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Réactiver' }));
-    await waitFor(() => expect(reviewAccommodation).toHaveBeenCalledWith('ACC-1', 'unsuspend', {}));
-    expect(screen.getByText(/Litige/)).toBeInTheDocument();
+  test('archive sans supprimer l’historique après confirmation', async () => {
+    deactivateAccommodation.mockResolvedValue();
+    render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
+    fireEvent.click(screen.getByRole('button', { name: 'Archiver' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Archiver' }));
+    await waitFor(() => expect(deactivateAccommodation).toHaveBeenCalledWith('ACC-1'));
   });
 });

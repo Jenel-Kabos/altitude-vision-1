@@ -1,244 +1,116 @@
 "use client";
 
-// Sprint B1 — Dashboard admin "Tous les hébergements" : vue dédiée au cycle
-// de vie Accommodation (brouillon/soumis/publié/suspendu/rejeté), distincte
-// de ManagePropertiesPage.jsx (générique Vente/Location/Hébergement, filtré
-// sur Property.status uniquement — jamais sur publicationStatus).
-
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { AlertTriangle, CalendarDays, Edit3, Eye, LayoutDashboard, Palmtree, PlusCircle, Search, Trash2, X } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { getAccommodationsAdmin, reviewAccommodation } from "../../services/accommodationService";
-import { getPublicationErrorMessage } from "../../utils/publicationError";
-import { ACCOMMODATION_TYPES, PUBLICATION_STATUSES } from "../../constants/accommodation";
+import { deactivateAccommodation, getAccommodationsAdmin } from "../../services/accommodationService";
+import { ACCOMMODATION_TYPES } from "../../constants/accommodation";
 import AccommodationPropertyForm from "../../components/dashboard/AccommodationPropertyForm";
 import DashboardKpis from "../../components/dashboard/DashboardKpis";
 import { getDashboardAnalytics } from "../../services/dashboardAnalyticsService";
 import AccommodationReservationsPanel from "../../components/dashboard/AccommodationReservationsPanel";
-
-const STATUS_TABS = [{ value: "tous", label: "Tous" }, ...PUBLICATION_STATUSES];
-
-const SORT_OPTIONS = [
-  { value: "recent", label: "Plus récent" },
-  { value: "ancien", label: "Plus ancien" },
-  { value: "prix_asc", label: "Prix croissant" },
-  { value: "prix_desc", label: "Prix décroissant" },
-];
-
-const STATUS_CLASSES = {
-  brouillon: "bg-gray-100 text-gray-700",
-  soumis: "bg-yellow-100 text-yellow-800",
-  publie: "bg-green-100 text-green-800",
-  suspendu: "bg-orange-100 text-orange-800",
-  rejete: "bg-red-100 text-red-700",
-};
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
+import PropertyManagementCard from "../../components/dashboard/PropertyManagementCard";
+import { useAuth } from "../../context/AuthContext";
+import { formatCurrencyXAF } from "../../utils/normalizePropertyDetail";
 
 const PAGE_SIZE = 20;
+const VIEWS = [
+  ["properties", "Mes biens"],
+  ["reservations", "Réservations"],
+  ["new", "Nouvelle réservation"],
+  ["calendar", "Calendrier et blocages"],
+  ["finance", "Finances"],
+  ["overview", "Vue d’ensemble"],
+];
 
-const ManageAccommodationsPage = () => {
-  const [status, setStatus] = useState("tous");
+export default function ManageAccommodationsPage() {
+  const { user, canEdit } = useAuth();
+  const canCreate = ["Admin", "CommunityManager", "Collaborateur"].includes(user?.role);
+  const [view, setView] = useState("properties");
   const [type, setType] = useState("tous");
-  const [search, setSearch] = useState("");
+  const [city, setCity] = useState("");
+  const [availability, setAvailability] = useState("tous");
   const [sort, setSort] = useState("recent");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ accommodations: [], total: 0 });
   const [loading, setLoading] = useState(true);
-  const [validatingId, setValidatingId] = useState(null);
-  const [reasonInputs, setReasonInputs] = useState({});
+  const [error, setError] = useState(false);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [selectedAccommodationId, setSelectedAccommodationId] = useState("");
+  const [archiveTarget, setArchiveTarget] = useState(null);
   const [analytics, setAnalytics] = useState(null);
 
+  const loadAnalytics = () => getDashboardAnalytics("accommodations").then(setAnalytics).catch(() => setAnalytics({ kpis: {} }));
   const load = async () => {
-    setLoading(true);
+    setLoading(true); setError(false);
     try {
-      const res = await getAccommodationsAdmin({ status, type, search: search || undefined, sort, page, limit: PAGE_SIZE });
-      setData(res);
-    } catch (err) {
-      toast.error("Erreur lors du chargement des hébergements.");
-    } finally {
-      setLoading(false);
-    }
+      setData(await getAccommodationsAdmin({
+        status: "publie", type, city: city || undefined, availability: availability === "tous" ? undefined : availability, search: search || undefined, sort, page, limit: PAGE_SIZE,
+        independentOnly: true, validatedOnly: true, activeOnly: true,
+      }));
+    } catch {
+      setError(true); toast.error("Erreur lors du chargement des hébergements.");
+    } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [status, type, sort, page]);
-  useEffect(() => { getDashboardAnalytics('accommodations').then(setAnalytics).catch(() => setAnalytics({ kpis: {} })); }, []);
+  useEffect(() => { load(); }, [type, city, availability, sort, page]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadAnalytics(); }, []);
   useEffect(() => {
     const timeout = setTimeout(() => { setPage(1); load(); }, 300);
     return () => clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const totalPages = Math.max(1, Math.ceil((data.total || 0) / PAGE_SIZE));
-
-  const handleAction = async (id, action) => {
-    if (action === "validate" && validatingId) return;
-    const reason = reasonInputs[id];
-    if ((action === "reject" || action === "suspend") && !reason?.trim()) {
-      toast.error("Un motif est requis pour cette action.");
-      return;
-    }
-    try {
-      if (action === "validate") setValidatingId(id);
-      await reviewAccommodation(id, action, reason ? { reason } : {});
-      toast.success("Action effectuée.");
-      load();
-    } catch (err) {
-      const msg = getPublicationErrorMessage(err, "cet hébergement") || err.response?.data?.message || "Erreur lors de l'action.";
-      toast.error(msg);
-    } finally {
-      if (action === "validate") setValidatingId(null);
-    }
+  const archive = async () => {
+    if (!archiveTarget) return;
+    try { await deactivateAccommodation(archiveTarget._id); toast.success("Hébergement archivé."); setArchiveTarget(null); await load(); await loadAnalytics(); }
+    catch (err) { toast.error(err.response?.data?.message || "Archivage impossible."); }
   };
+  const totalPages = Math.max(1, Math.ceil((data.total || 0) / PAGE_SIZE));
+  const operationalTab = view === "new" ? "new" : view === "calendar" ? "calendar" : view === "finance" ? "finance" : "reservations";
 
-  return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <div className="flex items-center justify-between gap-3"><h2 className="text-2xl font-bold mb-1">Gestion des hébergements</h2>
-        {!creating && !editing && <button onClick={() => setCreating(true)} className="bg-blue-600 text-white px-4 py-2 rounded font-semibold">Ajouter un hébergement</button>}
-      </div>
-      <p className="text-sm text-gray-500 mb-4">
-        Tous les hébergements indépendants (villas, appartements, studios, maisons, chambres d'hôtes,
-        résidences meublées), quel que soit leur statut de publication.
-      </p>
+  return <DashboardPage>
+    <DashboardPageHeader icon={Palmtree} eyebrow="Altimmo · Hébergements indépendants" title="Hébergements" description="Gérez vos hébergements indépendants validés, leurs disponibilités et leurs activités." actions={view === "properties" && canCreate && <button type="button" onClick={() => setCreating(true)} className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-3 font-bold text-white shadow-lg transition hover:scale-105 hover:from-emerald-600 hover:to-green-700"><PlusCircle className="h-5 w-5" /> Ajouter un hébergement</button>} />
 
-      <DashboardKpis items={[
-        { key: 'total', label: 'Hébergements', value: analytics?.kpis?.total }, { key: 'published', label: 'Publiés', value: analytics?.kpis?.published },
-        { key: 'drafts', label: 'Brouillons', value: analytics?.kpis?.drafts }, { key: 'unavailable', label: 'Indisponibles', value: analytics?.kpis?.unavailable },
-        { key: 'maintenance', label: 'Maintenance', value: analytics?.kpis?.maintenance },
-        { key: 'today', label: "Réservations aujourd'hui", value: analytics?.kpis?.reservationsToday }, { key: 'week', label: 'Réservations semaine', value: analytics?.kpis?.reservationsWeek },
-        { key: 'checkins', label: 'Arrivées du jour', value: analytics?.kpis?.checkInsToday }, { key: 'checkouts', label: 'Départs du jour', value: analytics?.kpis?.checkOutsToday },
-        { key: 'occupancy', label: 'Occupation mensuelle', value: `${analytics?.kpis?.occupancyRate || 0}%` }, { key: 'nights', label: 'Nuitées réservées', value: analytics?.kpis?.reservedNights },
-        { key: 'bookedMonth', label: 'Valeur réservée ce mois', value: analytics?.kpis?.bookedValueMonth, format: 'money' }, { key: 'grossCollected', label: 'Montant brut encaissé', value: analytics?.kpis?.grossAmountCollected, format: 'money' },
-        { key: 'remaining', label: 'Solde à encaisser', value: analytics?.kpis?.remainingAmount, format: 'money' }, { key: 'refunded', label: 'Montant remboursé', value: analytics?.kpis?.refundedAmount, format: 'money' },
-        { key: 'netCollected', label: 'Montant net encaissé', value: analytics?.kpis?.netAmountCollected, format: 'money' }, { key: 'refundPending', label: 'Remboursements en attente', value: analytics?.kpis?.pendingRefunds }, { key: 'refundFailed', label: 'Remboursements échoués', value: analytics?.kpis?.failedRefunds },
-        { key: 'paid', label: 'Réservations payées', value: analytics?.kpis?.paidReservations }, { key: 'partial', label: 'Paiements partiels', value: analytics?.kpis?.partiallyPaidReservations }, { key: 'unpaid', label: 'Réservations impayées', value: analytics?.kpis?.unpaidReservations },
-      ]} loading={!analytics} note={analytics?.occupancyFormula} />
+    <nav className="dashboard-toolbar" aria-label="Sections Hébergements">
+      {VIEWS.map(([key, label]) => <button type="button" key={key} onClick={() => setView(key)} aria-current={view === key ? "page" : undefined} className={view === key ? "bg-blue-700 text-white" : ""}>{label}</button>)}
+    </nav>
 
-      {(creating || editing) && <div className="mb-6 border rounded-xl p-4">
-        <AccommodationPropertyForm accommodation={editing} onSuccess={() => { setCreating(false); setEditing(null); load(); }} onCancel={() => { setCreating(false); setEditing(null); }} />
+    {(creating || editing) && <DashboardCard className="mb-6">
+      <AccommodationPropertyForm accommodation={editing} onSuccess={() => { setCreating(false); setEditing(null); load(); }} onCancel={() => { setCreating(false); setEditing(null); }} />
+    </DashboardCard>}
+
+    {view === "properties" && <>
+      <DashboardToolbar>
+        <label className="relative flex-1 min-w-[220px]"><Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"/><span className="sr-only">Rechercher</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un hébergement…" className="w-full pl-10" /></label>
+        <select value={type} onChange={(event) => { setType(event.target.value); setPage(1); }} aria-label="Type d’hébergement"><option value="tous">Tous les types</option>{ACCOMMODATION_TYPES.filter((item) => item.value !== "hotel").map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
+        <input value={city} onChange={(event) => { setCity(event.target.value); setPage(1); }} placeholder="Ville" aria-label="Ville" />
+        <select value={availability} onChange={(event) => { setAvailability(event.target.value); setPage(1); }} aria-label="Disponibilité"><option value="tous">Toutes disponibilités</option><option value="Disponible">Disponible</option><option value="Indisponible">Indisponible</option><option value="Maintenance">Maintenance</option></select>
+        <select value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }} aria-label="Trier par"><option value="recent">Plus récent</option><option value="ancien">Plus ancien</option><option value="prix_asc">Prix croissant</option><option value="prix_desc">Prix décroissant</option></select>
+      </DashboardToolbar>
+      {loading ? <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4" role="status" aria-label="Chargement des hébergements">{Array.from({ length: 8 }, (_, index) => <div key={index} className="overflow-hidden rounded-xl bg-white shadow-md"><div className="h-48 animate-pulse bg-slate-200"/><div className="space-y-3 p-4"><div className="h-5 w-3/4 animate-pulse rounded bg-slate-200"/><div className="h-4 animate-pulse rounded bg-slate-100"/><div className="h-10 animate-pulse rounded bg-slate-100"/></div></div>)}</div> : error ? <DashboardState type="error" title="Chargement impossible" description="Réessayez dans quelques instants." action={<button onClick={load}>Réessayer</button>} /> : data.accommodations.length === 0 ? <DashboardState title="Aucun hébergement validé" description="Les hébergements apparaîtront ici après leur validation dans l’onglet Modération Hébergements." action={canCreate && <button onClick={() => setCreating(true)}>Ajouter un hébergement</button>} /> : <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4" data-testid="accommodation-grid">
+        {data.accommodations.map((accommodation) => <PropertyManagementCard key={accommodation._id} property={accommodation.property} description={ACCOMMODATION_TYPES.find((item) => item.value === accommodation.accommodationType)?.label || accommodation.accommodationType} capacity={(accommodation.capacity?.maxAdults || 0) + (accommodation.capacity?.maxChildren || 0)} priceLabel={`${formatCurrencyXAF(accommodation.property?.price || accommodation.rates?.[0]?.amount || 0).replace("FCFA", "XAF")} / nuit`} badges={[{ label: "Publié", className: "bg-gradient-to-r from-green-600 to-emerald-600" }, ...(accommodation.property?.availability && accommodation.property.availability !== "Disponible" ? [{ label: accommodation.property.availability, className: accommodation.property.availability === "Maintenance" ? "bg-amber-600" : "bg-slate-700" }] : [])]} actions={<>
+            <Link href={`/immobilier/property/${accommodation.property?._id || accommodation.property}`} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-50 p-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"><Eye className="h-4 w-4" /> Voir</Link>
+            {canEdit && <button type="button" onClick={() => setEditing(accommodation)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-50 p-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"><Edit3 className="h-4 w-4" /> Modifier</button>}
+            <button type="button" onClick={() => { setSelectedAccommodationId(accommodation._id); setView("reservations"); }} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-50 p-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"><LayoutDashboard className="h-4 w-4" /> Réservations</button>
+            <button type="button" onClick={() => { setSelectedAccommodationId(accommodation._id); setView("calendar"); }} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-50 p-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"><CalendarDays className="h-4 w-4" /> Calendrier</button>
+            {canEdit && <button type="button" onClick={() => setArchiveTarget(accommodation)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 p-2 text-sm font-semibold text-red-700 hover:bg-red-100"><Trash2 className="h-4 w-4" /> Archiver</button>}
+          </>} />)}
       </div>}
+      {totalPages > 1 && <DashboardPagination page={page} totalPages={totalPages} onPrevious={() => setPage((value) => value - 1)} onNext={() => setPage((value) => value + 1)} />}
+    </>}
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => { setStatus(tab.value); setPage(1); }}
-            className={`px-3 py-1.5 rounded text-sm font-medium ${status === tab.value ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+    {view === "overview" && <DashboardKpis items={[
+      { key: "total", label: "Hébergements", value: analytics?.kpis?.total }, { key: "published", label: "Publiés", value: analytics?.kpis?.published }, { key: "unavailable", label: "Indisponibles", value: analytics?.kpis?.unavailable }, { key: "maintenance", label: "Maintenance", value: analytics?.kpis?.maintenance },
+      { key: "today", label: "Réservations aujourd’hui", value: analytics?.kpis?.reservationsToday }, { key: "week", label: "Réservations semaine", value: analytics?.kpis?.reservationsWeek }, { key: "checkins", label: "Arrivées du jour", value: analytics?.kpis?.checkInsToday }, { key: "checkouts", label: "Départs du jour", value: analytics?.kpis?.checkOutsToday },
+      { key: "occupancy", label: "Occupation mensuelle", value: `${analytics?.kpis?.occupancyRate || 0}%` }, { key: "bookedMonth", label: "Valeur réservée ce mois", value: analytics?.kpis?.bookedValueMonth, format: "money" }, { key: "grossCollected", label: "Montant brut encaissé", value: analytics?.kpis?.grossAmountCollected, format: "money" }, { key: "remaining", label: "Solde à encaisser", value: analytics?.kpis?.remainingAmount, format: "money" },
+      { key: "refunded", label: "Montant remboursé", value: analytics?.kpis?.refundedAmount, format: "money" }, { key: "refundPending", label: "Remboursements en attente", value: analytics?.kpis?.pendingRefunds }, { key: "paid", label: "Réservations payées", value: analytics?.kpis?.paidReservations }, { key: "unpaid", label: "Réservations impayées", value: analytics?.kpis?.unpaidReservations },
+    ]} loading={!analytics} note={analytics?.occupancyFormula} />}
 
-      <div className="flex flex-wrap gap-3 mb-4">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher un titre..."
-          aria-label="Rechercher"
-          className="flex-1 min-w-[200px] px-3 py-2 border rounded text-sm"
-        />
-        <select value={type} onChange={(e) => { setType(e.target.value); setPage(1); }} aria-label="Type" className="px-3 py-2 border rounded text-sm">
-          <option value="tous">Tous les types</option>
-          {ACCOMMODATION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-        </select>
-        <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Trier par" className="px-3 py-2 border rounded text-sm">
-          {SORT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-      </div>
-
-      {loading ? (
-        <p className="text-center text-gray-500 py-8">Chargement...</p>
-      ) : data.accommodations.length === 0 ? (
-        <p className="text-center text-gray-500 py-8">Aucun hébergement pour ces critères.</p>
-      ) : (
-        <div className="space-y-3">
-          {data.accommodations.map((acc) => (
-            <div key={acc._id} className="border rounded p-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <h3 className="font-semibold">{acc.property?.title || "(sans titre)"}</h3>
-                  <p className="text-xs text-gray-500">
-                    {ACCOMMODATION_TYPES.find((t) => t.value === acc.accommodationType)?.label || acc.accommodationType}
-                    {" · "}{acc.property?.address?.city}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-semibold px-2 py-1 rounded ${STATUS_CLASSES[acc.publicationStatus] || "bg-gray-100"}`}>
-                    {PUBLICATION_STATUSES.find((s) => s.value === acc.publicationStatus)?.label || acc.publicationStatus}
-                  </span>
-                  {acc.completion && (
-                    <span className={`text-xs font-semibold px-2 py-1 rounded ${acc.completion.complete ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
-                      {acc.completion.score}%
-                    </span>
-                  )}
-                  <button onClick={() => setEditing(acc)} className="text-xs text-blue-600 underline">
-                    Modifier
-                  </button>
-                </div>
-              </div>
-
-              {acc.publicationStatus === "soumis" && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button onClick={() => handleAction(acc._id, "validate")} disabled={Boolean(validatingId)} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm disabled:opacity-50">
-                    {validatingId === acc._id ? "Publication…" : "Valider"}
-                  </button>
-                  <input
-                    placeholder="Motif de rejet"
-                    value={reasonInputs[acc._id] || ""}
-                    onChange={(e) => setReasonInputs((prev) => ({ ...prev, [acc._id]: e.target.value }))}
-                    className="px-2 py-1.5 border rounded text-sm"
-                  />
-                  <button onClick={() => handleAction(acc._id, "reject")} className="bg-red-600 text-white px-3 py-1.5 rounded text-sm">
-                    Rejeter
-                  </button>
-                </div>
-              )}
-
-              {acc.publicationStatus === "publie" && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <input
-                    placeholder="Motif de suspension"
-                    value={reasonInputs[acc._id] || ""}
-                    onChange={(e) => setReasonInputs((prev) => ({ ...prev, [acc._id]: e.target.value }))}
-                    className="px-2 py-1.5 border rounded text-sm"
-                  />
-                  <button onClick={() => handleAction(acc._id, "suspend")} className="bg-orange-600 text-white px-3 py-1.5 rounded text-sm">
-                    Suspendre
-                  </button>
-                </div>
-              )}
-
-              {acc.publicationStatus === "suspendu" && (
-                <div className="mt-3">
-                  <button onClick={() => handleAction(acc._id, "unsuspend")} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm">
-                    Réactiver
-                  </button>
-                  {acc.suspensionReason && <p className="text-xs text-orange-700 mt-1">Motif : {acc.suspensionReason}</p>}
-                </div>
-              )}
-
-              {acc.publicationStatus === "rejete" && acc.rejectionReason && (
-                <p className="text-xs text-red-600 mt-2">Motif du rejet : {acc.rejectionReason}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1.5 border rounded text-sm disabled:opacity-40">
-            Précédent
-          </button>
-          <span className="text-sm text-gray-500 self-center">Page {page} / {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="px-3 py-1.5 border rounded text-sm disabled:opacity-40">
-            Suivant
-          </button>
-        </div>
-      )}
-      <AccommodationReservationsPanel accommodations={data.accommodations} onChanged={() => getDashboardAnalytics('accommodations').then(setAnalytics)} />
-    </div>
-  );
-};
-
-export default ManageAccommodationsPage;
+    {["reservations", "new", "calendar", "finance"].includes(view) && <><>{selectedAccommodationId && <div className="mb-3 flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900"><span>Filtre actif : {data.accommodations.find((item) => item._id === selectedAccommodationId)?.property?.title || "Hébergement sélectionné"}</span><button type="button" onClick={() => setSelectedAccommodationId("")} className="inline-flex items-center gap-1 font-semibold"><X className="h-4 w-4"/> Effacer</button></div>}</><AccommodationReservationsPanel key={`${view}-${selectedAccommodationId}`} accommodations={data.accommodations} initialAccommodationId={selectedAccommodationId} initialTab={operationalTab} onChanged={loadAnalytics} /></>}
+    {archiveTarget && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="archive-title"><div className="w-full max-w-sm rounded-xl bg-white p-6 text-center shadow-2xl"><AlertTriangle className="mx-auto mb-3 h-12 w-12 text-red-500"/><h2 id="archive-title" className="text-xl font-bold">Archiver cet hébergement ?</h2><p className="my-4 text-sm text-slate-600">« {archiveTarget.property?.title} » sera masqué. Ses réservations et données financières seront conservées.</p><div className="flex gap-3"><button autoFocus onClick={() => setArchiveTarget(null)} className="flex-1 rounded-lg bg-slate-100 px-4 py-2 font-semibold">Annuler</button><button onClick={archive} className="flex-1 rounded-lg bg-red-600 px-4 py-2 font-semibold text-white">Archiver</button></div></div></div>}
+  </DashboardPage>;
+}
