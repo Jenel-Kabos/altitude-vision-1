@@ -11,7 +11,10 @@ vi.mock('next/link', () => ({ default: ({ children, href }) => <a href={href}>{c
 vi.mock('../services/accommodationService', () => ({
   getAccommodationsAdmin: vi.fn(),
   reviewAccommodation: vi.fn(),
+  createFullAccommodation: vi.fn(),
+  updateFullAccommodation: vi.fn(),
 }));
+vi.mock('../components/dashboard/AccommodationPropertyForm', () => ({ default: () => <div>FORMULAIRE HÉBERGEMENT TEST DATA</div> }));
 
 const acc = (overrides = {}) => ({
   _id: 'ACC-1',
@@ -32,6 +35,12 @@ describe('ManageAccommodationsPage — Sprint B1 (dashboard admin) — TEST DATA
     render(<ManageAccommodationsPage />);
     expect(await screen.findByText('Villa Test')).toBeInTheDocument();
     expect(screen.getAllByText('En attente').length).toBeGreaterThan(0);
+  });
+
+  test('Ajouter un hébergement ouvre exclusivement le formulaire hébergement', async () => {
+    render(<ManageAccommodationsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter un hébergement' }));
+    expect(screen.getByText('FORMULAIRE HÉBERGEMENT TEST DATA')).toBeInTheDocument();
   });
 
   test('cliquer sur un onglet de statut relance la requête avec le bon filtre', async () => {

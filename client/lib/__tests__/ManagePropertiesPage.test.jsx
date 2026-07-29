@@ -105,7 +105,7 @@ describe('Dashboard annonces — séparation des responsabilités', () => {
   test('la rubrique Ventes ouvre directement le formulaire Vente', async () => {
     getAllProperties.mockResolvedValue([]);
     render(<ManagePropertiesPage section="vente" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter un bien à vendre' }));
 
     expect(await screen.findByText('Ajouter — Vente')).toBeInTheDocument();
     expect(screen.queryByText('Quel type d’annonce souhaitez-vous publier ?')).not.toBeInTheDocument();

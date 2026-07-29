@@ -12,6 +12,7 @@ vi.mock('../services/hotelService', () => ({
   getHotelsAdmin: vi.fn(),
   reviewHotel: vi.fn(),
 }));
+vi.mock('../components/dashboard/HotelPropertyForm', () => ({ default: () => <div>FORMULAIRE HÔTEL TEST DATA</div> }));
 
 const hotel = (overrides = {}) => ({
   _id: 'HOTEL-1',
@@ -32,6 +33,12 @@ describe('ManageHotelsPage — Sprint B2 (dashboard admin) — TEST DATA', () =>
     render(<ManageHotelsPage />);
     expect(await screen.findByText('Hôtel Le Panorama')).toBeInTheDocument();
     expect(screen.getAllByText('En attente').length).toBeGreaterThan(0);
+  });
+
+  test('Ajouter un hôtel ouvre exclusivement HotelPropertyForm', async () => {
+    render(<ManageHotelsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter un hôtel' }));
+    expect(screen.getByText('FORMULAIRE HÔTEL TEST DATA')).toBeInTheDocument();
   });
 
   test('cliquer sur un onglet de statut relance la requête avec le bon filtre', async () => {

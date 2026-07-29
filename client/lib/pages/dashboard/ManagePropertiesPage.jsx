@@ -635,7 +635,7 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
             {!readOnly && canAddProperty && (
               <button onClick={openCreate}
                 className="flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all hover:scale-105">
-                <PlusCircle className="w-5 h-5" /> Ajouter
+                <PlusCircle className="w-5 h-5" /> {section === 'vente' ? 'Ajouter un bien à vendre' : section === 'location' ? 'Ajouter un bien à louer' : section === 'hebergement' ? 'Ajouter un hébergement' : 'Ajouter'}
               </button>
             )}
           </div>

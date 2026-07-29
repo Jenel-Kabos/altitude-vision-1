@@ -44,6 +44,7 @@ const PropertyForm = ({
   enableHebergement = false,
   errors = {},
   isEditing = false,
+  excludeHotelAccommodationTypes = false,
 }) => {
   const fileInputRef = useRef(null);
 
@@ -97,8 +98,11 @@ const PropertyForm = ({
   // faire disparaître silencieusement du <select>.
   const accommodationTypeOptions = useMemo(() => {
     const currentLegacy = LEGACY_ACCOMMODATION_TYPES.find((t) => t.value === formData.accommodationType);
-    return currentLegacy ? [...ACCOMMODATION_TYPES, currentLegacy] : ACCOMMODATION_TYPES;
-  }, [formData.accommodationType]);
+    const available = excludeHotelAccommodationTypes
+      ? ACCOMMODATION_TYPES.filter((type) => !HOTEL_ACCOMMODATION_TYPES.includes(type.value))
+      : ACCOMMODATION_TYPES;
+    return currentLegacy ? [...available, currentLegacy] : available;
+  }, [formData.accommodationType, excludeHotelAccommodationTypes]);
 
   useEffect(() => {
     if (!isHotelType) return;

@@ -11,6 +11,7 @@ import { getHotelsAdmin, reviewHotel } from "../../services/hotelService";
 import { getPublicationErrorMessage } from "../../utils/publicationError";
 import { HOTEL_PUBLICATION_STATUSES } from "../../constants/hotel";
 import { Building2 } from "lucide-react";
+import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
 import {
   DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination,
   DashboardState, DashboardToolbar,
@@ -39,6 +40,8 @@ const ManageHotelsPage = () => {
   const [loading, setLoading] = useState(true);
   const [validatingId, setValidatingId] = useState(null);
   const [reasonInputs, setReasonInputs] = useState({});
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -74,7 +77,10 @@ const ManageHotelsPage = () => {
       toast.success("Action effectuée.");
       load();
     } catch (err) {
-      toast.error(getPublicationErrorMessage(err, "cet hôtel") || err.response?.data?.message || "Erreur lors de l'action.");
+      const completion = err.response?.data?.completion;
+      toast.error(completion
+        ? `Hôtel incomplet (${completion.score}%).`
+        : (getPublicationErrorMessage(err, "cet hôtel") || err.response?.data?.message || "Erreur lors de l'action."));
     } finally {
       if (action === "validate") setValidatingId(null);
     }
@@ -83,7 +89,14 @@ const ManageHotelsPage = () => {
   return (
     <DashboardPage>
       <DashboardPageHeader icon={Building2} title="Gestion hôtelière — Établissements"
-        description="Tous les établissements hôteliers, quel que soit leur statut de publication." />
+        description="Tous les établissements hôteliers, quel que soit leur statut de publication."
+        actions={!creating && !editing && <button onClick={() => setCreating(true)} className="bg-gold text-white px-4 py-2 rounded font-semibold">Ajouter un hôtel</button>} />
+
+      {(creating || editing) && <DashboardCard className="mb-6"><HotelPropertyForm
+        hotelId={editing?._id} accommodationType={editing?.accommodationType || 'hotel'} initialProperty={editing?.property}
+        initialHotel={editing} existingImages={editing?.property?.images || editing?.gallery || []}
+        onSuccess={() => { setCreating(false); setEditing(null); load(); }} onCancel={() => { setCreating(false); setEditing(null); }}
+      /></DashboardCard>}
 
       <DashboardToolbar>
       <div className="flex flex-wrap gap-2 w-full">
@@ -127,6 +140,7 @@ const ManageHotelsPage = () => {
                     </span>
                   )}
                   <Link href={`/dashboard/hotels/${hotel._id}`} className="text-xs text-blue-600 underline">Détail</Link>
+                  <button onClick={() => setEditing(hotel)} className="text-xs text-blue-600 underline">Modifier</button>
                 </div>
               </div>
 

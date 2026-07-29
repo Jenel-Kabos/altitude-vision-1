@@ -6,11 +6,11 @@
 // sur Property.status uniquement — jamais sur publicationStatus).
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { getAccommodationsAdmin, reviewAccommodation } from "../../services/accommodationService";
 import { getPublicationErrorMessage } from "../../utils/publicationError";
 import { ACCOMMODATION_TYPES, PUBLICATION_STATUSES } from "../../constants/accommodation";
+import AccommodationPropertyForm from "../../components/dashboard/AccommodationPropertyForm";
 
 const STATUS_TABS = [{ value: "tous", label: "Tous" }, ...PUBLICATION_STATUSES];
 
@@ -41,6 +41,8 @@ const ManageAccommodationsPage = () => {
   const [loading, setLoading] = useState(true);
   const [validatingId, setValidatingId] = useState(null);
   const [reasonInputs, setReasonInputs] = useState({});
+  const [editing, setEditing] = useState(null);
+  const [creating, setCreating] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -85,11 +87,17 @@ const ManageAccommodationsPage = () => {
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-white rounded shadow-md">
-      <h2 className="text-2xl font-bold mb-1">Gestion des hébergements</h2>
+      <div className="flex items-center justify-between gap-3"><h2 className="text-2xl font-bold mb-1">Gestion des hébergements</h2>
+        {!creating && !editing && <button onClick={() => setCreating(true)} className="bg-blue-600 text-white px-4 py-2 rounded font-semibold">Ajouter un hébergement</button>}
+      </div>
       <p className="text-sm text-gray-500 mb-4">
         Tous les hébergements indépendants (villas, appartements, studios, maisons, chambres d'hôtes,
         résidences meublées), quel que soit leur statut de publication.
       </p>
+
+      {(creating || editing) && <div className="mb-6 border rounded-xl p-4">
+        <AccommodationPropertyForm accommodation={editing} onSuccess={() => { setCreating(false); setEditing(null); load(); }} onCancel={() => { setCreating(false); setEditing(null); }} />
+      </div>}
 
       <div className="flex flex-wrap gap-2 mb-4">
         {STATUS_TABS.map((tab) => (
@@ -145,9 +153,9 @@ const ManageAccommodationsPage = () => {
                       {acc.completion.score}%
                     </span>
                   )}
-                  <Link href={`/dashboard/properties?status=hebergement`} className="text-xs text-blue-600 underline">
+                  <button onClick={() => setEditing(acc)} className="text-xs text-blue-600 underline">
                     Modifier
-                  </Link>
+                  </button>
                 </div>
               </div>
 
