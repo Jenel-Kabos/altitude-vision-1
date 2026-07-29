@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
 const Hotel = require('../models/Hotel');
@@ -44,9 +45,9 @@ async function rentals() {
   return { kpis: { ...(management[0] || { available: 0, occupied: 0, notices: 0 }), ...(contracts[0] || { activeContracts: 0, expiringContracts: 0 }), ...(payments[0] || { rentCollected: 0, unpaidRent: 0, penalties: 0 }), maintenance } };
 }
 
-async function accommodations() {
+async function accommodations(accommodationId = null) {
   const { today, tomorrow, month, year } = periodStarts(); const week = new Date(today.getTime() + 7 * 86400000); const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const independent = { $or: [{ hotel: null }, { hotel: { $exists: false } }] };
+  const independent = { $or: [{ hotel: null }, { hotel: { $exists: false } }], ...(accommodationId ? { _id: accommodationId } : {}) };
   const publishedIds = await Accommodation.find({ ...independent, publicationStatus: 'publie' }).distinct('_id');
   const [rows, reservationRows, reservationNights, blockedNights, documents, allocations, refunds] = await Promise.all([
     Accommodation.aggregate([{ $match: independent }, { $lookup: { from: 'properties', localField: 'property', foreignField: '_id', as: 'property' } }, { $unwind: '$property' }, { $group: { _id: null, total: { $sum: 1 }, published: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'publie'] }, 1, 0] } }, drafts: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'brouillon'] }, 1, 0] } }, unavailable: { $sum: { $cond: [{ $ne: ['$property.availability', 'Disponible'] }, 1, 0] } }, maintenance: { $sum: { $cond: [{ $eq: ['$property.availability', 'En maintenance'] }, 1, 0] } } } }]),
@@ -93,6 +94,8 @@ exports.getModuleAnalytics = async (req, res) => {
     if (!handlers[req.params.module]) return res.status(404).json({ status: 'fail', message: 'Module analytics inconnu.' });
     const allowedRoles = req.params.module === 'rentals' ? ROLES_GL : ROLES_ALTIMMO;
     if (!allowedRoles.includes(req.user?.role)) return res.status(403).json({ status: 'fail', message: 'Accès refusé à ce module.' });
-    res.json({ status: 'success', data: await handlers[req.params.module]() });
+    const requestedAccommodationId = req.query?.accommodationId;
+    const accommodationId = req.params.module === 'accommodations' && mongoose.isValidObjectId(requestedAccommodationId) ? new mongoose.Types.ObjectId(requestedAccommodationId) : null;
+    res.json({ status: 'success', data: await handlers[req.params.module](accommodationId) });
   } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };

@@ -18,10 +18,10 @@ const validatedAccommodation = {
 describe('ManageAccommodationsPage — gestion des hébergements validés', () => {
   beforeEach(() => { vi.clearAllMocks(); getAccommodationsAdmin.mockResolvedValue({ accommodations: [validatedAccommodation], total: 1 }); });
 
-  test('Mes biens est la vue d’entrée et demande uniquement les hébergements indépendants validés', async () => {
+  test('la liste des biens est l’unique vue principale et demande uniquement les hébergements indépendants validés', async () => {
     render(<ManageAccommodationsPage />);
     expect(await screen.findByText('Villa Test')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Mes biens' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('navigation', { name: 'Sections Hébergements' })).not.toBeInTheDocument();
     expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ status: 'publie', independentOnly: true, validatedOnly: true, activeOnly: true }));
     expect(screen.queryByRole('button', { name: /Valider|Rejeter|Suspendre/ })).not.toBeInTheDocument();
     expect(screen.getByTestId('accommodation-grid')).toHaveClass('grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-4');
@@ -60,17 +60,13 @@ describe('ManageAccommodationsPage — gestion des hébergements validés', () =
     expect(await screen.findByText('Villa Test')).toBeInTheDocument();
   });
 
-  test('conserve les vues opérationnelles et cible le bien choisi', async () => {
+  test('déplace les vues opérationnelles vers la route détail préfiltrée', async () => {
     render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
-    const sections = screen.getByRole('navigation', { name: 'Sections Hébergements' });
-    fireEvent.click(within(sections).getByRole('button', { name: 'Réservations' }));
-    expect(screen.getByText('OPÉRATIONS reservations')).toBeInTheDocument();
-    fireEvent.click(within(sections).getByRole('button', { name: 'Mes biens' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Calendrier' }));
-    expect(screen.getByText('OPÉRATIONS calendar ACC-1')).toBeInTheDocument();
-    expect(screen.getByText(/Filtre actif : Villa Test/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Effacer' }));
-    expect(screen.queryByText(/Filtre actif/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Voir' })).toHaveAttribute('href', '/dashboard/hebergements/ACC-1');
+    expect(screen.getByRole('link', { name: 'Réservations' })).toHaveAttribute('href', '/dashboard/hebergements/ACC-1?view=reservations');
+    expect(screen.getByRole('link', { name: 'Calendrier' })).toHaveAttribute('href', '/dashboard/hebergements/ACC-1?view=calendar');
+    expect(screen.getByRole('link', { name: 'Finances' })).toHaveAttribute('href', '/dashboard/hebergements/ACC-1?view=finance');
+    expect(screen.queryByText(/OPÉRATIONS/)).not.toBeInTheDocument();
   });
 
   test('permet la modification avec le formulaire existant', async () => {

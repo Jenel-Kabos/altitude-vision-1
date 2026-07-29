@@ -3,13 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { toast } from "react-hot-toast";
 import { getAllProperties, getPropertyById, deleteProperty, updateProperty, addProperty, toggleRecommande } from "../../services/propertyService";
 import { createFullAccommodation, updateFullAccommodation } from "../../services/accommodationService";
 import { useAuth } from '../../context/AuthContext';
 import {
   PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle, Eye,
-  ArrowLeft, ArrowRight, Building2, Sparkles, Send,
+  ArrowLeft, ArrowRight, Building2, Sparkles,
 } from "lucide-react";
 import PropertyForm from "../../components/dashboard/PropertyForm";
 import SalePropertyForm from "../../components/dashboard/SalePropertyForm";
@@ -88,7 +87,7 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
   const [loadingSubmit, setSubmit]    = useState(false);
   const [errors, setErrors]           = useState({});
 
-  useEffect(() => { fetchProperties(); }, []);
+  useEffect(() => { fetchProperties(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const module = section === 'vente' ? 'sales' : section === 'location' ? 'rentals' : null;
     if (!module) return;
