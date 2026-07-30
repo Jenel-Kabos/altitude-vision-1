@@ -18,6 +18,7 @@ const FinancialDocument = require('../models/FinancialDocument');
 const PaymentAllocation = require('../models/PaymentAllocation');
 const FinancialRefund = require('../models/FinancialRefund');
 const { ROLES_ALTIMMO, ROLES_GL } = require('../utils/roles');
+const { listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
 
 const dayBounds = () => { const start = new Date(); start.setHours(0, 0, 0, 0); const end = new Date(start); end.setDate(end.getDate() + 1); return { start, end }; };
 const periodStarts = () => { const { start: today, end: tomorrow } = dayBounds(); const month = new Date(today.getFullYear(), today.getMonth(), 1); const year = new Date(today.getFullYear(), 0, 1); return { today, tomorrow, month, year }; };
@@ -74,28 +75,43 @@ async function accommodations(accommodationId = null) {
     occupancyFormula: 'Nuits verrouillées par réservation sur le mois / (hébergements publiés × jours du mois − nuits bloquées manuellement) × 100.', revenueBasis: 'Valeur réservée et montant encaissé sont exposés séparément.' };
 }
 
-async function hotels() {
-  const { today, tomorrow, month, year } = periodStarts();
+async function hotels(actor) {
+  const { today, tomorrow } = periodStarts();
   const activeReservation = ['confirmed', 'checked_in', 'checked_out'];
-  const [activeHotels, rooms, reservations, housekeeping, maintenance, revenue] = await Promise.all([
-    Hotel.countDocuments({ status: 'actif' }),
-    Room.aggregate([{ $match: { active: true } }, { $group: { _id: null, availableRooms: { $sum: { $cond: [{ $eq: ['$status', 'available'] }, 1, 0] } }, occupiedRooms: { $sum: { $cond: [{ $eq: ['$status', 'occupied'] }, 1, 0] } } } }]),
-    HotelReservation.aggregate([{ $group: { _id: null, reservations: { $sum: { $cond: [{ $in: ['$status', activeReservation] }, 1, 0] } }, checkInsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$checkInDate', today] }, { $lt: ['$checkInDate', tomorrow] }, { $in: ['$status', activeReservation] }] }, 1, 0] } }, checkOutsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$checkOutDate', today] }, { $lt: ['$checkOutDate', tomorrow] }, { $in: ['$status', activeReservation] }] }, 1, 0] } } } }]),
-    HousekeepingTask.countDocuments({ status: { $in: ['pending', 'assigned', 'in_progress'] } }),
-    MaintenanceTicket.countDocuments({ status: { $in: MaintenanceTicket.OPEN_MAINTENANCE_STATUSES } }),
-    HotelReservation.aggregate([{ $match: { status: { $in: activeReservation } } }, { $group: { _id: null, dailyRevenue: { $sum: { $cond: [{ $gte: ['$createdAt', today] }, '$totalAmount', 0] } }, monthlyRevenue: { $sum: { $cond: [{ $gte: ['$createdAt', month] }, '$totalAmount', 0] } }, annualRevenue: { $sum: { $cond: [{ $gte: ['$createdAt', year] }, '$totalAmount', 0] } } } }]),
+  let scopedIds;
+  if (actor?.role !== 'Admin') {
+    const scoped = await listAccessibleHotels(actor);
+    scopedIds = scoped.hotels.map((hotel) => hotel._id);
+  }
+  const validatedHotels = await Hotel.find({ publicationStatus: 'publie', ...(scopedIds ? { _id: { $in: scopedIds } } : {}) })
+    .populate({ path: 'property', select: '_id', match: { statusAdmin: 'Validée', availability: 'Disponible' } })
+    .lean();
+  const eligibleHotels = validatedHotels.filter((hotel) => hotel.property);
+  const activeEligibleHotels = eligibleHotels.filter((hotel) => hotel.status === 'actif' && hotel.active !== false);
+  const hotelIds = activeEligibleHotels.map((hotel) => hotel._id);
+  const [rooms, reservations, housekeeping, maintenance, collections, refunds, balances] = await Promise.all([
+    Room.aggregate([{ $match: { hotel: { $in: hotelIds }, active: true } }, { $group: { _id: null, availableRooms: { $sum: { $cond: [{ $eq: ['$status', 'available'] }, 1, 0] } }, occupiedRooms: { $sum: { $cond: [{ $eq: ['$status', 'occupied'] }, 1, 0] } }, totalRooms: { $sum: 1 } } }]),
+    HotelReservation.aggregate([{ $match: { hotel: { $in: hotelIds } } }, { $group: { _id: null, reservations: { $sum: { $cond: [{ $in: ['$status', activeReservation] }, 1, 0] } }, reservationsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$createdAt', today] }, { $lt: ['$createdAt', tomorrow] }] }, 1, 0] } }, checkInsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$checkInDate', today] }, { $lt: ['$checkInDate', tomorrow] }, { $in: ['$status', activeReservation] }] }, 1, 0] } }, checkOutsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$checkOutDate', today] }, { $lt: ['$checkOutDate', tomorrow] }, { $in: ['$status', activeReservation] }] }, 1, 0] } } } }]),
+    HousekeepingTask.countDocuments({ hotel: { $in: hotelIds }, status: { $in: ['pending', 'assigned', 'in_progress'] } }),
+    MaintenanceTicket.countDocuments({ hotel: { $in: hotelIds }, status: { $in: MaintenanceTicket.OPEN_MAINTENANCE_STATUSES } }),
+    PaymentAllocation.aggregate([{ $match: { domain: 'hotel', establishmentType: 'Hotel', establishmentId: { $in: hotelIds }, status: 'active' } }, { $group: { _id: null, grossAmountCollected: { $sum: '$amountMinor' } } }]),
+    FinancialRefund.aggregate([{ $match: { domain: 'hotel', establishmentType: 'Hotel', establishmentId: { $in: hotelIds }, status: 'completed' } }, { $group: { _id: null, refundedAmount: { $sum: '$amountMinor' } } }]),
+    FinancialDocument.aggregate([{ $match: { domain: 'hotel', establishmentType: 'Hotel', establishmentId: { $in: hotelIds }, status: { $in: ['issued', 'credited'] } } }, { $group: { _id: null, remainingAmount: { $sum: '$balanceMinor' } } }]),
   ]);
-  return { kpis: { activeHotels, ...(rooms[0] || { availableRooms: 0, occupiedRooms: 0 }), ...(reservations[0] || { reservations: 0, checkInsToday: 0, checkOutsToday: 0 }), housekeeping, maintenance, ...(revenue[0] || { dailyRevenue: 0, monthlyRevenue: 0, annualRevenue: 0 }) }, revenueBasis: 'Valeur des réservations confirmées, non assimilée aux encaissements.' };
+  const roomStats = rooms[0] || { availableRooms: 0, occupiedRooms: 0, totalRooms: 0 };
+  const gross = collections[0]?.grossAmountCollected || 0;
+  const refunded = refunds[0]?.refundedAmount || 0;
+  return { kpis: { activeHotels: hotelIds.length, temporarilyClosedHotels: eligibleHotels.length - hotelIds.length, ...roomStats, occupancyRate: roomStats.totalRooms ? Math.round((roomStats.occupiedRooms / roomStats.totalRooms) * 10000) / 100 : 0, ...(reservations[0] || { reservations: 0, reservationsToday: 0, checkInsToday: 0, checkOutsToday: 0 }), housekeeping, maintenance, grossAmountCollected: gross, refundedAmount: refunded, netAmountCollected: Math.max(0, gross - refunded), remainingAmount: balances[0]?.remainingAmount || 0 }, revenueBasis: 'Encaissements hôteliers confirmés, remboursements terminés et soldes de factures émis ; hôtels validés et actifs uniquement.' };
 }
 
 exports.getModuleAnalytics = async (req, res) => {
   try {
     const handlers = { sales, rentals, accommodations, hotels };
     if (!handlers[req.params.module]) return res.status(404).json({ status: 'fail', message: 'Module analytics inconnu.' });
-    const allowedRoles = req.params.module === 'rentals' ? ROLES_GL : ROLES_ALTIMMO;
+    const allowedRoles = req.params.module === 'rentals' ? ROLES_GL : (req.params.module === 'hotels' ? [...ROLES_ALTIMMO, 'Proprietaire'] : ROLES_ALTIMMO);
     if (!allowedRoles.includes(req.user?.role)) return res.status(403).json({ status: 'fail', message: 'Accès refusé à ce module.' });
     const requestedAccommodationId = req.query?.accommodationId;
     const accommodationId = req.params.module === 'accommodations' && mongoose.isValidObjectId(requestedAccommodationId) ? new mongoose.Types.ObjectId(requestedAccommodationId) : null;
-    res.json({ status: 'success', data: await handlers[req.params.module](accommodationId) });
+    res.json({ status: 'success', data: await (req.params.module === 'hotels' ? handlers.hotels(req.user) : handlers[req.params.module](accommodationId)) });
   } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };

@@ -107,6 +107,17 @@ const HotelModerationPage = () => {
                 Catégories de chambres ({(hotel.categories || []).length}) : {(hotel.categories || []).map((c) => c.name).join(", ") || "aucune"}
               </p>
 
+              {hotel.proposedVersion?.status === 'pending' && (
+                <div className="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                  <strong>Modification sensible proposée</strong>
+                  <p className="mt-1">La version actuellement publiée reste exploitée jusqu’à la décision.</p>
+                  <dl className="mt-2 space-y-1">
+                    {Object.entries(hotel.proposedVersion.hotelChanges || {}).map(([field, value]) => <div key={`hotel-${field}`}><dt className="inline font-semibold">{field} :</dt> <dd className="inline">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}
+                    {Object.entries(hotel.proposedVersion.propertyChanges || {}).map(([field, value]) => <div key={`property-${field}`}><dt className="inline font-semibold">{field} :</dt> <dd className="inline">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}
+                  </dl>
+                </div>
+              )}
+
               {hotel.categories?.length > 0 && (
                 <p className="text-sm">
                   Tarifs actifs : {hotel.categories.reduce((sum, c) => sum + (c.rates?.length || 0), 0)} / {HOTEL_RATE_TYPES.length * hotel.categories.length} possibles

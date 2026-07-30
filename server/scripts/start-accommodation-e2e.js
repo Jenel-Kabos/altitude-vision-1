@@ -11,8 +11,15 @@ const ids = {
   guest: "66e200000000000000000002",
   property: "66e200000000000000000003",
   accommodation: "66e200000000000000000004",
+  hotelProperty: "66e200000000000000000010",
+  hotel: "66e200000000000000000011",
+  roomCategory: "66e200000000000000000012",
+  mobileHotelProperty: "66e200000000000000000020",
+  mobileHotel: "66e200000000000000000021",
+  mobileRoomCategory: "66e200000000000000000022",
 };
 let mongo;
+let shuttingDown = false;
 const children = [];
 const waitFor = (url, timeout = 120000) =>
   new Promise((resolve, reject) => {
@@ -37,6 +44,8 @@ async function seed(uri) {
   const Property = require("../models/Property");
   const Accommodation = require("../models/Accommodation");
   const RatePlan = require("../models/RatePlan");
+  const Hotel = require("../models/Hotel");
+  const RoomCategory = require("../models/RoomCategory");
   await User.create([
     {
       _id: ids.owner,
@@ -75,6 +84,40 @@ async function seed(uri) {
       bedrooms: 2,
       bathrooms: 1,
       statusAdmin: "Validée",
+      availability: "Disponible",
+      owner: ids.owner,
+    },
+    {
+      _id: ids.hotelProperty,
+      title: "Hôtel Portefeuille E2E",
+      description: "Établissement hôtelier fictif réservé à la recette automatisée.",
+      pole: "Altimmo",
+      type: "Appartement",
+      status: "hebergement",
+      price: 35000,
+      address: { arrondissement: "Centre-ville", city: "Brazzaville" },
+      latitude: -4.27,
+      longitude: 15.29,
+      surface: 500,
+      images: ["https://placehold.co/1200x800/png?text=Hotel-1", "https://placehold.co/1200x800/png?text=Hotel-2", "https://placehold.co/1200x800/png?text=Hotel-3"],
+      statusAdmin: "En attente",
+      availability: "Disponible",
+      owner: ids.owner,
+    },
+    {
+      _id: ids.mobileHotelProperty,
+      title: "Hôtel Portefeuille E2E Mobile",
+      description: "Établissement hôtelier mobile fictif réservé à la recette automatisée.",
+      pole: "Altimmo",
+      type: "Appartement",
+      status: "hebergement",
+      price: 35000,
+      address: { arrondissement: "Centre-ville", city: "Brazzaville" },
+      latitude: -4.27,
+      longitude: 15.29,
+      surface: 500,
+      images: ["https://placehold.co/1200x800/png?text=Mobile-1", "https://placehold.co/1200x800/png?text=Mobile-2", "https://placehold.co/1200x800/png?text=Mobile-3"],
+      statusAdmin: "En attente",
       availability: "Disponible",
       owner: ids.owner,
     },
@@ -134,6 +177,46 @@ async function seed(uri) {
     active: true,
     createdBy: ids.owner,
   });
+  await Hotel.create({
+    _id: ids.hotel,
+    name: "Hôtel Portefeuille E2E",
+    description: "Établissement hôtelier fictif réservé à la recette automatisée.",
+    starRating: 4,
+    phone: "+242060000000",
+    hotelServices: { wifi: true, parking: true },
+    manager: ids.owner,
+    property: ids.hotelProperty,
+    publicationStatus: "soumis",
+    submittedAt: new Date(),
+    totalRooms: 13,
+    totalCapacity: 26,
+    minNightlyRate: 35000,
+    maxNightlyRate: 35000,
+    createdBy: ids.owner,
+  });
+  await Accommodation.create({ property: ids.hotelProperty, accommodationType: "hotel", hotel: ids.hotel, publicationStatus: "soumis", active: true, createdBy: ids.owner });
+  await RoomCategory.create({ _id: ids.roomCategory, hotel: ids.hotel, name: "Standard", code: "STD", unitsAvailable: 13, capacity: { maxAdults: 2, maxChildren: 0 }, createdBy: ids.owner });
+  await RatePlan.create({ roomCategory: ids.roomCategory, rateType: "public", amount: 35000, currency: "XAF", active: true, createdBy: ids.owner });
+  await Hotel.create({
+    _id: ids.mobileHotel,
+    name: "Hôtel Portefeuille E2E Mobile",
+    description: "Établissement hôtelier mobile fictif réservé à la recette automatisée.",
+    starRating: 4,
+    phone: "+242060000001",
+    hotelServices: { wifi: true, parking: true },
+    manager: ids.owner,
+    property: ids.mobileHotelProperty,
+    publicationStatus: "soumis",
+    submittedAt: new Date(),
+    totalRooms: 13,
+    totalCapacity: 26,
+    minNightlyRate: 35000,
+    maxNightlyRate: 35000,
+    createdBy: ids.owner,
+  });
+  await Accommodation.create({ property: ids.mobileHotelProperty, accommodationType: "hotel", hotel: ids.mobileHotel, publicationStatus: "soumis", active: true, createdBy: ids.owner });
+  await RoomCategory.create({ _id: ids.mobileRoomCategory, hotel: ids.mobileHotel, name: "Standard Mobile", code: "STDM", unitsAvailable: 13, capacity: { maxAdults: 2, maxChildren: 0 }, createdBy: ids.owner });
+  await RatePlan.create({ roomCategory: ids.mobileRoomCategory, rateType: "public", amount: 35000, currency: "XAF", active: true, createdBy: ids.owner });
   await mongoose.disconnect();
 }
 function start(command, args, cwd, env) {
@@ -141,20 +224,35 @@ function start(command, args, cwd, env) {
     cwd,
     env: { ...process.env, ...env },
     stdio: "inherit",
+    detached: true,
   });
   children.push(child);
   return child;
 }
 async function shutdown() {
-  children.forEach((child) => child.kill("SIGTERM"));
-  if (mongo) await mongo.stop();
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const forcedExit = setTimeout(() => process.exit(), 3000);
+  forcedExit.unref();
+  children.forEach((child) => {
+    try { process.kill(-child.pid, "SIGTERM"); } catch { /* processus déjà arrêté */ }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  if (mongo) {
+    try {
+      await mongo.stop({ doCleanup: false });
+      await mongo.cleanup({ force: true });
+    } catch (error) {
+      console.warn(`E2E Mongo cleanup warning: ${error.message}`);
+    }
+  }
   process.exit();
 }
 async function main() {
   mongo = await MongoMemoryServer.create();
   const uri = mongo.getUri("altitude_e2e");
   await seed(uri);
-  start("npm", ["start"], serverDir, {
+  start(process.execPath, ["server.js"], serverDir, {
     MONGO_URI: uri,
     PORT: "5000",
     NODE_ENV: "e2e",
@@ -165,13 +263,18 @@ async function main() {
   });
   await waitFor("http://localhost:5000/api/health");
   start(
-    "npm",
-    ["run", "dev", "--", "--hostname", "localhost", "--port", "3000"],
+    process.execPath,
+    [path.join(clientDir, "node_modules/next/dist/bin/next"), "dev", "--hostname", "localhost", "--port", "3000"],
     clientDir,
     { NEXT_PUBLIC_API_URL: "http://localhost:5000/api" },
   );
   await waitFor("http://localhost:3000");
   console.log(`E2E_READY property=${ids.property}`);
+  // Le processus lancé par Playwright est le propriétaire explicite de
+  // MongoMemoryServer et des deux groupes de processus. Sans ce verrou de
+  // cycle de vie, le launcher pouvait terminer dès la fin de main(),
+  // laissant npm/Next/Express orphelins et privant Playwright de verdict.
+  await new Promise(() => setInterval(() => {}, 1000));
 }
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

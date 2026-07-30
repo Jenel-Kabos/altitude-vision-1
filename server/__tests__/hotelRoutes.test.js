@@ -6,6 +6,14 @@ jest.mock('../models/Property');
 jest.mock('../models/User');
 jest.mock('../models/Hotel');
 jest.mock('../models/RoomCategory');
+jest.mock('../models/Room');
+jest.mock('../models/HotelReservation');
+jest.mock('../models/HousekeepingTask');
+jest.mock('../models/MaintenanceTicket');
+jest.mock('../models/HotelStaffAssignment');
+jest.mock('../models/FinancialDocument');
+jest.mock('../models/FinancialPayment');
+jest.mock('../models/FinancialRefund');
 jest.mock('../models/SaleManagement');
 jest.mock('../models/RentalManagement');
 jest.mock('../config/db', () => jest.fn());
@@ -33,6 +41,14 @@ const Property = require('../models/Property');
 const User = require('../models/User');
 const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
+const Room = require('../models/Room');
+const HotelReservation = require('../models/HotelReservation');
+const HousekeepingTask = require('../models/HousekeepingTask');
+const MaintenanceTicket = require('../models/MaintenanceTicket');
+const HotelStaffAssignment = require('../models/HotelStaffAssignment');
+const FinancialDocument = require('../models/FinancialDocument');
+const FinancialPayment = require('../models/FinancialPayment');
+const FinancialRefund = require('../models/FinancialRefund');
 const SaleManagement = require('../models/SaleManagement');
 const RentalManagement = require('../models/RentalManagement');
 
@@ -153,7 +169,45 @@ describe('POST /api/hotels/admin vs /api/hotels/mine — permissions de créatio
   });
 });
 
+describe('PUT /api/hotels/mine/:hotelId — version publiée et version proposée', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('une modification ordinaire est immédiate, une modification sensible reste proposée', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const hotel = { _id: HOTEL_ID, manager: OWNER_ID, property: PROPERTY_ID, publicationStatus: 'publie', name: 'Nom publié', description: 'Description publiée', proposedVersion: null, save: jest.fn().mockResolvedValue() };
+    const property = { _id: PROPERTY_ID, title: 'Titre publié', description: 'Description publiée', address: { city: 'Brazzaville', arrondissement: 'Centre-ville' }, longitude: 15.28, latitude: -4.26, save: jest.fn().mockResolvedValue() };
+    Hotel.findById = jest.fn().mockResolvedValue(hotel);
+    Property.findById = jest.fn().mockResolvedValue(property);
+
+    const res = await request(app).put(`/api/hotels/mine/${HOTEL_ID}`).set('Authorization', `Bearer ${makeToken(OWNER_ID)}`).send({
+      name: 'Nom proposé', title: 'Titre publié', description: 'Description ordinaire mise à jour', price: 35000,
+      address: { city: 'Brazzaville', arrondissement: 'Centre-ville' }, longitude: 15.28, latitude: -4.26,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.proposedVersionPending).toBe(true);
+    expect(hotel.name).toBe('Nom publié');
+    expect(hotel.description).toBe('Description ordinaire mise à jour');
+    expect(hotel.proposedVersion.hotelChanges).toEqual({ name: 'Nom proposé' });
+    expect(property.description).toBe('Description ordinaire mise à jour');
+  });
+
+  test('refuse d’écraser une proposition sensible déjà en attente', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const hotel = { _id: HOTEL_ID, manager: OWNER_ID, property: PROPERTY_ID, publicationStatus: 'publie', name: 'Nom publié', proposedVersion: { status: 'pending' } };
+    Hotel.findById = jest.fn().mockResolvedValue(hotel);
+    Property.findById = jest.fn().mockResolvedValue({ _id: PROPERTY_ID });
+    const res = await request(app).put(`/api/hotels/mine/${HOTEL_ID}`).set('Authorization', `Bearer ${makeToken(OWNER_ID)}`).send({ name: 'Autre nom' });
+    expect(res.statusCode).toBe(409);
+    expect(res.body.code).toBe('HOTEL_PROPOSED_VERSION_PENDING');
+  });
+});
+
 describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/suspend/unsuspend) — Sprint B2', () => {
+  beforeEach(() => {
+    Hotel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+    Property.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+  });
   afterEach(() => jest.clearAllMocks());
 
   const submitted = (overrides = {}) => ({
@@ -213,6 +267,57 @@ describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/sus
     expect(hotel.publicationStatus).toBe('publie');
     expect(hotel.publishedAt).not.toBeNull();
     expect(Accommodation.updateMany).toHaveBeenCalledWith({ hotel: HOTEL_ID }, { $set: { publicationStatus: 'publie' } });
+  });
+
+  test('409 — une seconde décision concurrente ne peut pas retraiter la même soumission', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const hotel = submitted();
+    Hotel.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(hotel) });
+    RoomCategory.find = jest.fn().mockResolvedValue([{ _id: CATEGORY_ID }]);
+    RatePlan.countDocuments = jest.fn().mockResolvedValue(1);
+    Hotel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 0 });
+
+    const res = await request(app)
+      .patch(`/api/hotels/${HOTEL_ID}/validate`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({});
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body.code).toBe('HOTEL_MODERATION_CONFLICT');
+    expect(Accommodation.updateMany).not.toHaveBeenCalled();
+  });
+
+  test('200 — valide atomiquement une version sensible proposée sans changer le statut publié', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const hotel = submitted({
+      publicationStatus: 'publie', name: 'Ancien nom',
+      proposedVersion: { requestId: 'proposal-1', status: 'pending', hotelChanges: { name: 'Nouveau nom' }, propertyChanges: { title: 'Nouveau titre' }, submittedBy: OWNER_ID, submittedAt: new Date() },
+    });
+    Hotel.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(hotel) });
+
+    const res = await request(app).patch(`/api/hotels/${HOTEL_ID}/validate`).set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`).send({});
+
+    expect(res.statusCode).toBe(200);
+    expect(hotel.publicationStatus).toBe('publie');
+    expect(hotel.name).toBe('Nouveau nom');
+    expect(Hotel.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ 'proposedVersion.requestId': 'proposal-1' }),
+      expect.objectContaining({ $push: { versionHistory: expect.objectContaining({ decision: 'approved', previousHotelValues: { name: 'Ancien nom' } }) } }),
+    );
+    expect(Property.updateOne).toHaveBeenCalledWith({ _id: PROPERTY_ID }, { $set: { title: 'Nouveau titre' } });
+  });
+
+  test('200 — refuse une version proposée et conserve la version publiée', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const hotel = submitted({ publicationStatus: 'publie', name: 'Nom publié', proposedVersion: { requestId: 'proposal-2', status: 'pending', hotelChanges: { name: 'Nom refusé' }, propertyChanges: {}, submittedBy: OWNER_ID } });
+    Hotel.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(hotel) });
+
+    const res = await request(app).patch(`/api/hotels/${HOTEL_ID}/reject`).set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`).send({ reason: 'Justificatif absent' });
+
+    expect(res.statusCode).toBe(200);
+    expect(hotel.name).toBe('Nom publié');
+    expect(Property.updateOne).not.toHaveBeenCalled();
+    expect(Hotel.updateOne.mock.calls[0][1].$push.versionHistory).toEqual(expect.objectContaining({ decision: 'rejected', reason: 'Justificatif absent' }));
   });
 
   test('200 — suspendre un hôtel publié (motif requis) puis le réactiver', async () => {
@@ -328,7 +433,7 @@ describe('Sprint B2 — cycle de vie propriétaire (deactivate/reactivate/duplic
   afterEach(() => jest.clearAllMocks());
 
   const owned = (overrides = {}) => ({
-    _id: HOTEL_ID, manager: OWNER_ID, active: true,
+    _id: HOTEL_ID, manager: OWNER_ID, active: true, status: 'actif', publicationStatus: 'publie', property: PROPERTY_ID,
     save: jest.fn().mockResolvedValue(),
     ...overrides,
   });
@@ -347,6 +452,8 @@ describe('Sprint B2 — cycle de vie propriétaire (deactivate/reactivate/duplic
     const hotel = owned();
     Hotel.findById = jest.fn().mockResolvedValue(hotel);
     Accommodation.updateMany = jest.fn().mockResolvedValue({});
+    [HotelReservation, Room, HousekeepingTask, MaintenanceTicket, HotelStaffAssignment, FinancialDocument, FinancialRefund].forEach((model) => { model.countDocuments = jest.fn().mockResolvedValue(0); });
+    Property.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue({ statusAdmin: 'Validée', availability: 'Disponible' }) });
     const res = await request(app)
       .patch(`/api/hotels/${HOTEL_ID}/deactivate`)
       .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
@@ -363,7 +470,7 @@ describe('Sprint B2 — cycle de vie propriétaire (deactivate/reactivate/duplic
   test('200 — le propriétaire supprime définitivement son hôtel', async () => {
     mockUserAuth(OWNER_ID, 'Proprietaire');
     const property = { _id: PROPERTY_ID, images: [] };
-    const hotelDoc = owned({ property });
+    const hotelDoc = owned({ property, publicationStatus: 'brouillon' });
     // F2.6.2 : le contrôleur appelle `.populate('property')` et le scope central appelle
     // `Hotel.findById` directement (sans populate) — le mock doit satisfaire les deux usages.
     Hotel.findById = jest.fn().mockReturnValue(Object.assign(Promise.resolve(hotelDoc), { populate: jest.fn().mockResolvedValue(hotelDoc) }));
@@ -373,6 +480,7 @@ describe('Sprint B2 — cycle de vie propriétaire (deactivate/reactivate/duplic
     Accommodation.deleteMany = jest.fn().mockResolvedValue({});
     Hotel.findByIdAndDelete = jest.fn().mockResolvedValue({});
     Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
+    [RoomCategory, Room, HotelReservation, FinancialPayment, FinancialDocument, FinancialRefund, HousekeepingTask, MaintenanceTicket, HotelStaffAssignment].forEach((model) => { model.countDocuments = jest.fn().mockResolvedValue(0); });
 
     const res = await request(app)
       .delete(`/api/hotels/${HOTEL_ID}`)
@@ -405,6 +513,28 @@ describe('GET /api/hotels/admin/list — Sprint B2 (dashboard admin, tous statut
     expect(res.statusCode).toBe(200);
     expect(res.body.data.hotels).toHaveLength(1);
     expect(res.body.data.total).toBe(1);
+  });
+});
+
+describe('GET /api/hotels/portfolio — portefeuille validé non contournable', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('impose publie + actif côté serveur même si status=soumis est injecté', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const doc = { _id: HOTEL_ID, name: 'Altitude Hôtel', property: { statusAdmin: 'Validée', availability: 'Disponible' }, toObject() { return { _id: this._id, name: this.name, property: this.property }; } };
+    const sort = jest.fn().mockResolvedValue([doc]);
+    const populate = jest.fn().mockReturnValue({ sort });
+    Hotel.find = jest.fn().mockReturnValue({ populate });
+    Room.aggregate = jest.fn().mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/api/hotels/portfolio?status=soumis')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.hotels).toHaveLength(1);
+    expect(Hotel.find).toHaveBeenCalledWith({ publicationStatus: 'publie', status: 'actif', active: { $ne: false } });
+    expect(populate.mock.calls[0][0].match).toEqual(expect.objectContaining({ statusAdmin: 'Validée', availability: 'Disponible' }));
   });
 });
 

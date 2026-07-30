@@ -3,9 +3,10 @@ import HotelDetailPage from '../pages/dashboard/HotelDetailPage';
 import { getHotelDetail, getRooms } from '../services/hotelService';
 
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('next/navigation', () => ({ useParams: () => ({ hotelId: 'HOTEL-1' }) }));
+vi.mock('next/navigation', () => ({ useParams: () => ({ hotelId: 'HOTEL-1' }), usePathname: () => '/dashboard/hotels/HOTEL-1', useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('../services/hotelService', () => ({
   getHotelDetail: vi.fn(),
+  getHotelPortfolioDetail: vi.fn(),
   submitHotel: vi.fn(),
   deactivateHotel: vi.fn(),
   reactivateHotel: vi.fn(),

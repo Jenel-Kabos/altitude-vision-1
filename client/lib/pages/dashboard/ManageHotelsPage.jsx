@@ -1,47 +1,26 @@
 "use client";
 
-// Sprint B2 — domaine Hôtellerie. Dashboard admin "Établissements" : filtres
-// par statut de publication, recherche, tri, pagination, actions rapides
-// (valider/rejeter/suspendre/réactiver) avec score de complétude dédié.
-
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { toast } from "react-hot-toast";
-import { getHotelsAdmin, reviewHotel } from "../../services/hotelService";
-import { getPublicationErrorMessage } from "../../utils/publicationError";
-import { HOTEL_PUBLICATION_STATUSES } from "../../constants/hotel";
 import { Building2 } from "lucide-react";
+import { toast } from "react-hot-toast";
 import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
 import DashboardKpis from "../../components/dashboard/DashboardKpis";
+import PropertyManagementCard from "../../components/dashboard/PropertyManagementCard";
+import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
+import { deactivateHotel, getHotelPortfolio } from "../../services/hotelService";
 import { getDashboardAnalytics } from "../../services/dashboardAnalyticsService";
-import {
-  DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination,
-  DashboardState, DashboardToolbar,
-} from "../../components/dashboard/DashboardUI";
+import { useAuth } from "../../context/AuthContext";
 
-const STATUS_TABS = [{ value: "tous", label: "Tous" }, ...HOTEL_PUBLICATION_STATUSES];
-const SORT_OPTIONS = [
-  { value: "recent", label: "Plus récent" },
-  { value: "ancien", label: "Plus ancien" },
-];
-const STATUS_CLASSES = {
-  brouillon: "bg-gray-100 text-gray-700",
-  soumis: "bg-yellow-100 text-yellow-800",
-  publie: "bg-green-100 text-green-800",
-  suspendu: "bg-orange-100 text-orange-800",
-  rejete: "bg-red-100 text-red-700",
-};
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 12;
+const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XAF", maximumFractionDigits: 0 });
 
-const ManageHotelsPage = () => {
-  const [status, setStatus] = useState("tous");
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("recent");
+export default function ManageHotelsPage() {
+  const { user } = useAuth();
+  const [filters, setFilters] = useState({ search: "", city: "", starRating: "", sort: "recent" });
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ hotels: [], total: 0 });
   const [loading, setLoading] = useState(true);
-  const [validatingId, setValidatingId] = useState(null);
-  const [reasonInputs, setReasonInputs] = useState({});
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(null);
   const [analytics, setAnalytics] = useState(null);
@@ -49,154 +28,90 @@ const ManageHotelsPage = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await getHotelsAdmin({ status, search: search || undefined, sort, page, limit: PAGE_SIZE });
-      setData(res);
-    } catch (err) {
-      toast.error("Erreur lors du chargement des établissements.");
+      const params = Object.fromEntries(Object.entries({ ...filters, page, limit: PAGE_SIZE }).filter(([, value]) => value !== ""));
+      setData(await getHotelPortfolio(params));
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Impossible de charger les établissements.");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, [status, sort, page]);
-  useEffect(() => { getDashboardAnalytics('hotels').then(setAnalytics).catch(() => setAnalytics({ kpis: {} })); }, []);
+  useEffect(() => { load(); }, [page, filters.city, filters.starRating, filters.sort]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const timeout = setTimeout(() => { setPage(1); load(); }, 300);
-    return () => clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+    const timer = setTimeout(() => { setPage(1); load(); }, 300);
+    return () => clearTimeout(timer);
+  }, [filters.search]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { getDashboardAnalytics("hotels").then(setAnalytics).catch(() => setAnalytics({ kpis: {} })); }, []);
 
-  const totalPages = Math.max(1, Math.ceil((data.total || 0) / PAGE_SIZE));
-
-  const handleAction = async (id, action) => {
-    if (action === "validate" && validatingId) return;
-    const reason = reasonInputs[id];
-    if ((action === "reject" || action === "suspend") && !reason?.trim()) {
-      toast.error("Un motif est requis pour cette action.");
-      return;
-    }
+  const updateFilter = (key, value) => { setFilters((current) => ({ ...current, [key]: value })); setPage(1); };
+  const archive = async (hotel) => {
+    if (!window.confirm(`Archiver « ${hotel.name} » ?`)) return;
     try {
-      if (action === "validate") setValidatingId(id);
-      await reviewHotel(id, action, reason ? { reason } : {});
-      toast.success("Action effectuée.");
+      await deactivateHotel(hotel._id);
+      toast.success("Établissement archivé.");
       load();
-    } catch (err) {
-      const completion = err.response?.data?.completion;
-      toast.error(completion
-        ? `Hôtel incomplet (${completion.score}%).`
-        : (getPublicationErrorMessage(err, "cet hôtel") || err.response?.data?.message || "Erreur lors de l'action."));
-    } finally {
-      if (action === "validate") setValidatingId(null);
+    } catch (error) {
+      const blockers = error.response?.data?.blockers;
+      const details = blockers ? Object.entries(blockers).filter(([, count]) => count).map(([key, count]) => `${key}: ${count}`).join(" · ") : "";
+      toast.error(`${error.response?.data?.message || "Archivage impossible."}${details ? ` ${details}` : ""}`);
     }
   };
 
-  return (
-    <DashboardPage>
-      <DashboardPageHeader icon={Building2} title="Gestion hôtelière — Établissements"
-        description="Tous les établissements hôteliers, quel que soit leur statut de publication."
-        actions={!creating && !editing && <button onClick={() => setCreating(true)} className="bg-gold text-white px-4 py-2 rounded font-semibold">Ajouter un hôtel</button>} />
+  const kpis = analytics?.kpis || {};
+  const totalPages = Math.max(1, Math.ceil((data.total || 0) / PAGE_SIZE));
+  return <DashboardPage>
+    <DashboardPageHeader icon={Building2} title="Établissements" description="Portefeuille des hôtels validés et autorisés à être exploités."
+      actions={!creating && !editing && <button onClick={() => setCreating(true)} className="rounded-lg bg-gold px-4 py-2 font-semibold text-white">Ajouter un établissement</button>} />
 
-      {(creating || editing) && <DashboardCard className="mb-6"><HotelPropertyForm
-        hotelId={editing?._id} accommodationType={editing?.accommodationType || 'hotel'} initialProperty={editing?.property}
-        initialHotel={editing} existingImages={editing?.property?.images || editing?.gallery || []}
-        onSuccess={() => { setCreating(false); setEditing(null); load(); }} onCancel={() => { setCreating(false); setEditing(null); }}
-      /></DashboardCard>}
+    {(creating || editing) && <DashboardCard className="mb-6"><HotelPropertyForm scope={user?.role === 'Proprietaire' ? 'owner' : 'admin'} hotelId={editing?._id} accommodationType={editing?.accommodationType || "hotel"} initialProperty={editing?.property} initialHotel={editing} existingImages={editing?.property?.images || editing?.gallery || []}
+      onSuccess={(result) => { setCreating(false); setEditing(null); toast.success(result?.proposedVersionPending ? "Les informations ordinaires sont enregistrées. Les modifications sensibles restent en attente dans Modération Hôtellerie ; la version publiée demeure active." : (editing ? "Établissement mis à jour." : "L’établissement a été soumis à la Modération Hôtellerie. Il apparaîtra ici après validation.")); load(); }}
+      onCancel={() => { setCreating(false); setEditing(null); }} /></DashboardCard>}
 
-      <DashboardKpis items={[
-        { key: 'hotels', label: 'Hôtels actifs', value: analytics?.kpis?.activeHotels }, { key: 'available', label: 'Chambres disponibles', value: analytics?.kpis?.availableRooms },
-        { key: 'occupied', label: 'Chambres occupées', value: analytics?.kpis?.occupiedRooms }, { key: 'reservations', label: 'Réservations', value: analytics?.kpis?.reservations },
-        { key: 'checkin', label: 'Check-in du jour', value: analytics?.kpis?.checkInsToday }, { key: 'checkout', label: 'Check-out du jour', value: analytics?.kpis?.checkOutsToday },
-        { key: 'housekeeping', label: 'Housekeeping', value: analytics?.kpis?.housekeeping }, { key: 'maintenance', label: 'Maintenance', value: analytics?.kpis?.maintenance },
-        { key: 'daily', label: 'Réservations du jour', value: analytics?.kpis?.dailyRevenue, format: 'money' }, { key: 'monthly', label: 'Réservations du mois', value: analytics?.kpis?.monthlyRevenue, format: 'money' },
-        { key: 'annual', label: 'Réservations annuelles', value: analytics?.kpis?.annualRevenue, format: 'money' },
-      ]} loading={!analytics} note={analytics?.revenueBasis} />
+    <DashboardKpis loading={!analytics} note={analytics?.revenueBasis} items={[
+      { key: "active", label: "Établissements actifs", value: kpis.activeHotels },
+      { key: "closed", label: "Temporairement fermés", value: kpis.temporarilyClosedHotels },
+      { key: "available", label: "Chambres disponibles", value: kpis.availableRooms },
+      { key: "occupied", label: "Chambres occupées", value: kpis.occupiedRooms },
+      { key: "occupancy", label: "Taux d’occupation", value: `${kpis.occupancyRate || 0} %` },
+      { key: "checkin", label: "Arrivées du jour", value: kpis.checkInsToday },
+      { key: "checkout", label: "Départs du jour", value: kpis.checkOutsToday },
+      { key: "housekeeping", label: "Chambres à nettoyer", value: kpis.housekeeping },
+      { key: "maintenance", label: "Maintenances ouvertes", value: kpis.maintenance },
+      { key: "gross", label: "Montant brut encaissé", value: kpis.grossAmountCollected, format: "money" },
+      { key: "refunded", label: "Montant remboursé", value: kpis.refundedAmount, format: "money" },
+      { key: "net", label: "Montant net encaissé", value: kpis.netAmountCollected, format: "money" },
+      { key: "balance", label: "Solde à encaisser", value: kpis.remainingAmount, format: "money" },
+    ]} />
 
-      <DashboardToolbar>
-      <div className="flex flex-wrap gap-2 w-full">
-        {STATUS_TABS.map((tab) => (
-          <button key={tab.value} onClick={() => { setStatus(tab.value); setPage(1); }}
-            className={`px-3 py-1.5 rounded text-sm font-medium ${status === tab.value ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+    <DashboardToolbar label="Rechercher et filtrer">
+      <input aria-label="Rechercher un établissement" value={filters.search} onChange={(event) => updateFilter("search", event.target.value)} placeholder="Nom de l’établissement" className="min-w-52 flex-1 rounded-lg border px-3 py-2 text-sm" />
+      <input aria-label="Filtrer par ville" value={filters.city} onChange={(event) => updateFilter("city", event.target.value)} placeholder="Ville" className="rounded-lg border px-3 py-2 text-sm" />
+      <select aria-label="Filtrer par catégorie" value={filters.starRating} onChange={(event) => updateFilter("starRating", event.target.value)} className="rounded-lg border px-3 py-2 text-sm">
+        <option value="">Toutes les catégories</option>{[1,2,3,4,5].map((rating) => <option key={rating} value={rating}>{rating} étoile{rating > 1 ? "s" : ""}</option>)}
+      </select>
+      <select aria-label="Trier les établissements" value={filters.sort} onChange={(event) => updateFilter("sort", event.target.value)} className="rounded-lg border px-3 py-2 text-sm">
+        <option value="recent">Plus récents</option><option value="ancien">Plus anciens</option><option value="nom">Nom</option>
+      </select>
+    </DashboardToolbar>
 
-      <div className="flex flex-wrap gap-3 w-full">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un titre..."
-          aria-label="Rechercher" className="flex-1 min-w-[200px] px-3 py-2 border rounded text-sm" />
-        <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Trier par" className="px-3 py-2 border rounded text-sm">
-          {SORT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-      </div>
-      </DashboardToolbar>
-
-      {loading ? (
-        <DashboardState type="loading" title="Chargement des établissements…" />
-      ) : data.hotels.length === 0 ? (
-        <DashboardState title="Aucun établissement" description="Aucun établissement ne correspond aux critères sélectionnés." />
-      ) : (
-        <div className="space-y-3">
-          {data.hotels.map((hotel) => (
-            <DashboardCard key={hotel._id}>
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <h3 className="font-semibold">{hotel.name}</h3>
-                  <p className="text-xs text-gray-500">{hotel.property?.address?.city}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-semibold px-2 py-1 rounded ${STATUS_CLASSES[hotel.publicationStatus] || "bg-gray-100"}`}>
-                    {HOTEL_PUBLICATION_STATUSES.find((s) => s.value === hotel.publicationStatus)?.label || hotel.publicationStatus}
-                  </span>
-                  {hotel.completion && (
-                    <span className={`text-xs font-semibold px-2 py-1 rounded ${hotel.completion.complete ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
-                      {hotel.completion.score}%
-                    </span>
-                  )}
-                  <Link href={`/dashboard/hotels/${hotel._id}`} className="text-xs text-blue-600 underline">Détail</Link>
-                  <button onClick={() => setEditing(hotel)} className="text-xs text-blue-600 underline">Modifier</button>
-                </div>
-              </div>
-
-              {hotel.publicationStatus === "soumis" && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button onClick={() => handleAction(hotel._id, "validate")} disabled={Boolean(validatingId)} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm disabled:opacity-50">{validatingId === hotel._id ? "Publication…" : "Valider"}</button>
-                  <input placeholder="Motif de rejet" value={reasonInputs[hotel._id] || ""}
-                    onChange={(e) => setReasonInputs((prev) => ({ ...prev, [hotel._id]: e.target.value }))}
-                    className="px-2 py-1.5 border rounded text-sm" />
-                  <button onClick={() => handleAction(hotel._id, "reject")} className="bg-red-600 text-white px-3 py-1.5 rounded text-sm">Rejeter</button>
-                </div>
-              )}
-
-              {hotel.publicationStatus === "publie" && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <input placeholder="Motif de suspension" value={reasonInputs[hotel._id] || ""}
-                    onChange={(e) => setReasonInputs((prev) => ({ ...prev, [hotel._id]: e.target.value }))}
-                    className="px-2 py-1.5 border rounded text-sm" />
-                  <button onClick={() => handleAction(hotel._id, "suspend")} className="bg-orange-600 text-white px-3 py-1.5 rounded text-sm">Suspendre</button>
-                </div>
-              )}
-
-              {hotel.publicationStatus === "suspendu" && (
-                <div className="mt-3">
-                  <button onClick={() => handleAction(hotel._id, "unsuspend")} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm">Réactiver</button>
-                  {hotel.suspensionReason && <p className="text-xs text-orange-700 mt-1">Motif : {hotel.suspensionReason}</p>}
-                </div>
-              )}
-
-              {hotel.publicationStatus === "rejete" && hotel.rejectionReason && (
-                <p className="text-xs text-red-600 mt-2">Motif du rejet : {hotel.rejectionReason}</p>
-              )}
-            </DashboardCard>
-          ))}
-        </div>
-      )}
-
-      {totalPages > 1 && (
-        <DashboardPagination page={page} totalPages={totalPages}
-          onPrevious={() => setPage((p) => p - 1)} onNext={() => setPage((p) => p + 1)} />
-      )}
-    </DashboardPage>
-  );
-};
-
-export default ManageHotelsPage;
+    {loading ? <DashboardState type="loading" title="Chargement des établissements…" /> : data.hotels.length === 0 ? <DashboardState title="Aucun établissement validé" description="Les nouvelles demandes apparaissent ici uniquement après validation dans Modération Hôtellerie." /> :
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{data.hotels.map((hotel) => {
+        const stats = hotel.operationalStats || {};
+        return <PropertyManagementCard key={hotel._id} property={{ ...hotel.property, title: hotel.name || hotel.property?.title }} description={hotel.description}
+          badges={[{ label: `${hotel.starRating || 0} étoile${hotel.starRating > 1 ? "s" : ""}` }, { label: "Validé", className: "bg-emerald-600" }]}
+          priceLabel={hotel.minNightlyRate ? `Dès ${money.format(hotel.minNightlyRate)}` : undefined} capacity={hotel.totalCapacity}
+          footer={<div className="mb-4 grid grid-cols-3 gap-2 text-center text-xs text-gray-600"><span><strong className="block text-base text-gray-900">{stats.totalRooms || hotel.totalRooms || 0}</strong>chambres</span><span><strong className="block text-base text-emerald-700">{stats.availableRooms || 0}</strong>disponibles</span><span><strong className="block text-base text-blue-700">{stats.occupancyRate || 0}%</strong>occupation</span></div>}
+          actions={<>
+            <Link href={`/dashboard/etablissements/${hotel._id}`} className="rounded bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Voir</Link>
+            <button onClick={() => setEditing(hotel)} className="rounded bg-slate-100 px-3 py-2 text-xs font-semibold">Modifier</button>
+            <Link href={`/dashboard/hotels/${hotel._id}/rooms`} className="rounded bg-slate-100 px-3 py-2 text-xs font-semibold">Chambres</Link>
+            <Link href={`/dashboard/hotel-reservations?hotelId=${hotel._id}`} className="rounded bg-slate-100 px-3 py-2 text-xs font-semibold">Réservations</Link>
+            <Link href={`/dashboard/hotels/${hotel._id}/inventory`} className="rounded bg-slate-100 px-3 py-2 text-xs font-semibold">Calendrier</Link>
+            <Link href={`/dashboard/hotel-finance?hotelId=${hotel._id}`} className="rounded bg-slate-100 px-3 py-2 text-xs font-semibold">Finances</Link>
+            <button onClick={() => archive(hotel)} className="rounded bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Archiver</button>
+          </>} />;
+      })}</div>}
+    {totalPages > 1 && <DashboardPagination page={page} totalPages={totalPages} onPrevious={() => setPage((value) => value - 1)} onNext={() => setPage((value) => value + 1)} />}
+  </DashboardPage>;
+}

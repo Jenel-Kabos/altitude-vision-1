@@ -9,7 +9,7 @@ const staffCtrl = require('../controllers/hotelStaffAssignmentController');
 const inventoryCtrl = require('../controllers/hotelInventoryController');
 const { requireHotelCapability } = require('../middleware/hotelAccessMiddleware');
 const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
-const { ROLES_ALTIMMO } = require('../utils/roles');
+const { ROLES_ALTIMMO, ROLES_MODERATION } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
 
 const router = express.Router();
@@ -30,6 +30,9 @@ router.use(auth.protect);
 // F2.6 — hôtels accessibles à l'utilisateur courant (Admin, manager legacy ou rattachement actif).
 // Placée avant '/:id' générique pour ne jamais être capturée par le paramètre.
 router.get('/accessible', staffCtrl.accessibleHotels);
+// Portefeuille validé : filtre de publication non paramétrable côté serveur.
+router.get('/portfolio', ctrl.portfolio);
+router.get('/portfolio/:id', ctrl.portfolioOne);
 
 // F2.6 — gouvernance des accès hôteliers (gestion du personnel rattaché).
 const staffView = requireHotelCapability(HOTEL_OPERATIONAL_CAPABILITIES.STAFF_ASSIGNMENT_VIEW, (req) => req.params.hotelId);
@@ -47,7 +50,7 @@ router.post('/:hotelId/staff-assignments/:assignmentId/revoke', staffManage, sta
 router.post('/admin', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.createFull);
 router.put('/admin/:hotelId', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.updateFull);
 router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), ctrl.listAdmin);
-router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), ctrl.pending);
+router.get('/status/pending', auth.restrictTo(...ROLES_MODERATION), ctrl.pending);
 // Contrôle final (audit Sprint B2) — réconciliation manuelle en cas de
 // désynchronisation Hotel↔Accommodation constatée (voir hotelService.
 // resyncLinkedAccommodations). Réservé au staff : action de récupération
@@ -97,7 +100,7 @@ router.patch('/room-assignments/change', roomAssignmentCtrl.change);
 router.patch('/room-assignments/release', roomAssignmentCtrl.release);
 
 // Staff — validate|reject|suspend|unsuspend (même convention qu'Accommodation)
-router.patch('/:id/:action', auth.restrictTo(...ROLES_ALTIMMO), ctrl.reviewDecision);
+router.patch('/:id/:action', auth.restrictTo(...ROLES_MODERATION), ctrl.reviewDecision);
 
 // Sélecteur admin (Sprint Hôtel, inchangé) — routes génériques en dernier
 router.get('/', auth.restrictTo(...ROLES_ALTIMMO), ctrl.list);

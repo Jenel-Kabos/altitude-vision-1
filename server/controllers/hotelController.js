@@ -13,9 +13,17 @@ const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
 const RoomCategory = require('../models/RoomCategory');
 const RatePlan = require('../models/RatePlan');
+const Room = require('../models/Room');
+const HotelReservation = require('../models/HotelReservation');
+const HousekeepingTask = require('../models/HousekeepingTask');
+const MaintenanceTicket = require('../models/MaintenanceTicket');
+const HotelStaffAssignment = require('../models/HotelStaffAssignment');
+const FinancialDocument = require('../models/FinancialDocument');
+const FinancialPayment = require('../models/FinancialPayment');
+const FinancialRefund = require('../models/FinancialRefund');
 const {
   computeHotelCompletionScore, syncLinkedAccommodations, resyncLinkedAccommodations,
-  createFullHotel, updateFullHotel, duplicateHotel, deleteHotel, listHotelsForAdmin,
+  createFullHotel, updateFullHotel, duplicateHotel, deleteHotel, listHotelsForAdmin, listValidatedHotelPortfolio,
 } = require('../services/hotelService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { notify } = require('../services/notificationService');
@@ -239,12 +247,55 @@ exports.listAdmin = async (req, res) => {
   }
 };
 
+// GET /api/hotels/portfolio — portefeuille exploitable uniquement.
+// Aucun paramètre ne peut élargir le filtre de publication imposé par le service.
+exports.portfolio = async (req, res) => {
+  try {
+    const { search, city, district, starRating, sort, page, limit } = req.query;
+    let hotelIds;
+    if (req.user.role !== 'Admin') {
+      const { hotels } = await listAccessibleHotels(req.user);
+      hotelIds = hotels.map((hotel) => hotel._id);
+      if (!hotelIds.length) return res.json({ status: 'success', data: { hotels: [], total: 0, page: Number(page) || 1, limit: Number(limit) || 20 } });
+    }
+    const result = await listValidatedHotelPortfolio({ search, city, district, starRating, sort, page, limit, hotelIds });
+    const ids = result.hotels.map((hotel) => hotel._id);
+    const roomRows = ids.length ? await Room.aggregate([
+      { $match: { hotel: { $in: ids }, active: true } },
+      { $group: { _id: '$hotel', totalRooms: { $sum: 1 }, availableRooms: { $sum: { $cond: [{ $eq: ['$status', 'available'] }, 1, 0] } }, occupiedRooms: { $sum: { $cond: [{ $eq: ['$status', 'occupied'] }, 1, 0] } } } },
+    ]) : [];
+    const roomsByHotel = new Map(roomRows.map((row) => [String(row._id), row]));
+    const hotels = result.hotels.map((hotel) => {
+      const roomStats = roomsByHotel.get(String(hotel._id)) || { totalRooms: 0, availableRooms: 0, occupiedRooms: 0 };
+      return { ...hotel.toObject(), operationalStats: { ...roomStats, occupancyRate: roomStats.totalRooms ? Math.round((roomStats.occupiedRooms / roomStats.totalRooms) * 10000) / 100 : 0 } };
+    });
+    res.json({ status: 'success', data: { ...result, hotels } });
+  } catch (error) {
+    fail(res, 500, error.message);
+  }
+};
+
+exports.portfolioOne = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const { error } = await assertHotelAccess(req, req.params.id, CAP.HOTEL_VIEW);
+    if (error) return fail(res, error, error === 404 ? 'Établissement introuvable.' : 'Accès refusé.');
+    const result = await listValidatedHotelPortfolio({ hotelIds: [req.params.id], page: 1, limit: 1 });
+    if (!result.hotels.length) return fail(res, 404, 'Établissement validé et actif introuvable.');
+    const hotel = result.hotels[0];
+    const completion = await getHotelCompletion(hotel, hotel.property);
+    res.json({ status: 'success', data: { hotel, completion } });
+  } catch (error) {
+    fail(res, 500, error.message);
+  }
+};
+
 function parseHotelServices(req) {
   const raw = req.body.hotelServicesStructured;
   if (raw === undefined) return undefined;
   if (raw && typeof raw === 'object') return raw;
   if (typeof raw === 'string') {
-    try { return JSON.parse(raw); } catch (e) { return undefined; }
+    try { return JSON.parse(raw); } catch { return undefined; }
   }
   return undefined;
 }
@@ -254,7 +305,7 @@ function parseContact(req) {
   if (raw === undefined) return undefined;
   if (raw && typeof raw === 'object') return raw;
   if (typeof raw === 'string') {
-    try { return JSON.parse(raw); } catch (e) { return undefined; }
+    try { return JSON.parse(raw); } catch { return undefined; }
   }
   return undefined;
 }
@@ -264,14 +315,29 @@ function parseGallery(req) {
   if (raw === undefined) return undefined;
   if (Array.isArray(raw)) return raw;
   if (typeof raw === 'string') {
-    try { return JSON.parse(raw); } catch (e) { return undefined; }
+    try { return JSON.parse(raw); } catch { return undefined; }
+  }
+  return undefined;
+}
+
+function parseObjectField(value) {
+  if (value === undefined) return undefined;
+  if (value && typeof value === 'object') return value;
+  if (typeof value === 'string') {
+    try { return JSON.parse(value); } catch { return undefined; }
   }
   return undefined;
 }
 
 function buildHotelDataFromBody(req) {
-  const { name, brand, description, starRating, phone, email, website, hotelServicesLegacy } = req.body;
-  const data = { name, brand: brand || '', description: description || '', phone: phone || '', email: email || '', website: website || '' };
+  const { name, brand, description, starRating, phone, email, website, hotelServicesLegacy, legalName, hotelType, timezone, currency } = req.body;
+  const data = {};
+  if (name !== undefined) data.name = name;
+  if (brand !== undefined) data.brand = brand;
+  if (description !== undefined) data.description = description;
+  if (phone !== undefined) data.phone = phone;
+  if (email !== undefined) data.email = email;
+  if (website !== undefined) data.website = website;
   if (starRating !== undefined && starRating !== '') data.starRating = Number(starRating);
   if (hotelServicesLegacy !== undefined) data.services = parseStringArray(hotelServicesLegacy);
   const structured = parseHotelServices(req);
@@ -280,7 +346,39 @@ function buildHotelDataFromBody(req) {
   if (contact !== undefined) data.contact = contact;
   const gallery = parseGallery(req);
   if (gallery !== undefined) data.gallery = gallery;
+  if (legalName !== undefined) data.legalName = legalName;
+  if (hotelType !== undefined) data.hotelType = hotelType;
+  if (timezone !== undefined) data.timezone = timezone;
+  if (currency !== undefined) data.currency = currency;
+  const taxInformation = parseObjectField(req.body.taxInformation);
+  if (taxInformation !== undefined) data.taxInformation = taxInformation;
+  const policies = parseObjectField(req.body.policies);
+  if (policies !== undefined) data.policies = policies;
+  const administrativeDocuments = parseObjectField(req.body.administrativeDocuments);
+  if (administrativeDocuments !== undefined) data.administrativeDocuments = administrativeDocuments;
   return data;
+}
+
+const SENSITIVE_PROPERTY_FIELDS = ['owner', 'title', 'address', 'longitude', 'latitude'];
+const SENSITIVE_HOTEL_FIELDS = ['name', 'brand', 'starRating', 'legalName', 'hotelType', 'currency', 'taxInformation', 'administrativeDocuments'];
+const changed = (before, after) => JSON.stringify(before ?? null) !== JSON.stringify(after ?? null);
+
+function splitSensitiveUpdates(property, hotel, propertyUpdates, hotelUpdates) {
+  const sensitiveProperty = {};
+  const sensitiveHotel = {};
+  SENSITIVE_PROPERTY_FIELDS.forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(propertyUpdates, field) && changed(property[field], propertyUpdates[field])) {
+      sensitiveProperty[field] = propertyUpdates[field];
+      delete propertyUpdates[field];
+    }
+  });
+  SENSITIVE_HOTEL_FIELDS.forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(hotelUpdates, field) && changed(hotel[field], hotelUpdates[field])) {
+      sensitiveHotel[field] = hotelUpdates[field];
+      delete hotelUpdates[field];
+    }
+  });
+  return { sensitiveProperty, sensitiveHotel };
 }
 
 // ─────────────────────────────────────────────
@@ -299,7 +397,7 @@ exports.createFull = async (req, res) => {
         payload = typeof req.body.publicationPayload === 'string'
           ? JSON.parse(req.body.publicationPayload)
           : req.body.publicationPayload;
-      } catch (_error) {
+      } catch {
         return fail(res, 400, 'Payload de publication hôtelier invalide.');
       }
       const uploadedImages = await uploadFilesToCloudinary(req.files);
@@ -419,6 +517,7 @@ exports.updateFull = async (req, res) => {
     if (latitude !== undefined) propertyUpdates.latitude = latitude;
     if (location) propertyUpdates.location = parseGeoLocation(location);
     if (req.body.address) propertyUpdates.address = parseAddress(req);
+    if (req.body.owner && req.user.role === 'Admin' && mongoose.isValidObjectId(req.body.owner)) propertyUpdates.owner = req.body.owner;
     if (honoraires !== undefined) {
       const parsed = parseNonNegativeAmount(honoraires, null);
       if (honoraires !== '' && parsed === null) return fail(res, 422, 'Honoraires invalides.');
@@ -440,6 +539,20 @@ exports.updateFull = async (req, res) => {
     const hotelUpdates = buildHotelDataFromBody(req);
     if (!hotelUpdates.name) delete hotelUpdates.name;
 
+    let proposed = false;
+    if (hotel.publicationStatus === 'publie') {
+      if (hotel.proposedVersion?.status === 'pending') return fail(res, 409, 'Une modification sensible est déjà en attente de modération.', { code: 'HOTEL_PROPOSED_VERSION_PENDING' });
+      const { sensitiveProperty, sensitiveHotel } = splitSensitiveUpdates(property, hotel, propertyUpdates, hotelUpdates);
+      if (Object.keys(sensitiveProperty).length || Object.keys(sensitiveHotel).length) {
+        proposed = true;
+        hotel.proposedVersion = {
+          requestId: new mongoose.Types.ObjectId().toString(), status: 'pending',
+          propertyChanges: sensitiveProperty, hotelChanges: sensitiveHotel,
+          submittedBy: req.user.id, submittedAt: new Date(), rejectionReason: '',
+        };
+      }
+    }
+
     const result = await updateFullHotel({ property, hotel, propertyUpdates, hotelUpdates, actingUser: req.user });
 
     logAction({
@@ -452,7 +565,7 @@ exports.updateFull = async (req, res) => {
       req,
     });
 
-    res.json({ status: 'success', data: { property: result.property, hotel: result.hotel } });
+    res.json({ status: 'success', data: { property: result.property, hotel: result.hotel, proposedVersionPending: proposed } });
   } catch (error) {
     fail(res, 500, error.message);
   }
@@ -489,7 +602,7 @@ exports.submit = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.pending = async (req, res) => {
   try {
-    const query = { publicationStatus: 'soumis' };
+    const query = { $or: [{ publicationStatus: 'soumis' }, { 'proposedVersion.status': 'pending' }] };
     if (req.user.role !== 'Admin') {
       const { hotels: accessibleHotels } = await listAccessibleHotels(req.user);
       query._id = { $in: accessibleHotels.map((h) => h._id) };
@@ -519,13 +632,49 @@ exports.reviewDecision = async (req, res) => {
     const VALID_ACTIONS = ['validate', 'reject', 'suspend', 'unsuspend'];
     if (!VALID_ACTIONS.includes(action)) return fail(res, 400, 'Action invalide.');
 
-    const hotel = await Hotel.findById(id).populate('property', 'title owner');
+    // La complétude accepte la galerie Hotel OU au moins trois images Property.
+    // Conserver les images dans cette projection évite qu'un hôtel affiché à
+    // 100 % dans la file de modération soit refusé au moment de la décision.
+    const hotel = await Hotel.findById(id).populate('property', 'title owner address longitude latitude images');
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
     // F2.6.2 : cette action n'avait auparavant AUCUN contrôle de portée au-delà du filtre de
     // rôle global au niveau route — n'importe quel membre du staff Altimmo pouvait valider,
     // rejeter, suspendre ou réactiver n'importe quel hôtel.
     const { error: scopeError } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
     if (scopeError) return fail(res, scopeError, scopeError === 404 ? 'Hôtel introuvable.' : 'Accès refusé.');
+
+    const proposed = hotel.proposedVersion?.status === 'pending' ? hotel.proposedVersion : null;
+    if (proposed) {
+      if (!['validate', 'reject'].includes(action)) return fail(res, 409, 'Cette action ne s’applique pas à une modification proposée.');
+      if (action === 'reject' && !String(req.body.reason || '').trim()) return fail(res, 422, 'Un motif est requis.');
+      const now = new Date();
+      const hotelChanges = proposed.hotelChanges || {};
+      const propertyChanges = proposed.propertyChanges || {};
+      const previousHotelValues = Object.fromEntries(Object.keys(hotelChanges).map((key) => [key, hotel[key]]));
+      const previousPropertyValues = Object.fromEntries(Object.keys(propertyChanges).map((key) => [key, hotel.property?.[key]]));
+      const history = {
+        requestId: proposed.requestId, decision: action === 'validate' ? 'approved' : 'rejected',
+        hotelChanges, propertyChanges, previousHotelValues, previousPropertyValues,
+        submittedBy: proposed.submittedBy, reviewedBy: req.user.id,
+        submittedAt: proposed.submittedAt, reviewedAt: now, reason: String(req.body.reason || '').trim(),
+      };
+      const set = { proposedVersion: null, reviewedBy: req.user.id };
+      if (action === 'validate') Object.assign(set, hotelChanges);
+      const transition = await Hotel.updateOne(
+        { _id: hotel._id, 'proposedVersion.status': 'pending', 'proposedVersion.requestId': proposed.requestId },
+        { $set: set, $push: { versionHistory: history } },
+      );
+      if (!transition?.modifiedCount) return fail(res, 409, 'Cette modification a déjà été traitée.', { code: 'HOTEL_PROPOSED_VERSION_CONFLICT' });
+      if (action === 'validate' && Object.keys(propertyChanges).length) await Property.updateOne({ _id: hotel.property._id }, { $set: propertyChanges });
+      Object.assign(hotel, action === 'validate' ? hotelChanges : {}, { proposedVersion: null, reviewedBy: req.user.id });
+      logAction({
+        action: action === 'validate' ? 'Modification sensible hôtelière validée' : 'Modification sensible hôtelière rejetée',
+        description: `Version proposée ${proposed.requestId} ${action === 'validate' ? 'publiée' : 'refusée'}`,
+        module: 'Altimmo', typeAction: action === 'validate' ? 'VALIDATION' : 'REJET', auteur: buildAuteur(req.user),
+        cible: { id: String(hotel._id), type: 'Hotel', nom: hotel.name }, req,
+      });
+      return res.json({ status: 'success', data: { hotel, proposedVersionDecision: action } });
+    }
 
     if (['validate', 'reject'].includes(action) && hotel.publicationStatus !== 'soumis') {
       return fail(res, 409, 'Seul un hôtel soumis peut être validé ou rejeté.');
@@ -548,14 +697,30 @@ exports.reviewDecision = async (req, res) => {
       }
     }
 
+    const oldStatus = hotel.publicationStatus;
     const newStatus = { validate: 'publie', reject: 'rejete', suspend: 'suspendu', unsuspend: 'publie' }[action];
-    hotel.publicationStatus = newStatus;
-    hotel.reviewedBy = req.user.id;
-    hotel.rejectionReason = action === 'reject' ? String(req.body.reason).trim() : hotel.rejectionReason;
-    hotel.suspensionReason = action === 'suspend' ? String(req.body.reason).trim() : (action === 'unsuspend' ? '' : hotel.suspensionReason);
-    if (action === 'validate') hotel.publishedAt = new Date();
-    if (action === 'suspend') hotel.suspendedAt = new Date();
-    await hotel.save();
+    const now = new Date();
+    const changes = { publicationStatus: newStatus, reviewedBy: req.user.id };
+    if (action === 'reject') changes.rejectionReason = String(req.body.reason).trim();
+    if (action === 'suspend') { changes.suspensionReason = String(req.body.reason).trim(); changes.suspendedAt = now; }
+    if (action === 'unsuspend') changes.suspensionReason = '';
+    if (action === 'validate') changes.publishedAt = now;
+    const transition = await Hotel.updateOne(
+      { _id: hotel._id, publicationStatus: oldStatus },
+      { $set: changes, $push: { moderationHistory: { from: oldStatus, to: newStatus, decision: action, reason: String(req.body.reason || '').trim(), comment: String(req.body.comment || '').trim(), moderator: req.user.id, decidedAt: now } } },
+    );
+    if (!transition?.modifiedCount) return fail(res, 409, 'Cette demande a déjà été traitée par un autre modérateur.', { code: 'HOTEL_MODERATION_CONFLICT' });
+    Object.assign(hotel, changes);
+    // La Property est l'ancre publique historique. La décision hôtelière
+    // reste l'unique action de modération et aligne cette ancre sans créer
+    // un second workflow à terminer ailleurs.
+    if (hotel.property?._id && ['validate', 'reject'].includes(action)) {
+      await Property.updateOne(
+        { _id: hotel.property._id },
+        { $set: { statusAdmin: action === 'validate' ? 'Validée' : 'Rejetée', reviewedAt: now } },
+      );
+      hotel.property.statusAdmin = action === 'validate' ? 'Validée' : 'Rejetée';
+    }
 
     // Synchronise l'Accommodation-adaptateur pour que la visibilité publique
     // (isPubliclyVisible, inchangée) suive le nouveau statut hôtel.
@@ -622,7 +787,24 @@ exports.deactivate = async (req, res) => {
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
     const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
     if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez modifier que vos propres hôtels.");
+    const now = new Date();
+    const [futureReservations, checkedIn, occupiedRooms, publishedRooms, openHousekeeping, openMaintenance, activeStaff, unpaidDocuments, pendingRefunds] = await Promise.all([
+      HotelReservation.countDocuments({ hotel: hotel._id, status: { $in: ['pending', 'confirmed'] }, checkOutDate: { $gt: now } }),
+      HotelReservation.countDocuments({ hotel: hotel._id, status: 'checked_in' }),
+      Room.countDocuments({ hotel: hotel._id, status: 'occupied' }),
+      Room.countDocuments({ hotel: hotel._id, active: true }),
+      HousekeepingTask.countDocuments({ hotel: hotel._id, status: { $in: HousekeepingTask.OPEN_HOUSEKEEPING_STATUSES } }),
+      MaintenanceTicket.countDocuments({ hotel: hotel._id, status: { $in: MaintenanceTicket.OPEN_MAINTENANCE_STATUSES } }),
+      HotelStaffAssignment.countDocuments({ hotel: hotel._id, status: 'active' }),
+      FinancialDocument.countDocuments({ domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotel._id, status: { $in: ['draft', 'issued'] }, paymentStatus: { $ne: 'paid' } }),
+      FinancialRefund.countDocuments({ domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotel._id, status: { $in: ['requested', 'approved', 'processing'] } }),
+    ]);
+    const blockers = { futureReservations, checkedIn, occupiedRooms, publishedRooms, openHousekeeping, openMaintenance, activeStaff, unpaidDocuments, pendingRefunds };
+    if (Object.values(blockers).some(Boolean)) {
+      return fail(res, 409, "Impossible d’archiver cet établissement tant que son activité opérationnelle n’est pas clôturée.", { code: 'HOTEL_ARCHIVE_BLOCKED', blockers });
+    }
     hotel.active = false;
+    hotel.status = 'inactif';
     await hotel.save();
     const syncResult = await syncLinkedAccommodations(hotel._id, { active: false });
     if (!syncResult.ok) {
@@ -649,7 +831,13 @@ exports.reactivate = async (req, res) => {
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
     const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
     if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez modifier que vos propres hôtels.");
+    if (hotel.publicationStatus !== 'publie') return fail(res, 409, 'Un établissement non validé ne peut pas être activé.', { code: 'HOTEL_NOT_APPROVED' });
+    const property = await Property.findById(hotel.property).select('statusAdmin availability');
+    if (!property || property.statusAdmin !== 'Validée' || property.availability !== 'Disponible') {
+      return fail(res, 409, "L’annonce liée doit être validée et disponible avant réactivation.", { code: 'HOTEL_PROPERTY_NOT_APPROVED' });
+    }
     hotel.active = true;
+    hotel.status = 'actif';
     await hotel.save();
     const syncResult = await syncLinkedAccommodations(hotel._id, { active: true });
     if (!syncResult.ok) {
@@ -739,6 +927,17 @@ exports.remove = async (req, res) => {
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
     const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
     if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez supprimer que vos propres hôtels.");
+    if (!['brouillon', 'rejete'].includes(hotel.publicationStatus) || hotel.publishedAt) {
+      return fail(res, 409, 'Seul un brouillon ou un hôtel refusé jamais publié peut être supprimé.', { code: 'HOTEL_DELETE_NOT_ALLOWED' });
+    }
+    const [categories, rooms, reservations, payments, documents, refunds, housekeeping, maintenance, staff] = await Promise.all([
+      RoomCategory.countDocuments({ hotel: hotel._id }), Room.countDocuments({ hotel: hotel._id }),
+      HotelReservation.countDocuments({ hotel: hotel._id }), FinancialPayment.countDocuments({ domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotel._id }),
+      FinancialDocument.countDocuments({ domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotel._id }), FinancialRefund.countDocuments({ domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotel._id }),
+      HousekeepingTask.countDocuments({ hotel: hotel._id }), MaintenanceTicket.countDocuments({ hotel: hotel._id }), HotelStaffAssignment.countDocuments({ hotel: hotel._id }),
+    ]);
+    const blockers = { categories, rooms, reservations, payments, documents, refunds, housekeeping, maintenance, staff };
+    if (Object.values(blockers).some(Boolean)) return fail(res, 409, 'Suppression impossible : cet hôtel possède déjà des données métier ou un historique.', { code: 'HOTEL_DELETE_BLOCKED', blockers });
     const name = hotel.name;
     await deleteHotel({ hotel, property: hotel.property });
 

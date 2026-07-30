@@ -4,11 +4,11 @@
 // complétude, liens vers Catégories/Tarifs, actions de cycle de vie.
 
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import {
-  getHotelDetail, submitHotel, deactivateHotel, reactivateHotel, duplicateHotel, deleteHotel, getRooms,
+  getHotelDetail, getHotelPortfolioDetail, submitHotel, deactivateHotel, reactivateHotel, duplicateHotel, deleteHotel, getRooms,
 } from "../../services/hotelService";
 import { HOTEL_PUBLICATION_STATUSES } from "../../constants/hotel";
 import { ROOM_STATUSES, ROOM_STATUS_CLASSES } from "../../constants/room";
@@ -25,7 +25,10 @@ const STATUS_CLASSES = {
 
 const HotelDetailPage = () => {
   const params = useParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const hotelId = params?.hotelId;
+  const portfolioMode = pathname?.startsWith('/dashboard/etablissements/');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [roomCounts, setRoomCounts] = useState(null);
@@ -34,7 +37,7 @@ const HotelDetailPage = () => {
     if (!hotelId) return;
     setLoading(true);
     try {
-      const res = await getHotelDetail(hotelId);
+      const res = await (portfolioMode ? getHotelPortfolioDetail(hotelId) : getHotelDetail(hotelId));
       setData(res);
     } catch (err) {
       toast.error("Erreur lors du chargement de l'établissement.");
@@ -57,7 +60,7 @@ const HotelDetailPage = () => {
     }
   };
 
-  useEffect(() => { load(); loadRoomCounts(); }, [hotelId]);
+  useEffect(() => { load(); loadRoomCounts(); }, [hotelId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <DashboardState type="loading" title="Chargement de l’établissement…" />;
   if (!data?.hotel) return <DashboardState title="Établissement introuvable" description="Cet établissement n’est pas disponible ou n’existe plus." />;
@@ -79,7 +82,8 @@ const HotelDetailPage = () => {
     try {
       if (hotel.active === false) { await reactivateHotel(hotelId); toast.success("Hôtel réactivé."); }
       else { await deactivateHotel(hotelId); toast.success("Hôtel désactivé."); }
-      load();
+      if (portfolioMode) router.push('/dashboard/etablissements');
+      else load();
     } catch (err) {
       toast.error(err.response?.data?.message || "Erreur.");
     }
@@ -130,7 +134,7 @@ const HotelDetailPage = () => {
         </div>
       )}
 
-      <DashboardToolbar label="Actions de l’établissement">
+      <DashboardToolbar label={portfolioMode ? "Centre opérationnel" : "Actions de l’établissement"}>
         <Link href={`/dashboard/hotels/${hotelId}/room-categories`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
           Catégories de chambres
         </Link>
@@ -140,16 +144,22 @@ const HotelDetailPage = () => {
         <Link href={`/dashboard/hotels/${hotelId}/rooms`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
           Chambres
         </Link>
-        {(hotel.publicationStatus === 'brouillon' || hotel.publicationStatus === 'rejete') && (
+        <Link href={`/dashboard/hotel-reservations?hotelId=${hotelId}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Réservations</Link>
+        <Link href={`/dashboard/hotels/${hotelId}/inventory`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Calendrier</Link>
+        <Link href={`/dashboard/housekeeping?hotelId=${hotelId}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Housekeeping</Link>
+        <Link href={`/dashboard/maintenance?hotelId=${hotelId}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Maintenance</Link>
+        <Link href={`/dashboard/hotel-finance?hotelId=${hotelId}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Finances</Link>
+        <Link href={`/dashboard/hotels/${hotelId}/staff`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Personnel</Link>
+        {!portfolioMode && (hotel.publicationStatus === 'brouillon' || hotel.publicationStatus === 'rejete') && (
           <button onClick={handleSubmit} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm">Soumettre pour validation</button>
         )}
         {hotel.publicationStatus === 'publie' && (
           <button onClick={handleToggleActive} className={`px-3 py-1.5 rounded text-sm text-white ${hotel.active === false ? 'bg-green-600' : 'bg-gray-600'}`}>
-            {hotel.active === false ? 'Réactiver' : 'Désactiver'}
+            {hotel.active === false ? 'Réactiver' : 'Archiver'}
           </button>
         )}
-        <button onClick={handleDuplicate} className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded text-sm">Dupliquer</button>
-        <button onClick={handleDelete} className="bg-red-600 text-white px-3 py-1.5 rounded text-sm">Supprimer</button>
+        {!portfolioMode && <button onClick={handleDuplicate} className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded text-sm">Dupliquer</button>}
+        {!portfolioMode && <button onClick={handleDelete} className="bg-red-600 text-white px-3 py-1.5 rounded text-sm">Supprimer</button>}
       </DashboardToolbar>
 
       {completion && !completion.complete && (

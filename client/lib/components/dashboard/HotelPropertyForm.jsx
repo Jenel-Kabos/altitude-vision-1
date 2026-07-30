@@ -40,6 +40,20 @@ const emptyForm = (initial = {}) => ({
   phone: initial.phone || "",
   email: initial.email || "",
   website: initial.website || "",
+  legalName: initial.legalName || "",
+  hotelType: initial.hotelType || "hotel",
+  timezone: initial.timezone || "Africa/Brazzaville",
+  currency: initial.currency || "XAF",
+  taxIdentifier: initial.taxInformation?.taxIdentifier || "",
+  taxRegime: initial.taxInformation?.taxRegime || "",
+  vatRate: initial.taxInformation?.vatRate ?? 0,
+  checkInTime: initial.policies?.checkInTime || "14:00",
+  checkOutTime: initial.policies?.checkOutTime || "11:00",
+  cancellationPolicy: initial.policies?.cancellation || "",
+  petsPolicy: initial.policies?.pets || "",
+  childrenPolicy: initial.policies?.children || "",
+  visitorsPolicy: initial.policies?.visitors || "",
+  accessibilityPolicy: initial.policies?.accessibility || "",
   contactResponsable: initial.contact?.responsable || "",
   contactHoraires: initial.contact?.horaires || "",
   hotelServicesStructured: initial.hotelServices || Object.fromEntries(HOTEL_SERVICES.map((s) => [s.key, false])),
@@ -130,9 +144,11 @@ const HotelPropertyForm = ({
     setLoading(true);
     try {
       const {
-        address, images, latitude, longitude,
+        address, images, latitude, longitude, description,
         name, brand, hotelDescription, starRating, phone, email, website,
         contactResponsable, contactHoraires, hotelServicesStructured,
+        taxIdentifier, taxRegime, vatRate, checkInTime, checkOutTime,
+        cancellationPolicy, petsPolicy, childrenPolicy, visitorsPolicy, accessibilityPolicy,
         ...rest
       } = formData;
 
@@ -149,13 +165,17 @@ const HotelPropertyForm = ({
 
       data.append("name", name);
       if (brand) data.append("brand", brand);
-      data.append("description", hotelDescription || formData.description);
+      // Un seul champ multipart : Multer transforme les doublons en tableau,
+      // incompatible avec les champs String de Property et Hotel.
+      data.append("description", hotelDescription || description);
       if (starRating !== "") data.append("starRating", starRating);
       if (phone) data.append("phone", phone);
       if (email) data.append("email", email);
       if (website) data.append("website", website);
       data.append("contact", JSON.stringify({ responsable: contactResponsable, horaires: contactHoraires, languesParlees: [] }));
       data.append("hotelServicesStructured", JSON.stringify(hotelServicesStructured));
+      data.append("taxInformation", JSON.stringify({ taxIdentifier, taxRegime, vatRate: Number(vatRate) || 0 }));
+      data.append("policies", JSON.stringify({ checkInTime, checkOutTime, cancellation: cancellationPolicy, pets: petsPolicy, children: childrenPolicy, visitors: visitorsPolicy, accessibility: accessibilityPolicy }));
       data.append("accommodationType", accommodationType);
 
       const create = scope === "owner" ? createMyHotel : createFullHotel;
@@ -204,6 +224,14 @@ const HotelPropertyForm = ({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Enseigne</label>
             <input name="brand" value={formData.brand} onChange={handleChange} aria-label="Enseigne" className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Raison sociale</label>
+            <input name="legalName" value={formData.legalName} onChange={handleChange} aria-label="Raison sociale" className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Type d’établissement</label>
+            <select name="hotelType" value={formData.hotelType} onChange={handleChange} aria-label="Type d’établissement" className={inputClass}><option value="hotel">Hôtel</option><option value="residence_hoteliere">Résidence hôtelière</option><option value="auberge">Auberge</option><option value="chambre_hotes">Chambre d’hôtes</option><option value="motel">Motel</option><option value="autre">Autre</option></select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie (étoiles)</label>
@@ -268,6 +296,24 @@ const HotelPropertyForm = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">Rue</label>
             <input name="street" value={formData.address.street} onChange={handleAddressChange} aria-label="Rue" className={inputClass} />
           </div>
+        </div>
+      </div>
+
+      <div className="border-t pt-4">
+        <h3 className="mb-3 text-lg font-semibold">Fiscalité et politiques</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <input name="timezone" value={formData.timezone} onChange={handleChange} aria-label="Fuseau horaire" placeholder="Fuseau horaire" className={inputClass} />
+          <select name="currency" value={formData.currency} onChange={handleChange} aria-label="Devise" className={inputClass}><option value="XAF">XAF</option><option value="EUR">EUR</option><option value="USD">USD</option></select>
+          <input name="taxIdentifier" value={formData.taxIdentifier} onChange={handleChange} aria-label="Identifiant fiscal" placeholder="Identifiant fiscal" className={inputClass} />
+          <input name="taxRegime" value={formData.taxRegime} onChange={handleChange} aria-label="Régime fiscal" placeholder="Régime fiscal" className={inputClass} />
+          <input type="number" min="0" max="100" name="vatRate" value={formData.vatRate} onChange={handleChange} aria-label="Taux de TVA" className={inputClass} />
+          <input type="time" name="checkInTime" value={formData.checkInTime} onChange={handleChange} aria-label="Heure de check-in" className={inputClass} />
+          <input type="time" name="checkOutTime" value={formData.checkOutTime} onChange={handleChange} aria-label="Heure de check-out" className={inputClass} />
+          <textarea name="cancellationPolicy" value={formData.cancellationPolicy} onChange={handleChange} aria-label="Politique d’annulation" placeholder="Politique d’annulation" className={inputClass} />
+          <textarea name="petsPolicy" value={formData.petsPolicy} onChange={handleChange} aria-label="Politique animaux" placeholder="Animaux" className={inputClass} />
+          <textarea name="childrenPolicy" value={formData.childrenPolicy} onChange={handleChange} aria-label="Politique enfants" placeholder="Enfants" className={inputClass} />
+          <textarea name="visitorsPolicy" value={formData.visitorsPolicy} onChange={handleChange} aria-label="Politique visiteurs" placeholder="Visiteurs" className={inputClass} />
+          <textarea name="accessibilityPolicy" value={formData.accessibilityPolicy} onChange={handleChange} aria-label="Accessibilité" placeholder="Accessibilité" className={inputClass} />
         </div>
       </div>
 

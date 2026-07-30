@@ -78,7 +78,7 @@ const NAV_SECTIONS = [
       // Sprint B2 — Catégories de chambres et Tarifs sont gérés PAR
       // établissement (depuis sa fiche, /dashboard/hotels/[hotelId]/...),
       // jamais comme des listes plates globales : un seul lien de nav.
-      { to: '/dashboard/hotels',                end: true,  Icon: Building2, label: 'Établissements',         accent: GOLD, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/etablissements',        end: true,  Icon: Building2, label: 'Établissements',         accent: GOLD, roles: [...ROLES_ALTIMMO, 'Proprietaire'] },
       { to: '/dashboard/hotel-reservations',    end: true,  Icon: Calendar,  label: 'Réservations hôtelières', accent: GOLD, roles: ROLES_ALTIMMO },
       // Sprint D — vue globale des chambres (libre/occupée/nettoyage/
       // inspection), tous établissements confondus (mission §18).
@@ -200,11 +200,12 @@ const AdminDashboard = ({ children }) => {
         }
       }
     };
+    const menuButton = menuButtonRef.current;
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', handleKeyDown);
-      menuButtonRef.current?.focus();
+      menuButton?.focus();
     };
   }, [sidebarOpen]);
 

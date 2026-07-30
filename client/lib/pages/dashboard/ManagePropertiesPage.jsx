@@ -168,7 +168,7 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
     if (classification?.family === 'vente') return `/dashboard/sales?focus=${property._id}`;
     if (classification?.family === 'location') return `/dashboard/rentals?focus=${property._id}`;
     if (classification?.family === 'accommodation') return `/dashboard/hebergements?accommodationId=${classification.accommodationId}`;
-    if (classification?.family === 'hotel') return `/dashboard/hotels/${classification.hotelId}`;
+    if (classification?.family === 'hotel') return `/dashboard/etablissements/${classification.hotelId}`;
     return `/dashboard/properties?focus=${property._id}&classification=ambiguous`;
   };
 

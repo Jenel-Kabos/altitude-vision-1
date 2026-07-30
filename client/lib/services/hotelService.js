@@ -89,6 +89,17 @@ export const getHotelsAdmin = async (params = {}) => {
   return res.data.data; // { hotels, total, page, limit }
 };
 
+/** Portefeuille hôtelier validé. Les statuts de modération sont imposés par le serveur. */
+export const getHotelPortfolio = async (params = {}) => {
+  const res = await api.get('/hotels/portfolio', { params });
+  return res.data.data;
+};
+
+export const getHotelPortfolioDetail = async (id) => {
+  const res = await api.get(`/hotels/portfolio/${id}`);
+  return res.data.data;
+};
+
 // ── Catégories de chambres ──
 
 export const getRoomCategories = async (hotelId) => {

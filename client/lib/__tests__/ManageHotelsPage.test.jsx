@@ -1,84 +1,61 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { toast } from 'react-hot-toast';
 import ManageHotelsPage from '../pages/dashboard/ManageHotelsPage';
-import { getHotelsAdmin, reviewHotel } from '../services/hotelService';
-
-// Sprint B2 — dashboard admin "Établissements" : filtres par statut, actions
-// rapides (valider/rejeter/suspendre/réactiver) avec score de complétude.
+import { deactivateHotel, getHotelPortfolio } from '../services/hotelService';
 
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('next/link', () => ({ default: ({ children, href }) => <a href={href}>{children}</a> }));
-vi.mock('../services/hotelService', () => ({
-  getHotelsAdmin: vi.fn(),
-  reviewHotel: vi.fn(),
-}));
-vi.mock('../components/dashboard/HotelPropertyForm', () => ({ default: () => <div>FORMULAIRE HÔTEL TEST DATA</div> }));
+vi.mock('next/image', () => ({ default: ({ fill: _fill, ...props }) => <img {...props} /> }));
+vi.mock('../services/hotelService', () => ({ getHotelPortfolio: vi.fn(), deactivateHotel: vi.fn() }));
+vi.mock('../components/dashboard/HotelPropertyForm', () => ({ default: ({ onSuccess }) => <button onClick={() => onSuccess({ hotel: { publicationStatus: 'soumis' } })}>Soumettre le formulaire test</button> }));
 vi.mock('../services/dashboardAnalyticsService', () => ({ getDashboardAnalytics: vi.fn().mockResolvedValue({ kpis: {} }) }));
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { role: 'Admin' } }) }));
 
-const hotel = (overrides = {}) => ({
-  _id: 'HOTEL-1',
-  name: 'Hôtel Le Panorama',
-  publicationStatus: 'soumis',
-  property: { address: { city: 'Brazzaville' } },
-  completion: { score: 100, complete: true },
-  ...overrides,
-});
+const publishedHotel = {
+  _id: 'HOTEL-1', name: 'Altitude Hôtel', publicationStatus: 'publie', status: 'actif', active: true,
+  starRating: 4, totalRooms: 18, totalCapacity: 41, minNightlyRate: 35000,
+  property: { title: 'Altitude Hôtel', images: [], address: { city: 'Brazzaville', arrondissement: 'Centre-ville' }, statusAdmin: 'Validée' },
+  operationalStats: { totalRooms: 18, availableRooms: 12, occupiedRooms: 6, occupancyRate: 33.33 },
+};
 
-describe('ManageHotelsPage — Sprint B2 (dashboard admin) — TEST DATA', () => {
+describe('ManageHotelsPage — portefeuille hôtelier validé', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getHotelsAdmin.mockResolvedValue({ hotels: [hotel()], total: 1, page: 1, limit: 20 });
+    getHotelPortfolio.mockResolvedValue({ hotels: [publishedHotel], total: 1, page: 1, limit: 12 });
+    window.confirm = vi.fn(() => true);
   });
 
-  test('affiche les hôtels retournés avec leur statut', async () => {
+  test('affiche les cartes opérationnelles reçues du portefeuille serveur', async () => {
     render(<ManageHotelsPage />);
-    expect(await screen.findByText('Hôtel Le Panorama')).toBeInTheDocument();
-    expect(screen.getAllByText('En attente').length).toBeGreaterThan(0);
+    expect(await screen.findByText('Altitude Hôtel')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Voir' })).toHaveAttribute('href', '/dashboard/etablissements/HOTEL-1');
   });
 
-  test('Ajouter un hôtel ouvre exclusivement HotelPropertyForm', async () => {
+  test('ne propose aucune action de modération', async () => {
     render(<ManageHotelsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter un hôtel' }));
-    expect(screen.getByText('FORMULAIRE HÔTEL TEST DATA')).toBeInTheDocument();
+    await screen.findByText('Altitude Hôtel');
+    ['Valider', 'Approuver', 'Rejeter', 'Suspendre'].forEach((name) => expect(screen.queryByRole('button', { name })).not.toBeInTheDocument());
   });
 
-  test('cliquer sur un onglet de statut relance la requête avec le bon filtre', async () => {
+  test('recherche via le seul endpoint portefeuille sans statut de modération', async () => {
     render(<ManageHotelsPage />);
-    await screen.findByText('Hôtel Le Panorama');
-    fireEvent.click(screen.getByRole('button', { name: 'Publié' }));
-    await waitFor(() => expect(getHotelsAdmin).toHaveBeenCalledWith(expect.objectContaining({ status: 'publie' })));
+    fireEvent.change(await screen.findByLabelText('Rechercher un établissement'), { target: { value: 'Altitude' } });
+    await waitFor(() => expect(getHotelPortfolio).toHaveBeenCalledWith(expect.objectContaining({ search: 'Altitude' })));
+    expect(getHotelPortfolio.mock.calls.flatMap(([params]) => Object.keys(params))).not.toContain('status');
   });
 
-  test('valider un hôtel soumis appelle reviewHotel("validate")', async () => {
-    reviewHotel.mockResolvedValue({});
+  test('l’ajout annonce le passage obligatoire par Modération Hôtellerie', async () => {
     render(<ManageHotelsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Valider' }));
-    await waitFor(() => expect(reviewHotel).toHaveBeenCalledWith('HOTEL-1', 'validate', {}));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter un établissement' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Soumettre le formulaire test' }));
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Modération Hôtellerie'));
   });
 
-  test("un hôtel incomplet ne peut pas être validé — l'API renvoie le score", async () => {
-    reviewHotel.mockRejectedValue({ response: { data: { completion: { score: 60 } } } });
+  test('archive via le cycle de vie hôtelier et retire ensuite la carte', async () => {
+    deactivateHotel.mockResolvedValue({});
     render(<ManageHotelsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Valider' }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('60%')));
-  });
-
-  test('suspendre un hôtel publié exige un motif', async () => {
-    getHotelsAdmin.mockResolvedValue({ hotels: [hotel({ publicationStatus: 'publie' })], total: 1, page: 1, limit: 20 });
-    reviewHotel.mockResolvedValue({});
-    render(<ManageHotelsPage />);
-    const input = await screen.findByPlaceholderText('Motif de suspension');
-    fireEvent.change(input, { target: { value: 'Signalement' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Suspendre' }));
-    await waitFor(() => expect(reviewHotel).toHaveBeenCalledWith('HOTEL-1', 'suspend', { reason: 'Signalement' }));
-  });
-
-  test('un hôtel suspendu propose "Réactiver"', async () => {
-    getHotelsAdmin.mockResolvedValue({ hotels: [hotel({ publicationStatus: 'suspendu', suspensionReason: 'Litige' })], total: 1, page: 1, limit: 20 });
-    reviewHotel.mockResolvedValue({});
-    render(<ManageHotelsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Réactiver' }));
-    await waitFor(() => expect(reviewHotel).toHaveBeenCalledWith('HOTEL-1', 'unsuspend', {}));
-    expect(screen.getByText(/Litige/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Archiver' }));
+    await waitFor(() => expect(deactivateHotel).toHaveBeenCalledWith('HOTEL-1'));
   });
 });

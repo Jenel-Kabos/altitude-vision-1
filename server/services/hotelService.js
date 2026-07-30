@@ -316,9 +316,44 @@ async function listHotelsForAdmin({ status, search, sort, page = 1, limit = 20, 
   return { hotels: paged, total, page: Number(page) || 1, limit: Number(limit) || 20 };
 }
 
+/**
+ * Portefeuille exploitable "Établissements".
+ *
+ * Contrairement à listHotelsForAdmin (outil de modération historique), ce
+ * filtre n'accepte aucun statut venant du client : la publication validée et
+ * l'activation opérationnelle sont des invariants serveur.
+ */
+async function listValidatedHotelPortfolio({ search, city, district, starRating, sort, page = 1, limit = 20, hotelIds }) {
+  const query = {
+    publicationStatus: 'publie',
+    status: 'actif',
+    active: { $ne: false },
+  };
+  if (hotelIds) query._id = { $in: hotelIds };
+  if (starRating !== undefined && starRating !== '') query.starRating = Number(starRating);
+
+  const propertyMatch = {
+    statusAdmin: 'Validée',
+    availability: 'Disponible',
+  };
+  if (search) propertyMatch.title = new RegExp(escapeRegex(search), 'i');
+  if (city) propertyMatch['address.city'] = new RegExp(`^${escapeRegex(city)}$`, 'i');
+  if (district) propertyMatch['address.arrondissement'] = new RegExp(`^${escapeRegex(district)}$`, 'i');
+
+  const sortMap = { recent: { updatedAt: -1 }, ancien: { updatedAt: 1 }, nom: { name: 1 } };
+  const hotels = await Hotel.find(query)
+    .populate({ path: 'property', select: 'title images address owner price statusAdmin availability updatedAt', match: propertyMatch })
+    .sort(sortMap[sort] || sortMap.recent);
+  const eligible = hotels.filter((hotel) => hotel.property);
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+  const start = (safePage - 1) * safeLimit;
+  return { hotels: eligible.slice(start, start + safeLimit), total: eligible.length, page: safePage, limit: safeLimit };
+}
+
 module.exports = {
   computeHotelCompletionScore, syncLinkedAccommodations, resyncLinkedAccommodations,
-  createFullHotel, updateFullHotel, duplicateHotel, deleteHotel, listHotelsForAdmin,
+  createFullHotel, updateFullHotel, duplicateHotel, deleteHotel, listHotelsForAdmin, listValidatedHotelPortfolio,
   ensureManagerGovernanceAtomic,
   HOTEL_COMPLETION_WEIGHTS,
 };
