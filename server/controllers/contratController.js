@@ -86,6 +86,17 @@ exports.getOne = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
+    if (!req.body?.bien || !['location', 'vente'].includes(req.body?.type)) {
+      return res.status(400).json({ status: 'fail', code: 'INVALID_CONTRACT_INPUT', message: 'Le bien et le type de contrat sont requis.' });
+    }
+    const property = await Property.findById(req.body.bien).select('status statusAdmin availability owner price');
+    if (!property) return res.status(404).json({ status: 'fail', code: 'PROPERTY_NOT_FOUND', message: 'Bien introuvable.' });
+    if (property.status !== req.body.type) {
+      return res.status(409).json({ status: 'fail', code: 'CONTRACT_TYPE_MISMATCH', message: 'Le type de contrat ne correspond pas au bien.' });
+    }
+    if (property.statusAdmin !== 'Validée' || property.availability !== 'Disponible') {
+      return res.status(409).json({ status: 'fail', code: 'PROPERTY_NOT_AVAILABLE', message: 'Ce bien ne peut plus faire l’objet d’un nouveau contrat.' });
+    }
     const c = await Contrat.create(req.body);
 
     if (c.type === 'location') {
@@ -122,6 +133,9 @@ exports.create = async (req, res) => {
       req,
     });
   } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(409).json({ status: 'fail', code: 'PROPERTY_CONTRACT_ALREADY_OPEN', message: 'Un contrat en attente ou actif existe déjà pour ce bien.' });
+    }
     res.status(400).json({ status: 'error', message: err.message });
   }
 };
@@ -165,8 +179,20 @@ exports.update = async (req, res) => {
 
 exports.delete = async (req, res) => {
   try {
-    const c = await Contrat.findByIdAndDelete(req.params.id);
+    const c = await Contrat.findById(req.params.id);
     if (!c) return res.status(404).json({ status: 'error', message: 'Contrat introuvable' });
+    const historicalPayment = await Paiement.findOne({
+      contrat: c._id,
+      $or: [
+        { statut: { $in: ['payé', 'partiel'] } },
+        { montantRecu: { $gt: 0 } },
+        { datePaiement: { $ne: null } },
+        { reference: { $nin: [null, ''] } },
+      ],
+    }).select('_id');
+    if (historicalPayment || (c.documents?.length || 0) > 0) {
+      return res.status(409).json({ status: 'fail', code: 'CONTRACT_HISTORY_IMMUTABLE', message: 'Ce contrat possède un historique financier ou documentaire et doit être archivé, pas supprimé.' });
+    }
     if (c.type === 'location' && c.bien) {
       const rental = await RentalManagement.findOne({ property: c.bien?._id || c.bien });
       if (rental?.activeLease?.toString() === c._id.toString()) {
@@ -177,8 +203,9 @@ exports.delete = async (req, res) => {
         });
       }
     }
-    // Supprimer les paiements associés
+    // Seules des échéances sans encaissement peuvent encore exister ici.
     await Paiement.deleteMany({ contrat: req.params.id });
+    await Contrat.deleteOne({ _id: c._id });
     res.json({ status: 'success', message: 'Contrat et paiements supprimés' });
     logAction({
       action: 'Contrat supprimé',

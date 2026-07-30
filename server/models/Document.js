@@ -58,6 +58,7 @@ const documentSchema = new mongoose.Schema(
     issueDate: { type: Date, default: Date.now },
     dueDate: { type: Date }, // Relevant for invoices
     notes: String,
+    businessOperationKey: { type: String, trim: true, maxlength: 200 },
   },
   {
     timestamps: true,
@@ -66,6 +67,7 @@ const documentSchema = new mongoose.Schema(
 
 // This plugin will add a 'docNumber' field that auto-increments
 documentSchema.plugin(AutoIncrement, { inc_field: 'docNumber' });
+documentSchema.index({ businessOperationKey: 1 }, { unique: true, partialFilterExpression: { businessOperationKey: { $type: 'string' } } });
 
 const Document = mongoose.model('Document', documentSchema);
 

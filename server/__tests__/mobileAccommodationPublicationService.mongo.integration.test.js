@@ -131,7 +131,7 @@ describe('createFullMobileAccommodation — établissement hôtelier professionn
     const user = await makeUser();
     const payload = hotelPayload({ roomCategories: [{ ...hotelPayload().roomCategories[0], quantity: 0 }] });
     await expect(createFullMobileAccommodation({ user, payload, publicationRequestId: `hotel-invalid-${Date.now()}` }))
-      .rejects.toMatchObject({ statusCode: 400 });
+      .rejects.toMatchObject({ statusCode: 422 });
     expect(await Promise.all([Property.countDocuments(), Accommodation.countDocuments(), Hotel.countDocuments(), RoomCategory.countDocuments(), RatePlan.countDocuments()])).toEqual([0, 0, 0, 0, 0]);
   });
 

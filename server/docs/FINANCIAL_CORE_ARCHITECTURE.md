@@ -59,10 +59,10 @@ flowchart LR
 
 | Moyen | Implémentation | État | Risques confirmés |
 |---|---|---|---|
-| YabetooPay immobilier | `paiementTransactionController`, `yabetooService` | Actif | webhook sans validation de signature annoncée en sandbox ; idempotence fournisseur incomplète ; ownership incomplet sur certains endpoints |
+| YabetooPay immobilier | `paiementTransactionController`, `yabetooService` | Actif | signature HMAC/timestamp, ownership et registre persistant `FinancialProviderEvent` vérifiés |
 | YabetooPay visite | `visiteController`, `yabetooService` | Actif | données de paiement embarquées dans `Visite`; aucun registre commun |
 | CinetPay locatif/générique | `cinetpayController` | Actif/legacy ambigu | montant et transaction fournis par le client ; mapping direct vers `Paiement.reference` |
-| CinetPay immobilier | webhook dans `paiementTransactionController` | Legacy conservé | secret facultatif ; événement non persisté avant traitement |
+| CinetPay immobilier | webhook dans `paiementTransactionController` | Legacy conservé | `x-token` HMAC obligatoire ; événement réservé avant traitement et rejouable sans rétrogradation d’état |
 | Virement | `PaiementTransaction.preuvePaiement` | Actif | middleware générique jusqu'à 100 Mo et MIME trop larges pour une preuve financière |
 | Espèces/chèque | saisie staff | Actif | confirmation manuelle sans allocation ni séparation des pouvoirs |
 
@@ -76,9 +76,6 @@ Zoho est déjà accessible via `zohoMailService`, `emailService`, `utils/email` 
 
 ### Critiques
 
-- webhook Yabetoo sans signature vérifiée et CinetPay conditionné à un secret facultatif ;
-- absence de stockage/idempotence atomique des événements fournisseur ;
-- endpoints de paiements immobiliers authentifiés mais sans ownership systématique ;
 - aucune source unique pour solde, allocation et remboursement.
 
 ### Élevés

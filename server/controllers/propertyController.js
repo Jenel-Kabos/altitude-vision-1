@@ -18,6 +18,8 @@ const { buildPropertyMongoFilter } = require('../services/propertyFilterService'
 // (SalePropertyForm/RentalPropertyForm), même convention que `accommodation`.
 const SaleManagement = require('../models/SaleManagement');
 const RentalManagement = require('../models/RentalManagement');
+const Transaction = require('../models/Transaction');
+const Contrat = require('../models/Contrat');
 
 /**
  * Projection publique de SaleManagement — jamais le document complet côté
@@ -542,9 +544,13 @@ const getProperty = asyncHandler(async (req, res) => {
   const isOwner = req.user && property.owner &&
     property.owner._id.toString() === req.user.id.toString();
 
-  if (property.statusAdmin !== 'Validée' && !isAdmin && !isOwner) {
+  // Les documents historiques hydratés par Mongoose reçoivent la valeur par
+  // défaut "Disponible" ; le test explicite conserve néanmoins la lecture
+  // de rares projections legacy où le champ est absent.
+  const explicitlyUnavailable = property.availability && property.availability !== 'Disponible';
+  if ((property.statusAdmin !== 'Validée' || explicitlyUnavailable) && !isAdmin && !isOwner) {
     res.status(403);
-    throw new Error('Cette propriété est en attente de validation.');
+    throw new Error('Cette propriété n’est pas disponible publiquement.');
   }
 
   // Hébergement : gate additionnel — voir accommodationService.isPubliclyVisible.
@@ -709,6 +715,13 @@ const updateProperty = asyncHandler(async (req, res) => {
   const updateData = { ...req.body };
   excludedFields.forEach(field => delete updateData[field]);
   delete updateData.statusAdmin; // toujours exclu du body
+  // Les champs de cycle de vie sont pilotés par la modération, la gestion
+  // locative ou la finalisation financière. Un propriétaire ne peut jamais
+  // les forcer via le formulaire générique.
+  if (!isAdmin) {
+    ['status', 'availability', 'isPublished', 'pole', 'agent', 'recommande']
+      .forEach((field) => delete updateData[field]);
+  }
 
   if (updateData.honoraires !== undefined) {
     const amount = parseNonNegativeAmount(updateData.honoraires, null);
@@ -925,6 +938,15 @@ const deleteProperty = asyncHandler(async (req, res) => {
   if (!isAdmin && !isOwner) {
     res.status(403);
     throw new Error('Vous ne pouvez supprimer que vos propres biens.');
+  }
+
+  const [transaction, contract] = await Promise.all([
+    Transaction.exists({ property: property._id }),
+    Contrat.exists({ bien: property._id }),
+  ]);
+  if (transaction || contract) {
+    res.status(409);
+    throw new Error('Ce bien possède un historique transactionnel ou contractuel et doit être archivé, pas supprimé.');
   }
 
   await Property.findByIdAndDelete(req.params.id);

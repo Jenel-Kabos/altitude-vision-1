@@ -53,7 +53,7 @@ describe('producteurs réels de notifications locatives GL-B3.1', () => {
   });
   test('validation paiement réussie → destinataire résolu par contrat et événement payé', async () => {
     Paiement.findById.mockResolvedValue({_id:'PAY-3',contrat:contract._id,montant:100,penaliteAppliquee:false});
-    Paiement.findByIdAndUpdate.mockResolvedValue({_id:'PAY-3',contrat:contract._id,mois:3,annee:2026,statut:'payé'});
+    Paiement.findOneAndUpdate.mockResolvedValue({_id:'PAY-3',contrat:contract._id,mois:3,annee:2026,statut:'payé'});
     await paiementController.marquerPaye({params:{id:'PAY-3'},body:{montantRecu:100},user:{id:'STAFF'}},response());
     expect(tenantNotifications.notifyContractTenant).toHaveBeenCalledWith(contract._id,expect.objectContaining({type:'tenant_payment_recorded',dedupeKey:'tenant:payment:PAY-3:payé'}));
   });

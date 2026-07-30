@@ -39,6 +39,17 @@ const transactionSchema = new Schema(
     },
 
     linkedInvoice: { type: ObjectId, ref: 'Document' },
+    finalization: {
+      operationKey: { type: String, maxlength: 200 },
+      payloadHash: String,
+      status: { type: String, enum: ['processing', 'completed', 'failed'] },
+      startedAt: Date,
+      completedAt: Date,
+      attemptCount: { type: Number, default: 0 },
+      invoice: { type: ObjectId, ref: 'Document' },
+      previousPropertyState: { availability: String, isPublished: Boolean },
+      lastError: String,
+    },
     paiements:     [{ type: ObjectId, ref: 'PaiementTransaction' }],
 
     transactionDate: { type: Date, default: Date.now },
@@ -53,5 +64,20 @@ const transactionSchema = new Schema(
 
 transactionSchema.index({ client: 1, status: 1 });
 transactionSchema.index({ property: 1 });
+// Une annonce ne peut porter qu'un seul dossier susceptible d'aboutir. Cet
+// index est le verrou de concurrence final : deux contrôleurs ou deux
+// instances serveur ne peuvent pas ouvrir/finaliser deux ventes ou locations
+// incompatibles après avoir toutes deux lu un état encore disponible.
+transactionSchema.index(
+  { property: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: { $in: ['En cours', 'Paiement en attente', 'Réussie', 'Litigée'] },
+    },
+    name: 'one_active_real_estate_transaction_per_property',
+  },
+);
+transactionSchema.index({ 'finalization.operationKey': 1 }, { unique: true, partialFilterExpression: { 'finalization.operationKey': { $type: 'string' } } });
 
 module.exports = mongoose.model('Transaction', transactionSchema);

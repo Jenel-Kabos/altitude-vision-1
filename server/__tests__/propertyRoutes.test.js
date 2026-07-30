@@ -6,6 +6,8 @@ jest.mock('../models/User');
 jest.mock('../models/Accommodation');
 jest.mock('../models/SaleManagement');
 jest.mock('../models/RentalManagement');
+jest.mock('../models/Transaction');
+jest.mock('../models/Contrat');
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
@@ -146,6 +148,18 @@ describe('GET /api/properties/:id', () => {
     Property.findByIdAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(null) });
     const res = await request(app).get('/api/properties/507f191e810c19729de860ea');
     expect(res.statusCode).toBe(404);
+  });
+
+  test('403 — un bien vendu ou loué reste inaccessible par URL publique directe', async () => {
+    const document = {
+      _id: '507f191e810c19729de860ea', title: 'TEST DATA CLOSED PROPERTY',
+      statusAdmin: 'Validée', availability: 'Vendu', owner: { _id: '507f1f77bcf86cd799439012' },
+    };
+    Property.findByIdAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(document) });
+
+    const res = await request(app).get('/api/properties/507f191e810c19729de860ea');
+
+    expect(res.statusCode).toBe(403);
   });
 
   test('200 — projection publique retire documents et coordonnées privées propriétaire', async () => {

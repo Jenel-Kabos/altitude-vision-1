@@ -1,9 +1,10 @@
 const Transaction = require('../models/Transaction');
-const Property    = require('../models/Property');
-const Document    = require('../models/Document');
-const { notify, notifyStaff } = require('../services/notificationService');
+const Property = require('../models/Property');
+const User = require('../models/User');
+const { notify } = require('../services/notificationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { ALL_STAFF } = require('../utils/roles');
+const { finalizeRealEstateTransaction } = require('../services/finance/realEstateTransactionFinalizationService');
 
 const calcCommission = (finalAmount, tauxPercent = 10, hasSpecial = false) => {
   const total       = Math.round(finalAmount * (tauxPercent / 100));
@@ -17,17 +18,38 @@ exports.createTransaction = async (req, res) => {
   try {
     const { propertyId, clientId, finalAmount, transactionType, tauxCommission = 10, notes } = req.body;
 
-    if (!propertyId || !clientId || !finalAmount || !transactionType) {
+    if (!propertyId || !clientId || finalAmount === undefined || !transactionType) {
       return res.status(400).json({ status: 'fail', message: 'propertyId, clientId, finalAmount et transactionType requis.' });
     }
 
-    const commission = calcCommission(finalAmount, tauxCommission);
+    const amount = Number(finalAmount);
+    if (!Number.isFinite(amount) || amount <= 0 || !['vente', 'location'].includes(transactionType)) {
+      return res.status(400).json({ status: 'fail', code: 'INVALID_TRANSACTION_INPUT', message: 'Type de transaction ou montant invalide.' });
+    }
+
+    const [property, client] = await Promise.all([
+      Property.findById(propertyId).select('status statusAdmin availability owner price'),
+      User.findById(clientId).select('_id'),
+    ]);
+    if (!property) return res.status(404).json({ status: 'fail', code: 'PROPERTY_NOT_FOUND', message: 'Bien introuvable.' });
+    if (!client) return res.status(404).json({ status: 'fail', code: 'CLIENT_NOT_FOUND', message: 'Client introuvable.' });
+    if (property.status !== transactionType) {
+      return res.status(409).json({ status: 'fail', code: 'TRANSACTION_TYPE_MISMATCH', message: 'Le type de transaction ne correspond pas au bien.' });
+    }
+    if (property.statusAdmin !== 'Validée' || property.availability !== 'Disponible') {
+      return res.status(409).json({ status: 'fail', code: 'PROPERTY_NOT_AVAILABLE', message: 'Ce bien ne peut plus faire l’objet d’une transaction.' });
+    }
+    if (String(property.owner) === String(clientId)) {
+      return res.status(409).json({ status: 'fail', code: 'OWNER_CANNOT_BE_CLIENT', message: 'Le propriétaire ne peut pas être le client de sa propre transaction.' });
+    }
+
+    const commission = calcCommission(amount, tauxCommission);
 
     const transaction = await Transaction.create({
       property: propertyId,
       client:   clientId,
       agent:    req.user.id,
-      finalAmount,
+      finalAmount: amount,
       transactionType,
       commission,
       notes,
@@ -50,6 +72,9 @@ exports.createTransaction = async (req, res) => {
 
     res.status(201).json({ status: 'success', data: { transaction } });
   } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(409).json({ status: 'fail', code: 'PROPERTY_TRANSACTION_ALREADY_OPEN', message: 'Une transaction active ou finalisée existe déjà pour ce bien.' });
+    }
     res.status(400).json({ status: 'fail', message: err.message });
   }
 };
@@ -57,12 +82,14 @@ exports.createTransaction = async (req, res) => {
 // GET /api/transactions
 exports.getAllTransactions = async (req, res) => {
   try {
-    const { status, transactionType, page = 1, limit = 20 } = req.query;
+    const { status, transactionType } = req.query;
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
     const filter = {};
     if (status)          filter.status          = status;
     if (transactionType) filter.transactionType = transactionType;
 
-    const skip  = (Number(page) - 1) * Number(limit);
+    const skip  = (page - 1) * limit;
     const total = await Transaction.countDocuments(filter);
     const transactions = await Transaction.find(filter)
       .populate('property', 'title images price address')
@@ -70,12 +97,12 @@ exports.getAllTransactions = async (req, res) => {
       .populate('agent',    'name photo')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(Number(limit));
+      .limit(limit);
 
     res.json({
       status: 'success',
       results: transactions.length,
-      pagination: { total, page: Number(page), pages: Math.ceil(total / Number(limit)) },
+      pagination: { total, page, pages: Math.ceil(total / limit) },
       data: { transactions },
     });
   } catch (err) {
@@ -90,7 +117,8 @@ exports.getMyTransactions = async (req, res) => {
       .populate('property', 'title images price type availability')
       .populate('agent',    'name photo')
       .populate({ path: 'paiements', select: 'methode statut montant createdAt provider' })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .limit(200);
 
     res.json({ status: 'success', results: transactions.length, data: { transactions } });
   } catch (err) {
@@ -122,54 +150,21 @@ exports.getTransaction = async (req, res) => {
 // POST /api/transactions/:id/finalize
 exports.finalizeTransaction = async (req, res) => {
   try {
-    const tx = await Transaction.findById(req.params.id).populate('property');
-    if (!tx) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
-    if (tx.status === 'Réussie') return res.status(400).json({ status: 'fail', message: 'Déjà finalisée.' });
-    if (tx.status === 'Annulée') return res.status(400).json({ status: 'fail', message: 'Transaction annulée — impossible de finaliser.' });
+    const result = await finalizeRealEstateTransaction({ transactionId: req.params.id, actorId: req.user.id || req.user._id, tauxCommission: req.body.tauxCommission, transactionMode: 'auto' });
+    const tx = await Transaction.findById(result.transaction._id).populate('property');
 
-    const { tauxCommission } = req.body;
-    const commission = calcCommission(tx.finalAmount, tauxCommission || tx.commission?.taux || 10, tx.property?.hasSpecialCommission);
-
-    await Property.findByIdAndUpdate(tx.property._id, {
-      availability: tx.transactionType === 'vente' ? 'Vendu' : 'Loué',
-      isPublished: false,
-    });
-
-    const invoice = await Document.create({
-      type:            'Facture',
-      status:          'Envoyé',
-      client:          tx.client,
-      createdBy:       req.user.id,
-      relatedProperty: tx.property._id,
-      items: [{
-        description: `Commission agence — ${tx.transactionType} de "${tx.property.title}"`,
-        quantity:    1,
-        unitPrice:   commission.total,
-        total:       commission.total,
-      }],
-      subTotal:    commission.total,
-      totalAmount: commission.agencyNet,
-      dueDate:     new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    });
-
-    tx.status        = 'Réussie';
-    tx.commission    = commission;
-    tx.paymentStatus = 'confirmé';
-    tx.linkedInvoice = invoice._id;
-    await tx.save();
-
-    notify({ recipient: tx.client,
+    if (!result.idempotent) notify({ recipient: tx.client,
       type:  'transaction_finalized',
       title: 'Transaction finalisée 🎉',
       body:  `Félicitations ! Votre ${tx.transactionType} de "${tx.property.title}" est officiellement finalisée.`,
       data:  { screen: 'Transactions', transactionId: tx._id.toString() },
     }).catch(() => {});
 
-    logAction({ action: 'Transaction finalisée', description: `${tx.transactionType} "${tx.property.title}"`, module: 'Altimmo', typeAction: 'VALIDATION', auteur: buildAuteur(req.user), cible: { id: String(tx._id), type: 'Transaction', nom: tx.property.title }, req });
+    if (!result.idempotent) logAction({ action: 'Transaction finalisée', description: `${tx.transactionType} "${tx.property.title}"`, module: 'Altimmo', typeAction: 'VALIDATION', auteur: buildAuteur(req.user), cible: { id: String(tx._id), type: 'Transaction', nom: tx.property.title }, req });
 
-    res.json({ status: 'success', data: { transaction: tx } });
+    res.json({ status: 'success', data: { transaction: tx, invoice: result.invoice, idempotent: result.idempotent } });
   } catch (err) {
-    res.status(500).json({ status: 'error', message: err.message });
+    res.status(err.statusCode || 500).json({ status: 'error', code: err.code, message: err.message });
   }
 };
 

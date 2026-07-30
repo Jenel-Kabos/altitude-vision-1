@@ -73,7 +73,7 @@ const hotelPayload = (accommodationType = 'hotel') => basePayload({
   accommodation: {
     accommodationType, capacity: { maxAdults: 80, maxChildren: 0 },
     checkInTime: '14:00', checkOutTime: '11:00',
-    hotel: { name: 'Hôtel Panorama', starRating: 3, hasReception: true, hotelServices: { wifi: true } },
+    hotel: { name: 'Hôtel Panorama', description: 'Établissement hôtelier au centre-ville.', phone: '+242060000000', starRating: 3, hasReception: true, hotelServices: { wifi: true, reception24h: true } },
   },
   ratePlan: { amount: 45000 },
   roomCategories: [],
@@ -137,24 +137,24 @@ describe('POST /api/accommodations/mobile/full', () => {
     ['quantité nulle', [{ ...professionalHotelPayload().roomCategories[0], quantity: 0 }], 'roomCategories.0.quantity'],
     ['tarif absent', [{ ...professionalHotelPayload().roomCategories[0], ratePlans: [] }], 'roomCategories.0.ratePlans'],
     ['codes dupliqués', [professionalHotelPayload().roomCategories[0], { ...professionalHotelPayload().roomCategories[1], code: 'STD' }], 'roomCategories.1.code'],
-  ])('400 — hôtel refusé : %s', async (_label, roomCategories, field) => {
+  ])('422 — hôtel refusé : %s', async (_label, roomCategories, field) => {
     const user = await makeUser();
     const res = await request(app).post('/api/accommodations/mobile/full')
       .set('Authorization', `Bearer ${signToken(user._id)}`)
       .send({ ...professionalHotelPayload(), roomCategories });
-    expect(res.statusCode).toBe(400);
-    expect(res.body.fields).toContain(field);
+    expect(res.statusCode).toBe(422);
+    expect(res.body.missingFields.map((item) => item.field)).toContain(field);
     expect(await Hotel.countDocuments()).toBe(0);
   });
 
-  test('400 — Property.prix divergent du tarif minimum', async () => {
+  test('422 — Property.prix divergent du tarif minimum', async () => {
     const user = await makeUser();
     const payload = professionalHotelPayload();
     payload.property.prix = 99999;
     const res = await request(app).post('/api/accommodations/mobile/full')
       .set('Authorization', `Bearer ${signToken(user._id)}`).send(payload);
-    expect(res.statusCode).toBe(400);
-    expect(res.body.fields).toContain('property.prix/minNightlyRate');
+    expect(res.statusCode).toBe(422);
+    expect(res.body.missingFields.map((item) => item.field)).toContain('property.prix/minNightlyRate');
   });
 
   test('400 — famille et accommodationType incohérents : rollback avant transaction', async () => {

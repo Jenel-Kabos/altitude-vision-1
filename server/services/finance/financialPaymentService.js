@@ -8,18 +8,35 @@ const { runFinancialOperation } = require('./financialTransactionService');
 
 const inSession = (query, session) => (session ? query.session(session) : query);
 
-async function createManualPayment({ data, actor }) {
+async function createManualPaymentCore({ data, actor, businessOperationKey, session }) {
   const amountMinor = assertAmountMinor(data.amountMinor);
   assertCurrency(data.currency);
   const actorId = actor.id || actor._id;
-  const paymentReference = data.paymentReference || `PAY-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+  const requestedReference = data.paymentReference || '';
+  const operationKey = businessOperationKey || `manual-payment:${requestedReference || `${Date.now()}-${crypto.randomBytes(6).toString('hex')}`}`;
+  const payloadHash = hashPayload({ establishmentId: String(data.establishmentId), amountMinor, currency: data.currency, method: data.method, paymentReference: requestedReference, confirmed: data.confirmed === true, subjectType: data.subjectType, subjectId: String(data.subjectId || '') });
+  const existing = await inSession(FinancialPayment.findOne({ domain: 'hotel', establishmentId: data.establishmentId, businessOperationKey: operationKey }).select('+payloadHash'), session);
+  if (existing) {
+    if (existing.payloadHash !== payloadHash) fail('FINANCIAL_IDEMPOTENCY_CONFLICT', 'Cette clé d’idempotence a déjà été utilisée avec des données différentes.', 409);
+    return existing;
+  }
+  const paymentReference = requestedReference || `PAY-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
   const approved = data.confirmed === true;
-  const payment = await FinancialPayment.create({ domain: 'hotel', establishmentType: 'Hotel', establishmentId: data.establishmentId, paymentReference, status: approved ? 'succeeded' : 'pending', method: data.method, provider: 'manual', currency: data.currency, amountMinor, availableAmountMinor: amountMinor, payer: data.payer, subjectType: data.subjectType, subjectId: data.subjectId, receivedAt: new Date(), confirmedAt: approved ? new Date() : null, manualValidation: { status: approved ? 'approved' : 'pending', submittedBy: actorId, approvedBy: approved ? actorId : null, approvedAt: approved ? new Date() : null }, createdBy: actorId, confirmedBy: approved ? actorId : null });
+  let payment;
+  try {
+    [payment] = await FinancialPayment.create([{ domain: 'hotel', establishmentType: 'Hotel', establishmentId: data.establishmentId, paymentReference, status: approved ? 'succeeded' : 'pending', method: data.method, provider: 'manual', currency: data.currency, amountMinor, availableAmountMinor: amountMinor, payer: data.payer, subjectType: data.subjectType, subjectId: data.subjectId, receivedAt: new Date(), confirmedAt: approved ? new Date() : null, manualValidation: { status: approved ? 'approved' : 'pending', submittedBy: actorId, approvedBy: approved ? actorId : null, approvedAt: approved ? new Date() : null }, createdBy: actorId, confirmedBy: approved ? actorId : null, businessOperationKey: operationKey, payloadHash }], { session });
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+    const duplicate = await inSession(FinancialPayment.findOne({ domain: 'hotel', establishmentId: data.establishmentId, businessOperationKey: operationKey }).select('+payloadHash'), session);
+    if (duplicate?.payloadHash === payloadHash) return duplicate;
+    throw translateMongoDuplicate(error, 'FINANCIAL_IDEMPOTENCY_CONFLICT');
+  }
   const commonLedger = { domain: payment.domain, establishmentType: payment.establishmentType, establishmentId: payment.establishmentId, entityType: 'FinancialPayment', entityId: payment._id, actorType: 'user', actorId, amountMinor, currency: payment.currency };
-  await appendFinancialLedgerEntry({ ...commonLedger, eventType: 'payment.created', businessOperationKey: `payment:${payment._id}:created`, newState: { status: 'pending' } });
-  if (approved) await appendFinancialLedgerEntry({ ...commonLedger, eventType: 'payment.confirmed', businessOperationKey: `payment:${payment._id}:confirmed`, previousState: { status: 'pending' }, newState: { status: 'succeeded' } });
+  await appendFinancialLedgerEntry({ ...commonLedger, eventType: 'payment.created', businessOperationKey: `${operationKey}:created`, newState: { status: 'pending' } }, { session });
+  if (approved) await appendFinancialLedgerEntry({ ...commonLedger, eventType: 'payment.confirmed', businessOperationKey: `${operationKey}:confirmed`, previousState: { status: 'pending' }, newState: { status: 'succeeded' } }, { session });
   return payment;
 }
+async function createManualPayment(args) { return runFinancialOperation({ operationName: 'payment.manual.create', transactionMode: args.transactionMode || 'auto' }, ({ session }) => createManualPaymentCore({ ...args, session })); }
 
 async function createHotelPaymentCore({ data, actor, businessOperationKey, session }) {
   const actorId = actor.id || actor._id;

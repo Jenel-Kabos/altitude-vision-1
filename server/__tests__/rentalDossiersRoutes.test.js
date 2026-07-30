@@ -36,7 +36,10 @@ const User = require('../models/User');
 const ADMIN_ID = '507f1f77bcf86cd799439012';
 const GESTIONNAIRE_ID = '507f1f77bcf86cd799439044';
 const CLIENT_ID = '507f1f77bcf86cd799439033';
+const COLLAB_ID = '507f1f77bcf86cd799439055';
 const TENANT_ID = 'a07f1f77bcf86cd799439088';
+const PAYMENT_ID = 'b07f1f77bcf86cd799439077';
+const CONTRACT_ID = 'c07f1f77bcf86cd799439066';
 
 const makeToken = (id) => jwt.sign({ id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' });
 const fakeUser = (id, role) => ({ _id: id, id, name: 'Test User', email: 't@a.com', role, isActive: true, status: 'Actif', tokenVersion: 0 });
@@ -89,7 +92,7 @@ describe('GET /api/paiements — pagination optionnelle + GET /api/paiements/sta
 
   test('200 — sans page/limit, comportement inchangé (pas de champ total)', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
-    Paiement.find = jest.fn().mockReturnValue({ populate: jest.fn().mockReturnThis(), sort: jest.fn().mockResolvedValue([]) });
+    Paiement.find = jest.fn().mockReturnValue({ populate: jest.fn().mockReturnThis(), sort: jest.fn().mockReturnThis(), limit: jest.fn().mockResolvedValue([]) });
     const res = await request(app).get('/api/paiements').set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
     expect(res.statusCode).toBe(200);
     expect(res.body.data.total).toBeUndefined();
@@ -120,6 +123,63 @@ describe('GET /api/paiements — pagination optionnelle + GET /api/paiements/sta
     mockUserAuth(CLIENT_ID, 'Client');
     const res = await request(app).get('/api/paiements/stats').set('Authorization', `Bearer ${makeToken(CLIENT_ID)}`);
     expect(res.statusCode).toBe(403);
+  });
+});
+
+describe('Paiements locatifs — immutabilité et concurrence', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('409 — un paiement intégralement encaissé ne peut pas être supprimé', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Paiement.findById = jest.fn().mockResolvedValue({ _id: PAYMENT_ID, statut: 'payé', montantRecu: 100000 });
+    const res = await request(app).delete(`/api/paiements/${PAYMENT_ID}`).set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
+    expect(res.statusCode).toBe(409);
+    expect(res.body.code).toBe('PAYMENT_HISTORY_IMMUTABLE');
+    expect(Paiement.findOneAndDelete).not.toHaveBeenCalled();
+  });
+
+  test('403 — un collaborateur ne peut pas supprimer une échéance', async () => {
+    mockUserAuth(COLLAB_ID, 'Collaborateur');
+    const res = await request(app).delete(`/api/paiements/${PAYMENT_ID}`).set('Authorization', `Bearer ${makeToken(COLLAB_ID)}`);
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('un versement inférieur au loyer est enregistré comme partiel même sans pénalité', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const current = { _id: PAYMENT_ID, contrat: CONTRACT_ID, statut: 'impayé', montant: 100000, montantRecu: 0, penaliteAppliquee: false, mois: 7, annee: 2026 };
+    Paiement.findById = jest.fn().mockResolvedValue(current);
+    Paiement.findOneAndUpdate = jest.fn().mockResolvedValue({ ...current, statut: 'partiel', montantRecu: 40000 });
+    const res = await request(app).post(`/api/paiements/${PAYMENT_ID}/marquer-paye`).set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`).send({ montantRecu: 40000 });
+    expect(res.statusCode).toBe(200);
+    expect(Paiement.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: PAYMENT_ID, statut: 'impayé' }),
+      expect.objectContaining({ statut: 'partiel', montantRecu: 40000 }),
+      { new: true },
+    );
+  });
+
+  test('409 — une écriture concurrente ne peut pas écraser un encaissement', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Paiement.findById = jest.fn().mockResolvedValue({ _id: PAYMENT_ID, contrat: CONTRACT_ID, statut: 'impayé', montant: 100000, montantRecu: 0 });
+    Paiement.findOneAndUpdate = jest.fn().mockResolvedValue(null);
+    const res = await request(app).post(`/api/paiements/${PAYMENT_ID}/marquer-paye`).set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`).send({ montantRecu: 100000 });
+    expect(res.statusCode).toBe(409);
+    expect(res.body.code).toBe('PAYMENT_CONCURRENT_UPDATE');
+  });
+});
+
+describe('Contrats — protection de l’historique financier', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('409 — un contrat avec encaissement ne peut pas être supprimé', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Contrat.findById = jest.fn().mockResolvedValue({ _id: CONTRACT_ID, type: 'location', documents: [] });
+    Paiement.findOne = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: PAYMENT_ID }) });
+    const res = await request(app).delete(`/api/contrats/${CONTRACT_ID}`).set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
+    expect(res.statusCode).toBe(409);
+    expect(res.body.code).toBe('CONTRACT_HISTORY_IMMUTABLE');
+    expect(Contrat.deleteOne).not.toHaveBeenCalled();
+    expect(Paiement.deleteMany).not.toHaveBeenCalled();
   });
 });
 

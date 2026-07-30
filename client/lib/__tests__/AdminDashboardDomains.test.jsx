@@ -48,7 +48,7 @@ describe('AdminDashboard — domaines métier Altimmo (Sprint 0) — TEST DATA',
 
     // Sprint B2 — Catégories/Tarifs sont gérés PAR établissement (depuis sa
     // fiche), plus de lien de nav global "à plat" pour ces deux entrées.
-    expect(screen.getByRole('link', { name: /Établissements/i })).toHaveAttribute('href', '/dashboard/hotels');
+    expect(screen.getByRole('link', { name: /Établissements/i })).toHaveAttribute('href', '/dashboard/etablissements');
   });
 
   test("CommunityManager voit Immobilier/Hôtellerie mais pas Gestion locative (ROLES_GL exclu) ni Modération Hébergement (harmonisé sur ROLES_MODERATION)", async () => {

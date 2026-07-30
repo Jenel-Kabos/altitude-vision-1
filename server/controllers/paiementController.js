@@ -25,6 +25,7 @@ exports.getAll = async (req, res) => {
       })
       .sort({ annee: 1, mois: 1 });
     if (hasPagination) query = query.skip((page - 1) * limit).limit(limit);
+    else query = query.limit(200);
 
     const [paiements, total] = await Promise.all([
       query,
@@ -87,10 +88,20 @@ exports.getOne = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const p = await Paiement.findByIdAndUpdate(req.params.id, req.body, {
+    const current = await Paiement.findById(req.params.id);
+    if (!current) return res.status(404).json({ status: 'error', message: 'Paiement introuvable' });
+    if (current.statut === 'payé' || Number(current.montantRecu) > 0 || current.datePaiement || current.reference) {
+      return res.status(409).json({ status: 'fail', code: 'PAYMENT_HISTORY_IMMUTABLE', message: 'Un encaissement enregistré ne peut plus être modifié.' });
+    }
+    const allowed = ['notes', 'jourEcheance'];
+    const updates = Object.fromEntries(allowed.filter((field) => Object.prototype.hasOwnProperty.call(req.body, field)).map((field) => [field, req.body[field]]));
+    if (!Object.keys(updates).length) {
+      return res.status(422).json({ status: 'fail', message: 'Aucun champ modifiable fourni.' });
+    }
+    const p = await Paiement.findOneAndUpdate({ _id: current._id, statut: current.statut, montantRecu: current.montantRecu }, updates, {
       new: true, runValidators: true,
     });
-    if (!p) return res.status(404).json({ status: 'error', message: 'Paiement introuvable' });
+    if (!p) return res.status(409).json({ status: 'fail', code: 'PAYMENT_CONCURRENT_UPDATE', message: 'Cette échéance vient d’être modifiée.' });
     res.json({ status: 'success', data: { paiement: p } });
   } catch (err) {
     res.status(400).json({ status: 'error', message: err.message });
@@ -99,7 +110,12 @@ exports.update = async (req, res) => {
 
 exports.delete = async (req, res) => {
   try {
-    const p = await Paiement.findByIdAndDelete(req.params.id);
+    const current = await Paiement.findById(req.params.id);
+    if (!current) return res.status(404).json({ status: 'error', message: 'Paiement introuvable' });
+    if (current.statut === 'payé' || current.statut === 'partiel' || Number(current.montantRecu) > 0 || current.datePaiement || current.reference) {
+      return res.status(409).json({ status: 'fail', code: 'PAYMENT_HISTORY_IMMUTABLE', message: 'Un encaissement historique ne peut pas être supprimé.' });
+    }
+    const p = await Paiement.findOneAndDelete({ _id: current._id, statut: { $in: ['impayé', 'en_retard'] }, montantRecu: { $in: [null, 0] } });
     if (!p) return res.status(404).json({ status: 'error', message: 'Paiement introuvable' });
     res.json({ status: 'success', message: 'Paiement supprimé' });
   } catch (err) {
@@ -114,26 +130,36 @@ exports.marquerPaye = async (req, res) => {
     if (!p) return res.status(404).json({ status: 'error', message: 'Paiement introuvable' });
 
     const { montantRecu, datePaiement, modePaiement, reference, notes } = req.body;
-    const recu = Number(montantRecu) || 0;
+    const recu = Number(montantRecu);
+    if (!Number.isFinite(recu) || recu <= 0) {
+      return res.status(422).json({ status: 'fail', message: 'Le montant reçu doit être strictement positif.' });
+    }
+    if (p.statut === 'payé') {
+      return res.status(409).json({ status: 'fail', code: 'PAYMENT_ALREADY_PAID', message: 'Cette échéance est déjà intégralement payée.' });
+    }
+    const totalDu = Number(p.montantTotal ?? p.montant ?? 0);
+    if (totalDu <= 0 || recu > totalDu) {
+      return res.status(422).json({ status: 'fail', message: 'Le montant reçu dépasse le montant dû.' });
+    }
+    if (Number(p.montantRecu) > 0 && recu < Number(p.montantRecu)) {
+      return res.status(422).json({ status: 'fail', message: 'Le montant cumulé ne peut pas diminuer.' });
+    }
 
-    let statut      = 'payé';
+    let statut      = recu < totalDu ? 'partiel' : 'payé';
     let notesFinale = notes || '';
 
     if (p.penaliteAppliquee) {
-      const totalDu = p.montantTotal || (p.montant + (p.penaliteMontant || 0));
-      if (recu > 0 && recu < totalDu) statut = 'partiel';
-
       if (p.penaliteMontant > 0) {
         const mention = `Pénalité de retard incluse : ${p.penaliteMontant.toLocaleString('fr-FR')} FCFA`;
         notesFinale = notesFinale ? `${notesFinale}\n${mention}` : mention;
       }
     }
 
-    const updated = await Paiement.findByIdAndUpdate(
-      p._id,
+    const updated = await Paiement.findOneAndUpdate(
+      { _id: p._id, statut: p.statut, montantRecu: p.montantRecu },
       {
         statut,
-        ...(recu > 0        && { montantRecu: recu }),
+        montantRecu: recu,
         ...(datePaiement    && { datePaiement }),
         ...(modePaiement    && { modePaiement }),
         ...(reference       && { reference }),
@@ -141,6 +167,9 @@ exports.marquerPaye = async (req, res) => {
       },
       { new: true },
     );
+    if (!updated) {
+      return res.status(409).json({ status: 'fail', code: 'PAYMENT_CONCURRENT_UPDATE', message: 'Un autre encaissement vient d’être enregistré sur cette échéance.' });
+    }
 
     await notifyContractTenant(p.contrat, {
       type: 'tenant_payment_recorded', title: 'Paiement locatif enregistré',

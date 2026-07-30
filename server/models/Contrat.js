@@ -82,4 +82,19 @@ const contratSchema = new mongoose.Schema({
   conditionsSuspensives: { type: String, trim: true },
 }, { timestamps: true });
 
+// Verrou persistant contre deux engagements incompatibles sur le même bien.
+// Les contrats clôturés restent conservés dans l'historique mais ne bloquent
+// pas un futur cycle. L'index protège aussi les créations concurrentes.
+contratSchema.index(
+  { bien: 1, type: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      bien: { $type: 'objectId' },
+      statut: { $in: ['en_attente', 'actif'] },
+    },
+    name: 'one_open_contract_per_property_and_type',
+  },
+);
+
 module.exports = mongoose.model('Contrat', contratSchema);

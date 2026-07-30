@@ -201,7 +201,17 @@ const mongoSanitize     = require('express-mongo-sanitize');
 
 app.use(compression());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({
+  limit: '2mb',
+  verify: (req, _res, buffer) => {
+    // Les signatures de paiement portent sur les octets exacts reçus, pas
+    // sur un objet JSON re-sérialisé. Limité aux webhooks concernés afin de
+    // ne pas conserver inutilement tous les corps de requête en mémoire.
+    if (req.originalUrl?.includes('/api/transactions/paiements/webhook')) {
+      req.rawBody = Buffer.from(buffer);
+    }
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(mongoSanitize());
 

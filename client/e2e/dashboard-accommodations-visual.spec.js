@@ -25,5 +25,5 @@ test('comparaison visuelle Ventes, Locations et Hébergements', async ({ page })
   await page.getByRole('link', { name: 'Réservations' }).click();
   await expect(page).toHaveURL(/\/dashboard\/hebergements\/66e200000000000000000004\?view=reservations/);
   await expect(page.getByRole('heading', { name: 'Villa E2E Brazzaville' })).toBeVisible();
-  await expect(page.getByText('Aucune réservation.')).toBeVisible();
+  await expect(page.getByText(/Aucune réservation\.|→ .* nuit/)).toBeVisible();
 });

@@ -44,7 +44,7 @@ async function scanFinancialConsistency(scope = {}) {
     const allocated = sum(documentAllocations, 'amountMinor');
     const refunded = document.refundedAmountMinor || 0; const netAllocated = Math.max(0, allocated - refunded);
     const expected = { amountAllocatedMinor: allocated, refundedAmountMinor: refunded, balanceMinor: document.totalMinor - netAllocated, paymentStatus: derivePaymentStatus(document.totalMinor, netAllocated) };
-    const actual = { amountAllocatedMinor: document.amountAllocatedMinor, balanceMinor: document.balanceMinor, paymentStatus: document.paymentStatus };
+    const actual = { amountAllocatedMinor: document.amountAllocatedMinor, refundedAmountMinor: document.refundedAmountMinor || 0, balanceMinor: document.balanceMinor, paymentStatus: document.paymentStatus };
     if (Object.keys(expected).some((key) => expected[key] !== actual[key])) issues.push(issue('FINANCIAL_DOCUMENT_AGGREGATE_MISMATCH', 'FinancialDocument', document._id, { repairable: true, actual, expected }));
     const documentLines = lines.filter((line) => same(line.financialDocument, document._id));
     const lineTotal = sum(documentLines, 'totalMinor');

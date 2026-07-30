@@ -36,7 +36,7 @@ describe('badges dashboard : visites et modération', () => {
     Property.countDocuments.mockResolvedValue(unreadCount);
     const res = response();
     await getPendingPropertiesCount({}, res);
-    expect(Property.countDocuments).toHaveBeenCalledWith({ statusAdmin: 'En attente' });
+    expect(Property.countDocuments).toHaveBeenCalledWith({ statusAdmin: 'En attente', status: { $in: ['vente', 'location'] } });
     expect(res.json).toHaveBeenCalledWith({ status: 'success', data: { unreadCount } });
   });
 });

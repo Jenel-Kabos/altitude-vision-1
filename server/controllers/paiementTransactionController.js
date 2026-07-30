@@ -1,16 +1,58 @@
-const axios               = require('axios');
 const crypto              = require('crypto');
 const Transaction         = require('../models/Transaction');
 const PaiementTransaction = require('../models/PaiementTransaction');
 const yabetooService      = require('../services/yabetooService');
-const { upload, uploadToCloudinary } = require('../config/cloudinary');
+const { uploadToCloudinary } = require('../config/cloudinary');
 const { notify, notifyStaff } = require('../services/notificationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
-
-const CINETPAY_SECRET  = process.env.CINETPAY_SECRET;
-const BACKEND_URL      = process.env.BACKEND_URL || 'https://altitude-vision.onrender.com';
+const { ALL_STAFF } = require('../utils/roles');
+const { registerProviderEvent, claimProviderEvent, completeProviderEvent, failProviderEvent } = require('../services/finance/financialIdempotencyService');
 
 const OPERATOR_LABEL = { AIRTEL: 'Airtel Money', MTN: 'MTN Mobile Money' };
+const YABETOO_WEBHOOK_TOLERANCE_SECONDS = 300;
+
+const canAccessTransaction = (transaction, user) => {
+  const clientId = transaction?.client?._id || transaction?.client;
+  return Boolean(clientId && String(clientId) === String(user?._id || user?.id)) || ALL_STAFF.includes(user?.role);
+};
+
+const denyTransactionAccess = (res) => res.status(403).json({ status: 'fail', message: 'Accès refusé à cette transaction.' });
+
+function verifyYabetooWebhook(req, nowSeconds = Math.floor(Date.now() / 1000)) {
+  const secret = process.env.YABETOO_WEBHOOK_SECRET;
+  if (!secret) return { ok: false, statusCode: 503, message: 'Webhook Yabetoo non configuré.' };
+  const timestamp = String(req.headers['x-yabetoo-webhook-timestamp'] || '');
+  const signatureHeader = String(req.headers['x-yabetoo-webhook-signature'] || '');
+  const timestampNumber = Number(timestamp);
+  if (!timestamp || !Number.isFinite(timestampNumber) || Math.abs(nowSeconds - timestampNumber) > YABETOO_WEBHOOK_TOLERANCE_SECONDS) {
+    return { ok: false, statusCode: 401, message: 'Horodatage webhook invalide.' };
+  }
+  const signature = signatureHeader.split(',').map((part) => part.trim()).find((part) => part.startsWith('v1='))?.slice(3)
+    || (signatureHeader.startsWith('v1=') ? signatureHeader.slice(3) : signatureHeader);
+  if (!signature || !/^[a-f0-9]{64}$/i.test(signature)) return { ok: false, statusCode: 401, message: 'Signature webhook invalide.' };
+  const rawBody = Buffer.isBuffer(req.rawBody) ? req.rawBody.toString('utf8') : '';
+  if (!rawBody) return { ok: false, statusCode: 400, message: 'Corps brut webhook indisponible.' };
+  const expected = crypto.createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
+  const valid = crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
+  return valid ? { ok: true } : { ok: false, statusCode: 401, message: 'Signature webhook invalide.' };
+}
+
+function verifyCinetPayWebhook(req) {
+  const secret = process.env.CINETPAY_SECRET;
+  if (!secret) return { ok: false, statusCode: 503, message: 'Webhook CinetPay non configuré.' };
+  const received = String(req.headers['x-token'] || '');
+  if (!/^[a-f0-9]{64}$/i.test(received)) return { ok: false, statusCode: 401, message: 'Signature webhook invalide.' };
+  const fields = [
+    'cpm_site_id', 'cpm_trans_id', 'cpm_trans_date', 'cpm_amount', 'cpm_currency', 'signature',
+    'payment_method', 'cel_phone_num', 'cpm_phone_prefixe', 'cpm_language', 'cpm_version',
+    'cpm_payment_config', 'cpm_page_action', 'cpm_custom', 'cpm_designation', 'cpm_error_message',
+  ];
+  const payload = fields.map((field) => String(req.body?.[field] ?? '')).join('');
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(received, 'hex'), Buffer.from(expected, 'hex'))
+    ? { ok: true }
+    : { ok: false, statusCode: 401, message: 'Signature webhook invalide.' };
+}
 
 // POST /api/transactions/:id/paiements/initier
 exports.initierPaiement = async (req, res) => {
@@ -26,6 +68,7 @@ exports.initierPaiement = async (req, res) => {
 
     const tx = await Transaction.findById(req.params.id).populate('property', 'title');
     if (!tx) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
+    if (!canAccessTransaction(tx, req.user)) return denyTransactionAccess(res);
     if (tx.status === 'Annulée') return res.status(400).json({ status: 'fail', message: 'Transaction annulée.' });
     if (tx.status === 'Réussie') return res.status(400).json({ status: 'fail', message: 'Transaction déjà finalisée.' });
 
@@ -96,6 +139,10 @@ exports.verifierPaiement = async (req, res) => {
 
     const paiement = await PaiementTransaction.findOne({ yabetooIntentId: intentId });
     if (!paiement) return res.status(404).json({ status: 'fail', message: 'Paiement introuvable.' });
+    if (String(paiement.transaction) !== String(req.params.id)) return res.status(404).json({ status: 'fail', message: 'Paiement introuvable.' });
+    const transaction = await Transaction.findById(paiement.transaction).select('client');
+    if (!transaction) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
+    if (!canAccessTransaction(transaction, req.user)) return denyTransactionAccess(res);
 
     const intent  = await yabetooService.getIntent(intentId);
     const yStatus = intent?.status || intent?.data?.status;
@@ -126,26 +173,43 @@ exports.verifierPaiement = async (req, res) => {
 };
 
 // POST /api/transactions/paiements/webhook — pas d'auth JWT (webhook public)
-// Pas de vérification de signature en sandbox — à ajouter avant la mise en prod.
 exports.webhookYabetoo = async (req, res) => {
-  res.status(200).json({ received: true });
-
+  const verification = verifyYabetooWebhook(req);
+  if (!verification.ok) return res.status(verification.statusCode).json({ received: false, message: verification.message });
+  let providerEvent;
   try {
     const { type, data } = req.body;
     const intentId = data?.id;
-    if (!intentId) return;
+    if (!intentId || !type) return res.status(422).json({ received: false, message: 'Événement Yabetoo incomplet.' });
+    const providerEventId = String(req.body.id || `${intentId}:${type}`);
+    const registered = await registerProviderEvent({ provider: 'yabetoo', providerEventId, providerPaymentId: intentId, providerTransactionId: intentId, eventType: type, payload: req.body, signatureVerified: true, businessOperationKey: `webhook:yabetoo:${providerEventId}` });
+    providerEvent = registered.event;
+    if (registered.duplicate && providerEvent?.status === 'processed') return res.status(200).json({ received: true, duplicate: true });
+    const claimed = await claimProviderEvent(providerEvent._id);
+    if (!claimed) return res.status(200).json({ received: true, duplicate: true });
 
     const statut = type === 'payment_intent.succeeded' ? 'Payé'
                  : type === 'payment_intent.failed'    ? 'Échoué'
                  : null;
-    if (!statut) return;
+    if (!statut) {
+      await completeProviderEvent(providerEvent._id, { ignored: true, reason: 'event_type_not_actionable' });
+      return res.status(200).json({ received: true, ignored: true });
+    }
 
+    const allowedCurrentStatuses = statut === 'Payé'
+      ? { $ne: 'Payé' }
+      : { $nin: ['Payé', 'Échoué'] };
     const paiement = await PaiementTransaction.findOneAndUpdate(
-      { yabetooIntentId: intentId },
+      { yabetooIntentId: intentId, statut: allowedCurrentStatuses },
       { statut, ...(statut === 'Payé' && { confirméAt: new Date() }) },
       { new: true },
     );
-    if (!paiement) return;
+    // Livraison répétée : l'état a déjà été appliqué. Ne pas renvoyer les
+    // notifications ni réécrire la transaction.
+    if (!paiement) {
+      await completeProviderEvent(providerEvent._id, { duplicateTransition: true, paymentStatus: statut });
+      return res.status(200).json({ received: true, duplicate: true });
+    }
 
     const tx = await Transaction.findByIdAndUpdate(
       paiement.transaction,
@@ -155,7 +219,7 @@ exports.webhookYabetoo = async (req, res) => {
       },
       { new: true },
     ).populate('property', 'title');
-    if (!tx) return;
+    if (!tx) throw new Error('Transaction liée au paiement introuvable.');
 
     if (statut === 'Payé') {
       notify({ recipient: tx.client,
@@ -179,42 +243,55 @@ exports.webhookYabetoo = async (req, res) => {
         data:  { screen: 'Transactions', transactionId: paiement.transaction.toString() },
       }).catch(() => {});
     }
+    await completeProviderEvent(providerEvent._id, { paymentId: paiement._id, transactionId: tx._id, paymentStatus: statut });
+    return res.status(200).json({ received: true });
   } catch (err) {
+    if (providerEvent?._id) await failProviderEvent(providerEvent._id, err).catch(() => {});
     console.error('❌ [Webhook Yabetoo] Erreur traitement:', err.message);
+    return res.status(err.statusCode || 500).json({ received: false, code: err.code, message: 'Traitement du webhook impossible.' });
   }
 };
 
+exports.verifyYabetooWebhook = verifyYabetooWebhook;
+exports.verifyCinetPayWebhook = verifyCinetPayWebhook;
+
 // POST /api/transactions/webhook/cinetpay — pas d'auth JWT
 exports.webhookCinetpay = async (req, res) => {
-  res.status(200).json({ received: true });
-
+  const verification = verifyCinetPayWebhook(req);
+  if (!verification.ok) return res.status(verification.statusCode).json({ received: false, message: verification.message });
+  let providerEvent;
   try {
-    const { transaction_id, status, amount, metadata } = req.body;
-
-    if (CINETPAY_SECRET) {
-      const received = req.headers['x-cinetpay-signature'] || '';
-      const payload  = JSON.stringify(req.body);
-      const expected = crypto.createHmac('sha256', CINETPAY_SECRET).update(payload).digest('hex');
-      if (received && received !== expected) {
-        console.warn('⚠️ [Webhook CinetPay] Signature invalide — ignoré');
-        return;
-      }
-    }
+    const { status, amount, metadata } = req.body;
 
     let meta = {};
     try { meta = JSON.parse(metadata || '{}'); } catch {}
     const { transactionId, paiementTransactionId, userId } = meta;
 
-    if (!transactionId || !paiementTransactionId) return;
+    if (!transactionId || !paiementTransactionId) return res.status(422).json({ received: false, message: 'Métadonnées CinetPay incomplètes.' });
+    const providerTransactionId = String(req.body.cpm_trans_id || paiementTransactionId);
+    const providerEventId = String(req.body.cpm_event_id || `${providerTransactionId}:${status || req.body.cpm_result || 'unknown'}`);
+    const registered = await registerProviderEvent({ provider: 'cinetpay', providerEventId, providerPaymentId: providerTransactionId, providerTransactionId, eventType: status || 'unknown', payload: req.body, signatureVerified: true, businessOperationKey: `webhook:cinetpay:${providerEventId}` });
+    providerEvent = registered.event;
+    if (registered.duplicate && providerEvent?.status === 'processed') return res.status(200).json({ received: true, duplicate: true });
+    const claimed = await claimProviderEvent(providerEvent._id);
+    if (!claimed) return res.status(200).json({ received: true, duplicate: true });
 
     const isSuccess = status === 'ACCEPTED';
     const isFailure = status === 'REFUSED' || status === 'CANCELLED';
 
-    await PaiementTransaction.findByIdAndUpdate(paiementTransactionId, {
-      statut:      isSuccess ? 'confirmé' : isFailure ? 'échoué' : 'en_attente',
+    const nextPaymentStatus = isSuccess ? 'confirmé' : isFailure ? 'échoué' : 'en_attente';
+    const allowedCurrentStatuses = isSuccess
+      ? { $ne: 'confirmé' }
+      : isFailure ? { $nin: ['confirmé', 'échoué'] } : { $in: ['en_attente'] };
+    const paymentTransition = await PaiementTransaction.findOneAndUpdate({ _id: paiementTransactionId, statut: allowedCurrentStatuses }, {
+      statut:      nextPaymentStatus,
       cinetpayRaw: req.body,
       ...(isSuccess && { confirméAt: new Date() }),
-    });
+    }, { new: true });
+    if (!paymentTransition) {
+      await completeProviderEvent(providerEvent._id, { duplicateTransition: true, paymentStatus: nextPaymentStatus });
+      return res.status(200).json({ received: true, duplicate: true });
+    }
 
     const tx = await Transaction.findByIdAndUpdate(
       transactionId,
@@ -225,7 +302,7 @@ exports.webhookCinetpay = async (req, res) => {
       { new: true }
     ).populate('property', 'title');
 
-    if (!tx) return;
+    if (!tx) throw new Error('Transaction liée au paiement introuvable.');
 
     if (isSuccess && userId) {
       notify({ recipient: userId,
@@ -251,8 +328,12 @@ exports.webhookCinetpay = async (req, res) => {
         data:  { screen: 'Transactions', transactionId },
       }).catch(() => {});
     }
+    await completeProviderEvent(providerEvent._id, { paymentId: paymentTransition._id, transactionId: tx._id, paymentStatus: nextPaymentStatus });
+    return res.status(200).json({ received: true });
   } catch (err) {
+    if (providerEvent?._id) await failProviderEvent(providerEvent._id, err).catch(() => {});
     console.error('❌ [Webhook CinetPay] Erreur traitement:', err.message);
+    return res.status(err.statusCode || 500).json({ received: false, code: err.code, message: 'Traitement du webhook impossible.' });
   }
 };
 
@@ -266,6 +347,7 @@ exports.soumettreVirement = async (req, res) => {
 
     const tx = await Transaction.findById(req.params.id).populate('property', 'title');
     if (!tx) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
+    if (!canAccessTransaction(tx, req.user)) return denyTransactionAccess(res);
     if (tx.status === 'Annulée') return res.status(400).json({ status: 'fail', message: 'Transaction annulée.' });
 
     let preuvePaiement = {};
@@ -365,6 +447,7 @@ exports.validerVirement = async (req, res) => {
 
     const paiement = await PaiementTransaction.findById(req.params.pId);
     if (!paiement) return res.status(404).json({ status: 'fail', message: 'Paiement introuvable.' });
+    if (String(paiement.transaction) !== String(req.params.txId)) return res.status(409).json({ status: 'fail', message: 'Ce paiement n’appartient pas à cette transaction.' });
     if (paiement.methode !== 'virement') return res.status(400).json({ status: 'fail', message: 'Uniquement pour les virements.' });
 
     const isValid    = action === 'valider';
@@ -403,6 +486,9 @@ exports.validerVirement = async (req, res) => {
 // GET /api/transactions/:id/paiements
 exports.getPaiements = async (req, res) => {
   try {
+    const transaction = await Transaction.findById(req.params.id).select('client');
+    if (!transaction) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
+    if (!canAccessTransaction(transaction, req.user)) return denyTransactionAccess(res);
     const paiements = await PaiementTransaction.find({ transaction: req.params.id })
       .populate('initiéPar',   'name')
       .populate('confirméPar', 'name')

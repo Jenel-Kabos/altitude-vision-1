@@ -37,7 +37,7 @@ describe('HotelStaffAssignmentsPage F2.6', () => {
   test("affiche un état vide explicite quand aucun rattachement n'existe", async () => {
     staffService.listHotelStaffAssignments.mockResolvedValue({ assignments: [], total: 0, page: 1, limit: 20 });
     render(<HotelStaffAssignmentsPage />);
-    expect(await screen.findByText('Aucun membre du personnel rattaché.')).toBeInTheDocument();
+    expect(await screen.findByText('Aucun personnel rattaché')).toBeInTheDocument();
   });
 
   test('affiche un message d’accès refusé sur une erreur 403', async () => {

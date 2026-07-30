@@ -21,6 +21,9 @@ router.get('/',       protect, ctrl.getAll);
 router.get('/:id',    protect, ctrl.getOne);
 router.put('/:id',    protect, ctrl.update);
 router.post('/:id/marquer-paye', protect, ctrl.marquerPaye);
-router.delete('/:id', protect, ctrl.delete);
+// Une échéance financière ne peut être supprimée que par un administrateur
+// et seulement tant qu'aucun encaissement n'a été enregistré (contrôle dans
+// le contrôleur). Les rôles de saisie conservent la gestion courante.
+router.delete('/:id', adminOnly, ctrl.delete);
 
 module.exports = router;
