@@ -47,12 +47,18 @@ const paiementTransactionSchema = new Schema(
   { timestamps: true }
 );
 
+// `statut` mélange deux vocabulaires (voir commentaire plus haut) : le
+// filtre doit couvrir les deux, sinon l'index ne protège en pratique que
+// YabetooPay ('En attente'/'Payé') et laisse virement/espèces/chèque, dont
+// le statut par défaut est 'en_attente' (minuscule), créer un nombre
+// illimité de paiements "ouverts" pour la même transaction+méthode sans
+// aucune contrainte DB.
 paiementTransactionSchema.index(
   { transaction: 1, methode: 1 },
   {
     unique: true,
-    partialFilterExpression: { statut: { $in: ['En attente', 'Payé'] } },
-    name: 'one_open_yabetoo_payment_per_transaction',
+    partialFilterExpression: { statut: { $in: ['En attente', 'Payé', 'en_attente', 'confirmé'] } },
+    name: 'one_open_payment_per_transaction_and_method',
   },
 );
 

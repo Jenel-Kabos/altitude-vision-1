@@ -1,4 +1,5 @@
 const Document = require('../models/Document');
+const Transaction = require('../models/Transaction');
 
 // --- GET ALL DOCUMENTS ---
 // Can be filtered by type, client, status, etc.
@@ -120,11 +121,24 @@ exports.updateDocument = async (req, res) => {
 // --- DELETE A DOCUMENT ---
 exports.deleteDocument = async (req, res) => {
     try {
-        const document = await Document.findByIdAndDelete(req.params.id);
+        const document = await Document.findById(req.params.id);
 
         if (!document) {
             return res.status(404).json({ status: 'fail', message: 'No document found with that ID' });
         }
+
+        // Un document porteur d'un businessOperationKey ou lié à une
+        // Transaction finalisée est un artefact du Financial Core (facture
+        // de finalisation, écriture idempotente) : le supprimer casserait
+        // l'idempotence de finalizeRealEstateTransaction (Document.findOne
+        // par businessOperationKey / Transaction.linkedInvoice) et romprait
+        // la piste d'audit. Il doit être conservé, jamais supprimé.
+        const linkedToTransaction = await Transaction.exists({ linkedInvoice: document._id });
+        if (document.businessOperationKey || linkedToTransaction) {
+            return res.status(409).json({ status: 'fail', code: 'DOCUMENT_IMMUTABLE', message: 'Ce document est lié au Financial Core et ne peut pas être supprimé.' });
+        }
+
+        await Document.findByIdAndDelete(req.params.id);
 
         res.status(204).json({
             status: 'success',

@@ -6,6 +6,7 @@ const { logAction, buildAuteur } = require('../services/actionLogService');
 const { ALL_STAFF } = require('../utils/roles');
 const { finalizeRealEstateTransaction } = require('../services/finance/realEstateTransactionFinalizationService');
 const RealEstateReservation = require('../models/RealEstateReservation');
+const { releaseReservation } = require('../services/realEstateApplicationService');
 
 const calcCommission = (finalAmount, tauxPercent = 10, hasSpecial = false) => {
   const total       = Math.round(finalAmount * (tauxPercent / 100));
@@ -192,6 +193,15 @@ exports.cancelTransaction = async (req, res) => {
     tx.annuleAt     = new Date();
     tx.annuleRaison = raison || '';
     await tx.save();
+
+    // Sans cela, la réservation (unique par transaction — voir
+    // Transaction.reservation) reste indéfiniment liée à une transaction
+    // morte et le bien reste bloqué en "Réservé" : ni une nouvelle
+    // transaction ne peut être créée pour cette réservation, ni le bien ne
+    // redevient visible sur le marché, sans une seconde action distincte et
+    // non découvrable (annuler la réservation séparément).
+    const reservation = await RealEstateReservation.findById(tx.reservation);
+    if (reservation) await releaseReservation(reservation, { status: 'cancelled', actorId: req.user._id, reason: raison || 'Transaction annulée' });
 
     notify({ recipient: tx.client,
       type:  'transaction_created',
