@@ -7,6 +7,7 @@ const { runFinancialOperation } = require('./financialTransactionService');
 const { FinancialError } = require('./financialError');
 const { financialCheckpoint } = require('./financialFaultInjection');
 const { appendFinancialLedgerEntry } = require('./financialLedgerService');
+const RealEstateReservation = require('../../models/RealEstateReservation');
 
 const inSession = (query, session) => (session ? query.session(session) : query);
 const operationKeyFor = (transactionId) => `real-estate:transaction:${transactionId}:finalize`;
@@ -52,6 +53,10 @@ async function finalizeCore({ transactionId, actorId, tauxCommission, operationK
   const property = await inSession(Property.findById(transaction.property), session);
   if (!property) throw new FinancialError('FINANCIAL_PROPERTY_NOT_FOUND', 'Bien associé introuvable.', 404);
   if (property.status !== transaction.transactionType) throw new FinancialError('FINANCIAL_TRANSACTION_TYPE_MISMATCH', 'Le type de transaction ne correspond plus au bien.', 409);
+  const reservation = await inSession(RealEstateReservation.findById(transaction.reservation), session);
+  if (!reservation || reservation.status !== 'active' || reservation.expiresAt <= new Date() || String(reservation.transaction) !== String(transaction._id)) {
+    throw new FinancialError('ACTIVE_RESERVATION_REQUIRED', 'La réservation active associée est requise pour finaliser.', 409);
+  }
   if (['Vendu', 'Loué', 'Retiré'].includes(property.availability)) {
     throw new FinancialError('FINANCIAL_PROPERTY_ALREADY_CLOSED', 'Le bien est déjà vendu, loué ou retiré.', 409);
   }
@@ -86,10 +91,23 @@ async function finalizeCore({ transactionId, actorId, tauxCommission, operationK
     await financialCheckpoint(faultInjector, 'finalization.after_property', { transactionId, operationKey });
     transaction = await Transaction.findOneAndUpdate(
       { _id: transactionId, status: { $nin: ['Réussie', 'Annulée'] }, paymentStatus: 'confirmé' },
-      { $set: { status: 'Réussie', commission, linkedInvoice: invoice._id, 'finalization.operationKey': operationKey, 'finalization.payloadHash': payloadHash, 'finalization.status': 'completed', 'finalization.completedAt': new Date(), 'finalization.invoice': invoice._id, 'finalization.lastError': null } },
+      {
+        $set: { status: 'Réussie', commission, linkedInvoice: invoice._id, 'finalization.operationKey': operationKey, 'finalization.payloadHash': payloadHash, 'finalization.status': 'completed', 'finalization.completedAt': new Date(), 'finalization.invoice': invoice._id, 'finalization.lastError': null },
+        // Mode transactional : le claim optimiste (et son $inc) ci-dessus est
+        // entièrement sauté (voir `if (!transactional)`), donc attemptCount
+        // ne serait jamais incrémenté sans ce $inc ici. Mode fallback : déjà
+        // incrémenté par le claim, ne pas compter deux fois la même tentative.
+        ...(transactional ? { $inc: { 'finalization.attemptCount': 1 } } : {}),
+      },
       { new: true, session },
     );
     if (!transaction) throw new FinancialError('FINANCIAL_FINALIZATION_STATE_CHANGED', 'La transaction a changé pendant la finalisation.', 409);
+    const converted = await RealEstateReservation.updateOne(
+      { _id: reservation._id, status: 'active', transaction: transaction._id },
+      { $set: { status: 'converted' }, $push: { history: { from: 'active', to: 'converted', action: 'transaction_finalized', actor: actorId, at: new Date() } } },
+      { session },
+    );
+    if (converted.modifiedCount !== 1) throw new FinancialError('RESERVATION_CONVERSION_CONFLICT', 'La réservation a changé pendant la conversion.', 409);
     await financialCheckpoint(faultInjector, 'finalization.after_transaction', { transactionId, operationKey });
     businessStateCommitted = true;
     await ensureFinalizationLedger({ transaction, property, actorId, operationKey, session });

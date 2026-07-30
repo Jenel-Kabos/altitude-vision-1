@@ -2,7 +2,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
 const mongoose = require("mongoose");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { MongoMemoryReplSet } = require("mongodb-memory-server");
 const root = path.resolve(__dirname, "../..");
 const serverDir = path.join(root, "server");
 const clientDir = path.join(root, "client");
@@ -17,8 +17,15 @@ const ids = {
   mobileHotelProperty: "66e200000000000000000020",
   mobileHotel: "66e200000000000000000021",
   mobileRoomCategory: "66e200000000000000000022",
+  saleProperty: "66e200000000000000000030",
+  rentalProperty: "66e200000000000000000031",
+  finalizationSaleProperty: "66e200000000000000000032",
+  finalizationSalePropertyMobile: "66e200000000000000000034",
+  rentalActivationProperty: "66e200000000000000000035",
+  rentalActivationPropertyMobile: "66e200000000000000000036",
 };
 let mongo;
+let fakePaymentProvider;
 let shuttingDown = false;
 const children = [];
 const waitFor = (url, timeout = 120000) =>
@@ -46,6 +53,7 @@ async function seed(uri) {
   const RatePlan = require("../models/RatePlan");
   const Hotel = require("../models/Hotel");
   const RoomCategory = require("../models/RoomCategory");
+  const PaiementTransaction = require("../models/PaiementTransaction");
   await User.create([
     {
       _id: ids.owner,
@@ -122,6 +130,7 @@ async function seed(uri) {
       owner: ids.owner,
     },
     {
+      _id: ids.saleProperty,
       title: "Appartement Vente E2E",
       description: "Bien fictif de comparaison visuelle.",
       pole: "Altimmo",
@@ -136,10 +145,12 @@ async function seed(uri) {
       bedrooms: 3,
       bathrooms: 2,
       statusAdmin: "Validée",
+      isPublished: true,
       availability: "Disponible",
       owner: ids.owner,
     },
     {
+      _id: ids.rentalProperty,
       title: "Maison Location E2E",
       description: "Bien fictif de comparaison visuelle.",
       pole: "Altimmo",
@@ -154,6 +165,87 @@ async function seed(uri) {
       bedrooms: 2,
       bathrooms: 1,
       statusAdmin: "Validée",
+      isPublished: true,
+      availability: "Disponible",
+      owner: ids.owner,
+    },
+    {
+      _id: ids.finalizationSaleProperty,
+      title: "Villa Vente Finalisation E2E",
+      description: "Bien fictif réservé au parcours paiement et finalisation.",
+      pole: "Altimmo",
+      type: "Villa",
+      status: "vente",
+      price: 125000000,
+      address: { arrondissement: "Bacongo", city: "Brazzaville" },
+      latitude: -4.28,
+      longitude: 15.27,
+      images: ["https://placehold.co/1200x800/png?text=Finalisation"],
+      surface: 180,
+      bedrooms: 4,
+      bathrooms: 3,
+      statusAdmin: "Validée",
+      isPublished: true,
+      availability: "Disponible",
+      owner: ids.owner,
+    },
+    {
+      _id: ids.finalizationSalePropertyMobile,
+      title: "Villa Vente Finalisation E2E Mobile",
+      description: "Bien fictif mobile réservé au parcours paiement et finalisation.",
+      pole: "Altimmo",
+      type: "Villa",
+      status: "vente",
+      price: 125000000,
+      address: { arrondissement: "Bacongo", city: "Brazzaville" },
+      latitude: -4.28,
+      longitude: 15.27,
+      images: ["https://placehold.co/1200x800/png?text=Finalisation-Mobile"],
+      surface: 180,
+      bedrooms: 4,
+      bathrooms: 3,
+      statusAdmin: "Validée",
+      isPublished: true,
+      availability: "Disponible",
+      owner: ids.owner,
+    },
+    {
+      _id: ids.rentalActivationProperty,
+      title: "Studio Location Activation E2E",
+      description: "Bien fictif dédié au parcours candidature → contrat → bail actif.",
+      pole: "Altimmo",
+      type: "Studio",
+      status: "location",
+      price: 300000,
+      address: { arrondissement: "Poto-Poto", city: "Brazzaville" },
+      latitude: -4.26,
+      longitude: 15.28,
+      images: ["https://placehold.co/1200x800/png?text=Location-Activation"],
+      surface: 35,
+      bedrooms: 1,
+      bathrooms: 1,
+      statusAdmin: "Validée",
+      isPublished: true,
+      availability: "Disponible",
+      owner: ids.owner,
+    },
+    {
+      _id: ids.rentalActivationPropertyMobile,
+      title: "Studio Location Activation E2E Mobile",
+      description: "Bien fictif mobile dédié au parcours candidature → contrat → bail actif.",
+      pole: "Altimmo",
+      type: "Studio",
+      status: "location",
+      price: 300000,
+      address: { arrondissement: "Poto-Poto", city: "Brazzaville" },
+      latitude: -4.26,
+      longitude: 15.28,
+      images: ["https://placehold.co/1200x800/png?text=Location-Activation-Mobile"],
+      surface: 35,
+      bedrooms: 1,
+      bathrooms: 1,
+      statusAdmin: "Validée",
+      isPublished: true,
       availability: "Disponible",
       owner: ids.owner,
     },
@@ -217,6 +309,7 @@ async function seed(uri) {
   await Accommodation.create({ property: ids.mobileHotelProperty, accommodationType: "hotel", hotel: ids.mobileHotel, publicationStatus: "soumis", active: true, createdBy: ids.owner });
   await RoomCategory.create({ _id: ids.mobileRoomCategory, hotel: ids.mobileHotel, name: "Standard Mobile", code: "STDM", unitsAvailable: 13, capacity: { maxAdults: 2, maxChildren: 0 }, createdBy: ids.owner });
   await RatePlan.create({ roomCategory: ids.mobileRoomCategory, rateType: "public", amount: 35000, currency: "XAF", active: true, createdBy: ids.owner });
+  await PaiementTransaction.syncIndexes();
   await mongoose.disconnect();
 }
 function start(command, args, cwd, env) {
@@ -229,6 +322,32 @@ function start(command, args, cwd, env) {
   children.push(child);
   return child;
 }
+function startFakePaymentProvider() {
+  let sequence = 0;
+  fakePaymentProvider = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.method === 'POST' && req.url === '/v1/payment-intents') {
+        sequence += 1;
+        res.end(JSON.stringify({ id: `e2e-intent-${sequence}` }));
+        return;
+      }
+      if (req.method === 'POST' && /^\/v1\/payment-intents\/[^/]+\/confirm$/.test(req.url)) {
+        res.end(JSON.stringify({ status: 'processing' }));
+        return;
+      }
+      if (req.method === 'GET' && /^\/v1\/payment-intents\/[^/]+$/.test(req.url)) {
+        res.end(JSON.stringify({ status: 'succeeded' }));
+        return;
+      }
+      res.statusCode = 404;
+      res.end(JSON.stringify({ error: 'not_found' }));
+    });
+  });
+  return new Promise((resolve) => fakePaymentProvider.listen(5051, '127.0.0.1', resolve));
+}
 async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
@@ -238,10 +357,10 @@ async function shutdown() {
     try { process.kill(-child.pid, "SIGTERM"); } catch { /* processus déjà arrêté */ }
   });
   await new Promise((resolve) => setTimeout(resolve, 300));
+  if (fakePaymentProvider) await new Promise((resolve) => fakePaymentProvider.close(resolve));
   if (mongo) {
     try {
-      await mongo.stop({ doCleanup: false });
-      await mongo.cleanup({ force: true });
+      await mongo.stop();
     } catch (error) {
       console.warn(`E2E Mongo cleanup warning: ${error.message}`);
     }
@@ -249,7 +368,8 @@ async function shutdown() {
   process.exit();
 }
 async function main() {
-  mongo = await MongoMemoryServer.create();
+  await startFakePaymentProvider();
+  mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
   const uri = mongo.getUri("altitude_e2e");
   await seed(uri);
   start(process.execPath, ["server.js"], serverDir, {
@@ -260,6 +380,9 @@ async function main() {
     JWT_SECRET: "e2e-jwt-secret-not-for-production",
     JWT_EXPIRES_IN: "1h",
     DISABLE_SCHEDULED_JOBS: "1",
+    YABETOO_API_URL: "http://127.0.0.1:5051/v1",
+    YABETOO_SECRET_KEY: "e2e-provider-secret",
+    YABETOO_WEBHOOK_SECRET: "e2e-webhook-secret",
   });
   await waitFor("http://localhost:5000/api/health");
   start(

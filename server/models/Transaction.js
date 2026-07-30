@@ -7,6 +7,7 @@ const transactionSchema = new Schema(
     property: { type: ObjectId, ref: 'Property', required: true },
     client:   { type: ObjectId, ref: 'User',     required: true },
     agent:    { type: ObjectId, ref: 'User',     required: true },
+    reservation: { type: ObjectId, ref: 'RealEstateReservation', required: true, unique: true },
 
     finalAmount: { type: Number, required: true, min: 0 },
     transactionType: {

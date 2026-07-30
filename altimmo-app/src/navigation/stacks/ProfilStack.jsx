@@ -18,6 +18,9 @@ import MyHotelReservationsScreen from '../../screens/Hotels/MyHotelReservationsS
 import HotelReservationDetailScreen from '../../screens/Hotels/HotelReservationDetailScreen';
 import HotelBookingScreen from '../../screens/Hotels/HotelBookingScreen';
 import HotelOperationsScreen from '../../screens/Hotels/HotelOperationsScreen';
+import RealEstateApplicationsScreen from '../../screens/Profil/RealEstateApplicationsScreen';
+import RealEstateApplicationDetailScreen from '../../screens/Profil/RealEstateApplicationDetailScreen';
+import SubmitRealEstateApplicationScreen from '../../screens/Annonces/SubmitRealEstateApplicationScreen';
 
 const Stack = createStackNavigator();
 
@@ -35,6 +38,9 @@ export default function ProfilStack() {
       <Stack.Screen name="AddAccommodation"   component={AddAccommodationScreen} />
       <Stack.Screen name="Favoris"         component={FavorisScreen} />
       <Stack.Screen name="Transactions"    component={TransactionsScreen} />
+      <Stack.Screen name="RealEstateApplications" component={RealEstateApplicationsScreen} />
+      <Stack.Screen name="RealEstateApplicationDetail" component={RealEstateApplicationDetailScreen} />
+      <Stack.Screen name="SubmitRealEstateApplication" component={SubmitRealEstateApplicationScreen} />
       <Stack.Screen name="PaiementCancel"  component={TransactionsScreen} />
       <Stack.Screen name="Paiement"        component={PaiementScreen} />
       <Stack.Screen name="VirementScreen"             component={VirementScreen} />

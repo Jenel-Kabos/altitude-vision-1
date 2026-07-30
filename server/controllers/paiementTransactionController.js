@@ -127,6 +127,9 @@ exports.initierPaiement = async (req, res) => {
 
     res.json({ status: 'success', data: { intentId, statut: 'En attente' } });
   } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(409).json({ status: 'fail', code: 'PAYMENT_ALREADY_PENDING', message: 'Un paiement est déjà en attente pour ce dossier.' });
+    }
     console.error('❌ [PaiementTx] initierPaiement (Yabetoo):', err.response?.data || err.message);
     res.status(500).json({ status: 'error', message: "Erreur lors de l'initiation du paiement." });
   }

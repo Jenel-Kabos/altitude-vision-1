@@ -1070,6 +1070,16 @@ export default function DetailAnnonceScreen({ route, navigation }) {
           </View>
         ) : (
           <View style={styles.ctaRow}>
+            {!isHebergement && permissions.canContact && (
+              <TouchableOpacity
+                style={styles.ctaBtnPrimary}
+                onPress={() => navigation.navigate('Profil', { screen: 'SubmitRealEstateApplication', params: { propertyId: annonce._id || annonce.id, propertyTitle: title, kind: isLocation ? 'rental_application' : 'purchase_offer' } })}
+                accessibilityLabel={isLocation ? 'Déposer une candidature locative' : 'Faire une offre d’achat'}
+              >
+                <Ionicons name="document-text-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.ctaBtnPrimaryText}>{isLocation ? 'Candidater' : 'Faire une offre'}</Text>
+              </TouchableOpacity>
+            )}
             {permissions.canContact && (
               <TouchableOpacity
                 style={[styles.ctaBtnSecondary, !permissions.canRequestVisit && styles.ctaBtnFull]}

@@ -176,7 +176,13 @@ const propertySchema = new mongoose.Schema(
       default: [],
     },
 
-    isPublished: { type: Boolean, default: false },
+    isPublished: { type: Boolean, default: false },
+    reservationLock: {
+      reservation: { type: mongoose.Schema.ObjectId, ref: 'RealEstateReservation', default: null },
+      lockedAt: { type: Date, default: null },
+      expiresAt: { type: Date, default: null },
+    },
+    hasReservationHistory: { type: Boolean, default: false },
     hasSpecialCommission: { type: Boolean, default: false },
     recommande: { type: Boolean, default: false },
 

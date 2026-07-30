@@ -2,6 +2,7 @@ jest.mock('../models/Transaction');
 jest.mock('../models/Property');
 jest.mock('../models/User');
 jest.mock('../models/Document');
+jest.mock('../models/RealEstateReservation');
 jest.mock('../services/notificationService', () => ({ notify: jest.fn(), notifyStaff: jest.fn() }));
 jest.mock('../services/actionLogService', () => ({ logAction: jest.fn(), buildAuteur: jest.fn() }));
 jest.mock('../services/finance/realEstateTransactionFinalizationService', () => ({ finalizeRealEstateTransaction: jest.fn() }));
@@ -10,6 +11,7 @@ const Property = require('../models/Property');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const Document = require('../models/Document');
+const RealEstateReservation = require('../models/RealEstateReservation');
 const controller = require('../controllers/transactionController');
 const { finalizeRealEstateTransaction } = require('../services/finance/realEstateTransactionFinalizationService');
 
@@ -50,7 +52,7 @@ describe('transactionController — ouverture sécurisée du dossier immobilier'
     User.findById.mockReturnValue(selected({ _id: clientId }));
     const res = response();
 
-    await controller.createTransaction({ body: { propertyId, clientId, finalAmount: 100000, transactionType: 'vente' }, user: { id: ownerId } }, res);
+    await controller.createTransaction({ body: { propertyId, clientId, reservationId: '507f1f77bcf86cd799439024', finalAmount: 100000, transactionType: 'vente' }, user: { id: ownerId } }, res);
 
     expect(res.statusCode).toBe(409);
     expect(res.body.code).toBe('TRANSACTION_TYPE_MISMATCH');
@@ -58,12 +60,14 @@ describe('transactionController — ouverture sécurisée du dossier immobilier'
   });
 
   test('convertit le verrou Mongo concurrent en conflit métier stable', async () => {
-    Property.findById.mockReturnValue(selected({ _id: propertyId, status: 'vente', statusAdmin: 'Validée', availability: 'Disponible', owner: ownerId }));
+    const reservationId = '507f1f77bcf86cd799439024';
+    Property.findById.mockReturnValue(selected({ _id: propertyId, status: 'vente', statusAdmin: 'Validée', availability: 'Réservé', owner: ownerId, reservationLock: { reservation: reservationId } }));
     User.findById.mockReturnValue(selected({ _id: clientId }));
+    RealEstateReservation.findById.mockResolvedValue({ _id: reservationId, property: propertyId, client: clientId, type: 'sale', status: 'active', expiresAt: new Date(Date.now() + 60000) });
     Transaction.create.mockRejectedValue(Object.assign(new Error('duplicate key'), { code: 11000 }));
     const res = response();
 
-    await controller.createTransaction({ body: { propertyId, clientId, finalAmount: 100000, transactionType: 'vente' }, user: { id: ownerId } }, res);
+    await controller.createTransaction({ body: { propertyId, clientId, reservationId, finalAmount: 100000, transactionType: 'vente' }, user: { id: ownerId } }, res);
 
     expect(res.statusCode).toBe(409);
     expect(res.body.code).toBe('PROPERTY_TRANSACTION_ALREADY_OPEN');

@@ -262,6 +262,8 @@ export default function ProfilScreen({ navigation }) {
               styles={styles} c={c}
             />
             <View style={styles.menuSep} />
+            <MenuRow icon="documents-outline" label="Mes offres et candidatures" onPress={() => navigation.navigate('RealEstateApplications')} styles={styles} c={c} />
+            <View style={styles.menuSep} />
             <MenuRow icon="bed-outline" label="Mes réservations hôtel" onPress={() => navigation.navigate('MyHotelReservations')} styles={styles} c={c} />
           </View>
         </Animated.View>

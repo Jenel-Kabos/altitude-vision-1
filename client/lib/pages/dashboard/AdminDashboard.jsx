@@ -46,6 +46,7 @@ const NAV_SECTIONS = [
       { to: '/dashboard/properties',               end: true,  Icon: Home,       label: 'Toutes les annonces', accent: BLUE, roles: ROLES_ALTIMMO },
       { to: '/dashboard/sales',              end: true,  Icon: Landmark,   label: 'Ventes',               accent: BLUE, roles: ROLES_ALTIMMO },
       { to: '/dashboard/rentals',            end: true,  Icon: KeyRound,   label: 'Locations',            accent: BLUE, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/dossiers-immobiliers', end: true, Icon: ClipboardList, label: 'Offres & candidatures', accent: BLUE, roles: ['Admin', 'Collaborateur', 'GestionnaireImmobilier'] },
       { to: '/dashboard/hebergements',       end: true,  Icon: Palmtree,   label: 'Hébergements',         accent: GOLD, roles: ROLES_ALTIMMO },
       { to: '/dashboard/estimations',        end: false, Icon: Calculator, label: 'Estimations',  accent: GOLD, roles: ROLES_ESTIM, badge: 'estimations' },
       { to: '/dashboard/devis',              end: false, Icon: FileText,   label: 'Devis locatif', accent: GOLD, roles: ROLES_ESTIM },

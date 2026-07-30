@@ -82,9 +82,13 @@ test('identifiants croisés bloqués : hotelId A + ressource de B, quel que soit
 });
 
 test('les counts et listes sont scopés (listAccessibleHotels) — aucune fuite du total', async () => {
-  const { hotelA, hotelB, staffA, roomA, roomB } = await twoHotelsFixture();
+  const { hotelA, hotelB, staffA, roomA, roomB, categoryA } = await twoHotelsFixture();
+  // Deux chambres distinctes dans l'hôtel A : une seule tâche "ouverte" par
+  // chambre à la fois (index unique partiel `{room, open:true}` sur
+  // HousekeepingTask) — les deux tâches ne peuvent pas partager roomA.
+  const roomA2 = await Room.create({ hotel: hotelA._id, roomCategory: categoryA._id, roomNumber: '2', createdBy: admin._id });
   await HousekeepingTask.create({ room: roomA._id, hotel: hotelA._id, type: 'refresh', createdBy: staffA._id });
-  await HousekeepingTask.create({ room: roomA._id, hotel: hotelA._id, type: 'deep_cleaning', createdBy: staffA._id });
+  await HousekeepingTask.create({ room: roomA2._id, hotel: hotelA._id, type: 'deep_cleaning', createdBy: staffA._id });
   await HousekeepingTask.create({ room: roomB._id, hotel: hotelB._id, type: 'refresh', createdBy: staffA._id });
 
   const { globalAccess, hotels } = await listAccessibleHotels({ role: 'Collaborateur', _id: staffA._id });

@@ -31,6 +31,8 @@ module.exports = {
     'dist/',
     'build/',
     'coverage/',
+    'playwright-report/',
+    'test-results/',
     // Doublon mort de emailService.js (jamais importé nulle part, vérifié
     // par grep), export cassé (nom de fonction manquant) — pré-existant.
     'lib/services/mailService.js',

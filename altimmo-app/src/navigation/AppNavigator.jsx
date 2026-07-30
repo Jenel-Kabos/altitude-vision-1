@@ -82,6 +82,8 @@ export default function AppNavigator() {
               screens: {
                 ProfilHome: 'profil',
                 Transactions:   'paiement/success',
+                RealEstateApplications: 'dossiers-immobiliers',
+                RealEstateApplicationDetail: 'dossiers-immobiliers/:applicationId',
                 PaiementCancel: 'paiement/cancel',
               },
             },

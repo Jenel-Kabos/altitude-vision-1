@@ -5,6 +5,7 @@ const RentalManagement = require('../models/RentalManagement');
 const rentalSync = require('../services/rentalListingSyncService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { notify } = require('../services/notificationService');
+const RealEstateReservation = require('../models/RealEstateReservation');
 
 const syncLeaseOccupation = async (contract, actor) => {
   if (contract.type !== 'location' || !contract.bien) return;
@@ -23,6 +24,12 @@ const syncLeaseOccupation = async (contract, actor) => {
   );
   if (contract.statut === 'actif') {
     await rentalSync.markPropertyRented(rental._id, { leaseId: contract._id, tenantId: contract.locataire, actor, source: 'contract' });
+    if (contract.reservation) {
+      await RealEstateReservation.updateOne(
+        { _id: contract.reservation, status: 'active', contract: contract._id, expiresAt: { $gt: new Date() } },
+        { $set: { status: 'converted' }, $push: { history: { from: 'active', to: 'converted', action: 'contract_activated', actor, at: new Date() } } },
+      );
+    }
   } else if (['résilié', 'expiré'].includes(contract.statut) && rental.activeLease?.toString() === contract._id.toString()) {
     await rentalSync.schedulePropertyExit(rental._id, { actor, source: 'contract' });
   }
@@ -89,15 +96,22 @@ exports.create = async (req, res) => {
     if (!req.body?.bien || !['location', 'vente'].includes(req.body?.type)) {
       return res.status(400).json({ status: 'fail', code: 'INVALID_CONTRACT_INPUT', message: 'Le bien et le type de contrat sont requis.' });
     }
-    const property = await Property.findById(req.body.bien).select('status statusAdmin availability owner price');
+    const property = await Property.findById(req.body.bien).select('status statusAdmin availability owner price reservationLock');
     if (!property) return res.status(404).json({ status: 'fail', code: 'PROPERTY_NOT_FOUND', message: 'Bien introuvable.' });
     if (property.status !== req.body.type) {
       return res.status(409).json({ status: 'fail', code: 'CONTRACT_TYPE_MISMATCH', message: 'Le type de contrat ne correspond pas au bien.' });
     }
-    if (property.statusAdmin !== 'Validée' || property.availability !== 'Disponible') {
+    const reservation = await RealEstateReservation.findById(req.body.reservation);
+    const expectedReservationType = req.body.type === 'location' ? 'rental' : 'sale';
+    if (!reservation || reservation.status !== 'active' || reservation.expiresAt <= new Date()
+      || reservation.type !== expectedReservationType || String(reservation.property) !== String(property._id)) {
+      return res.status(409).json({ status: 'fail', code: 'ACTIVE_RESERVATION_REQUIRED', message: 'Une réservation active et cohérente est requise.' });
+    }
+    if (property.statusAdmin !== 'Validée' || property.availability !== 'Réservé' || String(property.reservationLock?.reservation) !== String(reservation._id)) {
       return res.status(409).json({ status: 'fail', code: 'PROPERTY_NOT_AVAILABLE', message: 'Ce bien ne peut plus faire l’objet d’un nouveau contrat.' });
     }
     const c = await Contrat.create(req.body);
+    await RealEstateReservation.updateOne({ _id: reservation._id, status: 'active', contract: null }, { $set: { contract: c._id }, $push: { history: { from: 'active', to: 'active', action: 'contract_created', actor: req.user._id } } });
 
     if (c.type === 'location') {
       await generatePaiements(c._id, c.dateEntree, c.dateFinBail, c.montantLoyer);

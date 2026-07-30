@@ -158,6 +158,7 @@ logger.info('⏰ [CRON] Rappels de visites activés (toutes les 5 minutes)');
 // aucune dépendance à l'horloge système dans son test).
 // ============================================================
 const { processReservationExpiry } = require('./services/hotelReservationExpiryService');
+const { expireReservations: expireRealEstateReservations, sendExpirationReminders: remindRealEstateReservations } = require('./services/realEstateApplicationService');
 
 schedule('*/5 * * * *', async () => {
   try {
@@ -169,6 +170,17 @@ schedule('*/5 * * * *', async () => {
 });
 
 logger.info('⏰ [CRON] Expiration des réservations hôtelières en attente activée (toutes les 5 minutes)');
+
+schedule('*/5 * * * *', async () => {
+  try {
+    const result = await expireRealEstateReservations();
+    if (result.expired) logger.info(`⏰ [CRON Immobilier] ${result.expired} réservation(s) expirée(s)`);
+    const reminders = await remindRealEstateReservations();
+    if (reminders.reminded) logger.info(`⏰ [CRON Immobilier] ${reminders.reminded} rappel(s) d’expiration`);
+  } catch (err) {
+    logger.error(`❌ [CRON Immobilier] ${err.message}`);
+  }
+});
 
 
 const app = express();
@@ -254,7 +266,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "Idempotency-Key"],
   exposedHeaders: ["Content-Range", "X-Content-Range"],
   maxAge: 86400
 }));
@@ -381,6 +393,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 // 🏠 Pôle Altimmo
 app.use("/api/properties", propertyRoutes);
 app.use("/api/transactions", transactionRoutes);
+app.use('/api/real-estate-applications', require('./routes/realEstateApplicationRoutes'));
 app.use('/api/publicites', require('./routes/publiciteRoutes'));
 
 // 🏘️ Gestion Locative

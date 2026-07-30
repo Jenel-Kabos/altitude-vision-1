@@ -58,7 +58,11 @@ const hotelReservationSchema = new mongoose.Schema(
     // buildReservationReference ci-dessous, exportée pure pour être testée
     // sans dépendre d'une connexion DB.
     sequenceNumber: { type: Number },
-    reference: { type: String, unique: true, index: true },
+    // sparse: sans lui, un index unique non-sparse traite tout document où
+    // `reference` est absent (jamais défini par le pre('save') faute de
+    // sequenceNumber) comme ayant la valeur `null`, et un deuxième document
+    // dans le même cas provoque un E11000 sur `reference: null`.
+    reference: { type: String, unique: true, sparse: true, index: true },
 
     // C/D.1 — clé fournie par le client et empreinte métier associée. Les
     // anciennes réservations restent valides grâce à l'index partiel.

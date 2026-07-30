@@ -37,6 +37,7 @@ const contratSchema = new mongoose.Schema({
     required: [true, 'Le type de contrat est requis'],
   },
   bien:         { type: mongoose.Schema.Types.ObjectId, ref: 'Property' },
+  reservation:  { type: mongoose.Schema.Types.ObjectId, ref: 'RealEstateReservation', default: null },
   proprietaire: { type: mongoose.Schema.Types.ObjectId, ref: 'Proprietaire' },
   statut: {
     type: String,
@@ -95,6 +96,10 @@ contratSchema.index(
     },
     name: 'one_open_contract_per_property_and_type',
   },
+);
+contratSchema.index(
+  { reservation: 1 },
+  { unique: true, partialFilterExpression: { reservation: { $type: 'objectId' } }, name: 'one_contract_per_real_estate_reservation' },
 );
 
 module.exports = mongoose.model('Contrat', contratSchema);

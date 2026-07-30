@@ -41,6 +41,14 @@ const TYPE_CONFIG = {
   visite_incident:       { icon: 'warning', color: '#EF4444', label: 'Rendez-vous' },
   transaction_created:   { icon: 'swap-horizontal',       color: '#F59E0B', label: 'Transaction'  },
   transaction_finalized: { icon: 'checkmark-circle',      color: '#10B981', label: 'Transaction'  },
+  real_estate_application_submitted: { icon: 'document-text', color: '#C8960C', label: 'Dossier' },
+  real_estate_application_under_review: { icon: 'time', color: '#3B82F6', label: 'Dossier' },
+  real_estate_application_accepted: { icon: 'checkmark-circle', color: '#10B981', label: 'Dossier' },
+  real_estate_application_rejected: { icon: 'close-circle', color: '#EF4444', label: 'Dossier' },
+  real_estate_application_withdrawn: { icon: 'arrow-undo', color: '#F59E0B', label: 'Dossier' },
+  real_estate_reservation_expiring: { icon: 'alarm', color: '#F59E0B', label: 'Réservation' },
+  real_estate_reservation_expired: { icon: 'time', color: '#EF4444', label: 'Réservation' },
+  real_estate_reservation_cancelled: { icon: 'close-circle', color: '#EF4444', label: 'Réservation' },
   quote_received:        { icon: 'document-text',         color: '#8B5CF6', label: 'Devis'        },
   quote_status:          { icon: 'document-text-outline', color: '#8B5CF6', label: 'Devis'        },
   quote_response:        { icon: 'mail',                  color: '#8B5CF6', label: 'Devis'        },
@@ -74,7 +82,7 @@ const formatRelativeTime = (dateStr) => {
 // ─── Navigation helper ────────────────────────────────────────────────────────
 
 function getNavTarget(notif) {
-  const { type, data = {} } = notif;
+  const { type, data = {}, entityId } = notif;
 
   // 'Chat' est imbriqué dans MessagerieStack (onglet 'Messages') — naviguer
   // directement vers 'Chat' depuis un autre onglet (Annonces) échoue, il faut
@@ -103,6 +111,12 @@ function getNavTarget(notif) {
     transaction_finalized: { screen: 'Profil',  params: { screen: 'Transactions' } },
     payment_success:       { screen: 'Profil',  params: { screen: 'Transactions' } },
     payment_failed:        { screen: 'Profil',  params: { screen: 'Transactions' } },
+    real_estate_application_under_review: { screen: 'Profil', params: { screen: 'RealEstateApplicationDetail', params: { applicationId: data.applicationId || entityId } } },
+    real_estate_application_accepted: { screen: 'Profil', params: { screen: 'RealEstateApplicationDetail', params: { applicationId: data.applicationId || entityId } } },
+    real_estate_application_rejected: { screen: 'Profil', params: { screen: 'RealEstateApplicationDetail', params: { applicationId: data.applicationId || entityId } } },
+    real_estate_reservation_expiring: { screen: 'Profil', params: { screen: 'RealEstateApplications' } },
+    real_estate_reservation_expired: { screen: 'Profil', params: { screen: 'RealEstateApplications' } },
+    real_estate_reservation_cancelled: { screen: 'Profil', params: { screen: 'RealEstateApplications' } },
   };
   return MAP[type] || null;
 }

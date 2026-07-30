@@ -236,7 +236,12 @@ const accommodationSchema = new mongoose.Schema(
     // Accommodation créés par les autres parcours, qui n'ont pas ce champ) est la
     // garantie ultime contre le double-doublon en cas de requêtes concurrentes
     // avec la même clé, au-delà de la vérification applicative.
-    publicationRequestId: { type: String, default: null },
+    // Pas de `default: null` : un sparse index MongoDB n'exclut que les
+    // documents où le champ est absent, pas ceux où il vaut `null` — un
+    // default explicite ferait entrer TOUS les Accommodation (créés par les
+    // autres parcours, sans cette clé) dans l'index unique et provoquerait un
+    // E11000 dès la deuxième création concurrente.
+    publicationRequestId: { type: String },
   },
   { timestamps: true },
 );

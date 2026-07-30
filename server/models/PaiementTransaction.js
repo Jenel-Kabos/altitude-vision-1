@@ -47,4 +47,13 @@ const paiementTransactionSchema = new Schema(
   { timestamps: true }
 );
 
+paiementTransactionSchema.index(
+  { transaction: 1, methode: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { statut: { $in: ['En attente', 'Payé'] } },
+    name: 'one_open_yabetoo_payment_per_transaction',
+  },
+);
+
 module.exports = mongoose.model('PaiementTransaction', paiementTransactionSchema);

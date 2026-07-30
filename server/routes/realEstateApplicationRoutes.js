@@ -1,0 +1,20 @@
+const express = require('express');
+const auth = require('../controllers/authController');
+const ctrl = require('../controllers/realEstateApplicationController');
+const realEstateApplicationUpload = require('../middleware/realEstateApplicationUpload');
+
+const router = express.Router();
+router.use(auth.protect);
+router.get('/', ctrl.list);
+router.post('/', ctrl.create);
+router.get('/reservations/:id', ctrl.getReservation);
+router.post('/reservations/:id/cancel', ctrl.cancelReservation);
+router.post('/:id/attachments', realEstateApplicationUpload.array('attachments', 5), ctrl.uploadAttachments);
+router.get('/:id/attachments/:attachmentId', ctrl.downloadAttachment);
+router.delete('/:id/attachments/:attachmentId', ctrl.deleteAttachment);
+router.get('/:id', ctrl.getOne);
+router.post('/:id/review', ctrl.review);
+router.post('/:id/accept', ctrl.accept);
+router.post('/:id/reject', ctrl.reject);
+router.post('/:id/withdraw', ctrl.withdraw);
+module.exports = router;

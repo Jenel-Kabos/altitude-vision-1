@@ -7,20 +7,22 @@ const FinancialPayment = require('../models/FinancialPayment');
 const FinancialLedgerEntry = require('../models/FinancialLedgerEntry');
 const { finalizeRealEstateTransaction } = require('../services/finance/realEstateTransactionFinalizationService');
 const { createManualPayment } = require('../services/finance/financialPaymentService');
+const RealEstateReservation = require('../models/RealEstateReservation');
 
 jest.setTimeout(120000);
 const id = () => new mongoose.Types.ObjectId();
 
 async function fixture(label) {
-  const propertyId = id(); const transactionId = id(); const clientId = id(); const agentId = id();
-  await Property.collection.insertOne({ _id: propertyId, title: `Bien ${label}`, status: 'vente', availability: 'Disponible', isPublished: true, hasSpecialCommission: false });
-  await Transaction.collection.insertOne({ _id: transactionId, property: propertyId, client: clientId, agent: agentId, finalAmount: 1000000, transactionType: 'vente', commission: { taux: 10, total: 100000, ownerPayout: 0, agencyNet: 100000 }, status: 'Paiement en attente', paymentStatus: 'confirmé', paiements: [], createdAt: new Date(), updatedAt: new Date() });
+  const propertyId = id(); const transactionId = id(); const clientId = id(); const agentId = id(); const reservationId = id();
+  await Property.collection.insertOne({ _id: propertyId, title: `Bien ${label}`, status: 'vente', availability: 'Réservé', isPublished: true, hasSpecialCommission: false, reservationLock: { reservation: reservationId } });
+  await RealEstateReservation.collection.insertOne({ _id: reservationId, property: propertyId, client: clientId, application: id(), type: 'sale', status: 'active', expiresAt: new Date(Date.now() + 60000), idempotencyKey: `fixture:${label}`, transaction: transactionId, history: [], createdAt: new Date(), updatedAt: new Date() });
+  await Transaction.collection.insertOne({ _id: transactionId, property: propertyId, reservation: reservationId, client: clientId, agent: agentId, finalAmount: 1000000, transactionType: 'vente', commission: { taux: 10, total: 100000, ownerPayout: 0, agencyNet: 100000 }, status: 'Paiement en attente', paymentStatus: 'confirmé', paiements: [], createdAt: new Date(), updatedAt: new Date() });
   return { propertyId, transactionId, agentId };
 }
 
 beforeAll(async () => {
   await startFinancialMongo();
-  await Promise.all([Transaction.syncIndexes(), Document.syncIndexes()]);
+  await Promise.all([Transaction.syncIndexes(), Document.syncIndexes(), RealEstateReservation.syncIndexes()]);
 });
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);
@@ -40,7 +42,7 @@ test('le fallback compense une interruption puis reprend avec la même clé', as
   const faultInjector = async (point) => { if (point === 'finalization.after_property') throw new Error('CRASH_AFTER_PROPERTY'); };
   await expect(finalizeRealEstateTransaction({ transactionId: f.transactionId, actorId: f.agentId, transactionMode: 'fallback', faultInjector })).rejects.toThrow('CRASH_AFTER_PROPERTY');
   expect(await Document.countDocuments()).toBe(0);
-  expect(await Property.findById(f.propertyId)).toMatchObject({ availability: 'Disponible', isPublished: true });
+  expect(await Property.findById(f.propertyId)).toMatchObject({ availability: 'Réservé', isPublished: true });
   expect(await Transaction.findById(f.transactionId)).toMatchObject({ status: 'Paiement en attente', finalization: { status: 'failed' } });
   const retry = await finalizeRealEstateTransaction({ transactionId: f.transactionId, actorId: f.agentId, transactionMode: 'fallback' });
   expect(retry.idempotent).toBe(false);

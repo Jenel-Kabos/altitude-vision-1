@@ -24,6 +24,16 @@ const NOTIFICATION_TYPES = [
   // ── Transactions ──
   'transaction_created',  // client : une transaction le concernant a été ouverte
   'transaction_finalized',// client : transaction réussie (vente/location validée)
+  'real_estate_application_submitted',
+  'real_estate_application_under_review',
+  'real_estate_application_accepted',
+  'real_estate_application_rejected',
+  'real_estate_application_withdrawn',
+  'real_estate_reservation_created',
+  'real_estate_reservation_expiring',
+  'real_estate_reservation_expired',
+  'real_estate_reservation_cancelled',
+  'real_estate_reservation_converted',
   // ── Devis ──
   'quote_received',       // staff : nouveau devis (Quote) soumis
   'quote_status',         // client : statut de son devis a changé

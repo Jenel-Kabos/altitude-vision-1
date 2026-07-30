@@ -5,6 +5,7 @@ const { notify } = require('../services/notificationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { ALL_STAFF } = require('../utils/roles');
 const { finalizeRealEstateTransaction } = require('../services/finance/realEstateTransactionFinalizationService');
+const RealEstateReservation = require('../models/RealEstateReservation');
 
 const calcCommission = (finalAmount, tauxPercent = 10, hasSpecial = false) => {
   const total       = Math.round(finalAmount * (tauxPercent / 100));
@@ -16,10 +17,10 @@ const calcCommission = (finalAmount, tauxPercent = 10, hasSpecial = false) => {
 // POST /api/transactions
 exports.createTransaction = async (req, res) => {
   try {
-    const { propertyId, clientId, finalAmount, transactionType, tauxCommission = 10, notes } = req.body;
+    const { propertyId, clientId, reservationId, finalAmount, transactionType, tauxCommission = 10, notes } = req.body;
 
-    if (!propertyId || !clientId || finalAmount === undefined || !transactionType) {
-      return res.status(400).json({ status: 'fail', message: 'propertyId, clientId, finalAmount et transactionType requis.' });
+    if (!propertyId || !clientId || !reservationId || finalAmount === undefined || !transactionType) {
+      return res.status(400).json({ status: 'fail', message: 'propertyId, clientId, reservationId, finalAmount et transactionType requis.' });
     }
 
     const amount = Number(finalAmount);
@@ -28,7 +29,7 @@ exports.createTransaction = async (req, res) => {
     }
 
     const [property, client] = await Promise.all([
-      Property.findById(propertyId).select('status statusAdmin availability owner price'),
+      Property.findById(propertyId).select('status statusAdmin availability owner price reservationLock'),
       User.findById(clientId).select('_id'),
     ]);
     if (!property) return res.status(404).json({ status: 'fail', code: 'PROPERTY_NOT_FOUND', message: 'Bien introuvable.' });
@@ -36,7 +37,13 @@ exports.createTransaction = async (req, res) => {
     if (property.status !== transactionType) {
       return res.status(409).json({ status: 'fail', code: 'TRANSACTION_TYPE_MISMATCH', message: 'Le type de transaction ne correspond pas au bien.' });
     }
-    if (property.statusAdmin !== 'Validée' || property.availability !== 'Disponible') {
+    const reservation = await RealEstateReservation.findById(reservationId);
+    if (!reservation || reservation.status !== 'active' || reservation.expiresAt <= new Date()
+      || reservation.type !== 'sale' || String(reservation.property) !== String(propertyId)
+      || String(reservation.client) !== String(clientId)) {
+      return res.status(409).json({ status: 'fail', code: 'ACTIVE_RESERVATION_REQUIRED', message: 'Une réservation de vente active et cohérente est requise.' });
+    }
+    if (property.statusAdmin !== 'Validée' || property.availability !== 'Réservé' || String(property.reservationLock?.reservation) !== String(reservation._id)) {
       return res.status(409).json({ status: 'fail', code: 'PROPERTY_NOT_AVAILABLE', message: 'Ce bien ne peut plus faire l’objet d’une transaction.' });
     }
     if (String(property.owner) === String(clientId)) {
@@ -49,11 +56,14 @@ exports.createTransaction = async (req, res) => {
       property: propertyId,
       client:   clientId,
       agent:    req.user.id,
+      reservation: reservation._id,
       finalAmount: amount,
       transactionType,
       commission,
       notes,
     });
+
+    await RealEstateReservation.updateOne({ _id: reservation._id, status: 'active', transaction: null }, { $set: { transaction: transaction._id }, $push: { history: { from: 'active', to: 'active', action: 'transaction_created', actor: req.user._id } } });
 
     await transaction.populate([
       { path: 'property', select: 'title images price' },

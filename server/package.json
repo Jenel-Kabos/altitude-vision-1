@@ -10,7 +10,7 @@
     "format": "prettier --write \"**/*.{js,json,css,md}\"",
     "test": "jest",
     "test:unit": "jest --testPathIgnorePatterns='\\.(mongo|replica)\\.integration\\.test\\.js$'",
-    "test:mongo": "jest --runInBand --detectOpenHandles --testPathPatterns='\\.(mongo|replica)\\.integration\\.test\\.js$'",
+    "test:mongo": "node scripts/run-mongo-tests.js",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:finance:unit": "jest --runInBand --testPathPatterns='financial(?!.*(mongo|replica)\\.).*test\\.js$'",

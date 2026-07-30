@@ -944,7 +944,7 @@ const deleteProperty = asyncHandler(async (req, res) => {
     Transaction.exists({ property: property._id }),
     Contrat.exists({ bien: property._id }),
   ]);
-  if (transaction || contract) {
+  if (transaction || contract || property.hasReservationHistory) {
     res.status(409);
     throw new Error('Ce bien possède un historique transactionnel ou contractuel et doit être archivé, pas supprimé.');
   }
@@ -968,11 +968,16 @@ const deleteProperty = asyncHandler(async (req, res) => {
  * @route DELETE /api/properties/admin/:id
  */
 const adminDeleteProperty = asyncHandler(async (req, res) => {
-  const property = await Property.findByIdAndDelete(req.params.id);
+  const property = await Property.findById(req.params.id);
   if (!property) {
     res.status(404);
     throw new Error('Propriété non trouvée.');
   }
+  if (property.hasReservationHistory) {
+    res.status(409);
+    throw new Error('Ce bien possède un historique de réservation et ne peut pas être supprimé physiquement.');
+  }
+  await property.deleteOne();
   res.status(204).json({ status: 'success', data: null });
 
   logAction({

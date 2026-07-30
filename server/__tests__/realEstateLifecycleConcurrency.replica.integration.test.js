@@ -2,21 +2,25 @@ const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const Transaction = require('../models/Transaction');
 const Contrat = require('../models/Contrat');
+const RealEstateApplication = require('../models/RealEstateApplication');
+const RealEstateReservation = require('../models/RealEstateReservation');
 
 jest.setTimeout(120000);
 const id = () => new mongoose.Types.ObjectId();
 
 beforeAll(async () => {
   await startFinancialMongo();
-  await Promise.all([Transaction.syncIndexes(), Contrat.syncIndexes()]);
+  await Promise.all([Transaction.syncIndexes(), Contrat.syncIndexes(), RealEstateApplication.syncIndexes(), RealEstateReservation.syncIndexes()]);
 });
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);
 
 test('deux ouvertures concurrentes du même dossier immobilier : une seule est persistée', async () => {
   const property = id();
+  const reservation = await RealEstateReservation.create({ property, client: id(), application: id(), type: 'sale', status: 'active', expiresAt: new Date(Date.now() + 60000), idempotencyKey: `test:${property}` });
   const common = {
     property, agent: id(), finalAmount: 25000000, transactionType: 'vente',
+    reservation: reservation._id,
     commission: { taux: 10, total: 2500000, ownerPayout: 0, agencyNet: 2500000 },
     status: 'En cours', paymentStatus: 'non_initié',
   };
@@ -32,9 +36,10 @@ test('deux ouvertures concurrentes du même dossier immobilier : une seule est p
 
 test('deux créations concurrentes de bail sur le même bien : une seule est persistée', async () => {
   const bien = id();
+  const reservation = await RealEstateReservation.create({ property: bien, client: id(), application: id(), type: 'rental', status: 'active', expiresAt: new Date(Date.now() + 60000), idempotencyKey: `test:${bien}` });
   const results = await Promise.allSettled([
-    Contrat.create({ type: 'location', bien, statut: 'en_attente', locataire: id(), montantLoyer: 150000 }),
-    Contrat.create({ type: 'location', bien, statut: 'en_attente', locataire: id(), montantLoyer: 150000 }),
+    Contrat.create({ type: 'location', bien, reservation: reservation._id, statut: 'en_attente', locataire: id(), montantLoyer: 150000 }),
+    Contrat.create({ type: 'location', bien, reservation: reservation._id, statut: 'en_attente', locataire: id(), montantLoyer: 150000 }),
   ]);
 
   expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(1);
