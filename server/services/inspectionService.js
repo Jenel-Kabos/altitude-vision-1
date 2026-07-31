@@ -44,8 +44,17 @@ async function createInspectionCore({ roomId, housekeepingTaskId, inspectorId, n
   }
 
   const data = { room: roomId, housekeepingTask: housekeepingTaskId, inspector: inspectorId, notes, fromOutOfService };
-  const inspection = session ? (await RoomInspection.create([data], { session }))[0] : await RoomInspection.create(data);
-  return inspection;
+  try {
+    const inspection = session ? (await RoomInspection.create([data], { session }))[0] : await RoomInspection.create(data);
+    return inspection;
+  } catch (error) {
+    // E11000 : une inspection ouverte existe déjà pour cette chambre —
+    // l'index unique partiel {room, result:null} a fait son travail (deux
+    // créations concurrentes lisent toutes deux room.status === 'inspection'
+    // sans le réclamer atomiquement).
+    if (error.code === 11000) throw fail('Une inspection est déjà ouverte pour cette chambre.', 409);
+    throw error;
+  }
 }
 
 async function createInspection({ roomId, housekeepingTaskId, inspectorId, notes = '', actingUser, transactionMode = 'fallback' }) {

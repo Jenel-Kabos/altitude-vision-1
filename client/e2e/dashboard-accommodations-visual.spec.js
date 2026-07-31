@@ -25,5 +25,11 @@ test('comparaison visuelle Ventes, Locations et Hébergements', async ({ page })
   await page.getByRole('link', { name: 'Réservations' }).click();
   await expect(page).toHaveURL(/\/dashboard\/hebergements\/66e200000000000000000004\?view=reservations/);
   await expect(page.getByRole('heading', { name: 'Villa E2E Brazzaville' })).toBeVisible();
-  await expect(page.getByText(/Aucune réservation\.|→ .* nuit/)).toBeVisible();
+  // .first() : ce test partage l'accommodation fixture avec
+  // accommodation-booking.spec.js, exécuté pour les deux projets
+  // (desktop-chromium et mobile-chromium) contre le même serveur E2E — deux
+  // réservations (dates différentes par projet) peuvent donc coexister ici.
+  // L'intention du test est de vérifier que de vraies données s'affichent,
+  // pas un nombre de lignes précis.
+  await expect(page.getByText(/Aucune réservation\.|→ .* nuit/).first()).toBeVisible();
 });

@@ -38,18 +38,33 @@ cd server && npm start
 ### Testing
 
 ```bash
-# Server (Jest + Supertest) — 20 tests
-cd server && npm test
+# Server unit (Jest + Supertest, models mocked, no DB)
+cd server && npm run test:unit
 cd server && npm run test:coverage
 
-# Client (Vitest + Testing Library) — 31 tests
+# Server Mongo/Replica Set integration (real MongoMemoryReplSet)
+cd server && npm run test:mongo
+
+# Client (Vitest + Testing Library)
 cd client && npm test
 cd client && npm run test:watch
+
+# Mobile (Jest + React Native Testing Library)
+cd altimmo-app && npm run test:coverage
+
+# Browser E2E (Playwright — spins up its own MongoMemoryReplSet + Express + Next dev server)
+cd client && npm run test:e2e
 ```
 
-**Server tests** live in `server/__tests__/` — unit tests for middleware and controller validation (no DB needed, models mocked).
+**Server tests** live in `server/__tests__/`. Plain `*.test.js` files are unit tests (no DB, models mocked) — `npm test`/`npm run test:unit` run only these. `*.mongo.integration.test.js` and `*.replica.integration.test.js` files hit a real MongoDB (via `mongodb-memory-server`) and are excluded from `test:unit`; run them with `npm run test:mongo` (uses its own script, `scripts/run-mongo-tests.js`, to manage the replica set lifecycle).
 
-**Client tests** live in `client/lib/__tests__/` — unit tests for utility functions (`imageUtils`, `formUtils`).
+**Client tests** live in `client/lib/__tests__/` — component and utility tests (Testing Library + jsdom).
+
+**Mobile tests** live in `altimmo-app/src/**/__tests__/`.
+
+**E2E tests** live in `client/e2e/` — full browser flows (Playwright, `desktop-chromium` + `mobile-chromium` projects) against a seeded, ephemeral backend. Not run in the `lint.yml`/`mobile-validation.yml` CI workflows' `test` jobs; see `.github/workflows/e2e.yml`.
+
+Exact test counts are intentionally not documented here — they drift with every PR; check `npm test`/`npm run test:mongo` output for the current numbers rather than trusting a hardcoded figure.
 
 ## Architecture
 

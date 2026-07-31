@@ -47,6 +47,21 @@ exports.googleLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Protège /auth/forgot-password contre le spam d'emails (harcèlement d'un
+// destinataire réel) et l'épuisement du quota d'envoi SMTP — seul endpoint
+// d'authentification déclenchant un envoi d'email externe qui n'était pas
+// limité (signup, resend-verification, login, google le sont déjà).
+exports.forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: {
+    status: 'fail',
+    message: 'Trop de demandes de réinitialisation. Réessayez dans 15 minutes.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 exports.estimationSubmissionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,

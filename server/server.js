@@ -569,9 +569,29 @@ if (process.env.NODE_ENV !== 'test') {
 // ============================================================
 // 🛑 GRACEFUL SHUTDOWN
 // ============================================================
+// Render (et la plupart des PaaS) envoient SIGTERM avant chaque redémarrage
+// de déploiement — un process.exit() immédiat coupait toute requête en vol
+// (y compris une écriture financière) au lieu de la laisser se terminer.
+// Ici : on arrête d'accepter de nouvelles connexions, on laisse les requêtes
+// en cours se terminer, on ferme Mongo, puis on quitte — avec un filet de
+// sécurité pour ne jamais bloquer un déploiement indéfiniment.
 const gracefulShutdown = (signal) => {
   logger.warn(`\n⚠️ Signal ${signal} reçu. Arrêt gracieux du serveur...`);
-  process.exit(0);
+  const forceExit = setTimeout(() => {
+    logger.error('❌ [SHUTDOWN] Délai dépassé — arrêt forcé.');
+    process.exit(1);
+  }, 10000);
+  forceExit.unref();
+  httpServer.close(async () => {
+    try {
+      await mongoose.connection.close(false);
+    } catch (error) {
+      logger.error('❌ [SHUTDOWN] Erreur fermeture MongoDB', error);
+    } finally {
+      clearTimeout(forceExit);
+      process.exit(0);
+    }
+  });
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

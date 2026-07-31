@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const Property = require('../models/Property');
+const logger = require('../utils/logger');
 
 // ======================================================
 // 🔒 MIDDLEWARE : AUTHENTIFICATION OBLIGATOIRE
@@ -80,13 +81,13 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
 
       if (user && user.isActive) {
         req.user = user;
-        console.log(`✅ [OptionalAuth] Utilisateur connecté : ${user.email}`);
+        logger.success('[OptionalAuth] Utilisateur connecté', { email: user.email });
       } else {
         req.user = null;
-        console.warn('⚠️ [OptionalAuth] Utilisateur inactif ou introuvable');
+        logger.warn('[OptionalAuth] Utilisateur inactif ou introuvable');
       }
     } catch (error) {
-      console.warn('⚠️ [OptionalAuth] Token invalide ou expiré, continuation sans authentification');
+      logger.warn('[OptionalAuth] Token invalide ou expiré, continuation sans authentification');
       req.user = null;
     }
   } else {

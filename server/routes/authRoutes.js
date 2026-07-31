@@ -2,7 +2,7 @@
 const express        = require('express');
 const router         = express.Router();
 const authController = require('../controllers/authController');
-const { signupLimiter, resendVerificationLimiter, loginLimiter, googleLimiter } = require('../middleware/rateLimiters');
+const { signupLimiter, resendVerificationLimiter, loginLimiter, googleLimiter, forgotPasswordLimiter } = require('../middleware/rateLimiters');
 const { protect } = require('../middleware/authMiddleware');
 
 // ======================================================
@@ -24,7 +24,7 @@ router.post('/google',               googleLimiter, authController.googleToken);
 router.post('/google-token',         googleLimiter, authController.googleGetToken);
 
 // ✅ Mot de passe oublié → envoie l'email avec le lien
-router.post('/forgot-password',      authController.forgotPassword);
+router.post('/forgot-password',      forgotPasswordLimiter, authController.forgotPassword);
 
 // ✅ Réinitialisation avec le token reçu par email
 router.patch('/reset-password/:token', authController.resetPassword);

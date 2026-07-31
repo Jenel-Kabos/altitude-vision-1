@@ -31,7 +31,12 @@ const roomInspectionSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-roomInspectionSchema.index({ room: 1 });
+// Anti double-inspection ouverte (mission §6/§13) — contrainte DB, même
+// stratégie que HousekeepingTask.js : createInspectionCore ne fait que lire
+// room.status === 'inspection' sans le réclamer atomiquement, donc deux
+// créations concurrentes pouvaient chacune passer ce contrôle et produire
+// deux RoomInspection ouvertes (result: null) pour la même chambre.
+roomInspectionSchema.index({ room: 1 }, { unique: true, partialFilterExpression: { result: null } });
 roomInspectionSchema.index({ housekeepingTask: 1 });
 
 const RoomInspection = mongoose.model('RoomInspection', roomInspectionSchema);
