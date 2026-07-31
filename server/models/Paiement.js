@@ -18,6 +18,12 @@ const paiementSchema = new mongoose.Schema({
   reference:    { type: String, trim: true },
   notes:        { type: String, trim: true },
   montantRecu:  { type: Number },
+  // Optionnel — les anciens documents n'ont pas ce champ, ce qui reste
+  // valide (aucune contrainte required, aucune migration nécessaire).
+  preuvePaiement: {
+    url:      { type: String },
+    publicId: { type: String },
+  },
 
   // ── Retard & Pénalités ─────────────────────────────────────
   jourEcheance:      { type: Number, default: 1 },

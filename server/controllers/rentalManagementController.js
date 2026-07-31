@@ -53,7 +53,7 @@ exports.stats = async (_req, res) => {
   try {
     const windowDays = contractAlertWindowDays();
     const soon = new Date(Date.now() + windowDays * 24 * 60 * 60 * 1000);
-    const [grouped, overduePayments, partialPayments, expiringContracts, expiredContracts] = await Promise.all([
+    const [grouped, overduePayments, partialPayments, expiringContracts, expiredContracts, biensInscrits] = await Promise.all([
       // Sprint A : n'agrège que les dossiers réellement activés — une
       // simple annonce Location ne doit jamais gonfler les statistiques de
       // gestion locative (voir server/docs/PROPERTY_TRANSACTION_ARCHITECTURE.md).
@@ -62,8 +62,28 @@ exports.stats = async (_req, res) => {
       Paiement.countDocuments({ statut: 'partiel' }),
       Contrat.countDocuments({ type: 'location', statut: 'actif', dateFinBail: { $gte: new Date(), $lte: soon } }),
       Contrat.countDocuments({ type: 'location', $or: [{ statut: 'expiré' }, { statut: 'actif', dateFinBail: { $lt: new Date() } }] }),
+      // "Biens inscrits" (Sprint GL-UX1, affiné GL-DEBT-1) — distinct de
+      // "biens sous gestion" (RentalManagement.managementActivated:true
+      // ci-dessus) : biens de LOCATION réellement rattachés à un
+      // propriétaire externe identifiable (role 'Proprietaire'), ni retirés
+      // du marché, ni internes à l'agence (owner Admin/Collaborateur/...).
+      // `owner` est `required:true` sur Property (aucun bien sans
+      // propriétaire n'existe en base), donc seul le filtre de rôle est
+      // nécessaire pour exclure les biens "possédés" par un compte staff.
+      // N'inclut PAS Proprietaire.biensPropres[] : cette structure historique
+      // (pré-Property) n'est reliée à aucun Contrat/RentalManagement du
+      // module Gestion Locative — l'inclure gonflerait ce KPI avec des
+      // entrées invisibles partout ailleurs dans le module. Voir
+      // server/docs/PROPERTY_TRANSACTION_ARCHITECTURE.md.
+      Property.aggregate([
+        { $match: { status: 'location', availability: { $ne: 'Retiré' }, owner: { $exists: true, $ne: null } } },
+        { $lookup: { from: 'users', localField: 'owner', foreignField: '_id', as: 'ownerDoc' } },
+        { $unwind: '$ownerDoc' },
+        { $match: { 'ownerDoc.role': 'Proprietaire' } },
+        { $count: 'total' },
+      ]).then((rows) => rows[0]?.total || 0),
     ]);
-    res.json({ status: 'success', data: { stats: { ...(grouped[0] || { total: 0, vacant: 0, available: 0, occupied: 0, notice: 0, scheduledExits: 0, inModeration: 0, published: 0, maintenance: 0, blockingInspections: 0, readyToRepublish: 0 }), overduePayments, partialPayments, expiringContracts, expiredContracts, contractAlertWindowDays: windowDays } } });
+    res.json({ status: 'success', data: { stats: { ...(grouped[0] || { total: 0, vacant: 0, available: 0, occupied: 0, notice: 0, scheduledExits: 0, inModeration: 0, published: 0, maintenance: 0, blockingInspections: 0, readyToRepublish: 0 }), overduePayments, partialPayments, expiringContracts, expiredContracts, contractAlertWindowDays: windowDays, biensInscrits } } });
   } catch (error) { fail(res, error); }
 };
 

@@ -1,4 +1,15 @@
 import '@testing-library/jest-dom';
+import { configure } from '@testing-library/react';
+
+// GL-DEBT-1 (Phase 15) — sous forte contention CPU (suite parallélisée sur
+// plusieurs threads), le défaut de Testing Library (1000ms pour
+// waitFor/findBy*) est parfois trop court pour un rendu jsdom + import()
+// dynamique de page dashboard, ce qui produit des échecs intermittents
+//("Unable to find role...", "Test timed out") sans rapport avec un bug
+// applicatif — les mêmes tests passent systématiquement en isolation.
+// Un timeout plus généreux, ciblé sur ce mécanisme précis (pas une
+// augmentation aveugle de tous les timeouts), absorbe cette contention.
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom n'a pas window.matchMedia (requis par framer-motion)
 Object.defineProperty(window, 'matchMedia', {

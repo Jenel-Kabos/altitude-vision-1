@@ -7,6 +7,15 @@ const documentSchema = new mongoose.Schema({
   dateGeneration: { type: Date, default: Date.now },
   envoiEmail:     { type: Boolean, default: false },
   dateEnvoi:      { type: Date },
+  // GL-DEBT-1 (Phase 9) — champs optionnels, absents sur tous les documents
+  // existants (rétrocompatibles sans migration). sourcePaiement permet de
+  // retrouver et invalider une quittance si l'encaissement qui l'a produite
+  // est ensuite annulé (Phase 8) — le document original n'est JAMAIS
+  // modifié ni supprimé, seul son statut de validité change.
+  sourcePaiement: { type: mongoose.Schema.Types.ObjectId, ref: 'Paiement', default: null },
+  invalidated:     { type: Boolean, default: false },
+  invalidatedAt:   { type: Date, default: null },
+  invalidatedReason: { type: String, trim: true, default: '' },
 });
 
 const pieceEdlSchema = new mongoose.Schema({

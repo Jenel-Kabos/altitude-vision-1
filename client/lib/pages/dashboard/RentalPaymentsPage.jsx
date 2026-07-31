@@ -41,7 +41,7 @@ const RentalPaymentsPage = () => {
   const [statut, setStatut] = useState('');
   const [page, setPage] = useState(1);
   const [payingId, setPayingId] = useState(null);
-  const [payForm, setPayForm] = useState({ montantRecu: '', modePaiement: 'espèces', reference: '' });
+  const [payForm, setPayForm] = useState({ montantRecu: '', datePaiement: '', modePaiement: 'espèces', reference: '', preuve: null });
   const limit = 20;
 
   const load = async () => {
@@ -68,12 +68,14 @@ const RentalPaymentsPage = () => {
     try {
       await marquerPaiementPaye(id, {
         montantRecu: Number(payForm.montantRecu) || undefined,
+        datePaiement: payForm.datePaiement || undefined,
         modePaiement: payForm.modePaiement,
         reference: payForm.reference,
+        preuve: payForm.preuve,
       });
       toast.success("Paiement enregistré.");
       setPayingId(null);
-      setPayForm({ montantRecu: '', modePaiement: 'espèces', reference: '' });
+      setPayForm({ montantRecu: '', datePaiement: '', modePaiement: 'espèces', reference: '', preuve: null });
       load();
     } catch (err) {
       toast.error(err.response?.data?.message || "Erreur lors de l'enregistrement.");
@@ -170,6 +172,10 @@ const RentalPaymentsPage = () => {
                         <div className="flex flex-wrap gap-1 items-center">
                           <input type="number" placeholder="Montant reçu" value={payForm.montantRecu}
                             onChange={(e) => setPayForm((f) => ({ ...f, montantRecu: e.target.value }))} className="w-24 text-xs border rounded px-1 py-1" />
+                          <input type="date" value={payForm.datePaiement}
+                            onChange={(e) => setPayForm((f) => ({ ...f, datePaiement: e.target.value }))} className="text-xs border rounded px-1 py-1" />
+                          <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
+                            onChange={(e) => setPayForm((f) => ({ ...f, preuve: e.target.files?.[0] || null }))} className="text-xs w-32" />
                           <button onClick={() => handleMarquerPaye(p._id)} className="bg-green-600 text-white px-2 py-1 rounded text-xs">Confirmer</button>
                           <button onClick={() => setPayingId(null)} className="text-gray-500 text-xs">Annuler</button>
                         </div>

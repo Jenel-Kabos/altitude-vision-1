@@ -9,6 +9,13 @@ jest.mock('../models/Paiement');
 jest.mock('../models/RentalManagement');
 jest.mock('../models/Document');
 jest.mock('../models/User');
+jest.mock('../models/RentalPaymentReceipt', () => ({ create: jest.fn().mockResolvedValue({ _id: 'RECEIPT-1' }) }));
+// GL-DEBT-1 (Phase 5-9) : marquerPaye passe par runFinancialOperation
+// (session Mongo réelle) — sans DB (convention unit test), on simule le
+// mode "fallback" (identique au comportement réel sans replica set).
+jest.mock('../services/finance/financialTransactionService', () => ({
+  runFinancialOperation: (meta, operation) => operation({ session: null, transactional: false }),
+}));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
@@ -188,8 +195,9 @@ describe('GET /api/documents — correctif permission GestionnaireImmobilier (Sp
 
   test('200 — GestionnaireImmobilier a maintenant accès (STAFF_DOC corrigé)', async () => {
     mockUserAuth(GESTIONNAIRE_ID, 'GestionnaireImmobilier');
-    // Document.find(...).populate(...).populate(...) doit résoudre un tableau.
-    const chain = { populate: jest.fn() };
+    // Document.find(...).sort(...).populate(...).populate(...) doit résoudre un tableau.
+    const chain = { sort: jest.fn(), populate: jest.fn() };
+    chain.sort.mockReturnValueOnce(chain);
     chain.populate.mockReturnValueOnce(chain).mockResolvedValueOnce([]);
     Document.find = jest.fn().mockReturnValue(chain);
     const res = await request(app).get('/api/documents').set('Authorization', `Bearer ${makeToken(GESTIONNAIRE_ID)}`);

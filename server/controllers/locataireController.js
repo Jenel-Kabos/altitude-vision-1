@@ -5,7 +5,8 @@ const Paiement = require('../models/Paiement');
 const RentalManagement = require('../models/RentalManagement');
 const Document  = require('../models/Document');
 const TenantLinkRequest = require('../models/TenantLinkRequest');
-const { uploadToCloudinary } = require('../config/cloudinary');
+const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
+const logger = require('../utils/logger');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const tenantLinkService = require('../services/tenantLinkService');
 const tenantPortalEmailService = require('../services/tenantPortalEmailService');
@@ -172,9 +173,9 @@ exports.getDossier = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
+  let piece = null;
   try {
     const data = { ...req.body };
-    let piece = null;
     if (req.file) {
       piece = await uploadPiece(req.file);
       data.pieceIdentite = piece.url;
@@ -198,20 +199,32 @@ exports.create = async (req, res) => {
       req,
     });
   } catch (err) {
+    if (piece?.url) {
+      await destroyFromCloudinary(piece.url).catch((rollbackError) => {
+        logger.error('locataire.cloudinary_rollback_failed', { url: piece.url, error: rollbackError.message });
+      });
+    }
     res.status(400).json({ status: 'error', message: err.message });
   }
 };
 
 exports.update = async (req, res) => {
+  let piece = null;
   try {
     const data = { ...req.body };
-    let piece = null;
     if (req.file) {
       piece = await uploadPiece(req.file);
       data.pieceIdentite = piece.url;
     }
     const l = await Locataire.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true });
-    if (!l) return res.status(404).json({ status: 'error', message: 'Locataire introuvable' });
+    if (!l) {
+      if (piece?.url) {
+        await destroyFromCloudinary(piece.url).catch((rollbackError) => {
+          logger.error('locataire.cloudinary_rollback_failed', { url: piece.url, error: rollbackError.message });
+        });
+      }
+      return res.status(404).json({ status: 'error', message: 'Locataire introuvable' });
+    }
     if (piece) {
       await saveIdentiteDocument({
         url: piece.url, nom: piece.nom,
@@ -230,6 +243,11 @@ exports.update = async (req, res) => {
       req,
     });
   } catch (err) {
+    if (piece?.url) {
+      await destroyFromCloudinary(piece.url).catch((rollbackError) => {
+        logger.error('locataire.cloudinary_rollback_failed', { url: piece.url, error: rollbackError.message });
+      });
+    }
     res.status(400).json({ status: 'error', message: err.message });
   }
 };

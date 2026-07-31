@@ -1,23 +1,77 @@
+const mongoose = require('mongoose');
 const Document = require('../models/Document');
 const Transaction = require('../models/Transaction');
 
+// GL-DEBT-1 (Phase 4) — `{...req.query}` était injecté tel quel dans
+// Document.find(), acceptant n'importe quelle clé et n'importe quelle valeur
+// (y compris un objet d'opérateurs Mongo côté client, ex. ?client[$ne]=null).
+// express-mongo-sanitize() (server.js) neutralise déjà les clés `$`/`.`, mais
+// une whitelist explicite est la protection correcte et durable : seules les
+// clés ci-dessous, avec un type scalaire validé, peuvent atteindre la
+// requête Mongo — toute autre clé ou toute valeur non scalaire est ignorée.
+const DOCUMENT_TYPE_VALUES = ['Devis', 'Facture', 'Contrat', 'Etat des Lieux', "Pièce d'identité"];
+const DOCUMENT_STATUS_VALUES = ['Brouillon', 'Envoyé', 'Accepté', 'Refusé', 'Payé', 'En retard'];
+const DOCUMENT_REF_TYPE_VALUES = ['Proprietaire', 'Locataire'];
+
+const isScalar = (value) => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+const asObjectId = (value) => (isScalar(value) && mongoose.isValidObjectId(value) ? value : undefined);
+const asEnum = (value, allowed) => (isScalar(value) && allowed.includes(value) ? value : undefined);
+
+function buildDocumentFilter(query = {}) {
+  const filter = {};
+  const type = asEnum(query.type, DOCUMENT_TYPE_VALUES);
+  if (type) filter.type = type;
+  const status = asEnum(query.status, DOCUMENT_STATUS_VALUES);
+  if (status) filter.status = status;
+  const refType = asEnum(query.refType, DOCUMENT_REF_TYPE_VALUES);
+  if (refType) filter.refType = refType;
+  const client = asObjectId(query.client);
+  if (client) filter.client = client;
+  const createdBy = asObjectId(query.createdBy);
+  if (createdBy) filter.createdBy = createdBy;
+  const refId = asObjectId(query.refId);
+  if (refId) filter.refId = refId;
+  const relatedProperty = asObjectId(query.relatedProperty);
+  if (relatedProperty) filter.relatedProperty = relatedProperty;
+  if (isScalar(query.businessOperationKey)) filter.businessOperationKey = String(query.businessOperationKey).slice(0, 200);
+  return filter;
+}
+
 // --- GET ALL DOCUMENTS ---
-// Can be filtered by type, client, status, etc.
+// Filtrable par type, statut, refType, client, createdBy, refId,
+// relatedProperty, businessOperationKey — toute autre clé de query string
+// est silencieusement ignorée (voir buildDocumentFilter).
 // e.g., /api/documents?type=Facture&status=En retard
+// GL-DEBT-1 (Phase 12) — pagination rétrocompatible : un client qui n'envoie
+// ni `page` ni `limit` reçoit exactement l'ancien comportement (liste
+// complète, non bornée) — aucun écran existant n'est cassé. Un client qui
+// envoie `?page=`  bascule sur une liste bornée + `meta` (total/totalPages).
 exports.getAllDocuments = async (req, res) => {
   try {
-    const filter = { ...req.query };
-    const excludedFields = ['page', 'sort', 'limit', 'fields'];
-    excludedFields.forEach((el) => delete filter[el]);
+    const filter = buildDocumentFilter(req.query);
+    const pageRaw = Number(req.query.page);
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : null;
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 200) : 50;
 
-    // Populate allows us to get details from referenced models
-    const documents = await Document.find(filter)
+    let query = Document.find(filter)
+      .sort({ createdAt: -1 })
       .populate('client', 'name email')
       .populate('createdBy', 'name');
+
+    let meta;
+    if (page) {
+      const total = await Document.countDocuments(filter);
+      query = query.skip((page - 1) * limit).limit(limit);
+      meta = { page, limit, total, totalPages: Math.max(Math.ceil(total / limit), 1) };
+    }
+
+    const documents = await query;
 
     res.status(200).json({
       status: 'success',
       results: documents.length,
+      ...(meta && { meta }),
       data: {
         documents,
       },
@@ -26,6 +80,8 @@ exports.getAllDocuments = async (req, res) => {
     res.status(500).json({ status: 'error', message: error.message });
   }
 };
+
+exports.buildDocumentFilter = buildDocumentFilter;
 
 // --- CREATE A NEW DOCUMENT ---
 exports.createDocument = async (req, res) => {

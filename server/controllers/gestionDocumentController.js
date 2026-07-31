@@ -42,8 +42,10 @@ const uploadPdf = async (buffer, folder, filename) => {
 };
 
 // ── Helper : push document to contrat.documents[] ────────────
-const saveDocToContrat = async (contratId, nom, url, type) => {
-  const doc = { nom, url, type, dateGeneration: new Date() };
+// `extra` (GL-DEBT-1) reste optionnel — les 5 appels existants sans 4e
+// argument continuent de produire exactement le même document qu'avant.
+const saveDocToContrat = async (contratId, nom, url, type, extra = {}) => {
+  const doc = { nom, url, type, dateGeneration: new Date(), ...extra };
   await Contrat.findByIdAndUpdate(contratId, { $push: { documents: doc } });
   return doc;
 };
@@ -117,7 +119,7 @@ exports.generateQuittance = async (req, res) => {
     const fname     = `quittance_${moisLabel}_${p.annee}_${Date.now()}`;
     const url       = await uploadPdf(buffer, folder, fname);
     const nom       = `Quittance ${moisLabel} ${p.annee}`;
-    const saved     = await saveDocToContrat(c._id, nom, url, 'quittance');
+    const saved     = await saveDocToContrat(c._id, nom, url, 'quittance', { sourcePaiement: p._id });
     await notifyVisibleDocument(c, saved, 'receipt');
 
     res.json({ status:'success', data:{ document: saved } });

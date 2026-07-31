@@ -1,8 +1,13 @@
+const mongoose = require('mongoose');
 const Paiement = require('../models/Paiement');
 const Contrat  = require('../models/Contrat');
+const RentalPaymentReceipt = require('../models/RentalPaymentReceipt');
 const { verifierPaiementsEnRetard } = require('../services/alerteService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { notifyContractTenant } = require('../services/rentalTenantNotificationService');
+const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
+const { runFinancialOperation } = require('../services/finance/financialTransactionService');
+const logger = require('../utils/logger');
 
 exports.getAll = async (req, res) => {
   try {
@@ -124,12 +129,22 @@ exports.delete = async (req, res) => {
 };
 
 // ── Marquer comme payé (avec gestion pénalités) ────────────────
+// GL-DEBT-1 (Phases 5-7-10) : chaque appel crée désormais aussi un
+// RentalPaymentReceipt (encaissement individuel, montant = la part
+// INCRÉMENTALE de ce versement, pas le cumul) — Paiement reste la vue
+// agrégée "état courant de l'échéance", inchangée pour tous les
+// consommateurs existants (Vue d'ensemble, portail locataire, quittances).
+// L'écriture Paiement+Reçu est atomique (transaction Mongo réelle avec
+// repli si la base ne supporte pas les transactions — même stratégie que le
+// reste du codebase). L'upload de preuve, non transactionnel par nature
+// (Cloudinary), est annulé explicitement si l'écriture finale échoue.
 exports.marquerPaye = async (req, res) => {
+  let preuvePaiement;
   try {
     const p = await Paiement.findById(req.params.id);
     if (!p) return res.status(404).json({ status: 'error', message: 'Paiement introuvable' });
 
-    const { montantRecu, datePaiement, modePaiement, reference, notes } = req.body;
+    const { montantRecu, datePaiement, modePaiement, reference, notes, idempotencyKey } = req.body;
     const recu = Number(montantRecu);
     if (!Number.isFinite(recu) || recu <= 0) {
       return res.status(422).json({ status: 'fail', message: 'Le montant reçu doit être strictement positif.' });
@@ -141,9 +156,11 @@ exports.marquerPaye = async (req, res) => {
     if (totalDu <= 0 || recu > totalDu) {
       return res.status(422).json({ status: 'fail', message: 'Le montant reçu dépasse le montant dû.' });
     }
-    if (Number(p.montantRecu) > 0 && recu < Number(p.montantRecu)) {
+    const montantAvant = Number(p.montantRecu) || 0;
+    if (montantAvant > 0 && recu < montantAvant) {
       return res.status(422).json({ status: 'fail', message: 'Le montant cumulé ne peut pas diminuer.' });
     }
+    const montantIncrement = recu - montantAvant;
 
     let statut      = recu < totalDu ? 'partiel' : 'payé';
     let notesFinale = notes || '';
@@ -155,20 +172,60 @@ exports.marquerPaye = async (req, res) => {
       }
     }
 
-    const updated = await Paiement.findOneAndUpdate(
-      { _id: p._id, statut: p.statut, montantRecu: p.montantRecu },
-      {
-        statut,
-        montantRecu: recu,
-        ...(datePaiement    && { datePaiement }),
-        ...(modePaiement    && { modePaiement }),
-        ...(reference       && { reference }),
-        ...(notesFinale     && { notes: notesFinale }),
-      },
-      { new: true },
-    );
-    if (!updated) {
-      return res.status(409).json({ status: 'fail', code: 'PAYMENT_CONCURRENT_UPDATE', message: 'Un autre encaissement vient d’être enregistré sur cette échéance.' });
+    // Preuve de paiement optionnelle (upload.single('preuve') sur la route —
+    // req.file n'existe que pour une requête multipart réelle, aucun impact
+    // sur les appels JSON existants sans pièce jointe).
+    if (req.file) {
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder: 'altitude-vision/gestion-locative/preuves-paiement',
+        resource_type: 'auto',
+      });
+      preuvePaiement = { url: result.secure_url, publicId: result.public_id };
+    }
+
+    let updated;
+    let receipt;
+    try {
+      const result = await runFinancialOperation({ operationName: 'rental.payment.record', transactionMode: 'auto' }, async ({ session }) => {
+        const withSession = (query) => (session ? query.session(session) : query);
+        const claimed = await withSession(Paiement.findOneAndUpdate(
+          { _id: p._id, statut: p.statut, montantRecu: p.montantRecu },
+          {
+            statut,
+            montantRecu: recu,
+            ...(datePaiement    && { datePaiement }),
+            ...(modePaiement    && { modePaiement }),
+            ...(reference       && { reference }),
+            ...(notesFinale     && { notes: notesFinale }),
+            ...(preuvePaiement  && { preuvePaiement }),
+          },
+          { new: true },
+        ));
+        if (!claimed) { const err = new Error('CONCURRENT'); err.code = 'CONCURRENT'; throw err; }
+        const receiptData = {
+          paiement: p._id, contrat: p.contrat, montant: montantIncrement, datePaiement: datePaiement || new Date(),
+          modePaiement, reference, preuvePaiement, auteur: req.user.id, idempotencyKey: idempotencyKey || undefined,
+        };
+        const [createdReceipt] = session
+          ? await RentalPaymentReceipt.create([receiptData], { session })
+          : [await RentalPaymentReceipt.create(receiptData)];
+        return { claimed, createdReceipt };
+      });
+      updated = result.claimed;
+      receipt = result.createdReceipt;
+    } catch (error) {
+      // Rollback Cloudinary (Phase 10) : l'upload a réussi mais l'écriture
+      // finale a échoué — ne jamais laisser un fichier orphelin, mais ne
+      // jamais masquer l'erreur métier d'origine si le rollback lui-même échoue.
+      if (preuvePaiement?.url) {
+        await destroyFromCloudinary(preuvePaiement.url).catch((rollbackError) => {
+          logger.error('rental_payment.cloudinary_rollback_failed', { url: preuvePaiement.url, error: rollbackError.message });
+        });
+      }
+      if (error.code === 'CONCURRENT' || String(error.message || '').includes('E11000')) {
+        return res.status(409).json({ status: 'fail', code: 'PAYMENT_CONCURRENT_UPDATE', message: 'Un autre encaissement vient d’être enregistré sur cette échéance.' });
+      }
+      throw error;
     }
 
     await notifyContractTenant(p.contrat, {
@@ -177,7 +234,7 @@ exports.marquerPaye = async (req, res) => {
       dedupeKey: `tenant:payment:${updated._id}:${statut}`, metadata: { paymentId: String(updated._id), status: statut },
     }).catch(() => {});
 
-    res.json({ status: 'success', data: { paiement: updated } });
+    res.json({ status: 'success', data: { paiement: updated, receipt } });
     const moisLabel = updated.mois ? updated.mois + '/' + updated.annee : String(updated.annee || '');
     logAction({
       action: 'Paiement enregistré',
@@ -186,6 +243,223 @@ exports.marquerPaye = async (req, res) => {
       typeAction: 'PAIEMENT',
       auteur: buildAuteur(req.user),
       cible: { id: String(updated._id), type: 'Paiement', nom: `Loyer ${moisLabel}` },
+      req,
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+};
+
+// POST /api/paiements/encaisser-multiple — GL-DEBT-1.1 : un seul encaissement
+// réparti sur PLUSIEURS échéances du même contrat (ex. un locataire règle
+// 2 mois de loyer en un seul virement). Tout-ou-rien : si une seule ligne
+// échoue (CAS perdue, échéance déjà payée, montant invalide), aucune n'est
+// appliquée. Idempotent : rejouer la même `idempotencyKey` renvoie le
+// résultat déjà enregistré au lieu de recompter les montants.
+exports.encaisserMultiple = async (req, res) => {
+  let preuvePaiement;
+  try {
+    const { contrat, allocations, datePaiement, modePaiement, reference, notes, idempotencyKey } = req.body;
+    if (!contrat || !mongoose.isValidObjectId(contrat)) {
+      return res.status(422).json({ status: 'fail', message: 'Identifiant de contrat invalide.' });
+    }
+    const parsedAllocations = typeof allocations === 'string' ? JSON.parse(allocations) : allocations;
+    if (!Array.isArray(parsedAllocations) || parsedAllocations.length === 0) {
+      return res.status(422).json({ status: 'fail', message: 'Au moins une allocation échéance/montant est requise.' });
+    }
+    const cleanAllocations = parsedAllocations.map((a) => ({ paiementId: a.paiementId || a.paiement, montant: Number(a.montant) }));
+    if (cleanAllocations.some((a) => !mongoose.isValidObjectId(a.paiementId) || !Number.isFinite(a.montant) || a.montant <= 0)) {
+      return res.status(422).json({ status: 'fail', message: 'Chaque allocation doit référencer une échéance valide avec un montant strictement positif.' });
+    }
+    const paiementIds = cleanAllocations.map((a) => a.paiementId);
+    if (new Set(paiementIds.map(String)).size !== paiementIds.length) {
+      return res.status(422).json({ status: 'fail', message: 'Une même échéance ne peut apparaître qu\'une seule fois dans un encaissement.' });
+    }
+
+    // Idempotence : un rejeu réseau avec la même clé renvoie le résultat déjà
+    // enregistré plutôt que de retraiter (et donc potentiellement doubler) l'encaissement.
+    if (idempotencyKey) {
+      const existing = await RentalPaymentReceipt.find({ paiement: { $in: paiementIds }, idempotencyKey })
+        .populate('auteur', 'name');
+      if (existing.length > 0) {
+        return res.status(200).json({ status: 'success', idempotentReplay: true, data: { receipts: existing } });
+      }
+    }
+
+    const paiements = await Paiement.find({ _id: { $in: paiementIds } });
+    if (paiements.length !== paiementIds.length) {
+      return res.status(404).json({ status: 'error', message: 'Une ou plusieurs échéances sont introuvables.' });
+    }
+    if (paiements.some((p) => String(p.contrat) !== String(contrat))) {
+      return res.status(422).json({ status: 'fail', message: 'Toutes les échéances doivent appartenir au même contrat.' });
+    }
+    const byId = new Map(paiements.map((p) => [String(p._id), p]));
+    for (const { paiementId, montant } of cleanAllocations) {
+      const p = byId.get(String(paiementId));
+      if (p.statut === 'payé') {
+        return res.status(409).json({ status: 'fail', code: 'PAYMENT_ALREADY_PAID', message: `L'échéance ${paiementId} est déjà intégralement payée.` });
+      }
+      const totalDu = Number(p.montantTotal ?? p.montant ?? 0);
+      const montantAvant = Number(p.montantRecu) || 0;
+      if (totalDu <= 0 || montantAvant + montant > totalDu) {
+        return res.status(422).json({ status: 'fail', message: `Le montant alloué à l'échéance ${paiementId} dépasse le solde restant dû.` });
+      }
+    }
+
+    if (req.file) {
+      const result = await uploadToCloudinary(req.file.buffer, {
+        folder: 'altitude-vision/gestion-locative/preuves-paiement',
+        resource_type: 'auto',
+      });
+      preuvePaiement = { url: result.secure_url, publicId: result.public_id };
+    }
+
+    const encaissementId = new mongoose.Types.ObjectId();
+    let receipts;
+    try {
+      receipts = await runFinancialOperation({ operationName: 'rental.payment.record_multi', transactionMode: 'auto' }, async ({ session }) => {
+        const withSession = (query) => (session ? query.session(session) : query);
+        const created = [];
+        for (const { paiementId, montant } of cleanAllocations) {
+          const p = byId.get(String(paiementId));
+          const montantAvant = Number(p.montantRecu) || 0;
+          const totalDu = Number(p.montantTotal ?? p.montant ?? 0);
+          const nouveauMontantRecu = montantAvant + montant;
+          const nouveauStatut = nouveauMontantRecu < totalDu ? 'partiel' : 'payé';
+          const claimed = await withSession(Paiement.findOneAndUpdate(
+            { _id: p._id, statut: p.statut, montantRecu: p.montantRecu },
+            {
+              statut: nouveauStatut,
+              montantRecu: nouveauMontantRecu,
+              ...(datePaiement  && { datePaiement }),
+              ...(modePaiement  && { modePaiement }),
+              ...(reference     && { reference }),
+              ...(notes         && { notes }),
+              ...(preuvePaiement && { preuvePaiement }),
+            },
+            { new: true },
+          ));
+          if (!claimed) { const err = new Error('CONCURRENT'); err.code = 'CONCURRENT'; throw err; }
+          const receiptData = {
+            paiement: p._id, contrat, montant, datePaiement: datePaiement || new Date(),
+            modePaiement, reference, preuvePaiement, auteur: req.user.id,
+            idempotencyKey: idempotencyKey || undefined, encaissementId,
+          };
+          const [createdReceipt] = session
+            ? await RentalPaymentReceipt.create([receiptData], { session })
+            : [await RentalPaymentReceipt.create(receiptData)];
+          created.push(createdReceipt);
+        }
+        return created;
+      });
+    } catch (error) {
+      if (preuvePaiement?.url) {
+        await destroyFromCloudinary(preuvePaiement.url).catch((rollbackError) => {
+          logger.error('rental_payment.cloudinary_rollback_failed', { url: preuvePaiement.url, error: rollbackError.message });
+        });
+      }
+      if (error.code === 'CONCURRENT' || String(error.message || '').includes('E11000')) {
+        return res.status(409).json({ status: 'fail', code: 'PAYMENT_CONCURRENT_UPDATE', message: 'Une des échéances vient d’être modifiée par un autre encaissement.' });
+      }
+      throw error;
+    }
+
+    res.json({ status: 'success', data: { receipts } });
+    logAction({
+      action: 'Encaissement multi-échéances enregistré',
+      description: `${receipts.length} échéance(s) réglées en un encaissement`,
+      module: 'GestionLocative',
+      typeAction: 'PAIEMENT',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(encaissementId), type: 'RentalPaymentReceipt', nom: 'Encaissement multi-échéances' },
+      req,
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+};
+
+// GET /api/paiements/:id/receipts — historique détaillé des versements
+// (Phase 6) : chaque encaissement individuel, confirmé ou annulé.
+exports.listReceipts = async (req, res) => {
+  try {
+    const receipts = await RentalPaymentReceipt.find({ paiement: req.params.id })
+      .populate('auteur', 'name').populate('cancelledBy', 'name')
+      .sort({ createdAt: -1 });
+    res.json({ status: 'success', results: receipts.length, data: { receipts } });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+};
+
+// POST /api/paiements/:id/receipts/:receiptId/cancel — annulation contrôlée
+// (Phase 8). Jamais une suppression : le reçu reste en base, marqué
+// "cancelled", avec motif/auteur/date. Recalcule l'échéance depuis la somme
+// des reçus encore confirmés et invalide la quittance si le solde redevient
+// impayé (Phase 9). Réservé Admin/GestionnaireImmobilier — jamais
+// propriétaire ou locataire (ROLES_PAIEMENTS, plus restrictif, gate déjà la
+// route ; ce contrôleur re-vérifie explicitement le sous-ensemble autorisé).
+const CANCEL_ROLES = ['Admin', 'GestionnaireImmobilier'];
+exports.cancelReceipt = async (req, res) => {
+  try {
+    if (!CANCEL_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ status: 'fail', code: 'FORBIDDEN', message: 'Seul un administrateur ou un gestionnaire immobilier peut annuler un encaissement.' });
+    }
+    const reason = String(req.body?.reason || '').trim();
+    if (reason.length < 5) {
+      return res.status(422).json({ status: 'fail', code: 'CANCEL_REASON_REQUIRED', message: 'Un motif d’annulation d’au moins 5 caractères est requis.' });
+    }
+    const p = await Paiement.findById(req.params.id);
+    if (!p) return res.status(404).json({ status: 'error', message: 'Paiement introuvable' });
+
+    const cancelled = await RentalPaymentReceipt.findOneAndUpdate(
+      { _id: req.params.receiptId, paiement: p._id, statut: 'confirmed' },
+      { statut: 'cancelled', cancelledAt: new Date(), cancelledBy: req.user.id, cancelledReason: reason },
+      { new: true },
+    );
+    if (!cancelled) {
+      return res.status(409).json({ status: 'fail', code: 'RECEIPT_ALREADY_CANCELLED_OR_MISSING', message: 'Ce reçu est introuvable ou déjà annulé.' });
+    }
+
+    const confirmedReceipts = await RentalPaymentReceipt.find({ paiement: p._id, statut: 'confirmed' });
+    const nouveauMontantRecu = confirmedReceipts.reduce((sum, r) => sum + r.montant, 0);
+    const totalDu = Number(p.montantTotal ?? p.montant ?? 0);
+    const nouveauStatut = nouveauMontantRecu <= 0 ? 'impayé' : nouveauMontantRecu < totalDu ? 'partiel' : 'payé';
+    const wasFullyPaid = p.statut === 'payé';
+
+    const updatedPaiement = await Paiement.findByIdAndUpdate(
+      p._id,
+      { montantRecu: nouveauMontantRecu, statut: nouveauStatut },
+      { new: true },
+    );
+
+    let invalidatedCount = 0;
+    if (wasFullyPaid && nouveauStatut !== 'payé') {
+      const invalidation = await Contrat.updateOne(
+        { _id: p.contrat, 'documents.sourcePaiement': p._id, 'documents.type': 'quittance' },
+        { $set: { 'documents.$[elem].invalidated': true, 'documents.$[elem].invalidatedAt': new Date(), 'documents.$[elem].invalidatedReason': `Encaissement annulé : ${reason}` } },
+        { arrayFilters: [{ 'elem.sourcePaiement': p._id, 'elem.type': 'quittance', 'elem.invalidated': { $ne: true } }] },
+      );
+      invalidatedCount = invalidation.modifiedCount;
+    }
+
+    res.json({ status: 'success', data: { receipt: cancelled, paiement: updatedPaiement, invalidatedQuittances: invalidatedCount } });
+
+    await notifyContractTenant(p.contrat, {
+      type: 'tenant_payment_recorded', title: 'Encaissement annulé',
+      body: `Un encaissement pour votre loyer ${updatedPaiement.mois || ''}/${updatedPaiement.annee || ''} a été annulé. Statut actuel : ${nouveauStatut}.`,
+      entityType: 'Paiement', entityId: updatedPaiement._id,
+      dedupeKey: `tenant:payment:${updatedPaiement._id}:cancelled:${cancelled._id}`,
+      metadata: { paymentId: String(updatedPaiement._id), receiptId: String(cancelled._id), status: nouveauStatut },
+    }).catch(() => {});
+
+    logAction({
+      action: 'Encaissement annulé',
+      description: `Reçu ${cancelled._id} annulé (${reason})`,
+      module: 'GestionLocative',
+      typeAction: 'PAIEMENT',
+      auteur: buildAuteur(req.user),
+      cible: { id: String(cancelled._id), type: 'RentalPaymentReceipt', nom: `Reçu ${cancelled._id}` },
       req,
     });
   } catch (err) {

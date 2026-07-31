@@ -365,6 +365,7 @@ const locataireRoutes        = require('./routes/locataireRoutes');
 const contratRoutes          = require('./routes/contratRoutes');
 const paiementRoutes         = require('./routes/paiementRoutes');
 const gestionDocumentRoutes  = require('./routes/gestionDocumentRoutes');
+const rentalDocumentRoutes   = require('./routes/rentalDocumentRoutes');
 const rentalManagementRoutes = require('./routes/rentalManagementRoutes');
 const rentalMaintenanceRoutes = require('./routes/rentalMaintenanceRoutes');
 const tenantPortalRoutes = require('./routes/tenantPortalRoutes');
@@ -402,6 +403,11 @@ app.use('/api/locataires',       locataireRoutes);
 app.use('/api/contrats',         contratRoutes);
 app.use('/api/paiements',        paiementRoutes);
 app.use('/api/gestion-docs',     gestionDocumentRoutes);
+// Accès contrôlé aux documents Gestion Locative (GL-DEBT-1, Phase 3) —
+// distinct de /api/gestion-docs (génération) et /api/documents (facturation
+// générale) : cette route sert uniquement la lecture protégée d'un document
+// déjà généré et attaché à un Contrat.
+app.use('/api/rental-documents', rentalDocumentRoutes);
 app.use('/api/rental-management', rentalManagementRoutes);
 // 🔧 Maintenance locative (Sprint GL-B2) — distincte de /api/maintenance (hôtelier, Sprint E).
 app.use('/api/rental-maintenance', rentalMaintenanceRoutes);
@@ -509,6 +515,21 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage()
+  });
+});
+
+// GL-DEBT-1 (Phase 16) : /api/health est une liveness (le process répond),
+// pas une readiness (le process peut dépendre à tort). mongoose.STATES :
+// 0 disconnected, 1 connected, 2 connecting, 3 disconnecting.
+app.get('/api/ready', (req, res) => {
+  const mongoState = mongoose.connection.readyState;
+  const ready = mongoState === 1;
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
+    timestamp: new Date().toISOString(),
+    dependencies: {
+      mongo: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoState] || 'unknown',
+    },
   });
 });
 

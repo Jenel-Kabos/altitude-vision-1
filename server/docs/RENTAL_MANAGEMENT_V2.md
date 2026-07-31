@@ -619,3 +619,86 @@ Une demande autonome reste `pending` jusqu'à une décision explicite du staff. 
 - `POST /api/locataires/invitations/:requestId/resend`
 
 Les endpoints historiques `/api/rental-management/owner/my` et actions propriétaire restent inchangés pour préserver l'application `altimmo-app`.
+
+## GL-DEBT-1 — Résorption de dettes (architecture ajoutée)
+
+### KPI "biens inscrits"
+`GET /api/rental-management/stats` compte un bien comme "inscrit" seulement
+si : `status: 'location'`, `availability !== 'Retiré'`, et son `owner`
+(`Property.owner`) référence un `User` de rôle `Proprietaire`. Les biens de
+vente, archivés, sans owner, ou dont l'owner est un compte staff interne
+sont exclus. `Proprietaire.biensPropres[]` (structure historique embarquée,
+invisible au reste du module GL) n'est délibérément pas compté.
+
+### Documents locatifs — accès sécurisé
+Les documents d'un contrat (`Contrat.documents[]`) ne sont plus liés
+directement en Cloudinary. `GET /api/rental-documents/:documentId/download`
+vérifie le scoping (staff `ROLES_DOCS`, propriétaire via
+`Contrat.bien.owner`, locataire via `Contrat.locataire.user`) avant de
+streamer le fichier depuis Cloudinary — l'URL Cloudinary brute n'est jamais
+exposée au client. Le filtre `GET /api/documents` est whitelisté
+(`documentController.buildDocumentFilter`) : seules 8 clés scalaires
+validées atteignent la requête Mongo.
+
+### Modèle de paiement — reçus et annulation
+`Paiement` reste le modèle agrégé "état courant de l'échéance" (inchangé
+pour les consommateurs existants). Chaque encaissement (`marquerPaye`) crée
+en plus un `RentalPaymentReceipt` (modèle additif, hors Financial Core) —
+montant incrémental, `idempotencyKey` unique par paiement, écriture
+atomique avec `Paiement` via `runFinancialOperation`. Annulation contrôlée
+via `POST /api/paiements/:id/receipts/:receiptId/cancel` (rôles Admin /
+GestionnaireImmobilier, motif obligatoire ≥5 caractères) : recalcule
+l'échéance à partir des reçus encore confirmés, et invalide (sans jamais
+supprimer) la quittance PDF associée si l'échéance n'est plus intégralement
+payée. L'upload Cloudinary de la preuve de paiement est annulé
+(`destroyFromCloudinary`) si l'écriture finale échoue après un upload
+réussi — jamais de fichier orphelin, jamais d'erreur métier masquée par un
+échec de rollback. La même protection couvre l'upload de pièce d'identité
+(`locataireController`, `proprietaireController`) et les photos de biens
+propriétaire.
+
+### Allocation multi-échéances (GL-DEBT-1.1)
+Un même encaissement peut désormais couvrir plusieurs échéances du même
+contrat en un seul appel : `POST /api/paiements/encaisser-multiple`
+(`{ contrat, allocations: [{ paiementId, montant }], datePaiement,
+modePaiement, reference, idempotencyKey }`). Un `RentalPaymentReceipt` est
+créé par échéance touchée, tous partageant le même `encaissementId`
+(regroupement, sans nouvelle collection). Comportement :
+- **Tout-ou-rien** : si une seule ligne échoue (montant > solde dû,
+  échéance déjà payée, CAS perdue par concurrence), aucune échéance n'est
+  modifiée — transaction Mongo réelle via `runFinancialOperation`.
+- **Idempotent** : rejouer la même `idempotencyKey` renvoie les reçus déjà
+  créés (`idempotentReplay: true`) sans recompter les montants.
+- **Réversion à la granularité de l'échéance** : annuler une ligne
+  (`cancelReceipt`, réutilisé tel quel) ne réverse que cette échéance —
+  comportement métier attendu, chaque échéance ayant son propre solde.
+Test : `rentalPaymentMultiEcheanceAllocation.mongo.integration.test.js`
+(8 tests : encaissement complet sur 2 échéances, partiel réparti, échec
+tout-ou-rien, idempotence, concurrence réelle sur la même échéance,
+réversion d'une ligne sans effet sur l'autre, validations, RBAC).
+
+### Pagination
+`GET /api/documents` accepte `?page&limit` (rétrocompatible : sans ces
+paramètres, comportement historique inchangé — liste complète, pas de
+`meta`). `limit` plafonnée à 200. Pattern à répliquer sur les autres
+endpoints de liste non bornés (`/api/locataires`, `/api/proprietaires`)
+lors d'un prochain sprint — non fait ici faute de temps, sans risque
+immédiat (volumes actuels faibles).
+
+### Observabilité locale
+`GET /api/ready` (nouveau, distinct de `/api/health`) reflète l'état réel
+de la connexion Mongo (`mongoose.connection.readyState`) — 503 si non
+connecté. Aucun service APM externe installé (hors périmètre sans
+nécessité) ; les logs financiers/sécurité (accès document, rollback
+Cloudinary, refus d'accès) utilisent déjà `utils/logger` structuré.
+
+### Tests
+- `documentFilterWhitelist.mongo.integration.test.js`
+- `rentalDocumentDownload.mongo.integration.test.js`
+- `rentalPaymentReceiptsAndCancellation.mongo.integration.test.js`
+- `rentalPaymentCloudinaryRollback.mongo.integration.test.js`
+- `rentalManagementBiensInscritsStat.mongo.integration.test.js`
+- `forgotPassword.test.js`
+
+Commandes : `npm run test:unit` (server, modèles mockés) et
+`npm run test:mongo` (server, réplica MongoDB réel) depuis `server/`.

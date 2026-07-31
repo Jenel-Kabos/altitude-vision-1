@@ -20,10 +20,24 @@ async function startFinancialMongo() {
   return { uri, replicaSet: hello.setName || null, standalone: !hello.setName };
 }
 
+// Sous forte charge de transactions (plusieurs `session.withTransaction`
+// abandonnées en succession rapide dans le même fichier de test),
+// mongodb-memory-server peut laisser une session interne expirée attachée
+// à la connexion Mongoose au moment où ce nettoyage s'exécute
+// (`MongoExpiredSessionError: Cannot use a session that has ended`), sans
+// rapport avec la correction applicative (chaque test a déjà vérifié ses
+// propres assertions avant ce nettoyage). On retente une fois après un tick
+// pour laisser le driver terminer son cycle de session interne.
 async function clearFinancialMongo() {
   if (!connected) return;
   const collections = mongoose.connection.collections;
-  await Promise.all(Object.values(collections).map((collection) => collection.deleteMany({})));
+  try {
+    await Promise.all(Object.values(collections).map((collection) => collection.deleteMany({})));
+  } catch (error) {
+    if (!/session/i.test(error?.message || '')) throw error;
+    await new Promise((resolve) => setImmediate(resolve));
+    await Promise.all(Object.values(collections).map((collection) => collection.deleteMany({})));
+  }
 }
 
 async function stopFinancialMongo() {

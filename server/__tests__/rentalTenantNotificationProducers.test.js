@@ -2,6 +2,16 @@ jest.mock('../models/Contrat');
 jest.mock('../models/Paiement');
 jest.mock('../models/Property');
 jest.mock('../models/RentalManagement');
+jest.mock('../models/RentalPaymentReceipt', () => ({ create: jest.fn().mockResolvedValue({ _id: 'RECEIPT-1' }) }));
+// GL-DEBT-1 (Phase 5-9) : marquerPaye passe désormais par
+// runFinancialOperation (session Mongo réelle). Ce fichier teste le
+// câblage des notifications sur des modèles mockés, sans DB (convention
+// "unit test" du repo) — on simule ici le mode "fallback" (pas de session),
+// déjà le comportement réel de runFinancialOperation quand aucune
+// transaction n'est disponible, pour rester compatible sans DB.
+jest.mock('../services/finance/financialTransactionService', () => ({
+  runFinancialOperation: (meta, operation) => operation({ session: null, transactional: false }),
+}));
 jest.mock('../services/rentalListingSyncService');
 jest.mock('../services/pdfService');
 jest.mock('../services/zohoMailService', () => ({ sendEmail: jest.fn().mockResolvedValue() }));

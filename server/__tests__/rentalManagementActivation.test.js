@@ -127,6 +127,7 @@ describe('RentalManagement — annonce simple vs dossier activé (Sprint A, audi
     const Paiement = require('../models/Paiement');
     Contrat.countDocuments = jest.fn().mockResolvedValue(0);
     Paiement.countDocuments = jest.fn().mockResolvedValue(0);
+    Property.aggregate = jest.fn().mockResolvedValue([]);
 
     const res = await request(app)
       .get('/api/rental-management/stats')

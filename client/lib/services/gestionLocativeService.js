@@ -1,5 +1,19 @@
 import api from './api';
 
+// GL-DEBT-1 (Phase 3) — accès contrôlé aux documents Gestion Locative.
+// Remplace l'exposition directe de l'URL Cloudinary (Sprint GL-UX1) : le
+// serveur vérifie l'authentification, le rôle et la relation avec le bail
+// avant de proxy-streamer le fichier. Même pattern que
+// tenantPortalService.downloadTenantDocument (portail locataire, non
+// modifié ici).
+export const downloadRentalDocument = async (documentId, filename = 'document') => {
+  const response = await api.get(`/rental-documents/${documentId}/download`, { responseType: 'blob' });
+  const url = URL.createObjectURL(response.data);
+  const anchor = document.createElement('a');
+  anchor.href = url; anchor.download = filename; anchor.click();
+  URL.revokeObjectURL(url);
+};
+
 // ── Dossiers locatifs synchronisés avec Property ─────────────
 export const getRentalManagement = async (params = {}) => {
   const res = await api.get('/rental-management', { params });
@@ -149,8 +163,15 @@ export const deletePaiement = async (id) => {
   await api.delete(`/paiements/${id}`);
 };
 
-export const marquerPaiementPaye = async (id, data) => {
-  const res = await api.post(`/paiements/${id}/marquer-paye`, data);
+export const marquerPaiementPaye = async (id, { preuve, ...data } = {}) => {
+  if (!preuve) {
+    const res = await api.post(`/paiements/${id}/marquer-paye`, data);
+    return res.data.data.paiement;
+  }
+  const form = new FormData();
+  Object.entries(data).forEach(([key, value]) => { if (value !== undefined && value !== null && value !== '') form.append(key, value); });
+  form.append('preuve', preuve);
+  const res = await api.post(`/paiements/${id}/marquer-paye`, form);
   return res.data.data.paiement;
 };
 

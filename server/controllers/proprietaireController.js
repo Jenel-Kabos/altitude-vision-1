@@ -2,6 +2,15 @@ const Proprietaire = require('../models/Proprietaire');
 const Document     = require('../models/Document');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+const logger = require('../utils/logger');
+
+const rollbackUploads = async (urls, tag) => {
+  const list = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
+  if (!list.length) return;
+  await Promise.allSettled(list.map((url) => destroyFromCloudinary(url).catch((rollbackError) => {
+    logger.error(`proprietaire.cloudinary_rollback_failed.${tag}`, { url, error: rollbackError.message });
+  })));
+};
 
 const saveIdentiteDocument = async ({ url, nom, type, personneId, personneNom, createdBy }) => {
   try {
@@ -88,9 +97,9 @@ exports.getOne = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
+  let piece = null;
   try {
     const data = { ...req.body };
-    let piece = null;
     if (req.file) {
       piece = await uploadPiece(req.file);
       data.pieceIdentite     = piece.url;
@@ -118,14 +127,15 @@ exports.create = async (req, res) => {
       req,
     });
   } catch (err) {
+    await rollbackUploads(piece?.url, 'create');
     res.status(400).json({ status: 'error', message: err.message });
   }
 };
 
 exports.update = async (req, res) => {
+  let piece = null;
   try {
     const data = { ...req.body };
-    let piece = null;
     if (req.file) {
       piece = await uploadPiece(req.file);
       data.pieceIdentite     = piece.url;
@@ -137,7 +147,10 @@ exports.update = async (req, res) => {
     const p = await Proprietaire.findByIdAndUpdate(req.params.id, data, {
       new: true, runValidators: true,
     });
-    if (!p) return res.status(404).json({ status: 'error', message: 'Propriétaire introuvable' });
+    if (!p) {
+      await rollbackUploads(piece?.url, 'update');
+      return res.status(404).json({ status: 'error', message: 'Propriétaire introuvable' });
+    }
     if (piece) {
       await saveIdentiteDocument({
         url: piece.url, nom: piece.nom, type: piece.type,
@@ -156,6 +169,7 @@ exports.update = async (req, res) => {
       req,
     });
   } catch (err) {
+    await rollbackUploads(piece?.url, 'update');
     res.status(400).json({ status: 'error', message: err.message });
   }
 };
@@ -182,6 +196,7 @@ exports.delete = async (req, res) => {
 // ── Gestion des biens ─────────────────────────────────────────
 
 exports.addBien = async (req, res) => {
+  let uploadedUrls = [];
   try {
     const p = await Proprietaire.findById(req.params.id);
     if (!p) return res.status(404).json({ status: 'error', message: 'Propriétaire introuvable' });
@@ -192,13 +207,14 @@ exports.addBien = async (req, res) => {
     // Upload photos si envoyées
     if (req.files?.length) {
       const idx = p.biensPropres.length - 1;
-      const urls = await uploadBienPhotos(req.files, p._id, idx);
-      p.biensPropres[idx].photos = urls;
+      uploadedUrls = await uploadBienPhotos(req.files, p._id, idx);
+      p.biensPropres[idx].photos = uploadedUrls;
     }
 
     await p.save();
     res.status(201).json({ status: 'success', data: { proprietaire: p } });
   } catch (err) {
+    await rollbackUploads(uploadedUrls, 'addBien');
     res.status(400).json({ status: 'error', message: err.message });
   }
 };
@@ -240,6 +256,7 @@ exports.deleteBien = async (req, res) => {
 };
 
 exports.addBienPhotos = async (req, res) => {
+  let uploadedUrls = [];
   try {
     const p = await Proprietaire.findById(req.params.id);
     if (!p) return res.status(404).json({ status: 'error', message: 'Propriétaire introuvable' });
@@ -249,12 +266,13 @@ exports.addBienPhotos = async (req, res) => {
 
     if (!req.files?.length) return res.status(400).json({ status: 'error', message: 'Aucun fichier envoyé' });
 
-    const urls = await uploadBienPhotos(req.files, p._id, idx);
-    p.biensPropres[idx].photos.push(...urls);
+    uploadedUrls = await uploadBienPhotos(req.files, p._id, idx);
+    p.biensPropres[idx].photos.push(...uploadedUrls);
     await p.save();
 
-    res.json({ status: 'success', data: { urls, bien: p.biensPropres[idx] } });
+    res.json({ status: 'success', data: { urls: uploadedUrls, bien: p.biensPropres[idx] } });
   } catch (err) {
+    await rollbackUploads(uploadedUrls, 'addBienPhotos');
     res.status(500).json({ status: 'error', message: err.message });
   }
 };

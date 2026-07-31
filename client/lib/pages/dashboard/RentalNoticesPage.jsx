@@ -146,7 +146,7 @@ const RentalNoticesPage = () => {
                   {n.noticeAcknowledgedAt && <span className="text-xs text-green-700 self-center">Réception accusée</span>}
                   <button onClick={() => handleValidateExit(n._id)} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm">Valider la sortie</button>
                   <button onClick={() => handleCancel(n._id)} className="bg-gray-500 text-white px-3 py-1.5 rounded text-sm">Annuler le préavis</button>
-                  <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline self-center">Documents →</Link>
+                  <Link href="/dashboard/gestion-locative/documents" className="text-sm text-blue-600 underline self-center">Documents →</Link>
                 </div>
               </DashboardCard>
             );

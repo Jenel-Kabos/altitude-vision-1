@@ -68,6 +68,7 @@ const NAV_SECTIONS = [
       { to: '/dashboard/gestion-locative/paiements',   end: false, Icon: CreditCard,    label: 'Paiements',      accent: BLUE, roles: ROLES_GL },
       { to: '/dashboard/gestion-locative/preavis',     end: false, Icon: Clock,         label: 'Préavis',        accent: BLUE, roles: ROLES_GL },
       { to: '/dashboard/gestion-locative/maintenance', end: false, Icon: Wrench,        label: 'Maintenance',    accent: BLUE, roles: ROLES_GL },
+      { to: '/dashboard/gestion-locative/documents',   end: false, Icon: FolderOpen,    label: 'Documents',      accent: BLUE, roles: ROLES_GL },
       { to: '/dashboard/documents',                    end: false, Icon: FolderOpen,    label: 'Documents',      accent: GOLD, roles: ROLES_DOCS },
     ],
   },

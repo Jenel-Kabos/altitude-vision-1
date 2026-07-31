@@ -11,6 +11,7 @@ const RentalStats = ({ rentalStats, contratsActifs, loyersMensuel, onRefresh, co
   return (
     <div className="flex items-center gap-4 flex-wrap">
       {[
+        ['Biens inscrits',  rentalStats.biensInscrits || 0, '#64748B'],
         ['Biens gérés',     rentalStats.total || 0,       BLUE],
         ['Vacants',         rentalStats.vacant || 0,      GREEN],
         ['Publiés',         rentalStats.published || 0,   '#7C3AED'],

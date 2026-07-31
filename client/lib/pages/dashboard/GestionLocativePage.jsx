@@ -1610,7 +1610,7 @@ const GestionLocativePage = () => {
   const [properties,    setProperties]    = useState([]);
   const [paiements,     setPaiements]     = useState([]);
   const [rentals,       setRentals]       = useState([]);
-  const [rentalStats,   setRentalStats]   = useState({ total:0, vacant:0, available:0, occupied:0, published:0, maintenance:0, readyToRepublish:0, overduePayments:0, partialPayments:0, expiringContracts:0, expiredContracts:0, blockingInspections:0 });
+  const [rentalStats,   setRentalStats]   = useState({ total:0, vacant:0, available:0, occupied:0, published:0, maintenance:0, readyToRepublish:0, overduePayments:0, partialPayments:0, expiringContracts:0, expiredContracts:0, blockingInspections:0, biensInscrits:0 });
   const [rentalActionId,setRentalActionId]= useState(null);
   // Sprint GL-B2 — vue d'ensemble enrichie : locataires actifs, loyers
   // attendus/encaissés (calculs serveur), préavis actifs, maintenances
@@ -1874,6 +1874,7 @@ const GestionLocativePage = () => {
       modePaiement: 'espèces',
       reference: '',
       notes: '',
+      preuve: null,
     });
     setPayModal(true);
   };
@@ -2528,6 +2529,14 @@ const GestionLocativePage = () => {
               <Textarea
                 value={payForm.notes}
                 onChange={e => setPayForm(f => ({...f, notes: e.target.value}))}
+              />
+            </Field>
+            <Field label="Preuve de paiement (facultatif)">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                onChange={e => setPayForm(f => ({...f, preuve: e.target.files?.[0] || null}))}
+                className="text-sm"
               />
             </Field>
 
