@@ -101,17 +101,36 @@ exports.create = async (req, res) => {
     if (property.status !== req.body.type) {
       return res.status(409).json({ status: 'fail', code: 'CONTRACT_TYPE_MISMATCH', message: 'Le type de contrat ne correspond pas au bien.' });
     }
-    const reservation = await RealEstateReservation.findById(req.body.reservation);
-    const expectedReservationType = req.body.type === 'location' ? 'rental' : 'sale';
-    if (!reservation || reservation.status !== 'active' || reservation.expiresAt <= new Date()
-      || reservation.type !== expectedReservationType || String(reservation.property) !== String(property._id)) {
-      return res.status(409).json({ status: 'fail', code: 'ACTIVE_RESERVATION_REQUIRED', message: 'Une réservation active et cohérente est requise.' });
-    }
-    if (property.statusAdmin !== 'Validée' || property.availability !== 'Réservé' || String(property.reservationLock?.reservation) !== String(reservation._id)) {
+    // REG-GL-1 : deux parcours légitimes et distincts créent un Contrat via
+    // cette même route. (1) Le parcours public candidature/réservation
+    // (RealEstateApplicationsPage → acceptation → réservation active) doit
+    // rester strictement verrouillé sur cette réservation (IM-1R/IM-2.2).
+    // (2) La création manuelle par le staff depuis GestionLocativePage
+    // (« Ajouter un contrat ») n'a jamais transmis de `reservation` — ce
+    // formulaire ne passe par aucune candidature publique. Une réservation
+    // a été rendue obligatoire sans condition (commit "Update Altimmo 1"),
+    // cassant ce second parcours (toute soumission renvoyait 409
+    // ACTIVE_RESERVATION_REQUIRED). On restaure ici le contrôle historique
+    // (bien validé + disponible) pour ce cas, sans rien changer au parcours
+    // réservation quand `reservation` est fourni.
+    let reservation = null;
+    if (req.body.reservation) {
+      reservation = await RealEstateReservation.findById(req.body.reservation);
+      const expectedReservationType = req.body.type === 'location' ? 'rental' : 'sale';
+      if (!reservation || reservation.status !== 'active' || reservation.expiresAt <= new Date()
+        || reservation.type !== expectedReservationType || String(reservation.property) !== String(property._id)) {
+        return res.status(409).json({ status: 'fail', code: 'ACTIVE_RESERVATION_REQUIRED', message: 'Une réservation active et cohérente est requise.' });
+      }
+      if (property.statusAdmin !== 'Validée' || property.availability !== 'Réservé' || String(property.reservationLock?.reservation) !== String(reservation._id)) {
+        return res.status(409).json({ status: 'fail', code: 'PROPERTY_NOT_AVAILABLE', message: 'Ce bien ne peut plus faire l’objet d’un nouveau contrat.' });
+      }
+    } else if (property.statusAdmin !== 'Validée' || property.availability !== 'Disponible') {
       return res.status(409).json({ status: 'fail', code: 'PROPERTY_NOT_AVAILABLE', message: 'Ce bien ne peut plus faire l’objet d’un nouveau contrat.' });
     }
     const c = await Contrat.create(req.body);
-    await RealEstateReservation.updateOne({ _id: reservation._id, status: 'active', contract: null }, { $set: { contract: c._id }, $push: { history: { from: 'active', to: 'active', action: 'contract_created', actor: req.user._id } } });
+    if (reservation) {
+      await RealEstateReservation.updateOne({ _id: reservation._id, status: 'active', contract: null }, { $set: { contract: c._id }, $push: { history: { from: 'active', to: 'active', action: 'contract_created', actor: req.user._id } } });
+    }
 
     if (c.type === 'location') {
       await generatePaiements(c._id, c.dateEntree, c.dateFinBail, c.montantLoyer);
