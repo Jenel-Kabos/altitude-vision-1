@@ -23,6 +23,8 @@ const ids = {
   finalizationSalePropertyMobile: "66e200000000000000000034",
   rentalActivationProperty: "66e200000000000000000035",
   rentalActivationPropertyMobile: "66e200000000000000000036",
+  proprietaireBienPropre: "66e200000000000000000040",
+  contratFormPropertyMobile: "66e200000000000000000041",
 };
 let mongo;
 let fakePaymentProvider;
@@ -153,6 +155,26 @@ async function seed(uri) {
       _id: ids.rentalProperty,
       title: "Maison Location E2E",
       description: "Bien fictif de comparaison visuelle.",
+      pole: "Altimmo",
+      type: "Maison",
+      status: "location",
+      price: 450000,
+      address: { arrondissement: "Moungali", city: "Brazzaville" },
+      latitude: -4.25,
+      longitude: 15.27,
+      images: ["https://placehold.co/1200x800/png?text=Location"],
+      surface: 90,
+      bedrooms: 2,
+      bathrooms: 1,
+      statusAdmin: "Validée",
+      isPublished: true,
+      availability: "Disponible",
+      owner: ids.owner,
+    },
+    {
+      _id: ids.contratFormPropertyMobile,
+      title: "Maison Location E2E Mobile",
+      description: "Bien fictif dédié au projet mobile-chromium (évite le conflit d'index avec desktop-chromium sur la même base).",
       pole: "Altimmo",
       type: "Maison",
       status: "location",
@@ -310,6 +332,19 @@ async function seed(uri) {
   await RoomCategory.create({ _id: ids.mobileRoomCategory, hotel: ids.mobileHotel, name: "Standard Mobile", code: "STDM", unitsAvailable: 13, capacity: { maxAdults: 2, maxChildren: 0 }, createdBy: ids.owner });
   await RatePlan.create({ roomCategory: ids.mobileRoomCategory, rateType: "public", amount: 35000, currency: "XAF", active: true, createdBy: ids.owner });
   await PaiementTransaction.syncIndexes();
+  // REG-GL-1.1 — propriétaire avec un "bien propre" (Proprietaire.biensPropres[],
+  // structure embarquée historique sans document Property réel), utilisé par
+  // contratCreationForm.spec.js pour vérifier que cette option reste non
+  // sélectionnable dans le formulaire de création de contrat.
+  const Proprietaire = require("../models/Proprietaire");
+  await Proprietaire.create({
+    _id: ids.proprietaireBienPropre,
+    nom: "PropriétaireE2E", prenom: "BienPropre", telephone: "+242060000099",
+    biensPropres: [{
+      typeBien: "location", titre: "Bien propre E2E", type: "Maison",
+      adresse: "12 rue du bien propre", ville: "Brazzaville",
+    }],
+  });
   await mongoose.disconnect();
 }
 function start(command, args, cwd, env) {

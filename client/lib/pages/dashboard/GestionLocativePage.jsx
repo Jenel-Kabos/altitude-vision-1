@@ -884,20 +884,24 @@ const ContratForm = ({ init = emptyContrat, proprietaires, locataires, propertie
   // Biens du propriétaire sélectionné
   const propBiens = proprietaires.find(p => p._id === f.proprietaire)?.biensPropres || [];
 
+  // REG-GL-1.1 : un "bien propre" (Proprietaire.biensPropres[], structure
+  // embarquée historique sans document Property réel) ne peut PAS produire
+  // un Contrat.bien valide — le contrôleur exige un ObjectId Property réel
+  // (validation métier intentionnelle, non modifiée ici). Cette option
+  // n'est donc plus sélectionnable (voir <option disabled> plus bas) ; ce
+  // handler ne traite plus que la sélection d'un bien du portefeuille.
   const handleBienChange = (val) => {
-    if (val.startsWith('propre:')) {
-      const idx = parseInt(val.split(':')[1], 10);
-      const b = propBiens[idx];
-      set('bien', '');
-      set('adresseBien', b?.adresse || '');
-      set('villeBien',   b?.ville   || '');
-    } else {
-      set('bien', val);
-      const prop = properties.find(p => p._id === val);
-      if (prop) {
-        set('adresseBien', prop.address || prop.adresse || '');
-        set('villeBien',   prop.city    || prop.ville   || '');
-      }
+    set('bien', val);
+    const prop = properties.find(p => p._id === val);
+    if (prop) {
+      // REG-GL-1.1 : Property.address est un objet {street, neighborhood,
+      // arrondissement, city} (voir models/Property.js), pas une chaîne —
+      // Contrat.adresseBien/villeBien sont des String. Assigner l'objet
+      // directement provoquait un CastError Mongoose bloquant la création.
+      const addr = typeof prop.address === 'string' ? { street: prop.address } : (prop.address || {});
+      const adresse = prop.adresse || [addr.street, addr.neighborhood, addr.arrondissement].filter(Boolean).join(', ');
+      set('adresseBien', adresse || '');
+      set('villeBien',   addr.city || prop.ville || '');
     }
   };
 
@@ -928,7 +932,7 @@ const ContratForm = ({ init = emptyContrat, proprietaires, locataires, propertie
         </Select>
       </Field>
       <Field label="Bien immobilier">
-        <Select value={f.bien.startsWith?.('propre:')?f.bien:f.bien} onChange={e => handleBienChange(e.target.value)}>
+        <Select value={f.bien} onChange={e => handleBienChange(e.target.value)}>
           <option value="">— Sélectionner un bien —</option>
           {properties.length > 0 && (
             <optgroup label="Portefeuille Altimmo">
@@ -936,15 +940,20 @@ const ContratForm = ({ init = emptyContrat, proprietaires, locataires, propertie
             </optgroup>
           )}
           {propBiens.length > 0 && (
-            <optgroup label="Biens du propriétaire">
+            <optgroup label="Biens du propriétaire (à publier dans le portefeuille avant contrat)">
               {propBiens.map((b, i) => (
-                <option key={`propre:${i}`} value={`propre:${i}`}>
-                  {b.titre} — {b.adresse}
+                <option key={`propre:${i}`} value={`propre:${i}`} disabled>
+                  {b.titre} — {b.adresse} (non disponible pour un contrat)
                 </option>
               ))}
             </optgroup>
           )}
         </Select>
+        {propBiens.length > 0 && (
+          <p className="mt-1 text-xs text-gray-500">
+            Les biens propres du propriétaire doivent d'abord être publiés comme annonce (portefeuille Altimmo) avant de pouvoir être rattachés à un contrat.
+          </p>
+        )}
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Adresse du bien"><Input value={f.adresseBien} onChange={e=>set('adresseBien',e.target.value)}/></Field>
