@@ -105,7 +105,7 @@ test('double soumission (double clic) sur la création manuelle : un seul contra
   expect(await Contrat.countDocuments({ bien: property._id })).toBe(1);
 });
 
-test('bien non validé (statusAdmin !== "Validée") sans réservation : 409, pas de contrat créé', async () => {
+test('[GL-ARCH-1] bien non publié (statusAdmin !== "Validée") mais disponible, sans réservation : le bail se crée quand même — la publication n’est plus une condition de la Gestion Locative', async () => {
   const admin = await makeUser({ role: 'Admin' });
   const property = await makeAvailableProperty({ statusAdmin: 'En attente' });
 
@@ -113,8 +113,8 @@ test('bien non validé (statusAdmin !== "Validée") sans réservation : 409, pas
     type: 'location', bien: property._id, statut: 'actif', dateEntree: '2027-01-01', dateFinBail: '2027-12-31', montantLoyer: 300000,
   });
 
-  expect(res.status).toBe(409);
-  expect(res.body.code).toBe('PROPERTY_NOT_AVAILABLE');
+  expect(res.status).toBe(201);
+  expect(await Contrat.countDocuments({ bien: property._id })).toBe(1);
 });
 
 test('parcours réservation (candidature acceptée) : la réservation reste strictement requise et cohérente — comportement inchangé', async () => {

@@ -163,6 +163,26 @@ describe('Audit filtrage Altimmo — getAllProperties (nomenclature canonique + 
     const { data } = await callGetAllProperties({ statusAdmin: 'En attente', availability: 'Indisponible', pole: 'MilaEvents' });
     expect(data.properties).toHaveLength(0);
   });
+
+  // GL-ARCH-1 : la Gestion Locative doit pouvoir proposer tous les biens
+  // déjà gérés ET tous les biens pouvant être pris en gestion, publiés ou
+  // non, disponibles ou non — jamais filtrés uniquement sur la publication
+  // (statusAdmin) ou la disponibilité publique.
+  test.each(['Admin', 'GestionnaireImmobilier', 'Collaborateur'])(
+    'le staff (%s) voit un bien non validé et non disponible (biens gérables pour la Gestion Locative)',
+    async (role) => {
+      await Property.create(baseProperty({ statusAdmin: 'En attente', availability: 'Loué', title: 'Bien gérable non publié' }));
+      const { data } = await callGetAllProperties({}, { role });
+      expect(data.properties).toHaveLength(1);
+      expect(data.properties[0].title).toBe('Bien gérable non publié');
+    },
+  );
+
+  test('un Proprietaire (non-staff) reste soumis au filtre public habituel', async () => {
+    await Property.create(baseProperty({ statusAdmin: 'En attente', title: 'Non validé' }));
+    const { data } = await callGetAllProperties({}, { role: 'Proprietaire' });
+    expect(data.properties).toHaveLength(0);
+  });
 });
 
 describe('Audit filtrage Altimmo — getRecommendedProperties scope pole (Mongo réel)', () => {

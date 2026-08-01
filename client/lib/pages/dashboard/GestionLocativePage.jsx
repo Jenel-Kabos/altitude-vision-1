@@ -940,7 +940,7 @@ const ContratForm = ({ init = emptyContrat, proprietaires, locataires, propertie
             </optgroup>
           )}
           {propBiens.length > 0 && (
-            <optgroup label="Biens du propriétaire (à publier dans le portefeuille avant contrat)">
+            <optgroup label="Biens du propriétaire (pas encore un bien réel du portefeuille)">
               {propBiens.map((b, i) => (
                 <option key={`propre:${i}`} value={`propre:${i}`} disabled>
                   {b.titre} — {b.adresse} (non disponible pour un contrat)
@@ -951,7 +951,7 @@ const ContratForm = ({ init = emptyContrat, proprietaires, locataires, propertie
         </Select>
         {propBiens.length > 0 && (
           <p className="mt-1 text-xs text-gray-500">
-            Les biens propres du propriétaire doivent d'abord être publiés comme annonce (portefeuille Altimmo) avant de pouvoir être rattachés à un contrat.
+            Les biens propres du propriétaire sont une fiche interne, pas un bien réel du portefeuille : ils doivent d'abord être créés comme bien (pris en gestion) — publiés ou non — avant de pouvoir être rattachés à un contrat.
           </p>
         )}
       </Field>

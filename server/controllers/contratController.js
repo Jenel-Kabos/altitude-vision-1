@@ -104,15 +104,18 @@ exports.create = async (req, res) => {
     // REG-GL-1 : deux parcours légitimes et distincts créent un Contrat via
     // cette même route. (1) Le parcours public candidature/réservation
     // (RealEstateApplicationsPage → acceptation → réservation active) doit
-    // rester strictement verrouillé sur cette réservation (IM-1R/IM-2.2).
-    // (2) La création manuelle par le staff depuis GestionLocativePage
-    // (« Ajouter un contrat ») n'a jamais transmis de `reservation` — ce
-    // formulaire ne passe par aucune candidature publique. Une réservation
-    // a été rendue obligatoire sans condition (commit "Update Altimmo 1"),
-    // cassant ce second parcours (toute soumission renvoyait 409
-    // ACTIVE_RESERVATION_REQUIRED). On restaure ici le contrôle historique
-    // (bien validé + disponible) pour ce cas, sans rien changer au parcours
-    // réservation quand `reservation` est fourni.
+    // rester strictement verrouillé sur cette réservation (IM-1R/IM-2.2) —
+    // une réservation publique n'existe que sur une annonce publiée, donc
+    // `statusAdmin==='Validée'` y reste un invariant légitime, pas une
+    // dépendance métier à la publication. (2) La création manuelle par le
+    // staff depuis GestionLocativePage (« Ajouter un contrat ») n'a jamais
+    // transmis de `reservation`.
+    // GL-ARCH-1 : pour ce second parcours, la Gestion Locative est la source
+    // de vérité — la publication (statusAdmin) n'est qu'une vitrine
+    // commerciale et ne doit jamais conditionner la création d'un bail
+    // (Admin/Gestionnaire Immobilier doivent pouvoir créer un bail sur
+    // n'importe quel bien pris en gestion, publié ou non). Seule la
+    // disponibilité réelle du bien (occupation) reste vérifiée ici.
     let reservation = null;
     if (req.body.reservation) {
       reservation = await RealEstateReservation.findById(req.body.reservation);
@@ -124,7 +127,7 @@ exports.create = async (req, res) => {
       if (property.statusAdmin !== 'Validée' || property.availability !== 'Réservé' || String(property.reservationLock?.reservation) !== String(reservation._id)) {
         return res.status(409).json({ status: 'fail', code: 'PROPERTY_NOT_AVAILABLE', message: 'Ce bien ne peut plus faire l’objet d’un nouveau contrat.' });
       }
-    } else if (property.statusAdmin !== 'Validée' || property.availability !== 'Disponible') {
+    } else if (property.availability !== 'Disponible') {
       return res.status(409).json({ status: 'fail', code: 'PROPERTY_NOT_AVAILABLE', message: 'Ce bien ne peut plus faire l’objet d’un nouveau contrat.' });
     }
     const c = await Contrat.create(req.body);

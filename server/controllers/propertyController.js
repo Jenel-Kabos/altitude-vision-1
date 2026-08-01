@@ -20,6 +20,7 @@ const SaleManagement = require('../models/SaleManagement');
 const RentalManagement = require('../models/RentalManagement');
 const Transaction = require('../models/Transaction');
 const Contrat = require('../models/Contrat');
+const { STAFF_IMMO } = require('../utils/roles');
 
 /**
  * Projection publique de SaleManagement — jamais le document complet côté
@@ -366,10 +367,17 @@ async function runPropertySearch({ query, isAdmin }) {
   // ── 1. Filtre de base passé directement à Property.find() ───────────────
   //    Ces champs NE passent PAS par APIFeatures.filter() (JSON.stringify
   //    détruit les objets RegExp et les opérateurs $-préfixés non-standards).
-  const baseFilter = { availability: 'Disponible' };
+  // GL-ARCH-1 : pour le staff (Admin/Gestionnaire Immobilier/Collaborateur),
+  // aucun filtre de publication (statusAdmin) ni de disponibilité n'est
+  // imposé ici — la Gestion Locative doit pouvoir proposer tous les biens
+  // déjà gérés ET tous les biens pouvant être pris en gestion, publiés ou
+  // non, disponibles ou non. Seul le public (non-staff) reste restreint aux
+  // annonces validées/disponibles/Altimmo.
+  const baseFilter = {};
   if (!isAdmin) {
-    baseFilter.statusAdmin = 'Validée';
-    baseFilter.pole        = 'Altimmo';
+    baseFilter.availability = 'Disponible';
+    baseFilter.statusAdmin  = 'Validée';
+    baseFilter.pole         = 'Altimmo';
   }
 
   // ── 2. Nomenclature canonique (offerType/propertyType/city/arrondissement/minPrice/
@@ -445,7 +453,10 @@ async function runPropertySearch({ query, isAdmin }) {
  * @route GET /api/properties
  */
 const getAllProperties = asyncHandler(async (req, res) => {
-  const isAdmin = req.user && req.user.role === 'Admin';
+  // GL-ARCH-1 : le staff Gestion Locative (Admin/Gestionnaire Immobilier/
+  // Collaborateur) a besoin de voir tous les biens gérables, pas seulement
+  // ceux déjà publiés/validés — pas uniquement `Admin`.
+  const isAdmin = req.user && STAFF_IMMO.includes(req.user.role);
   const includeDashboardClassification = req.query.dashboardClassification === '1';
   const query = { ...req.query };
   delete query.dashboardClassification;
@@ -719,8 +730,22 @@ const updateProperty = asyncHandler(async (req, res) => {
   // locative ou la finalisation financière. Un propriétaire ne peut jamais
   // les forcer via le formulaire générique.
   if (!isAdmin) {
-    ['status', 'availability', 'isPublished', 'pole', 'agent', 'recommande']
+    ['status', 'isPublished', 'pole', 'agent', 'recommande']
       .forEach((field) => delete updateData[field]);
+
+    // GL-ARCH-1 : un bien "pris en gestion" (RentalManagement.managementActivated)
+    // suit désormais exclusivement les règles de l'agence — le propriétaire du
+    // portail perd tout contrôle sur `availability` dès qu'il est géré. Sur son
+    // propre bien non géré, il garde le droit contractuel de signaler
+    // Loué/Retiré/Vendu (portail propriétaire, univers 1) : ce cycle est
+    // indépendant de toute décision de prise en gestion par le staff.
+    if (updateData.availability !== undefined) {
+      const managedRental = await RentalManagement.findOne({ property: property._id, managementActivated: true }).select('_id');
+      const ALLOWED_OWNER_AVAILABILITY = ['Disponible', 'Loué', 'Retiré', 'Vendu'];
+      if (managedRental || !ALLOWED_OWNER_AVAILABILITY.includes(updateData.availability)) {
+        delete updateData.availability;
+      }
+    }
   }
 
   if (updateData.honoraires !== undefined) {
