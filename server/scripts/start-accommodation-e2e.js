@@ -25,6 +25,7 @@ const ids = {
   rentalActivationPropertyMobile: "66e200000000000000000036",
   proprietaireBienPropre: "66e200000000000000000040",
   contratFormPropertyMobile: "66e200000000000000000041",
+  proprietaireBienPropreMobile: "66e200000000000000000042",
 };
 let mongo;
 let fakePaymentProvider;
@@ -332,10 +333,31 @@ async function seed(uri) {
   await RoomCategory.create({ _id: ids.mobileRoomCategory, hotel: ids.mobileHotel, name: "Standard Mobile", code: "STDM", unitsAvailable: 13, capacity: { maxAdults: 2, maxChildren: 0 }, createdBy: ids.owner });
   await RatePlan.create({ roomCategory: ids.mobileRoomCategory, rateType: "public", amount: 35000, currency: "XAF", active: true, createdBy: ids.owner });
   await PaiementTransaction.syncIndexes();
-  // REG-GL-1.1 — propriétaire avec un "bien propre" (Proprietaire.biensPropres[],
-  // structure embarquée historique sans document Property réel), utilisé par
-  // contratCreationForm.spec.js pour vérifier que cette option reste non
-  // sélectionnable dans le formulaire de création de contrat.
+  // REG-GL-1.1 / GL-ARCH-1.1 — propriétaire avec un "bien propre"
+  // (Proprietaire.biensPropres[], structure embarquée historique sans
+  // document Property réel), utilisé par contrat-creation-form.spec.js pour
+  // vérifier (1) que ce bien n'apparaît jamais directement comme option
+  // sélectionnable du portefeuille, et (2) que le staff peut l'intégrer à la
+  // Gestion locative (POST .../importer-gestion) puis créer un contrat
+  // dessus. Champs complets (photos/description/superficie/prixLoyer) pour
+  // que cet import réussisse réellement dans le test e2e (seuls
+  // arrondissement/latitude/longitude restent à compléter via `overrides`,
+  // jamais présents sur biensPropres[]).
+  //
+  // GL-ARCH-1.2 — deux fiches distinctes (desktop / mobile), même
+  // convention que `contratFormPropertyMobile` ci-dessus : desktop-chromium
+  // et mobile-chromium partagent la même base éphémère (un seul webServer
+  // Playwright pour tout le run, voir playwright.config.js), et l'import
+  // biensPropres→Property crée un état PERMANENT (Property.sourceOwnerAssetId
+  // unique + RentalManagement actif) — jamais nettoyé entre projets par
+  // conception (ce n'est pas un état éphémère comme un Contrat, c'est le
+  // portefeuille géré lui-même). Réutiliser la même fiche pour les deux
+  // projets rendait donc le second projet à s'exécuter dépendant du
+  // premier (bien déjà importé) — cause exacte du `skip` précédent.
+  // Deux fiches avec des `_id`, adresses et clés `sourceOwnerAssetId`
+  // (dérivées de `_id`) totalement distinctes éliminent cette dépendance
+  // d'ordre : chaque projet importe SON propre bien, indépendamment,
+  // idempotent en lui-même, sans jamais toucher à celui de l'autre projet.
   const Proprietaire = require("../models/Proprietaire");
   await Proprietaire.create({
     _id: ids.proprietaireBienPropre,
@@ -343,6 +365,20 @@ async function seed(uri) {
     biensPropres: [{
       typeBien: "location", titre: "Bien propre E2E", type: "Maison",
       adresse: "12 rue du bien propre", ville: "Brazzaville",
+      description: "Description e2e suffisamment longue pour la validation du modèle Property.",
+      superficie: 90, nombreChambres: 3, nombreSDB: 1, prixLoyer: 275000,
+      photos: ["https://placehold.co/1200x800/png?text=BienPropreE2E"],
+    }],
+  });
+  await Proprietaire.create({
+    _id: ids.proprietaireBienPropreMobile,
+    nom: "PropriétaireE2E", prenom: "BienPropreMobile", telephone: "+242060000098",
+    biensPropres: [{
+      typeBien: "location", titre: "Bien propre E2E Mobile", type: "Maison",
+      adresse: "13 rue du bien propre mobile", ville: "Brazzaville",
+      description: "Description e2e suffisamment longue pour la validation du modèle Property (fiche dédiée mobile-chromium).",
+      superficie: 88, nombreChambres: 3, nombreSDB: 1, prixLoyer: 270000,
+      photos: ["https://placehold.co/1200x800/png?text=BienPropreE2EMobile"],
     }],
   });
   await mongoose.disconnect();

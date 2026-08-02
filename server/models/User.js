@@ -98,6 +98,17 @@ const userSchema = new mongoose.Schema(
         // 🔹 Vérification Propriétaire (KYC Admin)
         isVerified: { type: Boolean, default: false },
 
+        // 🔹 GL-ARCH-1.1 — compte technique créé automatiquement pour
+        // satisfaire Property.owner (obligatoire) lorsqu'une fiche
+        // Proprietaire (staff, sans compte) n'a aucun User lié et qu'un de
+        // ses biensPropres[] est importé en Gestion locative. Ne représente
+        // jamais un utilisateur réel du portail : `isActive: false` dès la
+        // création (bloque authMiddleware.protect) + mot de passe aléatoire
+        // jamais communiqué. Une procédure d'invitation séparée (hors
+        // périmètre de cette mission) devra explicitement activer ce compte
+        // si ce propriétaire doit un jour recevoir un accès self-service.
+        isTechnical: { type: Boolean, default: false },
+
         // 🔹 Statut de contrôle global
         status: {
             type:    String,

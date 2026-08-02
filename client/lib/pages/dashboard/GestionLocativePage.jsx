@@ -16,6 +16,7 @@ import {
   addBienPhotos,
   getRentalManagement, getRentalManagementStats, getRentalManagementDetail, runRentalAction,
   getLocataireDossiers, getPaiementsStats,
+  importBienIntoGestionLocative,
 } from "../../services/gestionLocativeService";
 import {
   getContratDocuments, generateBail, generateQuittance, generateMiseEnDemeure,
@@ -874,7 +875,7 @@ const emptyContrat = {
   notaireNom:'', notaireTel:'', notaireEmail:'', conditionsSuspensives:'', notes:'',
 };
 
-const ContratForm = ({ init = emptyContrat, proprietaires, locataires, properties, onSave, onCancel, loading }) => {
+const ContratForm = ({ init = emptyContrat, proprietaires, locataires, properties, onSave, onCancel, loading, onImportBien }) => {
   const [f, setF] = useState(init);
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
 
@@ -884,12 +885,47 @@ const ContratForm = ({ init = emptyContrat, proprietaires, locataires, propertie
   // Biens du propriétaire sélectionné
   const propBiens = proprietaires.find(p => p._id === f.proprietaire)?.biensPropres || [];
 
-  // REG-GL-1.1 : un "bien propre" (Proprietaire.biensPropres[], structure
-  // embarquée historique sans document Property réel) ne peut PAS produire
-  // un Contrat.bien valide — le contrôleur exige un ObjectId Property réel
-  // (validation métier intentionnelle, non modifiée ici). Cette option
-  // n'est donc plus sélectionnable (voir <option disabled> plus bas) ; ce
-  // handler ne traite plus que la sélection d'un bien du portefeuille.
+  // GL-ARCH-1.1 — un "bien propre" (Proprietaire.biensPropres[], structure
+  // embarquée historique sans document Property réel) ne peut toujours pas
+  // produire directement un Contrat.bien valide — le contrôleur exige un
+  // ObjectId Property réel. Mais désormais le staff (Admin/Gestionnaire
+  // Immobilier) peut l'intégrer explicitement à la Gestion locative
+  // (POST .../importer-gestion), qui crée le vrai Property + son
+  // RentalManagement actif ; voir `importingIndex` ci-dessous.
+  const [importingIndex, setImportingIndex] = useState(null);
+  const [importOverrides, setImportOverrides] = useState({ arrondissement: '', latitude: '', longitude: '' });
+  const [importError, setImportError] = useState('');
+  const [importedIndexes, setImportedIndexes] = useState(new Set());
+  const [importing, setImporting] = useState(false);
+
+  const handleConfirmImport = async (bienIndex) => {
+    setImporting(true);
+    setImportError('');
+    try {
+      const overrides = {
+        address: { arrondissement: importOverrides.arrondissement },
+        latitude: importOverrides.latitude ? parseFloat(importOverrides.latitude) : undefined,
+        longitude: importOverrides.longitude ? parseFloat(importOverrides.longitude) : undefined,
+      };
+      const property = await onImportBien(f.proprietaire, bienIndex, overrides);
+      setImportedIndexes(prev => new Set(prev).add(bienIndex));
+      setImportingIndex(null);
+      setImportOverrides({ arrondissement: '', latitude: '', longitude: '' });
+      handleBienChange(property._id);
+    } catch (err) {
+      const body = err.response?.data;
+      if (body?.code === 'INCOMPLETE_SOURCE_BIEN') {
+        setImportError(`Champs manquants : ${(body.missingFields || []).join(', ')}`);
+      } else {
+        setImportError(body?.message || 'Import impossible.');
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // REG-GL-1.1 : ce handler traite la sélection d'un bien du portefeuille
+  // (Property réel) — jamais une entrée biensPropres[] non importée.
   const handleBienChange = (val) => {
     set('bien', val);
     const prop = properties.find(p => p._id === val);
@@ -935,24 +971,60 @@ const ContratForm = ({ init = emptyContrat, proprietaires, locataires, propertie
         <Select value={f.bien} onChange={e => handleBienChange(e.target.value)}>
           <option value="">— Sélectionner un bien —</option>
           {properties.length > 0 && (
-            <optgroup label="Portefeuille Altimmo">
+            <optgroup label="Portefeuille Altimmo (biens gérés ou gérables)">
               {properties.map(p => <option key={p._id} value={p._id}>{p.title || p.adresse}</option>)}
-            </optgroup>
-          )}
-          {propBiens.length > 0 && (
-            <optgroup label="Biens du propriétaire (pas encore un bien réel du portefeuille)">
-              {propBiens.map((b, i) => (
-                <option key={`propre:${i}`} value={`propre:${i}`} disabled>
-                  {b.titre} — {b.adresse} (non disponible pour un contrat)
-                </option>
-              ))}
             </optgroup>
           )}
         </Select>
         {propBiens.length > 0 && (
-          <p className="mt-1 text-xs text-gray-500">
-            Les biens propres du propriétaire sont une fiche interne, pas un bien réel du portefeuille : ils doivent d'abord être créés comme bien (pris en gestion) — publiés ou non — avant de pouvoir être rattachés à un contrat.
-          </p>
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-gray-500">
+              Biens déclarés par ce propriétaire, pas encore un bien réel du portefeuille — un bien géré peut être publié ou non, la publication n'est jamais requise pour créer un contrat :
+            </p>
+            {propBiens.map((b, i) => {
+              const done = importedIndexes.has(i);
+              return (
+                <div key={`propre:${i}`} className="rounded-lg border border-gray-200 p-2 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-gray-700">{b.titre} — {b.adresse}</span>
+                    {done ? (
+                      <span className="font-semibold text-green-600">Intégré ✓</span>
+                    ) : onImportBien ? (
+                      <button type="button" className="rounded-md px-2 py-1 font-semibold text-white"
+                        style={{ background: BLUE }}
+                        onClick={() => { setImportingIndex(importingIndex === i ? null : i); setImportError(''); }}>
+                        Ajouter à la Gestion locative
+                      </button>
+                    ) : (
+                      <span className="text-gray-400">non disponible pour un contrat</span>
+                    )}
+                  </div>
+                  {importingIndex === i && !done && (
+                    <div className="mt-2 space-y-2 border-t border-gray-100 pt-2">
+                      <p className="text-gray-500">
+                        Ce bien sera enregistré dans le portefeuille interne de Gestion locative. Il ne sera pas publié dans les annonces publiques.
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Input placeholder="Arrondissement" value={importOverrides.arrondissement}
+                          onChange={e => setImportOverrides(p => ({ ...p, arrondissement: e.target.value }))} />
+                        <Input placeholder="Latitude" value={importOverrides.latitude}
+                          onChange={e => setImportOverrides(p => ({ ...p, latitude: e.target.value }))} />
+                        <Input placeholder="Longitude" value={importOverrides.longitude}
+                          onChange={e => setImportOverrides(p => ({ ...p, longitude: e.target.value }))} />
+                      </div>
+                      {importError && <p className="text-red-600">{importError}</p>}
+                      <button type="button" disabled={importing}
+                        className="rounded-md px-3 py-1 font-semibold text-white disabled:opacity-60"
+                        style={{ background: GREEN }}
+                        onClick={() => handleConfirmImport(i)}>
+                        {importing ? 'Import…' : 'Confirmer l’import'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </Field>
       <div className="grid grid-cols-2 gap-3">
@@ -1665,7 +1737,15 @@ const GestionLocativePage = () => {
     try {
       const [c, p, l, props, rentalData, stats] = await Promise.all([
         getContrats(), getProprietaires(), getLocataires(),
-        getAllProperties().catch(() => []),
+        // GL-ARCH-1.2 — `GET /api/properties` pagine à 10 résultats par
+        // défaut (APIFeatures.paginate) : silencieusement tronquer cette
+        // liste violerait la règle GL-ARCH-1 ("tous les biens déjà gérés +
+        // tous les biens pouvant être pris en gestion", jamais un
+        // sous-ensemble). Limite haute explicite plutôt que dépendante du
+        // défaut générique de recherche publique (découvert via un effet de
+        // bord E2E : de nouveaux imports repoussaient un bien de portefeuille
+        // plus ancien hors de la première page).
+        getAllProperties({ limit: 1000 }).catch(() => []),
         getRentalManagement().catch(() => ({ rentals: [] })),
         getRentalManagementStats().catch(() => ({ total:0, vacant:0, occupied:0, published:0, maintenance:0, readyToRepublish:0 })),
       ]);
@@ -1716,6 +1796,16 @@ const GestionLocativePage = () => {
   }, [filterContrat, filterAnnee, tab]);
 
   // ── Contrats ────────────────────────────────────────────────
+  // GL-ARCH-1.1 — intègre un bien propre en Gestion locative (Property réel +
+  // RentalManagement actif), sans fermer la modale « Nouveau contrat » ni
+  // perdre sa saisie en cours (Phase 10 : le formulaire reste ouvert).
+  const handleImportBien = async (proprietaireId, bienIndex, overrides) => {
+    const { property, alreadyImported } = await importBienIntoGestionLocative(proprietaireId, bienIndex, overrides);
+    setProperties(prev => (prev.some(p => p._id === property._id) ? prev : [property, ...prev]));
+    toast(alreadyImported ? 'Bien déjà intégré à la Gestion locative' : 'Bien intégré à la Gestion locative');
+    return property;
+  };
+
   const handleSaveContrat = async (f) => {
     if (!f.proprietaire) return toast('Propriétaire requis', 'error');
     setSaving(true);
@@ -2425,6 +2515,7 @@ const GestionLocativePage = () => {
             onSave={handleSaveContrat}
             onCancel={() => {setContratModal(false);setEditContrat(null);}}
             loading={saving}
+            onImportBien={handleImportBien}
           />
         </Modal>
       )}

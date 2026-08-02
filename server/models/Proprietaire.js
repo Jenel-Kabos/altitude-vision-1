@@ -99,6 +99,16 @@ const proprietaireSchema = new mongoose.Schema({
   pieceIdentiteNom:  { type: String }, // nom original du fichier
   notes:             { type: String, trim: true },
   biensPropres:   [bienSchema],
+  // GL-ARCH-1.1 : lien optionnel vers un compte User représentant ce
+  // propriétaire — jamais renseigné automatiquement à la création d'une
+  // fiche Proprietaire (décision historique, voir RENTAL_MANAGEMENT_V2.md
+  // §11 : Proprietaire et User de rôle Proprietaire restent deux notions
+  // distinctes). Renseigné uniquement lorsqu'un bien de biensPropres[] est
+  // importé en Gestion locative (server/services/proprietaireGestionImportService.js) :
+  // soit un User existant est explicitement lié par le staff, soit un User
+  // technique minimal (inactif, sans mot de passe utilisable) est créé pour
+  // satisfaire la relation obligatoire Property.owner → User.
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Proprietaire', proprietaireSchema);

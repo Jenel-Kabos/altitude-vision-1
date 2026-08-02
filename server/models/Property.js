@@ -226,6 +226,15 @@ const propertySchema = new mongoose.Schema(
     /** 📅 Date de validation / rejet */
     reviewedAt: { type: Date },
 
+    // GL-ARCH-1.1 : tracabilite + dedoublonnage d une Property creee depuis
+    // Proprietaire.biensPropres[] (import staff vers la Gestion locative,
+    // voir proprietaireGestionImportService.js). sourceOwnerAssetId est une
+    // cle composite stable <proprietaireId>:<bienId> - jamais le titre seul -
+    // index unique sparse pour qu un double import concurrent (double clic)
+    // echoue en base plutot que de creer un doublon.
+    sourceType: { type: String, enum: ['proprietaire_bien_propre'] },
+    sourceOwnerAssetId: { type: String, unique: true, sparse: true, index: true },
+
     documents: { type: [String], default: [] },
   },
   {

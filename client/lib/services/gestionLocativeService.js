@@ -84,6 +84,17 @@ export const deleteBien = async (proprietaireId, bienIndex) => {
   await api.delete(`/proprietaires/${proprietaireId}/biens/${bienIndex}`);
 };
 
+// GL-ARCH-1.1 — Intègre un bien propre (Proprietaire.biensPropres[]) dans la
+// Gestion locative : crée un Property réel + un RentalManagement actif.
+// `overrides` complète les champs obligatoires absents de la fiche (ex :
+// arrondissement, latitude/longitude, jamais présents sur biensPropres[]).
+// Idempotent côté serveur : un second appel sur le même bien renvoie 200
+// avec `alreadyImported: true` au lieu de dupliquer.
+export const importBienIntoGestionLocative = async (proprietaireId, bienIndex, overrides = {}) => {
+  const res = await api.post(`/proprietaires/${proprietaireId}/biens/${bienIndex}/importer-gestion`, overrides);
+  return res.data.data;
+};
+
 // ── Locataires ────────────────────────────────────────────────
 
 export const getLocataires = async () => {

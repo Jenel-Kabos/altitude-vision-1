@@ -6,34 +6,10 @@ const rentalSync = require('../services/rentalListingSyncService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { notify } = require('../services/notificationService');
 const RealEstateReservation = require('../models/RealEstateReservation');
-
-const syncLeaseOccupation = async (contract, actor) => {
-  if (contract.type !== 'location' || !contract.bien) return;
-  const propertyId = contract.bien?._id || contract.bien;
-  const property = await Property.findById(propertyId).select('_id owner status price');
-  if (!property || property.status !== 'location') return;
-  const rental = await RentalManagement.findOneAndUpdate(
-    { property: property._id },
-    {
-      $setOnInsert: { property: property._id, owner: property.owner, manager: actor },
-      // Un bail signé implique une gestion active, même si l'écran d'activation
-      // dédié n'a jamais été utilisé (Sprint A — voir rentalManagementController.create).
-      $set: { monthlyRent: contract.montantLoyer ?? property.price, managementActivated: true },
-    },
-    { new: true, upsert: true, runValidators: true },
-  );
-  if (contract.statut === 'actif') {
-    await rentalSync.markPropertyRented(rental._id, { leaseId: contract._id, tenantId: contract.locataire, actor, source: 'contract' });
-    if (contract.reservation) {
-      await RealEstateReservation.updateOne(
-        { _id: contract.reservation, status: 'active', contract: contract._id, expiresAt: { $gt: new Date() } },
-        { $set: { status: 'converted' }, $push: { history: { from: 'active', to: 'converted', action: 'contract_activated', actor, at: new Date() } } },
-      );
-    }
-  } else if (['résilié', 'expiré'].includes(contract.statut) && rental.activeLease?.toString() === contract._id.toString()) {
-    await rentalSync.schedulePropertyExit(rental._id, { actor, source: 'contract' });
-  }
-};
+// GL-ARCH-1.1 : extrait dans un service partagé pour être réutilisé par le
+// script de réconciliation historique (server/scripts/reconcileRentalManagement.js)
+// — comportement strictement inchangé, voir rentalManagementLeaseSyncService.js.
+const { syncLeaseOccupation } = require('../services/rentalManagementLeaseSyncService');
 
 // Génère les paiements mensuels pour un bail location
 const generatePaiements = async (contratId, dateEntree, dateFinBail, montantLoyer) => {

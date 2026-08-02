@@ -28,8 +28,28 @@ describe('AccommodationReservationsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Créer la demande' })); await waitFor(() => expect(createAccommodationReservation).toHaveBeenCalled());
   });
   test('une cellule multiéléments ouvre une vraie liste de choix accessible', async () => {
-    getAccommodationReservationCalendar.mockResolvedValue({ reservations:[{ _id:'R1', status:'confirmed', checkInDate:'2026-08-10T00:00:00Z', checkOutDate:'2026-08-12T00:00:00Z', guestCount:2 }], blocks:[{ _id:'B1', type:'maintenance', startDate:'2026-08-10T00:00:00Z', endDate:'2026-08-11T00:00:00Z', reason:'Travaux' }] });
+    // GL-ARCH-1.2 — le panneau initialise son mois affiché sur la VRAIE date
+    // système (`AccommodationReservationsPanel.jsx` : `useState(() => new
+    // Date(...))`), jamais mockée ici. Un clic sur « Mois suivant » affiche
+    // donc toujours le mois civil suivant le mois réel courant, quel qu'il
+    // soit — coder une date absolue (ex: août 2026) rendait ce test
+    // dépendant de la date d'exécution et cassait dès que « aujourd'hui »
+    // dépassait juillet 2026. Les dates mockées sont désormais calculées
+    // relativement à « maintenant », donc valides à n'importe quelle date
+    // d'exécution, sans jamais devenir obsolètes.
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const targetDay = 10; // présent dans tous les mois, aucun risque de débordement
+    const iso = (day) => new Date(Date.UTC(nextMonth.getFullYear(), nextMonth.getMonth(), day)).toISOString();
+    const expectedDateLabel = new RegExp(
+      `${String(targetDay).padStart(2, '0')}\\/${String(nextMonth.getMonth() + 1).padStart(2, '0')}\\/${nextMonth.getFullYear()}.*confirmed.*Maintenance`,
+      'i',
+    );
+    getAccommodationReservationCalendar.mockResolvedValue({
+      reservations: [{ _id: 'R1', status: 'confirmed', checkInDate: iso(targetDay), checkOutDate: iso(targetDay + 2), guestCount: 2 }],
+      blocks: [{ _id: 'B1', type: 'maintenance', startDate: iso(targetDay), endDate: iso(targetDay + 1), reason: 'Travaux' }],
+    });
     render(<AccommodationReservationsPanel accommodations={accommodations}/>); fireEvent.click(screen.getByRole('button', { name:'Calendrier et blocages' })); fireEvent.click(screen.getByRole('button', { name:'Mois suivant' }));
-    const cell = await screen.findByRole('button', { name:/10\/08\/2026.*confirmed.*Maintenance/i }); fireEvent.click(cell); const dialog = screen.getByRole('dialog', { name:'2 éléments sur cette date' }); expect(within(dialog).getByRole('button', { name:/Réservation/ })).toBeInTheDocument(); expect(within(dialog).getByRole('button', { name:/maintenance/i })).toBeInTheDocument(); fireEvent.keyDown(window, { key:'Escape' }); await waitFor(() => expect(screen.queryByRole('dialog', { name:'2 éléments sur cette date' })).not.toBeInTheDocument());
+    const cell = await screen.findByRole('button', { name: expectedDateLabel }); fireEvent.click(cell); const dialog = screen.getByRole('dialog', { name:'2 éléments sur cette date' }); expect(within(dialog).getByRole('button', { name:/Réservation/ })).toBeInTheDocument(); expect(within(dialog).getByRole('button', { name:/maintenance/i })).toBeInTheDocument(); fireEvent.keyDown(window, { key:'Escape' }); await waitFor(() => expect(screen.queryByRole('dialog', { name:'2 éléments sur cette date' })).not.toBeInTheDocument());
   });
 });

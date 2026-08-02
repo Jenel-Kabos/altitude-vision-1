@@ -3,6 +3,7 @@ const Document     = require('../models/Document');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const logger = require('../utils/logger');
+const { importBienPropreVersGestion, ImportError } = require('../services/proprietaireGestionImportService');
 
 const rollbackUploads = async (urls, tag) => {
   const list = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
@@ -293,6 +294,37 @@ exports.deleteBienPhoto = async (req, res) => {
     await p.save();
     res.json({ status: 'success', data: { bien: p.biensPropres[bienIdx] } });
   } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+};
+
+/**
+ * GL-ARCH-1.1 — Intègre un Proprietaire.biensPropres[] réel dans la Gestion
+ * locative : crée un Property + un RentalManagement actif. Réservé au staff
+ * (Admin/GestionnaireImmobilier, voir routes). Voir
+ * proprietaireGestionImportService.js pour la règle métier complète
+ * (résolution du owner, dédoublonnage, complétion des champs manquants).
+ */
+exports.importBienIntoGestionLocative = async (req, res) => {
+  try {
+    const result = await importBienPropreVersGestion({
+      proprietaireId: req.params.id,
+      bienIndex: req.params.bienIndex,
+      overrides: req.body || {},
+      actor: req.user,
+    });
+    res.status(result.alreadyImported ? 200 : 201).json({
+      status: 'success',
+      data: {
+        property: result.property,
+        rentalManagement: result.rentalManagement,
+        alreadyImported: !!result.alreadyImported,
+      },
+    });
+  } catch (err) {
+    if (err instanceof ImportError) {
+      return res.status(err.statusCode).json({ status: 'fail', code: err.code, message: err.message, ...(err.missingFields && { missingFields: err.missingFields }) });
+    }
     res.status(500).json({ status: 'error', message: err.message });
   }
 };
