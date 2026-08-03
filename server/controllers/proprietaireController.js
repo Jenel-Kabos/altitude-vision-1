@@ -13,6 +13,8 @@ const rollbackUploads = async (urls, tag) => {
   })));
 };
 
+// DOC-ARCH-2 — classement automatique : déclenché par le workflow métier
+// (fiche propriétaire), jamais une saisie manuelle.
 const saveIdentiteDocument = async ({ url, nom, type, personneId, personneNom, createdBy }) => {
   try {
     await Document.create({
@@ -25,6 +27,12 @@ const saveIdentiteDocument = async ({ url, nom, type, personneId, personneNom, c
       content:   url,
       notes:     `Pièce d'identité — ${personneNom} — ${nom || type || ''}`,
       issueDate: new Date(),
+      pole: 'Altimmo',
+      service: 'gestion_locative',
+      categorie: "Pièces d'identité",
+      entityType: 'Proprietaire',
+      entityId: personneId,
+      visibility: 'owner',
     });
   } catch (e) {
     console.error('⚠️ Document pièce identité non créé:', e.message);

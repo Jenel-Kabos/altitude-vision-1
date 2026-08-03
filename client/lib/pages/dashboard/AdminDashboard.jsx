@@ -68,7 +68,10 @@ const NAV_SECTIONS = [
       { to: '/dashboard/gestion-locative/paiements',   end: false, Icon: CreditCard,    label: 'Paiements',      accent: BLUE, roles: ROLES_GL },
       { to: '/dashboard/gestion-locative/preavis',     end: false, Icon: Clock,         label: 'Préavis',        accent: BLUE, roles: ROLES_GL },
       { to: '/dashboard/gestion-locative/maintenance', end: false, Icon: Wrench,        label: 'Maintenance',    accent: BLUE, roles: ROLES_GL },
-      { to: '/dashboard/gestion-locative/documents',   end: false, Icon: FolderOpen,    label: 'Documents',      accent: BLUE, roles: ROLES_GL },
+      // DOC-ARCH-1 — un seul Centre documentaire pour toute la plateforme :
+      // ce point d'entrée ouvre désormais /dashboard/documents déjà filtré
+      // (pole=Altimmo&service=gestion_locative), jamais un écran séparé.
+      { to: '/dashboard/documents?pole=Altimmo&service=gestion_locative', end: false, Icon: FolderOpen, label: 'Documents', accent: BLUE, roles: ROLES_GL },
       { to: '/dashboard/documents',                    end: false, Icon: FolderOpen,    label: 'Documents',      accent: GOLD, roles: ROLES_DOCS },
     ],
   },

@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { Suspense, useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import {
   FileText, FilePlus, Trash2, ExternalLink, Search, Filter,
   ChevronLeft, ChevronRight, Loader2, AlertCircle, X, Check,
-  FileCheck, Receipt, ScrollText, ClipboardCheck, FolderOpen,
+  FileCheck, Receipt, ScrollText, ClipboardCheck, FolderOpen, Folder,
   Calendar, User, DollarSign, Eye,
 } from 'lucide-react';
 import {
@@ -16,6 +17,11 @@ import {
   deleteDocument,
 } from '../../services/documentService';
 import api from '../../services/api';
+import { POLES, findPole, findService } from '../../constants/documentTaxonomy';
+import RentalDocumentsPage from './RentalDocumentsPage';
+import FinancialDocumentsFolder from '../../components/dashboard/FinancialDocumentsFolder';
+import DossierPanel from '../../components/dashboard/DossierPanel';
+import GlobalDossierSearch from '../../components/dashboard/GlobalDossierSearch';
 
 const GOLD     = '#C8960C';
 const BLUE     = '#2E7BB5';
@@ -89,7 +95,11 @@ const StatCard = ({ label, value, Icon, color }) => (
 );
 
 // ── Create / Edit modal ───────────────────────────────────────
-const DocModal = ({ doc, clients, onClose, onSaved }) => {
+// DOC-ARCH-1 — `folder` (optionnel) porte le pole/service/categories du
+// dossier ouvert au moment du clic "Nouveau document" : préremplit le
+// classement plutôt que de le redemander, sans jamais l'imposer (les champs
+// restent modifiables, un document peut être créé hors contexte de dossier).
+const DocModal = ({ doc, clients, folder, onClose, onSaved }) => {
   const isEdit = !!doc;
   const [form, setForm] = useState(doc || {
     type: 'Devis', status: 'Brouillon', client: '', notes: '',
@@ -97,6 +107,10 @@ const DocModal = ({ doc, clients, onClose, onSaved }) => {
     dueDate: '',
     items: [{ description: '', quantity: 1, unitPrice: 0, total: 0 }],
     content: '',
+    pole: folder?.pole || '',
+    service: folder?.service || '',
+    categorie: '',
+    visibility: 'staff',
   });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -161,6 +175,17 @@ const DocModal = ({ doc, clients, onClose, onSaved }) => {
 
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
+          {/* DOC-ARCH-2 — la saisie manuelle n'est qu'un mécanisme
+              transitoire pour les catégories sans workflow métier dédié
+              (ex: Altcom, Mila Events, Administration, compromis/offres de
+              vente…). Elle disparaîtra dossier par dossier à mesure que de
+              vrais workflows documentaires seront construits. */}
+          {!isEdit && (
+            <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+              Solution transitoire : ce classement manuel est destiné aux documents qui n'ont pas encore de workflow automatique. Dès qu'un workflow existe pour cette catégorie, le classement se fait sans intervention.
+            </p>
+          )}
+
           {/* Type + Status */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -176,6 +201,42 @@ const DocModal = ({ doc, clients, onClose, onSaved }) => {
               <label className={labelCls}>Statut</label>
               <select value={form.status} onChange={e => set('status', e.target.value)} className={inputCls}>
                 {STATUSES.map(s => <option key={s} value={s}>{STATUS_CFG[s].label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* DOC-ARCH-1 — Classement (pôle / service / catégorie / confidentialité) */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Pôle</label>
+              <select value={form.pole || ''} onChange={e => { set('pole', e.target.value); set('service', ''); set('categorie', ''); }} className={inputCls}>
+                <option value="">— Non classé —</option>
+                {POLES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Service</label>
+              <select value={form.service || ''} onChange={e => { set('service', e.target.value); set('categorie', ''); }} className={inputCls} disabled={!form.pole}>
+                <option value="">— Sélectionner —</option>
+                {(findPole(form.pole)?.services || []).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Catégorie</label>
+              <select value={form.categorie || ''} onChange={e => set('categorie', e.target.value)} className={inputCls} disabled={!form.service}>
+                <option value="">— Aucune —</option>
+                {(findService(form.pole, form.service)?.categories || []).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Confidentialité</label>
+              <select value={form.visibility || 'staff'} onChange={e => set('visibility', e.target.value)} className={inputCls}>
+                <option value="staff">Équipe uniquement</option>
+                <option value="owner">Propriétaire concerné</option>
+                <option value="tenant">Locataire concerné</option>
+                <option value="client">Client concerné</option>
               </select>
             </div>
           </div>
@@ -326,7 +387,9 @@ const DeleteModal = ({ doc, onClose, onDeleted }) => {
 };
 
 // ── Document row ──────────────────────────────────────────────
-const DocRow = ({ doc, onEdit, onDelete }) => {
+const DOSSIER_DOMAIN_BY_ENTITY_TYPE = { Transaction: 'vente_location' };
+
+const DocRow = ({ doc, onEdit, onDelete, onOpenDossier }) => {
   const { Icon, color } = TYPE_ICONS[doc.type] || { Icon: FileText, color: GOLD };
   const clientName = doc.refNom || doc.client?.name || '—';
   const hasAmount  = doc.totalAmount > 0;
@@ -371,6 +434,16 @@ const DocRow = ({ doc, onEdit, onDelete }) => {
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* DOC-EVO-1 — évolution 9 : navigation croisée vers le dossier
+              métier (Transaction) quand ce document en a été le fruit
+              (facture de finalisation, taguée entityType='Transaction' —
+              voir realEstateTransactionFinalizationService.js). */}
+          {doc.entityType && DOSSIER_DOMAIN_BY_ENTITY_TYPE[doc.entityType] && (
+            <button onClick={() => onOpenDossier(DOSSIER_DOMAIN_BY_ENTITY_TYPE[doc.entityType], doc.entityId)} title="Ouvrir le dossier"
+              className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors">
+              <FolderOpen size={15} />
+            </button>
+          )}
           {doc.content && doc.content.startsWith('http') && (() => {
             console.log(`[DocumentsPage] doc #${doc.docNumber || doc._id?.slice(-4)} content URL:`, doc.content);
             return (
@@ -394,8 +467,52 @@ const DocRow = ({ doc, onEdit, onDelete }) => {
   );
 };
 
+// DOC-ARCH-1 — Explorateur Pôle → Service (Niveau 1 / Niveau 2). Purement de
+// la navigation : ouvre le Centre documentaire déjà filtré (query params),
+// jamais un écran séparé. Un service sans donnée aujourd'hui reste listé
+// (arborescence cible) mais affichera une liste vide tant qu'aucun document
+// n'est classé dessus — rien n'est inventé.
+const FolderGrid = ({ items, onOpen }) => (
+  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+    {items.map((item) => (
+      <button key={item.key} onClick={() => onOpen(item.key)}
+        className="flex flex-col items-center gap-2 rounded-xl p-5 bg-white hover:bg-gray-50 transition-colors text-center"
+        style={{ border: '1px solid rgba(17,24,39,0.08)' }}>
+        <Folder size={28} style={{ color: GOLD }} />
+        <span className="text-sm font-semibold text-gray-800" style={{ fontFamily: "'DM Sans', sans-serif" }}>{item.label}</span>
+      </button>
+    ))}
+  </div>
+);
+
+const Breadcrumb = ({ poleLabel, serviceLabel, onRoot, onPole }) => (
+  <nav className="flex items-center gap-1.5 text-sm text-gray-500" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <button onClick={onRoot} className="hover:text-gray-800 hover:underline">Centre documentaire</button>
+    {poleLabel && (<><ChevronRight size={13} className="text-gray-300" />
+      <button onClick={onPole} disabled={!serviceLabel} className={serviceLabel ? 'hover:text-gray-800 hover:underline' : 'text-gray-800 font-semibold'}>{poleLabel}</button>
+    </>)}
+    {serviceLabel && (<><ChevronRight size={13} className="text-gray-300" /><span className="text-gray-800 font-semibold">{serviceLabel}</span></>)}
+  </nav>
+);
+
 // ── Main page ─────────────────────────────────────────────────
-const DocumentsPage = () => {
+const DocumentsPageContent = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const poleKey = searchParams.get('pole') || '';
+  const serviceKey = searchParams.get('service') || '';
+  const pole = findPole(poleKey);
+  const service = findService(poleKey, serviceKey);
+  // Un service invalide dans l'URL (lien obsolète, faute de frappe) retombe
+  // silencieusement au niveau pôle plutôt que de planter.
+  const showServiceLevel = !!pole && !service;
+  const showDocuments = !!pole && !!service;
+  const isRentalManagement = service?.dataSource === 'contrats';
+
+  const goToRoot = () => router.push('/dashboard/documents');
+  const goToPole = (key) => router.push(`/dashboard/documents?pole=${key}`);
+  const goToService = (key) => router.push(`/dashboard/documents?pole=${poleKey}&service=${key}`);
+
   const [docs,       setDocs]       = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
@@ -406,21 +523,28 @@ const DocumentsPage = () => {
   const [page,       setPage]       = useState(1);
   const [editDoc,    setEditDoc]    = useState(null);   // null = closed, false = new, obj = edit
   const [deleteDoc,  setDeleteDoc]  = useState(null);
+  const [openDossier, setOpenDossier] = useState(null); // { domain, entityId } | null
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAllDocuments();
+      // DOC-ARCH-1 — champ scopé au dossier ouvert (jamais de duplication de
+      // stockage : même collection `Document`, simplement filtrée côté API).
+      // Sans pole/service (racine), comportement historique inchangé.
+      const params = pole && service ? { pole: pole.key, service: service.key } : {};
+      const data = await getAllDocuments(params);
       setDocs(data);
     } catch {
       setError('Impossible de charger les documents.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pole, service]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (showDocuments && !isRentalManagement) load();
+  }, [load, showDocuments, isRentalManagement]);
 
   useEffect(() => {
     api.get('/users').then(r => setClients(r.data?.data?.users || [])).catch(() => {});
@@ -472,6 +596,14 @@ const DocumentsPage = () => {
     setDeleteDoc(null);
   };
 
+  // DOC-ARCH-1 — bouton "Nouveau document" masqué pour les dossiers
+  // alimentés par un workflow métier déjà existant (Gestion locative : bail/
+  // quittance/mise en demeure/préavis/état des lieux) — ces documents ne
+  // doivent jamais être créés manuellement, uniquement produits par ces
+  // workflows (cf. GestionLocativePage). Le Centre documentaire ne fait que
+  // les afficher.
+  const canCreateHere = !isRentalManagement;
+
   return (
     <div className="max-w-6xl mx-auto space-y-5">
 
@@ -481,17 +613,37 @@ const DocumentsPage = () => {
           <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
             Documents
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-            Contrats, factures, devis et états des lieux
-          </p>
+          <div className="mt-1">
+            <Breadcrumb poleLabel={pole?.label} serviceLabel={service?.label} onRoot={goToRoot} onPole={() => goToPole(poleKey)} />
+          </div>
         </div>
-        <button onClick={() => setEditDoc(false)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-          style={{ background: `linear-gradient(135deg, #A06820, ${GOLD})`, fontFamily: "'DM Sans', sans-serif" }}>
-          <FilePlus size={16} />
-          Nouveau document
-        </button>
+        {canCreateHere && (
+          <button onClick={() => setEditDoc(false)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            style={{ background: `linear-gradient(135deg, #A06820, ${GOLD})`, fontFamily: "'DM Sans', sans-serif" }}>
+            <FilePlus size={16} />
+            Nouveau document
+          </button>
+        )}
       </div>
+
+      {/* DOC-EVO-1 — évolution 5 : recherche globale, visible à tout niveau */}
+      <GlobalDossierSearch />
+
+      {/* Niveau 1 — pôles */}
+      {!pole && <FolderGrid items={POLES} onOpen={goToPole} />}
+
+      {/* Niveau 2 — services d'un pôle */}
+      {showServiceLevel && <FolderGrid items={pole.services} onOpen={goToService} />}
+
+      {/* Gestion locative — réutilise intégralement RentalDocumentsPage
+          (Contrat.documents[], jamais une copie physique) */}
+      {showDocuments && isRentalManagement && <RentalDocumentsPage embedded />}
+
+      {showDocuments && !isRentalManagement && (<>
+      {/* DOC-ARCH-2 — projection automatique des factures FinancialDocument
+          (Hébergements/Hôtellerie), jamais dupliquées dans Document */}
+      {service?.financialDomain && <FinancialDocumentsFolder domain={service.financialDomain} />}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -589,7 +741,8 @@ const DocumentsPage = () => {
                   {paginated.map(doc => (
                     <DocRow key={doc._id} doc={doc}
                       onEdit={d => setEditDoc(d)}
-                      onDelete={d => setDeleteDoc(d)} />
+                      onDelete={d => setDeleteDoc(d)}
+                      onOpenDossier={(domain, entityId) => setOpenDossier({ domain, entityId })} />
                   ))}
                 </AnimatePresence>
               </tbody>
@@ -634,6 +787,7 @@ const DocumentsPage = () => {
           <DocModal
             doc={editDoc || null}
             clients={clients}
+            folder={pole && service ? { pole: pole.key, service: service.key } : null}
             onClose={() => setEditDoc(null)}
             onSaved={handleSaved} />
         )}
@@ -644,8 +798,18 @@ const DocumentsPage = () => {
             onDeleted={handleDeleted} />
         )}
       </AnimatePresence>
+      {openDossier && (
+        <DossierPanel domain={openDossier.domain} entityId={openDossier.entityId} onClose={() => setOpenDossier(null)} />
+      )}
+      </>)}
     </div>
   );
 };
+
+const DocumentsPage = () => (
+  <Suspense fallback={<div className="max-w-6xl mx-auto py-20 text-center text-sm text-gray-400">Chargement…</div>}>
+    <DocumentsPageContent />
+  </Suspense>
+);
 
 export default DocumentsPage;

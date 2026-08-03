@@ -2,8 +2,12 @@ const express = require('express');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/financialController');
 const dashboardCtrl = require('../controllers/hotelFinancialDashboardController');
+const { STAFF_IMMO } = require('../utils/roles');
 const router = express.Router();
 router.use(auth.protect);
+// DOC-ARCH-2 — lecture seule, gardée au niveau route (pas d'établissement
+// précis à vérifier ici, contrairement aux routes /hotel/:hotelId/*).
+router.get('/accommodations/documents', auth.restrictTo(...STAFF_IMMO), ctrl.listAccommodationDocuments);
 router.get('/hotel/dashboard/summary', dashboardCtrl.getSummary);
 router.get('/hotel/dashboard/trends', dashboardCtrl.getTrends);
 router.get('/hotel/dashboard/breakdown', dashboardCtrl.getBreakdown);

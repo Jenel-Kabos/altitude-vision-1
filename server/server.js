@@ -381,6 +381,8 @@ const rentalPropertyRoutes   = require('./routes/rentalPropertyRoutes');
 const financialRoutes        = require('./routes/financialRoutes');
 const dashboardAnalyticsRoutes = require('./routes/dashboardAnalyticsRoutes');
 const accommodationReservationRoutes = require('./routes/accommodationReservationRoutes');
+// DOC-EVO-1 — moteur générique de dossier métier (Centre documentaire).
+const dossierRoutes = require('./routes/dossierRoutes');
 
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
@@ -408,6 +410,9 @@ app.use('/api/gestion-docs',     gestionDocumentRoutes);
 // générale) : cette route sert uniquement la lecture protégée d'un document
 // déjà généré et attaché à un Contrat.
 app.use('/api/rental-documents', rentalDocumentRoutes);
+// DOC-EVO-1 — Centre documentaire : dossier métier (agrégation en lecture
+// seule, jamais une nouvelle collection). Voir server/services/dossier/.
+app.use('/api/dossiers', dossierRoutes);
 app.use('/api/rental-management', rentalManagementRoutes);
 // 🔧 Maintenance locative (Sprint GL-B2) — distincte de /api/maintenance (hôtelier, Sprint E).
 app.use('/api/rental-maintenance', rentalMaintenanceRoutes);

@@ -16,30 +16,58 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { FolderOpen, Search } from "lucide-react";
-import { getContrats, downloadRentalDocument } from "../../services/gestionLocativeService";
+import { getContrats, previewRentalDocument } from "../../services/gestionLocativeService";
+import { getAllDocuments } from "../../services/documentService";
 import {
   DashboardPage, DashboardPageHeader, DashboardToolbar, DashboardCard, DashboardState,
 } from "../../components/dashboard/DashboardUI";
+import DossierPanel from "../../components/dashboard/DossierPanel";
 
 const TYPE_LABELS = {
   bail: 'Bail', quittance: 'Quittance', mise_en_demeure: 'Mise en demeure', preavis: 'Préavis',
   etat_entree: "État des lieux d'entrée", etat_sortie: 'État des lieux de sortie',
+  piece_identite: "Pièce d'identité",
 };
 
-const RentalDocumentsContent = () => {
+// DOC-ARCH-1 — `embedded` : rendu depuis le Centre documentaire unifié
+// (DocumentsPage, dossier Altimmo → Gestion locative). Supprime l'en-tête et
+// le lien "voir tous les documents" propres à l'ancien écran autonome
+// (devenu une redirection, plus une page) — le reste (agrégation
+// Contrat.documents[], filtres, téléchargement sécurisé) est identique et
+// intégralement réutilisé, sans aucune duplication de logique.
+const RentalDocumentsContent = ({ embedded = false }) => {
   const searchParams = useSearchParams();
   const contratIdFilter = searchParams.get('contratId') || '';
 
   const [contrats, setContrats] = useState([]);
+  // DOC-ARCH-2 — classement automatique : les documents créés hors
+  // Contrat.documents[] (ex: pièces d'identité locataire/propriétaire,
+  // server/controllers/locataireController.js et proprietaireController.js)
+  // sont maintenant tagués pole=Altimmo/service=gestion_locative dès leur
+  // création par leur workflow — cette vue les fusionne simplement, sans
+  // jamais dupliquer leur stockage (toujours la même collection `Document`).
+  const [genericDocs, setGenericDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [type, setType] = useState('');
   const [search, setSearch] = useState('');
+  // DOC-EVO-1 — évolution 2 : le Centre documentaire n'affiche plus
+  // uniquement des documents isolés, mais aussi les dossiers métier
+  // (un bail = un dossier) qu'on peut ouvrir pour voir toute sa vie
+  // (documents, paiements, maintenance, préavis, timeline). Dérivé des
+  // contrats déjà chargés — aucun appel réseau supplémentaire pour la liste.
+  const [openDossierId, setOpenDossierId] = useState(null);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      try { setContrats(await getContrats({ type: 'location' }) || []); }
-      catch (err) { toast.error("Erreur lors du chargement des documents."); }
+      try {
+        const [contratsData, docsData] = await Promise.all([
+          getContrats({ type: 'location' }).catch(() => []),
+          getAllDocuments({ pole: 'Altimmo', service: 'gestion_locative' }).catch(() => []),
+        ]);
+        setContrats(contratsData || []);
+        setGenericDocs(docsData || []);
+      } catch (err) { toast.error("Erreur lors du chargement des documents."); }
       finally { setLoading(false); }
     })();
   }, []);
@@ -59,6 +87,17 @@ const RentalDocumentsContent = () => {
         });
       }
     }
+    if (!contratIdFilter) {
+      for (const d of genericDocs) {
+        rows.push({
+          key: `doc-${d._id}`,
+          directUrl: d.content, nom: d.notes || d.refNom || d.type, type: 'piece_identite', date: d.issueDate || d.createdAt,
+          bien: '—',
+          proprietaire: d.refType === 'Proprietaire' ? d.refNom : '—',
+          locataire: d.refType === 'Locataire' ? d.refNom : '—',
+        });
+      }
+    }
     return rows
       .filter((d) => !type || d.type === type)
       .filter((d) => {
@@ -67,36 +106,69 @@ const RentalDocumentsContent = () => {
         return [d.nom, d.bien, d.proprietaire, d.locataire].some((v) => (v || '').toLowerCase().includes(q));
       })
       .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-  }, [contrats, type, search, contratIdFilter]);
+  }, [contrats, genericDocs, type, search, contratIdFilter]);
 
   const availableTypes = useMemo(() => {
     const set = new Set();
     contrats.forEach((c) => (c.documents || []).forEach((d) => d.type && set.add(d.type)));
+    if (genericDocs.length) set.add('piece_identite');
     return Array.from(set);
-  }, [contrats]);
+  }, [contrats, genericDocs]);
 
-  const handleOpen = async (documentId, nom) => {
-    try { await downloadRentalDocument(documentId, nom || 'document'); }
+  // DOC-EVO-1 — évolution 8 : ouvrir sans téléchargement obligatoire (le
+  // navigateur affiche nativement le PDF/l'image dans un nouvel onglet).
+  const handleOpen = async (documentId) => {
+    try { await previewRentalDocument(documentId); }
     catch (err) { toast.error(err.response?.status === 403 ? "Accès refusé à ce document." : "Impossible d'ouvrir ce document."); }
   };
 
+  const dossiers = useMemo(() => contrats
+    .filter((c) => !contratIdFilter || c._id === contratIdFilter)
+    .map((c) => ({
+      id: c._id,
+      bien: c.bien?.title || c.adresseBien || 'Bien',
+      locataire: c.locataire ? `${c.locataire.prenom || ''} ${c.locataire.nom || ''}`.trim() : '—',
+      statut: c.statut,
+      documentCount: (c.documents || []).length,
+    })), [contrats, contratIdFilter]);
+
   return (
     <DashboardPage>
-      <DashboardPageHeader
-        icon={FolderOpen}
-        title="Documents"
-        description="Centre documentaire de la gestion locative — baux, quittances, préavis, états des lieux, mises en demeure."
-        actions={(
-          <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
-            Vue d'ensemble Gestion Locative
-          </Link>
-        )}
-      />
+      {!embedded && (
+        <DashboardPageHeader
+          icon={FolderOpen}
+          title="Documents"
+          description="Centre documentaire de la gestion locative — baux, quittances, préavis, états des lieux, mises en demeure."
+          actions={(
+            <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
+              Vue d'ensemble Gestion Locative
+            </Link>
+          )}
+        />
+      )}
 
       {contratIdFilter && (
         <p className="mb-3 text-xs text-gray-500">
-          Filtré sur un bail précis — <Link href="/dashboard/gestion-locative/documents" className="text-blue-600 underline">voir tous les documents</Link>
+          Filtré sur un bail précis — <Link href="/dashboard/documents?pole=Altimmo&service=gestion_locative" className="text-blue-600 underline">voir tous les documents</Link>
         </p>
+      )}
+
+      {/* DOC-EVO-1 — évolution 2 : dossiers métier (un bail = un dossier
+          complet), pas seulement des documents isolés. */}
+      {dossiers.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Dossiers</p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {dossiers.map((d) => (
+              <button key={d.id} onClick={() => setOpenDossierId(d.id)}
+                className="text-left border border-gray-100 rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                <p className="text-sm font-semibold text-gray-800 truncate">{d.bien}</p>
+                <p className="text-xs text-gray-500">{d.locataire} · {d.documentCount} document(s)</p>
+                <span className="text-xs text-blue-600 underline">Ouvrir le dossier</span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       <DashboardToolbar label="Filtrer les documents">
@@ -151,8 +223,10 @@ const RentalDocumentsContent = () => {
                   <td className="py-2 pr-3">{d.date ? new Date(d.date).toLocaleDateString('fr-FR') : '—'}</td>
                   <td className="py-2 pr-3">
                     {d.url && d.documentId
-                      ? <button onClick={() => handleOpen(d.documentId, d.nom)} className="text-blue-600 underline text-xs">Ouvrir</button>
-                      : <span className="text-xs text-gray-400">Indisponible</span>}
+                      ? <button onClick={() => handleOpen(d.documentId)} className="text-blue-600 underline text-xs">Ouvrir</button>
+                      : d.directUrl
+                        ? <a href={d.directUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">Ouvrir</a>
+                        : <span className="text-xs text-gray-400">Indisponible</span>}
                   </td>
                 </tr>
               ))}
@@ -160,13 +234,17 @@ const RentalDocumentsContent = () => {
           </table>
         </DashboardCard>
       )}
+
+      {openDossierId && (
+        <DossierPanel domain="gestion_locative" entityId={openDossierId} onClose={() => setOpenDossierId(null)} />
+      )}
     </DashboardPage>
   );
 };
 
-const RentalDocumentsPage = () => (
+const RentalDocumentsPage = ({ embedded = false }) => (
   <Suspense fallback={<DashboardPage><DashboardState type="loading" title="Chargement…" /></DashboardPage>}>
-    <RentalDocumentsContent />
+    <RentalDocumentsContent embedded={embedded} />
   </Suspense>
 );
 

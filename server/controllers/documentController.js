@@ -12,6 +12,8 @@ const Transaction = require('../models/Transaction');
 const DOCUMENT_TYPE_VALUES = ['Devis', 'Facture', 'Contrat', 'Etat des Lieux', "Pièce d'identité"];
 const DOCUMENT_STATUS_VALUES = ['Brouillon', 'Envoyé', 'Accepté', 'Refusé', 'Payé', 'En retard'];
 const DOCUMENT_REF_TYPE_VALUES = ['Proprietaire', 'Locataire'];
+// DOC-ARCH-1 — filtres de classement du Centre documentaire unifié.
+const DOCUMENT_POLE_VALUES = ['Altimmo', 'Altcom', 'MilaEvents', 'Administration'];
 
 const isScalar = (value) => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 const asObjectId = (value) => (isScalar(value) && mongoose.isValidObjectId(value) ? value : undefined);
@@ -34,6 +36,16 @@ function buildDocumentFilter(query = {}) {
   const relatedProperty = asObjectId(query.relatedProperty);
   if (relatedProperty) filter.relatedProperty = relatedProperty;
   if (isScalar(query.businessOperationKey)) filter.businessOperationKey = String(query.businessOperationKey).slice(0, 200);
+  // DOC-ARCH-1 — navigation Pôle → Service → Catégorie du Centre
+  // documentaire unifié. `service`/`categorie` sont du texte libre (comme
+  // sur le modèle), whitelistés en scalaire uniquement.
+  const pole = asEnum(query.pole, DOCUMENT_POLE_VALUES);
+  if (pole) filter.pole = pole;
+  if (isScalar(query.service)) filter.service = String(query.service).slice(0, 100);
+  if (isScalar(query.categorie)) filter.categorie = String(query.categorie).slice(0, 100);
+  if (isScalar(query.entityType)) filter.entityType = String(query.entityType).slice(0, 60);
+  const entityId = asObjectId(query.entityId);
+  if (entityId) filter.entityId = entityId;
   return filter;
 }
 

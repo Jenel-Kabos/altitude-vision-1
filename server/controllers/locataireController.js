@@ -26,6 +26,10 @@ const uploadPiece = async (file) => {
   };
 };
 
+// DOC-ARCH-2 — classement automatique : cet upload est déclenché par le
+// workflow métier (fiche locataire), jamais une saisie manuelle dans le
+// Centre documentaire — pole/service/categorie sont donc déduits ici,
+// jamais demandés à l'utilisateur.
 const saveIdentiteDocument = async ({ url, nom, personneId, personneNom, createdBy }) => {
   try {
     await Document.create({
@@ -38,6 +42,12 @@ const saveIdentiteDocument = async ({ url, nom, personneId, personneNom, created
       content:   url,
       notes:     `Pièce d'identité — ${personneNom} — ${nom || ''}`,
       issueDate: new Date(),
+      pole: 'Altimmo',
+      service: 'gestion_locative',
+      categorie: "Pièces d'identité",
+      entityType: 'Locataire',
+      entityId: personneId,
+      visibility: 'tenant',
     });
   } catch (e) {
     console.error('⚠️ Document pièce identité non créé:', e.message);

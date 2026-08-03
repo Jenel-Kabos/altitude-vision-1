@@ -59,6 +59,23 @@ const documentSchema = new mongoose.Schema(
     dueDate: { type: Date }, // Relevant for invoices
     notes: String,
     businessOperationKey: { type: String, trim: true, maxlength: 200 },
+
+    // DOC-ARCH-1 — métadonnées de classement pour le Centre documentaire
+    // unifié (navigation Pôle → Service → Catégorie). Purement additif :
+    // tous optionnels, aucune valeur par défaut devinée pour les documents
+    // existants (ils restent visibles, simplement non classés tant qu'ils
+    // ne sont pas explicitement tagués). Un dossier n'est jamais une copie —
+    // uniquement une vue filtrée sur ces champs.
+    pole: { type: String, enum: ['Altimmo', 'Altcom', 'MilaEvents', 'Administration'] },
+    service: { type: String, trim: true, maxlength: 100 },
+    categorie: { type: String, trim: true, maxlength: 100 },
+    // Polymorphisme léger pour rattacher un document à une entité métier
+    // sans dupliquer sa référence typée existante (relatedProperty, refId…) :
+    // entityType nomme le modèle, entityId son ObjectId. Aucun `ref` déclaré
+    // (le modèle cible varie), jamais populate automatiquement.
+    entityType: { type: String, trim: true, maxlength: 60 },
+    entityId: { type: mongoose.Schema.Types.ObjectId },
+    visibility: { type: String, enum: ['staff', 'owner', 'tenant', 'client'], default: 'staff' },
   },
   {
     timestamps: true,
@@ -68,6 +85,8 @@ const documentSchema = new mongoose.Schema(
 // This plugin will add a 'docNumber' field that auto-increments
 documentSchema.plugin(AutoIncrement, { inc_field: 'docNumber' });
 documentSchema.index({ businessOperationKey: 1 }, { unique: true, partialFilterExpression: { businessOperationKey: { $type: 'string' } } });
+documentSchema.index({ pole: 1, service: 1, categorie: 1 });
+documentSchema.index({ entityType: 1, entityId: 1 });
 
 const Document = mongoose.model('Document', documentSchema);
 

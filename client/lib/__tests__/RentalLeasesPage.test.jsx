@@ -51,7 +51,7 @@ describe('RentalLeasesPage — Sprint GL-UX1 — TEST DATA', () => {
   test('le lien Documents pointe vers le centre documentaire filtré sur ce bail', async () => {
     render(<RentalLeasesPage />);
     const link = await screen.findByRole('link', { name: /1 document/ });
-    expect(link).toHaveAttribute('href', '/dashboard/gestion-locative/documents?contratId=C1');
+    expect(link).toHaveAttribute('href', '/dashboard/documents?pole=Altimmo&service=gestion_locative&contratId=C1');
   });
 
   test('changer le filtre de statut recharge avec le bon paramètre', async () => {

@@ -91,6 +91,51 @@ test('valeur enum invalide pour type : ignorée plutôt que provoquer une recher
   expect(res.body.results).toBe(2);
 });
 
+// DOC-ARCH-1 — filtres de classement du Centre documentaire unifié
+// (navigation Pôle → Service → Catégorie). Additifs : un document existant
+// sans ces champs reste visible sans filtre, jamais masqué par défaut.
+describe('filtres de classement DOC-ARCH-1 (pole/service/categorie/entityType/entityId)', () => {
+  test('filtre par pole (enum whitelisté) fonctionne normalement', async () => {
+    const { adminToken, clientA } = await fixture();
+    await Document.create({ type: 'Facture', status: 'Envoyé', client: clientA._id, pole: 'Altimmo', service: 'gestion_locative' });
+    const res = await request(app).get('/api/documents').query({ pole: 'Altimmo' }).set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.results).toBe(1);
+    expect(res.body.data.documents[0].pole).toBe('Altimmo');
+  });
+
+  test('valeur de pole hors enum : ignorée plutôt que provoquer une recherche vide inattendue', async () => {
+    const { adminToken } = await fixture();
+    const res = await request(app).get('/api/documents').query({ pole: 'NotAPole' }).set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.results).toBe(2);
+  });
+
+  test('filtre combiné pole + service (texte libre whitelisté en scalaire)', async () => {
+    const { adminToken, clientA } = await fixture();
+    await Document.create({ type: 'Facture', status: 'Envoyé', client: clientA._id, pole: 'Altimmo', service: 'gestion_locative' });
+    await Document.create({ type: 'Facture', status: 'Envoyé', client: clientA._id, pole: 'Altimmo', service: 'proprietaires' });
+    const res = await request(app).get('/api/documents').query({ pole: 'Altimmo', service: 'gestion_locative' }).set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.results).toBe(1);
+    expect(res.body.data.documents[0].service).toBe('gestion_locative');
+  });
+
+  test('objet imbriqué inattendu sur service/categorie : ignoré plutôt que planter', async () => {
+    const { adminToken } = await fixture();
+    const res = await request(app).get('/api/documents').query({ service: { nested: { deep: 'value' } } }).set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.results).toBe(2);
+  });
+
+  test('entityId invalide (non ObjectId) : ignoré', async () => {
+    const { adminToken } = await fixture();
+    const res = await request(app).get('/api/documents').query({ entityId: 'not-an-object-id' }).set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.results).toBe(2);
+  });
+});
+
 // GL-DEBT-1 — Phase 12 : pagination rétrocompatible.
 describe('pagination', () => {
   test('sans page/limit : comportement historique inchangé (liste complète, pas de meta)', async () => {

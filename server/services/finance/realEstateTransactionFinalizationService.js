@@ -21,12 +21,28 @@ const assertFinalizable = (transaction) => {
   if (transaction.status === 'Annulée') throw new FinancialError('FINANCIAL_TRANSACTION_CANCELLED', 'Transaction annulée — impossible de finaliser.', 409);
   if (transaction.paymentStatus !== 'confirmé') throw new FinancialError('PAYMENT_NOT_CONFIRMED', 'Le paiement doit être confirmé avant la finalisation.', 409);
 };
+// DOC-ARCH-2 — classement automatique du Centre documentaire : ce Document
+// est produit par un vrai workflow métier (finalisation de transaction, paiement
+// déjà confirmé), jamais une saisie manuelle. `pole`/`service`/`categorie`
+// sont donc déduits ici du contexte déjà disponible (transactionType,
+// property), jamais demandés à un utilisateur — conformément à la règle
+// « un document doit toujours être créé par son workflow métier lorsqu'un
+// workflow existe ». `entityType`/`entityId` pointent vers la Transaction
+// (source de vérité de cette facture), même convention que le ledger
+// financier (`ensureFinalizationLedger`, ci-dessus) qui référence déjà
+// `entityType: 'Transaction', entityId: transaction._id`.
 const invoiceData = ({ transaction, property, actorId, commission, operationKey }) => ({
   type: 'Facture', status: 'Envoyé', client: transaction.client, createdBy: actorId,
   relatedProperty: property._id, businessOperationKey: operationKey,
   items: [{ description: `Commission agence — ${transaction.transactionType} de "${property.title}"`, quantity: 1, unitPrice: commission.total, total: commission.total }],
   subTotal: commission.total, totalAmount: commission.agencyNet,
   dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  pole: 'Altimmo',
+  service: transaction.transactionType === 'vente' ? 'vente' : 'location',
+  categorie: 'Factures',
+  entityType: 'Transaction',
+  entityId: transaction._id,
+  visibility: 'client',
 });
 async function ensureFinalizationLedger({ transaction, property, actorId, operationKey, session }) {
   const ledgerKey = `${operationKey}:ledger`;

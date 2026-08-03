@@ -150,7 +150,7 @@ const RentalLeasesPage = () => {
                       <span className={`text-xs font-semibold px-2 py-1 rounded ${STATUT_CLASSES[c.statut] || 'bg-gray-100 text-gray-700'}`}>{STATUT_LABELS[c.statut] || c.statut}</span>
                     </td>
                     <td className="py-2 pr-3">
-                      <Link href={`/dashboard/gestion-locative/documents?contratId=${c._id}`} className="text-blue-600 underline text-xs">
+                      <Link href={`/dashboard/documents?pole=Altimmo&service=gestion_locative&contratId=${c._id}`} className="text-blue-600 underline text-xs">
                         {(c.documents || []).length} document(s)
                       </Link>
                     </td>

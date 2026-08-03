@@ -28,6 +28,13 @@ export const listHotelFinancialDocuments = async (hotelId, params = {}) => {
   const res = await api.get(`/financial/hotel/${hotelId}/documents`, { params });
   return res.data.data;
 };
+// DOC-ARCH-2 — Centre documentaire, dossier Altimmo → Hébergements →
+// Factures : lecture seule, aucun établissement précis requis (contrairement
+// à listHotelFinancialDocuments), voir financialController.listAccommodationDocuments.
+export const listAccommodationFinancialDocuments = async (params = {}) => {
+  const res = await api.get('/financial/accommodations/documents', { params });
+  return res.data.data;
+};
 const mutationConfig = () => ({ headers: { 'Idempotency-Key': globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}` } });
 export const listDocumentPayments = async (documentId) => { const res = await api.get(`/financial/documents/${documentId}/payments`); return res.data.data; };
 export const createHotelPayment = async (data) => { const res = await api.post('/financial/hotel/payments', data, mutationConfig()); return res.data.data.payment; };

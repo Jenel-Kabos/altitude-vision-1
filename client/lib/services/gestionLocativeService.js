@@ -14,6 +14,19 @@ export const downloadRentalDocument = async (documentId, filename = 'document') 
   URL.revokeObjectURL(url);
 };
 
+// DOC-EVO-1 — évolution 8 (prévisualisation) : le serveur sert déjà ce
+// fichier en `Content-Disposition: inline` (rentalDocumentController.js) —
+// seul le comportement du CLIENT forçait un enregistrement (l'attribut
+// `download` sur l'ancre ci-dessus). Ouvrir le blob dans un nouvel onglet
+// laisse le navigateur l'afficher nativement (PDF/image), sans
+// téléchargement obligatoire — même endpoint sécurisé, même vérification
+// d'accès, seule la présentation change.
+export const previewRentalDocument = async (documentId) => {
+  const response = await api.get(`/rental-documents/${documentId}/download`, { responseType: 'blob' });
+  const url = URL.createObjectURL(response.data);
+  window.open(url, '_blank', 'noopener,noreferrer');
+};
+
 // ── Dossiers locatifs synchronisés avec Property ─────────────
 export const getRentalManagement = async (params = {}) => {
   const res = await api.get('/rental-management', { params });

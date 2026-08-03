@@ -37,6 +37,20 @@ test('dix finalisations simultanées créent une seule facture et un seul état 
   expect(await Property.findById(f.propertyId)).toMatchObject({ availability: 'Vendu', isPublished: false });
 });
 
+// DOC-ARCH-2 — la facture de finalisation est produite par un vrai workflow
+// métier (paiement déjà confirmé) : son classement dans le Centre
+// documentaire doit être déduit automatiquement, jamais laissé vide/à
+// compléter manuellement.
+test('la facture de finalisation est automatiquement classée (pole/service/categorie/entityType)', async () => {
+  const f = await fixture('classement-vente');
+  await finalizeRealEstateTransaction({ transactionId: f.transactionId, actorId: f.agentId, transactionMode: 'transactional' });
+  const invoice = await Document.findOne({ businessOperationKey: `real-estate:transaction:${f.transactionId}:finalize` });
+  expect(invoice).toMatchObject({
+    pole: 'Altimmo', service: 'vente', categorie: 'Factures', entityType: 'Transaction', visibility: 'client',
+  });
+  expect(String(invoice.entityId)).toBe(String(f.transactionId));
+});
+
 test('le fallback compense une interruption puis reprend avec la même clé', async () => {
   const f = await fixture('fallback');
   const faultInjector = async (point) => { if (point === 'finalization.after_property') throw new Error('CRASH_AFTER_PROPERTY'); };
