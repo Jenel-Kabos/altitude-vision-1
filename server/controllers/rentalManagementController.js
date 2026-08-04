@@ -178,6 +178,17 @@ exports.validateExitInspection = async (req, res) => {
     rental.exitInspectionClearedAt = new Date();
     rental.workflowHistory.push({ action: 'exit_inspection_validated', actor: req.user.id, source: 'staff', comment: inspection.blockingReason, from: rental.occupancyStatus, to: rental.occupancyStatus });
     await rental.save();
+    // GL-LIFE-1 — best-effort : fait avancer le cycle de vie du bail
+    // (preavis → inspection_sortie) sans jamais faire échouer la validation
+    // de l'état des lieux elle-même (un bail legacy peut ne pas avoir suivi
+    // l'étape 'preavis' via la state machine).
+    require('../services/rentalLeaseLifecycleService').transition(contract._id, 'inspection_sortie', { actor: req.user.id, comment: 'État des lieux de sortie validé', action: 'exit_inspection_validated' }).catch(() => {});
+    // GL-ASSET-1 — best-effort : fait avancer le cycle de vie patrimonial du
+    // bien lui-même (preavis → inspection), avant que markMaintenance/
+    // markPropertyVacant (ci-dessous) ne l'avance à son tour vers
+    // travaux/disponible. Attendu (pas fire-and-forget) pour que la
+    // transition suivante trouve l'étape 'inspection' déjà en place.
+    await require('../services/propertyAssetLifecycleService').transition(rental.property, 'inspection', { actor: req.user.id, comment: 'État des lieux de sortie validé', action: 'exit_inspection_validated', bestEffort: true }).catch(() => {});
     const result = inspection.maintenanceRequired
       ? await sync.markMaintenance(rental._id, { actor: req.user.id, comment: inspection.blockingReason || 'Travaux requis après état des lieux' })
       : await sync.markPropertyVacant(rental._id, { actor: req.user.id, comment: req.body.comment });

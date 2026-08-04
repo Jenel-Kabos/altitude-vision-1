@@ -383,6 +383,11 @@ const dashboardAnalyticsRoutes = require('./routes/dashboardAnalyticsRoutes');
 const accommodationReservationRoutes = require('./routes/accommodationReservationRoutes');
 // DOC-EVO-1 — moteur générique de dossier métier (Centre documentaire).
 const dossierRoutes = require('./routes/dossierRoutes');
+// GL-LIFE-1 — cycle de vie du bail (machine d'état, renouvellement,
+// avenants, caution, tableau de bord).
+const rentalLeaseLifecycleRoutes = require('./routes/rentalLeaseLifecycleRoutes');
+// GL-ASSET-1 — cycle de vie patrimonial du bien (indépendant du bail).
+const propertyAssetRoutes = require('./routes/propertyAssetRoutes');
 
 // ============================================================
 // 🛣️ ROUTES PRINCIPALES
@@ -413,6 +418,14 @@ app.use('/api/rental-documents', rentalDocumentRoutes);
 // DOC-EVO-1 — Centre documentaire : dossier métier (agrégation en lecture
 // seule, jamais une nouvelle collection). Voir server/services/dossier/.
 app.use('/api/dossiers', dossierRoutes);
+// GL-LIFE-1 — cycle de vie du bail (Contrat.cycleVie/avenants/caution) —
+// distinct de /api/rental-management (occupation/publication du bien) et de
+// /api/contrats (CRUD légal du contrat).
+app.use('/api/rental-lease-lifecycle', rentalLeaseLifecycleRoutes);
+// GL-ASSET-1 — distinct de /api/rental-lease-lifecycle (bail) et de
+// /api/rental-management (occupation) : ceci porte le cycle de vie du bien
+// lui-même, indépendant de tout bail.
+app.use('/api/property-asset', propertyAssetRoutes);
 app.use('/api/rental-management', rentalManagementRoutes);
 // 🔧 Maintenance locative (Sprint GL-B2) — distincte de /api/maintenance (hôtelier, Sprint E).
 app.use('/api/rental-maintenance', rentalMaintenanceRoutes);

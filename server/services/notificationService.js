@@ -81,6 +81,17 @@ const STAFF_LINKS = {
   // Sprint GL-B2 — maintenance LOCATIVE (distincte de la maintenance hôtelière ci-dessus).
   rental_maintenance_ticket_created: '/dashboard/gestion-locative/maintenance',
   rental_maintenance_ticket_resolved: '/dashboard/gestion-locative/maintenance',
+  // GL-UX-1 — cycle de vie du bail (GL-LIFE-1) : renvoie vers la fiche
+  // contrat pilotable (RentalLeasesPage), jamais vers un écran générique.
+  contrat_updated: '/dashboard/gestion-locative/baux',
+  rental_lease_renewed: '/dashboard/gestion-locative/baux',
+  rental_amendment_created: '/dashboard/gestion-locative/baux',
+  rental_deposit_encashed: '/dashboard/gestion-locative/baux',
+  rental_deposit_blocked: '/dashboard/gestion-locative/baux',
+  rental_deposit_withheld: '/dashboard/gestion-locative/baux',
+  rental_deposit_returned: '/dashboard/gestion-locative/baux',
+  rental_exit_inspection_cleared: '/dashboard/gestion-locative/baux',
+  rental_lease_archived: '/dashboard/gestion-locative/baux',
 };
 
 const visitSocketEventFor = (type) => {

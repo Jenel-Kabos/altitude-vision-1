@@ -6,11 +6,13 @@
 // cette page est le suivi du cycle de vie des baux de LOCATION uniquement :
 // actifs, à échéance proche, dépôt de garantie non régularisé, documents
 // liés. Aucun second modèle de bail : tout est lu depuis Contrat.
-// Les transitions de statut ne sont pas exposées ici : Contrat.statut n'a
-// pas de table de transitions formelle côté serveur (contrairement à
-// HotelReservation/AccommodationReservation) — inventer des règles de
-// transition dans l'UI serait une décision métier non déductible du code
-// existant. La modification de statut reste sur l'onglet Contrats.
+// GL-UX-1 : la note ci-dessous ("pas de table de transitions formelle côté
+// serveur") est devenue caduque depuis GL-LIFE-1
+// (rentalLeaseLifecycleService.LEASE_TRANSITIONS) — cette page est
+// désormais le point d'entrée du pilotage du cycle de vie via le bouton
+// "Piloter" (LeaseLifecycleDrawer), qui n'appelle que les endpoints
+// /api/rental-lease-lifecycle/* déjà construits ; aucune règle de
+// transition n'est codée ici.
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -20,6 +22,10 @@ import { getContrats } from "../../services/gestionLocativeService";
 import {
   DashboardPage, DashboardPageHeader, DashboardToolbar, DashboardCard, DashboardState,
 } from "../../components/dashboard/DashboardUI";
+import LeaseLifecycleDrawer from "../../components/dashboard/leaseLifecycle/LeaseLifecycleDrawer";
+import LeaseLifecycleDashboard from "../../components/dashboard/leaseLifecycle/LeaseLifecycleDashboard";
+import { useAuth } from "../../context/AuthContext";
+import { isStaffImmo } from "../../utils/staffRoles";
 
 const STATUT_CLASSES = {
   actif: 'bg-green-100 text-green-800',
@@ -35,9 +41,11 @@ const joursAvantEcheance = (dateFinBail) => {
 };
 
 const RentalLeasesPage = () => {
+  const { user } = useAuth();
   const [contrats, setContrats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statut, setStatut] = useState('actif');
+  const [pilotage, setPilotage] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -74,6 +82,8 @@ const RentalLeasesPage = () => {
           </Link>
         )}
       />
+
+      {isStaffImmo(user) && <LeaseLifecycleDashboard />}
 
       {!loading && contrats.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
@@ -120,6 +130,7 @@ const RentalLeasesPage = () => {
                 <th className="py-2 pr-3">Dépôt</th>
                 <th className="py-2 pr-3">Statut</th>
                 <th className="py-2 pr-3">Documents</th>
+                <th className="py-2 pr-3">Pilotage</th>
               </tr>
             </thead>
             <tbody>
@@ -154,12 +165,21 @@ const RentalLeasesPage = () => {
                         {(c.documents || []).length} document(s)
                       </Link>
                     </td>
+                    <td className="py-2 pr-3">
+                      <button onClick={() => setPilotage(c)} className="text-xs font-medium px-2.5 py-1 rounded-lg border border-gray-300 hover:bg-gray-50">
+                        Piloter
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </DashboardCard>
+      )}
+
+      {pilotage && (
+        <LeaseLifecycleDrawer contrat={pilotage} onClose={() => setPilotage(null)} onChanged={load} />
       )}
     </DashboardPage>
   );

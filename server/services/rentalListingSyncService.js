@@ -162,6 +162,10 @@ const markPropertyRented = async (managementId, { leaseId, tenantId, actor, comm
   appendHistory(management, { from, to: 'occupe', action: 'lease_activated', actor, source, comment });
   await Promise.all([property.save(), management.save()]);
   await notifyTransition(management, property, 'rental_property_occupied', 'Bien désormais occupé', `Le bien « ${property.title} » est occupé et son annonce est suspendue.`);
+  // GL-ASSET-1 — best-effort : fait avancer le cycle de vie patrimonial du
+  // bien (indépendant du bail) sans jamais faire échouer l'activation
+  // locative elle-même.
+  await require('./propertyAssetLifecycleService').transition(property._id, 'en_location', { actor, comment: 'Bail activé', action: 'lease_activated', bestEffort: true }).catch(() => {});
   return { management, property };
 };
 
@@ -197,6 +201,17 @@ const startNotice = async (managementId, { actor, comment = '', plannedExitAt, s
   await Promise.all([property.save(), management.save()]);
   await notifyTransition(management, property, 'rental_notice_started', 'Préavis enregistré', `Une sortie est programmée pour le bien « ${property.title} ».`);
   await notifyCurrentTenant(management, 'tenant_notice_recorded', 'Préavis enregistré', `Votre départ est programmé le ${planned.toLocaleDateString('fr-FR')}.`, 'started');
+  // GL-LIFE-1 — le préavis fait avancer le cycle de vie du bail
+  // (actif → preavis) et bloque la caution si elle avait été encaissée.
+  // Best-effort : un bail non 'actif' (legacy, ou cycle déjà avancé) ne doit
+  // jamais faire échouer la prise de préavis elle-même.
+  if (management.activeLease) {
+    require('./rentalLeaseLifecycleService').transition(management.activeLease, 'preavis', { actor, comment: 'Préavis démarré', action: 'notice_started' }).catch(() => {});
+    require('./rentalLeaseCautionService').bloquerCaution(management.activeLease, { actor, comment: 'Préavis démarré' }).catch(() => {});
+  }
+  // GL-ASSET-1 — best-effort : le préavis fait aussi avancer le cycle de vie
+  // patrimonial du bien lui-même (indépendant du bail).
+  await require('./propertyAssetLifecycleService').transition(property._id, 'preavis', { actor, comment: 'Préavis démarré', action: 'notice_started', bestEffort: true }).catch(() => {});
   return { management, property };
 };
 
@@ -240,6 +255,7 @@ const cancelNotice = async (managementId, { actor, comment = '' } = {}) => {
   await Promise.all([property.save(), management.save()]);
   await notifyTransition(management, property, 'rental_notice_cancelled', 'Préavis annulé', `Le préavis pour « ${property.title} » a été annulé — le locataire reste en place.`);
   await notifyCurrentTenant(management, 'tenant_notice_cancelled', 'Préavis annulé', 'Votre préavis a été annulé.', 'cancelled');
+  await require('./propertyAssetLifecycleService').transition(property._id, 'en_location', { actor, comment: 'Préavis annulé', action: 'notice_cancelled', bestEffort: true }).catch(() => {});
   return { management, property };
 };
 
@@ -263,6 +279,7 @@ const markPropertyVacant = async (managementId, { actor, comment = '' } = {}) =>
   await Promise.all([property.save(), management.save()]);
   if (departingTenant) await notifyCurrentTenant(management, 'tenant_notice_closed', 'Départ locatif clôturé', 'Votre sortie locative a été clôturée.', 'closed', departingTenant);
   await notifyTransition(management, property, 'rental_property_available', 'Bien disponible', `Le bien « ${property.title} » est de nouveau disponible.`);
+  await require('./propertyAssetLifecycleService').transition(property._id, 'disponible', { actor, comment: 'Bien remis en disponibilité', action: 'mark_vacant', bestEffort: true }).catch(() => {});
   if (management.publicationPolicy === 'automatique' && management.publicationAuthorized) {
     return publishRentalProperty(management._id, actor, 'Republication après validation de sortie');
   }
@@ -279,6 +296,7 @@ const markMaintenance = async (managementId, { actor, comment = '' } = {}) => {
   appendHistory(management, { from, to: 'travaux', action: 'maintenance_started', actor, comment });
   await Promise.all([property.save(), management.save()]);
   await notifyTransition(management, property, 'rental_maintenance_started', 'Maintenance démarrée', `Le bien « ${property.title} » est indisponible pendant la maintenance.`);
+  await require('./propertyAssetLifecycleService').transition(property._id, 'travaux', { actor, comment, action: 'maintenance_started', bestEffort: true }).catch(() => {});
   return { management, property };
 };
 
@@ -294,6 +312,7 @@ const completeMaintenance = async (managementId, { actor, comment = '', controlV
   appendHistory(management, { from, to: 'vacant', action: 'maintenance_completed', actor, comment });
   await Promise.all([property.save(), management.save()]);
   await notifyTransition(management, property, 'rental_maintenance_completed', 'Maintenance terminée', `La maintenance du bien « ${property.title} » a été validée.`);
+  await require('./propertyAssetLifecycleService').transition(property._id, 'disponible', { actor, comment, action: 'maintenance_completed', bestEffort: true }).catch(() => {});
   if (management.publicationPolicy === 'automatique' && management.publicationAuthorized && readiness.ready) {
     return publishRentalProperty(management._id, actor, 'Republication après maintenance validée');
   }

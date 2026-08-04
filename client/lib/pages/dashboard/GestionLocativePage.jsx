@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useAuth } from '../../context/AuthContext';
 import {
   Building, Users, Home, FileText, CreditCard,
@@ -1031,14 +1032,34 @@ const ContratForm = ({ init = emptyContrat, proprietaires, locataires, propertie
         <Field label="Adresse du bien"><Input value={f.adresseBien} onChange={e=>set('adresseBien',e.target.value)}/></Field>
         <Field label="Ville du bien"><Input value={f.villeBien} onChange={e=>set('villeBien',e.target.value)}/></Field>
       </div>
-      <Field label="Statut">
-        <Select value={f.statut} onChange={e=>set('statut',e.target.value)}>
-          <option value="en_attente">En attente</option>
-          <option value="actif">Actif</option>
-          <option value="résilié">Résilié</option>
-          <option value="expiré">Expiré</option>
-        </Select>
-      </Field>
+      {/* GL-UX-1 — pour un bail (location) déjà existant, le statut ne se
+          modifie plus librement ici : depuis GL-LIFE-1, un changement de
+          statut passe par la machine d'état centralisée côté serveur et
+          peut être refusé (409) si la transition n'est pas légale. Le
+          pilotage se fait désormais depuis la page Baux ("Piloter"), qui
+          n'affiche que les transitions réellement autorisées. Le
+          sélecteur libre reste disponible à la création (aucun cycle de
+          vie n'existe encore) et pour les contrats de vente (hors
+          périmètre du cycle de vie locatif). */}
+      {init?._id && f.type === 'location' ? (
+        <Field label="Statut">
+          <div className="flex items-center gap-2">
+            <span className="text-sm px-2 py-1 rounded bg-gray-100 text-gray-700">{f.statut}</span>
+            <Link href="/dashboard/gestion-locative/baux" className="text-xs text-blue-600 underline">
+              Piloter le cycle de vie de ce bail
+            </Link>
+          </div>
+        </Field>
+      ) : (
+        <Field label="Statut">
+          <Select value={f.statut} onChange={e=>set('statut',e.target.value)}>
+            <option value="en_attente">En attente</option>
+            <option value="actif">Actif</option>
+            <option value="résilié">Résilié</option>
+            <option value="expiré">Expiré</option>
+          </Select>
+        </Field>
+      )}
 
       {f.type === 'location' && (
         <>

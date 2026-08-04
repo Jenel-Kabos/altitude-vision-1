@@ -51,6 +51,17 @@ vi.mock('../services/rentalPropertyService', () => ({
 }));
 vi.mock('../services/dashboardAnalyticsService', () => ({ getDashboardAnalytics: vi.fn().mockResolvedValue({ kpis: {} }) }));
 
+// GL-ASSET-UX-1 — PropertyPortfolioDashboard (Phase 8) est désormais monté
+// sur cette page pour le staff ; mocké ici pour ne jamais dépendre d'un
+// appel réseau réel dans ce test.
+vi.mock('../services/propertyAssetService', () => ({
+  getPortfolioDashboard: vi.fn().mockResolvedValue({
+    totalBiens: 0, valeurTotale: 0, valeurParType: {}, rentabiliteMoyenne: null,
+    biensVacants: 0, biensOccupes: 0, coutEntretienTotal: 0,
+    alertesCritiques: 0, alertesAttention: 0, topRentabilite: [], historiqueRecent: [],
+  }),
+}));
+
 // Sprint A — cliquer "Ajouter" ouvre désormais un sélecteur métier
 // (Vente/Location/Hébergement) avant tout formulaire.
 const chooseBusinessCard = async (label) => {

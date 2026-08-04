@@ -61,6 +61,15 @@ const NOTIFICATION_TYPES = [
   'rental_payment_overdue',
   'rental_contract_expiring',
   'rental_owner_request',
+  // ── Cycle de vie du bail (GL-LIFE-1) ──
+  'rental_lease_renewed',
+  'rental_amendment_created',
+  'rental_deposit_encashed',
+  'rental_deposit_blocked',
+  'rental_deposit_withheld',
+  'rental_deposit_returned',
+  'rental_exit_inspection_cleared',
+  'rental_lease_archived',
   // ── Portail locataire GL-B3 ──
   'tenant_invitation_received', 'tenant_invitation_accepted', 'tenant_invitation_rejected',
   'tenant_link_requested', 'tenant_link_approved', 'tenant_link_rejected',

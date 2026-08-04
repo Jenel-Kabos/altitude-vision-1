@@ -52,6 +52,13 @@ const rentalMaintenanceTicketSchema = new mongoose.Schema(
     attachments: { type: [attachmentSchema], default: [] },
     resolvedAt: { type: Date, default: null },
 
+    // GL-ASSET-1 — Phase 3 (carnet d'entretien) : champs optionnels, absents
+    // sur tout ticket existant (rétrocompatibles sans migration). Enrichit
+    // CE modèle plutôt que d'en créer un second — même ticket, deux
+    // informations administratives de plus.
+    entrepriseIntervenante: { type: String, trim: true, default: '' },
+    garantieJusquau: { type: Date, default: null },
+
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },

@@ -145,6 +145,30 @@ const propertySchema = new mongoose.Schema(
       default: 'Disponible',
     },
 
+    // GL-ASSET-1 — cycle de vie patrimonial du bien, indépendant du bail
+    // et indépendant de `availability` : `availability` reste écrit
+    // exactement comme avant par les sous-systèmes existants (rental sync,
+    // réservation, finalisation de vente) — aucune régression, aucune
+    // nouvelle source de vérité. `assetCycle` est optionnel (absent sur tout
+    // bien créé avant ce sprint — aucune migration) et dérivé depuis
+    // `availability` pour les biens legacy (voir propertyAssetLifecycleService.js).
+    assetCycle: {
+      type: String,
+      enum: ['disponible', 'reserve', 'en_location', 'preavis', 'inspection', 'travaux', 'vendu', 'archive'],
+      default: null,
+    },
+    assetCycleHistory: {
+      type: [{
+        from: String,
+        to: { type: String, required: true },
+        action: { type: String, required: true },
+        actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        comment: { type: String, trim: true, maxlength: 1000 },
+        at: { type: Date, default: Date.now },
+      }],
+      default: [],
+    },
+
     // ─── Champs spécifiques location (status: 'location') ─────────
     // Validation conditionnelle déléguée au contrôleur.
 

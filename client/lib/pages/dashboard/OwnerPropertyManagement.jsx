@@ -16,6 +16,8 @@ import { getMyRentalManagement, requestRentalAction } from '../../services/gesti
 import Image from 'next/image';
 import Link from 'next/link';
 import { Calendar } from 'lucide-react';
+import PropertyAssetCockpitDrawer from "../../components/dashboard/propertyAsset/PropertyAssetCockpitDrawer";
+import PropertyPortfolioDashboard from "../../components/dashboard/propertyAsset/PropertyPortfolioDashboard";
 
 const BLUE = '#2E7BB5';
 const GOLD = '#C8960C';
@@ -165,7 +167,7 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
 // ─────────────────────────────────────────────────────────────
 const ALTIMMO_FALLBACK = 'https://placehold.co/600x400/2E7BB5/FFFFFF?text=Altimmo';
 
-const PropertyCard = ({ property, rental, onEdit, onDelete, onToggleAvailability, onRentalRequest }) => {
+const PropertyCard = ({ property, rental, onEdit, onDelete, onToggleAvailability, onRentalRequest, onOpenCockpit }) => {
   const [imgSrc, setImgSrc] = useState(
     getImageUrl(property.images?.[0]) || ALTIMMO_FALLBACK
   );
@@ -269,6 +271,11 @@ const PropertyCard = ({ property, rental, onEdit, onDelete, onToggleAvailability
         </div>}
 
         <div className="flex gap-2">
+          <button onClick={() => onOpenCockpit(property)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
+            style={{ background:'#ECFDF5', color:'#047857', fontFamily:"'DM Sans', sans-serif" }}>
+            <Building2 size={13} /> Patrimoine
+          </button>
           <button onClick={() => onEdit(property)}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
             style={{ background:`${BLUE}15`, color:BLUE, fontFamily:"'DM Sans', sans-serif" }}>
@@ -324,6 +331,7 @@ const OwnerPropertyManagement = () => {
   const [view, setView]               = useState("list");   // list | add | edit
   const [editingId, setEditingId]     = useState(null);
   const [confirm, setConfirm]         = useState(null);     // { id, message }
+  const [cockpitProperty, setCockpitProperty] = useState(null); // GL-ASSET-UX-1
 
   const fetchProperties = useCallback(async () => {
     if (!user) return;
@@ -429,6 +437,8 @@ const OwnerPropertyManagement = () => {
         )}
       </div>
 
+      {view === 'list' && <PropertyPortfolioDashboard />}
+
       {view === 'list' && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
@@ -506,11 +516,18 @@ const OwnerPropertyManagement = () => {
               {properties.map(p => (
                 <PropertyCard key={p._id} property={p} rental={rentals.find(r=>String(r.property?._id||r.property)===String(p._id))}
                   onEdit={handleEdit} onDelete={handleDelete}
-                  onToggleAvailability={handleToggleAvailability} onRentalRequest={handleRentalRequest} />
+                  onToggleAvailability={handleToggleAvailability} onRentalRequest={handleRentalRequest}
+                  onOpenCockpit={setCockpitProperty} />
               ))}
             </div>
           )}
         </>
+      )}
+
+      {/* GL-ASSET-UX-1 — cockpit patrimonial (Phase 2-3), même contenu que
+          la page staff dédiée, réutilisé ici en modale pour le propriétaire. */}
+      {cockpitProperty && (
+        <PropertyAssetCockpitDrawer property={cockpitProperty} onClose={() => setCockpitProperty(null)} />
       )}
 
       {/* ── Dialog confirmation ── */}

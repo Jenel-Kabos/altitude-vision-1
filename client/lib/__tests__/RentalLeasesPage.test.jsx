@@ -1,9 +1,23 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import RentalLeasesPage from '../pages/dashboard/RentalLeasesPage';
 import { getContrats } from '../services/gestionLocativeService';
+import { getLeaseLifecycleDashboard, getAvailableTransitions } from '../services/rentalLeaseLifecycleService';
 
+// GL-UX-1 — la page devient le point d'entrée du pilotage du cycle de vie
+// (LeaseLifecycleDashboard + bouton "Piloter" → LeaseLifecycleDrawer) —
+// STAFF_IMMO uniquement, d'où le mock d'AuthContext (rôle Admin par défaut).
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../services/gestionLocativeService', () => ({ getContrats: vi.fn() }));
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { role: 'Admin' } }) }));
+vi.mock('../services/rentalLeaseLifecycleService', () => ({
+  getLeaseLifecycleDashboard: vi.fn().mockResolvedValue({
+    bauxAEcheance: [], renouvellementsAPreparer: [], preavisEnAttente: [],
+    inspectionsAProgrammer: [], cautionsARestituer: [], dossiersBloques: [],
+  }),
+  getAvailableTransitions: vi.fn().mockResolvedValue({ cycleVie: 'actif', allowed: ['preavis', 'resilie'] }),
+  transitionLease: vi.fn(), previewRenewal: vi.fn(), renewLease: vi.fn(), addLeaseAvenant: vi.fn(),
+  encaisserCaution: vi.fn(), bloquerCaution: vi.fn(), appliquerRetenueCaution: vi.fn(), restituerCaution: vi.fn(),
+}));
 
 const bail = (overrides = {}) => ({
   _id: 'C1', type: 'location', statut: 'actif',
@@ -65,5 +79,20 @@ describe('RentalLeasesPage — Sprint GL-UX1 — TEST DATA', () => {
     getContrats.mockResolvedValue([]);
     render(<RentalLeasesPage />);
     expect(await screen.findByText('Aucun bail')).toBeInTheDocument();
+  });
+
+  test('GL-UX-1 : affiche le tableau de bord du cycle de vie pour un rôle STAFF_IMMO', async () => {
+    render(<RentalLeasesPage />);
+    await screen.findByText('Villa Bail Test');
+    expect(getLeaseLifecycleDashboard).toHaveBeenCalled();
+    expect(await screen.findByText('Baux à échéance')).toBeInTheDocument();
+  });
+
+  test('GL-UX-1 : le bouton "Piloter" ouvre le panneau de cycle de vie (machine d\'état affichée)', async () => {
+    render(<RentalLeasesPage />);
+    await screen.findByText('Villa Bail Test');
+    fireEvent.click(screen.getByRole('button', { name: 'Piloter' }));
+    expect(getAvailableTransitions).toHaveBeenCalledWith('C1');
+    expect(await screen.findByText('Piloter le bail')).toBeInTheDocument();
   });
 });

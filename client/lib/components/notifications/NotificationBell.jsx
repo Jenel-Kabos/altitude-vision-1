@@ -71,6 +71,18 @@ const TYPE_CONFIG = {
   paiement_echoue:        { Icon: XCircle,       color: '#EF4444', route: '/mes-paiements'        },
   nouveau_signalement:    { Icon: AlertTriangle, color: '#EF4444', route: '/dashboard/litiges'    },
   visite_payee:           { Icon: CreditCard,    color: '#10B981', route: '/dashboard/paiements'  },
+  // GL-UX-1 — cycle de vie du bail (GL-LIFE-1). La route effective pour le
+  // staff vient en priorité de `notif.link` (résolu côté serveur via
+  // STAFF_LINKS, voir notificationService.js) — ce `route` n'est qu'un
+  // repli et sert surtout à fixer une icône cohérente dans la liste.
+  rental_lease_renewed:          { Icon: FileText,     color: GOLD,      route: '/dashboard/gestion-locative/baux' },
+  rental_amendment_created:      { Icon: FileText,     color: GOLD,      route: '/dashboard/gestion-locative/baux' },
+  rental_deposit_encashed:       { Icon: CreditCard,   color: '#10B981', route: '/dashboard/gestion-locative/baux' },
+  rental_deposit_blocked:        { Icon: CreditCard,   color: '#B45309', route: '/dashboard/gestion-locative/baux' },
+  rental_deposit_withheld:       { Icon: AlertTriangle, color: '#EF4444', route: '/dashboard/gestion-locative/baux' },
+  rental_deposit_returned:       { Icon: CheckCircle,  color: '#10B981', route: '/dashboard/gestion-locative/baux' },
+  rental_exit_inspection_cleared: { Icon: CheckCircle2, color: '#10B981', route: '/dashboard/gestion-locative/baux' },
+  rental_lease_archived:         { Icon: XCircle,      color: '#6B7280', route: '/dashboard/gestion-locative/baux' },
 };
 
 const DEFAULT_CONFIG = { Icon: Bell, color: GOLD, route: '/profile' };

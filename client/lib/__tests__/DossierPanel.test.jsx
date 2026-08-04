@@ -27,6 +27,7 @@ const baseDossier = (overrides = {}) => ({
     { date: '2027-01-05T00:00:00.000Z', label: 'Paiement — Échéance 01/2027', type: 'paiement' },
   ],
   actions: [{ key: 'generate_quittance', label: 'Générer une quittance' }],
+  health: { level: 'conforme', checks: [] },
   ...overrides,
 });
 
@@ -77,11 +78,106 @@ describe('DossierPanel — moteur générique', () => {
     expect(await screen.findByText('Accès refusé à ce dossier.')).toBeInTheDocument();
   });
 
+  test('affiche le badge de santé et le détail des alertes', async () => {
+    getDossier.mockResolvedValue(baseDossier({
+      health: { level: 'critique', checks: [{ key: 'paiement_en_retard', level: 'critique', label: '1 échéance en retard' }] },
+    }));
+    render(<DossierPanel domain="gestion_locative" entityId="C1" onClose={() => {}} />);
+    expect(await screen.findByText(/Critique/)).toBeInTheDocument();
+    expect(screen.getByText(/1 échéance en retard/)).toBeInTheDocument();
+  });
+
+  test('une action connue devient un lien vers la page qui porte le workflow réel', async () => {
+    render(<DossierPanel domain="gestion_locative" entityId="C1" onClose={() => {}} />);
+    const link = await screen.findByRole('link', { name: 'Générer une quittance' });
+    expect(link).toHaveAttribute('href', '/dashboard/gestion-locative/documents?contratId=C1');
+  });
+
+  test('une clé d\'action inconnue ne produit jamais de bouton mort', async () => {
+    getDossier.mockResolvedValue(baseDossier({ actions: [{ key: 'action_future_inconnue', label: 'Futur' }] }));
+    render(<DossierPanel domain="gestion_locative" entityId="C1" onClose={() => {}} />);
+    await screen.findByText('Bail — Villa Test');
+    expect(screen.queryByText('Futur')).not.toBeInTheDocument();
+  });
+
+  // GL-UX-1 — Phase 7 : la section 'contrat' (cycleVie/caution/chaîne de
+  // renouvellement) et 'avenants' (champsModifies) reçoivent un rendu riche
+  // dédié — ces données existaient déjà dans l'API (GL-LIFE-1) mais
+  // restaient invisibles jusqu'à ce sprint.
+  test('affiche le cycle de vie et le statut de caution dans la section contrat', async () => {
+    getDossier.mockResolvedValue(baseDossier({
+      sections: [
+        { key: 'contrat', label: 'Contrat', items: [{ id: 'C1', label: 'Version actuelle — actif', date: '2027-01-01', meta: { cycleVie: 'preavis', caution: { statut: 'bloquee', montantRetenu: 50000 } } }] },
+      ],
+    }));
+    render(<DossierPanel domain="gestion_locative" entityId="C1" onClose={() => {}} />);
+    expect(await screen.findByText('Préavis')).toBeInTheDocument();
+    expect(screen.getByText(/Caution : Bloquée/)).toBeInTheDocument();
+    expect(screen.getByText(/retenu 50 000 FCFA/)).toBeInTheDocument();
+  });
+
+  test('la chaîne de renouvellement ouvre le contrat lié dans un nouveau dossier', async () => {
+    getDossier.mockImplementation((domain, entityId) => Promise.resolve(baseDossier({
+      entityId,
+      sections: entityId === 'C1'
+        ? [{ key: 'contrat', label: 'Contrat', items: [{ id: 'C1', label: 'V1', meta: { renouvelePar: { contratId: 'C2', statut: 'actif' } } }] }]
+        : [{ key: 'contrat', label: 'Contrat', items: [{ id: 'C2', label: 'V2', meta: {} }] }],
+    })));
+    render(<DossierPanel domain="gestion_locative" entityId="C1" onClose={() => {}} />);
+    fireEvent.click(await screen.findByText(/Contrat suivant/));
+    await waitFor(() => expect(getDossier).toHaveBeenCalledWith('gestion_locative', 'C2'));
+    expect(await screen.findAllByText('Bail — Villa Test')).toHaveLength(2); // le dossier ouvrant + le dossier lié
+  });
+
+  test('un avenant affiche le détail avant/après des champs modifiés', async () => {
+    getDossier.mockResolvedValue(baseDossier({
+      sections: [
+        { key: 'avenants', label: 'Avenants & renouvellements', items: [{ id: 'A1', label: 'Avenant — loyer', date: '2027-02-01', meta: { motif: 'Révision annuelle', champsModifies: [{ champ: 'montantLoyer', avant: 300000, apres: 320000 }] } }] },
+      ],
+    }));
+    render(<DossierPanel domain="gestion_locative" entityId="C1" onClose={() => {}} />);
+    expect(await screen.findByText('Révision annuelle')).toBeInTheDocument();
+    expect(screen.getByText(/300000 → 320000/)).toBeInTheDocument();
+  });
+
   test('le bouton fermer appelle onClose', async () => {
     const onClose = vi.fn();
     render(<DossierPanel domain="gestion_locative" entityId="C1" onClose={onClose} />);
     await screen.findByText('Bail — Villa Test');
     fireEvent.click(screen.getByRole('button', { name: '' }));
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+// GL-ASSET-UX-1 — Phase 7 : le dossier "bien" (domain='bien', GL-ASSET-1)
+// reçoit lui aussi un rendu riche pour 'maintenance'/'transactions' — ces
+// données existaient déjà dans l'enveloppe API (GL-ASSET-1), seul leur
+// affichage était générique jusqu'ici.
+describe('DossierPanel — domaine "bien" (GL-ASSET-1/GL-ASSET-UX-1)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test('affiche le coût, l\'entreprise et la garantie d\'une intervention de maintenance', async () => {
+    getDossier.mockResolvedValue(baseDossier({
+      domain: 'bien', entityId: 'P1',
+      sections: [
+        { key: 'maintenance', label: "Carnet d'entretien", items: [{ id: 'T1', label: 'plomberie — normale', date: '2027-01-01', meta: { status: 'resolu', actualCost: 50000, entrepriseIntervenante: 'Plomberie Congo', garantieJusquau: '2028-01-01' } }] },
+      ],
+    }));
+    render(<DossierPanel domain="bien" entityId="P1" onClose={() => {}} />);
+    expect(await screen.findByText(/Résolu/)).toBeInTheDocument();
+    expect(screen.getByText(/50 000 FCFA/)).toBeInTheDocument();
+    expect(screen.getByText(/Plomberie Congo/)).toBeInTheDocument();
+    expect(screen.getByText(/Garantie jusqu'au/)).toBeInTheDocument();
+  });
+
+  test('affiche le montant d\'une transaction', async () => {
+    getDossier.mockResolvedValue(baseDossier({
+      domain: 'bien', entityId: 'P1',
+      sections: [
+        { key: 'transactions', label: 'Ventes / Transactions', items: [{ id: 'TX1', label: 'vente — Réussie', date: '2027-02-01', meta: { finalAmount: 50000000, status: 'Réussie' } }] },
+      ],
+    }));
+    render(<DossierPanel domain="bien" entityId="P1" onClose={() => {}} />);
+    expect(await screen.findByText(/50 000 000 FCFA/)).toBeInTheDocument();
   });
 });

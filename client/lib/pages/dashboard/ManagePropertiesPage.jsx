@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getAllProperties, getPropertyById, deleteProperty, updateProperty, addProperty, toggleRecommande } from "../../services/propertyService";
 import { createFullAccommodation, updateFullAccommodation } from "../../services/accommodationService";
 import { useAuth } from '../../context/AuthContext';
+import { isStaffDocs } from '../../utils/staffRoles';
 import {
   PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle, Eye,
   ArrowLeft, ArrowRight, Building2, Sparkles,
@@ -17,6 +18,7 @@ import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
 import PropertyWizard from "../../components/dashboard/PropertyWizard";
 import { HOTEL_ACCOMMODATION_TYPES } from "../../constants/accommodation";
 import DashboardKpis from '../../components/dashboard/DashboardKpis';
+import PropertyPortfolioDashboard from '../../components/dashboard/propertyAsset/PropertyPortfolioDashboard';
 import PropertyManagementCard from '../../components/dashboard/PropertyManagementCard';
 import { formatCurrencyXAF } from '../../utils/normalizePropertyDetail';
 import { getDashboardAnalytics } from '../../services/dashboardAnalyticsService';
@@ -540,6 +542,12 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
             </button>
           )}
           </>} actions={<>
+            {isStaffDocs(user) && (
+              <Link href={`/dashboard/properties/${property._id}`} title="Piloter le patrimoine"
+                className="flex-1 p-2.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all flex items-center justify-center">
+                <Building2 className="w-5 h-5" />
+              </Link>
+            )}
             {readOnly && (
               <Link href={ownerHref(property)} className="flex-1 p-2.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all flex items-center justify-center gap-2 font-semibold">
                 <Eye className="w-5 h-5" /> Voir
@@ -600,6 +608,8 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
             <p className="text-sm sm:text-lg text-gray-600 font-medium mt-1">Gérez le patrimoine immobilier de <span className="font-bold text-blue-600">Altimmo</span></p>
           </div>
         </div>
+
+        {isStaffDocs(user) && <PropertyPortfolioDashboard />}
 
         {section === 'vente' && <DashboardKpis items={[
           { key: 'active', label: 'Biens actifs', value: analytics?.kpis?.active }, { key: 'drafts', label: 'Brouillons', value: analytics?.kpis?.drafts },

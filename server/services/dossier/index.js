@@ -8,10 +8,14 @@ const { registerDossierAdapter } = require('./dossierRegistry');
 const gestionLocative = require('./gestionLocativeDossierAdapter');
 const venteLocation = require('./venteLocationDossierAdapter');
 const { loadHebergementDossier, loadHotelDossier } = require('./hebergementHotelDossierAdapter');
+// GL-ASSET-1 — 5ème domaine : dossier patrimonial du bien (entityId =
+// Property._id), indépendant du bail.
+const propertyAsset = require('./propertyDossierAdapter');
 
 registerDossierAdapter('gestion_locative', gestionLocative.load);
 registerDossierAdapter('vente_location', venteLocation.load);
 registerDossierAdapter('hebergement', loadHebergementDossier);
 registerDossierAdapter('hotellerie', loadHotelDossier);
+registerDossierAdapter('bien', propertyAsset.load);
 
 module.exports = require('./dossierRegistry');

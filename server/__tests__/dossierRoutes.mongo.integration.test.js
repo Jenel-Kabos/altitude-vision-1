@@ -93,6 +93,63 @@ describe('gestion_locative — dossier bail complet', () => {
     expect(dossier.relatedLinks.map((l) => l.entityType)).toEqual(expect.arrayContaining(['Property', 'Proprietaire', 'Locataire']));
     const dates = dossier.timeline.map((e) => new Date(e.date).getTime());
     expect(dates).toEqual([...dates].sort((a, b) => a - b));
+
+    // DOC-EVO-2 — cockpit métier : bien/propriétaire/locataire, santé, actions.
+    expect(dossier.sections.find((s) => s.key === 'bien').items).toHaveLength(1);
+    expect(dossier.sections.find((s) => s.key === 'proprietaire').items).toHaveLength(1);
+    expect(dossier.sections.find((s) => s.key === 'locataire').items).toHaveLength(1);
+    expect(['attention', 'critique']).toContain(dossier.health.level);
+    expect(dossier.health.checks.map((c) => c.key)).toEqual(expect.arrayContaining(['etat_des_lieux_absent', 'quittance_manquante']));
+    expect(dossier.summary.fields.soldeActuel).toBe(0);
+    expect(dossier.actions.map((a) => a.key)).toEqual(expect.arrayContaining(['signaler_maintenance', 'gerer_preavis']));
+  });
+
+  test('le locataire (rôle non-staff) ne voit aucune action de génération de document réservée au staff', async () => {
+    const { tenantUser, contrat } = await buildLease();
+    const res = await request(app).get(`/api/dossiers/gestion_locative/${contrat._id}`).set('Authorization', `Bearer ${signToken(tenantUser._id)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.dossier.actions).toEqual([]);
+  });
+
+  test('un paiement en retard fait passer la santé du dossier à critique, jamais stocké', async () => {
+    const admin = await makeUser({ role: 'Admin' });
+    const { contrat } = await buildLease();
+    await Paiement.create({ contrat: contrat._id, mois: 2, annee: 2027, montant: 300000, statut: 'en_retard' });
+    const res = await request(app).get(`/api/dossiers/gestion_locative/${contrat._id}`).set('Authorization', `Bearer ${signToken(admin._id)}`);
+    expect(res.body.data.dossier.health.level).toBe('critique');
+    expect(res.body.data.dossier.health.checks.map((c) => c.key)).toContain('paiement_en_retard');
+    const freshContrat = await Contrat.findById(contrat._id).lean();
+    expect(freshContrat.statut).toBe('actif');
+  });
+
+  // GL-LIFE-1 — Phase 7 : le Centre documentaire affiche automatiquement
+  // avenants/renouvellements/caution/cycle de vie, sans nouvelle collection
+  // ni duplication (tout provient de Contrat lui-même).
+  test('un avenant apparaît dans la section "avenants" et dans la timeline', async () => {
+    const admin = await makeUser({ role: 'Admin' });
+    const { contrat } = await buildLease();
+    const { addAvenant } = require('../services/rentalLeaseAmendmentService');
+    await addAvenant(contrat._id, { type: 'loyer', motif: 'Révision', actor: admin._id, changes: { montantLoyer: 350000 } });
+
+    const res = await request(app).get(`/api/dossiers/gestion_locative/${contrat._id}`).set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const { dossier } = res.body.data;
+    expect(dossier.sections.find((s) => s.key === 'avenants').items).toHaveLength(1);
+    expect(dossier.timeline.some((e) => e.type === 'avenant')).toBe(true);
+  });
+
+  test('un renouvellement majeur (nouveau contrat lié) reconstruit la chaîne sans duplication', async () => {
+    const admin = await makeUser({ role: 'Admin' });
+    const { contrat } = await buildLease();
+    const { renewLease } = require('../services/rentalLeaseRenewalService');
+    const nouveauLocataire = await Locataire.create({ nom: 'Loemba', prenom: 'Marie', telephone: '+242060000098' });
+    const { contrat: nouveau } = await renewLease(contrat._id, { actor: admin._id, locataire: nouveauLocataire._id, motif: 'Changement de locataire' });
+
+    const ancienRes = await request(app).get(`/api/dossiers/gestion_locative/${contrat._id}`).set('Authorization', `Bearer ${signToken(admin._id)}`);
+    expect(ancienRes.body.data.dossier.sections.find((s) => s.key === 'contrat').items[0].meta.renouvelePar.contratId).toBe(String(nouveau._id));
+    expect(ancienRes.body.data.dossier.status).toBe('Archivé');
+
+    const nouveauRes = await request(app).get(`/api/dossiers/gestion_locative/${nouveau._id}`).set('Authorization', `Bearer ${signToken(admin._id)}`);
+    expect(nouveauRes.body.data.dossier.sections.find((s) => s.key === 'contrat').items[0].meta.renouvelleDe.contratId).toBe(String(contrat._id));
   });
 
   test('le locataire rattaché voit son propre dossier', async () => {

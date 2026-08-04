@@ -10,6 +10,10 @@ const RealEstateReservation = require('../models/RealEstateReservation');
 // script de réconciliation historique (server/scripts/reconcileRentalManagement.js)
 // — comportement strictement inchangé, voir rentalManagementLeaseSyncService.js.
 const { syncLeaseOccupation } = require('../services/rentalManagementLeaseSyncService');
+// GL-LIFE-1 — la machine d'état devient l'unique point d'entrée pour tout
+// changement de `statut` sur un bail (comportement inchangé pour les
+// contrats de vente, hors périmètre du cycle de vie locatif).
+const leaseLifecycle = require('../services/rentalLeaseLifecycleService');
 
 // Génère les paiements mensuels pour un bail location
 const generatePaiements = async (contratId, dateEntree, dateFinBail, montantLoyer) => {
@@ -114,6 +118,13 @@ exports.create = async (req, res) => {
     if (c.type === 'location') {
       await generatePaiements(c._id, c.dateEntree, c.dateFinBail, c.montantLoyer);
       await syncLeaseOccupation(c, req.user.id);
+      // GL-LIFE-1 — amorce le cycle de vie dès la création (sinon dérivé à
+      // la première transition) ; n'écrase jamais une valeur déjà fournie.
+      if (!c.cycleVie) {
+        c.cycleVie = leaseLifecycle.deriveCycleVie(c);
+        c.cycleHistory.push({ to: c.cycleVie, action: 'contrat_cree', actor: req.user.id });
+        await c.save();
+      }
     }
 
     const populated = await c.populate([
@@ -154,7 +165,19 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const c = await Contrat.findByIdAndUpdate(req.params.id, req.body, {
+    const existing = await Contrat.findById(req.params.id).select('type statut');
+    if (!existing) return res.status(404).json({ status: 'error', message: 'Contrat introuvable' });
+
+    const updates = { ...req.body };
+    if (existing.type === 'location' && updates.statut !== undefined && updates.statut !== existing.statut) {
+      // GL-LIFE-1 : toute demande de changement de statut sur un bail passe
+      // désormais par la machine d'état centralisée — rejetée (409) si la
+      // transition est illégale, jamais un écrasement silencieux.
+      await leaseLifecycle.requestStatutChange(existing._id, updates.statut, { actor: req.user.id, comment: updates.comment });
+      delete updates.statut; // déjà appliqué et synchronisé par la state machine
+    }
+
+    const c = await Contrat.findByIdAndUpdate(req.params.id, updates, {
       new: true, runValidators: true,
     })
       .populate('proprietaire', 'nom prenom telephone')
@@ -185,7 +208,7 @@ exports.update = async (req, res) => {
       req,
     });
   } catch (err) {
-    res.status(400).json({ status: 'error', message: err.message });
+    res.status(err.statusCode || 400).json({ status: 'error', message: err.message });
   }
 };
 
@@ -261,3 +284,8 @@ exports.createPaiement = async (req, res) => {
     res.status(400).json({ status: 'error', message: err.message });
   }
 };
+
+// GL-LIFE-1 — réutilisé par rentalLeaseRenewalService.js pour générer les
+// échéances futures d'un renouvellement (prolongation ou nouveau contrat
+// lié) sans dupliquer cette logique de calendrier.
+exports.generatePaiements = generatePaiements;

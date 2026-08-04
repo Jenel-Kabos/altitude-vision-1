@@ -142,8 +142,9 @@ async function finalizeCore({ transactionId, actorId, tauxCommission, operationK
 async function finalizeRealEstateTransaction({ transactionId, actorId, tauxCommission, transactionMode = 'auto', faultInjector }) {
   const operationKey = operationKeyFor(transactionId);
   const payloadHash = hashPayload({ transactionId: String(transactionId), tauxCommission: tauxCommission || null });
+  let result;
   try {
-    return await runFinancialOperation({ operationName: 'real_estate.transaction.finalize', transactionMode }, (context) => finalizeCore({ transactionId, actorId, tauxCommission, operationKey, payloadHash, faultInjector, ...context }));
+    result = await runFinancialOperation({ operationName: 'real_estate.transaction.finalize', transactionMode }, (context) => finalizeCore({ transactionId, actorId, tauxCommission, operationKey, payloadHash, faultInjector, ...context }));
   } catch (error) {
     if (error.code === 'FINANCIAL_IDEMPOTENCY_CONFLICT') {
       const transaction = await Transaction.findById(transactionId);
@@ -151,6 +152,18 @@ async function finalizeRealEstateTransaction({ transactionId, actorId, tauxCommi
     }
     throw error;
   }
+  // GL-ASSET-1 — best-effort, APRÈS que `runFinancialOperation` a
+  // définitivement résolu (jamais à l'intérieur de `finalizeCore`, qui peut
+  // être invoquée deux fois sous transactionMode 'auto' — une tentative
+  // transactionnelle avortée puis un repli non-transactionnel — un écrit
+  // hors session dans la première tentative avortée survivrait à son
+  // rollback et ferait échouer la seconde à tort). Ne fait avancer le cycle
+  // de vie patrimonial que pour une finalisation réellement nouvelle
+  // (jamais un rejeu idempotent, qui n'a rien de plus à synchroniser).
+  if (result && !result.idempotent) {
+    await require('../propertyAssetLifecycleService').transition(result.transaction.property, result.transaction.transactionType === 'vente' ? 'vendu' : 'en_location', { actor: actorId, comment: 'Transaction finalisée', action: 'transaction_finalized', bestEffort: true }).catch(() => {});
+  }
+  return result;
 }
 
 module.exports = { finalizeRealEstateTransaction, calculateCommission, operationKeyFor };
