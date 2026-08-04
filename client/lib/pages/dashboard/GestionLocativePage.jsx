@@ -16,6 +16,7 @@ import {
   getPaiements,     updatePaiement,     marquerPaiementPaye, calculerPenalites,
   addBienPhotos,
   getRentalManagement, getRentalManagementStats, getRentalManagementDetail, runRentalAction,
+  getRentalOnboardingOptions, onboardRentalProperty,
   getLocataireDossiers, getPaiementsStats,
   importBienIntoGestionLocative,
 } from "../../services/gestionLocativeService";
@@ -1685,6 +1686,47 @@ const ConfirmDelete = ({ label, onConfirm, onCancel }) => (
   </Modal>
 );
 
+const emptyManagedProperty = { owner:'', title:'', type:'Appartement', street:'', city:'Brazzaville', arrondissement:'', neighborhood:'', monthlyRent:'', surface:'', latitude:'', longitude:'', bedrooms:0, bathrooms:0, initialAvailability:'Disponible', description:'', internalNotes:'' };
+
+const AddManagedPropertyModal = ({ onClose, onSuccess, toast }) => {
+  const [mode, setMode] = useState('existing');
+  const [options, setOptions] = useState({ properties:[], owners:[] });
+  const [property, setProperty] = useState('');
+  const [form, setForm] = useState(emptyManagedProperty);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { getRentalOnboardingOptions().then(setOptions).catch(e=>toast(e.response?.data?.message||'Options indisponibles','error')).finally(()=>setLoading(false)); }, []);
+  const change = (key) => (event) => setForm(prev=>({...prev,[key]:event.target.value}));
+  const submit = async (event) => {
+    event.preventDefault(); if (saving) return; setSaving(true);
+    try { await onSuccess(await onboardRentalProperty(mode==='existing'?{mode,property}:{mode,...form})); }
+    catch (error) { const d=error.response?.data; toast(d?.code==='ALREADY_MANAGED'?'Ce bien est déjà sous gestion.':d?.missingFields?.length?`Champs manquants : ${d.missingFields.join(', ')}`:d?.message||'Ajout impossible','error'); }
+    finally { setSaving(false); }
+  };
+  return <Modal title="Ajouter un bien à la gestion locative" onClose={onClose} wide><form onSubmit={submit} className="space-y-5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {[['existing','Utiliser un bien existant','Activer un Property éligible.'],['new','Créer un nouveau bien géré','Créer un bien interne privé.']].map(([id,title,help])=><button key={id} type="button" onClick={()=>setMode(id)} className={`rounded-xl border p-4 text-left ${mode===id?'border-blue-500 bg-blue-50':'border-gray-200'}`}><strong className="block text-sm text-gray-900">{title}</strong><span className="text-xs text-gray-500">{help}</span></button>)}
+    </div>
+    {loading?<div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600"/></div>:mode==='existing'?<Field label="Bien éligible" required><Select required value={property} onChange={e=>setProperty(e.target.value)}><option value="">Sélectionner un bien</option>{options.properties.map(p=><option key={p._id} value={p._id}>{p.title} — {p.address?.city||'Ville inconnue'} — {fmt(p.price)}</option>)}</Select>{!options.properties.length&&<p className="mt-2 text-xs text-gray-500">Aucun bien existant éligible.</p>}</Field>:<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <Field label="Propriétaire métier" required><Select required value={form.owner} onChange={change('owner')}><option value="">Sélectionner</option>{options.owners.map(o=><option key={o._id} value={o._id}>{o.name}{o.email?` — ${o.email}`:''}</option>)}</Select></Field>
+      <Field label="Titre" required><Input required value={form.title} onChange={change('title')}/></Field>
+      <Field label="Type de bien" required><Select value={form.type} onChange={change('type')}>{BIEN_TYPES.map(t=>{const value=typeof t==='string'?t:t.value; const label=typeof t==='string'?t:t.label; return <option key={value} value={value}>{label}</option>;})}</Select></Field>
+      <Field label="Loyer mensuel" required><Input required min="1" type="number" value={form.monthlyRent} onChange={change('monthlyRent')}/></Field>
+      <Field label="Adresse" required><Input required value={form.street} onChange={change('street')}/></Field>
+      <Field label="Ville" required><Input required value={form.city} onChange={change('city')}/></Field>
+      <Field label="Arrondissement" required><Input required value={form.arrondissement} onChange={change('arrondissement')}/></Field>
+      <Field label="Quartier"><Input value={form.neighborhood} onChange={change('neighborhood')}/></Field>
+      <Field label="Surface (m²)" required><Input required min="1" type="number" value={form.surface} onChange={change('surface')}/></Field>
+      <Field label="Disponibilité initiale"><Select value={form.initialAvailability} onChange={change('initialAvailability')}><option>Disponible</option><option>Indisponible</option><option>En maintenance</option></Select></Field>
+      <Field label="Latitude" required><Input required step="any" type="number" value={form.latitude} onChange={change('latitude')}/></Field>
+      <Field label="Longitude" required><Input required step="any" type="number" value={form.longitude} onChange={change('longitude')}/></Field>
+      <Field label="Chambres"><Input min="0" type="number" value={form.bedrooms} onChange={change('bedrooms')}/></Field><Field label="Salles de bain"><Input min="0" type="number" value={form.bathrooms} onChange={change('bathrooms')}/></Field>
+      <div className="sm:col-span-2"><Field label="Description"><Textarea value={form.description} onChange={change('description')}/></Field></div><div className="sm:col-span-2"><Field label="Notes internes"><Textarea value={form.internalNotes} onChange={change('internalNotes')}/></Field></div>
+    </div>}
+    <div className="flex justify-end gap-3"><Btn outline color={GRAY} onClick={onClose}>Annuler</Btn><Btn type="submit" loading={saving||loading}>Ajouter le bien</Btn></div>
+  </form></Modal>;
+};
+
 // ═══════════════════════════════════════════════════════════════
 // COMPOSANT PRINCIPAL
 // ═══════════════════════════════════════════════════════════════
@@ -1723,6 +1765,8 @@ const GestionLocativePage = () => {
   });
   const [rentalDetail, setRentalDetail] = useState(null);
   const [rentalDetailLoading, setRentalDetailLoading] = useState(false);
+  const [addManagedModal, setAddManagedModal] = useState(false);
+  const [highlightedRental, setHighlightedRental] = useState(null);
 
   const [tab,     setTab]     = useState('contrats');
   const [loading, setLoading] = useState(true);
@@ -2045,6 +2089,16 @@ const GestionLocativePage = () => {
     finally { setRentalDetailLoading(false); }
   };
 
+  const handleManagedPropertyAdded = async ({ property, rental }) => {
+    const [rentalData, stats] = await Promise.all([getRentalManagement(), getRentalManagementStats()]);
+    setRentals(Array.isArray(rentalData?.rentals) ? rentalData.rentals : []);
+    setRentalStats(stats || {});
+    setProperties(prev => prev.some(p=>p._id===property._id) ? prev : [property, ...prev]);
+    setHighlightedRental(rental?._id || null);
+    setAddManagedModal(false);
+    toast('Le bien a été ajouté à la Gestion locative.');
+  };
+
   // ── Tabs ─────────────────────────────────────────────────────
   const TABS = [
     { id:'biens',         label:'Biens gérés',   Icon:Building,  count:rentals.length },
@@ -2106,7 +2160,7 @@ const GestionLocativePage = () => {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="flex border-b border-gray-100">
           {TABS.map(({id, label, Icon, count}) => (
-            <button key={id} onClick={() => setTab(id)}
+            <button key={id} aria-label={label} onClick={() => setTab(id)}
               className={`flex items-center gap-2 px-5 py-3.5 text-sm font-semibold transition-all flex-1 justify-center border-b-2 ${
                 tab===id ? 'text-blue-600 border-blue-500' : 'text-gray-400 border-transparent hover:text-gray-700'
               }`}>
@@ -2127,17 +2181,19 @@ const GestionLocativePage = () => {
           {/* ─── BIENS SOUS GESTION — Property reste la source de vérité ─── */}
           {tab === 'biens' && (
             <div className="space-y-4">
+              {canManage && <div className="flex justify-end"><Btn onClick={()=>setAddManagedModal(true)}><Plus size={15}/> Ajouter un bien à la gestion locative</Btn></div>}
               {rentals.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-200 py-12 text-center">
-                  <p className="text-sm font-semibold text-gray-600">Aucun Property activé en gestion locative</p>
-                  <p className="mt-1 text-xs text-gray-400">Les anciens biens intégrés aux fiches propriétaires restent lisibles mais doivent être rapprochés avant activation.</p>
+                  <p className="text-sm font-semibold text-gray-700">Aucun bien sous gestion</p>
+                  <p className="mt-1 text-xs text-gray-500">Ajoutez un bien existant ou créez un nouveau bien pour commencer sa gestion locative.</p>
+                  {canManage && <div className="mt-4 flex justify-center"><Btn onClick={()=>setAddManagedModal(true)}><Plus size={15}/> Ajouter un bien à la gestion locative</Btn></div>}
                 </div>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-gray-100">
                   <table className="w-full text-left">
                     <thead><tr>{['Bien','Occupation','Publication','Disponibilité','Loyer','Paiement','Readiness','Actions'].map(h=><TH key={h}>{h}</TH>)}</tr></thead>
                     <tbody>{rentals.map(rental => (
-                      <TRow key={rental._id}>
+                      <tr key={rental._id} className={`border-b border-gray-50 transition-colors ${highlightedRental===rental._id?'bg-green-50 ring-1 ring-inset ring-green-200':'hover:bg-gray-50'}`}>
                         <TD bold><div className="flex items-center gap-2">{rental.property?.images?.[0] && <img src={rental.property.images[0]} alt="" className="h-9 w-12 rounded object-cover"/>}<span>{rental.property?.title || 'Bien introuvable'}</span></div></TD>
                         <TD><span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{rental.displayStatus}</span></TD>
                         <TD>{rental.publicationStatus}</TD>
@@ -2155,7 +2211,7 @@ const GestionLocativePage = () => {
                           {rental.allowedActions?.includes('complete_maintenance') && <Btn small outline color={GREEN} loading={rentalActionId===`${rental._id}:complete-maintenance`} onClick={()=>handleRentalAction(rental,'complete-maintenance')}>Fin maintenance</Btn>}
                           {rental.allowedActions?.includes('validate_exit') && <Btn small outline color={BLUE} loading={rentalActionId===`${rental._id}:validate-exit`} onClick={()=>handleRentalAction(rental,'validate-exit')}>Valider sortie</Btn>}
                         </div></TD>
-                      </TRow>
+                      </tr>
                     ))}</tbody>
                   </table>
                 </div>
@@ -2509,6 +2565,8 @@ const GestionLocativePage = () => {
 
       {/* ─── Modaux ─── */}
 
+      {addManagedModal && <AddManagedPropertyModal onClose={()=>setAddManagedModal(false)} onSuccess={handleManagedPropertyAdded} toast={toast}/>}
+
       {rentalDetail && (
         <Modal title={`Dossier locatif — ${rentalDetail.property?.title || 'Bien'}`} onClose={()=>setRentalDetail(null)} wide>
           <div className="space-y-5 text-sm">
@@ -2691,4 +2749,5 @@ const GestionLocativePage = () => {
   );
 };
 
+export { AddManagedPropertyModal };
 export default GestionLocativePage;

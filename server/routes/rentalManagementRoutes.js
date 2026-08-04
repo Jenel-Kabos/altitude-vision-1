@@ -7,6 +7,8 @@ const router = express.Router();
 router.use(auth.protect);
 router.get('/owner/my', auth.restrictTo('Proprietaire'), ctrl.ownerList);
 router.post('/:id/owner/:action', auth.restrictTo('Proprietaire'), ctrl.ownerRequest);
+router.get('/onboarding/options', auth.restrictTo('Admin', 'GestionnaireImmobilier'), ctrl.onboardingOptions);
+router.post('/onboarding', auth.restrictTo('Admin', 'GestionnaireImmobilier'), ctrl.onboard);
 router.use(auth.restrictTo(...ROLES_GL));
 router.get('/stats', ctrl.stats);
 router.get('/', ctrl.list);

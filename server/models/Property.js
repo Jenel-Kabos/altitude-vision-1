@@ -103,7 +103,7 @@ const propertySchema = new mongoose.Schema(
       validate: [
             // 🔑 CORRECTION CLÉ : Rendre les images obligatoires
             {
-                validator: (val) => val.length > 0,
+        validator: function (val) { return this.internalManagedOnly || val.length > 0; },
                 message: 'Au moins une image est requise pour la propriété.',
             },
             // Le validateur existant pour la limite maximale
@@ -201,6 +201,9 @@ const propertySchema = new mongoose.Schema(
     },
 
     isPublished: { type: Boolean, default: false },
+    // Bien privé créé volontairement depuis la Gestion locative. Il peut
+    // être complété (notamment en images) avant un futur workflow public.
+    internalManagedOnly: { type: Boolean, default: false, index: true },
     reservationLock: {
       reservation: { type: mongoose.Schema.ObjectId, ref: 'RealEstateReservation', default: null },
       lockedAt: { type: Date, default: null },
@@ -258,6 +261,10 @@ const propertySchema = new mongoose.Schema(
     // echoue en base plutot que de creer un doublon.
     sourceType: { type: String, enum: ['proprietaire_bien_propre'] },
     sourceOwnerAssetId: { type: String, unique: true, sparse: true, index: true },
+    // GL-ASSET-UX-1.1 — empreinte stable des créations internes afin que
+    // deux requêtes concurrentes plausiblement identiques ne puissent pas
+    // créer deux Property. Champ additif, absent des documents historiques.
+    onboardingFingerprint: { type: String, unique: true, sparse: true, index: true },
 
     documents: { type: [String], default: [] },
   },

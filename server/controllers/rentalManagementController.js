@@ -6,13 +6,32 @@ const Paiement = require('../models/Paiement');
 const sync = require('../services/rentalListingSyncService');
 const { notifyStaff } = require('../services/notificationService');
 const { contractAlertWindowDays } = require('../services/rentalFinancialAutomationService');
+const onboarding = require('../services/rentalAssetOnboardingService');
 
 const fail = (res, error) => res.status(error.statusCode || 500).json({
   status: (error.statusCode || 500) >= 500 ? 'error' : 'fail',
   message: error.message,
+  ...(error.code && { code: error.code }),
+  ...(error.missingFields?.length && { missingFields: error.missingFields }),
   ...(error.readiness && { publicationReadiness: error.readiness }),
   ...(error.vacancyReadiness && { vacancyReadiness: error.vacancyReadiness }),
 });
+
+exports.onboardingOptions = async (_req, res) => {
+  try { res.json({ status: 'success', data: await onboarding.getOptions() }); }
+  catch (error) { fail(res, error); }
+};
+
+exports.onboard = async (req, res) => {
+  try {
+    const result = req.body.mode === 'existing'
+      ? await onboarding.activateExisting({ propertyId: req.body.property, actor: req.user })
+      : req.body.mode === 'new'
+        ? await onboarding.createManaged({ data: req.body, actor: req.user })
+        : (() => { throw new onboarding.OnboardingError('Le parcours sélectionné est invalide.', 422, 'MODE_INVALID', ['mode']); })();
+    res.status(201).json({ status: 'success', message: 'Le bien a été ajouté à la Gestion locative.', data: result });
+  } catch (error) { fail(res, error); }
+};
 
 exports.list = async (req, res) => {
   try {

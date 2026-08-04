@@ -23,6 +23,9 @@ const ids = {
   finalizationSalePropertyMobile: "66e200000000000000000034",
   rentalActivationProperty: "66e200000000000000000035",
   rentalActivationPropertyMobile: "66e200000000000000000036",
+  rentalOnboardingOwner: "66e200000000000000000037",
+  rentalOnboardingProperty: "66e200000000000000000038",
+  rentalOnboardingPropertyMobile: "66e200000000000000000039",
   proprietaireBienPropre: "66e200000000000000000040",
   contratFormPropertyMobile: "66e200000000000000000041",
   proprietaireBienPropreMobile: "66e200000000000000000042",
@@ -74,6 +77,15 @@ async function seed(uri) {
       password: "E2eClient!2026",
       passwordConfirm: "E2eClient!2026",
       role: "Client",
+      isEmailVerified: true,
+    },
+    {
+      _id: ids.rentalOnboardingOwner,
+      name: "Propriétaire Gestion E2E",
+      email: "rental-owner-e2e@example.test",
+      password: "E2eOwnerRental!2026",
+      passwordConfirm: "E2eOwnerRental!2026",
+      role: "Proprietaire",
       isEmailVerified: true,
     },
   ]);
@@ -272,6 +284,17 @@ async function seed(uri) {
       availability: "Disponible",
       owner: ids.owner,
     },
+    ...[
+      [ids.rentalOnboardingProperty, "Bien privé Gestion E2E"],
+      [ids.rentalOnboardingPropertyMobile, "Bien privé Gestion E2E Mobile"],
+    ].map(([_id, title]) => ({
+      _id, title, description: "Bien privé fictif dédié à l'onboarding Gestion locative.",
+      pole: "Altimmo", type: "Appartement", status: "location", price: 225000,
+      address: { street: "12 rue E2E", arrondissement: "Bacongo", city: "Brazzaville" },
+      latitude: -4.27, longitude: 15.28, images: ["https://placehold.co/1200x800/png?text=Gestion-Locative"], surface: 65, bedrooms: 2, bathrooms: 1,
+      statusAdmin: "En attente", isPublished: false, recommande: false, availability: "Disponible",
+      owner: ids.rentalOnboardingOwner,
+    })),
   ]);
   await Accommodation.create({
     _id: ids.accommodation,

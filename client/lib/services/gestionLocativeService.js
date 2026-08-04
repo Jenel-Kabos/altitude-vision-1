@@ -44,6 +44,8 @@ export const enableRentalManagement = async (data) => {
   const res = await api.post('/rental-management', data);
   return res.data.data.rental;
 };
+export const getRentalOnboardingOptions = async () => (await api.get('/rental-management/onboarding/options')).data.data;
+export const onboardRentalProperty = async (data) => (await api.post('/rental-management/onboarding', data)).data.data;
 export const runRentalAction = async (id, action, data = {}) => {
   const res = await api.post(`/rental-management/${id}/${action}`, data);
   return res.data.data;
