@@ -4,6 +4,7 @@ const FinancialPayment = require('../models/FinancialPayment');
 const PaymentAllocation = require('../models/PaymentAllocation');
 const FinancialLedgerEntry = require('../models/FinancialLedgerEntry');
 const HotelReservation = require('../models/HotelReservation');
+const AccommodationReservation = require('../models/AccommodationReservation');
 const authz = require('../services/finance/financialAuthorizationService');
 const { createHotelInvoiceDraftFromReservation } = require('../services/finance/hotelBillingAdapter');
 const { replaceDraftLines, issueFinancialDocument } = require('../services/finance/financialDocumentService');
@@ -25,9 +26,30 @@ const operationKey = (req, fallback) => String(req.headers['idempotency-key'] ||
 const requiredOperationKey = (req) => { const key = req.headers['idempotency-key'] || req.body?.idempotencyKey; if (!String(key || '').trim()) fail('FINANCIAL_IDEMPOTENCY_KEY_REQUIRED', 'Une clé d’idempotence est obligatoire.'); return String(key).trim(); };
 const pagination = (req) => ({ page: Math.max(1, Number(req.query.page) || 1), limit: Math.min(100, Math.max(1, Number(req.query.limit) || 20)) });
 
-async function requireDocument(req, capability) {
+const accommodationReaderRoles = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager', 'Secretaire'];
+async function assertAccommodationDocumentReader(user, document) {
+  if (document.domain !== 'real_estate' || document.establishmentType !== 'Accommodation' || document.subjectType !== 'AccommodationReservation') return false;
+  const reservation = await AccommodationReservation.findOne({ _id: document.subjectId, financialDocument: document._id }).select('guest owner');
+  if (!reservation) fail('FINANCIAL_DOCUMENT_ACCESS_DENIED', 'Document de séjour inaccessible.', 403);
+  const userId = String(user.id || user._id);
+  if (!accommodationReaderRoles.includes(user.role) && String(reservation.guest) !== userId && String(reservation.owner) !== userId) {
+    fail('FINANCIAL_DOCUMENT_ACCESS_DENIED', 'Document de séjour inaccessible.', 403);
+  }
+  return true;
+}
+async function assertHotelGuestDocumentReader(user, document) {
+  if (document.domain !== 'hotel' || document.subjectType !== 'HotelReservation') return false;
+  const reservation = await HotelReservation.findOne({ _id: document.subjectId, hotel: document.establishmentId }).select('guestUser');
+  if (!reservation || !reservation.guestUser || String(reservation.guestUser) !== String(user.id || user._id)) return false;
+  return true;
+}
+async function assertPersonalDocumentReader(user, document) {
+  return (await assertAccommodationDocumentReader(user, document)) || (await assertHotelGuestDocumentReader(user, document));
+}
+async function requireDocument(req, capability, { personalRead = false } = {}) {
   const document = await FinancialDocument.findById(req.params.documentId);
   if (!document) fail('FINANCIAL_DOCUMENT_NOT_ISSUED', 'Facture introuvable.', 404);
+  if (personalRead && await assertPersonalDocumentReader(req.user, document)) return document;
   await capability(req.user, document.establishmentId);
   if (document.domain !== 'hotel') fail('FINANCIAL_DOCUMENT_ACCESS_DENIED', 'Ce document ne relève pas du domaine hôtelier.', 403);
   return document;
@@ -40,16 +62,16 @@ exports.generateOfficialPdf = async (req, res, next) => { try {
 } catch (e) { next(e); } };
 
 exports.getOfficialPdfStatus = async (req, res, next) => { try {
-  const document = await requireDocument(req, authz.assertCanDownloadFinancialDocumentPdf);
+  const document = await requireDocument(req, authz.assertCanDownloadFinancialDocumentPdf, { personalRead: true });
   let artifact = null;
   try { artifact = publicArtifact(await getReadyArtifact(document._id)); } catch (error) { if (error.code !== 'FINANCIAL_PDF_NOT_AVAILABLE') throw error; }
   res.json({ status: 'success', data: { artifact } });
 } catch (e) { next(e); } };
 
 exports.downloadOfficialPdf = async (req, res, next) => { try {
-  const document = await requireDocument(req, authz.assertCanDownloadFinancialDocumentPdf);
+  const document = await requireDocument(req, authz.assertCanDownloadFinancialDocumentPdf, { personalRead: true });
   const artifact = await getReadyArtifact(document._id); const buffer = await readAndVerifyArtifact(artifact);
-  await appendFinancialLedgerEntry({ eventType: 'financial_document.pdf_downloaded', domain: 'hotel', establishmentType: 'Hotel', establishmentId: document.establishmentId, entityType: 'FinancialDocumentArtifact', entityId: artifact._id, relatedEntities: [{ entityType: 'FinancialDocument', entityId: document._id }], actorType: 'user', actorId: req.user.id || req.user._id, currency: document.currency, businessOperationKey: `artifact:${artifact._id}:download:${req.user.id || req.user._id}:${Date.now()}`, newState: { hash: artifact.hash, templateVersion: artifact.templateVersion } });
+  await appendFinancialLedgerEntry({ eventType: 'financial_document.pdf_downloaded', domain: document.domain, establishmentType: document.establishmentType, establishmentId: document.establishmentId, entityType: 'FinancialDocumentArtifact', entityId: artifact._id, relatedEntities: [{ entityType: 'FinancialDocument', entityId: document._id }, { entityType: document.subjectType, entityId: document.subjectId }], actorType: 'user', actorId: req.user.id || req.user._id, currency: document.currency, businessOperationKey: `artifact:${artifact._id}:download:${req.user.id || req.user._id}:${Date.now()}`, newState: { hash: artifact.hash, templateVersion: artifact.templateVersion } });
   res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${safeFilename(document.documentNumber)}"`, 'Cache-Control': 'private, no-store, max-age=0', 'Content-Length': String(buffer.length), 'X-Content-Type-Options': 'nosniff' });
   res.send(buffer);
 } catch (e) { next(e); } };
@@ -66,11 +88,11 @@ exports.listDocumentDeliveries = async (req, res, next) => { try {
 } catch (e) { next(e); } };
 
 exports.createHotelDraft = async (req, res, next) => { try { const reservation = await HotelReservation.findById(req.params.reservationId).select('hotel'); if (!reservation) fail('FINANCIAL_DOCUMENT_NOT_ISSUED', 'Réservation introuvable.', 404); await authz.assertCanCreateFinancialDraft(req.user, reservation.hotel); const existing = await FinancialDocument.findOne({ domain: 'hotel', subjectType: 'HotelReservation', subjectId: reservation._id }); const document = await createHotelInvoiceDraftFromReservation({ reservationId: req.params.reservationId, actor: req.user, source: 'manual' }); const lines = await FinancialDocumentLine.find({ financialDocument: document._id }).sort('lineNumber').lean(); res.status(existing ? 200 : 201).json({ status: 'success', data: { document: safeDocument(document, lines), created: !existing } }); } catch (e) { next(e); } };
-exports.getDocument = async (req, res, next) => { try { const doc = await FinancialDocument.findById(req.params.documentId); if (!doc) return res.status(404).json({ status: 'fail', message: 'Facture introuvable.' }); await authz.assertCanViewFinancialDocument(req.user, doc.establishmentId); const lines = await FinancialDocumentLine.find({ financialDocument: doc._id }).sort('lineNumber').lean(); res.json({ status: 'success', data: { document: safeDocument(doc, lines) } }); } catch (e) { next(e); } };
+exports.getDocument = async (req, res, next) => { try { const doc = await FinancialDocument.findById(req.params.documentId); if (!doc) return res.status(404).json({ status: 'fail', message: 'Facture introuvable.' }); if (!(await assertPersonalDocumentReader(req.user, doc))) await authz.assertCanViewFinancialDocument(req.user, doc.establishmentId); const lines = await FinancialDocumentLine.find({ financialDocument: doc._id }).sort('lineNumber').lean(); res.json({ status: 'success', data: { document: safeDocument(doc, lines) } }); } catch (e) { next(e); } };
 exports.updateDraft = async (req, res, next) => { try { const doc = await FinancialDocument.findById(req.params.documentId); if (!doc) fail('FINANCIAL_DOCUMENT_NOT_ISSUED', 'Facture introuvable.', 404); await authz.assertCanEditFinancialDraft(req.user, doc.establishmentId); const lines = (req.body.lines || []).map(({ description, quantity, unitAmountMinor, discountAmountMinor, taxAmountMinor, feesAmountMinor, taxes, lineType, serviceDate, metadata }) => ({ description, quantity, unitAmountMinor, discountAmountMinor, taxAmountMinor, feesAmountMinor, taxes, lineType, sourceType: doc.subjectType, sourceId: doc.subjectId, serviceDate, metadata })); const updated = await replaceDraftLines(doc._id, lines, req.user.id); const savedLines = await FinancialDocumentLine.find({ financialDocument: doc._id }).sort('lineNumber').lean(); res.json({ status: 'success', data: { document: safeDocument(updated, savedLines) } }); } catch (e) { next(e); } };
 exports.finalizeLines = async (req, res, next) => { try { const doc = await FinancialDocument.findById(req.params.documentId); if (!doc) fail('FINANCIAL_DOCUMENT_NOT_ISSUED', 'Facture introuvable.', 404); await authz.assertCanEditFinancialDraft(req.user, doc.establishmentId); const updated = await finalizeDocumentLines({ documentId: doc._id, actor: req.user }); const lines = await FinancialDocumentLine.find({ financialDocument: doc._id }).sort('lineNumber').lean(); res.json({ status: 'success', data: { document: safeDocument(updated, lines) } }); } catch (e) { next(e); } };
 exports.refreshFromReservation = async (req, res, next) => { try { const doc = await FinancialDocument.findById(req.params.documentId); if (!doc) fail('FINANCIAL_DOCUMENT_NOT_ISSUED', 'Facture introuvable.', 404); await authz.assertCanEditFinancialDraft(req.user, doc.establishmentId); const updated = await refreshHotelInvoiceDraftFromReservation({ documentId: doc._id, actor: req.user }); const lines = await FinancialDocumentLine.find({ financialDocument: doc._id }).sort('lineNumber').lean(); res.json({ status: 'success', data: { document: safeDocument(updated, lines) } }); } catch (e) { next(e); } };
-exports.getReservationDocument = async (req, res, next) => { try { const reservation = await HotelReservation.findById(req.params.reservationId).select('hotel'); if (!reservation) fail('FINANCIAL_DOCUMENT_NOT_ISSUED', 'Réservation introuvable.', 404); await authz.assertCanViewFinancialDocument(req.user, reservation.hotel); const doc = await FinancialDocument.findOne({ domain: 'hotel', subjectType: 'HotelReservation', subjectId: reservation._id, documentType: 'invoice' }).sort({ createdAt: 1 }); if (!doc) return res.json({ status: 'success', data: { document: null } }); const lines = await FinancialDocumentLine.find({ financialDocument: doc._id }).sort('lineNumber').lean(); res.json({ status: 'success', data: { document: safeDocument(doc, lines) } }); } catch (e) { next(e); } };
+exports.getReservationDocument = async (req, res, next) => { try { const reservation = await HotelReservation.findById(req.params.reservationId).select('hotel guestUser'); if (!reservation) fail('FINANCIAL_DOCUMENT_NOT_ISSUED', 'Réservation introuvable.', 404); const isGuest = reservation.guestUser && String(reservation.guestUser) === String(req.user.id || req.user._id); if (!isGuest) await authz.assertCanViewFinancialDocument(req.user, reservation.hotel); const doc = await FinancialDocument.findOne({ domain: 'hotel', subjectType: 'HotelReservation', subjectId: reservation._id, establishmentId: reservation.hotel, documentType: 'invoice' }).sort({ createdAt: 1 }); if (!doc) return res.json({ status: 'success', data: { document: null } }); const lines = await FinancialDocumentLine.find({ financialDocument: doc._id }).sort('lineNumber').lean(); res.json({ status: 'success', data: { document: safeDocument(doc, lines) } }); } catch (e) { next(e); } };
 exports.listHotelDocuments = async (req, res, next) => { try { const hotelId = req.params.hotelId; await authz.assertCanViewFinancialDocument(req.user, hotelId); const page = Math.max(1, Number(req.query.page) || 1); const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20)); const query = { domain: 'hotel', establishmentId: hotelId, documentType: 'invoice' }; if (req.query.status) query.status = req.query.status; if (req.query.reservationId) query.subjectId = req.query.reservationId; if (req.query.number) query.documentNumber = String(req.query.number); if (req.query.from || req.query.to) query.createdAt = { ...(req.query.from ? { $gte: new Date(req.query.from) } : {}), ...(req.query.to ? { $lte: new Date(req.query.to) } : {}) }; if (req.query.customer) query['customer.name'] = { $regex: String(req.query.customer).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' }; const [documents, total] = await Promise.all([FinancialDocument.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit), FinancialDocument.countDocuments(query)]); res.json({ status: 'success', data: { documents: documents.map((doc) => safeDocument(doc)), total, page, limit } }); } catch (e) { next(e); } };
 // DOC-ARCH-2 — projection en lecture seule pour le Centre documentaire
 // (dossier Altimmo → Hébergements → Factures), jamais une écriture ni une

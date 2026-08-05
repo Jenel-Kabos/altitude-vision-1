@@ -21,6 +21,7 @@ import {
 } from '../../services/notificationApiService';
 import { connectSocket, getSocket } from '../../services/socketService';
 import { getCurrentUserId } from '../../services/notificationsService';
+import { resolveNotificationMobileTarget } from '../../navigation/navigationSdk';
 
 // ─── Config icônes par type ───────────────────────────────────────────────────
 
@@ -83,6 +84,9 @@ const formatRelativeTime = (dateStr) => {
 
 function getNavTarget(notif) {
   const { type, data = {}, entityId } = notif;
+
+  const registeredTarget = resolveNotificationMobileTarget(notif);
+  if (registeredTarget) return registeredTarget;
 
   // 'Chat' est imbriqué dans MessagerieStack (onglet 'Messages') — naviguer
   // directement vers 'Chat' depuis un autre onglet (Annonces) échoue, il faut

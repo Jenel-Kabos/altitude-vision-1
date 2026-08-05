@@ -76,6 +76,12 @@ const NOTIFICATION_TYPES = [
   'tenant_document_added', 'tenant_receipt_added', 'tenant_payment_recorded',
   'tenant_maintenance_created', 'tenant_maintenance_scheduled', 'tenant_maintenance_resolved',
   'tenant_notice_recorded', 'tenant_notice_acknowledged', 'tenant_notice_cancelled', 'tenant_notice_closed',
+  // ── Séjours en hébergement indépendant (ACC-1) ──
+  'accommodation_reservation_pending', 'accommodation_reservation_confirmed',
+  'accommodation_reservation_cancelled', 'accommodation_reservation_checked_in',
+  'accommodation_reservation_checked_out', 'accommodation_reservation_no_show',
+  'accommodation_arrival_reminder', 'accommodation_checkin_today', 'accommodation_checkout_today',
+  'accommodation_payment_received', 'accommodation_payment_due', 'accommodation_payment_completed',
   // ── Biens immobiliers ──
   'new_property',                 // tous les utilisateurs : nouveau bien validé et publié
   'property_pending_moderation',  // staff : nouveau bien mobile en attente de modération
@@ -121,6 +127,7 @@ const notificationSchema = new mongoose.Schema(
     title: { type: String, required: true, maxlength: 100 },
     body:  { type: String, required: true, maxlength: 300 },
     link: { type: String, default: null, maxlength: 500 },
+    destination: { type: String, default: null, maxlength: 100, index: true },
     entityType: { type: String, default: null, maxlength: 80 },
     entityId: { type: mongoose.Schema.Types.ObjectId, default: null },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },

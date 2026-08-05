@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
 import FormSwitch from '../../components/FormSwitch';
+import { resolveMobileDestination } from '../../navigation/navigationSdk';
 
 const ROLE_COLOR = {
   admin:         colors.error,
@@ -249,6 +250,23 @@ export default function ProfilScreen({ navigation }) {
           <Text style={styles.sectionTitle}>Activité</Text>
           <View style={styles.menuGroup}>
             <MenuRow
+              icon="key-outline"
+              label="Espace locataire"
+              onPress={() => {
+                const target = resolveMobileDestination('TENANT_PORTAL');
+                if (target?.screen === 'Profil' && target.params?.screen) {
+                  navigation.navigate(target.params.screen, target.params.params);
+                }
+              }}
+              styles={styles} c={c}
+            />
+            <View style={styles.menuSep} />
+            <MenuRow icon="folder-open-outline" label="Mes documents" onPress={() => {
+              const target = resolveMobileDestination('MY_DOCUMENTS');
+              if (target?.screen === 'Profil' && target.params?.screen) navigation.navigate(target.params.screen, target.params.params);
+            }} styles={styles} c={c} />
+            <View style={styles.menuSep} />
+            <MenuRow
               icon="heart-outline"
               label="Mes favoris"
               onPress={() => navigation.navigate('Favoris')}
@@ -265,6 +283,11 @@ export default function ProfilScreen({ navigation }) {
             <MenuRow icon="documents-outline" label="Mes offres et candidatures" onPress={() => navigation.navigate('RealEstateApplications')} styles={styles} c={c} />
             <View style={styles.menuSep} />
             <MenuRow icon="bed-outline" label="Mes réservations hôtel" onPress={() => navigation.navigate('MyHotelReservations')} styles={styles} c={c} />
+            <View style={styles.menuSep} />
+            <MenuRow icon="home-outline" label="Mes hébergements" onPress={() => {
+              const target = resolveMobileDestination('ACCOMMODATION_RESERVATIONS');
+              if (target?.screen === 'Profil' && target.params?.screen) navigation.navigate(target.params.screen, target.params.params);
+            }} styles={styles} c={c} />
           </View>
         </Animated.View>
 

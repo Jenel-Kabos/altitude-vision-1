@@ -69,6 +69,20 @@ describe('tenantPortalService — résolution stricte via userId — TEST DATA',
     expect(result.montantLoyer).toBe(150000);
   });
 
+  test('getMyLease expose GL-LIFE-1 sans exposer les URLs documentaires', async () => {
+    resolveLocataireForUser.mockResolvedValue(locataire());
+    Contrat.find = jest.fn().mockReturnValue({ sort: jest.fn().mockReturnThis(), populate: jest.fn().mockResolvedValue([lease({
+      cycleVie: 'inspection_sortie', cycleHistory: [{ action: 'inspection', to: 'inspection_sortie' }],
+      avenants: [{ type: 'renouvellement' }], caution: { statut: 'bloquee' },
+      proprietaire: { _id: 'OWNER', nom: 'Makosso', prenom: 'Aline', email: 'a@test.cg' },
+      etatsDesLieux: [{ type: 'sortie', documentUrl: 'https://secret.example/doc.pdf', validatedByStaff: true }],
+    })]) });
+    const result = await getMyLease(USER_ID);
+    expect(result).toEqual(expect.objectContaining({ cycleVie: 'inspection_sortie', caution: { statut: 'bloquee' } }));
+    expect(result.proprietaire.nom).toBe('Makosso');
+    expect(result.etatsDesLieux[0].documentUrl).toBeUndefined();
+  });
+
   test('getMyPayments interroge Paiement filtré par le bail du locataire résolu', async () => {
     resolveLocataireForUser.mockResolvedValue(locataire());
     Contrat.find = jest.fn().mockReturnValue({ sort: jest.fn().mockReturnThis(), populate: jest.fn().mockResolvedValue([lease()]) });

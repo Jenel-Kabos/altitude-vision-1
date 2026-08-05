@@ -34,7 +34,7 @@ exports.list = async (req, res) => {
     else query.guest = req.user.id;
     const page = Math.max(1, Number(req.query.page) || 1); const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const [reservations, total] = await Promise.all([
-      Reservation.find(query).populate({ path: 'accommodation', populate: { path: 'property', select: 'title images address owner' } }).populate('guest', 'name email phone').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+      Reservation.find(query).populate({ path: 'accommodation', populate: { path: 'property', select: 'title images address owner' } }).populate('guest', 'name email phone').populate('owner', 'name email phone').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
       Reservation.countDocuments(query),
     ]);
     res.json({ status: 'success', data: { reservations, total, page, totalPages: Math.ceil(total / limit) } });
@@ -43,7 +43,7 @@ exports.list = async (req, res) => {
 
 exports.getOne = async (req, res) => {
   try {
-    const reservation = await Reservation.findById(req.params.id).populate({ path: 'accommodation', populate: { path: 'property' } }).populate('guest', 'name email phone');
+    const reservation = await Reservation.findById(req.params.id).populate({ path: 'accommodation', populate: { path: 'property' } }).populate('guest', 'name email phone').populate('owner', 'name email phone');
     if (!reservation) return res.status(404).json({ status: 'fail', message: 'Réservation introuvable.' });
     if (!(isStaff(req.user) || String(reservation.owner) === String(req.user.id) || String(reservation.guest?._id || reservation.guest) === String(req.user.id))) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
     res.json({ status: 'success', data: { reservation } });

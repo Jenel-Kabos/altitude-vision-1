@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import api, { getToken } from './api';
 import { navigate } from './navigationService';
+import { resolveNotificationMobileTarget } from '../navigation/navigationSdk';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -158,6 +159,9 @@ const TYPE_TO_SCREEN = {
 
 export async function resolveNavigation(data = {}) {
   const { type, screen, params } = data;
+
+  const registeredTarget = resolveNotificationMobileTarget(data);
+  if (registeredTarget) return [registeredTarget.screen, registeredTarget.params];
 
   // Le resolver dédié au type est prioritaire — il peut enrichir les params
   // (ex: charger la conversation complète) avant de determiner l'écran.

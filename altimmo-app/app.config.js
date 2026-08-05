@@ -1,9 +1,16 @@
+const navigationRegistry = require('../shared/navigation/registry.json');
+const { URL } = require('url');
+
+const universalLinkPrefixes = [...new Set(navigationRegistry.destinations
+  .map((destination) => destination.universalLink?.split('/:')[0])
+  .filter(Boolean))];
+
 module.exports = {
   expo: {
     name: 'Altimmo',
     slug: 'altimmo-app',
     version: '1.0.1',
-    scheme: 'altimmo',
+    scheme: navigationRegistry.origins.scheme,
     orientation: 'portrait',
     newArchEnabled: true,
 
@@ -27,7 +34,7 @@ module.exports = {
       supportsTablet: false,
       bundleIdentifier: 'com.altitudevision.altimmo',
       associatedDomains: [
-        'applinks:altitudevision.agency',
+        `applinks:${new URL(navigationRegistry.origins.web).host}`,
       ],
       infoPlist: {
         NSCameraUsageDescription:
@@ -56,13 +63,11 @@ module.exports = {
         {
           action: 'VIEW',
           autoVerify: true,
-          data: [
-            {
-              scheme: 'https',
-              host: 'altitudevision.agency',
-              pathPrefix: '/annonces',
-            },
-          ],
+          data: universalLinkPrefixes.map((pathPrefix) => ({
+            scheme: 'https',
+            host: new URL(navigationRegistry.origins.web).host,
+            pathPrefix,
+          })),
           category: ['BROWSABLE', 'DEFAULT'],
         },
       ],

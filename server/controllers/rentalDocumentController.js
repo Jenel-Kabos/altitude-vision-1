@@ -25,6 +25,27 @@ const fail = (res, status, message) => res.status(status).json({ status: status 
 
 const safeFilename = (name) => String(name || 'document').replace(/[^\w.\- ]/g, '_').slice(0, 120);
 
+const streamRemoteDocument = ({ url, name, res, context = {} }) => {
+  if (!/^https?:\/\//i.test(url || '')) return fail(res, 422, 'Document indisponible.');
+  const client = url.startsWith('https:') ? https : http;
+  const upstream = client.get(url, (upstreamRes) => {
+    if (upstreamRes.statusCode >= 400) {
+      logger.error('rental_document.upstream_error', { ...context, statusCode: upstreamRes.statusCode });
+      upstreamRes.resume();
+      return fail(res, 502, 'Impossible de récupérer le document.');
+    }
+    res.setHeader('Content-Type', upstreamRes.headers['content-type'] || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${safeFilename(name)}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    upstreamRes.pipe(res);
+  });
+  upstream.on('error', (error) => {
+    logger.error('rental_document.stream_failed', { ...context, error: error.message });
+    if (!res.headersSent) fail(res, 502, 'Impossible de récupérer le document.');
+  });
+};
+
 // GET /api/rental-documents/:documentId/download
 exports.download = async (req, res) => {
   const { documentId } = req.params;
@@ -62,20 +83,7 @@ exports.download = async (req, res) => {
     documentId, contratId: String(contrat._id), docType: doc.type, userId, role: user.role,
   });
 
-  const client = doc.url.startsWith('https:') ? https : http;
-  const upstream = client.get(doc.url, (upstreamRes) => {
-    if (upstreamRes.statusCode >= 400) {
-      logger.error('rental_document.upstream_error', { documentId, statusCode: upstreamRes.statusCode });
-      upstreamRes.resume();
-      return fail(res, 502, 'Impossible de récupérer le document.');
-    }
-    res.setHeader('Content-Type', upstreamRes.headers['content-type'] || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${safeFilename(doc.nom)}.pdf"`);
-    res.setHeader('Cache-Control', 'private, no-store');
-    upstreamRes.pipe(res);
-  });
-  upstream.on('error', (error) => {
-    logger.error('rental_document.stream_failed', { documentId, error: error.message });
-    if (!res.headersSent) fail(res, 502, 'Impossible de récupérer le document.');
-  });
+  return streamRemoteDocument({ url: doc.url, name: `${doc.nom}.pdf`, res, context: { documentId } });
 };
+
+exports.streamRemoteDocument = streamRemoteDocument;

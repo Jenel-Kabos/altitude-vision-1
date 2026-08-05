@@ -9,6 +9,8 @@ const jwt = require('jsonwebtoken');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const User = require('../models/User');
 const FinancialDocument = require('../models/FinancialDocument');
+const AccommodationReservation = require('../models/AccommodationReservation');
+const HotelReservation = require('../models/HotelReservation');
 const financialRoutes = require('../routes/financialRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 
@@ -75,4 +77,45 @@ test('filtre par statut fonctionne (?status=issued exclut les brouillons)', asyn
   expect(res.status).toBe(200);
   expect(res.body.data.documents).toHaveLength(1);
   expect(res.body.data.documents[0].id).toBe(String(issued._id));
+});
+
+test('un voyageur peut lire uniquement la facture de sa réservation Accommodation', async () => {
+  const guest = await makeUser({ role: 'Client' }); const outsider = await makeUser({ role: 'Client' });
+  const owner = await makeUser({ role: 'Proprietaire' }); const reservationId = new mongoose.Types.ObjectId();
+  const invoice = await makeAccommodationInvoice(owner._id, { subjectId: reservationId });
+  await AccommodationReservation.create({
+    _id: reservationId, accommodation: invoice.establishmentId, guest: guest._id, owner: owner._id,
+    checkInDate: new Date('2026-09-01'), checkOutDate: new Date('2026-09-03'), nights: 2,
+    guestCount: 1, adults: 1, total: 5000000, financialDocument: invoice._id, createdBy: guest._id,
+  });
+
+  const allowed = await request(app).get(`/api/financial/documents/${invoice._id}`).set('Authorization', `Bearer ${signToken(guest._id)}`);
+  expect(allowed.status).toBe(200);
+  expect(allowed.body.data.document.id).toBe(String(invoice._id));
+
+  const denied = await request(app).get(`/api/financial/documents/${invoice._id}`).set('Authorization', `Bearer ${signToken(outsider._id)}`);
+  expect(denied.status).toBe(403);
+});
+
+test('un voyageur hôtel peut lire uniquement la facture de sa propre réservation', async () => {
+  const guest = await makeUser({ role: 'Client' }); const outsider = await makeUser({ role: 'Client' });
+  const hotelId = new mongoose.Types.ObjectId();
+  const reservation = await HotelReservation.create({
+    hotel: hotelId, roomCategory: new mongoose.Types.ObjectId(), guestUser: guest._id,
+    guest: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test', country: 'CG' },
+    checkInDate: new Date('2026-10-01'), checkOutDate: new Date('2026-10-03'), roomsCount: 1, adults: 1,
+    unitPrice: 30000, subtotal: 60000, totalAmount: 60000, currency: 'XAF',
+    rateSnapshot: { rateType: 'nightly', amount: 30000, currency: 'XAF', version: 1 },
+    status: 'confirmed', source: 'owner_dashboard', createdBy: guest._id,
+  });
+  const invoice = await FinancialDocument.create({
+    domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotelId, documentType: 'invoice', status: 'issued', currency: 'XAF',
+    subjectType: 'HotelReservation', subjectId: reservation._id, totalMinor: 60000,
+    businessOperationKey: `test:hotel-personal:${Date.now()}`, createdBy: guest._id,
+  });
+
+  const allowed = await request(app).get(`/api/financial/documents/${invoice._id}`).set('Authorization', `Bearer ${signToken(guest._id)}`);
+  expect(allowed.status).toBe(200);
+  const denied = await request(app).get(`/api/financial/documents/${invoice._id}`).set('Authorization', `Bearer ${signToken(outsider._id)}`);
+  expect(denied.status).toBe(403);
 });

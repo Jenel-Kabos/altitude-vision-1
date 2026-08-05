@@ -16,6 +16,7 @@ const Notification = require('../models/Notification');
 const { getIO, isUserOnline }         = require('../socket');
 const { sendExpoPushNotification }    = require('../utils/expoPush');
 const { ALL_STAFF }                   = require('../utils/roles');
+const { buildNotificationNavigation } = require('./navigationService');
 
 const USER_LINKS = {
   visite_status: '/mes-visites', visite_cancelled: '/mes-visites', visite_auto_cancelled: '/mes-visites',
@@ -121,6 +122,8 @@ async function notify({
   // Compatibilité de données avec les producteurs et clients mobiles existants.
   body,
   data,
+  destination = null,
+  audience = 'user',
   dedupeKey = null,
 } = {}) {
   if (!recipient) {
@@ -130,6 +133,13 @@ async function notify({
   const id = recipient.toString();
   const resolvedMessage = message ?? body;
   const resolvedMetadata = metadata ?? data ?? {};
+  const navigation = buildNotificationNavigation({
+    type, destination, entityType, entityId, data: resolvedMetadata, audience,
+  });
+  // NAV-CORE est prioritaire dès qu'une destination canonique existe. Le lien
+  // fourni par un ancien producteur ne sert que de repli de compatibilité.
+  const resolvedLink = link ?? navigation.link ?? (audience === 'staff' ? STAFF_LINKS[type] : USER_LINKS[type]) ?? null;
+  const resolvedData = navigation.data || resolvedMetadata;
 
   // 1 — Persistance
   let notif;
@@ -140,10 +150,13 @@ async function notify({
     type,
     title,
     body: resolvedMessage,
-    link: link ?? USER_LINKS[type] ?? null,
-    entityType,
-    entityId,
+    link: resolvedLink,
+    destination: navigation.destination,
+    entityType: navigation.entityType,
+    entityId: navigation.entityId,
     metadata: resolvedMetadata,
+    // Contrat historique persistant : ne pas réécrire les données fournies par
+    // les producteurs. La destination canonique est stockée au premier niveau.
     data: resolvedMetadata,
     dedupeKey,
     });
@@ -159,8 +172,12 @@ async function notify({
       type,
       title,
       body: resolvedMessage,
-      link: link ?? USER_LINKS[type] ?? null,
+      link: resolvedLink,
+      destination: navigation.destination,
+      entityType: navigation.entityType,
+      entityId: navigation.entityId,
       metadata: resolvedMetadata,
+      data: resolvedData,
       read:      false,
       createdAt: notif.createdAt,
     });
@@ -204,9 +221,12 @@ async function notify({
     const user = await User.findById(id).select('pushToken').lean();
     if (user?.pushToken) {
       sendExpoPushNotification(user.pushToken, title, resolvedMessage, {
-      ...resolvedMetadata,
+      ...resolvedData,
         notificationId: notif._id.toString(),
         type,
+        destination: navigation.destination,
+        entityType: navigation.entityType,
+        entityId: navigation.entityId?.toString?.() || navigation.entityId,
       });
     }
   }
@@ -228,7 +248,7 @@ async function notifyStaff(payload) {
   }).select('_id').lean();
 
   await Promise.allSettled(
-    staffMembers.map((s) => notify({ ...payload, link: payload.link ?? STAFF_LINKS[payload.type] ?? null, recipient: s._id })),
+    staffMembers.map((s) => notify({ ...payload, audience: 'staff', link: payload.link ?? null, recipient: s._id })),
   );
 }
 

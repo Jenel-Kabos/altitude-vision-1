@@ -12,6 +12,7 @@ import CompleterProfilScreen from '../screens/Auth/CompleterProfilScreen';
 import OnboardingScreen from '../screens/Onboarding/OnboardingScreen';
 import { navigationRef, flushPendingNavigation } from '../services/navigationService';
 import { setupNotificationListeners } from '../services/notificationsService';
+import { linking } from './navigationSdk';
 
 const LOGO = require('../../assets/Logo_Altitude_transparent.png');
 
@@ -63,35 +64,6 @@ export default function AppNavigator() {
       />
     );
   }
-
-  const linking = {
-    prefixes: ['altimmo://', 'https://altitudevision.agency'],
-    config: {
-      screens: {
-        Main: {
-          screens: {
-            Annonces: {
-              screens: {
-                ListeAnnonces: 'annonces',
-                DetailAnnonce: 'annonces/:propertyId',
-              },
-            },
-            Visites: 'visites',
-            Messages: 'messages',
-            Profil: {
-              screens: {
-                ProfilHome: 'profil',
-                Transactions:   'paiement/success',
-                RealEstateApplications: 'dossiers-immobiliers',
-                RealEstateApplicationDetail: 'dossiers-immobiliers/:applicationId',
-                PaiementCancel: 'paiement/cancel',
-              },
-            },
-          },
-        },
-      },
-    },
-  };
 
   return (
     <NavigationContainer ref={navigationRef} onReady={flushPendingNavigation} linking={linking}>

@@ -9,6 +9,7 @@ const tenantPortalService = require('../services/tenantPortalService');
 const tenantLinkService = require('../services/tenantLinkService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
+const { streamRemoteDocument } = require('./rentalDocumentController');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
@@ -57,9 +58,12 @@ exports.getDocuments = async (req, res) => {
 exports.downloadDocument = async (req, res) => {
   try {
     const document = await tenantPortalService.getMyDocumentDownload(req.user.id, req.params.documentId);
-    if (!/^https:\/\//i.test(document.url)) return fail(res, 422, 'Document indisponible.');
-    res.set('Cache-Control', 'private, no-store');
-    return res.redirect(document.url);
+    return streamRemoteDocument({
+      url: document.url,
+      name: document.name || 'document',
+      res,
+      context: { documentId: req.params.documentId, userId: req.user.id, source: 'tenant_portal' },
+    });
   } catch (error) { return fail(res, error.statusCode || 500, error.message); }
 };
 exports.getMaintenance = async (req, res) => {

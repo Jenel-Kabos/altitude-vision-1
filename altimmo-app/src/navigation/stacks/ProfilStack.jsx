@@ -21,6 +21,12 @@ import HotelOperationsScreen from '../../screens/Hotels/HotelOperationsScreen';
 import RealEstateApplicationsScreen from '../../screens/Profil/RealEstateApplicationsScreen';
 import RealEstateApplicationDetailScreen from '../../screens/Profil/RealEstateApplicationDetailScreen';
 import SubmitRealEstateApplicationScreen from '../../screens/Annonces/SubmitRealEstateApplicationScreen';
+import TenantPortalScreen from '../../screens/TenantPortal/TenantPortalScreen';
+import MyAccommodationReservationsScreen from '../../screens/Accommodation/MyAccommodationReservationsScreen';
+import AccommodationReservationDetailScreen from '../../screens/Accommodation/AccommodationReservationDetailScreen';
+import AccommodationBookingScreen from '../../screens/Accommodation/AccommodationBookingScreen';
+import MyDocumentsScreen from '../../screens/Documents/MyDocumentsScreen';
+import PersonalDocumentDetailScreen from '../../screens/Documents/PersonalDocumentDetailScreen';
 
 const Stack = createStackNavigator();
 
@@ -50,6 +56,12 @@ export default function ProfilStack() {
       <Stack.Screen name="HotelReservationDetail" component={HotelReservationDetailScreen} />
       <Stack.Screen name="HotelBooking" component={HotelBookingScreen} />
       <Stack.Screen name="HotelOperations" component={HotelOperationsScreen} />
+      <Stack.Screen name="TenantPortal" component={TenantPortalScreen} />
+      <Stack.Screen name="MyAccommodationReservations" component={MyAccommodationReservationsScreen} />
+      <Stack.Screen name="AccommodationReservationDetail" component={AccommodationReservationDetailScreen} />
+      <Stack.Screen name="AccommodationBooking" component={AccommodationBookingScreen} />
+      <Stack.Screen name="MyDocuments" component={MyDocumentsScreen} />
+      <Stack.Screen name="PersonalDocumentDetail" component={PersonalDocumentDetailScreen} />
     </Stack.Navigator>
   );
 }

@@ -1,0 +1,5516 @@
+{
+  "generatedAt": "2026-08-05T03:13:04.822Z",
+  "methodology": "static inventory plus manual audit; no application modules imported",
+  "counts": {
+    "backendRoutes": 489,
+    "backendMounts": 48,
+    "webRoutes": 151,
+    "mobileScreenFiles": 37,
+    "mobileRegisteredRoutes": 46,
+    "mobileApiCalls": 82
+  },
+  "backendMounts": [
+    {
+      "basePath": "/api/users",
+      "symbol": "userRoutes",
+      "file": "server/routes/userRoutes.js"
+    },
+    {
+      "basePath": "/api/admin",
+      "symbol": "adminRoutes",
+      "file": "server/routes/adminRoutes.js"
+    },
+    {
+      "basePath": "/api/properties",
+      "symbol": "propertyRoutes",
+      "file": "server/routes/propertyRoutes.js"
+    },
+    {
+      "basePath": "/api/transactions",
+      "symbol": "transactionRoutes",
+      "file": "server/routes/transactionRoutes.js"
+    },
+    {
+      "basePath": "/api/proprietaires",
+      "symbol": "proprietaireRoutes",
+      "file": "server/routes/proprietaireRoutes.js"
+    },
+    {
+      "basePath": "/api/locataires",
+      "symbol": "locataireRoutes",
+      "file": "server/routes/locataireRoutes.js"
+    },
+    {
+      "basePath": "/api/contrats",
+      "symbol": "contratRoutes",
+      "file": "server/routes/contratRoutes.js"
+    },
+    {
+      "basePath": "/api/paiements",
+      "symbol": "paiementRoutes",
+      "file": "server/routes/paiementRoutes.js"
+    },
+    {
+      "basePath": "/api/gestion-docs",
+      "symbol": "gestionDocumentRoutes",
+      "file": "server/routes/gestionDocumentRoutes.js"
+    },
+    {
+      "basePath": "/api/rental-documents",
+      "symbol": "rentalDocumentRoutes",
+      "file": "server/routes/rentalDocumentRoutes.js"
+    },
+    {
+      "basePath": "/api/dossiers",
+      "symbol": "dossierRoutes",
+      "file": "server/routes/dossierRoutes.js"
+    },
+    {
+      "basePath": "/api/rental-lease-lifecycle",
+      "symbol": "rentalLeaseLifecycleRoutes",
+      "file": "server/routes/rentalLeaseLifecycleRoutes.js"
+    },
+    {
+      "basePath": "/api/property-asset",
+      "symbol": "propertyAssetRoutes",
+      "file": "server/routes/propertyAssetRoutes.js"
+    },
+    {
+      "basePath": "/api/rental-management",
+      "symbol": "rentalManagementRoutes",
+      "file": "server/routes/rentalManagementRoutes.js"
+    },
+    {
+      "basePath": "/api/rental-maintenance",
+      "symbol": "rentalMaintenanceRoutes",
+      "file": "server/routes/rentalMaintenanceRoutes.js"
+    },
+    {
+      "basePath": "/api/tenant-portal",
+      "symbol": "tenantPortalRoutes",
+      "file": "server/routes/tenantPortalRoutes.js"
+    },
+    {
+      "basePath": "/api/accommodations",
+      "symbol": "accommodationRoutes",
+      "file": "server/routes/accommodationRoutes.js"
+    },
+    {
+      "basePath": "/api/hotels",
+      "symbol": "hotelRoutes",
+      "file": "server/routes/hotelRoutes.js"
+    },
+    {
+      "basePath": "/api/altimmo",
+      "symbol": "altimmoSearchRoutes",
+      "file": "server/routes/altimmoSearchRoutes.js"
+    },
+    {
+      "basePath": "/api/hotel-reservations",
+      "symbol": "hotelReservationRoutes",
+      "file": "server/routes/hotelReservationRoutes.js"
+    },
+    {
+      "basePath": "/api/financial",
+      "symbol": "financialRoutes",
+      "file": "server/routes/financialRoutes.js"
+    },
+    {
+      "basePath": "/api/dashboard-analytics",
+      "symbol": "dashboardAnalyticsRoutes",
+      "file": "server/routes/dashboardAnalyticsRoutes.js"
+    },
+    {
+      "basePath": "/api/accommodation-reservations",
+      "symbol": "accommodationReservationRoutes",
+      "file": "server/routes/accommodationReservationRoutes.js"
+    },
+    {
+      "basePath": "/api/housekeeping",
+      "symbol": "housekeepingRoutes",
+      "file": "server/routes/housekeepingRoutes.js"
+    },
+    {
+      "basePath": "/api/inspections",
+      "symbol": "inspectionRoutes",
+      "file": "server/routes/inspectionRoutes.js"
+    },
+    {
+      "basePath": "/api/maintenance",
+      "symbol": "maintenanceRoutes",
+      "file": "server/routes/maintenanceRoutes.js"
+    },
+    {
+      "basePath": "/api/sale-properties",
+      "symbol": "salePropertyRoutes",
+      "file": "server/routes/salePropertyRoutes.js"
+    },
+    {
+      "basePath": "/api/rental-properties",
+      "symbol": "rentalPropertyRoutes",
+      "file": "server/routes/rentalPropertyRoutes.js"
+    },
+    {
+      "basePath": "/api/services",
+      "symbol": "serviceRoutes",
+      "file": "server/routes/serviceRoutes.js"
+    },
+    {
+      "basePath": "/api/portfolio",
+      "symbol": "portfolioRoutes",
+      "file": "server/routes/portfolioRoutes.js"
+    },
+    {
+      "basePath": "/api/altcom",
+      "symbol": "altcomRoutes",
+      "file": "server/routes/altcomRoutes.js"
+    },
+    {
+      "basePath": "/api/events",
+      "symbol": "eventRoutes",
+      "file": "server/routes/eventRoutes.js"
+    },
+    {
+      "basePath": "/api/reviews",
+      "symbol": "reviewRoutes",
+      "file": "server/routes/reviewRoutes.js"
+    },
+    {
+      "basePath": "/api/quotes",
+      "symbol": "quoteRoutes",
+      "file": "server/routes/quoteRoutes.js"
+    },
+    {
+      "basePath": "/api/documents",
+      "symbol": "documentRoutes",
+      "file": "server/routes/documentRoutes.js"
+    },
+    {
+      "basePath": "/api/dashboard",
+      "symbol": "dashboardRoutes",
+      "file": "server/routes/dashboardRoutes.js"
+    },
+    {
+      "basePath": "/api/conversations",
+      "symbol": "conversationRoutes",
+      "file": "server/routes/conversationRoutes.js"
+    },
+    {
+      "basePath": "/api/messages",
+      "symbol": "messageRoutes",
+      "file": "server/routes/messageRoutes.js"
+    },
+    {
+      "basePath": "/api/visites",
+      "symbol": "visiteRoutes",
+      "file": "server/routes/visiteRoutes.js"
+    },
+    {
+      "basePath": "/api/internal-mails",
+      "symbol": "internalMailRoutes",
+      "file": "server/routes/internalMailRoutes.js"
+    },
+    {
+      "basePath": "/api/company-emails",
+      "symbol": "companyEmailRoutes",
+      "file": "server/routes/companyEmailRoutes.js"
+    },
+    {
+      "basePath": "/api/emails",
+      "symbol": "emailRoutes",
+      "file": "server/routes/emailRoutes.js"
+    },
+    {
+      "basePath": "/api/webhooks",
+      "symbol": "webhookRoutes",
+      "file": "server/routes/webhookRoutes.js"
+    },
+    {
+      "basePath": "/api/likes",
+      "symbol": "likeRoutes",
+      "file": "server/routes/likeRoutes.js"
+    },
+    {
+      "basePath": "/api/comments",
+      "symbol": "commentRoutes",
+      "file": "server/routes/commentRoutes.js"
+    },
+    {
+      "basePath": "/api/contact",
+      "symbol": "contactRoutes",
+      "file": "server/routes/contactRoutes.js"
+    },
+    {
+      "basePath": "/api/estimation",
+      "symbol": "estimationRoutes",
+      "file": "server/routes/estimationRoutes.js"
+    },
+    {
+      "basePath": "/api/devis",
+      "symbol": "devisRoutes",
+      "file": "server/routes/devisRoutes.js"
+    }
+  ],
+  "backendRoutes": [
+    {
+      "method": "POST",
+      "path": "/api/users/signup",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "upload.single('photo'), authController.signup);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/login",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "authController.login);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/verify-email/:token",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "authController.verifyEmail); /* ======================================= 🧭 ROUTES PROTÉGÉES (token requis) ======================================= */"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/me",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "userController.getMe, userController.getUser); // ✅ Mise à jour profil + photo (Cloudinary) // AccountPage envoie soit un FormData (avec \"photo\" ou \"removePhoto\") // soit un JSON classique — upload.single gère les deux cas"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/updateMe",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "upload.single('photo'), authController.updateMe); // ✅ Mise à jour mot de passe (pas de fichier → pas de multer)"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/updateMyPassword",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "authController.updateMyPassword); // ✅ Compléter le profil après connexion Google"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/complete-profile",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "userController.completeProfile); // ✅ Enregistrer le token Expo Push (appelé par le mobile au démarrage)"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/push-token",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "userController.savePushToken); /* ======================================= 👑 ROUTES ADMIN UNIQUEMENT ======================================= */"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "userController.getAllUsers);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/owners",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "userController.getAllOwners); // ✅ Création d'utilisateur par admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/create-by-admin",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "userController.createByAdmin); // ✅ Gestion admin + suspension / vérification KYC"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/:id/verify",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "userController.verifyOwner);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/:id/suspend",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "userController.suspendUser);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/:id/activate",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "userController.activateUser);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/:id/role",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "userController.updateUserRole);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/:id/renvoyer-contrat",
+      "routeFile": "server/routes/userRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "userController.renvoyerContrat); router .route('/:id') .get(userController.getUser) .put(userController.updateUser) .delete(userController.deleteUser);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/roles",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "(req, res) => { const collabRoles = ['Secretaire', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant']; res.json({ status: 'success', data: { collabRoles: collabRoles.map(r => ({ value: r, label: ROLE_LABELS[r] })), allRoles: Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label })), }, }); }); // ── Statistiques & activité (tous les collaborateurs) ────────────"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/stats",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminController.getDashboardStats);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/activity",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminController.getActivityReport); // ── Propriétés : lecture (CM + Gestionnaire) ─────────────────────"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/properties/status/pending",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "authController.restrictTo(...STAFF_CM, ...STAFF_IMMO), adminController.getPendingProperties);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/properties",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "authController.restrictTo(...STAFF_CM, ...STAFF_IMMO), adminController.getAllProperties); // ── Propriétés : modération / suppression (Admin uniquement) ─────"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/properties/:id/approve",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, adminController.approveProperty);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/properties/:id/reject",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, adminController.rejectProperty);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/properties/:id",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, adminController.deleteProperty); // ── Utilisateurs (Admin uniquement) ──────────────────────────────"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/owners/active-sessions",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, adminController.getConnectedUsers);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/owners",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, adminController.getAllUsers);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/owners/:id/verify",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, adminController.verifyOwner);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/owners/:id/suspend",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, adminController.suspendUser);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/owners/:id/activate",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, adminController.activateUser);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/owners/:id/ban",
+      "routeFile": "server/routes/adminRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, adminController.banUser);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/properties/latest",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "propertyController.getLatestProperties, propertyController.getAllProperties); /** * @route GET /api/properties/status/pending * @description Propriétés en attente (ADMIN UNIQUEMENT) * ✅ Placé ici pour éviter le conflit avec /:id */"
+    },
+    {
+      "method": "GET",
+      "path": "/api/properties/status/pending",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Admin"
+      ],
+      "handlerChain": "authController.protect, authController.restrictTo('Admin'), propertyController.getPendingProperties );"
+    },
+    {
+      "method": "GET",
+      "path": "/api/properties/status/pending-count",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Admin",
+        "Collaborateur"
+      ],
+      "handlerChain": "authController.protect, authController.restrictTo('Admin', 'Collaborateur'), propertyController.getPendingPropertiesCount ); /** * @route GET /api/properties/my-properties * @description Propriétés de l'utilisateur connecté */"
+    },
+    {
+      "method": "GET",
+      "path": "/api/properties/my-properties",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "authController.protect, propertyController.getMyProperties ); /** * @route GET /api/properties/recommended * @description Biens recommandés (Public) — placé avant /:id pour éviter * que 'recommended' soit interprété comme un ObjectId */"
+    },
+    {
+      "method": "GET",
+      "path": "/api/properties/recommended",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "propertyController.getRecommendedProperties ); /** * @route GET /api/properties * @description Toutes les propriétés avec filtres */"
+    },
+    {
+      "method": "GET",
+      "path": "/api/properties/",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "authController.optionalAuth, propertyController.getAllProperties ); // ============================================================ // 2️⃣ ROUTE DE CRÉATION // ============================================================ /** * @route POST /api/properties/mobile * @description Création depuis l'app mobile (JSON, photos déjà sur Cloudinary) */"
+    },
+    {
+      "method": "POST",
+      "path": "/api/properties/mobile",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Proprietaire"
+      ],
+      "handlerChain": "authController.protect, authController.restrictTo(...STAFF_CM, 'Proprietaire'), createPropertyMobile ); /** * @route POST /api/properties * @description Créer une propriété + Upload images * ✅ Correction du rôle : 'Admin' (et pas AdminOnly) */"
+    },
+    {
+      "method": "POST",
+      "path": "/api/properties/",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Proprietaire"
+      ],
+      "handlerChain": "authController.protect, authController.restrictTo(...STAFF_CM, 'Proprietaire'), upload.array('images', 10), propertyController.createProperty ); // ============================================================ // 3️⃣ ROUTES ADMIN SPÉCIFIQUES // ============================================================ /** * @route PATCH /api/properties/admin/:id/:action * @description Valider ou Rejeter (Admin) */"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/properties/admin/:id/:action",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Admin"
+      ],
+      "handlerChain": "authController.protect, authController.restrictTo('Admin'), propertyController.updatePropertyStatus ); /** * @route DELETE /api/properties/admin/:id * @description Suppression forcée (Admin) */"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/properties/admin/:id",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Admin"
+      ],
+      "handlerChain": "authController.protect, authController.restrictTo('Admin'), propertyController.adminDeleteProperty ); /** * @route PATCH /api/properties/:id/recommande * @description Marquer / démarquer un bien comme recommandé (Admin) * Placé ici (sous-route :id/recommande, pas conflit avec /:id qui catch-all) */"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/properties/:id/recommande",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Admin"
+      ],
+      "handlerChain": "authController.protect, authController.restrictTo('Admin'), propertyController.setRecommande );"
+    },
+    {
+      "method": "POST",
+      "path": "/api/properties/:id/like",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "authController.protect, propertyController.toggleLike);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/properties/:id/share",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "propertyController.incrementShare);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/properties/:id/reviews",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "authController.protect, propertyController.addPropertyReview); // ============================================================ // 4️⃣ ROUTES DYNAMIQUES PAR ID (EN DERNIER) // ============================================================ /** * @route PUT /api/properties/:id * @description Mise à jour (Propriétaire ou Admin) * Note: La vérification de propriété est faite dans le contrôleur */"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/properties/:id",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Admin",
+        "Proprietaire"
+      ],
+      "handlerChain": "authController.protect, authController.restrictTo('Admin', 'Proprietaire'), upload.array('images', 10), propertyController.updateProperty ); /** * @route DELETE /api/properties/:id * @description Suppression (Propriétaire ou Admin) */"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/properties/:id",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Admin",
+        "Proprietaire"
+      ],
+      "handlerChain": "authController.protect, authController.restrictTo('Admin', 'Proprietaire'), propertyController.deleteProperty ); /** * @route GET /api/properties/:id * @description Détail d'une propriété (Public ou Privé selon statut) * ⚠️ C'est la route \"Catch-All\", elle doit être tout en bas ! */"
+    },
+    {
+      "method": "GET",
+      "path": "/api/properties/:id",
+      "routeFile": "server/routes/propertyRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "authController.optionalAuth, propertyController.getProperty );"
+    },
+    {
+      "method": "POST",
+      "path": "/api/transactions/webhook/cinetpay",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "pCtrl.webhookCinetpay); // legacy — conservé, non utilisé par les nouveaux paiements"
+    },
+    {
+      "method": "POST",
+      "path": "/api/transactions/paiements/webhook",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "pCtrl.webhookYabetoo); // Stats (staff)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/transactions/stats",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, ctrl.getStats); // Client : ses transactions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/transactions/my",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.getMyTransactions); // Staff : toutes les transactions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/transactions/",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, ctrl.getAllTransactions);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/transactions/",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, ctrl.createTransaction); // Transaction unique"
+    },
+    {
+      "method": "GET",
+      "path": "/api/transactions/:id",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.getTransaction);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/transactions/:id/finalize",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, ctrl.finalizeTransaction);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/transactions/:id/cancel",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, ctrl.cancelTransaction);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/transactions/:id/notes",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, ctrl.updateNotes); // Paiements"
+    },
+    {
+      "method": "GET",
+      "path": "/api/transactions/:id/paiements",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, pCtrl.getPaiements);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/transactions/:id/paiements/initier",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, pCtrl.initierPaiement);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/transactions/:id/paiements/verifier/:intentId",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, pCtrl.verifierPaiement);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/transactions/:id/paiements/virement",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "upload.single('preuve'), protect, pCtrl.soumettreVirement);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/transactions/:id/paiements/especes",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, pCtrl.enregistrerEspecesCheque);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/transactions/:txId/paiements/:pId/valider",
+      "routeFile": "server/routes/transactionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, pCtrl.validerVirement);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/proprietaires/",
+      "routeFile": "server/routes/proprietaireRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "readAll, ctrl.getAll);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/proprietaires/:id",
+      "routeFile": "server/routes/proprietaireRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "readAll, ctrl.getOne);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/proprietaires/",
+      "routeFile": "server/routes/proprietaireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, single, ctrl.create);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/proprietaires/:id",
+      "routeFile": "server/routes/proprietaireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, single, ctrl.update);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/proprietaires/:id",
+      "routeFile": "server/routes/proprietaireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.delete); // ── Gestion des biens ─────────────────────────────────────────"
+    },
+    {
+      "method": "POST",
+      "path": "/api/proprietaires/:id/biens",
+      "routeFile": "server/routes/proprietaireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, multiPics, ctrl.addBien);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/proprietaires/:id/biens/:bienIndex",
+      "routeFile": "server/routes/proprietaireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.updateBien);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/proprietaires/:id/biens/:bienIndex",
+      "routeFile": "server/routes/proprietaireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.deleteBien);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/proprietaires/:id/biens/:bienIndex/photos",
+      "routeFile": "server/routes/proprietaireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, multiPics, ctrl.addBienPhotos);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/proprietaires/:id/biens/:bienIndex/photos/:photoIndex",
+      "routeFile": "server/routes/proprietaireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.deleteBienPhoto); // ── GL-ARCH-1.1 — Import vers la Gestion locative ─────────────"
+    },
+    {
+      "method": "POST",
+      "path": "/api/proprietaires/:id/biens/:bienIndex/importer-gestion",
+      "routeFile": "server/routes/proprietaireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "gestionLocativeOnly, ctrl.importBienIntoGestionLocative);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/locataires/",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "readAll, ctrl.getAll); // Sprint GL-B2 — littéraux/2-segments AVANT le fallback générique /:id // (convention de routage déjà établie dans ce projet, voir hotelRoutes.js)."
+    },
+    {
+      "method": "GET",
+      "path": "/api/locataires/dossiers",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "readAll, ctrl.listDossiers); // Dette technique GL-B2 — liaison User ↔ Locataire (Missions 1 & 3), // littéraux avant /:id également."
+    },
+    {
+      "method": "GET",
+      "path": "/api/locataires/link-requests",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.listLinkRequests);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/locataires/link-requests/:requestId/review",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.reviewLinkRequest);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/locataires/invitations/:requestId/cancel",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.cancelInvitation);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/locataires/invitations/:requestId/resend",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.resendInvitation);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/locataires/:id/dossier",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "readAll, ctrl.getDossier);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/locataires/:id/invite",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.invite);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/locataires/:id",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "readAll, ctrl.getOne);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/locataires/",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, fileField, ctrl.create);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/locataires/:id",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, fileField, ctrl.update);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/locataires/:id",
+      "routeFile": "server/routes/locataireRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.delete);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/contrats/",
+      "routeFile": "server/routes/contratRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "readAll, ctrl.getAll);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/contrats/:id",
+      "routeFile": "server/routes/contratRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "readAll, ctrl.getOne);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/contrats/",
+      "routeFile": "server/routes/contratRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.create);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/contrats/:id",
+      "routeFile": "server/routes/contratRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.update);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/contrats/:id",
+      "routeFile": "server/routes/contratRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, ctrl.delete); // Paiements liés à un contrat"
+    },
+    {
+      "method": "GET",
+      "path": "/api/contrats/:id/paiements",
+      "routeFile": "server/routes/contratRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "readAll, ctrl.getPaiements);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/contrats/:id/paiements",
+      "routeFile": "server/routes/contratRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "docOnly, ctrl.createPaiement);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/paiements/initier",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.protect, cinetpay.initierPaiement);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/paiements/webhook-cinetpay",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "cinetpay.webhookCinetpay); // Routes spécifiques AVANT /:id pour éviter les conflits"
+    },
+    {
+      "method": "GET",
+      "path": "/api/paiements/alertes",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.getAlertes);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/paiements/stats",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.getStats);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/paiements/calculer-penalites",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.calculerPenalites); // GL-DEBT-1.1 — un encaissement réparti sur plusieurs échéances du même contrat."
+    },
+    {
+      "method": "POST",
+      "path": "/api/paiements/encaisser-multiple",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, upload.single('preuve'), ctrl.encaisserMultiple);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/paiements/",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.getAll);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/paiements/:id",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.getOne);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/paiements/:id",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.update); // upload.single ne touche req.body/req.file que pour une requête // multipart/form-data réelle — un appel JSON existant (sans preuve jointe) // traverse ce middleware sans aucun changement de comportement."
+    },
+    {
+      "method": "POST",
+      "path": "/api/paiements/:id/marquer-paye",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, upload.single('preuve'), ctrl.marquerPaye); // Historique détaillé des versements (Phase 6) et annulation contrôlée (Phase 8)."
+    },
+    {
+      "method": "GET",
+      "path": "/api/paiements/:id/receipts",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.listReceipts);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/paiements/:id/receipts/:receiptId/cancel",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "cancelReceipt, ctrl.cancelReceipt); // Une échéance financière ne peut être supprimée que par un administrateur // et seulement tant qu'aucun encaissement n'a été enregistré (contrôle dans // le contrôleur). Les rôles de saisie conservent la gestion courante."
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/paiements/:id",
+      "routeFile": "server/routes/paiementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, ctrl.delete);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/gestion-docs/contrat/:contratId",
+      "routeFile": "server/routes/gestionDocumentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.getDocuments);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/gestion-docs/bail/:contratId",
+      "routeFile": "server/routes/gestionDocumentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.generateBail);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/gestion-docs/quittance/:paiementId",
+      "routeFile": "server/routes/gestionDocumentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.generateQuittance);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/gestion-docs/mise-en-demeure/:paiementId",
+      "routeFile": "server/routes/gestionDocumentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.generateMiseEnDemeure);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/gestion-docs/preavis/:contratId",
+      "routeFile": "server/routes/gestionDocumentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.generatePreavis);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/gestion-docs/etat-des-lieux/:contratId",
+      "routeFile": "server/routes/gestionDocumentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.generateEtatDesLieux);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/gestion-docs/envoyer/:contratId/:docIndex",
+      "routeFile": "server/routes/gestionDocumentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.envoyerDocument);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rental-documents/:documentId/download",
+      "routeFile": "server/routes/rentalDocumentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.protect, ctrl.download);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dossiers/search",
+      "routeFile": "server/routes/dossierRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.protect, auth.restrictTo(...STAFF_DOC), ctrl.search);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dossiers/:domain/:entityId",
+      "routeFile": "server/routes/dossierRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.protect, ctrl.getDossier);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rental-lease-lifecycle/dashboard",
+      "routeFile": "server/routes/rentalLeaseLifecycleRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.dashboard);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rental-lease-lifecycle/:id/available-transitions",
+      "routeFile": "server/routes/rentalLeaseLifecycleRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.availableTransitions);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-lease-lifecycle/:id/transition",
+      "routeFile": "server/routes/rentalLeaseLifecycleRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.transition);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-lease-lifecycle/:id/renew/preview",
+      "routeFile": "server/routes/rentalLeaseLifecycleRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.previewRenew);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-lease-lifecycle/:id/renew",
+      "routeFile": "server/routes/rentalLeaseLifecycleRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.renew);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-lease-lifecycle/:id/avenants",
+      "routeFile": "server/routes/rentalLeaseLifecycleRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.addAvenant);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-lease-lifecycle/:id/caution/encaisser",
+      "routeFile": "server/routes/rentalLeaseLifecycleRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.encaisserCaution);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-lease-lifecycle/:id/caution/bloquer",
+      "routeFile": "server/routes/rentalLeaseLifecycleRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.bloquerCaution);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-lease-lifecycle/:id/caution/retenue",
+      "routeFile": "server/routes/rentalLeaseLifecycleRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.appliquerRetenueCaution);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-lease-lifecycle/:id/caution/restituer",
+      "routeFile": "server/routes/rentalLeaseLifecycleRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, ctrl.restituerCaution);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/property-asset/portfolio/dashboard",
+      "routeFile": "server/routes/propertyAssetRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getPortfolioDashboard);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/property-asset/:id/lifecycle",
+      "routeFile": "server/routes/propertyAssetRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getLifecycle);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/property-asset/:id/transition",
+      "routeFile": "server/routes/propertyAssetRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...STAFF_IMMO), ctrl.transition);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/property-asset/:id/history",
+      "routeFile": "server/routes/propertyAssetRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getHistory);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/property-asset/:id/maintenance-logbook",
+      "routeFile": "server/routes/propertyAssetRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getMaintenanceLogbook);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/property-asset/:id/valuation",
+      "routeFile": "server/routes/propertyAssetRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getValuation);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/property-asset/:id/alerts",
+      "routeFile": "server/routes/propertyAssetRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getAlerts);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rental-management/owner/my",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Proprietaire"
+      ],
+      "handlerChain": "auth.restrictTo('Proprietaire'), ctrl.ownerList);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/owner/:action",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Proprietaire"
+      ],
+      "handlerChain": "auth.restrictTo('Proprietaire'), ctrl.ownerRequest);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rental-management/onboarding/options",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Admin",
+        "GestionnaireImmobilier"
+      ],
+      "handlerChain": "auth.restrictTo('Admin', 'GestionnaireImmobilier'), ctrl.onboardingOptions);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/onboarding",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Admin",
+        "GestionnaireImmobilier"
+      ],
+      "handlerChain": "auth.restrictTo('Admin', 'GestionnaireImmobilier'), ctrl.onboard);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rental-management/stats",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.stats);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rental-management/",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.list);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.create);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rental-management/:id",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getOne);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/rental-management/:id",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.update);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rental-management/:id/history",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.history);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/publish",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.publish);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/suspend-listing",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.suspend);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/mark-rented",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.markRented);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/mark-vacant",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.markVacant);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/maintenance",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.markMaintenance);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/complete-maintenance",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.completeMaintenance);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/start-notice",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.startNotice);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/acknowledge-notice",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.acknowledgeNotice);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/cancel-notice",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.cancelNotice);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/validate-exit",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.validateExitInspection);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-management/:id/requests/:requestId/resolve",
+      "routeFile": "server/routes/rentalManagementRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.resolveRequest);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rental-maintenance/",
+      "routeFile": "server/routes/rentalMaintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.list);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-maintenance/",
+      "routeFile": "server/routes/rentalMaintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.create);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/rental-maintenance/:id/assign",
+      "routeFile": "server/routes/rentalMaintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.assign);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/rental-maintenance/:id/schedule",
+      "routeFile": "server/routes/rentalMaintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.schedule);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/rental-maintenance/:id/start",
+      "routeFile": "server/routes/rentalMaintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.start);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/rental-maintenance/:id/resolve",
+      "routeFile": "server/routes/rentalMaintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.resolve);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/rental-maintenance/:id/close",
+      "routeFile": "server/routes/rentalMaintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.close);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenant-portal/activate",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.activate);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenant-portal/request-link",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.requestLink);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenant-portal/link-status",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getLinkStatus);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenant-portal/dashboard",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getDashboard);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenant-portal/me",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getMe);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenant-portal/lease",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getLease);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenant-portal/leases",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getLeases);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenant-portal/payments",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getPayments);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenant-portal/documents",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getDocuments);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenant-portal/documents/:documentId/download",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.downloadDocument);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenant-portal/notice",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getNotice);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenant-portal/maintenance",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getMaintenance);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenant-portal/maintenance",
+      "routeFile": "server/routes/tenantPortalRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "maintenanceUpload.array('photos', 5), ctrl.createMaintenanceRequest);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodations/public/:id",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getPublic);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodations/:id/availability",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "reservationCtrl.availability);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodations/admin",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.createFull);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/accommodations/admin/:propertyId",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.updateFull);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodations/admin/list",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), ctrl.listAdmin);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodations/status/pending",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), ctrl.pending); // Mobile — publication atomique et idempotente (correctif robustesse 2026-07, // Property + Accommodation + RatePlan + soumission en une transaction). Mêmes // rôles que POST /api/properties/mobile (seule route qui crée une Property // depuis l'app) — jamais ouverte à un rôle qui ne peut pas publier de bien."
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodations/mobile/full",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": true,
+      "roles": [
+        "Proprietaire"
+      ],
+      "handlerChain": "auth.restrictTo(...STAFF_CM, 'Proprietaire'), ctrl.createFullMobile); // Propriétaire"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodations/mine",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.mine);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodations/",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.create);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodations/:id",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getOne);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/accommodations/:id",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.update);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/accommodations/:id",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.remove);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodations/:id/submit",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.submit);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodations/:id/duplicate",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.duplicate);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/accommodations/:id/deactivate",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.deactivate);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/accommodations/:id/reactivate",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.reactivate);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodations/:id/rate-plans",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.listRates);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodations/:id/rate-plans",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.upsertRate);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/accommodations/:id/rate-plans/:rateId",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.deactivateRate);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodations/:id/availability-blocks",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "reservationCtrl.listBlocks);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodations/:id/reservation-calendar",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "reservationCtrl.calendar);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodations/:id/availability-blocks",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "reservationCtrl.createBlock);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/accommodations/:id/availability-blocks/:blockId",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "reservationCtrl.deleteBlock); // Staff — même convention que GET/PATCH /api/properties/:id/:action // (validate|reject|suspend|unsuspend) — placée en dernier pour ne jamais // capturer les routes propriétaire ci-dessus (:action est générique)."
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/accommodations/:id/:action",
+      "routeFile": "server/routes/accommodationRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), ctrl.reviewDecision);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/public",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.listPublic);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/public/:id",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "ctrl.getPublic); // Sprint C — disponibilité + demande de réservation, accessibles sans // compte. `auth.optionalAuth` attache req.user si un jeton valide est // fourni (pour rattacher la demande à un compte client existant), sans // jamais l'exiger — voir hotelReservationController.createPublicReservation."
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/:hotelId/availability",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.optionalAuth, reservationCtrl.getPublicAvailability);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/:hotelId/reservations",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.optionalAuth, reservationCtrl.createPublicReservation);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/accessible",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffCtrl.accessibleHotels); // Portefeuille validé : filtre de publication non paramétrable côté serveur."
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/portfolio",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.portfolio);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/portfolio/:id",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.portfolioOne); // F2.6 — gouvernance des accès hôteliers (gestion du personnel rattaché). const staffView = requireHotelCapability(HOTEL_OPERATIONAL_CAPABILITIES.STAFF_ASSIGNMENT_VIEW, (req) => req.params.hotelId); const staffManage = requireHotelCapability(HOTEL_OPERATIONAL_CAPABILITIES.STAFF_ASSIGNMENT_MANAGE, (req) => req.params.hotelId);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/:hotelId/staff-assignments",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffView, staffCtrl.list);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/:hotelId/staff-assignments",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffManage, staffCtrl.create);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/:hotelId/staff-assignments/:assignmentId",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffView, staffCtrl.get);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotels/:hotelId/staff-assignments/:assignmentId",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffManage, staffCtrl.update);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/:hotelId/staff-assignments/:assignmentId/suspend",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffManage, staffCtrl.suspend);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/:hotelId/staff-assignments/:assignmentId/reactivate",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffManage, staffCtrl.reactivate);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/:hotelId/staff-assignments/:assignmentId/revoke",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffManage, staffCtrl.revoke); // Staff (dashboard admin) — placées AVANT '/:id' pour ne jamais être // capturées par le paramètre générique."
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/admin",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.createFull);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/hotels/admin/:hotelId",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.updateFull);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/admin/list",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), ctrl.listAdmin);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/status/pending",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_MODERATION), ctrl.pending); // Contrôle final (audit Sprint B2) — réconciliation manuelle en cas de // désynchronisation Hotel↔Accommodation constatée (voir hotelService. // resyncLinkedAccommodations). Réservé au staff : action de récupération // d'incident, jamais un levier de cycle de vie normal."
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/:id/resync",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), ctrl.resync); // Propriétaire — \"Mes hôtels\" (mêmes contrôleurs que le dashboard admin ; // ownership vérifiée dans le contrôleur, jamais uniquement côté route)."
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/mine",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.mine);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/mine",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "upload.array('images', 10), ctrl.createFull);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/hotels/mine/:hotelId",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "upload.array('images', 10), ctrl.updateFull);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/:id/submit",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.submit);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/:id/duplicate",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.duplicate);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotels/:id/deactivate",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.deactivate);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotels/:id/reactivate",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.reactivate);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hotels/:id",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.remove); // Catégories de chambres (propriétaire + staff, filtré par assertHotelAccess)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/:hotelId/room-categories",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCategoryCtrl.list);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/:hotelId/room-categories",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCategoryCtrl.create);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotels/room-categories/:id",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCategoryCtrl.update);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hotels/room-categories/:id",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCategoryCtrl.remove);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/room-categories/:id/duplicate",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCategoryCtrl.duplicate);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotels/room-categories/:id/deactivate",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCategoryCtrl.deactivate);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotels/room-categories/:id/activate",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCategoryCtrl.activate);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/room-categories/:id/rate-plans",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCategoryCtrl.listRates);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/room-categories/:id/rate-plans",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCategoryCtrl.upsertRate);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hotels/room-categories/:id/rate-plans/:rateId",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCategoryCtrl.archiveRate); // Sprint D — chambres physiques (propriétaire + staff, filtré par assertHotelAccess)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/:hotelId/rooms",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCtrl.list);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/:hotelId/rooms",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCtrl.create);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotels/rooms/:id",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCtrl.update);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hotels/rooms/:id",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomCtrl.remove); const inventoryView = requireHotelCapability(HOTEL_OPERATIONAL_CAPABILITIES.INVENTORY_VIEW, (req) => req.params.hotelId); const inventoryManage = requireHotelCapability(HOTEL_OPERATIONAL_CAPABILITIES.INVENTORY_MANAGE, (req) => req.params.hotelId);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/:hotelId/inventory/calendar",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "inventoryView, inventoryCtrl.calendar);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotels/:hotelId/inventory/range",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "inventoryManage, inventoryCtrl.updateRange);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/:hotelId/inventory/rebuild",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "inventoryManage, inventoryCtrl.rebuild); // Sprint D — affectation de chambre (accès résolu via l'hôtel de la // réservation, jamais un :hotelId d'URL — voir roomAssignmentController)."
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/room-assignments",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomAssignmentCtrl.assign);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotels/room-assignments/auto",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomAssignmentCtrl.autoAssign);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotels/room-assignments/change",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomAssignmentCtrl.change);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotels/room-assignments/release",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "roomAssignmentCtrl.release); // Staff — validate|reject|suspend|unsuspend (même convention qu'Accommodation)"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotels/:id/:action",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_MODERATION), ctrl.reviewDecision); // Sélecteur admin (Sprint Hôtel, inchangé) — routes génériques en dernier"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), ctrl.list);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotels/:id",
+      "routeFile": "server/routes/hotelRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getOne);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/altimmo/search",
+      "routeFile": "server/routes/altimmoSearchRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "search);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotel-reservations/mine",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.mine); // Propriétaire (+ staff, ownership vérifiée dans le contrôleur) — littéral, // avant /:id."
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotel-reservations/owner",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.ownerList);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/hotel-reservations/owner",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.ownerCreate); // Administration — littéral, avant /:id."
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotel-reservations/admin/list",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), ctrl.listAdmin);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotel-reservations/status/pending",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...ROLES_ALTIMMO), ctrl.pending); // Actions nommées à 2 segments — avant le fallback générique /:id."
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotel-reservations/:id/cancel",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.cancel);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotel-reservations/:id/confirm",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.confirm);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotel-reservations/:id/reject",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.reject); // Sprint D — jamais accessible au client (ownership vérifiée dans le contrôleur)."
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotel-reservations/:id/check-in",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.checkIn);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotel-reservations/:id/checkout-financial-readiness",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.checkoutFinancialReadiness);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotel-reservations/:id/check-out",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.checkOut); // Correctif Sprint D — lecture persistante de l'affectation active (voir // mission \"AFFECTATION PERSISTANTE\"). Accessible au client, mais projection // nulle avant check-in (contrôlée dans le contrôleur)."
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotel-reservations/:id/room-assignment",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getRoomAssignment); // Génériques — toujours en dernier."
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hotel-reservations/:id",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.update);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/hotel-reservations/:id",
+      "routeFile": "server/routes/hotelReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getOne);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/accommodations/documents",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "auth.restrictTo(...STAFF_IMMO), ctrl.listAccommodationDocuments);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/hotel/dashboard/summary",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "dashboardCtrl.getSummary);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/hotel/dashboard/trends",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "dashboardCtrl.getTrends);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/hotel/dashboard/breakdown",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "dashboardCtrl.getBreakdown);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/hotel/dashboard/aging",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "dashboardCtrl.getAging);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/hotel/dashboard/alerts",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "dashboardCtrl.getAlerts);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/hotel/reservations/:reservationId/invoice-draft",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.createHotelDraft);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/hotel/reservations/:reservationId/document",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getReservationDocument);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/hotel/:hotelId/documents",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.listHotelDocuments);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/documents/:documentId",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getDocument);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/financial/documents/:documentId/draft",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.updateDraft);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/documents/:documentId/finalize-lines",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.finalizeLines);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/documents/:documentId/refresh-from-reservation",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.refreshFromReservation);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/documents/:documentId/issue",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.issue);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/documents/:documentId/pdf",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.generateOfficialPdf);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/documents/:documentId/pdf",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getOfficialPdfStatus);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/documents/:documentId/pdf/download",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.downloadOfficialPdf);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/documents/:documentId/email",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.sendOfficialInvoiceEmail);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/documents/:documentId/deliveries",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.listDocumentDeliveries);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/payments/manual",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.createManualPayment);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/hotel/payments",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.createHotelPayment);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/hotel/:hotelId/payments",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.listHotelPayments);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/hotel/reservations/:reservationId/payments",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.listReservationPayments);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/documents/:documentId/payments",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.listDocumentPayments);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/payments/:paymentId",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getPayment);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/payments/:paymentId/confirm",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.confirmPayment);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/payments/:paymentId/allocations",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.allocateHotelPayment);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/allocations",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.allocate);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/allocations/:allocationId/reverse",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.reverseAllocation);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/financial/hotel/allocations/:allocationId/reverse",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.reverseHotelAllocation);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/financial/documents/:documentId/ledger",
+      "routeFile": "server/routes/financialRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getLedger);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboard-analytics/:module(sales|rentals|accommodations|hotels)",
+      "routeFile": "server/routes/dashboardAnalyticsRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "controller.getModuleAnalytics);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.create);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodation-reservations/",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.list);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodation-reservations/:id",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.getOne);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/:id/confirm",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.transition('confirmed'));"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/:id/cancel",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.transition('cancelled'));"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/:id/check-in",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.transition('checked_in'));"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/:id/check-out",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.transition('checked_out'));"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/:id/no-show",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.transition('no_show'));"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodation-reservations/:id/financial-summary",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.financialSummary);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/:id/payments",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.createPayment);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/payments/:paymentId/confirm",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.confirmPayment);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/allocations/:allocationId/reverse",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.reversePaymentAllocation);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/accommodation-reservations/:id/refundable-summary",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.refundableSummary);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/:id/refunds",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.requestRefund);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/refunds/:refundId/approve",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.approveRefund);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/refunds/:refundId/complete",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.completeRefund);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/accommodation-reservations/refunds/:refundId/cancel",
+      "routeFile": "server/routes/accommodationReservationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.cancelRefund);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/housekeeping/",
+      "routeFile": "server/routes/housekeepingRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.list);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/housekeeping/",
+      "routeFile": "server/routes/housekeepingRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.create);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/housekeeping/:id/assign",
+      "routeFile": "server/routes/housekeepingRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.assign);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/housekeeping/:id/start",
+      "routeFile": "server/routes/housekeepingRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.start);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/housekeeping/:id/complete",
+      "routeFile": "server/routes/housekeepingRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.complete);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/housekeeping/:id/cancel",
+      "routeFile": "server/routes/housekeepingRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.cancel);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/inspections/",
+      "routeFile": "server/routes/inspectionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.create);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/inspections/:id/approve",
+      "routeFile": "server/routes/inspectionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.approve);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/inspections/:id/reject",
+      "routeFile": "server/routes/inspectionRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.reject);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/maintenance/",
+      "routeFile": "server/routes/maintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.list);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/maintenance/",
+      "routeFile": "server/routes/maintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.create);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/maintenance/:id/assign",
+      "routeFile": "server/routes/maintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.assign);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/maintenance/:id/start",
+      "routeFile": "server/routes/maintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.start);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/maintenance/:id/resolve",
+      "routeFile": "server/routes/maintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.resolve);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/maintenance/:id/close",
+      "routeFile": "server/routes/maintenanceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.close);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/sale-properties/",
+      "routeFile": "server/routes/salePropertyRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.createFull);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/sale-properties/:propertyId",
+      "routeFile": "server/routes/salePropertyRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.updateFull);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rental-properties/",
+      "routeFile": "server/routes/rentalPropertyRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.createFull);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/rental-properties/:propertyId",
+      "routeFile": "server/routes/rentalPropertyRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "ctrl.updateFull);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/services/",
+      "routeFile": "server/routes/serviceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "serviceController.getAllServices);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/services/:id",
+      "routeFile": "server/routes/serviceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "serviceController.getService); // --- Routes protégées: modification réservée aux Admin et Collaborateur ---"
+    },
+    {
+      "method": "POST",
+      "path": "/api/services/",
+      "routeFile": "server/routes/serviceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "authController.restrictTo(...STAFF_CM), writeWindowMiddleware, serviceController.createService); // Mise à jour d'un service (Admin ou Collaborateur)"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/services/:id",
+      "routeFile": "server/routes/serviceRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "authController.restrictTo(...STAFF_CM), writeWindowMiddleware, serviceController.updateService); // Suppression d'un service (uniquement Admin)"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/services/:id",
+      "routeFile": "server/routes/serviceRoutes.js",
+      "authenticated": false,
+      "roles": [
+        "Admin"
+      ],
+      "handlerChain": "authController.restrictTo('Admin'), serviceController.deleteService);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/altcom/projects",
+      "routeFile": "server/routes/altcomRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "altcomController.createProject); // ============================================================ // 🔒 ROUTES ADMIN (Gestion des projets) // ============================================================ // Toutes les routes ci-dessous nécessitent d'être connecté ET Admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/altcom/projects",
+      "routeFile": "server/routes/altcomRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "altcomController.getAllProjects); // 🔍 Gestion d'un projet spécifique (Voir & Supprimer)"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/altcom/projects/:id/status",
+      "routeFile": "server/routes/altcomRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "altcomController.updateProjectStatus);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/events/",
+      "routeFile": "server/routes/eventRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "eventController.getAllEvents);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/events/:id",
+      "routeFile": "server/routes/eventRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "eventController.getEvent); // ====================================================== // 🔒 PROTECTION - Routes suivantes réservées aux admins/collaborateurs // ======================================================"
+    },
+    {
+      "method": "POST",
+      "path": "/api/events/upload-images",
+      "routeFile": "server/routes/eventRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "upload.array('images', 10), async (req, res) => { try { if (!req.files || req.files.length === 0) { return res.status(400).json({ status: 'fail', message: \"Aucune image n'a été uploadée\", }); } const imageUrls = await Promise.all( req.files.map(file => uploadToCloudinary(file.buffer, { folder: 'altitude-vision/events', transformation: [{ width: 1200, crop: 'limit' }], })) ); console.log('✅ [Upload Images] Images uploadées:', imageUrls.map(r => r.secure_url)); res.status(200).json({ status: 'succ"
+    },
+    {
+      "method": "POST",
+      "path": "/api/events/upload-videos",
+      "routeFile": "server/routes/eventRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "upload.array('videos', 3), async (req, res) => { try { if (!req.files || req.files.length === 0) { return res.status(400).json({ status: 'fail', message: \"Aucune vidéo n'a été uploadée\", }); } if (req.files.length > 3) { return res.status(400).json({ status: 'fail', message: 'Maximum 3 vidéos autorisées', }); } const videoResults = await Promise.all( req.files.map(file => uploadToCloudinary(file.buffer, { folder: 'altitude-vision/events/videos', resource_type: 'video', // ← Important pour les vi"
+    },
+    {
+      "method": "POST",
+      "path": "/api/events/",
+      "routeFile": "server/routes/eventRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "eventController.createEvent);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/events/:id",
+      "routeFile": "server/routes/eventRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "eventController.updateEvent);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/events/:id",
+      "routeFile": "server/routes/eventRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "eventController.updateEvent);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/events/:id",
+      "routeFile": "server/routes/eventRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "eventController.deleteEvent);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/quotes/",
+      "routeFile": "server/routes/quoteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "quoteController.createQuoteRequest); // ====================================================== // 🔒 PROTECTION - Routes suivantes réservées aux admins/collaborateurs // ======================================================"
+    },
+    {
+      "method": "GET",
+      "path": "/api/quotes/stats",
+      "routeFile": "server/routes/quoteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "quoteController.getQuoteStats); // ====================================================== // 📋 LISTE & DÉTAILS - Gérer tous les devis // ====================================================== // GET /api/v1/quotes - Récupérer tous les devis"
+    },
+    {
+      "method": "GET",
+      "path": "/api/quotes/",
+      "routeFile": "server/routes/quoteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "quoteController.getAllQuotes); // GET /api/v1/quotes/:id - Récupérer un devis spécifique"
+    },
+    {
+      "method": "GET",
+      "path": "/api/quotes/:id",
+      "routeFile": "server/routes/quoteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "quoteController.getQuoteById); // ====================================================== // ✏️ MISE À JOUR - Modifier le statut d'un devis // ====================================================== // PATCH /api/v1/quotes/:id"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/quotes/:id",
+      "routeFile": "server/routes/quoteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "quoteController.updateQuoteStatus); // ====================================================== // 📧 RÉPONSE - Envoyer un devis au client // ====================================================== // POST /api/v1/quotes/:id/respond"
+    },
+    {
+      "method": "POST",
+      "path": "/api/quotes/:id/respond",
+      "routeFile": "server/routes/quoteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "quoteController.sendQuoteResponse); // ====================================================== // 🗑️ SUPPRESSION - Supprimer un devis (Admin uniquement) // ====================================================== // DELETE /api/v1/quotes/:id"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/quotes/:id",
+      "routeFile": "server/routes/quoteRoutes.js",
+      "authenticated": false,
+      "roles": [
+        "Admin"
+      ],
+      "handlerChain": "authController.restrictTo('Admin'), // Seul Admin peut supprimer quoteController.deleteQuote );"
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents/",
+      "routeFile": "server/routes/documentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, documentController.getAllDocuments);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents/:id",
+      "routeFile": "server/routes/documentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, documentController.getDocument); // Création : Admin + Collaborateur (avec fenêtre d'écriture pour les collaborateurs)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/",
+      "routeFile": "server/routes/documentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, writeWindowMiddleware, documentController.createDocument); // Modification : Admin + Collaborateur (avec fenêtre d'écriture pour les collaborateurs)"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/documents/:id",
+      "routeFile": "server/routes/documentRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, writeWindowMiddleware, documentController.updateDocument); // Suppression : Admin uniquement"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/documents/:id",
+      "routeFile": "server/routes/documentRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "adminOnly, documentController.deleteDocument);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboard/stats",
+      "routeFile": "server/routes/dashboardRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "async (req, res) => { try { const [propertyCount, eventCount, usersCount, ownersCount, portfolioCount] = await Promise.all([ Property.countDocuments(), Event.countDocuments(), User.countDocuments(), User.countDocuments({ role: 'Proprietaire' }), PortfolioItem.countDocuments({ isPublished: true }), ]); const statsData = { Altimmo: propertyCount, MilaEvents: eventCount, Altcom: portfolioCount, Users: usersCount, Owners: ownersCount, }; res.status(200).json({ status: 'success', data: { stats: stats"
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/count/unread",
+      "routeFile": "server/routes/conversationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getUnreadCount); // Boîte partagée staff (Admin + tous sous-rôles collaborateurs)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/staff-inbox",
+      "routeFile": "server/routes/conversationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "restrictTo(...ALL_STAFF), getStaffInbox); // Ma propre conversation staff-inbox (côté client/propriétaire)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/my-inbox",
+      "routeFile": "server/routes/conversationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getMyInbox); // ✅ Nouvelle route de création — routage staff/client automatique"
+    },
+    {
+      "method": "POST",
+      "path": "/api/conversations/start",
+      "routeFile": "server/routes/conversationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "startConversation); // Liste des conversations 1-à-1 de l'utilisateur"
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/",
+      "routeFile": "server/routes/conversationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getConversations); // ⚠️ DÉPRÉCIÉ — ancienne création, conservée pour le mobile existant (DetailAnnonceScreen.ouvrirChat) // Migrer vers POST /start dès que le mobile est mis à jour."
+    },
+    {
+      "method": "POST",
+      "path": "/api/conversations/",
+      "routeFile": "server/routes/conversationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "createOrGetConversation); // ── Routes dynamiques ──────────────────────────────────────────────────────── // AVANT /:conversationId/messages pour éviter tout conflit de route"
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/:conversationId",
+      "routeFile": "server/routes/conversationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getConversationById);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/:conversationId/messages",
+      "routeFile": "server/routes/conversationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getConversationMessages);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/conversations/:conversationId/mark-read",
+      "routeFile": "server/routes/conversationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "markConversationAsRead);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/conversations/:conversationId",
+      "routeFile": "server/routes/conversationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "deleteConversation);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/messages/conversations",
+      "routeFile": "server/routes/messageRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, getConversations); // ========================================================== // --- 🔗 Routes dynamiques --- // ========================================================== // Envoyer un message dans une conversation"
+    },
+    {
+      "method": "POST",
+      "path": "/api/messages/",
+      "routeFile": "server/routes/messageRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, uploadAttachments, sendMessage); // Récupérer les messages d'une conversation spécifique"
+    },
+    {
+      "method": "GET",
+      "path": "/api/messages/:conversationId",
+      "routeFile": "server/routes/messageRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, getMessages); // Marquer un message comme lu"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/messages/:messageId/read",
+      "routeFile": "server/routes/messageRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, markAsRead); // Supprimer un message"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/messages/:messageId",
+      "routeFile": "server/routes/messageRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, deleteMessage);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/visites/my",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getMyVisites); // Client : créneaux disponibles pour un bien à une date donnée"
+    },
+    {
+      "method": "GET",
+      "path": "/api/visites/availability",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getAvailability); // Propriétaire : voir les visites sur ses biens"
+    },
+    {
+      "method": "GET",
+      "path": "/api/visites/owner",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [
+        "Proprietaire",
+        "Admin"
+      ],
+      "handlerChain": "restrictTo('Proprietaire', 'Admin'), getOwnerVisites);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/visites/owner/unread-count",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [
+        "Proprietaire",
+        "Admin"
+      ],
+      "handlerChain": "restrictTo('Proprietaire', 'Admin'), getOwnerUnreadCount); // Staff : voir toutes les visites avec paiement requis"
+    },
+    {
+      "method": "GET",
+      "path": "/api/visites/all-payments",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "restrictTo(...ROLES_UNIVERSAL), getAllPayments); // Client : voir ses propres visites avec paiement requis"
+    },
+    {
+      "method": "GET",
+      "path": "/api/visites/my-payments",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getMyPayments); // Client : vérifie le statut d'un paiement YabetooPay (polling)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/visites/paiement/verifier/:intentId",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "verifierPaiementVisite); // Staff : voir toutes les visites"
+    },
+    {
+      "method": "GET",
+      "path": "/api/visites/unread-count",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "restrictTo(...ROLES_UNIVERSAL), getUnreadCount);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/visites/",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "restrictTo(...ROLES_UNIVERSAL), getAllVisites); // Client : créer une demande de visite"
+    },
+    {
+      "method": "POST",
+      "path": "/api/visites/",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "createVisite); // ── Routes dynamiques ──────────────────────────────────────────────────────── // Client : initie un paiement YabetooPay pour une visite"
+    },
+    {
+      "method": "POST",
+      "path": "/api/visites/:id/paiement/initier",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "initierPaiementVisite); // Staff : mettre à jour (dateProposee, dateConfirmee, statut, notes)"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/visites/:id",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "restrictTo(...ROLES_UNIVERSAL), updateVisite); // Staff : mettre à jour le paiement (paiementStatus, paiementRef)"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/visites/:id/paiement",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "restrictTo(...ROLES_UNIVERSAL), updatePaiementVisite); // Client : annuler sa propre visite"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/visites/:id/cancel",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "cancelVisite);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/visites/:id/owner/:action(start|complete|client-absent|request-cancellation|report-incident)",
+      "routeFile": "server/routes/visiteRoutes.js",
+      "authenticated": false,
+      "roles": [
+        "Proprietaire",
+        "Admin"
+      ],
+      "handlerChain": "restrictTo('Proprietaire', 'Admin'), ownerAction);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/internal-mails/count/unread",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.getUnreadCount); // Listes de messages"
+    },
+    {
+      "method": "GET",
+      "path": "/api/internal-mails/received",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.getInbox);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/internal-mails/sent",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.getSent);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/internal-mails/unread",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.getUnread);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/internal-mails/starred",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.getStarred);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/internal-mails/drafts",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.getDrafts);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/internal-mails/trash",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.getTrash); // ========================================================== // --- 📤 Routes d'envoi et de gestion des brouillons --- // ========================================================== // Envoyer un email (avec pièces jointes Cloudinary) // 'attachments' est le nom du champ dans le FormData, max 5 fichiers"
+    },
+    {
+      "method": "POST",
+      "path": "/api/internal-mails/",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "upload.array('attachments', 5), internalMailController.sendInternalMail ); // Sauvegarder un brouillon"
+    },
+    {
+      "method": "POST",
+      "path": "/api/internal-mails/drafts",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "upload.array('attachments', 5), internalMailController.saveDraft ); // Mettre à jour un brouillon"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/internal-mails/drafts/:draftId",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "upload.array('attachments', 5), internalMailController.updateDraft ); // Supprimer un brouillon"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/internal-mails/drafts/:draftId",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.deleteDraft); // ========================================================== // --- 🗑️ Actions Globales --- // ========================================================== // Vider la corbeille (Doit être avant les routes dynamiques /:mailId)"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/internal-mails/trash/empty",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.emptyTrash); // ========================================================== // --- 🔗 Routes Dynamiques (Actions sur un email spécifique) --- // ⚠️ Doivent être À LA FIN du fichier // ========================================================== // Lecture"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/internal-mails/:mailId/read",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.markAsRead);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/internal-mails/:mailId/unread",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.markAsUnread); // Favoris"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/internal-mails/:mailId/star",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.addStar);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/internal-mails/:mailId/unstar",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.removeStar); // Corbeille & Suppression"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/internal-mails/:mailId/trash",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.moveToTrash);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/internal-mails/:mailId/restore",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.restoreFromTrash);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/internal-mails/:mailId/permanent",
+      "routeFile": "server/routes/internalMailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "internalMailController.permanentlyDelete);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/company-emails/stats",
+      "routeFile": "server/routes/companyEmailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "companyEmailController.getGlobalStats); // 📋 Listes filtrées"
+    },
+    {
+      "method": "GET",
+      "path": "/api/company-emails/active",
+      "routeFile": "server/routes/companyEmailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "companyEmailController.getActiveEmails);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/company-emails/notifications/quotes",
+      "routeFile": "server/routes/companyEmailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "companyEmailController.getQuoteNotificationEmails);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/company-emails/notifications/contact",
+      "routeFile": "server/routes/companyEmailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "companyEmailController.getContactNotificationEmails); // 👤 Par utilisateur"
+    },
+    {
+      "method": "GET",
+      "path": "/api/company-emails/user/:userId",
+      "routeFile": "server/routes/companyEmailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "companyEmailController.getEmailsByUser); // ====================================================== // 2️⃣ ROUTE RACINE (LISTE & CRÉATION) // ======================================================"
+    },
+    {
+      "method": "GET",
+      "path": "/api/company-emails/",
+      "routeFile": "server/routes/companyEmailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "companyEmailController.getAllEmails); // Création : Réservé aux Admins (Sécurité supplémentaire)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/company-emails/",
+      "routeFile": "server/routes/companyEmailRoutes.js",
+      "authenticated": false,
+      "roles": [
+        "Admin"
+      ],
+      "handlerChain": "authController.restrictTo('Admin'), companyEmailController.createEmail); // ====================================================== // 3️⃣ ROUTES DYNAMIQUES (AVEC :id - À LA FIN) // ====================================================== // Actions spécifiques (Patch)"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/company-emails/:id/toggle-status",
+      "routeFile": "server/routes/companyEmailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "companyEmailController.toggleEmailStatus);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/company-emails/:id/notifications",
+      "routeFile": "server/routes/companyEmailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "companyEmailController.updateNotifications);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/company-emails/:id/increment-sent",
+      "routeFile": "server/routes/companyEmailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "companyEmailController.incrementSent);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/company-emails/:id/increment-received",
+      "routeFile": "server/routes/companyEmailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "companyEmailController.incrementReceived); // Opérations CRUD sur un ID"
+    },
+    {
+      "method": "GET",
+      "path": "/api/emails/active",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getActiveEmails);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/emails/stats/global",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getGlobalStats);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/emails/notifications/quotes",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getQuoteNotificationEmails);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/emails/notifications/contact",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getContactNotificationEmails);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/emails/user/:userId",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getEmailsByUser); // ───────────────────────────────────────────── // 📋 Routes CRUD de base // ─────────────────────────────────────────────"
+    },
+    {
+      "method": "GET",
+      "path": "/api/emails/",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getAllEmails);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/emails/",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "createEmail); // ───────────────────────────────────────────── // 📤 Routes d'action (sans :id) // ─────────────────────────────────────────────"
+    },
+    {
+      "method": "POST",
+      "path": "/api/emails/send",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "sendEmailViaZoho);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/emails/sync-zoho",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "syncWithZoho); // ───────────────────────────────────────────── // 🔑 Routes avec paramètre dynamique /:id // Ces routes DOIVENT être en dernier // ─────────────────────────────────────────────"
+    },
+    {
+      "method": "GET",
+      "path": "/api/emails/:id",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getEmailById);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/emails/:id",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "updateEmail);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/emails/:id",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "deleteEmail);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/emails/:id/toggle",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "toggleEmailStatus);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/emails/:id/notifications",
+      "routeFile": "server/routes/emailRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "updateNotifications);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/webhooks/test",
+      "routeFile": "server/routes/webhookRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "testWebhook); // Route principale — recevoir les emails entrants de Zoho"
+    },
+    {
+      "method": "POST",
+      "path": "/api/webhooks/zoho-incoming",
+      "routeFile": "server/routes/webhookRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "handleZohoIncoming);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/likes/status/:targetType/:targetId",
+      "routeFile": "server/routes/likeRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "optionalAuth, getLikeStatus);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/likes/users/:targetType/:targetId",
+      "routeFile": "server/routes/likeRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getLikeUsers); // Routes protégées (authentification requise)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/likes/",
+      "routeFile": "server/routes/likeRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "toggleLike);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/likes/my-favorites",
+      "routeFile": "server/routes/likeRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getMyFavorites);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/comments/",
+      "routeFile": "server/routes/commentRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getComments);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/comments/count/:targetType/:targetId",
+      "routeFile": "server/routes/commentRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getCommentsCount);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/comments/user/:userId",
+      "routeFile": "server/routes/commentRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "getUserComments); // Routes protégées (authentification requise)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/comments/",
+      "routeFile": "server/routes/commentRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "createComment);"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/comments/:id",
+      "routeFile": "server/routes/commentRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "updateComment);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/comments/:id",
+      "routeFile": "server/routes/commentRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "deleteComment);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/contact/",
+      "routeFile": "server/routes/contactRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "createContactMessage); // Routes protégées (Admin)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/contact/stats",
+      "routeFile": "server/routes/contactRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, adminOnly, getContactStats);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/contact/unread-count",
+      "routeFile": "server/routes/contactRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, restrictTo(...ROLES_UNIVERSAL), getUnreadCount);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/contact/",
+      "routeFile": "server/routes/contactRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, restrictTo(...ROLES_UNIVERSAL), getAllContactMessages);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/contact/:id",
+      "routeFile": "server/routes/contactRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, adminOnly, getContactMessageById);"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/contact/:id/status",
+      "routeFile": "server/routes/contactRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, restrictTo(...ROLES_UNIVERSAL), updateMessageStatus);"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/contact/:id",
+      "routeFile": "server/routes/contactRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "protect, adminOnly, deleteContactMessage);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": true,
+      "roles": [],
+      "handlerChain": "estimationSubmissionLimiter, auth.optionalAuth, publicEstimationFiles, async (req, res) => { const agenceEmail = process.env.ZOHO_FROM_EMAIL || \"support@altitudevision.agency\"; try { const raw = req.body.payload ? JSON.parse(req.body.payload) : req.body; if (raw.website) return res .status(200) .json({ status: \"success\", message: \"Demande reçue.\" }); const normalized = normalizeEstimationRequest(raw, { userId: req.user?.id || null, }); const uploadPrivate = async (file, kind) => { const result ="
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, async (req, res) => { try { const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1); const limit = Math.min( 50, Math.max(1, Number.parseInt(req.query.limit, 10) || 50), ); const estimations = await Estimation.find() .populate(\"traitePar\", \"name\") .sort(\"-createdAt\") .skip((page - 1) * limit) .limit(limit); await Estimation.updateMany( { _id: { $in: estimations.map((item) => item._id) }, staffViewedAt: null, }, { $set: { staffViewedAt: new Date() } }, ); const total = await"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/unread-count",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.getUnreadEstimationCount, ); // Le laboratoire conserve les anciennes routes et isole ses règles métier dans le contrôleur/service."
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/reports/verify/:code",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "estimationController.verifyReport);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/analytics/market-history",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.getMarketHistory, );"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/analytics/statistics",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.getLaboratoryStatistics, );"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/compare",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.compareEstimations);"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/references",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.listMarketReferences);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/references",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "valuationManagers, estimationController.createMarketReference, );"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/estimation/references/:id",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "valuationManagers, estimationController.updateMarketReference, );"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/references/:id/deactivate",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "valuationManagers, estimationController.deactivateMarketReference, );"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/construction-costs",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.listConstructionCosts, );"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/construction-costs",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "valuationManagers, estimationController.createConstructionCost, );"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/estimation/construction-costs/:id",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "valuationManagers, estimationController.updateConstructionCost, );"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/coefficients",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.listCoefficients);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/coefficients",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "valuationManagers, estimationController.createCoefficient, );"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/estimation/coefficients/:id",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "valuationManagers, estimationController.updateCoefficient, );"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/:id/calculations",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.getCalculations, );"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/:id/expert-analysis",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.getExpertAnalysis, );"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/:id/internal-comparables",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.searchInternalComparables, );"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/:id/internal-comparables",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.addInternalComparable, );"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/estimation/:id/comparables/:comparableId",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.updateComparable, );"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/estimation/:id/comparables/:comparableId",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.deleteComparable, );"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/:id/comparables/score",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.scoreComparable, );"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/:id/calculate",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.calculateEstimation, );"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/:id/adjust-value",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "valuationManagers, estimationController.adjustExpertValue, );"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/:id/validate",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "valuationManagers, estimationController.validateEstimation, );"
+    },
+    {
+      "method": "POST",
+      "path": "/api/estimation/:id/publish",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "valuationManagers, estimationController.publishEstimation, );"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/:id/report/html",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.renderReportHtml, );"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/:id/report/pdf",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.downloadReportPdf, );"
+    },
+    {
+      "method": "GET",
+      "path": "/api/estimation/:id",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.getEstimation); // ── PATCH /api/estimation/:id — met à jour statut + noteInterne (Admin/Collaborateur) ──"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/estimation/:id",
+      "routeFile": "server/routes/estimationRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, estimationController.updateEstimation);"
+    },
+    {
+      "method": "POST",
+      "path": "/api/devis/",
+      "routeFile": "server/routes/devisRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "async (req, res) => { const { nom, email, telephone, adresseBien, typeBien, surface, loyerSouhaite, nbBiens, message } = req.body; if (!nom || !email || !adresseBien || !typeBien) { return res.status(400).json({ status: 'fail', message: 'Champs obligatoires manquants : nom, email, adresse du bien, type de bien.', }); } try { const devis = await Devis.create({ nom, email, telephone, adresseBien, typeBien, surface, loyerSouhaite, nbBiens, message, }); // Notifier le staff (cloche/liste + push) — b"
+    },
+    {
+      "method": "GET",
+      "path": "/api/devis/",
+      "routeFile": "server/routes/devisRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, async (req, res) => { try { const devis = await Devis.find() .populate('traitePar', 'name') .sort('-createdAt'); res.status(200).json({ status: 'success', results: devis.length, data: { devis }, }); } catch (err) { console.error('❌ [Devis] Erreur récupération liste:', err.message); res.status(500).json({ status: 'error', message: 'Erreur lors de la récupération des demandes.' }); } }); // ── PATCH /api/devis/:id — met à jour statut + noteInterne (Admin/Collaborateur) ──"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/devis/:id",
+      "routeFile": "server/routes/devisRoutes.js",
+      "authenticated": false,
+      "roles": [],
+      "handlerChain": "staffOnly, async (req, res) => { try { const { statut, noteInterne } = req.body; const devis = await Devis.findById(req.params.id); if (!devis) { return res.status(404).json({ status: 'fail', message: 'Demande de devis introuvable.' }); } if (statut !== undefined) devis.statut = statut; if (noteInterne !== undefined) devis.noteInterne = noteInterne; devis.traitePar = req.user.id; await devis.save(); await devis.populate('traitePar', 'name'); res.status(200).json({ status: 'success', data: { devi"
+    }
+  ],
+  "webRoutes": [
+    {
+      "file": "client/app/[...slug]/page.jsx",
+      "route": "/[...slug]"
+    },
+    {
+      "file": "client/app/activer-espace-locataire/page.jsx",
+      "route": "/activer-espace-locataire"
+    },
+    {
+      "file": "client/app/actualites/page.jsx",
+      "route": "/actualites"
+    },
+    {
+      "file": "client/app/actualites/[slug]/page.jsx",
+      "route": "/actualites/[slug]"
+    },
+    {
+      "file": "client/app/admin/messages/page.jsx",
+      "route": "/admin/messages"
+    },
+    {
+      "file": "client/app/admin/projets/page.jsx",
+      "route": "/admin/projets"
+    },
+    {
+      "file": "client/app/admin/properties/page.jsx",
+      "route": "/admin/properties"
+    },
+    {
+      "file": "client/app/admin/services/page.jsx",
+      "route": "/admin/services"
+    },
+    {
+      "file": "client/app/altcom/page.jsx",
+      "route": "/altcom"
+    },
+    {
+      "file": "client/app/altcom/[...slug]/page.jsx",
+      "route": "/altcom/[...slug]"
+    },
+    {
+      "file": "client/app/altcom/[serviceSlug]/page.jsx",
+      "route": "/altcom/[serviceSlug]"
+    },
+    {
+      "file": "client/app/altcom/annonces/page.jsx",
+      "route": "/altcom/annonces"
+    },
+    {
+      "file": "client/app/altcom/couverture-mediatique/page.jsx",
+      "route": "/altcom/couverture-mediatique"
+    },
+    {
+      "file": "client/app/altcom/portfolio/[portfolioId]/page.jsx",
+      "route": "/altcom/portfolio/[portfolioId]"
+    },
+    {
+      "file": "client/app/altcom/service/[serviceId]/page.jsx",
+      "route": "/altcom/service/[serviceId]"
+    },
+    {
+      "file": "client/app/altimmo/page.jsx",
+      "route": "/altimmo"
+    },
+    {
+      "file": "client/app/altimmo/[...slug]/page.jsx",
+      "route": "/altimmo/[...slug]"
+    },
+    {
+      "file": "client/app/altimmo/annonces/page.jsx",
+      "route": "/altimmo/annonces"
+    },
+    {
+      "file": "client/app/altimmo/application/page.jsx",
+      "route": "/altimmo/application"
+    },
+    {
+      "file": "client/app/altimmo/estimation/page.jsx",
+      "route": "/altimmo/estimation"
+    },
+    {
+      "file": "client/app/altimmo/property/[propertyId]/page.jsx",
+      "route": "/altimmo/property/[propertyId]"
+    },
+    {
+      "file": "client/app/altimmo/services/conseil-investissement/page.jsx",
+      "route": "/altimmo/services/conseil-investissement"
+    },
+    {
+      "file": "client/app/altimmo/services/location-gestion/page.jsx",
+      "route": "/altimmo/services/location-gestion"
+    },
+    {
+      "file": "client/app/altimmo/services/vente-de-biens/page.jsx",
+      "route": "/altimmo/services/vente-de-biens"
+    },
+    {
+      "file": "client/app/auth/google-redirect/page.jsx",
+      "route": "/auth/google-redirect"
+    },
+    {
+      "file": "client/app/avis/nouveau/page.jsx",
+      "route": "/avis/nouveau"
+    },
+    {
+      "file": "client/app/communication/page.jsx",
+      "route": "/communication"
+    },
+    {
+      "file": "client/app/communication/[...slug]/page.jsx",
+      "route": "/communication/[...slug]"
+    },
+    {
+      "file": "client/app/communication/[serviceSlug]/page.jsx",
+      "route": "/communication/[serviceSlug]"
+    },
+    {
+      "file": "client/app/communication/annonces/page.jsx",
+      "route": "/communication/annonces"
+    },
+    {
+      "file": "client/app/communication/couverture-mediatique/page.jsx",
+      "route": "/communication/couverture-mediatique"
+    },
+    {
+      "file": "client/app/communication/portfolio/[portfolioId]/page.jsx",
+      "route": "/communication/portfolio/[portfolioId]"
+    },
+    {
+      "file": "client/app/communication/service/[serviceId]/page.jsx",
+      "route": "/communication/service/[serviceId]"
+    },
+    {
+      "file": "client/app/completer-profil/page.jsx",
+      "route": "/completer-profil"
+    },
+    {
+      "file": "client/app/contact/page.jsx",
+      "route": "/contact"
+    },
+    {
+      "file": "client/app/dashboard/page.jsx",
+      "route": "/dashboard"
+    },
+    {
+      "file": "client/app/dashboard/[...slug]/page.jsx",
+      "route": "/dashboard/[...slug]"
+    },
+    {
+      "file": "client/app/dashboard/active-sessions/page.jsx",
+      "route": "/dashboard/active-sessions"
+    },
+    {
+      "file": "client/app/dashboard/active-users/page.jsx",
+      "route": "/dashboard/active-users"
+    },
+    {
+      "file": "client/app/dashboard/altcom/page.jsx",
+      "route": "/dashboard/altcom"
+    },
+    {
+      "file": "client/app/dashboard/contact-messages/page.jsx",
+      "route": "/dashboard/contact-messages"
+    },
+    {
+      "file": "client/app/dashboard/conversations/page.jsx",
+      "route": "/dashboard/conversations"
+    },
+    {
+      "file": "client/app/dashboard/devis/page.jsx",
+      "route": "/dashboard/devis"
+    },
+    {
+      "file": "client/app/dashboard/documents/page.jsx",
+      "route": "/dashboard/documents"
+    },
+    {
+      "file": "client/app/dashboard/dossiers-immobiliers/page.jsx",
+      "route": "/dashboard/dossiers-immobiliers"
+    },
+    {
+      "file": "client/app/dashboard/emails/page.jsx",
+      "route": "/dashboard/emails"
+    },
+    {
+      "file": "client/app/dashboard/estimations/page.jsx",
+      "route": "/dashboard/estimations"
+    },
+    {
+      "file": "client/app/dashboard/etablissements/page.jsx",
+      "route": "/dashboard/etablissements"
+    },
+    {
+      "file": "client/app/dashboard/etablissements/[hotelId]/page.jsx",
+      "route": "/dashboard/etablissements/[hotelId]"
+    },
+    {
+      "file": "client/app/dashboard/events/page.jsx",
+      "route": "/dashboard/events"
+    },
+    {
+      "file": "client/app/dashboard/export-marketing/page.jsx",
+      "route": "/dashboard/export-marketing"
+    },
+    {
+      "file": "client/app/dashboard/gestion-locative/page.jsx",
+      "route": "/dashboard/gestion-locative"
+    },
+    {
+      "file": "client/app/dashboard/gestion-locative/baux/page.jsx",
+      "route": "/dashboard/gestion-locative/baux"
+    },
+    {
+      "file": "client/app/dashboard/gestion-locative/documents/page.jsx",
+      "route": "/dashboard/gestion-locative/documents"
+    },
+    {
+      "file": "client/app/dashboard/gestion-locative/locataires/page.jsx",
+      "route": "/dashboard/gestion-locative/locataires"
+    },
+    {
+      "file": "client/app/dashboard/gestion-locative/maintenance/page.jsx",
+      "route": "/dashboard/gestion-locative/maintenance"
+    },
+    {
+      "file": "client/app/dashboard/gestion-locative/paiements/page.jsx",
+      "route": "/dashboard/gestion-locative/paiements"
+    },
+    {
+      "file": "client/app/dashboard/gestion-locative/preavis/page.jsx",
+      "route": "/dashboard/gestion-locative/preavis"
+    },
+    {
+      "file": "client/app/dashboard/hebergements/page.jsx",
+      "route": "/dashboard/hebergements"
+    },
+    {
+      "file": "client/app/dashboard/hebergements/[id]/page.jsx",
+      "route": "/dashboard/hebergements/[id]"
+    },
+    {
+      "file": "client/app/dashboard/historique/page.jsx",
+      "route": "/dashboard/historique"
+    },
+    {
+      "file": "client/app/dashboard/hotel-finance/page.jsx",
+      "route": "/dashboard/hotel-finance"
+    },
+    {
+      "file": "client/app/dashboard/hotel-reservations/page.jsx",
+      "route": "/dashboard/hotel-reservations"
+    },
+    {
+      "file": "client/app/dashboard/hotel-rooms/page.jsx",
+      "route": "/dashboard/hotel-rooms"
+    },
+    {
+      "file": "client/app/dashboard/hotels/page.jsx",
+      "route": "/dashboard/hotels"
+    },
+    {
+      "file": "client/app/dashboard/hotels/[hotelId]/page.jsx",
+      "route": "/dashboard/hotels/[hotelId]"
+    },
+    {
+      "file": "client/app/dashboard/hotels/[hotelId]/inventory/page.jsx",
+      "route": "/dashboard/hotels/[hotelId]/inventory"
+    },
+    {
+      "file": "client/app/dashboard/hotels/[hotelId]/rates/page.jsx",
+      "route": "/dashboard/hotels/[hotelId]/rates"
+    },
+    {
+      "file": "client/app/dashboard/hotels/[hotelId]/room-categories/page.jsx",
+      "route": "/dashboard/hotels/[hotelId]/room-categories"
+    },
+    {
+      "file": "client/app/dashboard/hotels/[hotelId]/rooms/page.jsx",
+      "route": "/dashboard/hotels/[hotelId]/rooms"
+    },
+    {
+      "file": "client/app/dashboard/hotels/[hotelId]/staff/page.jsx",
+      "route": "/dashboard/hotels/[hotelId]/staff"
+    },
+    {
+      "file": "client/app/dashboard/hotels/rates/page.jsx",
+      "route": "/dashboard/hotels/rates"
+    },
+    {
+      "file": "client/app/dashboard/hotels/room-categories/page.jsx",
+      "route": "/dashboard/hotels/room-categories"
+    },
+    {
+      "file": "client/app/dashboard/housekeeping/page.jsx",
+      "route": "/dashboard/housekeeping"
+    },
+    {
+      "file": "client/app/dashboard/litiges/page.jsx",
+      "route": "/dashboard/litiges"
+    },
+    {
+      "file": "client/app/dashboard/maintenance/page.jsx",
+      "route": "/dashboard/maintenance"
+    },
+    {
+      "file": "client/app/dashboard/messages/page.jsx",
+      "route": "/dashboard/messages"
+    },
+    {
+      "file": "client/app/dashboard/moderation/hebergement/page.jsx",
+      "route": "/dashboard/moderation/hebergement"
+    },
+    {
+      "file": "client/app/dashboard/moderation/hotellerie/page.jsx",
+      "route": "/dashboard/moderation/hotellerie"
+    },
+    {
+      "file": "client/app/dashboard/moderation/properties/page.jsx",
+      "route": "/dashboard/moderation/properties"
+    },
+    {
+      "file": "client/app/dashboard/moderation/reviews/page.jsx",
+      "route": "/dashboard/moderation/reviews"
+    },
+    {
+      "file": "client/app/dashboard/my-properties/page.jsx",
+      "route": "/dashboard/my-properties"
+    },
+    {
+      "file": "client/app/dashboard/notifications/page.jsx",
+      "route": "/dashboard/notifications"
+    },
+    {
+      "file": "client/app/dashboard/paiements/page.jsx",
+      "route": "/dashboard/paiements"
+    },
+    {
+      "file": "client/app/dashboard/properties/page.jsx",
+      "route": "/dashboard/properties"
+    },
+    {
+      "file": "client/app/dashboard/properties/[id]/page.jsx",
+      "route": "/dashboard/properties/[id]"
+    },
+    {
+      "file": "client/app/dashboard/properties/add/page.jsx",
+      "route": "/dashboard/properties/add"
+    },
+    {
+      "file": "client/app/dashboard/proprietaires/page.jsx",
+      "route": "/dashboard/proprietaires"
+    },
+    {
+      "file": "client/app/dashboard/publicites/page.jsx",
+      "route": "/dashboard/publicites"
+    },
+    {
+      "file": "client/app/dashboard/quotes/page.jsx",
+      "route": "/dashboard/quotes"
+    },
+    {
+      "file": "client/app/dashboard/rentals/page.jsx",
+      "route": "/dashboard/rentals"
+    },
+    {
+      "file": "client/app/dashboard/sales/page.jsx",
+      "route": "/dashboard/sales"
+    },
+    {
+      "file": "client/app/dashboard/transactions/page.jsx",
+      "route": "/dashboard/transactions"
+    },
+    {
+      "file": "client/app/dashboard/users/page.jsx",
+      "route": "/dashboard/users"
+    },
+    {
+      "file": "client/app/dashboard/visites/page.jsx",
+      "route": "/dashboard/visites"
+    },
+    {
+      "file": "client/app/espace-locataire/page.jsx",
+      "route": "/espace-locataire"
+    },
+    {
+      "file": "client/app/evenementiel/page.jsx",
+      "route": "/evenementiel"
+    },
+    {
+      "file": "client/app/evenementiel/[...slug]/page.jsx",
+      "route": "/evenementiel/[...slug]"
+    },
+    {
+      "file": "client/app/evenementiel/annonces/page.jsx",
+      "route": "/evenementiel/annonces"
+    },
+    {
+      "file": "client/app/evenementiel/creer-projet/page.jsx",
+      "route": "/evenementiel/creer-projet"
+    },
+    {
+      "file": "client/app/evenementiel/event/[eventId]/page.jsx",
+      "route": "/evenementiel/event/[eventId]"
+    },
+    {
+      "file": "client/app/favoris/page.jsx",
+      "route": "/favoris"
+    },
+    {
+      "file": "client/app/forgot-password/page.jsx",
+      "route": "/forgot-password"
+    },
+    {
+      "file": "client/app/home/page.jsx",
+      "route": "/home"
+    },
+    {
+      "file": "client/app/immobilier/page.jsx",
+      "route": "/immobilier"
+    },
+    {
+      "file": "client/app/immobilier/[...slug]/page.jsx",
+      "route": "/immobilier/[...slug]"
+    },
+    {
+      "file": "client/app/immobilier/acheter/page.jsx",
+      "route": "/immobilier/acheter"
+    },
+    {
+      "file": "client/app/immobilier/annonces/page.jsx",
+      "route": "/immobilier/annonces"
+    },
+    {
+      "file": "client/app/immobilier/dossiers/page.jsx",
+      "route": "/immobilier/dossiers"
+    },
+    {
+      "file": "client/app/immobilier/hotels/page.jsx",
+      "route": "/immobilier/hotels"
+    },
+    {
+      "file": "client/app/immobilier/hotels/[hotelId]/page.jsx",
+      "route": "/immobilier/hotels/[hotelId]"
+    },
+    {
+      "file": "client/app/immobilier/louer/page.jsx",
+      "route": "/immobilier/louer"
+    },
+    {
+      "file": "client/app/immobilier/property/[propertyId]/page.jsx",
+      "route": "/immobilier/property/[propertyId]"
+    },
+    {
+      "file": "client/app/immobilier/sejourner/page.jsx",
+      "route": "/immobilier/sejourner"
+    },
+    {
+      "file": "client/app/immobilier/services/conseil-investissement/page.jsx",
+      "route": "/immobilier/services/conseil-investissement"
+    },
+    {
+      "file": "client/app/immobilier/services/location-gestion/page.jsx",
+      "route": "/immobilier/services/location-gestion"
+    },
+    {
+      "file": "client/app/immobilier/services/vente-de-biens/page.jsx",
+      "route": "/immobilier/services/vente-de-biens"
+    },
+    {
+      "file": "client/app/login/page.jsx",
+      "route": "/login"
+    },
+    {
+      "file": "client/app/mentions-legales/page.jsx",
+      "route": "/mentions-legales"
+    },
+    {
+      "file": "client/app/mes-biens/page.jsx",
+      "route": "/mes-biens"
+    },
+    {
+      "file": "client/app/mes-biens/[...slug]/page.jsx",
+      "route": "/mes-biens/[...slug]"
+    },
+    {
+      "file": "client/app/mes-biens/paiements/page.jsx",
+      "route": "/mes-biens/paiements"
+    },
+    {
+      "file": "client/app/mes-biens/securite/page.jsx",
+      "route": "/mes-biens/securite"
+    },
+    {
+      "file": "client/app/mes-biens/visites/page.jsx",
+      "route": "/mes-biens/visites"
+    },
+    {
+      "file": "client/app/mes-hebergements/page.jsx",
+      "route": "/mes-hebergements"
+    },
+    {
+      "file": "client/app/mes-hotels/page.jsx",
+      "route": "/mes-hotels"
+    },
+    {
+      "file": "client/app/mes-hotels/reservations/page.jsx",
+      "route": "/mes-hotels/reservations"
+    },
+    {
+      "file": "client/app/mes-paiements/page.jsx",
+      "route": "/mes-paiements"
+    },
+    {
+      "file": "client/app/mes-reservations-hotel/page.jsx",
+      "route": "/mes-reservations-hotel"
+    },
+    {
+      "file": "client/app/mes-visites/page.jsx",
+      "route": "/mes-visites"
+    },
+    {
+      "file": "client/app/messages/page.jsx",
+      "route": "/messages"
+    },
+    {
+      "file": "client/app/mila-events/page.jsx",
+      "route": "/mila-events"
+    },
+    {
+      "file": "client/app/mila-events/[...slug]/page.jsx",
+      "route": "/mila-events/[...slug]"
+    },
+    {
+      "file": "client/app/mila-events/annonces/page.jsx",
+      "route": "/mila-events/annonces"
+    },
+    {
+      "file": "client/app/mila-events/creer-projet/page.jsx",
+      "route": "/mila-events/creer-projet"
+    },
+    {
+      "file": "client/app/mila-events/event/[eventId]/page.jsx",
+      "route": "/mila-events/event/[eventId]"
+    },
+    {
+      "file": "client/app/mon-compte/page.jsx",
+      "route": "/mon-compte"
+    },
+    {
+      "file": "client/app/page.jsx",
+      "route": "/page.jsx"
+    },
+    {
+      "file": "client/app/politique-confidentialite/page.jsx",
+      "route": "/politique-confidentialite"
+    },
+    {
+      "file": "client/app/profile/page.jsx",
+      "route": "/profile"
+    },
+    {
+      "file": "client/app/properties/page.jsx",
+      "route": "/properties"
+    },
+    {
+      "file": "client/app/properties/edit/[id]/page.jsx",
+      "route": "/properties/edit/[id]"
+    },
+    {
+      "file": "client/app/properties/list/page.jsx",
+      "route": "/properties/list"
+    },
+    {
+      "file": "client/app/properties/submit/page.jsx",
+      "route": "/properties/submit"
+    },
+    {
+      "file": "client/app/register/page.jsx",
+      "route": "/register"
+    },
+    {
+      "file": "client/app/reset-password/[token]/page.jsx",
+      "route": "/reset-password/[token]"
+    },
+    {
+      "file": "client/app/signaler-un-litige/page.jsx",
+      "route": "/signaler-un-litige"
+    },
+    {
+      "file": "client/app/trouve-ta-commission/page.jsx",
+      "route": "/trouve-ta-commission"
+    },
+    {
+      "file": "client/app/unauthorized/page.jsx",
+      "route": "/unauthorized"
+    },
+    {
+      "file": "client/app/verify-email-pending/page.jsx",
+      "route": "/verify-email-pending"
+    },
+    {
+      "file": "client/app/verify-email/[token]/page.jsx",
+      "route": "/verify-email/[token]"
+    }
+  ],
+  "mobileNavigation": [
+    {
+      "name": "CompleterProfil",
+      "component": "CompleterProfilScreen",
+      "navigationFile": "altimmo-app/src/navigation/AppNavigator.jsx",
+      "screenFile": "altimmo-app/src/screens/Auth/CompleterProfilScreen.jsx"
+    },
+    {
+      "name": "Main",
+      "component": "TabNavigator",
+      "navigationFile": "altimmo-app/src/navigation/AppNavigator.jsx",
+      "screenFile": "altimmo-app/src/navigation/TabNavigator.jsx"
+    },
+    {
+      "name": "Auth",
+      "component": "AuthNavigator",
+      "navigationFile": "altimmo-app/src/navigation/AppNavigator.jsx",
+      "screenFile": "altimmo-app/src/navigation/AuthNavigator.jsx"
+    },
+    {
+      "name": "Login",
+      "component": "LoginScreen",
+      "navigationFile": "altimmo-app/src/navigation/AuthNavigator.jsx",
+      "screenFile": "altimmo-app/src/screens/Auth/LoginScreen.jsx"
+    },
+    {
+      "name": "Register",
+      "component": "RegisterScreen",
+      "navigationFile": "altimmo-app/src/navigation/AuthNavigator.jsx",
+      "screenFile": "altimmo-app/src/screens/Auth/RegisterScreen.jsx"
+    },
+    {
+      "name": "ForgotPassword",
+      "component": "ForgotPasswordScreen",
+      "navigationFile": "altimmo-app/src/navigation/AuthNavigator.jsx",
+      "screenFile": "altimmo-app/src/screens/Auth/ForgotPasswordScreen.jsx"
+    },
+    {
+      "name": "ResetPassword",
+      "component": "ResetPasswordScreen",
+      "navigationFile": "altimmo-app/src/navigation/AuthNavigator.jsx",
+      "screenFile": "altimmo-app/src/screens/Auth/ResetPasswordScreen.jsx"
+    },
+    {
+      "name": "ListeAnnonces",
+      "component": "ListeAnnoncesScreen",
+      "navigationFile": "altimmo-app/src/navigation/TabNavigator.jsx",
+      "screenFile": "altimmo-app/src/screens/Annonces/ListeAnnoncesScreen.jsx"
+    },
+    {
+      "name": "DetailAnnonce",
+      "component": "DetailAnnonceScreen",
+      "navigationFile": "altimmo-app/src/navigation/TabNavigator.jsx",
+      "screenFile": "altimmo-app/src/screens/Annonces/DetailAnnonceScreen.jsx"
+    },
+    {
+      "name": "Notifications",
+      "component": "NotificationsScreen",
+      "navigationFile": "altimmo-app/src/navigation/TabNavigator.jsx",
+      "screenFile": "altimmo-app/src/screens/Notifications/NotificationsScreen.jsx"
+    },
+    {
+      "name": "Annonces",
+      "component": "AnnoncesStack",
+      "navigationFile": "altimmo-app/src/navigation/TabNavigator.jsx",
+      "screenFile": null
+    },
+    {
+      "name": "Publier",
+      "component": "PublicationStack",
+      "navigationFile": "altimmo-app/src/navigation/TabNavigator.jsx",
+      "screenFile": "altimmo-app/src/navigation/stacks/PublicationStack.jsx"
+    },
+    {
+      "name": "Carte",
+      "component": "CarteScreen",
+      "navigationFile": "altimmo-app/src/navigation/TabNavigator.jsx",
+      "screenFile": "altimmo-app/src/screens/Annonces/CarteScreen.jsx"
+    },
+    {
+      "name": "Messages",
+      "component": "MessagerieStack",
+      "navigationFile": "altimmo-app/src/navigation/TabNavigator.jsx",
+      "screenFile": "altimmo-app/src/navigation/stacks/MessagerieStack.jsx"
+    },
+    {
+      "name": "Visites",
+      "component": "VisitesScreen",
+      "navigationFile": "altimmo-app/src/navigation/TabNavigator.jsx",
+      "screenFile": "altimmo-app/src/screens/Visites/VisitesScreen.jsx"
+    },
+    {
+      "name": "Profil",
+      "component": "ProfilStack",
+      "navigationFile": "altimmo-app/src/navigation/TabNavigator.jsx",
+      "screenFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx"
+    },
+    {
+      "name": "Conversations",
+      "component": "ConversationsScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/MessagerieStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Messagerie/ConversationsScreen.jsx"
+    },
+    {
+      "name": "Chat",
+      "component": "ChatScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/MessagerieStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Messagerie/ChatScreen.jsx"
+    },
+    {
+      "name": "Chatbot",
+      "component": "ChatbotScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/MessagerieStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Messagerie/ChatbotScreen.jsx"
+    },
+    {
+      "name": "ProfilHome",
+      "component": "ProfilScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Profil/ProfilScreen.jsx"
+    },
+    {
+      "name": "EditProfile",
+      "component": "EditProfileScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Profil/EditProfileScreen.jsx"
+    },
+    {
+      "name": "ChangePassword",
+      "component": "ChangePasswordScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Profil/ChangePasswordScreen.jsx"
+    },
+    {
+      "name": "MesAnnonces",
+      "component": "MesAnnoncesScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/MesBiens/MesAnnoncesScreen.jsx"
+    },
+    {
+      "name": "PublierBien",
+      "component": "PublierBienScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Publication/PublierBienScreen.jsx"
+    },
+    {
+      "name": "ChoixTypeAnnonce",
+      "component": "ChoixTypeAnnonceScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Publication/ChoixTypeAnnonceScreen.jsx"
+    },
+    {
+      "name": "AddSaleProperty",
+      "component": "AddSalePropertyScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Publication/AddSalePropertyScreen.jsx"
+    },
+    {
+      "name": "AddRentalProperty",
+      "component": "AddRentalPropertyScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Publication/AddRentalPropertyScreen.jsx"
+    },
+    {
+      "name": "AddAccommodation",
+      "component": "AddAccommodationScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Publication/AddAccommodationScreen.jsx"
+    },
+    {
+      "name": "Favoris",
+      "component": "FavorisScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Profil/FavorisScreen.jsx"
+    },
+    {
+      "name": "Transactions",
+      "component": "TransactionsScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Profil/TransactionsScreen.jsx"
+    },
+    {
+      "name": "RealEstateApplications",
+      "component": "RealEstateApplicationsScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Profil/RealEstateApplicationsScreen.jsx"
+    },
+    {
+      "name": "RealEstateApplicationDetail",
+      "component": "RealEstateApplicationDetailScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Profil/RealEstateApplicationDetailScreen.jsx"
+    },
+    {
+      "name": "SubmitRealEstateApplication",
+      "component": "SubmitRealEstateApplicationScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Annonces/SubmitRealEstateApplicationScreen.jsx"
+    },
+    {
+      "name": "PaiementCancel",
+      "component": "TransactionsScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Profil/TransactionsScreen.jsx"
+    },
+    {
+      "name": "Paiement",
+      "component": "PaiementScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Paiements/PaiementScreen.jsx"
+    },
+    {
+      "name": "VirementScreen",
+      "component": "VirementScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Paiements/VirementScreen.jsx"
+    },
+    {
+      "name": "PolitiqueConfidentialite",
+      "component": "PolitiqueConfidentialiteScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Profil/PolitiqueConfidentialiteScreen.jsx"
+    },
+    {
+      "name": "CacheManagement",
+      "component": "CacheManagementScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Profil/CacheManagementScreen.jsx"
+    },
+    {
+      "name": "MyHotelReservations",
+      "component": "MyHotelReservationsScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Hotels/MyHotelReservationsScreen.jsx"
+    },
+    {
+      "name": "HotelReservationDetail",
+      "component": "HotelReservationDetailScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Hotels/HotelReservationDetailScreen.jsx"
+    },
+    {
+      "name": "HotelBooking",
+      "component": "HotelBookingScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Hotels/HotelBookingScreen.jsx"
+    },
+    {
+      "name": "HotelOperations",
+      "component": "HotelOperationsScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/ProfilStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Hotels/HotelOperationsScreen.jsx"
+    },
+    {
+      "name": "ChoixTypeAnnonce",
+      "component": "ChoixTypeAnnonceScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/PublicationStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Publication/ChoixTypeAnnonceScreen.jsx"
+    },
+    {
+      "name": "AddSaleProperty",
+      "component": "AddSalePropertyScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/PublicationStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Publication/AddSalePropertyScreen.jsx"
+    },
+    {
+      "name": "AddRentalProperty",
+      "component": "AddRentalPropertyScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/PublicationStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Publication/AddRentalPropertyScreen.jsx"
+    },
+    {
+      "name": "AddAccommodation",
+      "component": "AddAccommodationScreen",
+      "navigationFile": "altimmo-app/src/navigation/stacks/PublicationStack.jsx",
+      "screenFile": "altimmo-app/src/screens/Publication/AddAccommodationScreen.jsx"
+    }
+  ],
+  "mobileUnregisteredScreenFiles": [
+    "altimmo-app/src/screens/Onboarding/OnboardingScreen.jsx",
+    "altimmo-app/src/screens/Publication/HotelEstablishmentScreen.jsx"
+  ],
+  "mobileApiCalls": [
+    {
+      "method": "GET",
+      "endpoint": "/notifications/count",
+      "file": "altimmo-app/src/components/GreetingBar.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/auth/login",
+      "file": "altimmo-app/src/context/AuthContext.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/auth/signup",
+      "file": "altimmo-app/src/context/AuthContext.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/auth/google",
+      "file": "altimmo-app/src/context/AuthContext.jsx"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/altimmo/search?${buildQuery(activeFilters)}",
+      "file": "altimmo-app/src/screens/Annonces/CarteScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/properties/${annonce?._id}/like",
+      "file": "altimmo-app/src/screens/Annonces/DetailAnnonceScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/properties/${annonce?._id}/share",
+      "file": "altimmo-app/src/screens/Annonces/DetailAnnonceScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/properties/${annonce?._id}/reviews",
+      "file": "altimmo-app/src/screens/Annonces/DetailAnnonceScreen.jsx"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/properties/${annonce?._id}",
+      "file": "altimmo-app/src/screens/Annonces/DetailAnnonceScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/conversations/start",
+      "file": "altimmo-app/src/screens/Annonces/DetailAnnonceScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/visites",
+      "file": "altimmo-app/src/screens/Annonces/DetailAnnonceScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/conversations/start",
+      "file": "altimmo-app/src/screens/Annonces/DetailAnnonceScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/signalements",
+      "file": "altimmo-app/src/screens/Annonces/DetailAnnonceScreen.jsx"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/altimmo/search?${query}",
+      "file": "altimmo-app/src/screens/Annonces/ListeAnnoncesScreen.jsx"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/users/complete-profile",
+      "file": "altimmo-app/src/screens/Auth/CompleterProfilScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/auth/forgot-password",
+      "file": "altimmo-app/src/screens/Auth/ForgotPasswordScreen.jsx"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/auth/reset-password/${token}",
+      "file": "altimmo-app/src/screens/Auth/ResetPasswordScreen.jsx"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/properties/my-properties",
+      "file": "altimmo-app/src/screens/MesBiens/MesAnnoncesScreen.jsx"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/rental-management/owner/my",
+      "file": "altimmo-app/src/screens/MesBiens/MesAnnoncesScreen.jsx"
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "/properties/${item._id}",
+      "file": "altimmo-app/src/screens/MesBiens/MesAnnoncesScreen.jsx"
+    },
+    {
+      "method": "PUT",
+      "endpoint": "/properties/${item._id}",
+      "file": "altimmo-app/src/screens/MesBiens/MesAnnoncesScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/rental-management/${rental._id}/owner/${action}",
+      "file": "altimmo-app/src/screens/MesBiens/MesAnnoncesScreen.jsx"
+    },
+    {
+      "method": "PUT",
+      "endpoint": "/properties/${leaseModal.property._id}",
+      "file": "altimmo-app/src/screens/MesBiens/MesAnnoncesScreen.jsx"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/messages/${conversation._id}",
+      "file": "altimmo-app/src/screens/Messagerie/ChatScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/messages",
+      "file": "altimmo-app/src/screens/Messagerie/ChatScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/messages",
+      "file": "altimmo-app/src/screens/Messagerie/ChatScreen.jsx"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/conversations/start",
+      "file": "altimmo-app/src/screens/Messagerie/ChatbotScreen.jsx"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/conversations/${data.conversationId}",
+      "file": "altimmo-app/src/screens/Notifications/NotificationsScreen.jsx"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/auth/update-my-password",
+      "file": "altimmo-app/src/screens/Profil/ChangePasswordScreen.jsx"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/users/updateMe",
+      "file": "altimmo-app/src/screens/Profil/EditProfileScreen.jsx"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/likes/my-favorites?type=Property",
+      "file": "altimmo-app/src/screens/Profil/FavorisScreen.jsx"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/properties/my-properties",
+      "file": "altimmo-app/src/screens/Profil/ProfilScreen.jsx"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/users/updateMe",
+      "file": "altimmo-app/src/screens/Profil/ProfilScreen.jsx"
+    },
+    {
+      "method": "PUT",
+      "endpoint": "/properties/${editProperty._id}",
+      "file": "altimmo-app/src/screens/Publication/PublierBienScreen.jsx"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/visites/${visite._id}/cancel",
+      "file": "altimmo-app/src/screens/Visites/VisitesScreen.jsx"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/visites/${visite._id}/owner/${action}",
+      "file": "altimmo-app/src/screens/Visites/VisitesScreen.jsx"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/properties/recommended",
+      "file": "altimmo-app/src/services/annonceService.js"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/properties/mobile",
+      "file": "altimmo-app/src/services/annonceService.js"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/accommodations/mobile/full",
+      "file": "altimmo-app/src/services/annonceService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/hotels/public",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/hotels/public/${id}",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/hotels/${hotelId}/availability",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/hotels/${hotelId}/reservations",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/hotel-reservations/mine",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/hotel-reservations/${id}",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/hotel-reservations/${id}",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/hotel-reservations/${id}/cancel",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/hotel-reservations/owner",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/hotels/accessible",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/hotel-reservations/${id}/room-assignment",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/hotels/${hotelId}/rooms",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/hotels/room-assignments",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/hotels/room-assignments/auto",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/hotels/room-assignments/change",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/hotel-reservations/${id}/check-in",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/hotel-reservations/${id}/check-out",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/hotels/${hotelId}/inventory/calendar",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/hotels/${hotelId}/inventory/range",
+      "file": "altimmo-app/src/services/hotelReservationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/notifications",
+      "file": "altimmo-app/src/services/notificationApiService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/notifications/count",
+      "file": "altimmo-app/src/services/notificationApiService.js"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/notifications/${id}/read",
+      "file": "altimmo-app/src/services/notificationApiService.js"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/notifications/read-all",
+      "file": "altimmo-app/src/services/notificationApiService.js"
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "/notifications/${id}",
+      "file": "altimmo-app/src/services/notificationApiService.js"
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "/notifications",
+      "file": "altimmo-app/src/services/notificationApiService.js"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/users/push-token",
+      "file": "altimmo-app/src/services/notificationsService.js"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/users/push-token",
+      "file": "altimmo-app/src/services/notificationsService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/conversations/${data.conversationId}",
+      "file": "altimmo-app/src/services/notificationsService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/conversations/${data.conversationId}",
+      "file": "altimmo-app/src/services/notificationsService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/conversations/${data.conversationId}",
+      "file": "altimmo-app/src/services/notificationsService.js"
+    },
+    {
+      "method": "PATCH",
+      "endpoint": "/notifications/${data.notificationId}/read",
+      "file": "altimmo-app/src/services/notificationsService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/publicites/active",
+      "file": "altimmo-app/src/services/publiciteService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "${root}/${id}",
+      "file": "altimmo-app/src/services/realEstateApplicationService.js"
+    },
+    {
+      "method": "POST",
+      "endpoint": "${root}/${id}/withdraw",
+      "file": "altimmo-app/src/services/realEstateApplicationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "${root}/reservations/${id}",
+      "file": "altimmo-app/src/services/realEstateApplicationService.js"
+    },
+    {
+      "method": "POST",
+      "endpoint": "${root}/${id}/attachments",
+      "file": "altimmo-app/src/services/realEstateApplicationService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/transactions/my",
+      "file": "altimmo-app/src/services/transactionService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/transactions/${id}",
+      "file": "altimmo-app/src/services/transactionService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/transactions/${transactionId}/paiements",
+      "file": "altimmo-app/src/services/transactionService.js"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/transactions/${transactionId}/paiements/initier",
+      "file": "altimmo-app/src/services/transactionService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/transactions/${transactionId}/paiements/verifier/${intentId}",
+      "file": "altimmo-app/src/services/transactionService.js"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/transactions/${transactionId}/paiements/virement",
+      "file": "altimmo-app/src/services/transactionService.js"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/visites/availability",
+      "file": "altimmo-app/src/services/visiteService.js"
+    }
+  ]
+}

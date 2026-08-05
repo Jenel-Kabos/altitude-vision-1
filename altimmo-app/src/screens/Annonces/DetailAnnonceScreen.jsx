@@ -24,6 +24,7 @@ import {
   resolveDetailParams, fetchAnnonceDetail, getDisplayPrice,
 } from '../../services/propertyMapper';
 import { formatDateFR, formatTimeHHmm, isFutureDateTime, buildVisitPayload, fetchAvailability } from '../../services/visiteService';
+import { resolveMobileDestination } from '../../navigation/navigationSdk';
 
 const { width } = Dimensions.get('window');
 // Galerie : ratio 4:3 portrait, plafonné à 310px — compact et élégant
@@ -1063,13 +1064,27 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
       {/* ══════════════════════ CTA FIXE ══════════════════════ */}
       <SafeAreaView style={styles.ctaSafe} edges={['bottom']}>
-        {!permissions.canContact && !permissions.canRequestVisit ? (
+        {!permissions.canContact && !permissions.canRequestVisit && !(isHebergement && annonce.accommodationId) ? (
           <View style={styles.ctaReasonWrap}>
             <Ionicons name="information-circle-outline" size={16} color={c.textMuted} />
             <Text style={styles.ctaReasonText}>{permissions.reason}</Text>
           </View>
         ) : (
           <View style={styles.ctaRow}>
+            {isHebergement && annonce.accommodationId && (
+              <TouchableOpacity
+                style={styles.ctaBtnPrimary}
+                onPress={() => {
+                  const target = resolveMobileDestination('ACCOMMODATION_BOOKING', { id: annonce.accommodationId, propertyId: annonce._id || annonce.id });
+                  if (target) navigation.navigate(target.screen, { ...target.params, params: { ...target.params?.params, title } });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Réserver cet hébergement"
+              >
+                <Ionicons name="bed-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.ctaBtnPrimaryText}>Réserver</Text>
+              </TouchableOpacity>
+            )}
             {!isHebergement && permissions.canContact && (
               <TouchableOpacity
                 style={styles.ctaBtnPrimary}

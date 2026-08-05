@@ -11,6 +11,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { clearRead } from '../../services/notificationService';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { resolveNotificationWebRoute } from '../../navigation/navigationSdk';
 
 const GOLD = '#C8960C';
 
@@ -149,7 +150,7 @@ export default function NotificationBell({ isAuthenticated }) {
     const fallbackRoute = isStaff
       ? cfg.route
       : CLIENT_ROUTES[notif.type] || (cfg.route.startsWith('/dashboard') ? '/profile' : cfg.route);
-    const destination = notif.link || notif.data?.webPath || fallbackRoute;
+    const destination = resolveNotificationWebRoute(notif, fallbackRoute);
     router.push(destination.startsWith('/') ? destination : fallbackRoute);
   }, [markRead, router, user]);
 

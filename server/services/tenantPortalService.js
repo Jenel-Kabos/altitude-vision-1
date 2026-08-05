@@ -19,7 +19,12 @@ async function requireLocataire(userId) {
 }
 
 async function getLeases(locataireId) {
-  return Contrat.find({ locataire: locataireId, type: 'location' }).sort({ createdAt: -1 }).populate('bien', 'title address city owner');
+  return Contrat.find({ locataire: locataireId, type: 'location' })
+    .sort({ createdAt: -1 })
+    .populate([
+      { path: 'bien', select: 'title address city owner' },
+      { path: 'proprietaire', select: 'nom prenom telephone email' },
+    ]);
 }
 async function getActiveLease(locataireId) {
   const leases = await getLeases(locataireId);
@@ -27,9 +32,13 @@ async function getActiveLease(locataireId) {
 }
 const publicLease = (lease) => lease && ({
   _id: lease._id, bien: lease.bien, statut: lease.statut, adresseBien: lease.adresseBien, villeBien: lease.villeBien,
+  proprietaire: lease.proprietaire ? { _id: lease.proprietaire._id, nom: lease.proprietaire.nom, prenom: lease.proprietaire.prenom, telephone: lease.proprietaire.telephone, email: lease.proprietaire.email } : null,
   dateEntree: lease.dateEntree, dateSortie: lease.dateSortie, dateFinBail: lease.dateFinBail,
   montantLoyer: lease.montantLoyer, montantCaution: lease.montantCaution, cautionVersee: lease.cautionVersee,
   dureePreavis: lease.dureePreavis, chargesIncluses: lease.chargesIncluses, montantCharges: lease.montantCharges,
+  cycleVie: lease.cycleVie, cycleHistory: lease.cycleHistory || [], avenants: lease.avenants || [], caution: lease.caution,
+  etatsDesLieux: (lease.etatsDesLieux || []).map(({ type, date, validatedByStaff, validatedAt, degradationReported, maintenanceRequired, blockingReason }) => ({ type, date, validatedByStaff, validatedAt, degradationReported, maintenanceRequired, blockingReason })),
+  renouvelleDe: lease.renouvelleDe, renouvelePar: lease.renouvelePar,
   joursRestants: daysUntil(lease.dateFinBail),
 });
 
