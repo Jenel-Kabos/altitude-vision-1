@@ -142,7 +142,7 @@ async function findExistingImport(sourceOwnerAssetId) {
   if (!property) return null;
   const rental = await RentalManagement.findOneAndUpdate(
     { property: property._id },
-    { $setOnInsert: { property: property._id, owner: property.owner }, $set: { managementActivated: true } },
+    { $setOnInsert: { property: property._id }, $set: { owner: property.owner, managementActivated: true } },
     { new: true, upsert: true, runValidators: true },
   );
   return { property, rentalManagement: rental, alreadyImported: true };

@@ -383,6 +383,10 @@ async function seed(uri) {
   // idempotent en lui-même, sans jamais toucher à celui de l'autre projet.
   const Proprietaire = require("../models/Proprietaire");
   await Proprietaire.create({
+    nom: "GestionE2E", prenom: "Propriétaire", telephone: "+242060000097",
+    user: ids.rentalOnboardingOwner, biensPropres: [],
+  });
+  await Proprietaire.create({
     _id: ids.proprietaireBienPropre,
     nom: "PropriétaireE2E", prenom: "BienPropre", telephone: "+242060000099",
     biensPropres: [{
