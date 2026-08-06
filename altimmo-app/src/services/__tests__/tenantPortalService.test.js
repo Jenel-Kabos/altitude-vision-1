@@ -1,11 +1,11 @@
 jest.mock('../api', () => ({ __esModule: true, default: { get: jest.fn(), post: jest.fn() }, getToken: jest.fn().mockResolvedValue('token') }));
 jest.mock('../cacheService', () => ({ cache: { get: jest.fn(), set: jest.fn(), invalidate: jest.fn() } }));
-jest.mock('expo-file-system', () => ({ cacheDirectory: 'file:///cache/', downloadAsync: jest.fn().mockResolvedValue({ status: 200, uri: 'file:///cache/bail.pdf' }) }));
+jest.mock('expo-file-system/legacy', () => ({ cacheDirectory: 'file:///cache/', downloadAsync: jest.fn().mockResolvedValue({ status: 200, uri: 'file:///cache/bail.pdf' }) }));
 jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn().mockResolvedValue(false), shareAsync: jest.fn() }));
 
 import api from '../api';
 import { cache } from '../cacheService';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { createTenantMaintenance, downloadTenantDocument, getTenantDashboard } from '../tenantPortalService';
 
 describe('service portail locataire Mobile', () => {

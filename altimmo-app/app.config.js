@@ -82,6 +82,13 @@ module.exports = {
     },
 
     plugins: [
+      'expo-asset',
+      'expo-image',
+      'expo-sharing',
+      'expo-status-bar',
+      'expo-web-browser',
+      'expo-video',
+      'expo-audio',
       'expo-updates',
       'expo-notifications',
       'expo-location',

@@ -10,7 +10,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
+import VideoPlayer from '../../components/VideoPlayer';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import api from '../../services/api';
@@ -77,13 +77,13 @@ const FeatureChip = React.memo(function FeatureChip({ icon, value, label, suffix
 const VideoGalleryItem = React.memo(function VideoGalleryItem({ uri, isPlaying, onPlay, styles }) {
   return (
     <View style={styles.galleryItem}>
-      <Video
-        source={{ uri }}
+      <VideoPlayer
+        source={uri}
         style={StyleSheet.absoluteFill}
-        resizeMode={ResizeMode.COVER}
+        contentFit="cover"
         shouldPlay={isPlaying}
         isLooping={false}
-        useNativeControls={isPlaying}
+        nativeControls={isPlaying}
       />
       {!isPlaying && (
         <TouchableOpacity

@@ -1,7 +1,7 @@
 import api from './api';
 import { getToken } from './api';
 import { cache } from './cacheService';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { environment } from '../config/environment';
 

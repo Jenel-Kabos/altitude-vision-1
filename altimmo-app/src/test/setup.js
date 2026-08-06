@@ -6,6 +6,10 @@ jest.mock('expo-secure-store', () => ({
 
 jest.mock('expo-device', () => ({ isDevice: true }));
 
+jest.mock('expo-image', () => ({
+  Image: require('react-native').Image,
+}));
+
 jest.mock('expo-notifications', () => ({
   setNotificationHandler: jest.fn(),
   requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),

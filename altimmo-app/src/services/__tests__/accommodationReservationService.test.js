@@ -1,4 +1,4 @@
-jest.mock('expo-file-system', () => ({ cacheDirectory: 'file:///cache/', downloadAsync: jest.fn() }));
+jest.mock('expo-file-system/legacy', () => ({ cacheDirectory: 'file:///cache/', downloadAsync: jest.fn() }));
 jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn(), shareAsync: jest.fn() }));
 jest.mock('../api', () => ({ __esModule: true, default: { get: jest.fn(), post: jest.fn() }, getToken: jest.fn() }));
 jest.mock('../cacheService', () => ({ cache: { get: jest.fn(), set: jest.fn(), invalidate: jest.fn() } }));

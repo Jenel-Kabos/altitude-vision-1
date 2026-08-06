@@ -8,7 +8,8 @@ import {
   Modal, Pressable, ScrollView, Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Video, ResizeMode, Audio } from 'expo-av';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import VideoPlayer from '../../components/VideoPlayer';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -83,27 +84,14 @@ const TypingDots = memo(function TypingDots({ bubbleStyle, dotStyle }) {
 
 const AudioPlayer = memo(function AudioPlayer({ url, nom, styles }) {
   const { themeColors: c } = useTheme();
-  const [sound,   setSound]   = useState(null);
-  const [playing, setPlaying] = useState(false);
+  const player = useAudioPlayer(url);
+  const status = useAudioPlayerStatus(player);
+  const playing = status.playing;
 
-  const toggle = useCallback(async () => {
-    if (!sound) {
-      const { sound: s } = await Audio.Sound.createAsync({ uri: url });
-      setSound(s);
-      await s.playAsync();
-      setPlaying(true);
-      return;
-    }
-    if (playing) {
-      await sound.pauseAsync();
-      setPlaying(false);
-    } else {
-      await sound.playAsync();
-      setPlaying(true);
-    }
-  }, [sound, playing, url]);
-
-  useEffect(() => () => { sound?.unloadAsync(); }, [sound]);
+  const toggle = useCallback(() => {
+    if (playing) player.pause();
+    else player.play();
+  }, [player, playing]);
 
   return (
     <TouchableOpacity onPress={toggle} style={styles.audioPlayer} activeOpacity={0.8}>
@@ -343,8 +331,8 @@ export default function ChatScreen({ route, navigation }) {
         );
       case 'video':
         return (
-          <Video key={i} source={{ uri: att.url }}
-            useNativeControls resizeMode={ResizeMode.CONTAIN}
+          <VideoPlayer key={i} source={att.url}
+            nativeControls contentFit="contain"
             style={styles.attachVideo} />
         );
       case 'audio':

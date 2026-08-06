@@ -6,7 +6,7 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { Video, ResizeMode } from 'expo-av';
+import VideoPlayer from '../../components/VideoPlayer';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -528,12 +528,12 @@ export default function PublierBienScreen({ navigation, route }) {
             {photos.map((p, idx) => (
               <View key={`${p.uri}-${idx}`} style={styles.photoCell}>
                 {isVideo(p.uri) ? (
-                  <Video
-                    source={{ uri: p.uri }}
+                  <VideoPlayer
+                    source={p.uri}
                     style={styles.photoImg}
-                    resizeMode={ResizeMode.COVER}
+                    contentFit="cover"
                     shouldPlay={false}
-                    useNativeControls={false}
+                    nativeControls={false}
                     isLooping={false}
                     isMuted
                   />

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const CrmCustomer = require('../models/CrmCustomer');
 const CrmOpportunity = require('../models/CrmOpportunity');
 const CrmActivity = require('../models/CrmActivity');
+const CrmConsolidation = require('../models/CrmConsolidation');
 const User = require('../models/User');
 const Proprietaire = require('../models/Proprietaire');
 const Locataire = require('../models/Locataire');
@@ -18,6 +19,8 @@ const Transaction = require('../models/Transaction');
 const AccommodationReservation = require('../models/AccommodationReservation');
 const HotelReservation = require('../models/HotelReservation');
 const FinancialDocument = require('../models/FinancialDocument');
+const Document = require('../models/Document');
+const Paiement = require('../models/Paiement');
 const { buildTimeline } = require('./dossier/dossierRegistry');
 const { notify } = require('./notificationService');
 
@@ -162,6 +165,14 @@ async function moveOpportunity(id, { stage, note }, actor) {
   const from = item.stage; item.stage = stage; item.history.push({ from, to: stage, actor, note });
   if (stage === 'ancien_client') item.closedAt = new Date(); await item.save(); return item;
 }
+async function setOpportunityOutcome(id, { outcome, reason = '' }, actor) {
+  const item = await CrmOpportunity.findById(id); if (!item) throw new CrmError('Opportunité introuvable.', 404);
+  if (!['open', 'won', 'lost'].includes(outcome)) throw new CrmError('Résultat d’opportunité invalide.', 422);
+  if (outcome === 'lost' && clean(reason).length < 3) throw new CrmError('Le motif de perte est requis.', 422);
+  item.outcome = outcome; item.outcomeReason = clean(reason); item.closedAt = outcome === 'open' ? null : new Date();
+  item.history.push({ from: item.stage, to: item.stage, actor, note: `Résultat : ${outcome}${reason ? ` — ${reason}` : ''}` });
+  await item.save(); return item;
+}
 async function createActivity(customerId, payload, actor) {
   if (!await CrmCustomer.exists({ _id: customerId })) throw new CrmError('Customer introuvable.', 404);
   const activity = await CrmActivity.create({ customer: customerId, opportunity: payload.opportunity || null, type: payload.type, title: payload.title, content: payload.content || '', dueAt: payload.dueAt || null, assignedTo: payload.assignedTo || actor, createdBy: actor, history: [{ action: 'created', actor }] });
@@ -174,4 +185,135 @@ async function updateActivity(id, payload, actor) {
   if (item.status === 'terminee' && !item.completedAt) item.completedAt = new Date(); item.history.push({ action: 'updated', actor, metadata: payload }); await item.save(); return item;
 }
 
-module.exports = { CrmError, synchronizeCustomers, listCustomers, getCustomer360, createOpportunity, moveOpportunity, createActivity, updateActivity };
+const dayBounds = (date = new Date()) => { const start = new Date(date); start.setHours(0, 0, 0, 0); const end = new Date(start); end.setDate(end.getDate() + 1); return { start, end }; };
+async function getDashboard(now = new Date()) {
+  const { start, end } = dayBounds(now); const weekEnd = new Date(start); weekEnd.setDate(weekEnd.getDate() + 7);
+  const [prospects, opportunities, activeIds, inactiveIds, finance, pendingQuotes, contractsToSign, followupsToday, overdueTasks, meetingsToday, newContacts, outcomes, cycleRows, revenueByPole, bestCommercial, activityByCollaborator] = await Promise.all([
+    CrmCustomer.countDocuments({ status: { $ne: 'archived' }, relations: 'prospect' }),
+    CrmOpportunity.countDocuments({ outcome: 'open' }),
+    CrmOpportunity.distinct('customer', { stage: { $in: ['client_actif', 'fidelisation'] }, outcome: { $ne: 'lost' } }),
+    CrmOpportunity.distinct('customer', { stage: 'ancien_client' }),
+    FinancialDocument.aggregate([{ $match: { status: { $ne: 'cancelled' } } }, { $group: { _id: null, revenueMinor: { $sum: { $subtract: ['$amountAllocatedMinor', '$refundedAmountMinor'] } } } }]),
+    QuoteRequest.countDocuments({ status: { $in: ['Nouveau', 'En cours', 'Devis Envoyé'] } }),
+    Contrat.countDocuments({ statut: 'en_attente' }),
+    CrmActivity.countDocuments({ type: 'relance', status: { $in: ['a_faire', 'en_cours'] }, dueAt: { $gte: start, $lt: end } }),
+    CrmActivity.countDocuments({ type: { $in: ['tache', 'rappel', 'relance'] }, status: { $in: ['a_faire', 'en_cours'] }, dueAt: { $lt: start } }),
+    CrmActivity.countDocuments({ type: 'rendez_vous', status: { $in: ['a_faire', 'en_cours'] }, dueAt: { $gte: start, $lt: end } }),
+    ContactMessage.countDocuments({ submittedAt: { $gte: start, $lt: end } }),
+    CrmOpportunity.aggregate([{ $group: { _id: '$outcome', count: { $sum: 1 } } }]),
+    CrmOpportunity.find({ outcome: { $in: ['won', 'lost'] }, closedAt: { $ne: null } }).select('createdAt closedAt').lean(),
+    FinancialDocument.aggregate([{ $match: { status: { $ne: 'cancelled' } } }, { $group: { _id: '$domain', revenueMinor: { $sum: { $subtract: ['$amountAllocatedMinor', '$refundedAmountMinor'] } } } }, { $sort: { revenueMinor: -1 } }]),
+    CrmOpportunity.aggregate([{ $match: { outcome: 'won', assignedTo: { $ne: null } } }, { $group: { _id: '$assignedTo', won: { $sum: 1 }, valueMinor: { $sum: '$valueMinor' } } }, { $sort: { valueMinor: -1, won: -1 } }, { $limit: 1 }, { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } }, { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }]),
+    CrmActivity.aggregate([{ $group: { _id: '$assignedTo', total: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ['$status', 'terminee'] }, 1, 0] } } } }, { $sort: { total: -1 } }, { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } }, { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }]),
+  ]);
+  const outcomeMap = Object.fromEntries(outcomes.map((x) => [x._id, x.count])); const decided = (outcomeMap.won || 0) + (outcomeMap.lost || 0);
+  const durations = cycleRows.map((x) => x.closedAt - x.createdAt).filter((x) => x >= 0);
+  return {
+    generatedAt: now, window: { todayStart: start, todayEnd: end, weekEnd },
+    kpis: { prospects, opportunities, activeClients: activeIds.length, inactiveClients: inactiveIds.length, revenueMinor: finance[0]?.revenueMinor || 0, pendingQuotes, contractsToSign, followupsToday, overdueTasks, meetingsToday, newContacts },
+    commercial: { conversionRate: decided ? Math.round(((outcomeMap.won || 0) / decided) * 10000) / 100 : null, averageCycleDays: durations.length ? Math.round((durations.reduce((a, b) => a + b, 0) / durations.length / 86400000) * 10) / 10 : null, won: outcomeMap.won || 0, lost: outcomeMap.lost || 0, revenueByPole, bestCommercial: bestCommercial[0] ? { userId: bestCommercial[0]._id, name: bestCommercial[0].user?.name || 'Collaborateur', won: bestCommercial[0].won, valueMinor: bestCommercial[0].valueMinor } : null, activityByCollaborator: activityByCollaborator.map((x) => ({ userId: x._id, name: x.user?.name || 'Non assigné', total: x.total, completed: x.completed })) },
+  };
+}
+
+async function getPipeline() {
+  const opportunities = await CrmOpportunity.find().populate('customer', 'displayName company emails phones status').populate('assignedTo', 'name email').sort({ updatedAt: -1 }).lean();
+  return { stages: require('../models/CrmOpportunity').STAGES, opportunities };
+}
+
+async function getActivities({ view = 'today', assignedTo } = {}, now = new Date()) {
+  const { start, end } = dayBounds(now); const weekEnd = new Date(start); weekEnd.setDate(weekEnd.getDate() + 7);
+  const filter = {}; if (assignedTo && mongoose.isValidObjectId(assignedTo)) filter.assignedTo = assignedTo;
+  if (view === 'today') filter.dueAt = { $gte: start, $lt: end };
+  else if (view === 'week') filter.dueAt = { $gte: start, $lt: weekEnd };
+  else if (view === 'overdue') { filter.dueAt = { $lt: start }; filter.status = { $in: ['a_faire', 'en_cours'] }; }
+  else if (view === 'upcoming') filter.dueAt = { $gte: weekEnd };
+  else throw new CrmError('Vue d’activités invalide.', 422);
+  const activities = await CrmActivity.find(filter).populate('customer', 'displayName company').populate('assignedTo createdBy', 'name email').sort({ dueAt: 1 }).limit(200).lean();
+  return { view, activities, total: activities.length };
+}
+
+const result = (type, item, title, subtitle, destination, params = {}) => ({ type, id: String(item._id), title, subtitle, destination, params });
+async function globalSearch(query) {
+  const q = clean(query); if (q.length < 2) throw new CrmError('Saisissez au moins 2 caractères.', 422); const rx = new RegExp(escapeRx(q), 'i');
+  const objectId = mongoose.isValidObjectId(q) ? new mongoose.Types.ObjectId(q) : null;
+  const [customers, properties, contracts, accommodation, hotels, invoices, payments, projects, conversations, documents] = await Promise.all([
+    CrmCustomer.find({ status: { $ne: 'archived' }, $or: [{ displayName: rx }, { company: rx }, { emails: rx }, { phones: rx }] }).limit(10).lean(),
+    Property.find({ $or: [{ title: rx }, { 'address.city': rx }, ...(objectId ? [{ _id: objectId }] : [])] }).select('title type address').limit(10).lean(),
+    Contrat.find({ $or: [{ adresseBien: rx }, { villeBien: rx }, ...(objectId ? [{ _id: objectId }] : [])] }).select('type statut adresseBien villeBien').limit(10).lean(),
+    AccommodationReservation.find(objectId ? { _id: objectId } : { _id: null }).select('status createdAt').limit(5).lean(),
+    HotelReservation.find(objectId ? { _id: objectId } : { _id: null }).select('status createdAt').limit(5).lean(),
+    FinancialDocument.find({ $or: [{ documentNumber: rx }, { 'customer.name': rx }, { 'customer.email': rx }, ...(objectId ? [{ _id: objectId }] : [])] }).select('documentNumber documentType customer status').limit(10).lean(),
+    Paiement.find({ $or: [{ reference: rx }, ...(objectId ? [{ _id: objectId }] : [])] }).select('reference statut montant').limit(10).lean(),
+    AltcomProject.find({ $or: [{ projectName: rx }, { contactName: rx }, { companyName: rx }, { email: rx }] }).select('projectName companyName status').limit(10).lean(),
+    Conversation.find({ $or: [{ lastMessage: rx }, ...(objectId ? [{ _id: objectId }] : [])] }).select('lastMessage updatedAt').limit(10).lean(),
+    Document.find({ $or: [{ refNom: rx }, { notes: rx }, { content: rx }, ...(Number.isFinite(Number(q)) ? [{ docNumber: Number(q) }] : []), ...(objectId ? [{ _id: objectId }] : [])] }).select('docNumber refNom type status').limit(10).lean(),
+  ]);
+  return { query: q, results: [
+    ...customers.map((x) => result('customer', x, x.displayName, x.company || x.emails?.[0] || '', 'CRM_CUSTOMER_DETAILS', { id: x._id })),
+    ...properties.map((x) => result('property', x, x.title, x.type || '', 'PROPERTY_DETAILS', { id: x._id })),
+    ...contracts.map((x) => result('contract', x, `Contrat ${x.type}`, x.adresseBien || x.villeBien || x.statut, 'LEASES')),
+    ...accommodation.map((x) => result('reservation', x, 'Réservation hébergement', x.status, 'ACCOMMODATION_RESERVATION_DETAILS', { id: x._id })),
+    ...hotels.map((x) => result('reservation', x, 'Réservation hôtel', x.status, 'HOTEL_RESERVATIONS')),
+    ...invoices.map((x) => result('invoice', x, x.documentNumber || x.documentType, x.customer?.name || x.status, 'ADMIN_DOCUMENTS')),
+    ...payments.map((x) => result('payment', x, x.reference || 'Paiement', x.statut || '', 'ADMIN_PAYMENTS')),
+    ...projects.map((x) => result('project', x, x.projectName, x.companyName || x.status, 'ADMIN_ALTCOM')),
+    ...conversations.map((x) => result('conversation', x, 'Conversation', x.lastMessage || '', 'ADMIN_CONVERSATIONS')),
+    ...documents.map((x) => result('document', x, `${x.type || 'Document'}${x.docNumber ? ` #${x.docNumber}` : ''}`, x.refNom || x.status || '', 'ADMIN_DOCUMENTS')),
+  ] };
+}
+
+const normalized = (value) => clean(value).toLowerCase().replace(/\s+/g, ' ');
+const normalizedPhone = (value) => { const digits = clean(value).replace(/\D/g, ''); return digits.length > 9 ? digits.slice(-9) : digits; };
+function assessDuplicate(a, b) {
+  let score = 0; const reasons = [];
+  const sharedEmails = (a.emails || []).map(normalized).filter((x) => x && (b.emails || []).map(normalized).includes(x));
+  const sharedPhones = (a.phones || []).map(normalizedPhone).filter((x) => x.length >= 7 && (b.phones || []).map(normalizedPhone).includes(x));
+  const sameName = Boolean(normalized(a.displayName) && normalized(a.displayName) === normalized(b.displayName));
+  const sameCompany = Boolean(normalized(a.company) && normalized(a.company) === normalized(b.company));
+  if (sharedEmails.length) { score += 70; reasons.push('Email identique (+70)'); }
+  if (sameName) { score += 25; reasons.push('Identité identique (+25)'); }
+  if (sameCompany) { score += 20; reasons.push('Entreprise identique (+20)'); }
+  if (sharedPhones.length) { score += 15; reasons.push('Téléphone identique, indice non décisif (+15)'); }
+  return { score: Math.min(100, score), reasons, sharedEmails, sharedPhones, phoneOnly: sharedPhones.length > 0 && !sharedEmails.length && !sameName && !sameCompany, differences: { displayName: [a.displayName, b.displayName], company: [a.company, b.company], emails: [a.emails, b.emails], phones: [a.phones, b.phones], relations: [a.relations, b.relations], sources: [a.sourceRefs?.length || 0, b.sourceRefs?.length || 0] } };
+}
+async function findDuplicates({ minimumScore = 15 } = {}) {
+  const customers = await CrmCustomer.find({ status: { $ne: 'archived' } }).sort({ displayName: 1 }).lean(); const pairs = [];
+  for (let i = 0; i < customers.length; i += 1) for (let j = i + 1; j < customers.length; j += 1) { const assessment = assessDuplicate(customers[i], customers[j]); if (assessment.score >= Number(minimumScore)) pairs.push({ customerA: customers[i], customerB: customers[j], ...assessment }); }
+  return { pairs: pairs.sort((a, b) => b.score - a.score), total: pairs.length };
+}
+async function compareCustomers(a, b) {
+  if (String(a) === String(b)) throw new CrmError('Sélectionnez deux Customers différents.', 422);
+  const [customerA, customerB] = await Promise.all([getCustomer360(a), getCustomer360(b)]);
+  return { customerA, customerB, assessment: assessDuplicate(customerA.customer, customerB.customer) };
+}
+async function consolidateCustomers({ customerA, customerB, decision, justification }, actor) {
+  if (!['keep_a', 'keep_b', 'defer'].includes(decision)) throw new CrmError('Décision de consolidation invalide.', 422);
+  if (clean(justification).length < 5) throw new CrmError('Une justification d’au moins 5 caractères est requise.', 422);
+  const comparison = await compareCustomers(customerA, customerB); const before = { customerA: comparison.customerA.customer, customerB: comparison.customerB.customer };
+  if (decision === 'defer') {
+    await CrmCustomer.updateMany({ _id: { $in: [customerA, customerB] } }, { $set: { status: 'merge_review' }, $push: { audit: { action: 'consolidation_deferred', actor, metadata: { justification } } } });
+    return CrmConsolidation.create({ customerA, customerB, decision, justification, actor, before, after: before, duplicateAssessment: comparison.assessment });
+  }
+  const keptId = decision === 'keep_a' ? customerA : customerB; const archivedId = decision === 'keep_a' ? customerB : customerA; const session = await mongoose.startSession(); let journal;
+  try {
+    await session.withTransaction(async () => {
+      const [kept, archived] = await Promise.all([CrmCustomer.findById(keptId).session(session), CrmCustomer.findById(archivedId).session(session)]);
+      if (!kept || !archived || archived.status === 'archived') throw new CrmError('Consolidation impossible sur ces fiches.', 409);
+      const archivedSnapshot = archived.toObject();
+      archived.identityKeys = []; archived.sourceRefs = []; archived.status = 'archived'; archived.mergedInto = kept._id; archived.audit.push({ action: 'consolidated_into', actor, metadata: { keptCustomer: kept._id, justification } }); await archived.save({ session });
+      kept.displayName = decision === 'keep_a' ? kept.displayName : kept.displayName;
+      kept.firstName = kept.firstName || archivedSnapshot.firstName; kept.lastName = kept.lastName || archivedSnapshot.lastName; kept.company = kept.company || archivedSnapshot.company;
+      kept.emails = uniq([...kept.emails, ...archivedSnapshot.emails]); kept.phones = uniq([...kept.phones, ...archivedSnapshot.phones]); kept.identityKeys = uniq([...kept.identityKeys, ...archivedSnapshot.identityKeys]); kept.relations = uniq([...kept.relations, ...archivedSnapshot.relations]); kept.languages = uniq([...kept.languages, ...archivedSnapshot.languages]);
+      for (const address of archivedSnapshot.addresses || []) if (!kept.addresses.some((x) => x.line === address.line && x.city === address.city)) kept.addresses.push(address);
+      for (const ref of archivedSnapshot.sourceRefs || []) if (!kept.sourceRefs.some((x) => x.entityType === ref.entityType && String(x.entityId) === String(ref.entityId))) kept.sourceRefs.push(ref);
+      kept.status = 'active'; kept.audit.push({ action: 'consolidation_kept', actor, metadata: { archivedCustomer: archived._id, justification } }); await kept.save({ session });
+      await Promise.all([CrmOpportunity.updateMany({ customer: archived._id }, { $set: { customer: kept._id } }, { session }), CrmActivity.updateMany({ customer: archived._id }, { $set: { customer: kept._id } }, { session })]);
+      [journal] = await CrmConsolidation.create([{ customerA, customerB, keptCustomer: kept._id, archivedCustomer: archived._id, decision, justification, actor, before, after: { kept: kept.toObject(), archived: archived.toObject() }, duplicateAssessment: comparison.assessment }], { session });
+    });
+  } finally { await session.endSession(); }
+  return journal;
+}
+
+async function listConsolidations() { return CrmConsolidation.find().populate('actor', 'name email').populate('keptCustomer archivedCustomer', 'displayName status').sort({ decidedAt: -1 }).limit(200).lean(); }
+
+module.exports = { CrmError, synchronizeCustomers, listCustomers, getCustomer360, createOpportunity, moveOpportunity, setOpportunityOutcome, createActivity, updateActivity, getDashboard, getPipeline, getActivities, globalSearch, assessDuplicate, findDuplicates, compareCustomers, consolidateCustomers, listConsolidations };

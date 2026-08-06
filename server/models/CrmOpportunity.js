@@ -6,6 +6,8 @@ const schema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, maxlength: 200 },
   pole: { type: String, enum: ['Altimmo', 'Accommodation', 'Hotel', 'Altcom', 'MilaEvents', 'Transversal'], default: 'Transversal' },
   stage: { type: String, enum: STAGES, default: 'prospect', index: true },
+  outcome: { type: String, enum: ['open', 'won', 'lost'], default: 'open', index: true },
+  outcomeReason: { type: String, trim: true, maxlength: 1000, default: '' },
   valueMinor: { type: Number, min: 0, default: 0 },
   currency: { type: String, default: 'XAF', maxlength: 3 },
   probability: { type: Number, min: 0, max: 100, default: 0 },
@@ -16,5 +18,6 @@ const schema = new mongoose.Schema({
   closedAt: { type: Date, default: null },
 }, { timestamps: true });
 schema.index({ stage: 1, updatedAt: -1 });
+schema.index({ outcome: 1, closedAt: -1 });
 module.exports = mongoose.model('CrmOpportunity', schema);
 module.exports.STAGES = STAGES;

@@ -28,6 +28,7 @@ const schema = new mongoose.Schema({
   sourceRefs: [sourceRefSchema],
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   status: { type: String, enum: ['active', 'archived', 'merge_review'], default: 'active', index: true },
+  mergedInto: { type: mongoose.Schema.Types.ObjectId, ref: 'CrmCustomer', default: null, index: true },
   audit: [auditSchema],
 }, { timestamps: true });
 

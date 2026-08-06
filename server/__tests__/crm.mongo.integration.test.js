@@ -7,7 +7,8 @@ const CrmCustomer = require('../models/CrmCustomer');
 const CrmOpportunity = require('../models/CrmOpportunity');
 const CrmActivity = require('../models/CrmActivity');
 const Notification = require('../models/Notification');
-const { synchronizeCustomers, listCustomers, getCustomer360, createOpportunity, moveOpportunity, createActivity, updateActivity } = require('../services/crmService');
+const CrmConsolidation = require('../models/CrmConsolidation');
+const { synchronizeCustomers, listCustomers, getCustomer360, createOpportunity, moveOpportunity, setOpportunityOutcome, createActivity, updateActivity, getDashboard, getPipeline, getActivities, globalSearch, findDuplicates, compareCustomers, consolidateCustomers } = require('../services/crmService');
 
 jest.setTimeout(120000);
 describe('CRM-CORE-1 — Customer 360 transversal', () => {
@@ -52,5 +53,50 @@ describe('CRM-CORE-1 — Customer 360 transversal', () => {
   test('l’index interdit deux fiches portant la même identité canonique', async () => {
     await CrmCustomer.create({ displayName: 'Premier', identityKeys: ['email:unique@example.test'], sourceRefs: [{ entityType: 'User', entityId: new mongoose.Types.ObjectId(), source: 'test' }] });
     await expect(CrmCustomer.create({ displayName: 'Second', identityKeys: ['email:unique@example.test'], sourceRefs: [{ entityType: 'User', entityId: new mongoose.Types.ObjectId(), source: 'test' }] })).rejects.toMatchObject({ code: 11000 });
+  });
+
+  test('calcule cockpit, KPI commerciaux, pipeline, agenda et recherche côté serveur', async () => {
+    const { admin } = await fixture(); await synchronizeCustomers(admin._id);
+    const customer = await CrmCustomer.findOne({ identityKeys: 'email:ada@example.test' });
+    const won = await createOpportunity(customer._id, { title: 'Mission gagnée', pole: 'Altimmo', valueMinor: 500000 }, admin._id);
+    await setOpportunityOutcome(won._id, { outcome: 'won' }, admin._id);
+    const lost = await createOpportunity(customer._id, { title: 'Mission perdue', pole: 'Altcom' }, admin._id);
+    await setOpportunityOutcome(lost._id, { outcome: 'lost', reason: 'Budget insuffisant' }, admin._id);
+    const overdue = new Date(); overdue.setDate(overdue.getDate() - 1);
+    await createActivity(customer._id, { type: 'relance', title: 'Relance en retard', dueAt: overdue }, admin._id);
+    const dashboard = await getDashboard();
+    expect(dashboard.commercial).toMatchObject({ conversionRate: 50, won: 1, lost: 1 });
+    expect(dashboard.kpis.overdueTasks).toBe(1);
+    expect((await getPipeline()).opportunities).toHaveLength(2);
+    expect((await getActivities({ view: 'overdue' })).activities).toHaveLength(1);
+    const search = await globalSearch('Ada');
+    expect(search.results.some((x) => x.type === 'customer' && x.destination === 'CRM_CUSTOMER_DETAILS')).toBe(true);
+  });
+
+  test('détecte, compare et consolide sans suppression avec journal append-only', async () => {
+    const admin = await User.create({ name: 'Admin Fusion', email: 'fusion.admin@example.test', role: 'Admin', password: 'Password123!', passwordConfirm: 'Password123!' });
+    const a = await CrmCustomer.create({ displayName: 'Ada Mpassi', company: 'Altitude', emails: ['a@example.test'], phones: ['+242061112233'], identityKeys: ['email:a@example.test'], sourceRefs: [{ entityType: 'ContactMessage', entityId: new mongoose.Types.ObjectId(), source: 'test' }] });
+    const b = await CrmCustomer.create({ displayName: 'Ada Mpassi', company: 'Altitude', emails: ['b@example.test'], phones: ['06 111 22 33'], identityKeys: ['email:b@example.test'], sourceRefs: [{ entityType: 'QuoteRequest', entityId: new mongoose.Types.ObjectId(), source: 'test' }] });
+    const opportunity = await createOpportunity(b._id, { title: 'À transférer' }, admin._id);
+    await createActivity(b._id, { type: 'note', title: 'Note à conserver' }, admin._id);
+    const duplicates = await findDuplicates(); expect(duplicates.pairs[0]).toMatchObject({ score: 60, phoneOnly: false });
+    const comparison = await compareCustomers(a._id, b._id); expect(comparison.customerA.customer.displayName).toBe('Ada Mpassi');
+    const journal = await consolidateCustomers({ customerA: a._id, customerB: b._id, decision: 'keep_a', justification: 'Identité confirmée par le gestionnaire' }, admin._id);
+    expect(journal.decision).toBe('keep_a');
+    expect(await CrmCustomer.exists({ _id: b._id, status: 'archived', mergedInto: a._id })).toBeTruthy();
+    expect(await CrmCustomer.exists({ _id: b._id })).toBeTruthy();
+    expect(await CrmOpportunity.exists({ _id: opportunity._id, customer: a._id })).toBeTruthy();
+    expect((await CrmCustomer.findById(a._id)).emails).toEqual(expect.arrayContaining(['a@example.test', 'b@example.test']));
+    await expect(CrmConsolidation.updateOne({ _id: journal._id }, { justification: 'Altération' })).rejects.toThrow(/append-only/);
+  });
+
+  test('le téléphone seul reste un indice et la décision peut être reportée', async () => {
+    const admin = await User.create({ name: 'Admin Report', email: 'report.admin@example.test', role: 'Admin', password: 'Password123!', passwordConfirm: 'Password123!' });
+    const a = await CrmCustomer.create({ displayName: 'Personne A', phones: ['061234567'], identityKeys: ['source:ContactMessage:aaaaaaaaaaaaaaaaaaaaaaaa'], sourceRefs: [{ entityType: 'ContactMessage', entityId: new mongoose.Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaaa'), source: 'test' }] });
+    const b = await CrmCustomer.create({ displayName: 'Personne B', phones: ['06 12 34 567'], identityKeys: ['source:QuoteRequest:bbbbbbbbbbbbbbbbbbbbbbbb'], sourceRefs: [{ entityType: 'QuoteRequest', entityId: new mongoose.Types.ObjectId('bbbbbbbbbbbbbbbbbbbbbbbb'), source: 'test' }] });
+    const pair = (await findDuplicates()).pairs[0]; expect(pair).toMatchObject({ score: 15, phoneOnly: true });
+    await consolidateCustomers({ customerA: a._id, customerB: b._id, decision: 'defer', justification: 'Téléphone partagé à vérifier' }, admin._id);
+    expect(await CrmCustomer.countDocuments({ status: 'merge_review' })).toBe(2);
+    expect(await CrmCustomer.countDocuments({ status: 'archived' })).toBe(0);
   });
 });
