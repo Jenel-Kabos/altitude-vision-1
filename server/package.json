@@ -18,6 +18,7 @@
     "test:finance:replica": "jest --runInBand --testPathPatterns='financialCore.replica.integration.test.js'",
     "test:finance:resilience": "jest --runInBand --detectOpenHandles --testPathPatterns='financialCore.resilience.replica.integration.test.js'",
     "finance:reconcile": "node scripts/reconcile-finance.js",
+    "rental:reconcile": "node scripts/reconcile-rental-management.js",
     "verify": "npm run lint",
     "ci": "npm run lint && npm run test:unit && npm run test:mongo"
   },

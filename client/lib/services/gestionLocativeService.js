@@ -171,6 +171,11 @@ export const deleteContrat = async (id) => {
   await api.delete(`/contrats/${id}`);
 };
 
+// GL-RECON-UX-1 — centre staff de régularisation, décisions serveur only.
+export const getRentalRegularizationCases = async () => (await api.get('/rental-contract-regularization')).data.data.cases;
+export const decideRentalRegularization = async (contractId, payload) => (await api.post(`/rental-contract-regularization/${contractId}/decision`, payload)).data.data.reconciliation;
+export const revertRentalRegularization = async (contractId, reason) => (await api.post(`/rental-contract-regularization/${contractId}/revert`, { reason })).data.data.reconciliation;
+
 // ── Paiements ─────────────────────────────────────────────────
 
 export const getPaiements = async (contratId, annee) => {

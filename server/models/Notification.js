@@ -104,6 +104,8 @@ const NOTIFICATION_TYPES = [
   'visite_payee',          // staff : client a payé les honoraires de visite
   // ── Modération ──
   'nouveau_signalement',   // admin : nouveau signalement reçu
+  // ── CRM transversal ──
+  'crm_activity_assigned',
 ];
 
 const notificationSchema = new mongoose.Schema(

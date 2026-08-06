@@ -61,7 +61,8 @@ const STAFF_DESTINATIONS = {
   contrat_updated: 'LEASES', rental_lease_renewed: 'LEASES', rental_amendment_created: 'LEASES',
   rental_deposit_encashed: 'LEASES', rental_deposit_blocked: 'LEASES', rental_deposit_withheld: 'LEASES',
   rental_deposit_returned: 'LEASES', rental_exit_inspection_cleared: 'LEASES', rental_lease_archived: 'LEASES',
-  rental_maintenance_ticket_created: 'RENTAL_MAINTENANCE', rental_maintenance_ticket_resolved: 'RENTAL_MAINTENANCE'
+  rental_maintenance_ticket_created: 'RENTAL_MAINTENANCE', rental_maintenance_ticket_resolved: 'RENTAL_MAINTENANCE',
+  crm_activity_assigned: 'CRM_CUSTOMER_DETAILS',
 };
 
 function destinationForNotification(type, audience = 'user') {

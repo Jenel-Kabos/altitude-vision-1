@@ -427,6 +427,7 @@ app.use('/api/rental-lease-lifecycle', rentalLeaseLifecycleRoutes);
 // lui-même, indépendant de tout bail.
 app.use('/api/property-asset', propertyAssetRoutes);
 app.use('/api/rental-management', rentalManagementRoutes);
+app.use('/api/rental-contract-regularization', require('./routes/rentalContractRegularizationRoutes'));
 // 🔧 Maintenance locative (Sprint GL-B2) — distincte de /api/maintenance (hôtelier, Sprint E).
 app.use('/api/rental-maintenance', rentalMaintenanceRoutes);
 // 🏠 Portail locataire (dette technique GL-B2, Mission 2) — préparation,
@@ -469,6 +470,9 @@ app.use("/api/quotes", quoteRoutes);
 // 📂 Documents & Dashboard
 app.use("/api/documents", documentRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+// CRM-CORE-1 — couche relationnelle transverse; les données métier restent
+// dans leurs moteurs sources (DOC, GL, ACC, HM, messagerie et finance).
+app.use('/api/crm', require('./routes/crmRoutes'));
 
 // 💬 Messagerie & Emails
 app.use("/api/conversations", conversationRoutes);

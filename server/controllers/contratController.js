@@ -9,7 +9,7 @@ const RealEstateReservation = require('../models/RealEstateReservation');
 // GL-ARCH-1.1 : extrait dans un service partagé pour être réutilisé par le
 // script de réconciliation historique (server/scripts/reconcileRentalManagement.js)
 // — comportement strictement inchangé, voir rentalManagementLeaseSyncService.js.
-const { syncLeaseOccupation } = require('../services/rentalManagementLeaseSyncService');
+const { ensureRentalManagementActive, syncLeaseOccupation } = require('../services/rentalManagementLeaseSyncService');
 // GL-LIFE-1 — la machine d'état devient l'unique point d'entrée pour tout
 // changement de `statut` sur un bail (comportement inchangé pour les
 // contrats de vente, hors périmètre du cycle de vie locatif).
@@ -110,6 +110,24 @@ exports.create = async (req, res) => {
     } else if (property.availability !== 'Disponible') {
       return res.status(409).json({ status: 'fail', code: 'PROPERTY_NOT_AVAILABLE', message: 'Ce bien ne peut plus faire l’objet d’un nouveau contrat.' });
     }
+    // GL-RECON-1 — l'invariant Property → RentalManagement actif → Contrat
+    // doit être vrai AVANT l'insertion du bail. La synchronisation complète
+    // d'occupation reste ensuite déléguée au même service officiel.
+    if (req.body.type === 'location') {
+      const rental = await ensureRentalManagementActive({
+        property,
+        actor: req.user.id,
+        monthlyRent: req.body.montantLoyer,
+      });
+      if (!rental?.active || !rental?.managementActivated) {
+        return res.status(409).json({
+          status: 'fail',
+          code: 'RENTAL_MANAGEMENT_REQUIRED',
+          message: 'Le bien doit être activé en Gestion locative avant la création du bail.',
+        });
+      }
+    }
+
     const c = await Contrat.create(req.body);
     if (reservation) {
       await RealEstateReservation.updateOne({ _id: reservation._id, status: 'active', contract: null }, { $set: { contract: c._id }, $push: { history: { from: 'active', to: 'active', action: 'contract_created', actor: req.user._id } } });

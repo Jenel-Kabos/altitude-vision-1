@@ -11,6 +11,10 @@ const User = require('../models/User');
 const Property = require('../models/Property');
 const Contrat = require('../models/Contrat');
 const RentalManagement = require('../models/RentalManagement');
+const Locataire = require('../models/Locataire');
+const Proprietaire = require('../models/Proprietaire');
+const Paiement = require('../models/Paiement');
+const ActionLog = require('../models/ActionLog');
 const {
   scanRentalManagementConsistency,
   planRentalManagementReconciliation,
@@ -41,10 +45,16 @@ const makeManagedProperty = (owner, overrides = {}) => Property.create({
 // Simule un contrat historique créé AVANT que `syncLeaseOccupation` existe :
 // insertion directe via le modèle, sans passer par contratController.create
 // (qui déclenche désormais toujours la synchronisation).
-const makeHistoricalActiveContract = (property) => Contrat.create({
-  type: 'location', bien: property._id, statut: 'actif',
-  dateEntree: '2025-01-01', dateFinBail: '2025-12-31', montantLoyer: 350000,
-});
+const makeHistoricalActiveContract = async (property, overrides = {}) => {
+  counter += 1;
+  const locataire = await Locataire.create({ nom: 'Locataire', prenom: `Test ${counter}`, telephone: `0600${counter}` });
+  const proprietaire = await Proprietaire.create({ nom: 'Propriétaire', prenom: `Test ${counter}`, telephone: `0700${counter}`, user: property.owner });
+  return Contrat.create({
+    type: 'location', bien: property._id, statut: 'actif', locataire: locataire._id, proprietaire: proprietaire._id,
+    dateEntree: '2025-01-01', dateFinBail: '2025-12-31', montantLoyer: 350000,
+    ...overrides,
+  });
+};
 
 const callStats = async () => {
   let payload;
@@ -68,7 +78,7 @@ describe('GL-ARCH-1.1 — scanRentalManagementConsistency', () => {
     expect(report.totalActiveLeaseContracts).toBe(1);
     expect(report.repairableCount).toBe(1);
     expect(report.items[0]).toEqual(expect.objectContaining({
-      contractId: contract._id, propertyId: property._id, status: 'MISSING_RENTAL_MANAGEMENT', repairable: true,
+      contractId: String(contract._id), propertyId: String(property._id), status: 'MISSING_RENTAL_MANAGEMENT', repairable: true,
     }));
     // Dry-run : lecture seule, aucune écriture.
     expect(await RentalManagement.countDocuments({})).toBe(0);
@@ -80,7 +90,7 @@ describe('GL-ARCH-1.1 — scanRentalManagementConsistency', () => {
     const contract = await makeHistoricalActiveContract(property);
     await RentalManagement.create({
       property: property._id, owner: owner._id, managementActivated: true,
-      occupancyStatus: 'occupe', activeLease: contract._id, monthlyRent: 350000,
+      occupancyStatus: 'occupe', activeLease: contract._id, currentTenant: contract.locataire, monthlyRent: 350000,
     });
 
     const report = await scanRentalManagementConsistency();
@@ -97,6 +107,52 @@ describe('GL-ARCH-1.1 — scanRentalManagementConsistency', () => {
     expect(report.repairableCount).toBe(0);
     expect(report.anomalyCount).toBe(1);
     expect(report.items[0].status).toBe('ANOMALY_PROPERTY_NOT_FOUND');
+  });
+
+  test('bloque deux contrats ouverts sur le même Property et ne planifie aucune correction', async () => {
+    const owner = await makeUser({ role: 'Proprietaire' });
+    const property = await makeManagedProperty(owner);
+    await makeHistoricalActiveContract(property);
+    // Contourne volontairement l'index de protection pour simuler une donnée legacy.
+    await Contrat.collection.createIndex(
+      { bien: 1, type: 1 },
+      {
+        unique: true,
+        partialFilterExpression: { bien: { $type: 'objectId' }, statut: { $in: ['en_attente', 'actif'] } },
+        name: 'one_open_contract_per_property_and_type',
+      },
+    );
+    await Contrat.collection.dropIndex('one_open_contract_per_property_and_type');
+    try {
+      await Contrat.collection.insertOne({
+        type: 'location', bien: property._id, statut: 'actif', locataire: new mongoose.Types.ObjectId(),
+        proprietaire: new mongoose.Types.ObjectId(), createdAt: new Date(), updatedAt: new Date(),
+      });
+
+      const report = await scanRentalManagementConsistency();
+      expect(report.duplicateCount).toBe(2);
+      expect(report.conflictCount).toBe(2);
+      expect(report.items.every((item) => item.status === 'CONFLICT_MULTIPLE_OPEN_CONTRACTS')).toBe(true);
+      expect(planRentalManagementReconciliation(report).actionCount).toBe(0);
+    } finally {
+      await Contrat.collection.deleteMany({ bien: property._id });
+      await Contrat.collection.createIndex(
+        { bien: 1, type: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { bien: { $type: 'objectId' }, statut: { $in: ['en_attente', 'actif'] } },
+          name: 'one_open_contract_per_property_and_type',
+        },
+      );
+    }
+  });
+
+  test('signale les paiements dont le contrat est introuvable sans les modifier', async () => {
+    await Paiement.collection.insertOne({ contrat: new mongoose.Types.ObjectId(), mois: 1, annee: 2026, montant: 100, statut: 'impayé' });
+    const report = await scanRentalManagementConsistency();
+    expect(report.paymentIssueCount).toBe(1);
+    expect(report.paymentIssues[0].status).toBe('PAYMENT_CONTRACT_NOT_FOUND');
+    expect(await Paiement.countDocuments()).toBe(1);
   });
 });
 
@@ -125,6 +181,26 @@ describe('GL-ARCH-1.1 — réconciliation (plan + apply) : idempotente, jamais d
     expect(updatedProperty.availability).toBe('Loué');
 
     expect((await callStats()).total).toBe(1);
+    expect(result.verification.items[0].status).toBe('CONSISTENT');
+    const log = await ActionLog.findOne({ action: 'Réconciliation Gestion locative' });
+    expect(log).toBeTruthy();
+    expect(log.metadata.ancienneValeur).toBe('null');
+    expect(log.metadata.nouvelleValeur).toContain(String(property._id));
+  });
+
+  test('réactive un RentalManagement inactif sans en créer un second', async () => {
+    const admin = await makeUser({ role: 'Admin' });
+    const owner = await makeUser({ role: 'Proprietaire' });
+    const property = await makeManagedProperty(owner);
+    const contract = await makeHistoricalActiveContract(property);
+    await RentalManagement.create({ property: property._id, owner: owner._id, active: false, managementActivated: false });
+
+    const report = await scanRentalManagementConsistency();
+    expect(report.items[0].status).toBe('RENTAL_MANAGEMENT_INACTIVE');
+    const result = await applyRentalManagementReconciliation({ plan: planRentalManagementReconciliation(report), actor: admin._id });
+    expect(result.repairedCount).toBe(1);
+    expect(await RentalManagement.countDocuments({ property: property._id })).toBe(1);
+    expect(await RentalManagement.exists({ property: property._id, active: true, managementActivated: true, activeLease: contract._id })).toBeTruthy();
   });
 
   test('exécuter la réconciliation deux fois ne crée jamais de second RentalManagement (idempotence)', async () => {

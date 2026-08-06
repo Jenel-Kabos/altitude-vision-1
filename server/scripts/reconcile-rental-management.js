@@ -13,12 +13,18 @@ const {
   applyRentalManagementReconciliation,
 } = require('../services/rentalManagementReconciliationService');
 
-const args = new Set(process.argv.slice(2));
-const valueOf = (name) => process.argv.find((arg) => arg.startsWith(`${name}=`))?.slice(name.length + 1);
+function parseArgs(argv = process.argv.slice(2)) {
+  const unknown = argv.filter((arg) => !['--dry-run', '--apply'].includes(arg) && !arg.startsWith('--actor='));
+  if (unknown.length) throw new Error(`RECONCILIATION_UNKNOWN_OPTION — ${unknown.join(', ')}`);
+  if (argv.includes('--dry-run') && argv.includes('--apply')) throw new Error('RECONCILIATION_MODE_CONFLICT');
+  return {
+    apply: argv.includes('--apply'),
+    actor: argv.find((arg) => arg.startsWith('--actor='))?.slice('--actor='.length),
+  };
+}
 
 async function main() {
-  const apply = args.has('--apply');
-  const actor = valueOf('--actor');
+  const { apply, actor } = parseArgs();
   if (apply && !actor) throw new Error('RECONCILIATION_ACTOR_REQUIRED — passez --actor=<userId Admin/GestionnaireImmobilier>');
   if (apply && process.env.NODE_ENV === 'production' && process.env.RENTAL_RECONCILIATION_ALLOW_PRODUCTION !== 'true') {
     throw new Error('RENTAL_RECONCILIATION_PRODUCTION_GUARD — cette mission interdit toute exécution en production sans confirmation explicite.');
@@ -34,6 +40,10 @@ async function main() {
   if (!apply && plan.actionCount > 0) process.exitCode = 2;
 }
 
-main()
-  .catch((error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; })
-  .finally(() => mongoose.disconnect());
+if (require.main === module) {
+  main()
+    .catch((error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; })
+    .finally(() => mongoose.disconnect());
+}
+
+module.exports = { parseArgs };

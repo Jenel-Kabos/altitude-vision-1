@@ -9,19 +9,37 @@ const RentalManagement = require('../models/RentalManagement');
 const RealEstateReservation = require('../models/RealEstateReservation');
 const rentalSync = require('./rentalListingSyncService');
 
+async function ensureRentalManagementActive({ property, actor, monthlyRent }) {
+  const propertyId = property?._id || property;
+  const resolvedProperty = property?.status
+    ? property
+    : await Property.findById(propertyId).select('_id owner status price');
+  if (!resolvedProperty || resolvedProperty.status !== 'location') return null;
+
+  return RentalManagement.findOneAndUpdate(
+    { property: resolvedProperty._id },
+    {
+      $setOnInsert: { property: resolvedProperty._id, owner: resolvedProperty.owner, manager: actor },
+      $set: {
+        active: true,
+        managementActivated: true,
+        monthlyRent: monthlyRent ?? resolvedProperty.price,
+      },
+    },
+    { new: true, upsert: true, runValidators: true },
+  );
+}
+
 async function syncLeaseOccupation(contract, actor) {
   if (contract.type !== 'location' || !contract.bien) return null;
   const propertyId = contract.bien?._id || contract.bien;
   const property = await Property.findById(propertyId).select('_id owner status price');
   if (!property || property.status !== 'location') return null;
-  const rental = await RentalManagement.findOneAndUpdate(
-    { property: property._id },
-    {
-      $setOnInsert: { property: property._id, owner: property.owner, manager: actor },
-      $set: { monthlyRent: contract.montantLoyer ?? property.price, managementActivated: true },
-    },
-    { new: true, upsert: true, runValidators: true },
-  );
+  const rental = await ensureRentalManagementActive({
+    property,
+    actor,
+    monthlyRent: contract.montantLoyer,
+  });
   if (contract.statut === 'actif') {
     await rentalSync.markPropertyRented(rental._id, { leaseId: contract._id, tenantId: contract.locataire, actor, source: 'contract' });
     if (contract.reservation) {
@@ -36,4 +54,4 @@ async function syncLeaseOccupation(contract, actor) {
   return rental;
 }
 
-module.exports = { syncLeaseOccupation };
+module.exports = { ensureRentalManagementActive, syncLeaseOccupation };

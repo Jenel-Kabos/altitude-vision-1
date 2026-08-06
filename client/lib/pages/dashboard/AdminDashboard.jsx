@@ -8,11 +8,13 @@ import {
   CheckCircle2, ShieldCheck, Mail, Menu, X, Star, Mountain, Building,
   ClipboardList, BarChart2, Scale, Megaphone, MessageCircle, FolderOpen,
   Clock, PenLine, Calculator, FileText, CreditCard, Palmtree,
-  Landmark, KeyRound, Users2, FileSignature, Wrench, Building2,
+  Landmark, KeyRound, Users2, FileSignature, Wrench, Building2, History,
+  ContactRound,
 } from "lucide-react";
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardBadges } from '../../hooks/useDashboardBadges';
 import DashboardBadge from '../../components/dashboard/DashboardBadge';
+import { resolveWebDestination } from '../../navigation/navigationSdk';
 
 const GOLD = '#C8960C';
 const BLUE = '#2E7BB5';
@@ -29,6 +31,7 @@ const ROLES_GL      = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secr
 const ROLES_DOCS    = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire'];
 const ROLES_LITIGES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier'];
 const ROLES_MOD     = ['Admin', 'Collaborateur'];
+const CRM_ROUTE     = resolveWebDestination('CRM_CUSTOMERS');
 
 const NAV_SECTIONS = [
   {
@@ -64,6 +67,7 @@ const NAV_SECTIONS = [
     links: [
       { to: '/dashboard/gestion-locative',            end: true,  Icon: Building,       label: "Vue d'ensemble", accent: BLUE, roles: ROLES_GL },
       { to: '/dashboard/gestion-locative/baux',        end: false, Icon: FileSignature, label: 'Baux',           accent: BLUE, roles: ROLES_GL },
+      { to: '/dashboard/gestion-locative/regularisation', end: false, Icon: History, label: 'Régularisation', accent: '#B45309', roles: ['Admin', 'GestionnaireImmobilier', 'Collaborateur'] },
       { to: '/dashboard/gestion-locative/locataires',  end: false, Icon: Users,         label: 'Locataires',     accent: BLUE, roles: ROLES_GL },
       { to: '/dashboard/gestion-locative/paiements',   end: false, Icon: CreditCard,    label: 'Paiements',      accent: BLUE, roles: ROLES_GL },
       { to: '/dashboard/gestion-locative/preavis',     end: false, Icon: Clock,         label: 'Préavis',        accent: BLUE, roles: ROLES_GL },
@@ -110,6 +114,12 @@ const NAV_SECTIONS = [
     ],
   },
   {
+    label: 'CRM 360°',
+    links: [
+      { to: CRM_ROUTE, end: false, Icon: ContactRound, label: 'Customers & pipeline', accent: '#0F766E', roles: ALL_STAFF },
+    ],
+  },
+  {
     label: 'Administration',
     links: [
       { to: '/dashboard/users',            end: false, Icon: Users,         label: 'Utilisateurs',       accent: '#0D9488', roles: ['Admin'] },
@@ -132,6 +142,7 @@ const NAV_SECTIONS = [
 ];
 
 const TOPBAR_TITLES = [
+  [CRM_ROUTE, 'CRM 360°'],
   ['/dashboard/moderation', 'Modération'],
   ['/dashboard/gestion-locative', 'Gestion Locative'],
   ['/dashboard/conversations', 'Messages clients'],
