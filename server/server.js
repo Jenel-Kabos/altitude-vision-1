@@ -473,6 +473,13 @@ app.use("/api/dashboard", dashboardRoutes);
 // CRM-CORE-1 — couche relationnelle transverse; les données métier restent
 // dans leurs moteurs sources (DOC, GL, ACC, HM, messagerie et finance).
 app.use('/api/crm', require('./routes/crmRoutes'));
+// USER-ARCH-1 — profils métiers (User → profils → domaines), distinct de
+// /api/users (identité) et de /api/crm (relations commerciales).
+app.use('/api/user-business-profiles', require('./routes/userBusinessProfileRoutes'));
+// CRM-AUTOMATION-1 — moteur d'automatisation (registre de règles, cockpit,
+// score dérivé) : observe les événements déjà émis par /api/crm et les
+// autres domaines, n'en produit jamais de nouveaux.
+app.use('/api/crm-automation', require('./routes/crmAutomationRoutes'));
 
 // 💬 Messagerie & Emails
 app.use("/api/conversations", conversationRoutes);

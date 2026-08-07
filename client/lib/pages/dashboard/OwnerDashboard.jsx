@@ -21,25 +21,41 @@ const GREEN = '#16A34A';
 // SalePropertyForm/RentalPropertyForm reste un flux admin uniquement pour
 // l'instant) et Hébergement (page propriétaire déjà dédiée). "Mes hôtels"
 // et "Mes paiements" préparent la navigation uniquement (pages vides).
+//
+// USER-ARCH-UX-1 — `profile` marque les entrées propres à un profil métier
+// ('proprietaire_immobilier' | 'exploitant_etablissement' | null = commun à
+// tous). Avant cette sprint, un exploitant pur (aucun bien vente/location)
+// voyait quand même "Vente"/"Location" et inversement — la navigation ne
+// distinguait jamais les deux identités portées par `User.role==='Proprietaire'`.
 const NAV_LINKS = [
-  { to: '/mes-biens',                    end: true,  Icon: Building,      label: 'Toutes mes annonces', accent: BLUE, section: 'Mes annonces' },
-  { to: '/mes-biens?status=vente',       end: false, Icon: Landmark,      label: 'Vente',                accent: BLUE, section: 'Mes annonces' },
-  { to: '/mes-biens?status=location',    end: false, Icon: KeyRound,      label: 'Location',             accent: BLUE, section: 'Mes annonces' },
-  { to: '/mes-hebergements',             end: true,  Icon: Palmtree,      label: 'Hébergement',          accent: GOLD, section: 'Mes annonces' },
-  { to: '/mes-hotels',                   end: true,  Icon: Building2,     label: 'Mes hôtels',           accent: GOLD, section: null },
-  { to: '/mes-hotels/reservations',       end: true,  Icon: BookOpenCheck, label: 'Mes réservations',     accent: GOLD, section: null },
-  { to: '/mes-biens/visites',            end: false, Icon: Calendar,      label: 'Mes rendez-vous',      accent: GOLD, section: null },
-  { to: '/mes-biens/paiements',          end: false, Icon: CreditCard,    label: 'Mes paiements',        accent: GOLD, section: null },
-  { to: '/messages',                     end: false, Icon: MessageCircle, label: 'Mes messages',         accent: BLUE, section: null },
-  { to: '/profile',                      end: false, Icon: User,          label: 'Mon profil',           accent: GOLD, section: null },
-  { to: '/mes-biens/securite',           end: false, Icon: ShieldCheck,   label: 'Sécurité',              accent: GREEN, section: null },
+  { to: '/mes-biens',                    end: true,  Icon: Building,      label: 'Toutes mes annonces', accent: BLUE, section: 'Mes annonces',  profile: 'proprietaire_immobilier' },
+  { to: '/mes-biens?status=vente',       end: false, Icon: Landmark,      label: 'Vente',                accent: BLUE, section: 'Mes annonces',  profile: 'proprietaire_immobilier' },
+  { to: '/mes-biens?status=location',    end: false, Icon: KeyRound,      label: 'Location',             accent: BLUE, section: 'Mes annonces',  profile: 'proprietaire_immobilier' },
+  { to: '/mes-hebergements',             end: true,  Icon: Palmtree,      label: 'Hébergement',          accent: GOLD, section: 'Mes annonces',  profile: 'exploitant_etablissement' },
+  { to: '/mes-hotels',                   end: true,  Icon: Building2,     label: 'Mes hôtels',           accent: GOLD, section: null,            profile: 'exploitant_etablissement' },
+  { to: '/mes-hotels/reservations',       end: true,  Icon: BookOpenCheck, label: 'Mes réservations',     accent: GOLD, section: null,            profile: 'exploitant_etablissement' },
+  { to: '/mes-biens/visites',            end: false, Icon: Calendar,      label: 'Mes rendez-vous',      accent: GOLD, section: null,            profile: null },
+  { to: '/mes-biens/paiements',          end: false, Icon: CreditCard,    label: 'Mes paiements',        accent: GOLD, section: null,            profile: null },
+  { to: '/messages',                     end: false, Icon: MessageCircle, label: 'Mes messages',         accent: BLUE, section: null,            profile: null },
+  { to: '/profile',                      end: false, Icon: User,          label: 'Mon profil',           accent: GOLD, section: null,            profile: null },
+  { to: '/mes-biens/securite',           end: false, Icon: ShieldCheck,   label: 'Sécurité',              accent: GREEN, section: null,           profile: null },
 ];
 
 const OwnerDashboard = ({ children }) => {
   const router = useRouter();
   const pathname = usePathname();
   const isActive = (to, end = false) => end ? pathname === to : pathname.startsWith(to);
-  const { logout, user } = useAuth();
+  const { logout, user, businessProfiles, isProprietaireImmobilier, isExploitantEtablissement } = useAuth();
+  // Tant que les profils métiers ne sont pas encore chargés (`null`), on
+  // affiche tout — un utilisateur légitime ne doit jamais voir son menu
+  // amputé pendant le chargement réseau.
+  const visibleNavLinks = businessProfiles === null
+    ? NAV_LINKS
+    : NAV_LINKS.filter(({ profile }) => (
+      profile === 'proprietaire_immobilier' ? isProprietaireImmobilier
+        : profile === 'exploitant_etablissement' ? isExploitantEtablissement
+          : true
+    ));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [rendezVousBadge, setRendezVousBadge] = useState(0);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
@@ -62,7 +78,7 @@ const OwnerDashboard = ({ children }) => {
   };
 
   const close = () => setSidebarOpen(false);
-  const activeTitle = NAV_LINKS.find(link => isActive(link.to, link.end))?.label || 'Espace Propriétaire';
+  const activeTitle = visibleNavLinks.find(link => isActive(link.to, link.end))?.label || 'Espace Propriétaire';
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 767px)');
@@ -164,9 +180,9 @@ const OwnerDashboard = ({ children }) => {
 
           {/* Nav */}
           <nav className="px-3 py-3 space-y-0.5">
-            {NAV_LINKS.map(({ to, end, Icon, label, accent, section }, index) => (
+            {visibleNavLinks.map(({ to, end, Icon, label, accent, section }, index) => (
               <React.Fragment key={to}>
-                {section && section !== NAV_LINKS[index - 1]?.section && (
+                {section && section !== visibleNavLinks[index - 1]?.section && (
                   <p className="px-3 pt-3 pb-1 text-white/25 text-xs font-semibold uppercase tracking-widest"
                     style={{ fontFamily: "'DM Sans', sans-serif" }}>
                     {section}

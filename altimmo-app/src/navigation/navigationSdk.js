@@ -12,9 +12,16 @@ const interpolate = (value, params = {}) => {
   }
   return value;
 };
-export const canAccessDestination = (destination, { authenticated = false, role = null } = {}) => Boolean(
+// USER-ARCH-UX-1 (Phase 5/6) — même contrat additif que la version web
+// (client/lib/navigation/navigationSdk.js) : `profiles` par défaut [] ne
+// change rien pour les appelants existants.
+export const canAccessDestination = (destination, { authenticated = false, role = null, profiles = [] } = {}) => Boolean(
   destination && (!destination.requiresAuth || authenticated)
-  && (destination.roles.length === 0 || destination.roles.includes(role))
+  && (
+    destination.roles.length === 0
+    || destination.roles.includes(role)
+    || (destination.profiles || []).some((p) => profiles.includes(p))
+  )
 );
 
 export function resolveMobileDestination(destination, params = {}) {

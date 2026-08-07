@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useWriteWindow } from '../hooks/useWriteWindow';
+import { getEffectiveProfiles } from '../services/userBusinessProfileService';
 
 const DEFAULT_AUTH = {
     user: null,
@@ -23,6 +24,11 @@ const DEFAULT_AUTH = {
     canModify:       () => true,
     timeLeft:        () => 0,
     activeWrites:    {},
+    businessProfiles: null,
+    hasBusinessProfile: () => false,
+    isProprietaireImmobilier:  false,
+    isExploitantEtablissement: false,
+    isLocataireProfile:        false,
 };
 
 const AuthContext = createContext(undefined);
@@ -31,6 +37,12 @@ export const AuthProvider = ({ children }) => {
     const [user,          setUser]          = useState(null);
     const [loading,       setLoading]       = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
+    // USER-ARCH-UX-1 — profils métiers effectifs (fusion stocké+dérivé,
+    // calculée côté backend par getEffectiveProfiles). null = pas encore
+    // chargé (à distinguer de [] = chargé, aucun profil) pour que les écrans
+    // consommateurs puissent afficher un état de chargement plutôt qu'un
+    // "aucun profil" prématuré.
+    const [businessProfiles, setBusinessProfiles] = useState(null);
 
     const COLLAB_ROLES = ['Collaborateur', 'Secretaire', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant'];
     const isCollab = COLLAB_ROLES.includes(user?.role);
@@ -154,6 +166,26 @@ export const AuthProvider = ({ children }) => {
         }
     }, [session, user]);
 
+    // ── Chargement des profils métiers effectifs ──────────────
+    // Se déclenche à chaque changement d'identité (login, logout, refresh
+    // de session Google) ; échec silencieux (réseau/backend indisponible)
+    // pour ne jamais bloquer le reste de l'app — les écrans consommateurs
+    // doivent traiter `businessProfiles === null` comme "pas encore su".
+    useEffect(() => {
+        const userId = user?._id || user?.id;
+        if (!userId) { setBusinessProfiles(user ? [] : null); return; }
+        let cancelled = false;
+        getEffectiveProfiles(userId)
+            .then((profiles) => { if (!cancelled) setBusinessProfiles(profiles); })
+            .catch(() => { if (!cancelled) setBusinessProfiles([]); });
+        return () => { cancelled = true; };
+    }, [user?._id, user?.id]);
+
+    const hasBusinessProfile = useCallback(
+        (profileType) => Boolean(businessProfiles?.includes(profileType)),
+        [businessProfiles]
+    );
+
     // Prevents hydration mismatch: Next.js RSC renders the layout in the HTML,
     // but loading=true would render a spinner client-side — causing a fatal mismatch.
     // The mounted flag defers the spinner until after hydration completes.
@@ -179,7 +211,13 @@ export const AuthProvider = ({ children }) => {
         canModify,
         timeLeft,
         activeWrites,
-    }), [user, loading, isInitialized, login, logout, updateUser, registerWrite, canModify, timeLeft, activeWrites]);
+        // USER-ARCH-UX-1 — profils métiers (indépendants de user.role)
+        businessProfiles,
+        hasBusinessProfile,
+        isProprietaireImmobilier:  hasBusinessProfile('proprietaire_immobilier'),
+        isExploitantEtablissement: hasBusinessProfile('exploitant_etablissement'),
+        isLocataireProfile:        hasBusinessProfile('locataire'),
+    }), [user, loading, isInitialized, login, logout, updateUser, registerWrite, canModify, timeLeft, activeWrites, businessProfiles, hasBusinessProfile]);
 
     return (
         <AuthContext.Provider value={value}>

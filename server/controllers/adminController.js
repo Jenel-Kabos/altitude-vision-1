@@ -7,17 +7,22 @@ const User = require('../models/User');
 const Property = require('../models/Property');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
+const userKpiService = require('../services/userKpiService'); // USER-KPI-1
 
 /* ============================================================
    📊 DASHBOARD ADMIN – STATISTIQUES GLOBALES
 ============================================================ */
 exports.getDashboardStats = catchAsync(async (req, res) => {
-    const [totalUsers, totalOwners, totalProperties, pendingProperties] = await Promise.all([
+    const [totalUsers, kpis, totalProperties, pendingProperties] = await Promise.all([
         User.countDocuments(),
-        User.countDocuments({ role: { $in: ['Propriétaire', 'Proprietaire'] } }),
+        // USER-KPI-1 — remplace l'ancien `User.countDocuments({role:{$in:[...]}})`
+        // (voir server/routes/dashboardRoutes.js pour la justification de la
+        // règle d'union propriétaire immobilier + exploitant d'établissement).
+        userKpiService.getUserKpiSummary(),
         Property.countDocuments(),
         Property.countDocuments({ adminStatus: 'pending' }),
     ]);
+    const totalOwners = kpis.proprietaires;
 
     res.status(200).json({
         status: 'success',
@@ -82,8 +87,11 @@ exports.getAllUsers = catchAsync(async (req, res) => {
 
 // 🔹 Liste de tous les propriétaires
 exports.getAllOwners = catchAsync(async (req, res) => {
+    // USER-KPI-1 — remplace l'ancien `role:{$in:['Propriétaire','Proprietaire']}`
+    // par la même règle d'union que getDashboardStats ci-dessus.
+    const ownerIds = await userKpiService.getProprietaireUserIds();
     const owners = await User.find({
-        role: { $in: ['Propriétaire', 'Proprietaire'] }
+        _id: { $in: ownerIds }
     }).select('-password').sort('-createdAt');
 
     res.status(200).json({

@@ -106,6 +106,14 @@ const NOTIFICATION_TYPES = [
   'nouveau_signalement',   // admin : nouveau signalement reçu
   // ── CRM transversal ──
   'crm_activity_assigned',
+  // ── CRM-AUTOMATION-1 — événements d'opportunité, seul manque identifié par
+  // l'audit (createOpportunity/moveOpportunity/setOpportunityOutcome
+  // n'appelaient ni notify() ni logAction()) : nécessaires pour que le
+  // moteur d'automatisation puisse observer les changements de pipeline.
+  'crm_opportunity_created',
+  'crm_opportunity_stage_changed',
+  'crm_opportunity_won',
+  'crm_opportunity_lost',
 ];
 
 const notificationSchema = new mongoose.Schema(

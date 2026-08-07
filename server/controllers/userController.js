@@ -4,6 +4,7 @@ const sendEmail  = require('../utils/email');
 const { destroyFromCloudinary, uploadToCloudinary } = require('../config/cloudinary');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { COLLAB_ROLES, ROLE_LABELS } = require('../utils/roles');
+const userKpiService = require('../services/userKpiService'); // USER-KPI-1
 
 // ── Email de notification de changement de rôle ──────────────
 
@@ -110,7 +111,11 @@ exports.getAllUsers = async (req, res) => {
 // ======================================================
 exports.getAllOwners = async (req, res) => {
     try {
-        const owners = await User.find({ role: 'Proprietaire' }).select('-password');
+        // USER-KPI-1 — remplace l'ancien `role:'Proprietaire'` (voir
+        // server/routes/dashboardRoutes.js pour la justification de la règle
+        // d'union propriétaire immobilier + exploitant d'établissement).
+        const ownerIds = await userKpiService.getProprietaireUserIds();
+        const owners = await User.find({ _id: { $in: ownerIds } }).select('-password');
         res.status(200).json({ status: 'success', results: owners.length, data: { owners } });
     } catch (error) {
         console.error('Erreur getAllOwners:', error);

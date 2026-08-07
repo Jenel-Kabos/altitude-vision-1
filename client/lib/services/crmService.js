@@ -8,7 +8,7 @@ export const moveCrmOpportunity = async (id, stage, note = '') => (await api.pat
 export const createCrmActivity = async (customerId, payload) => (await api.post(`/crm/customers/${customerId}/activities`, payload)).data.data.activity;
 export const updateCrmActivity = async (id, payload) => (await api.patch(`/crm/activities/${id}`, payload)).data.data.activity;
 export const getCrmDashboard = async () => (await api.get('/crm/dashboard')).data.data;
-export const getCrmPipeline = async () => (await api.get('/crm/pipeline')).data.data;
+export const getCrmPipeline = async (params = {}) => (await api.get('/crm/pipeline', { params })).data.data;
 export const getCrmActivities = async (params = {}) => (await api.get('/crm/activities', { params })).data.data;
 export const searchCrm = async (q) => (await api.get('/crm/search', { params: { q } })).data.data;
 export const getCrmDuplicates = async () => (await api.get('/crm/duplicates')).data.data;

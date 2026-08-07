@@ -8,6 +8,8 @@ const CrmOpportunity = require('../models/CrmOpportunity');
 const CrmActivity = require('../models/CrmActivity');
 const Notification = require('../models/Notification');
 const CrmConsolidation = require('../models/CrmConsolidation');
+const Property = require('../models/Property');
+const Hotel = require('../models/Hotel');
 const { synchronizeCustomers, listCustomers, getCustomer360, createOpportunity, moveOpportunity, setOpportunityOutcome, createActivity, updateActivity, getDashboard, getPipeline, getActivities, globalSearch, findDuplicates, compareCustomers, consolidateCustomers } = require('../services/crmService');
 
 jest.setTimeout(120000);
@@ -98,5 +100,51 @@ describe('CRM-CORE-1 — Customer 360 transversal', () => {
     await consolidateCustomers({ customerA: a._id, customerB: b._id, decision: 'defer', justification: 'Téléphone partagé à vérifier' }, admin._id);
     expect(await CrmCustomer.countDocuments({ status: 'merge_review' })).toBe(2);
     expect(await CrmCustomer.countDocuments({ status: 'archived' })).toBe(0);
+  });
+
+  // USER-ARCH-1 — un utilisateur qui exploite un hébergement/hôtel reçoit la
+  // relation 'exploitant_etablissement' EN PLUS de ses autres relations,
+  // jamais à la place — jamais dérivé de User.role (qui reste 'Proprietaire'
+  // pour les deux cas, sans distinction).
+  test('exploitant_etablissement est ajouté pour un propriétaire de bien hébergement, sans retirer les autres relations', async () => {
+    const admin = await User.create({ name: 'Admin CRM 2', email: 'admin.crm2@example.test', role: 'Admin', password: 'Password123!', passwordConfirm: 'Password123!' });
+    const exploitant = await User.create({ name: 'Exploitant Hebergement', email: 'exploitant.heb@example.test', phone: '+242060000099', role: 'Proprietaire', password: 'Password123!', passwordConfirm: 'Password123!' });
+    await Property.create({
+      title: 'Villa meublée CRM test', description: 'Description suffisamment longue pour la validation du modèle Property.',
+      pole: 'Altimmo', type: 'Villa', status: 'hebergement', price: 100000,
+      address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: -4.26, longitude: 15.24,
+      images: ['https://placehold.co/1200x800/png?text=Test'], surface: 90,
+      statusAdmin: 'Validée', availability: 'Disponible', owner: exploitant._id,
+    });
+    await synchronizeCustomers(admin._id);
+    const customer = await CrmCustomer.findOne({ identityKeys: 'email:exploitant.heb@example.test' });
+    expect(customer.relations).toEqual(expect.arrayContaining(['exploitant_etablissement', 'prospect']));
+  });
+
+  test('exploitant_etablissement est ajouté pour un manager d\'hôtel', async () => {
+    const admin = await User.create({ name: 'Admin CRM 3', email: 'admin.crm3@example.test', role: 'Admin', password: 'Password123!', passwordConfirm: 'Password123!' });
+    const manager = await User.create({ name: 'Manager Hotel', email: 'manager.hotel@example.test', role: 'Proprietaire', password: 'Password123!', passwordConfirm: 'Password123!' });
+    await Hotel.create({ name: 'Hotel CRM Test', manager: manager._id, createdBy: admin._id });
+    await synchronizeCustomers(admin._id);
+    const customer = await CrmCustomer.findOne({ identityKeys: 'email:manager.hotel@example.test' });
+    expect(customer.relations).toContain('exploitant_etablissement');
+  });
+
+  // USER-ARCH-UX-1 (Phase 4) — le pipeline filtré par `relation` ne doit
+  // renvoyer que les opportunités des customers portant ce segment, sans
+  // jamais modifier les autres opportunités ni la vue non filtrée.
+  test('getPipeline({relation}) segmente le pipeline sans affecter la vue non filtrée', async () => {
+    const admin = await User.create({ name: 'Admin CRM 4', email: 'admin.crm4@example.test', role: 'Admin', password: 'Password123!', passwordConfirm: 'Password123!' });
+    const exploitantCustomer = await CrmCustomer.create({ displayName: 'Exploitant Pipeline', relations: ['exploitant_etablissement'], identityKeys: ['source:Test:exploitant-pipeline'], sourceRefs: [{ entityType: 'User', entityId: new mongoose.Types.ObjectId(), source: 'test' }] });
+    const proprietaireCustomer = await CrmCustomer.create({ displayName: 'Proprietaire Pipeline', relations: ['proprietaire'], identityKeys: ['source:Test:proprietaire-pipeline'], sourceRefs: [{ entityType: 'User', entityId: new mongoose.Types.ObjectId(), source: 'test' }] });
+    await createOpportunity(exploitantCustomer._id, { title: 'Mission exploitant' }, admin._id);
+    await createOpportunity(proprietaireCustomer._id, { title: 'Mission proprietaire' }, admin._id);
+
+    const filtered = await getPipeline({ relation: 'exploitant_etablissement' });
+    expect(filtered.opportunities).toHaveLength(1);
+    expect(filtered.opportunities[0].title).toBe('Mission exploitant');
+
+    const unfiltered = await getPipeline();
+    expect(unfiltered.opportunities).toHaveLength(2);
   });
 });

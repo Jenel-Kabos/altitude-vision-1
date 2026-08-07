@@ -9,7 +9,7 @@ exports.moveOpportunity = asyncHandler(async (req, res) => res.json({ status: 's
 exports.createActivity = asyncHandler(async (req, res) => res.status(201).json({ status: 'success', data: { activity: await crm.createActivity(req.params.customerId, req.body, req.user._id) } }));
 exports.updateActivity = asyncHandler(async (req, res) => res.json({ status: 'success', data: { activity: await crm.updateActivity(req.params.activityId, req.body, req.user._id) } }));
 exports.dashboard = asyncHandler(async (_req, res) => res.json({ status: 'success', data: await crm.getDashboard() }));
-exports.pipeline = asyncHandler(async (_req, res) => res.json({ status: 'success', data: await crm.getPipeline() }));
+exports.pipeline = asyncHandler(async (req, res) => res.json({ status: 'success', data: await crm.getPipeline(req.query) }));
 exports.activities = asyncHandler(async (req, res) => res.json({ status: 'success', data: await crm.getActivities(req.query) }));
 exports.search = asyncHandler(async (req, res) => res.json({ status: 'success', data: await crm.globalSearch(req.query.q) }));
 exports.duplicates = asyncHandler(async (req, res) => res.json({ status: 'success', data: await crm.findDuplicates(req.query) }));

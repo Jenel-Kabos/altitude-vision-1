@@ -165,6 +165,19 @@ async function notify({
     return Notification.findOne({ recipient: id, dedupeKey });
   }
 
+  // CRM-AUTOMATION-1 — point d'observation unique du moteur d'automatisation
+  // CRM : notify() est le choke point déjà emprunté par tous les domaines
+  // métier (voir audit). Fire-and-forget, require() différé pour éviter tout
+  // cycle de dépendance au chargement des modules ; une erreur ici ne doit
+  // JAMAIS empêcher l'émission de la notification elle-même (déjà persistée
+  // ci-dessus).
+  Promise.resolve()
+    .then(() => require('./crmAutomationEngine').handleEvent({
+      type, recipient: id, sender, entityType: navigation.entityType, entityId: navigation.entityId,
+      metadata: resolvedMetadata, audience, dedupeKey, notificationId: notif._id,
+    }))
+    .catch(() => {});
+
   // 2 — Temps réel Socket.IO (la room = userId, configurée dans socket.js)
   try {
     getIO().to(id).emit('notification', {

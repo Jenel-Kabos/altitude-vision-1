@@ -4,12 +4,14 @@ import api from '@/lib/services/api';
 import toast from '@/lib/utils/toast';
 import { Users } from 'lucide-react';
 import { DashboardPage, DashboardPageHeader, DashboardState, DashboardTableContainer } from '../../components/dashboard/DashboardUI';
+import UserBusinessProfilePanel from '../../components/dashboard/userBusinessProfile/UserBusinessProfilePanel';
 
 const UserManagementPage = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null); // pour suppression
+  const [profileUserId, setProfileUserId] = useState(null); // USER-ARCH-UX-1 — profils métiers
 
   // Récupération des utilisateurs
   const fetchUsers = async () => {
@@ -117,6 +119,12 @@ const UserManagementPage = () => {
                     </button>
                   )}
                   <button
+                    onClick={() => setProfileUserId(user._id)}
+                    className="bg-slate-700 text-white px-2 py-1 rounded hover:bg-slate-800 text-sm"
+                  >
+                    Profils métiers
+                  </button>
+                  <button
                     onClick={() => setSelectedUser(user)}
                     className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-sm"
                   >
@@ -153,6 +161,10 @@ const UserManagementPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {profileUserId && (
+        <UserBusinessProfilePanel userId={profileUserId} onClose={() => setProfileUserId(null)} />
       )}
     </DashboardPage>
   );

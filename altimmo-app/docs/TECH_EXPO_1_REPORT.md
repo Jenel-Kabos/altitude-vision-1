@@ -64,14 +64,17 @@ Les alertes modérées restantes appartiennent notamment aux chaînes Expo CLI/c
 | Export Android | PASS — 2 239 modules, bundle Hermes 6,3 MB |
 | Vérification NAV-CORE/deep links | PASS — 41 destinations, 25 chemins, aucun doublon |
 | Vérification notifications | PASS — tests Jest et API SDK 57 adaptées |
-| Build Android release | EN COURS lors de la rédaction initiale |
+| Build Android release | PASS — `assembleRelease`, API 36, Hermes, 4 ABI, 1 253 tâches, 16 min 28 s |
 | Build iOS | NON EXÉCUTABLE localement — Xcode complet absent |
-| `git diff --check` | PASS intermédiaire |
+| `git diff --check` | PASS final |
+
+Artefact Android local : `android/app/build/outputs/apk/release/app-release.apk` (142 MB, APK universel). L'upload automatique des sourcemaps Sentry a été désactivé pour le build local, faute de jeton CI ; la collecte locale des modules Sentry a bien été exécutée. L'upload reste à valider dans la CI disposant de `SENTRY_AUTH_TOKEN`.
 
 ## Risques et dettes
 
 - Tester sur appareils physiques les notifications foreground/background/cold start, Google Sign-In, Maps, caméra, galerie, géolocalisation, partage, téléchargement, SecureStore, audio/vidéo et App/Universal Links.
 - Produire un build iOS sur Xcode 26.4+ ou EAS, puis tester iOS 16.4 minimum.
+- Valider l'upload des sourcemaps Sentry dans la CI authentifiée ; ce contrôle ne peut pas être certifié depuis le poste local sans secret.
 - Migrer FileSystem `/legacy` vers l'API objet dans un sprint technique séparé.
 - Les avertissements `act(...)` de quelques tests de publication sous React 19 n'échouent pas les suites mais doivent être nettoyés.
 - Les projets natifs générés restent ignorés par Git conformément à l'organisation existante ; les builds doivent toujours partir de `app.config.js` et du lockfile.
@@ -99,4 +102,4 @@ Modifiés :
 - `src/services/__tests__/tenantPortalService.test.js`
 - `src/test/setup.js`
 
-TECH-EXPO-1 n'exécute aucun commit, aucun push, aucune migration destructive et aucune suppression de données.
+Codex n'a exécuté aucun commit, aucun push, aucune migration destructive et aucune suppression de données. Pendant l'exécution du build, un processus externe à cette mission a créé le commit `58e4441` (`Update Altimmo 11`, 2026-08-06 09:28:37 +0100), qui inclut les fichiers TECH-EXPO-1 ainsi que des travaux CRM/PREP préexistants. L'historique n'a pas été réécrit et ce commit externe n'a pas été poussé par Codex.

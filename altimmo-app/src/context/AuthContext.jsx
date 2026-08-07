@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import api, { saveToken, getToken, deleteToken, setSessionInvalidatedHandler } from '../services/api';
 import { enregistrerNotifications, dissocierNotifications } from '../services/notificationsService';
 import { disconnectSocket } from '../services/socketService';
+import { getEffectiveProfiles } from '../services/userBusinessProfileService';
 
 const AuthContext = createContext({});
 
@@ -44,8 +45,21 @@ export const AuthProvider = ({ children }) => {
   // true entre la création d'un nouveau compte Google et la soumission
   // de CompleterProfilScreen (téléphone, rôle définitif, certifications)
   const [needsProfileCompletion, setNeedsProfileCompletion] = useState(false);
+  // USER-ARCH-UX-1 — même contrat que le contexte web : null = pas encore
+  // chargé, [] = chargé sans profil.
+  const [businessProfiles, setBusinessProfiles] = useState(null);
 
   useEffect(() => { loadStoredAuth(); }, []);
+
+  useEffect(() => {
+    const userId = user?._id || user?.id;
+    if (!userId) { setBusinessProfiles(user ? [] : null); return; }
+    let cancelled = false;
+    getEffectiveProfiles(userId)
+      .then((profiles) => { if (!cancelled) setBusinessProfiles(profiles); })
+      .catch(() => { if (!cancelled) setBusinessProfiles([]); });
+    return () => { cancelled = true; };
+  }, [user?._id, user?.id]);
   useEffect(() => {
     setSessionInvalidatedHandler(() => {
       disconnectSocket();
@@ -141,6 +155,7 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     setNeedsProfileCompletion(false);
+    setBusinessProfiles(null);
   };
 
   const updateUser = (data) => setUser((prev) => ({ ...prev, ...data }));
@@ -163,6 +178,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const role = useMemo(() => user?.role?.toLowerCase(), [user?.role]);
+  const hasBusinessProfile = (profileType) => Boolean(businessProfiles?.includes(profileType));
 
   return (
     <AuthContext.Provider value={{
@@ -172,6 +188,12 @@ export const AuthProvider = ({ children }) => {
       isCollaborateur: role === 'collaborateur',
       isProprietaire:  role === 'proprietaire',
       canAdd:          ['admin', 'collaborateur', 'proprietaire'].includes(role),
+      // USER-ARCH-UX-1 — profils métiers (indépendants de user.role)
+      businessProfiles,
+      hasBusinessProfile,
+      isProprietaireImmobilier:  hasBusinessProfile('proprietaire_immobilier'),
+      isExploitantEtablissement: hasBusinessProfile('exploitant_etablissement'),
+      isLocataireProfile:        hasBusinessProfile('locataire'),
     }}>
       {children}
     </AuthContext.Provider>

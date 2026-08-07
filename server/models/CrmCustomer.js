@@ -24,7 +24,10 @@ const schema = new mongoose.Schema({
   addresses: [{ label: String, line: String, city: String, country: String }],
   languages: [{ type: String, trim: true }],
   identityKeys: [{ type: String, required: true }],
-  relations: [{ type: String, enum: ['proprietaire', 'locataire', 'acheteur', 'vendeur', 'voyageur', 'client_hotel', 'client_hebergement', 'client_altcom', 'organisateur', 'sponsor', 'partenaire', 'prestataire', 'prospect'] }],
+  // USER-ARCH-1 — 'exploitant_etablissement' ajouté de façon additive :
+  // distingue la personne qui EXPLOITE un hébergement/hôtel (ce champ) du
+  // client qui y séjourne ('client_hotel'/'client_hebergement', inchangés).
+  relations: [{ type: String, enum: ['proprietaire', 'locataire', 'acheteur', 'vendeur', 'voyageur', 'client_hotel', 'client_hebergement', 'client_altcom', 'organisateur', 'sponsor', 'partenaire', 'prestataire', 'prospect', 'exploitant_etablissement'] }],
   sourceRefs: [sourceRefSchema],
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   status: { type: String, enum: ['active', 'archived', 'merge_review'], default: 'active', index: true },

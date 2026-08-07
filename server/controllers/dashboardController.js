@@ -6,6 +6,7 @@ const PortfolioItem = require('../models/portfolioItemModel');
 const AltcomProject = require('../models/AltcomProject');
 const Review        = require('../models/Review');
 const Contrat       = require('../models/Contrat');
+const userKpiService = require('../services/userKpiService'); // USER-KPI-1
 
 /**
  * @DESC   Statistiques enrichies du Dashboard
@@ -16,6 +17,10 @@ exports.getDashboardStats = async (req, res) => {
   try {
     const now        = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    // USER-KPI-1 — source unique, remplace l'ancien
+    // `User.countDocuments({role:'Proprietaire'})` (voir dashboardRoutes.js
+    // pour la justification complète de la règle d'union).
+    const kpis = await userKpiService.getUserKpiSummary();
 
     const [
       // Comptages globaux
@@ -44,7 +49,7 @@ exports.getDashboardStats = async (req, res) => {
       User.countDocuments(),
       Property.countDocuments(),
       Event.countDocuments(),
-      User.countDocuments({ role: 'Proprietaire' }),
+      Promise.resolve(kpis.proprietaires),
       PortfolioItem.countDocuments({ isPublished: true }),
       // Altimmo
       Property.countDocuments({ statusAdmin: 'Validée' }),

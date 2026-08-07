@@ -23,6 +23,7 @@ const Document = require('../models/Document');
 const Paiement = require('../models/Paiement');
 const { buildTimeline } = require('./dossier/dossierRegistry');
 const { notify } = require('./notificationService');
+const { getBulkDerivedProfileUserIds } = require('./userBusinessProfileService'); // USER-ARCH-UX-1
 
 class CrmError extends Error { constructor(message, statusCode = 400, code = 'CRM_ERROR') { super(message); this.statusCode = statusCode; this.code = code; } }
 const clean = (value) => String(value || '').trim();
@@ -45,16 +46,27 @@ function sourceRecord(entityType, row, fields, relations, source) {
 }
 
 async function loadIdentitySources() {
-  const [users, owners, tenants, contacts, quotes, projects] = await Promise.all([
+  const [users, owners, tenants, contacts, quotes, projects, signalSets] = await Promise.all([
     User.find({ isTechnical: { $ne: true } }).select('name email phone role').lean(),
     Proprietaire.find().select('nom prenom email telephone adresse ville user').lean(),
     Locataire.find().select('nom prenom email telephone adresse ville user').lean(),
     ContactMessage.find().select('name email phone').lean(),
     QuoteRequest.find().select('name email phone source projectDetails.clientInfo.company').lean(),
     AltcomProject.find().select('contactName companyName email phone').lean(),
+    // USER-ARCH-UX-1 — même couche de lecture que partout ailleurs
+    // (userBusinessProfileService) : lève l'ambiguïté 'Proprietaire' sans
+    // dupliquer la règle ici — un utilisateur qui possède un bien
+    // hébergement ou gère un hôtel reçoit EN PLUS la relation
+    // 'exploitant_etablissement', distincte de 'proprietaire' (immobilier
+    // vente/location) — jamais une lecture de `User.role`.
+    getBulkDerivedProfileUserIds(),
   ]);
+  const exploitantIds = signalSets.exploitant_etablissement;
   return [
-    ...users.map((r) => sourceRecord('User', r, { name: 'name', email: 'email', phone: 'phone' }, r.role === 'Prestataire' ? ['prestataire'] : ['prospect'], 'auth')),
+    ...users.map((r) => sourceRecord('User', r, { name: 'name', email: 'email', phone: 'phone' }, [
+      ...(r.role === 'Prestataire' ? ['prestataire'] : ['prospect']),
+      ...(exploitantIds.has(String(r._id)) ? ['exploitant_etablissement'] : []),
+    ], 'auth')),
     ...owners.map((r) => sourceRecord('Proprietaire', { ...r, linkedUser: r.user }, { firstName: 'prenom', lastName: 'nom', email: 'email', phone: 'telephone', address: 'adresse', city: 'ville' }, ['proprietaire'], 'gestion_locative')),
     ...tenants.map((r) => sourceRecord('Locataire', { ...r, linkedUser: r.user }, { firstName: 'prenom', lastName: 'nom', email: 'email', phone: 'telephone', address: 'adresse', city: 'ville' }, ['locataire'], 'gestion_locative')),
     ...contacts.map((r) => sourceRecord('ContactMessage', r, { name: 'name', email: 'email', phone: 'phone' }, ['prospect'], 'contact')),
@@ -158,12 +170,24 @@ async function getCustomer360(customerId) {
 
 async function createOpportunity(customerId, payload, actor) {
   if (!await CrmCustomer.exists({ _id: customerId })) throw new CrmError('Customer introuvable.', 404);
-  return CrmOpportunity.create({ customer: customerId, title: payload.title, pole: payload.pole, stage: payload.stage || 'prospect', valueMinor: payload.valueMinor || 0, currency: payload.currency || 'XAF', probability: payload.probability || 0, expectedCloseAt: payload.expectedCloseAt || null, assignedTo: payload.assignedTo || actor, sourceRef: payload.sourceRef, history: [{ to: payload.stage || 'prospect', actor, note: payload.note || 'Création' }] });
+  const opportunity = await CrmOpportunity.create({ customer: customerId, title: payload.title, pole: payload.pole, stage: payload.stage || 'prospect', valueMinor: payload.valueMinor || 0, currency: payload.currency || 'XAF', probability: payload.probability || 0, expectedCloseAt: payload.expectedCloseAt || null, assignedTo: payload.assignedTo || actor, sourceRef: payload.sourceRef, history: [{ to: payload.stage || 'prospect', actor, note: payload.note || 'Création' }] });
+  // CRM-AUTOMATION-1 — seul ajout d'observabilité : ni createOpportunity ni
+  // moveOpportunity ni setOpportunityOutcome n'appelaient notify() avant ce
+  // sprint (voir audit), rendant le pipeline invisible au moteur
+  // d'automatisation. N'altère aucun comportement métier existant.
+  if (opportunity.assignedTo) {
+    await notify({ recipient: opportunity.assignedTo, sender: actor, type: 'crm_opportunity_created', title: 'Nouvelle opportunité CRM', body: opportunity.title, destination: 'CRM_CUSTOMER_DETAILS', entityType: 'crmCustomer', entityId: customerId, audience: 'staff', metadata: { opportunityId: String(opportunity._id), stage: opportunity.stage }, dedupeKey: `crm-opportunity-created:${opportunity._id}` }).catch(() => {});
+  }
+  return opportunity;
 }
 async function moveOpportunity(id, { stage, note }, actor) {
   const item = await CrmOpportunity.findById(id); if (!item) throw new CrmError('Opportunité introuvable.', 404);
   const from = item.stage; item.stage = stage; item.history.push({ from, to: stage, actor, note });
-  if (stage === 'ancien_client') item.closedAt = new Date(); await item.save(); return item;
+  if (stage === 'ancien_client') item.closedAt = new Date(); await item.save();
+  if (item.assignedTo) {
+    await notify({ recipient: item.assignedTo, sender: actor, type: 'crm_opportunity_stage_changed', title: 'Opportunité déplacée', body: `${item.title} → ${stage}`, destination: 'CRM_CUSTOMER_DETAILS', entityType: 'crmCustomer', entityId: item.customer, audience: 'staff', metadata: { opportunityId: String(item._id), from, to: stage }, dedupeKey: `crm-opportunity-stage:${item._id}:${from}:${stage}:${Date.now()}` }).catch(() => {});
+  }
+  return item;
 }
 async function setOpportunityOutcome(id, { outcome, reason = '' }, actor) {
   const item = await CrmOpportunity.findById(id); if (!item) throw new CrmError('Opportunité introuvable.', 404);
@@ -171,7 +195,11 @@ async function setOpportunityOutcome(id, { outcome, reason = '' }, actor) {
   if (outcome === 'lost' && clean(reason).length < 3) throw new CrmError('Le motif de perte est requis.', 422);
   item.outcome = outcome; item.outcomeReason = clean(reason); item.closedAt = outcome === 'open' ? null : new Date();
   item.history.push({ from: item.stage, to: item.stage, actor, note: `Résultat : ${outcome}${reason ? ` — ${reason}` : ''}` });
-  await item.save(); return item;
+  await item.save();
+  if (item.assignedTo && (outcome === 'won' || outcome === 'lost')) {
+    await notify({ recipient: item.assignedTo, sender: actor, type: outcome === 'won' ? 'crm_opportunity_won' : 'crm_opportunity_lost', title: outcome === 'won' ? 'Opportunité gagnée' : 'Opportunité perdue', body: item.title, destination: 'CRM_CUSTOMER_DETAILS', entityType: 'crmCustomer', entityId: item.customer, audience: 'staff', metadata: { opportunityId: String(item._id), reason }, dedupeKey: `crm-opportunity-outcome:${item._id}:${outcome}` }).catch(() => {});
+  }
+  return item;
 }
 async function createActivity(customerId, payload, actor) {
   if (!await CrmCustomer.exists({ _id: customerId })) throw new CrmError('Customer introuvable.', 404);
@@ -215,8 +243,18 @@ async function getDashboard(now = new Date()) {
   };
 }
 
-async function getPipeline() {
-  const opportunities = await CrmOpportunity.find().populate('customer', 'displayName company emails phones status').populate('assignedTo', 'name email').sort({ updatedAt: -1 }).lean();
+// USER-ARCH-UX-1 (Phase 4) — `relation` optionnel filtre le pipeline sur un
+// segment de profil métier (ex. 'exploitant_etablissement' pour un pipeline
+// dédié aux exploitants) en s'appuyant sur `CrmCustomer.relations[]`, déjà
+// alimenté par `loadIdentitySources`/`getBulkDerivedProfileUserIds` — aucune
+// nouvelle donnée, aucune fusion automatique, juste un filtre de lecture.
+async function getPipeline({ relation } = {}) {
+  const filter = {};
+  if (relation) {
+    const customerIds = await CrmCustomer.distinct('_id', { relations: relation });
+    filter.customer = { $in: customerIds };
+  }
+  const opportunities = await CrmOpportunity.find(filter).populate('customer', 'displayName company emails phones status relations').populate('assignedTo', 'name email').sort({ updatedAt: -1 }).lean();
   return { stages: require('../models/CrmOpportunity').STAGES, opportunities };
 }
 

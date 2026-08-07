@@ -60,7 +60,7 @@ function MenuRow({ icon, label, onPress, danger, toggle, toggleVal, onToggle, st
 
 // ─── ProfilScreen ────────────────────────────────────────────────────────────
 export default function ProfilScreen({ navigation }) {
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, updateUser, businessProfiles, isProprietaireImmobilier, isExploitantEtablissement } = useAuth();
   const { themeColors: c, preference, setPreference } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
 
@@ -70,7 +70,13 @@ export default function ProfilScreen({ navigation }) {
   const role          = user?.role?.toLowerCase();
   const isProprietaire = role === 'proprietaire';
   const isAdmin        = role === 'admin';
-  const canSeeMyBiens  = isProprietaire || isAdmin;
+  // USER-ARCH-UX-1 — distingue les deux identités que 'Proprietaire' portait
+  // indifféremment : tant que les profils métiers ne sont pas encore chargés
+  // (businessProfiles === null), on retombe sur l'ancien comportement basé
+  // sur le rôle pour ne jamais faire disparaître une section légitime.
+  const showImmoSection = businessProfiles === null ? isProprietaire : isProprietaireImmobilier;
+  const showEtablissementSection = businessProfiles === null ? isProprietaire : isExploitantEtablissement;
+  const canSeeMyBiens  = showImmoSection || showEtablissementSection || isAdmin;
   const roleColor      = ROLE_COLOR[role] || colors.info;
   const roleLabel      = user?.role || 'Utilisateur';
 
@@ -226,21 +232,27 @@ export default function ProfilScreen({ navigation }) {
           <Animated.View entering={FadeInDown.delay(100).springify().damping(18)}>
             <Text style={styles.sectionTitle}>Mes biens</Text>
             <View style={styles.menuGroup}>
-              <MenuRow
-                icon="business-outline"
-                label="Mes annonces"
-                onPress={() => navigation.navigate('MesAnnonces')}
-                styles={styles} c={c}
-              />
-              <View style={styles.menuSep} />
-              <MenuRow
-                icon="calendar-outline"
-                label="Mes visites"
-                onPress={() => navigation.navigate('Visites')}
-                styles={styles} c={c}
-              />
-              <View style={styles.menuSep} />
-              <MenuRow icon="key-outline" label="Opérations hôtelières" onPress={() => navigation.navigate('HotelOperations')} styles={styles} c={c} />
+              {(showImmoSection || isAdmin) && (
+                <>
+                  <MenuRow
+                    icon="business-outline"
+                    label="Mes annonces"
+                    onPress={() => navigation.navigate('MesAnnonces')}
+                    styles={styles} c={c}
+                  />
+                  <View style={styles.menuSep} />
+                  <MenuRow
+                    icon="calendar-outline"
+                    label="Mes visites"
+                    onPress={() => navigation.navigate('Visites')}
+                    styles={styles} c={c}
+                  />
+                </>
+              )}
+              {(showImmoSection || isAdmin) && (showEtablissementSection || isAdmin) && <View style={styles.menuSep} />}
+              {(showEtablissementSection || isAdmin) && (
+                <MenuRow icon="key-outline" label="Opérations hôtelières" onPress={() => navigation.navigate('HotelOperations')} styles={styles} c={c} />
+              )}
             </View>
           </Animated.View>
         )}

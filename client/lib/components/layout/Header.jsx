@@ -341,7 +341,7 @@ const ProfileDropdown = ({ user, isTablet, profileOpen, setProfile, handleLogout
 );
 
 const Header = () => {
-  const { user, logout }          = useAuth();
+  const { user, logout, isProprietaireImmobilier, isExploitantEtablissement } = useAuth();
   const [scrolled, setScrolled]   = useState(false);
   const [mobileOpen, setMobile]   = useState(false);
   const [profileOpen, setProfile] = useState(false);
@@ -364,7 +364,12 @@ const Header = () => {
   const headerPadding  = isMobile ? '0 16px' : isTablet ? '0 28px' : isXL ? '0 80px' : '0 48px';
 
   const isAdmin = STAFF_ROLES.includes(user?.role);
-  const isOwner = user?.role === 'Proprietaire';
+  // USER-ARCH-UX-1 — reflète le profil métier effectif (immobilier ET/OU
+  // établissement), plus seulement le rôle brut 'Proprietaire' : l'entrée
+  // "Espace Propriétaire" doit rester visible pour tout utilisateur portant
+  // au moins un des deux profils, quelle que soit l'origine (rôle légataire
+  // ou profil accordé explicitement).
+  const isOwner = user?.role === 'Proprietaire' || isProprietaireImmobilier || isExploitantEtablissement;
   // Le staff a sa propre boîte partagée ; les autres utilisateurs ont leur messagerie perso
   const msgUrl  = isAdmin ? '/dashboard/conversations' : '/messages';
 

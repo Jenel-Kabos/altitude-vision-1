@@ -59,11 +59,18 @@ const errorHandler = (err, req, res, next) => {
     message = err.message;
   }
 
+  // USER-ARCH-1 — même convention que FinancialError/HotelAccessError.
+  if (err.name === 'BusinessProfileError') {
+    statusCode = err.statusCode || 400;
+    message = err.message;
+  }
+
   res.status(statusCode).json({
     status: statusCode >= 500 ? 'error' : 'fail',
     message,
     ...(err.name === 'FinancialError' && { code: err.code }),
     ...(err.name === 'HotelAccessError' && { code: err.code }),
+    ...(err.name === 'BusinessProfileError' && { code: err.code }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
