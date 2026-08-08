@@ -660,4 +660,9 @@ module.exports = {
   generatePreavis,
   generateEtatDesLieux,
   generateContratHebergement,
+  // REPORTING-1 — helpers déjà existants, exportés additivement pour être
+  // réutilisés par reportingExportService.js (même en-tête/pied de page
+  // brandés que tous les autres documents PDF de la plateforme, aucune
+  // duplication de mise en page).
+  pdfToBuffer, newDoc, addHeader, addFooter, infoLine, sectionTitle, fmt, fmtDate,
 };

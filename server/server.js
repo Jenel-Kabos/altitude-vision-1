@@ -480,6 +480,30 @@ app.use('/api/user-business-profiles', require('./routes/userBusinessProfileRout
 // score dérivé) : observe les événements déjà émis par /api/crm et les
 // autres domaines, n'en produit jamais de nouveaux.
 app.use('/api/crm-automation', require('./routes/crmAutomationRoutes'));
+// REPORTING-1 — Centre de Pilotage : agrège exclusivement des services déjà
+// existants (dashboardAnalyticsController, userKpiService, crmService,
+// crmCockpitService, propertyAssetPortfolioService, valuationMarketAnalytics
+// Service, finance/hotelFinancialDashboardService) — aucun calcul métier
+// nouveau, uniquement de l'orchestration/agrégation en lecture seule.
+app.use('/api/reporting', require('./routes/reportingRoutes'));
+// ORGANIZATION-1 — couche organisationnelle générique (Organisation →
+// Filiale → Établissement → Département → Équipe), AU-DESSUS de User/
+// UserBusinessProfile/HotelStaffAssignment/Property.owner/Hotel.manager/CRM
+// — ne remplace aucun d'entre eux, orthogonale.
+app.use('/api/organization', require('./routes/organizationRoutes'));
+
+// API-PUBLIC-1 — plateforme d'API publiques, complètement découplée des
+// routes internes ci-dessus : les contrôleurs public/v1 n'appellent jamais
+// un contrôleur interne, uniquement services/publicApi/*. Authentifiée par
+// clé API (jamais le JWT interne — voir audit Phase 1), versionnée
+// (/api/public/v1 ; v2 s'ajoutera en sœur de v1, jamais en remplacement).
+// Documentation OpenAPI/Swagger (Phase 7) — jamais authentifiée par clé,
+// montée avant la chaîne authentifiée de v1 pour rester consultable sans clé.
+app.use('/api/public/v1', require('./routes/publicApi/docs'));
+app.use('/api/public/v1', require('./routes/publicApi/v1'));
+// Administration des clés/webhooks (portail développeur, Phase 9) — staff
+// uniquement, JWT interne classique (ce n'est pas une route publique).
+app.use('/api/dev-portal', require('./routes/apiPlatformAdminRoutes'));
 
 // 💬 Messagerie & Emails
 app.use("/api/conversations", conversationRoutes);

@@ -65,12 +65,19 @@ const errorHandler = (err, req, res, next) => {
     message = err.message;
   }
 
+  // ORGANIZATION-1 — même convention.
+  if (err.name === 'OrganizationError') {
+    statusCode = err.statusCode || 400;
+    message = err.message;
+  }
+
   res.status(statusCode).json({
     status: statusCode >= 500 ? 'error' : 'fail',
     message,
     ...(err.name === 'FinancialError' && { code: err.code }),
     ...(err.name === 'HotelAccessError' && { code: err.code }),
     ...(err.name === 'BusinessProfileError' && { code: err.code }),
+    ...(err.name === 'OrganizationError' && { code: err.code }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };

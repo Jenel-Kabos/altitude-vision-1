@@ -72,3 +72,19 @@ exports.estimationSubmissionLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// API-PUBLIC-1 (Phase 6) — filet de sécurité par IP, en complément du quota
+// par clé (publicApiQuota.js, sur ApiCallLog). Une seule clé compromise/mal
+// configurée ne doit jamais pouvoir saturer le serveur avant même que la
+// vérification de clé n'ait lieu (cet limiteur s'applique AVANT
+// requireApiKey dans la chaîne de middlewares).
+exports.publicApiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  message: {
+    status: "fail",
+    message: "Trop de requêtes. Réessayez dans une minute.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});

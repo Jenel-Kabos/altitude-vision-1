@@ -9,7 +9,7 @@ import {
   ClipboardList, BarChart2, Scale, Megaphone, MessageCircle, FolderOpen,
   Clock, PenLine, Calculator, FileText, CreditCard, Palmtree,
   Landmark, KeyRound, Users2, FileSignature, Wrench, Building2, History,
-  ContactRound,
+  ContactRound, LayoutDashboard, Network,
 } from "lucide-react";
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardBadges } from '../../hooks/useDashboardBadges';
@@ -32,12 +32,24 @@ const ROLES_DOCS    = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secr
 const ROLES_LITIGES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier'];
 const ROLES_MOD     = ['Admin', 'Collaborateur'];
 const CRM_ROUTE     = resolveWebDestination('CRM_CUSTOMERS');
+const REPORTING_ROUTE = resolveWebDestination('REPORTING_EXECUTIVE');
+const ORGANIZATION_ROUTE = resolveWebDestination('ORGANIZATION_ADMIN');
+const API_PLATFORM_ROUTE = resolveWebDestination('API_PLATFORM_ADMIN');
 
 const NAV_SECTIONS = [
   {
     label: null,
     links: [
       { to: '/dashboard',                    end: true,  Icon: BarChart3,    label: 'Tableau de bord',    accent: BLUE,      roles: ALL_STAFF },
+      // REPORTING-1 — Centre de Pilotage, réservé à la Direction (même
+      // périmètre que la route serveur /api/reporting).
+      { to: REPORTING_ROUTE,                 end: true,  Icon: LayoutDashboard, label: 'Centre de Pilotage', accent: GOLD,   roles: ['Admin', 'GestionnaireImmobilier'] },
+      // ORGANIZATION-1 — administration de la hiérarchie organisationnelle,
+      // réservée Admin (même périmètre que la route serveur /api/organization).
+      { to: ORGANIZATION_ROUTE,              end: true,  Icon: Network,         label: 'Organisation',        accent: BLUE,   roles: ['Admin'] },
+      // API-PUBLIC-1 — portail développeur (clés API, webhooks, journal
+      // d'appels), réservé Admin (émission de clé = action sensible).
+      { to: API_PLATFORM_ROUTE,              end: true,  Icon: KeyRound,        label: 'API publique',        accent: GOLD,   roles: ['Admin'] },
     ],
   },
   {

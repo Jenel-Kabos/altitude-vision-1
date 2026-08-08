@@ -178,6 +178,18 @@ async function notify({
     }))
     .catch(() => {});
 
+  // API-PUBLIC-1 — même choke point, même convention (fire-and-forget,
+  // require() différé) : la diffusion webhook (Phase 8) consomme le même
+  // événement que le moteur d'automatisation CRM ci-dessus — jamais un
+  // second bus d'événements. webhookDispatchService filtre lui-même sur
+  // ALLOWED_WEBHOOK_EVENTS, donc la quasi-totalité des appels à notify()
+  // sont des no-op immédiats ici.
+  Promise.resolve()
+    .then(() => require('./publicApi/webhookDispatchService').dispatch({
+      type, entityType: navigation.entityType, entityId: navigation.entityId, metadata: resolvedMetadata,
+    }))
+    .catch(() => {});
+
   // 2 — Temps réel Socket.IO (la room = userId, configurée dans socket.js)
   try {
     getIO().to(id).emit('notification', {

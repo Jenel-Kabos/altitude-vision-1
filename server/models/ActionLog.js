@@ -18,6 +18,7 @@ const actionLogSchema = new mongoose.Schema({
       'Altimmo','MilaEvents','Altcom','GestionLocative',
       'Utilisateurs','Actualites','Portfolio','Devis',
       'Messagerie','Dashboard','Hotel',
+      'Organisation', // ORGANIZATION-1 — ajout additif, aucune valeur retirée.
     ],
   },
   auteur: {

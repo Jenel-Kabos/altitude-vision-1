@@ -104,6 +104,16 @@ async function hotels(actor) {
   return { kpis: { activeHotels: hotelIds.length, temporarilyClosedHotels: eligibleHotels.length - hotelIds.length, ...roomStats, occupancyRate: roomStats.totalRooms ? Math.round((roomStats.occupiedRooms / roomStats.totalRooms) * 10000) / 100 : 0, ...(reservations[0] || { reservations: 0, reservationsToday: 0, checkInsToday: 0, checkOutsToday: 0 }), housekeeping, maintenance, grossAmountCollected: gross, refundedAmount: refunded, netAmountCollected: Math.max(0, gross - refunded), remainingAmount: balances[0]?.remainingAmount || 0 }, revenueBasis: 'Encaissements hôteliers confirmés, remboursements terminés et soldes de factures émis ; hôtels validés et actifs uniquement.' };
 }
 
+// REPORTING-1 — exportées additivement (elles existaient déjà comme
+// fonctions pures internes, jamais exposées) pour être réutilisées telles
+// quelles par server/services/reporting/domains/*.js — aucune requête
+// dupliquée, aucun changement de comportement pour getModuleAnalytics
+// ci-dessous, qui continue à les utiliser exactement comme avant.
+exports.sales = sales;
+exports.rentals = rentals;
+exports.accommodations = accommodations;
+exports.hotels = hotels;
+
 exports.getModuleAnalytics = async (req, res) => {
   try {
     const handlers = { sales, rentals, accommodations, hotels };
