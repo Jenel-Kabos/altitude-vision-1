@@ -377,6 +377,7 @@ async function runPropertySearch({ query, isAdmin }) {
   if (!isAdmin) {
     baseFilter.availability = 'Disponible';
     baseFilter.statusAdmin  = 'Validée';
+    baseFilter.isPublished  = true;
     baseFilter.pole         = 'Altimmo';
   }
 
@@ -386,6 +387,7 @@ async function runPropertySearch({ query, isAdmin }) {
   //    propertyFilterService.js. Le reste (search, sort, page, limit, fields, et tout
   //    passthrough) continue d'être géré par APIFeatures exactement comme avant.
   delete workingQuery.statusAdmin;
+  delete workingQuery.isPublished;
   delete workingQuery.availability;
   delete workingQuery.pole;
   // `accommodationType` n'a aucun sens sur Property (catégorie propre à Accommodation) —
@@ -559,7 +561,7 @@ const getProperty = asyncHandler(async (req, res) => {
   // défaut "Disponible" ; le test explicite conserve néanmoins la lecture
   // de rares projections legacy où le champ est absent.
   const explicitlyUnavailable = property.availability && property.availability !== 'Disponible';
-  if ((property.statusAdmin !== 'Validée' || explicitlyUnavailable) && !isAdmin && !isOwner) {
+  if ((property.statusAdmin !== 'Validée' || property.isPublished !== true || explicitlyUnavailable) && !isAdmin && !isOwner) {
     res.status(403);
     throw new Error('Cette propriété n’est pas disponible publiquement.');
   }
@@ -1046,7 +1048,7 @@ const getRecommendedProperties = asyncHandler(async (req, res) => {
   // `pole: 'Altimmo'` — cohérent avec `getAllProperties` (audit filtrage Altimmo) : sans ce
   // filtre, un bien MilaEvents/Altcom marqué `recommande:true` pourrait apparaître sur les
   // pages de recommandation Altimmo.
-  const publicFilter = { statusAdmin: 'Validée', availability: 'Disponible', pole: 'Altimmo' };
+  const publicFilter = { statusAdmin: 'Validée', isPublished: true, availability: 'Disponible', pole: 'Altimmo' };
 
   let properties = await Property.find({
     ...publicFilter,

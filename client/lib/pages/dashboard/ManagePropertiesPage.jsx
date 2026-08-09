@@ -32,7 +32,7 @@ const PROPERTIES_PER_PAGE = 8;
 
 const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
   const { canEdit, canDelete, user } = useAuth();
-  const canAddProperty = ['Admin', 'CommunityManager', 'Collaborateur'].includes(user?.role);
+  const canAddProperty = ['Admin', 'CommunityManager', 'Collaborateur', 'GestionnaireImmobilier'].includes(user?.role);
   // Sprint 0 (architecture Altimmo) — pré-filtre lu depuis l'URL
   // (?status=vente|location|hebergement), posé par les liens dédiés du
   // domaine Immobilier dans AdminDashboard.jsx. Filtre 100% frontend, ne
@@ -603,7 +603,7 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
           </div>
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-4xl lg:text-5xl leading-tight font-black bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">
-              {{ vente: 'Vente', location: 'Location', hebergement: 'Hébergement' }[statusFilter] || 'Toutes les annonces'}
+              {{ vente: 'Vente', location: 'Location', hebergement: 'Hébergement' }[statusFilter] || 'Tous les biens'}
             </h1>
             <p className="text-sm sm:text-lg text-gray-600 font-medium mt-1">Gérez le patrimoine immobilier de <span className="font-bold text-blue-600">Altimmo</span></p>
           </div>

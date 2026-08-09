@@ -15,6 +15,7 @@ router.get('/', ctrl.list);
 router.post('/', ctrl.create);
 router.get('/:id', ctrl.getOne);
 router.patch('/:id', ctrl.update);
+router.post('/:id/deactivate', auth.restrictTo('Admin', 'GestionnaireImmobilier'), ctrl.deactivate);
 router.get('/:id/history', ctrl.history);
 router.post('/:id/publish', ctrl.publish);
 router.post('/:id/suspend-listing', ctrl.suspend);

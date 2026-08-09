@@ -3,6 +3,11 @@
 // `Authorization: Bearer <clé>` ou `X-API-Key`, ne touche jamais au JWT/
 // User.tokenVersion.
 const { verifyApiKey, touchLastUsed } = require('../services/publicApi/apiKeyService');
+// TENANT-CORE-1 (Phase 7) — résolution optionnelle du scope tenant d'une
+// clé API. `resolveTenantScope` renvoie `{scopeUserIds:null}` si
+// `apiKey.tenant` est absent — aucun changement de comportement pour les
+// clés déjà émises (voir models/ApiKey.js).
+const { resolveTenantScope } = require('../services/platformTenant/tenantContextService');
 
 async function requireApiKey(req, res, next) {
   const header = req.headers.authorization;
@@ -14,6 +19,7 @@ async function requireApiKey(req, res, next) {
   if (!apiKey) return res.status(401).json({ status: 'fail', message: 'Clé API invalide, expirée ou révoquée.' });
 
   req.apiKey = apiKey;
+  req.apiKeyTenantScope = apiKey.tenant ? (await resolveTenantScope(apiKey.tenant).catch(() => null))?.scopeUserIds || null : null;
   touchLastUsed(apiKey._id); // fire-and-forget, jamais bloquant
   next();
 }

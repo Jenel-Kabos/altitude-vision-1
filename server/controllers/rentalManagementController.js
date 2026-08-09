@@ -24,12 +24,54 @@ exports.onboardingOptions = async (_req, res) => {
 
 exports.onboard = async (req, res) => {
   try {
-    const result = req.body.mode === 'existing'
-      ? await onboarding.activateExisting({ propertyId: req.body.property, actor: req.user })
-      : req.body.mode === 'new'
-        ? await onboarding.createManaged({ data: req.body, actor: req.user })
-        : (() => { throw new onboarding.OnboardingError('Le parcours sélectionné est invalide.', 422, 'MODE_INVALID', ['mode']); })();
+    if (req.body.mode !== 'existing') {
+      throw new onboarding.OnboardingError(
+        'La Gestion locative ne peut activer qu’un Property existant. Créez d’abord le bien depuis le référentiel immobilier.',
+        422,
+        'EXISTING_PROPERTY_REQUIRED',
+        ['mode', 'property'],
+      );
+    }
+    const result = await onboarding.activateExisting({ propertyId: req.body.property, actor: req.user });
     res.status(201).json({ status: 'success', message: 'Le bien a été ajouté à la Gestion locative.', data: result });
+  } catch (error) { fail(res, error); }
+};
+
+exports.deactivate = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
+    const rental = await RentalManagement.findById(req.params.id);
+    if (!rental || !rental.managementActivated) return res.status(404).json({ status: 'fail', message: 'Dossier de gestion actif introuvable.' });
+
+    const blockingContracts = await Contrat.find({
+      bien: rental.property,
+      type: 'location',
+      $or: [
+        { statut: { $in: ['en_attente', 'actif'] } },
+        { cycleVie: { $in: ['projet', 'en_preparation', 'a_signer', 'actif', 'preavis', 'inspection_sortie', 'cloture_financiere'] } },
+      ],
+    }).select('_id');
+    if (blockingContracts.length) {
+      const blockingPayments = await Paiement.exists({ contrat: { $in: blockingContracts.map(contract => contract._id) }, statut: { $in: ['impayé', 'en_retard', 'partiel'] } });
+      const error = new Error(blockingPayments
+        ? 'Retrait impossible : le dossier comporte un contrat ouvert et des obligations financières non soldées.'
+        : 'Retrait impossible : un contrat locatif est encore actif ou ouvert.');
+      error.statusCode = 409;
+      error.code = blockingPayments ? 'FINANCIAL_OBLIGATIONS_BLOCK_REMOVAL' : 'ACTIVE_LEASE_BLOCKS_REMOVAL';
+      throw error;
+    }
+
+    rental.managementActivated = false;
+    rental.active = false;
+    rental.currentTenant = null;
+    rental.activeLease = null;
+    rental.workflowHistory.push({
+      action: 'rental_management_deactivated', actor: req.user.id, source: 'staff',
+      comment: String(req.body?.comment || '').slice(0, 1000), from: rental.occupancyStatus, to: rental.occupancyStatus,
+    });
+    await rental.save();
+    const propertyStillExists = Boolean(await Property.exists({ _id: rental.property }));
+    res.json({ status: 'success', message: 'Le bien a été retiré de la Gestion locative. Le Property et son historique sont conservés.', data: { rental: sync.serializeRentalManagement(rental), propertyStillExists } });
   } catch (error) { fail(res, error); }
 };
 

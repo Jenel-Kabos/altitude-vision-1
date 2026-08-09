@@ -20,10 +20,16 @@ const accommodationService = require('../accommodationReservationService');
 const PUBLIC_ACCOMMODATION_FIELDS = 'accommodationType occupancyMode capacity beds checkInTime checkOutTime minimumStay maximumStay amenities rules houseRules includedServices property';
 const PUBLIC_PROPERTY_SUBFIELDS = 'title description images address';
 
-async function getPublicAccommodationById(id) {
+// TENANT-CORE-1 (Phase 7) — `scopeUserIds` optionnel. `Accommodation` ne
+// porte pas de champ `owner` directement (c'est `Property.owner` qui fait
+// foi, voir en-tête) : le scope est donc vérifié APRÈS le peuplement de
+// `property`, jamais par une requête directe sur un champ inexistant.
+async function getPublicAccommodationById(id, { scopeUserIds } = {}) {
   const accommodation = await Accommodation.findById(id).select(PUBLIC_ACCOMMODATION_FIELDS)
-    .populate('property', PUBLIC_PROPERTY_SUBFIELDS).lean();
+    .populate('property', `${PUBLIC_PROPERTY_SUBFIELDS} owner`).lean();
   if (!accommodation || accommodation.hotel) return null; // uniquement les hébergements indépendants (jamais un hôtel)
+  if (scopeUserIds && !scopeUserIds.has(String(accommodation.property?.owner))) return null;
+  if (accommodation.property) delete accommodation.property.owner; // jamais exposé publiquement, seulement utilisé pour le scope
   return accommodation;
 }
 

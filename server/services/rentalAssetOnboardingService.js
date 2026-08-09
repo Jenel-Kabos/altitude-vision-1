@@ -97,7 +97,10 @@ async function getOptions() {
   const owners = proprietaires.filter(p => p.user).map(p => ({
     _id: String(p.user), proprietaireId: String(p._id), name: `${p.prenom} ${p.nom}`.trim(), email: p.email, phone: p.telephone,
   }));
-  return { existingEligibleProperties, declaredOwnerAssets, ineligibleProperties, owners };
+  // Les biens historiques `Proprietaire.biensPropres[]` restent audités mais
+  // ne sont plus proposés ici : ils doivent d'abord devenir un Property via
+  // le référentiel Immobilier, dans un workflow distinct de l'activation GL.
+  return { existingEligibleProperties, declaredOwnerAssets: [], ineligibleProperties, owners };
 }
 
 async function validateOwner(ownerId) {
@@ -157,7 +160,22 @@ async function activateExisting({ propertyId, actor }) {
 
 const requiredNewFields = ['owner', 'title', 'type', 'street', 'city', 'arrondissement', 'monthlyRent', 'surface', 'latitude', 'longitude'];
 
-async function createManaged({ data, actor }) {
+async function reconstructHistoricalManagedProperty({ data, actor, contractId, reason }) {
+  if (!['Admin', 'GestionnaireImmobilier'].includes(actor?.role)) {
+    throw new OnboardingError('Reconstruction historique réservée aux responsables immobiliers.', 403, 'HISTORICAL_RECONSTRUCTION_FORBIDDEN');
+  }
+  if (!mongoose.isValidObjectId(contractId) || String(reason || '').trim().length < 5) {
+    throw new OnboardingError('Un contrat historique et un motif explicite sont obligatoires.', 422, 'HISTORICAL_CONTEXT_REQUIRED');
+  }
+  const legacyContract = await Contrat.findOne({
+    _id: contractId,
+    type: 'location',
+    statut: { $in: ['actif', 'en_attente'] },
+    bien: null,
+  }).select('_id');
+  if (!legacyContract) {
+    throw new OnboardingError('Ce contrat ne nécessite pas de reconstruction patrimoniale.', 409, 'HISTORICAL_RECONSTRUCTION_NOT_ELIGIBLE');
+  }
   const missingFields = requiredNewFields.filter((field) => data[field] === undefined || data[field] === null || String(data[field]).trim() === '');
   if (missingFields.length) throw new OnboardingError('Des champs obligatoires sont manquants.', 422, 'VALIDATION_ERROR', missingFields);
   const owner = await validateManagementOwner(data.owner);
@@ -196,11 +214,11 @@ async function createManaged({ data, actor }) {
       active: true, monthlyRent, occupancyStatus: 'vacant', availabilityStatus: 'disponible',
       publicationStatus: 'brouillon', publicationPolicy: 'manuelle', publicationAuthorized: false,
       availableFrom: data.availableFrom || null,
-      workflowHistory: [{ action: 'managed_property_created', actor: actor.id || actor._id, source: 'staff', to: 'vacant', comment: String(data.internalNotes || '').slice(0, 1000) }],
+      workflowHistory: [{ action: 'historical_property_reconstructed', actor: actor.id || actor._id, source: 'regularization', to: 'vacant', comment: String(reason).slice(0, 1000) }],
     });
     sync.refreshReadiness(rental, property);
     await rental.save();
-    await logAction({ action: 'Bien interne créé en Gestion locative', description: `Création privée de « ${property.title} »`, module: 'GestionLocative', typeAction: 'CRÉATION', auteur: buildAuteur(actor), cible: { id: String(property._id), type: 'Property', nom: property.title } }).catch(() => {});
+    await logAction({ action: 'Reconstruction patrimoniale historique', description: `Contrat ${contractId} — ${String(reason).trim()}`, module: 'GestionLocative', typeAction: 'CRÉATION', auteur: buildAuteur(actor), cible: { id: String(property._id), type: 'Property', nom: property.title } }).catch(() => {});
     return { property, rental: serializeCreatedRental(rental, property) };
   } catch (error) {
     if (property?._id) await Property.deleteOne({ _id: property._id });
@@ -209,4 +227,4 @@ async function createManaged({ data, actor }) {
   }
 }
 
-module.exports = { getOptions, activateExisting, createManaged, OnboardingError };
+module.exports = { getOptions, activateExisting, reconstructHistoricalManagedProperty, OnboardingError };

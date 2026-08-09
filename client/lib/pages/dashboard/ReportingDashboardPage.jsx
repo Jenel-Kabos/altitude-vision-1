@@ -27,6 +27,10 @@ const DOMAIN_TABS = [
   { key: 'finance', label: 'Finance', Icon: Wallet, destination: null },
   { key: 'communication', label: 'Communication', Icon: Megaphone, destination: 'ADMIN_ALTCOM' },
   { key: 'evenementiel', label: 'Événementiel', Icon: PartyPopper, destination: null },
+  // MARKETING-AUTOMATION-1 — nouveau domaine Reporting (backend déjà
+  // agrégé dans DOMAINS, voir reportingService.js) ; drill-down vers le
+  // module dédié Altcom Marketing plutôt qu'une destination NAV générique.
+  { key: 'marketing', label: 'Marketing', Icon: Megaphone, destination: null },
 ];
 
 const KPI_LABELS = {

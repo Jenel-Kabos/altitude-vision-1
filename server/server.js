@@ -505,6 +505,25 @@ app.use('/api/public/v1', require('./routes/publicApi/v1'));
 // uniquement, JWT interne classique (ce n'est pas une route publique).
 app.use('/api/dev-portal', require('./routes/apiPlatformAdminRoutes'));
 
+// MARKETING-AUTOMATION-1 — Altcom Marketing (segments dynamiques, modèles
+// versionnés, campagnes avec approbation humaine obligatoire, journal
+// d'envoi). Réutilise CRM-AUTOMATION-1 (workflows), Reporting (domaine
+// 'marketing'), Notifications (notify(), type 'marketing_message') — ne
+// crée aucun second moteur, aucune seconde API.
+app.use('/api/marketing', require('./routes/marketingRoutes'));
+
+// ERP-CORE-1 — Centre d'Administration Global : couche d'orchestration
+// pure au-dessus de Reporting/CRM/Organisation/Marketing/API Gateway/
+// ActionLog — ne remplace aucun dashboard existant, ne recalcule aucun KPI,
+// réservé à la Direction (Admin).
+app.use('/api/erp', require('./routes/erpRoutes'));
+
+// TENANT-CORE-1 — Racine SaaS multi-tenant. Nommée `PlatformTenant` (jamais
+// `Tenant` seul) pour éviter toute collision avec le concept déjà existant
+// de locataire (`TenantLinkRequest`, espace locataire) — voir audit Phase 1
+// du rapport de sprint. Réservé Admin.
+app.use('/api/platform-tenants', require('./routes/platformTenantRoutes'));
+
 // 💬 Messagerie & Emails
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/messages", messageRoutes);

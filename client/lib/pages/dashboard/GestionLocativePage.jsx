@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -16,9 +16,9 @@ import {
   getPaiements,     updatePaiement,     marquerPaiementPaye, calculerPenalites,
   addBienPhotos,
   getRentalManagement, getRentalManagementStats, getRentalManagementDetail, runRentalAction,
+  deactivateRentalManagement,
   getRentalOnboardingOptions, onboardRentalProperty,
   getLocataireDossiers, getPaiementsStats,
-  importBienIntoGestionLocative,
 } from "../../services/gestionLocativeService";
 import {
   getContratDocuments, generateBail, generateQuittance, generateMiseEnDemeure,
@@ -210,8 +210,8 @@ const SectionTitle = ({ children }) => (
   <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 pt-3 pb-1 border-b border-gray-100" style={{fontFamily:FONT}}>{children}</h3>
 );
 
-const Btn = ({ onClick, color=BLUE, children, small=false, outline=false, loading=false, type='button' }) => (
-  <button type={type} onClick={onClick} disabled={loading}
+const Btn = ({ onClick, color=BLUE, children, small=false, outline=false, loading=false, disabled=false, type='button' }) => (
+  <button type={type} onClick={onClick} disabled={loading || disabled}
     className={`flex items-center gap-1.5 font-semibold rounded-xl transition-all hover:opacity-90 disabled:opacity-50 ${
       small ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'
     } ${outline ? 'border' : 'text-white'}`}
@@ -1686,68 +1686,41 @@ const ConfirmDelete = ({ label, onConfirm, onCancel }) => (
   </Modal>
 );
 
-const emptyManagedProperty = { owner:'', title:'', type:'Appartement', street:'', city:'Brazzaville', arrondissement:'', neighborhood:'', monthlyRent:'', surface:'', latitude:'', longitude:'', bedrooms:0, bathrooms:0, initialAvailability:'Disponible', description:'', internalNotes:'', imageUrls:'' };
-
 const AddManagedPropertyModal = ({ onClose, onSuccess, toast }) => {
-  const [mode, setMode] = useState('existing');
-  const [options, setOptions] = useState({ existingEligibleProperties:[], declaredOwnerAssets:[], ineligibleProperties:[], owners:[] });
+  const [options, setOptions] = useState({ existingEligibleProperties:[], ineligibleProperties:[] });
   const [property, setProperty] = useState('');
-  const [form, setForm] = useState(emptyManagedProperty);
-  const [importAsset, setImportAsset] = useState(null);
+  const [owner, setOwner] = useState('');
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const loadOptions = useCallback(async () => { setOptions(await getRentalOnboardingOptions()); }, []);
-  useEffect(() => { loadOptions().catch(e=>toast(e.response?.data?.message||'Options indisponibles','error')).finally(()=>setLoading(false)); }, [loadOptions]);
-  const change = (key) => (event) => setForm(prev=>({...prev,[key]:event.target.value}));
-  const prepareImport = (asset) => {
-    setImportAsset(asset); setMode('import');
-    setForm({...emptyManagedProperty, title:asset.title||'', type:asset.type||'Appartement', street:asset.address||'', city:asset.city||'Brazzaville', neighborhood:asset.neighborhood||'', monthlyRent:asset.price||'', surface:asset.surface||'', bedrooms:asset.bedrooms||0, bathrooms:asset.bathrooms||0, description:asset.description||'', imageUrls:(asset.photos||[]).join(', ')});
-  };
+  const eligibleProperties = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase('fr');
+    return options.existingEligibleProperties.filter((item) => {
+      if (owner && item.ownerUserId !== owner) return false;
+      if (!needle) return true;
+      return [item.title, item.address, item.city, item.type, item.proprietaireName, item.id]
+        .some((value) => String(value || '').toLocaleLowerCase('fr').includes(needle));
+    });
+  }, [options.existingEligibleProperties, owner, query]);
+  useEffect(() => { getRentalOnboardingOptions().then(setOptions).catch(e=>toast(e.response?.data?.message||'Options indisponibles','error')).finally(()=>setLoading(false)); }, [toast]);
   const submit = async (event) => {
     event.preventDefault(); if (saving) return; setSaving(true);
     try {
-      if (mode === 'import') {
-        const imported = await importBienIntoGestionLocative(importAsset.proprietaireId, importAsset.bienIndex, {
-          title:form.title, description:form.description, type:form.type, arrondissement:form.arrondissement,
-          city:form.city, latitude:Number(form.latitude), longitude:Number(form.longitude), surface:Number(form.surface),
-          price:Number(form.monthlyRent), bedrooms:Number(form.bedrooms)||0, bathrooms:Number(form.bathrooms)||0,
-          images:form.imageUrls.split(',').map(value=>value.trim()).filter(Boolean),
-        });
-        setProperty(imported.property._id); await loadOptions();
-        await onSuccess({property:imported.property,rental:imported.rentalManagement}, {keepOpen:true});
-        toast(imported.alreadyImported?'Ce bien déclaré était déjà intégré.':'Fiche de gestion créée et sélectionnée.');
-        setImportAsset(null); setMode('existing');
-      } else await onSuccess(await onboardRentalProperty(mode==='existing'?{mode,property}:{mode,...form}));
+      await onSuccess(await onboardRentalProperty({mode:'existing',property}));
     }
     catch (error) { const d=error.response?.data; toast(d?.code==='ALREADY_MANAGED'?'Ce bien est déjà sous gestion.':d?.missingFields?.length?`Champs manquants : ${d.missingFields.join(', ')}`:d?.message||'Ajout impossible','error'); }
     finally { setSaving(false); }
   };
   return <Modal title="Ajouter un bien à la gestion locative" onClose={onClose} wide><form onSubmit={submit} className="space-y-5">
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {[['existing','Utiliser un bien existant','Activer un Property éligible.'],['new','Créer un nouveau bien géré','Créer un bien interne privé.']].map(([id,title,help])=><button key={id} type="button" onClick={()=>setMode(id)} className={`rounded-xl border p-4 text-left ${mode===id?'border-blue-500 bg-blue-50':'border-gray-200'}`}><strong className="block text-sm text-gray-900">{title}</strong><span className="text-xs text-gray-500">{help}</span></button>)}
-    </div>
-    {loading?<div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600"/></div>:mode==='existing'?<div className="space-y-5"><Field label="Biens existants éligibles" required={!!options.existingEligibleProperties.length}><Select required={!!options.existingEligibleProperties.length} value={property} onChange={e=>setProperty(e.target.value)}><option value="">Sélectionner un bien</option>{options.existingEligibleProperties.map(p=><option key={p.id} value={p.id}>{p.title} — {p.city||'Ville inconnue'} — {fmt(p.price)}</option>)}</Select></Field>
-      {!!options.declaredOwnerAssets.length&&<section><h3 className="text-sm font-bold text-gray-800">Biens déclarés par le propriétaire — à intégrer</h3><div className="mt-2 space-y-2">{options.declaredOwnerAssets.map(asset=><div key={`${asset.proprietaireId}-${asset.id}`} className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-gray-900">{asset.title}</p><p className="text-xs text-gray-600">{asset.address}, {asset.city} · {asset.proprietaireName}</p></div><Btn type="button" outline onClick={()=>prepareImport(asset)}>Créer la fiche de gestion</Btn></div>)}</div></section>}
-      {!options.existingEligibleProperties.length&&!options.declaredOwnerAssets.length&&<p className="text-sm text-gray-500">Aucun bien n’est encore enregistré pour les propriétaires de la Gestion locative. Vous pouvez créer un nouveau bien interne.</p>}
+    <p className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">Sélectionnez un bien déjà créé dans le référentiel immobilier. Son état de publication n’empêche pas son activation en Gestion locative.</p>
+    {loading?<div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600"/></div>:<div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2"><Field label="Propriétaire"><Select value={owner} onChange={e=>{setOwner(e.target.value);setProperty('');}}><option value="">Tous les propriétaires</option>{options.owners?.map(item=><option key={item._id} value={item._id}>{item.name}</option>)}</Select></Field><Field label="Rechercher"><input aria-label="Rechercher un Property" value={query} onChange={e=>{setQuery(e.target.value);setProperty('');}} placeholder="Référence, titre, adresse, ville, type…" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"/></Field></div>
+      <Field label="Biens existants éligibles" required><Select required value={property} onChange={e=>setProperty(e.target.value)}><option value="">Sélectionner un bien</option>{eligibleProperties.map(p=><option key={p.id} value={p.id}>{p.proprietaireName} — {p.title} — {p.address||'Adresse inconnue'} — {p.city||'Ville inconnue'} — {p.type} — {fmt(p.price)} — {p.isPublished?'Publié':'Non publié'}</option>)}</Select></Field>
+      {!options.existingEligibleProperties.length&&<p className="text-sm text-gray-500">Aucun Property éligible. Créez d’abord le bien depuis Immobilier → Tous les biens.</p>}
+      {!!options.existingEligibleProperties.length&&!eligibleProperties.length&&<p className="text-sm text-gray-500">Aucun Property ne correspond à ces filtres.</p>}
       {!!options.ineligibleProperties.length&&<details className="text-sm"><summary className="cursor-pointer font-semibold text-gray-600">Biens non éligibles ({options.ineligibleProperties.length})</summary><ul className="mt-2 space-y-1 text-xs text-gray-500">{options.ineligibleProperties.map(asset=><li key={`${asset.sourceType}-${asset.id}`}>{asset.title} — {asset.reason}</li>)}</ul></details>}
-    </div>:<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {mode==='new'&&<Field label="Propriétaire métier" required><Select required value={form.owner} onChange={change('owner')}><option value="">Sélectionner</option>{options.owners.map(o=><option key={o._id} value={o._id}>{o.name}{o.email?` — ${o.email}`:''}</option>)}</Select></Field>}
-      <Field label="Titre" required><Input required value={form.title} onChange={change('title')}/></Field>
-      <Field label="Type de bien" required><Select value={form.type} onChange={change('type')}>{BIEN_TYPES.map(t=>{const value=typeof t==='string'?t:t.value; const label=typeof t==='string'?t:t.label; return <option key={value} value={value}>{label}</option>;})}</Select></Field>
-      <Field label="Loyer mensuel" required><Input required min="1" type="number" value={form.monthlyRent} onChange={change('monthlyRent')}/></Field>
-      <Field label="Adresse" required><Input required value={form.street} onChange={change('street')}/></Field>
-      <Field label="Ville" required><Input required value={form.city} onChange={change('city')}/></Field>
-      <Field label="Arrondissement" required><Input required value={form.arrondissement} onChange={change('arrondissement')}/></Field>
-      <Field label="Quartier"><Input value={form.neighborhood} onChange={change('neighborhood')}/></Field>
-      <Field label="Surface (m²)" required><Input required min="1" type="number" value={form.surface} onChange={change('surface')}/></Field>
-      <Field label="Disponibilité initiale"><Select value={form.initialAvailability} onChange={change('initialAvailability')}><option>Disponible</option><option>Indisponible</option><option>En maintenance</option></Select></Field>
-      <Field label="Latitude" required><Input required step="any" type="number" value={form.latitude} onChange={change('latitude')}/></Field>
-      <Field label="Longitude" required><Input required step="any" type="number" value={form.longitude} onChange={change('longitude')}/></Field>
-      {mode==='import'&&<div className="sm:col-span-2"><Field label="Images (URLs séparées par des virgules)" required><Input required value={form.imageUrls} onChange={change('imageUrls')}/></Field></div>}
-      <Field label="Chambres"><Input min="0" type="number" value={form.bedrooms} onChange={change('bedrooms')}/></Field><Field label="Salles de bain"><Input min="0" type="number" value={form.bathrooms} onChange={change('bathrooms')}/></Field>
-      <div className="sm:col-span-2"><Field label="Description"><Textarea value={form.description} onChange={change('description')}/></Field></div><div className="sm:col-span-2"><Field label="Notes internes"><Textarea value={form.internalNotes} onChange={change('internalNotes')}/></Field></div>
     </div>}
-    <div className="flex justify-end gap-3"><Btn outline color={GRAY} onClick={onClose}>Annuler</Btn><Btn type="submit" loading={saving||loading}>{mode==='import'?'Créer la fiche de gestion':'Ajouter le bien'}</Btn></div>
+    <div className="flex justify-end gap-3"><Btn outline color={GRAY} onClick={onClose}>Annuler</Btn><Btn type="submit" disabled={!property} loading={saving||loading}>Activer en gestion locative</Btn></div>
   </form></Modal>;
 };
 
@@ -1885,16 +1858,6 @@ const GestionLocativePage = () => {
   }, [filterContrat, filterAnnee, tab]);
 
   // ── Contrats ────────────────────────────────────────────────
-  // GL-ARCH-1.1 — intègre un bien propre en Gestion locative (Property réel +
-  // RentalManagement actif), sans fermer la modale « Nouveau contrat » ni
-  // perdre sa saisie en cours (Phase 10 : le formulaire reste ouvert).
-  const handleImportBien = async (proprietaireId, bienIndex, overrides) => {
-    const { property, alreadyImported } = await importBienIntoGestionLocative(proprietaireId, bienIndex, overrides);
-    setProperties(prev => (prev.some(p => p._id === property._id) ? prev : [property, ...prev]));
-    toast(alreadyImported ? 'Bien déjà intégré à la Gestion locative' : 'Bien intégré à la Gestion locative');
-    return property;
-  };
-
   const handleSaveContrat = async (f) => {
     if (!f.proprietaire) return toast('Propriétaire requis', 'error');
     setSaving(true);
@@ -2106,6 +2069,20 @@ const GestionLocativePage = () => {
     } finally { setRentalActionId(null); }
   };
 
+  const handleDeactivateRental = async (rental) => {
+    if (!window.confirm(`Retirer « ${rental.property?.title || 'ce bien'} » de la Gestion locative ? Le bien immobilier sera conservé.`)) return;
+    setRentalActionId(`${rental._id}:deactivate`);
+    try {
+      const result = await deactivateRentalManagement(rental._id, 'Retrait explicite depuis le centre de Gestion locative');
+      if (!result.propertyStillExists) throw new Error('Le contrôle de conservation du Property a échoué.');
+      setRentals(prev => prev.filter(item => item._id !== rental._id));
+      setRentalStats(await getRentalManagementStats());
+      toast('Bien retiré de la Gestion locative. Le Property est conservé.');
+    } catch (error) {
+      toast(error.response?.data?.message || error.message || 'Retrait impossible', 'error');
+    } finally { setRentalActionId(null); }
+  };
+
   const openRentalDetail = async (rental) => {
     setRentalDetailLoading(true);
     try { setRentalDetail(await getRentalManagementDetail(rental._id)); }
@@ -2209,7 +2186,7 @@ const GestionLocativePage = () => {
               {rentals.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-200 py-12 text-center">
                   <p className="text-sm font-semibold text-gray-700">Aucun bien sous gestion</p>
-                  <p className="mt-1 text-xs text-gray-500">Ajoutez un bien existant ou créez un nouveau bien pour commencer sa gestion locative.</p>
+                  <p className="mt-1 text-xs text-gray-500">Sélectionnez un Property existant pour commencer sa gestion locative.</p>
                   {canManage && <div className="mt-4 flex justify-center"><Btn onClick={()=>setAddManagedModal(true)}><Plus size={15}/> Ajouter un bien à la gestion locative</Btn></div>}
                 </div>
               ) : (
@@ -2234,6 +2211,7 @@ const GestionLocativePage = () => {
                           {rental.allowedActions?.includes('start_maintenance') && <Btn small outline color={RED} loading={rentalActionId===`${rental._id}:maintenance`} onClick={()=>handleRentalAction(rental,'maintenance')}>Maintenance</Btn>}
                           {rental.allowedActions?.includes('complete_maintenance') && <Btn small outline color={GREEN} loading={rentalActionId===`${rental._id}:complete-maintenance`} onClick={()=>handleRentalAction(rental,'complete-maintenance')}>Fin maintenance</Btn>}
                           {rental.allowedActions?.includes('validate_exit') && <Btn small outline color={BLUE} loading={rentalActionId===`${rental._id}:validate-exit`} onClick={()=>handleRentalAction(rental,'validate-exit')}>Valider sortie</Btn>}
+                          {canManage && <Btn small outline color={RED} loading={rentalActionId===`${rental._id}:deactivate`} onClick={()=>handleDeactivateRental(rental)}>Retirer de la gestion locative</Btn>}
                         </div></TD>
                       </tr>
                     ))}</tbody>
@@ -2618,7 +2596,6 @@ const GestionLocativePage = () => {
             onSave={handleSaveContrat}
             onCancel={() => {setContratModal(false);setEditContrat(null);}}
             loading={saving}
-            onImportBien={handleImportBien}
           />
         </Modal>
       )}

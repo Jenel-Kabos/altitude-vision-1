@@ -6,12 +6,12 @@ const asyncHandler = require('express-async-handler');
 const { listPublicProperties, getPublicPropertyById } = require('../../services/publicApi/publicPropertyService');
 
 exports.list = asyncHandler(async (req, res) => {
-  const result = await listPublicProperties(req.query);
+  const result = await listPublicProperties(req.query, { scopeUserIds: req.apiKeyTenantScope });
   res.json({ status: 'success', data: result });
 });
 
 exports.getOne = asyncHandler(async (req, res) => {
-  const property = await getPublicPropertyById(req.params.id);
+  const property = await getPublicPropertyById(req.params.id, { scopeUserIds: req.apiKeyTenantScope });
   if (!property) return res.status(404).json({ status: 'fail', message: 'Annonce introuvable.' });
   res.json({ status: 'success', data: { property } });
 });

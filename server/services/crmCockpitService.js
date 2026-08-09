@@ -134,4 +134,10 @@ async function getCockpit() {
   };
 }
 
-module.exports = { getCockpit };
+module.exports = {
+  getCockpit,
+  // MARKETING-AUTOMATION-1 — exportées additivement pour être réutilisées
+  // comme segments "comportementaux" par marketingSegmentService.js —
+  // aucune requête n'est dupliquée, seul l'export change.
+  clientsSansSuivi, prospectsInactifs,
+};

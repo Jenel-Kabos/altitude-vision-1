@@ -7,6 +7,16 @@ const CrmCustomer = require('../models/CrmCustomer');
 const CrmOpportunity = require('../models/CrmOpportunity');
 const { createActivity, setOpportunityOutcome } = require('./crmService');
 const { notify } = require('./notificationService');
+// MARKETING-AUTOMATION-1 (Phase 5) — un scénario marketing ("nouveau
+// prospect → séquence de bienvenue", "fin de séjour → demande d'avis"…)
+// n'est jamais qu'une CrmAutomationRule de plus, avec un actionId
+// 'marketing.message.send' — AUCUN second moteur d'automatisation, ce
+// fichier reste le seul registre d'actions exécuté par
+// crmAutomationEngine.handleEvent().
+const MarketingTemplate = require('../models/MarketingTemplate');
+const MarketingSend = require('../models/MarketingSend');
+const { deliverToChannel } = require('./marketingCampaignService');
+const { renderTemplate } = require('./marketingTemplateService');
 
 // Résout le CrmCustomer concerné par un événement — réutilise exactement la
 // même clé d'identité (`identityKeys: 'user:<id>'`) que crmService.js
@@ -76,6 +86,33 @@ async function createNotification(event, params = {}) {
   return { status: 'success' };
 }
 
+// MARKETING-AUTOMATION-1 (Phase 5) — envoi individuel (1 destinataire, celui
+// résolu depuis l'événement), jamais une campagne de masse : aucune porte
+// d'approbation requise ici, exactement comme les autres actions
+// automatisées de ce fichier (crm.activity.create, etc.) qui s'exécutent
+// déjà sans validation humaine par événement — la distinction avec
+// marketingCampaignService.sendCampaign() (qui EXIGE un statut 'approved')
+// est que celui-ci cible UN client au fil d'un scénario métier réel, pas
+// une diffusion de masse déclarative.
+async function sendMarketingMessage(event, params = {}) {
+  const customerId = await resolveCustomerId(event);
+  if (!customerId) return { status: 'skipped', reason: 'no_customer_match' };
+  if (!params.templateFamily) return { status: 'skipped', reason: 'no_template_configured' };
+  const template = await MarketingTemplate.findOne({ family: params.templateFamily, status: 'active' });
+  if (!template) return { status: 'skipped', reason: 'no_active_template' };
+  const customer = await CrmCustomer.findById(customerId).select('emails identityKeys displayName firstName').lean();
+  if (!customer) return { status: 'skipped', reason: 'no_customer_match' };
+
+  const rendered = renderTemplate(template, { prenom: customer.firstName || customer.displayName, nom: customer.displayName, ...(event.metadata || {}) });
+  const outcome = await deliverToChannel({ channel: params.channel || template.channel, customer, rendered, actor: { _id: resolveActor(event) } });
+  await MarketingSend.create({
+    workflowRuleId: params.ruleId || event.type, template: template._id, channel: params.channel || template.channel,
+    recipientCustomer: customer._id, recipientEmail: customer.emails?.[0] || null,
+    status: outcome.status, error: outcome.error || null,
+  });
+  return outcome.status === 'sent' ? { status: 'success', channel: template.channel } : { status: 'error', error: outcome.error };
+}
+
 // Clé = actionId référencé par CrmAutomationRule.actions[].actionId.
 const ACTION_HANDLERS = {
   'crm.activity.create': (event, params) => createCrmActivity(event, { ...params, type: params.type || 'note' }),
@@ -83,6 +120,7 @@ const ACTION_HANDLERS = {
   'crm.reminder.create': (event, params) => createCrmActivity(event, { ...params, type: 'rappel' }),
   'crm.opportunity.close_won': (event, params) => closeOpportunityWon(event, params),
   'crm.notification.create': (event, params) => createNotification(event, params),
+  'marketing.message.send': (event, params) => sendMarketingMessage(event, params),
 };
 
 module.exports = { ACTION_HANDLERS, resolveCustomerId, resolveActor };

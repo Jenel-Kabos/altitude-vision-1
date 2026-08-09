@@ -15,7 +15,7 @@ const baseProperty = (overrides = {}) => ({
   title: 'Villa Meublée Détail', description: 'Description suffisamment longue pour la validation du modèle.',
   pole: 'Altimmo', type: 'Villa', status: 'hebergement', price: 25000,
   address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: 4.26, longitude: 15.28,
-  images: ['https://example.test/image.jpg'], surface: 150, statusAdmin: 'Validée', availability: 'Disponible',
+  images: ['https://example.test/image.jpg'], surface: 150, statusAdmin: 'Validée', isPublished: true, availability: 'Disponible',
   owner: ownerId(), ...overrides,
 });
 

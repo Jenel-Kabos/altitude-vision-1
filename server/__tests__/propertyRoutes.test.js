@@ -164,7 +164,7 @@ describe('GET /api/properties/:id', () => {
 
   test('200 — projection publique retire documents et coordonnées privées propriétaire', async () => {
     const document = {
-      _id: '507f191e810c19729de860ea', title: 'TEST DATA PROPERTY', statusAdmin: 'Validée',
+      _id: '507f191e810c19729de860ea', title: 'TEST DATA PROPERTY', statusAdmin: 'Validée', isPublished: true,
       owner: { _id: '507f1f77bcf86cd799439012', name: 'TEST DATA OWNER', photo: '', email: 'private@example.com', phone: '+242000000000' },
       documents: ['TEST DATA PRIVATE DOCUMENT'], images: [], latitude: -4, longitude: 15,
       location: { type: 'Point', coordinates: [15, -4] }, address: { street: 'TEST DATA PRIVATE STREET', city: 'TEST DATA CITY' },
@@ -185,7 +185,7 @@ describe('GET /api/properties/:id', () => {
 
   test('200 — incrémente réellement le compteur de vues en base ($inc, jamais un calcul local)', async () => {
     const document = {
-      _id: '507f191e810c19729de860ea', title: 'TEST DATA PROPERTY', statusAdmin: 'Validée',
+      _id: '507f191e810c19729de860ea', title: 'TEST DATA PROPERTY', statusAdmin: 'Validée', isPublished: true,
       views: 43, images: [], address: {},
       toObject() { return { ...this, toObject: undefined }; },
     };
@@ -226,7 +226,7 @@ describe('GET /api/properties/:id', () => {
 
   test("200 (accès public, sans authentification) — la fiche SaleManagement est réduite à une projection publique sans champ interne", async () => {
     const document = {
-      _id: '507f191e810c19729de860ea', title: 'TEST DATA VILLA', statusAdmin: 'Validée',
+      _id: '507f191e810c19729de860ea', title: 'TEST DATA VILLA', statusAdmin: 'Validée', isPublished: true,
       status: 'vente', images: [], address: {},
       toObject() { return { ...this, toObject: undefined }; },
     };
@@ -248,7 +248,7 @@ describe('GET /api/properties/:id', () => {
 
   test("200 (accès public, sans authentification) — la fiche RentalManagement est réduite à une projection publique sans dossier locatif interne", async () => {
     const document = {
-      _id: '507f191e810c19729de860ea', title: 'TEST DATA APPART', statusAdmin: 'Validée',
+      _id: '507f191e810c19729de860ea', title: 'TEST DATA APPART', statusAdmin: 'Validée', isPublished: true,
       status: 'location', images: [], address: {},
       toObject() { return { ...this, toObject: undefined }; },
     };

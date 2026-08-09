@@ -39,14 +39,21 @@ const { getCrmReport } = require('./domains/crmReport');
 const { getFinanceReport } = require('./domains/financeReport');
 const { getCommunicationReport } = require('./domains/communicationReport');
 const { getEvenementielReport } = require('./domains/evenementielReport');
+const { getMarketingReport } = require('./domains/marketingReport');
 // Référence au module (pas de destructuration) : permet à jest.spyOn(crmService,
 // 'getDashboard') d'intercepter réellement l'appel dans les tests de résilience.
 const crmService = require('../crmService');
 const { getUserKpiSummary } = require('../userKpiService');
 const organizationService = require('../organizationService');
 const OrgUnit = require('../../models/OrgUnit');
+// TENANT-CORE-1 (Phase 7) — `tenantId` est un simple ALIAS pratique de
+// `orgUnitId` : un PlatformTenant n'est qu'une racine OrgUnit (voir
+// models/PlatformTenant.js) — résolu puis transmis tel quel au mécanisme de
+// scope ORGANIZATION-1/REPORTING-1 déjà en place, jamais un second système
+// de filtrage.
+const { resolveTenantScope } = require('../platformTenant/tenantContextService');
 
-const DOMAINS = ['immobilier', 'location', 'patrimoine', 'accommodation', 'hotel', 'crm', 'finance', 'communication', 'evenementiel'];
+const DOMAINS = ['immobilier', 'location', 'patrimoine', 'accommodation', 'hotel', 'crm', 'finance', 'communication', 'evenementiel', 'marketing'];
 const NO_ORG_SCOPE = { orgScopeSupported: false, orgScopeNote: null };
 
 async function settle(promise) {
@@ -77,12 +84,24 @@ function withNoOrgScope(dataPromise) {
   return dataPromise.then((data) => ({ ...NO_ORG_SCOPE, ...data }));
 }
 
+// `tenantId` prime sur `orgUnitId` si les deux sont fournis (un appelant ne
+// devrait normalement jamais passer les deux) — résolution en échec ou
+// tenant introuvable dégrade vers "aucun scope", jamais une erreur bloquante
+// (même discipline que resolveOrgScope ci-dessus).
+async function resolveEffectiveOrgUnitId({ orgUnitId, tenantId }) {
+  if (orgUnitId) return orgUnitId;
+  if (!tenantId) return null;
+  const { rootOrgUnitId } = await resolveTenantScope(tenantId).catch(() => ({ rootOrgUnitId: null }));
+  return rootOrgUnitId;
+}
+
 // `user` : req.user, requis par le DomainReport Hôtel (scope financier) et
 // transmis à hotels(). `dateFrom`/`dateTo` : uniquement honorés par les
 // domaines dont periodSupported === true (Patrimoine, Hôtel) — voir audit
 // Phase 1 ; les autres renvoient un instantané total, jamais silencieusement
 // filtré. `orgUnitId` : voir résumé ORGANIZATION-1 ci-dessus.
-async function getExecutiveReport({ user, dateFrom, dateTo, orgUnitId } = {}) {
+async function getExecutiveReport({ user, dateFrom, dateTo, orgUnitId, tenantId } = {}) {
+  const effectiveOrgUnitId = await resolveEffectiveOrgUnitId({ orgUnitId, tenantId });
   // Calculée une seule fois puis injectée dans crm/finance/communication/
   // evenementiel — évite de relancer 4 fois la même agrégation
   // FinancialDocument.aggregate (voir Phase 8 performance). En cas d'échec,
@@ -92,10 +111,10 @@ async function getExecutiveReport({ user, dateFrom, dateTo, orgUnitId } = {}) {
   // isolée via settle() ci-dessous, jamais en cascade.
   const [crmDashboard, { scopeUserIds, hotelId }] = await Promise.all([
     crmService.getDashboard().catch(() => null),
-    resolveOrgScope(orgUnitId),
+    resolveOrgScope(effectiveOrgUnitId),
   ]);
 
-  const [immobilier, location, patrimoine, accommodation, hotel, crm, finance, communication, evenementiel, users] = await Promise.all([
+  const [immobilier, location, patrimoine, accommodation, hotel, crm, finance, communication, evenementiel, marketing, users] = await Promise.all([
     settle(withNoOrgScope(getImmobilierReport())),
     settle(withNoOrgScope(getLocationReport())),
     settle(withNoOrgScope(getPatrimoineReport({ dateFrom, dateTo }))),
@@ -105,21 +124,24 @@ async function getExecutiveReport({ user, dateFrom, dateTo, orgUnitId } = {}) {
     settle(withNoOrgScope(getFinanceReport({ crmDashboard }))),
     settle(withNoOrgScope(getCommunicationReport({ crmDashboard }))),
     settle(withNoOrgScope(getEvenementielReport({ crmDashboard }))),
+    settle(getMarketingReport({ crmDashboard })),
     settle(getUserKpiSummary()),
   ]);
 
   return {
     generatedAt: new Date(),
     period: { dateFrom: dateFrom || null, dateTo: dateTo || null },
-    orgUnitId: orgUnitId || null,
-    domains: { immobilier, location, patrimoine, accommodation, hotel, crm, finance, communication, evenementiel },
+    orgUnitId: effectiveOrgUnitId || null,
+    tenantId: tenantId || null,
+    domains: { immobilier, location, patrimoine, accommodation, hotel, crm, finance, communication, evenementiel, marketing },
     users,
   };
 }
 
-async function getDomainReport(domain, { user, dateFrom, dateTo, orgUnitId } = {}) {
-  const crmDashboard = ['finance', 'communication', 'evenementiel'].includes(domain) ? await crmService.getDashboard() : null;
-  const { scopeUserIds, hotelId } = await resolveOrgScope(orgUnitId);
+async function getDomainReport(domain, { user, dateFrom, dateTo, orgUnitId, tenantId } = {}) {
+  const effectiveOrgUnitId = await resolveEffectiveOrgUnitId({ orgUnitId, tenantId });
+  const crmDashboard = ['finance', 'communication', 'evenementiel', 'marketing'].includes(domain) ? await crmService.getDashboard() : null;
+  const { scopeUserIds, hotelId } = await resolveOrgScope(effectiveOrgUnitId);
   switch (domain) {
     case 'immobilier': return withNoOrgScope(getImmobilierReport());
     case 'location': return withNoOrgScope(getLocationReport());
@@ -130,6 +152,7 @@ async function getDomainReport(domain, { user, dateFrom, dateTo, orgUnitId } = {
     case 'finance': return withNoOrgScope(getFinanceReport({ crmDashboard }));
     case 'communication': return withNoOrgScope(getCommunicationReport({ crmDashboard }));
     case 'evenementiel': return withNoOrgScope(getEvenementielReport({ crmDashboard }));
+    case 'marketing': return getMarketingReport({ crmDashboard });
     default: { const err = new Error(`Domaine de reporting inconnu : ${domain}.`); err.statusCode = 404; throw err; }
   }
 }

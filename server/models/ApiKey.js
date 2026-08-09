@@ -23,6 +23,14 @@ const schema = new mongoose.Schema({
   rateLimitPerMinute: { type: Number, default: 60, min: 1, max: 6000 },
   ownerUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   organizationLabel: { type: String, trim: true, maxlength: 200, default: '' }, // nom libre du partenaire, PAS un lien vers ORGANIZATION-1 (portée différente)
+  // TENANT-CORE-1 (Phase 7) — lien optionnel et additif vers un
+  // PlatformTenant : quand renseigné, l'API publique (properties/hotels/
+  // accommodations) est scopée aux seules ressources de ce tenant (voir
+  // publicApiAuth.js). `null` par défaut = comportement STRICTEMENT
+  // inchangé pour toute clé déjà émise (catalogue global, comme avant ce
+  // sprint) — jamais une régression silencieuse d'une intégration partenaire
+  // existante.
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null },
   expiresAt: { type: Date, default: null },
   lastUsedAt: { type: Date, default: null },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

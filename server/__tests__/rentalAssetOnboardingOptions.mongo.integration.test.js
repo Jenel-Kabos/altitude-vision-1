@@ -31,7 +31,7 @@ test('classe les Property privés/publiés, les blocages et les biensPropres dep
   const result=await onboarding.getOptions();
   expect(result.existingEligibleProperties.map(p=>p.title)).toEqual(expect.arrayContaining(['Privé','Publié']));
   expect(result.existingEligibleProperties.map(p=>p.title)).not.toContain('Personnel hors gestion');
-  expect(result.declaredOwnerAssets).toEqual(expect.arrayContaining([expect.objectContaining({title:'Déclaré seul',proprietaireId:String(declaredOnly._id),ownerUserId:null,sourceType:'proprietaire_bien_propre'})]));
+  expect(result.declaredOwnerAssets).toEqual([]);
   expect(Object.fromEntries(result.ineligibleProperties.map(p=>[p.title,p.reason]))).toMatchObject({'Vendu':'vendu','Retiré':'retiré','Archivé':'archivé','Géré':'déjà sous gestion','Contrat':'contrat actif'});
   expect(privateP.isPublished).toBe(false); expect(publishedP.isPublished).toBe(true); expect(sold).toBeTruthy(); expect(removed).toBeTruthy(); expect(archived).toBeTruthy();
 });

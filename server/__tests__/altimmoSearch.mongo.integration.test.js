@@ -18,7 +18,7 @@ const baseProperty = (overrides = {}) => ({
   title: 'Bien Test Altimmo Search', description: 'Description suffisamment longue pour la validation du modèle.',
   pole: 'Altimmo', type: 'Appartement', status: 'vente', price: 50000000,
   address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: 4.26, longitude: 15.28,
-  images: ['https://example.test/image.jpg'], surface: 120, statusAdmin: 'Validée', availability: 'Disponible',
+  images: ['https://example.test/image.jpg'], surface: 120, statusAdmin: 'Validée', isPublished: true, availability: 'Disponible',
   owner: ownerId(), ...overrides,
 });
 

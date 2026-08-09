@@ -26,7 +26,7 @@ const baseProperty = (overrides = {}) => ({
   longitude: 15.28,
   images: ['https://example.test/image.jpg'],
   surface: 120,
-  statusAdmin: 'Validée',
+  statusAdmin: 'Validée', isPublished: true,
   availability: 'Disponible',
   owner: ownerId(),
   ...overrides,

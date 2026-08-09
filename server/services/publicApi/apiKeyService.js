@@ -26,7 +26,11 @@ function generateRawKey() {
   return { rawKey: `${KEY_PREFIX}${secret}`, keyPrefix: `${KEY_PREFIX}${displayPrefix}` };
 }
 
-async function createApiKey({ name, scopes, rateLimitPerMinute, organizationLabel, expiresAt, actor } = {}) {
+// TENANT-CORE-1 (Phase 7) — `tenant` optionnel et additif (référence
+// PlatformTenant) : quand renseigné, l'API publique restreint son
+// catalogue aux ressources de ce tenant (voir publicApiAuth.js). `undefined`
+// par défaut = comportement STRICTEMENT inchangé.
+async function createApiKey({ name, scopes, rateLimitPerMinute, organizationLabel, expiresAt, tenant, actor } = {}) {
   if (!name || !name.trim()) fail('API_KEY_NAME_REQUIRED', 'Le nom est requis.', 422);
   const invalidScopes = (scopes || []).filter((s) => !API_KEY_SCOPES.includes(s));
   if (invalidScopes.length) fail('API_KEY_SCOPE_INVALID', `Scope(s) invalide(s) : ${invalidScopes.join(', ')}.`, 422);
@@ -40,6 +44,7 @@ async function createApiKey({ name, scopes, rateLimitPerMinute, organizationLabe
     rateLimitPerMinute: rateLimitPerMinute || undefined,
     organizationLabel: organizationLabel || '',
     expiresAt: expiresAt || null,
+    tenant: tenant || null,
     createdBy: actor?._id || actor?.id || null,
   });
   // La clé en clair n'est JAMAIS relue après cet appel — le contrôleur doit

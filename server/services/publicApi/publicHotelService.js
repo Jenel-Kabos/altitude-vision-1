@@ -18,9 +18,14 @@ const { escapeRegex } = require('../../utils/regexEscape');
 const PUBLIC_HOTEL_FIELDS = 'name brand description starRating phone email website contact services hotelServices hasRestaurant hasReception gallery property publicationStatus active totalRooms totalCapacity totalBeds minNightlyRate maxNightlyRate currency';
 const PUBLIC_PROPERTY_SUBFIELDS = 'title images address statusAdmin availability price';
 
-async function listPublicHotels({ city, ville, search, page = 1, limit = 20 } = {}) {
+// TENANT-CORE-1 (Phase 7) — `scopeUserIds` optionnel, même discipline que
+// publicPropertyService.js : restreint aux hôtels dont `manager` appartient
+// au scope résolu depuis `ApiKey.tenant`, jamais appliqué par défaut.
+async function listPublicHotels({ city, ville, search, page = 1, limit = 20 } = {}, { scopeUserIds } = {}) {
   const cityFilter = buildExactCiRegexFilter(city !== undefined ? city : ville);
-  const hotels = await Hotel.find({ publicationStatus: 'publie', active: { $ne: false } })
+  const hotelFilter = { publicationStatus: 'publie', active: { $ne: false } };
+  if (scopeUserIds) hotelFilter.manager = { $in: [...scopeUserIds] };
+  const hotels = await Hotel.find(hotelFilter)
     .select(PUBLIC_HOTEL_FIELDS)
     .populate({
       path: 'property',
@@ -43,8 +48,10 @@ async function listPublicHotels({ city, ville, search, page = 1, limit = 20 } = 
   return { hotels: visible.slice(start, start + safeLimit), total, page: safePage, limit: safeLimit };
 }
 
-async function getPublicHotelById(id) {
-  const hotel = await Hotel.findOne({ _id: id, publicationStatus: 'publie', active: { $ne: false } })
+async function getPublicHotelById(id, { scopeUserIds } = {}) {
+  const filter = { _id: id, publicationStatus: 'publie', active: { $ne: false } };
+  if (scopeUserIds) filter.manager = { $in: [...scopeUserIds] };
+  const hotel = await Hotel.findOne(filter)
     .select(PUBLIC_HOTEL_FIELDS).populate('property', PUBLIC_PROPERTY_SUBFIELDS).lean();
   if (!hotel) return null;
   const categories = await RoomCategory.find({ hotel: id, status: 'actif' }).select('name capacity description').lean();

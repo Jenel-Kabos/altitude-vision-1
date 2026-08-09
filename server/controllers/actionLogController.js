@@ -1,5 +1,12 @@
 // server/controllers/actionLogController.js
 const ActionLog = require('../models/ActionLog');
+// ERP-CORE-1 (Phase 7) — filtre additif par organisation : ActionLog ne
+// stocke aucune référence à OrgUnit (et n'en a pas besoin), donc jamais une
+// seconde jointure inventée — on réutilise organizationService.
+// getScopeUserIds (ORGANIZATION-1, déjà agrégé) pour résoudre l'unité en un
+// ensemble d'utilisateurs, puis on post-filtre sur `auteur.id`, exactement
+// le même schéma déjà appliqué au pipeline CRM par reportingService.js.
+const { getScopeUserIds } = require('../services/organizationService');
 
 // ── GET /api/action-logs ──────────────────────────────────────
 exports.getLogs = async (req, res) => {
@@ -10,6 +17,7 @@ exports.getLogs = async (req, res) => {
       module:   mod,
       typeAction,
       auteurId,
+      orgUnitId,
       dateFrom,
       dateTo,
       search,
@@ -19,6 +27,13 @@ exports.getLogs = async (req, res) => {
     if (mod)        filter.module     = mod;
     if (typeAction) filter.typeAction = typeAction;
     if (auteurId)   filter['auteur.id'] = auteurId;
+    if (orgUnitId) {
+      const scopeUserIds = await getScopeUserIds(orgUnitId).catch(() => null);
+      // Résolution en échec ou unité vide : ne renvoie jamais tout
+      // silencieusement — un $in sur un tableau vide ne matche rien,
+      // jamais une approximation qui montrerait des logs hors périmètre.
+      filter['auteur.id'] = { $in: [...(scopeUserIds || [])] };
+    }
 
     if (dateFrom || dateTo) {
       filter.date = {};

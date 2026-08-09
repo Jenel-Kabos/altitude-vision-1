@@ -42,11 +42,10 @@ async function login(page) {
 // test suivant), chacune avec son propre `_id` → sa propre clé
 // `sourceOwnerAssetId` unique. Chaque projet importe SON propre bien,
 // indépendamment de l'autre, dans n'importe quel ordre, sans collision.
-test('intégrer un bien propre à la Gestion locative puis créer un contrat dessus', async ({ page }, testInfo) => {
+test('un bien propre historique ne peut plus être importé depuis un contrat', async ({ page }, testInfo) => {
   const isMobile = testInfo.project.name === 'mobile-chromium';
   const proprietaireLabel = isMobile ? /^BienPropreMobile PropriétaireE2E$/ : /^BienPropre PropriétaireE2E$/;
   const bienTitre = isMobile ? 'Bien propre E2E Mobile' : 'Bien propre E2E';
-  const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // GL-ARCH-1.2 — "Bien propre E2E" est un préfixe exact de "Bien propre E2E
   // Mobile" : desktop-chromium et mobile-chromium partagent la même base, et
   // selon l'ordre d'exécution le bien de L'AUTRE projet peut déjà avoir été
@@ -57,9 +56,6 @@ test('intégrer un bien propre à la Gestion locative puis créer un contrat des
   // ligne biensPropres[] (dont le texte combine titre + adresse : on ancre
   // sur "titre + tiret" pour ne matcher que cette ligne précise, jamais
   // l'option/la cellule de contrat de l'autre projet qui n'ont pas de tiret).
-  const bienTitreOptionExact = new RegExp(`^${escapeRegExp(bienTitre)}$`);
-  const bienRowLabel = new RegExp(`^${escapeRegExp(bienTitre)} —`);
-
   await login(page);
   await page.goto('/dashboard/gestion-locative');
   await page.getByRole('button', { name: /nouveau contrat/i }).click();
@@ -69,32 +65,9 @@ test('intégrer un bien propre à la Gestion locative puis créer un contrat des
   await proprietaireSelect.selectOption({ label: proprietaireOptionText });
 
   const bienSelect = page.locator('label:text("Bien immobilier")').locator('xpath=following-sibling::select');
-  await expect(bienSelect.locator('option', { hasText: bienTitreOptionExact })).toHaveCount(0);
-  await expect(page.getByText(bienRowLabel)).toBeVisible();
-  await page.getByRole('button', { name: /ajouter à la gestion locative/i }).click();
-  await page.getByPlaceholder('Arrondissement').fill('Bacongo');
-  await page.getByPlaceholder('Latitude').fill('-4.26');
-  await page.getByPlaceholder('Longitude').fill('15.24');
-
-  const [importResponse] = await Promise.all([
-    page.waitForResponse((r) => r.url().includes('/importer-gestion') && r.request().method() === 'POST'),
-    page.getByRole('button', { name: /confirmer l.import/i }).click(),
-  ]);
-  expect(importResponse.status()).toBe(201);
-  const importedPropertyId = (await importResponse.json()).data.property._id;
-
-  await expect(page.getByText('Intégré ✓')).toBeVisible();
-  await expect(bienSelect).toHaveValue(importedPropertyId);
-
-  await page.locator('label:text("Loyer/mois")').locator('xpath=following-sibling::input').fill('275000');
-  const [contratResponse] = await Promise.all([
-    page.waitForResponse((r) => r.url().includes('/api/contrats') && r.request().method() === 'POST'),
-    page.getByRole('button', { name: /enregistrer/i }).click(),
-  ]);
-  expect(contratResponse.status()).toBe(201);
-  const body = await contratResponse.json();
-  expect(String(body.data.contrat.bien._id)).toBe(String(importedPropertyId));
-  await expect(page.getByText(/Contrat créé/i)).toBeVisible();
+  await expect(bienSelect.locator('option', { hasText: new RegExp(`^${bienTitre}$`) })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /ajouter à la gestion locative/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /confirmer l.import/i })).toHaveCount(0);
 });
 
 test('création de contrat avec un bien du portefeuille Altimmo réussit et le contrat apparaît dans la liste', async ({ page }, testInfo) => {

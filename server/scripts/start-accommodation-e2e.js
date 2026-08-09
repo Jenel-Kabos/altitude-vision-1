@@ -107,6 +107,7 @@ async function seed(uri) {
       bedrooms: 2,
       bathrooms: 1,
       statusAdmin: "Validée",
+      isPublished: true,
       availability: "Disponible",
       owner: ids.owner,
     },

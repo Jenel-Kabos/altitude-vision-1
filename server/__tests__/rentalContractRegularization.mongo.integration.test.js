@@ -19,6 +19,14 @@ const fixture = async () => {
   const contract = await Contrat.create({ type: 'location', statut: 'actif', proprietaire: proprietaire._id, locataire: locataire._id, adresseBien: 'Rue Test', villeBien: 'Brazzaville', montantLoyer: 250000 });
   return { admin, owner, proprietaire, locataire, property, contract };
 };
+const reconstructionData = {
+  reason: 'Reconstruction après contrôle humain des pièces historiques',
+  property: {
+    title: 'Bien historique reconstruit', type: 'Appartement', street: 'Rue Legacy',
+    city: 'Brazzaville', arrondissement: 'Centre', monthlyRent: 250000, surface: 75,
+    latitude: -4.2, longitude: 15.2, description: 'Bien reconstruit exclusivement depuis un contrat historique vérifié.',
+  },
+};
 
 beforeAll(startFinancialMongo); afterEach(clearFinancialMongo); afterAll(stopFinancialMongo);
 
@@ -53,4 +61,49 @@ test('classe une anomalie sans modifier le contrat et réserve la réversion à 
   expect((await Contrat.findById(contract._id)).statut).toBe('actif');
   await expect(service.revert({ contractId: contract._id, reason: 'Tentative gestionnaire', actor: manager })).rejects.toMatchObject({ code: 'ADMIN_REQUIRED' });
   await expect(service.revert({ contractId: contract._id, reason: 'Validation administrateur', actor: admin })).resolves.toMatchObject({ status: 'reverted' });
+});
+
+test('reconstruit exactement un Property non publié et un RentalManagement pour un contrat legacy', async () => {
+  const { admin, contract } = await fixture();
+  const before = await Property.countDocuments();
+  const record = await service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: admin });
+  const updated = await Contrat.findById(contract._id);
+  const property = await Property.findById(updated.bien);
+  const rental = await RentalManagement.findOne({ property: property._id });
+
+  expect(await Property.countDocuments()).toBe(before + 1);
+  expect(record.createdProperty).toBe(true);
+  expect(property.toObject()).toMatchObject({ isPublished: false, statusAdmin: 'En attente', internalManagedOnly: true });
+  expect(rental.toObject()).toMatchObject({ managementActivated: true, publicationAuthorized: false, publicationStatus: 'suspendu' });
+  expect(record.events[0]).toMatchObject({ action: 'create_internal', reason: reconstructionData.reason });
+  expect(await ActionLog.exists({ action: 'Reconstruction patrimoniale historique' })).toBeTruthy();
+});
+
+test('refuse la reconstruction sans motif, pour Collaborateur et pour un contrat moderne déjà rattaché', async () => {
+  const { admin, property, contract } = await fixture();
+  const collaborator = await user('Collaborateur');
+  await expect(service.decide({
+    contractId: contract._id,
+    action: 'create_internal',
+    data: { ...reconstructionData, reason: '' },
+    actor: admin,
+  })).rejects.toMatchObject({ code: 'REASON_REQUIRED' });
+  await expect(service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: collaborator }))
+    .rejects.toMatchObject({ code: 'HISTORICAL_RECONSTRUCTION_FORBIDDEN' });
+
+  contract.bien = property._id;
+  await contract.save();
+  await expect(service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: admin }))
+    .rejects.toMatchObject({ code: 'CASE_NOT_PENDING' });
+});
+
+test('la réversion d’une reconstruction conserve le Property et le rend interne non publié', async () => {
+  const { admin, contract } = await fixture();
+  await service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: admin });
+  const propertyId = (await Contrat.findById(contract._id)).bien;
+  await service.revert({ contractId: contract._id, reason: 'Réversion contrôlée sans suppression patrimoniale', actor: admin });
+
+  expect(await Property.exists({ _id: propertyId })).toBeTruthy();
+  expect(await Property.findById(propertyId)).toMatchObject({ isPublished: false });
+  expect((await Contrat.findById(contract._id)).bien).toBeFalsy();
 });

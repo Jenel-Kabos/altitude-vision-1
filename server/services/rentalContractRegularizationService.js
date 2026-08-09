@@ -125,8 +125,14 @@ async function decide({ contractId, action, data, actor }) {
     return finish({ contract, record, decision: action, property, rental, actor, reason, before });
   }
   if (action === 'create_internal') {
+    if (!['Admin', 'GestionnaireImmobilier'].includes(actor?.role)) throw new RegularizationError('Reconstruction réservée aux responsables immobiliers.', 403, 'HISTORICAL_RECONSTRUCTION_FORBIDDEN');
     if (!contract.proprietaire?.user) throw new RegularizationError('La fiche Propriétaire doit être liée à un compte avant de créer le Property.', 422, 'OWNER_USER_REQUIRED');
-    const created = await onboarding.createManaged({ data: { ...data.property, owner: contract.proprietaire.user, monthlyRent: data.property?.monthlyRent || contract.montantLoyer }, actor });
+    const created = await onboarding.reconstructHistoricalManagedProperty({
+      data: { ...data.property, owner: contract.proprietaire.user, monthlyRent: data.property?.monthlyRent || contract.montantLoyer },
+      actor,
+      contractId: contract._id,
+      reason,
+    });
     property = created.property; rental = await RentalManagement.findOne({ property: property._id }); createdProperty = true;
     const before = snapshot(contract, property, rental);
     contract.bien = property._id; await contract.save(); await syncLeaseOccupation(contract, actor._id || actor.id);

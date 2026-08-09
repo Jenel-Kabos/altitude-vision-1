@@ -9,7 +9,7 @@ import {
   ClipboardList, BarChart2, Scale, Megaphone, MessageCircle, FolderOpen,
   Clock, PenLine, Calculator, FileText, CreditCard, Palmtree,
   Landmark, KeyRound, Users2, FileSignature, Wrench, Building2, History,
-  ContactRound, LayoutDashboard, Network,
+  ContactRound, LayoutDashboard, Network, Gauge,
 } from "lucide-react";
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardBadges } from '../../hooks/useDashboardBadges';
@@ -41,6 +41,15 @@ const NAV_SECTIONS = [
     label: null,
     links: [
       { to: '/dashboard',                    end: true,  Icon: BarChart3,    label: 'Tableau de bord',    accent: BLUE,      roles: ALL_STAFF },
+      // ERP-CORE-1 — Centre d'Administration Global, réservé à la Direction
+      // (même périmètre que la route serveur /api/erp) : orchestration pure,
+      // ne remplace aucun des dashboards listés ci-dessous.
+      { to: '/dashboard/erp',                end: true,  Icon: Gauge,           label: "Centre d'Administration", accent: GOLD, roles: ['Admin'] },
+      // TENANT-CORE-1 — administration SaaS multi-tenant, réservée Admin
+      // (même périmètre que /api/platform-tenants). Nommé « Multi-Tenant »
+      // dans l'UI pour rester sans ambiguïté avec l'espace locataire
+      // existant (Gestion locative → Locataires).
+      { to: '/dashboard/tenants',            end: true,  Icon: Building2,       label: 'Multi-Tenant (SaaS)', accent: BLUE, roles: ['Admin'] },
       // REPORTING-1 — Centre de Pilotage, réservé à la Direction (même
       // périmètre que la route serveur /api/reporting).
       { to: REPORTING_ROUTE,                 end: true,  Icon: LayoutDashboard, label: 'Centre de Pilotage', accent: GOLD,   roles: ['Admin', 'GestionnaireImmobilier'] },
@@ -58,7 +67,7 @@ const NAV_SECTIONS = [
     // "Gestion locative" ci-dessous — voir ARCHITECTURE_ALTIMMO_V2.md.
     label: 'Immobilier',
     links: [
-      { to: '/dashboard/properties',               end: true,  Icon: Home,       label: 'Toutes les annonces', accent: BLUE, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/properties',               end: true,  Icon: Home,       label: 'Tous les biens', accent: BLUE, roles: ROLES_ALTIMMO },
       { to: '/dashboard/sales',              end: true,  Icon: Landmark,   label: 'Ventes',               accent: BLUE, roles: ROLES_ALTIMMO },
       { to: '/dashboard/rentals',            end: true,  Icon: KeyRound,   label: 'Locations',            accent: BLUE, roles: ROLES_ALTIMMO },
       { to: '/dashboard/dossiers-immobiliers', end: true, Icon: ClipboardList, label: 'Offres & candidatures', accent: BLUE, roles: ['Admin', 'Collaborateur', 'GestionnaireImmobilier'] },
@@ -114,6 +123,9 @@ const NAV_SECTIONS = [
     links: [
       { to: '/dashboard/events',             end: false, Icon: Calendar,     label: 'Mila Events',         accent: '#D42B2B', roles: ROLES_CM   },
       { to: '/dashboard/altcom',             end: false, Icon: Briefcase,    label: 'Altcom',              accent: GOLD,      roles: ROLES_CM   },
+      // MARKETING-AUTOMATION-1 — même périmètre rôles qu'Altcom (ROLES_CM) :
+      // segments, modèles, campagnes, journal d'envoi.
+      { to: '/dashboard/altcom/marketing',   end: false, Icon: Megaphone,    label: 'Marketing Automation', accent: GOLD,      roles: ROLES_CM   },
     ],
   },
   {

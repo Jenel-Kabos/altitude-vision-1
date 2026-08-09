@@ -6,7 +6,7 @@ const { getPublicAccommodationById, getPublicAccommodationAvailability } = requi
 
 exports.getOne = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
-  const accommodation = await getPublicAccommodationById(req.params.id);
+  const accommodation = await getPublicAccommodationById(req.params.id, { scopeUserIds: req.apiKeyTenantScope });
   if (!accommodation) return res.status(404).json({ status: 'fail', message: 'Hébergement introuvable.' });
   res.json({ status: 'success', data: { accommodation } });
 });

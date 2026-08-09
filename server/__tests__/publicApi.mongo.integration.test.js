@@ -45,7 +45,7 @@ const makeValidatedProperty = (owner, overrides = {}) => Property.create({
   pole: 'Altimmo', type: 'Villa', status: 'vente', price: 50000000,
   address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: -4.26, longitude: 15.24,
   images: ['https://placehold.co/1200x800/png?text=Test'], surface: 90,
-  statusAdmin: 'Validée', availability: 'Disponible', owner,
+  statusAdmin: 'Validée', isPublished: true, availability: 'Disponible', owner,
   commissionRate: 7.5, internalManagedOnly: true, // champs internes — jamais exposés publiquement (voir test dédié)
   ...overrides,
 });

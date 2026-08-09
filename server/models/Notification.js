@@ -114,6 +114,12 @@ const NOTIFICATION_TYPES = [
   'crm_opportunity_stage_changed',
   'crm_opportunity_won',
   'crm_opportunity_lost',
+  // MARKETING-AUTOMATION-1 — type dédié pour les envois marketing
+  // push/notification (campagnes et workflows) : jamais réutilisé un type
+  // CRM existant, qui déclencherait par erreur des règles CRM-AUTOMATION-1
+  // conçues pour un tout autre événement (voir le `triggerEvent` de
+  // CrmAutomationRule, indexé sur cette même valeur `type`).
+  'marketing_message',
 ];
 
 const notificationSchema = new mongoose.Schema(

@@ -9,11 +9,6 @@ const { STAFF_IMMO } = require('../utils/roles');
 const protect    = [auth.protect, auth.restrictTo(...STAFF_IMMO)];
 const readAll    = [auth.protect, auth.restrictTo(...STAFF_IMMO, 'Secretaire')];
 const adminOnly  = [auth.protect, auth.restrictTo('Admin')];
-// GL-ARCH-1.1 : décision explicite de gestion locative (biensPropres → bien
-// géré) — réservée à Admin/GestionnaireImmobilier, jamais Collaborateur
-// (aucune capacité explicite ne le lui accorde, cf. CLAUDE.md : Collaborateur
-// « ne peut pas modifier/supprimer/valider ») ni bien sûr Proprietaire/Client.
-const gestionLocativeOnly = [auth.protect, auth.restrictTo('Admin', 'GestionnaireImmobilier')];
 const multiPics  = upload.array('photos', 20);
 
 // Multer dédié pièce d'identité : 5 MB, PDF + images uniquement
@@ -41,8 +36,5 @@ router.put(   '/:id/biens/:bienIndex',                    protect, ctrl.updateBi
 router.delete('/:id/biens/:bienIndex',                    protect, ctrl.deleteBien);
 router.post(  '/:id/biens/:bienIndex/photos',             protect, multiPics, ctrl.addBienPhotos);
 router.delete('/:id/biens/:bienIndex/photos/:photoIndex', protect, ctrl.deleteBienPhoto);
-
-// ── GL-ARCH-1.1 — Import vers la Gestion locative ─────────────
-router.post('/:id/biens/:bienIndex/importer-gestion', gestionLocativeOnly, ctrl.importBienIntoGestionLocative);
 
 module.exports = router;

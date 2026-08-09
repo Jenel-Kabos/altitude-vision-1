@@ -612,6 +612,7 @@ describe('GET /api/properties/:id — visibilité publique Hébergement (brouill
 
   test('403 — un hébergement dont Accommodation est en brouillon reste invisible au public', async () => {
     const property = hebergementProperty({
+      isPublished: true,
       toObject() { return { ...this, toObject: undefined }; },
     });
     Property.findByIdAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(property) });
@@ -622,6 +623,7 @@ describe('GET /api/properties/:id — visibilité publique Hébergement (brouill
 
   test('200 — un hébergement publié est visible publiquement', async () => {
     const property = hebergementProperty({
+      isPublished: true,
       toObject() { return { ...this, toObject: undefined }; },
     });
     Property.findByIdAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(property) });
@@ -638,7 +640,7 @@ describe('GET /api/properties/:id — visibilité publique Hébergement (brouill
 
   test("200 — une ancienne Property Vente sans Accommodation reste valide (comportement inchangé)", async () => {
     const property = {
-      _id: PROPERTY_ID, title: 'Ancien bien', status: 'vente', statusAdmin: 'Validée', availability: 'Disponible',
+      _id: PROPERTY_ID, title: 'Ancien bien', status: 'vente', statusAdmin: 'Validée', isPublished: true, availability: 'Disponible',
       toObject() { return { ...this, toObject: undefined }; },
     };
     Property.findByIdAndUpdate = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(property) });

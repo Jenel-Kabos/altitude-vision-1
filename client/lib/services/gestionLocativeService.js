@@ -50,6 +50,10 @@ export const runRentalAction = async (id, action, data = {}) => {
   const res = await api.post(`/rental-management/${id}/${action}`, data);
   return res.data.data;
 };
+export const deactivateRentalManagement = async (id, comment = '') => {
+  const res = await api.post(`/rental-management/${id}/deactivate`, { comment });
+  return res.data.data;
+};
 export const getMyRentalManagement = async () => {
   const res = await api.get('/rental-management/owner/my');
   return res.data.data.rentals;

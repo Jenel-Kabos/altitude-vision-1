@@ -12,8 +12,16 @@ const APIFeatures = require('../../utils/apiFeatures');
 
 const PUBLIC_PROPERTY_FIELDS = 'title description type status price address latitude longitude location images bedrooms bathrooms surface livingRooms kitchens constructionType amenities availability createdAt';
 
-async function listPublicProperties(query = {}) {
-  const baseQuery = Property.find({ statusAdmin: 'Validée', availability: { $ne: 'Retiré' } });
+// TENANT-CORE-1 (Phase 7) — `scopeUserIds` optionnel (Set d'identifiants
+// User) : quand fourni (clé API liée à un PlatformTenant, voir
+// publicApiAuth.js), restreint aux biens dont `owner` appartient au scope —
+// même mécanisme de post-filtrage que reportingService.js (assignedTo
+// CRM), jamais une seconde implémentation. `undefined`/`null` = comportement
+// STRICTEMENT inchangé (catalogue global, tel qu'avant ce sprint).
+async function listPublicProperties(query = {}, { scopeUserIds } = {}) {
+  const filter = { statusAdmin: 'Validée', isPublished: true, availability: { $ne: 'Retiré' } };
+  if (scopeUserIds) filter.owner = { $in: [...scopeUserIds] };
+  const baseQuery = Property.find(filter);
   const features = new APIFeatures(baseQuery, query).filter().sort().paginate();
   // `limitFields()` n'est jamais appliqué ici : un appelant public ne doit
   // jamais pouvoir demander un champ hors de l'allow-list via `?fields=`.
@@ -24,8 +32,10 @@ async function listPublicProperties(query = {}) {
   return { properties, total, page: Number(query.page) || 1, limit: Number(query.limit) || 20 };
 }
 
-async function getPublicPropertyById(id) {
-  const property = await Property.findOne({ _id: id, statusAdmin: 'Validée' }).select(PUBLIC_PROPERTY_FIELDS).lean();
+async function getPublicPropertyById(id, { scopeUserIds } = {}) {
+  const filter = { _id: id, statusAdmin: 'Validée', isPublished: true };
+  if (scopeUserIds) filter.owner = { $in: [...scopeUserIds] };
+  const property = await Property.findOne(filter).select(PUBLIC_PROPERTY_FIELDS).lean();
   return property || null;
 }
 
