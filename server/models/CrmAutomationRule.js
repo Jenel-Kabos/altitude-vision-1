@@ -19,7 +19,8 @@ const actionSchema = new mongoose.Schema({
 }, { _id: false });
 
 const schema = new mongoose.Schema({
-  ruleId: { type: String, required: true, unique: true, trim: true, maxlength: 100 },
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
+  ruleId: { type: String, required: true, trim: true, maxlength: 100 },
   label: { type: String, required: true, trim: true, maxlength: 200 },
   description: { type: String, default: '', maxlength: 1000 },
   // Correspond exactement à Notification.type (voir models/Notification.js,
@@ -36,6 +37,7 @@ const schema = new mongoose.Schema({
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 }, { timestamps: true });
 
-schema.index({ triggerEvent: 1, enabled: 1, priority: 1 });
+schema.index({ tenant: 1, ruleId: 1 }, { unique: true });
+schema.index({ tenant: 1, triggerEvent: 1, enabled: 1, priority: 1 });
 
 module.exports = mongoose.model('CrmAutomationRule', schema);

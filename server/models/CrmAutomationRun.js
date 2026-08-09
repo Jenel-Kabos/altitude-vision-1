@@ -5,6 +5,7 @@
 const mongoose = require('mongoose');
 
 const schema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   rule: { type: mongoose.Schema.Types.ObjectId, ref: 'CrmAutomationRule', required: true, index: true },
   ruleId: { type: String, required: true }, // dénormalisé — survit même si la règle est supprimée
   triggerEvent: { type: String, required: true },
@@ -17,6 +18,6 @@ const schema = new mongoose.Schema({
 }, { timestamps: true });
 
 schema.index({ createdAt: -1 });
-schema.index({ ruleId: 1, createdAt: -1 });
+schema.index({ tenant: 1, ruleId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('CrmAutomationRun', schema);

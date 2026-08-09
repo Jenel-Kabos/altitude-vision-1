@@ -2,7 +2,6 @@
 // cockpit et administration. Vérifie en particulier que le moteur
 // n'intervient QUE via le hook notify() déjà en place (aucune modification
 // des domaines GL/Hôtel/Accommodation eux-mêmes n'était nécessaire).
-const mongoose = require('mongoose');
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
@@ -13,8 +12,11 @@ const CrmActivity = require('../models/CrmActivity');
 const CrmOpportunity = require('../models/CrmOpportunity');
 const CrmAutomationRule = require('../models/CrmAutomationRule');
 const CrmAutomationRun = require('../models/CrmAutomationRun');
+const OrgUnit = require('../models/OrgUnit');
+const OrgMembership = require('../models/OrgMembership');
+const PlatformTenant = require('../models/PlatformTenant');
 const { notify } = require('../services/notificationService');
-const { handleEvent } = require('../services/crmAutomationEngine');
+const { handleEvent: handleTenantEvent } = require('../services/crmAutomationEngine');
 const { computeCustomerScore } = require('../services/crmScoreService');
 const { getCockpit } = require('../services/crmCockpitService');
 const { createOpportunity, moveOpportunity, setOpportunityOutcome } = require('../services/crmService');
@@ -32,17 +34,27 @@ app.use(errorHandler);
 const signToken = (userId) => jwt.sign({ id: userId, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
 let counter = 0;
-const makeUser = (overrides = {}) => {
+let currentTenant;
+const handleEvent = (event, options) => handleTenantEvent({ ...event, platformTenantId: currentTenant._id }, options);
+const makeUser = async (overrides = {}) => {
   counter += 1;
-  return User.create({ name: 'Test User', email: `crmauto${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
+  const created = await User.create({ name: 'Test User', email: `crmauto${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
+  await OrgMembership.create({ user: created._id, orgUnit: currentTenant.rootOrgUnit, status: 'active' });
+  return created;
 };
 
 const makeCustomerForUser = (user, relations = ['prospect']) => CrmCustomer.create({
+  tenant: currentTenant._id,
   displayName: user.name, emails: [user.email], identityKeys: [`user:${user._id}`, `email:${user.email}`],
   relations, sourceRefs: [{ entityType: 'User', entityId: user._id, source: 'auth' }],
 });
 
 beforeAll(startFinancialMongo);
+beforeEach(async () => {
+  const root = await OrgUnit.create({ name: `CRM Automation ${Date.now()} ${counter}`, type: 'organization', status: 'active' });
+  currentTenant = await PlatformTenant.create({ name: root.name, slug: `crm-auto-${Date.now()}-${counter++}`, rootOrgUnit: root._id, status: 'active' });
+  CrmAutomationRule.schema.path('tenant').default(() => currentTenant._id);
+});
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);
 
@@ -112,7 +124,7 @@ describe('crmAutomationEngine — moteur générique', () => {
 
     // Simule exactement ce qu'un domaine GL ferait — un simple appel à
     // notify(), déjà existant, sans aucune connaissance du moteur CRM.
-    await notify({ recipient: admin._id, sender: admin._id, type: 'rental_notice_started', title: 'Préavis démarré', body: 'Test', audience: 'staff' });
+    await notify({ recipient: admin._id, sender: admin._id, type: 'rental_notice_started', title: 'Préavis démarré', body: 'Test', audience: 'staff', platformTenantId: currentTenant._id });
     // Le hook est fire-and-forget (Promise.resolve().then(...)) — laisser le
     // microtask/event loop s'exécuter avant d'assertionner.
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -127,9 +139,10 @@ describe('crmService — instrumentation opportunité (Phase 1, gap comblé)', (
     const customer = await makeCustomerForUser(admin);
     await CrmAutomationRule.create({ ruleId: 'test-opp-won', label: 'Test', triggerEvent: 'crm_opportunity_won', actions: [{ actionId: 'crm.activity.create', params: { title: 'Opportunité gagnée détectée' } }] });
 
-    const opp = await createOpportunity(customer._id, { title: 'Mandat', pole: 'Altimmo', assignedTo: admin._id }, admin._id);
-    await moveOpportunity(opp._id, { stage: 'negociation' }, admin._id);
-    await setOpportunityOutcome(opp._id, { outcome: 'won' }, admin._id);
+    const scope = { tenantId: currentTenant._id };
+    const opp = await createOpportunity(customer._id, { title: 'Mandat', pole: 'Altimmo', assignedTo: admin._id }, admin._id, scope);
+    await moveOpportunity(opp._id, { stage: 'negociation' }, admin._id, scope);
+    await setOpportunityOutcome(opp._id, { outcome: 'won' }, admin._id, scope);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     const Notification = require('../models/Notification');

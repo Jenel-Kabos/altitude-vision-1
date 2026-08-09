@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const STAGES = ['prospect', 'qualification', 'proposition', 'negociation', 'contrat', 'client_actif', 'fidelisation', 'ancien_client'];
 const schema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'CrmCustomer', required: true, index: true },
   title: { type: String, required: true, trim: true, maxlength: 200 },
   pole: { type: String, enum: ['Altimmo', 'Accommodation', 'Hotel', 'Altcom', 'MilaEvents', 'Transversal'], default: 'Transversal' },

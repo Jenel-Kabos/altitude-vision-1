@@ -20,7 +20,7 @@ exports.create = asyncHandler(async (req, res) => {
     return res.status(422).json({ status: 'fail', message: `events invalide(s) : ${invalidEvents.join(', ') || 'aucun événement fourni'}.` });
   }
   const secret = crypto.randomBytes(24).toString('hex');
-  const subscription = await WebhookSubscription.create({ apiKey: req.apiKey._id, url, events, secret, createdBy: req.apiKey.createdBy });
+  const subscription = await WebhookSubscription.create({ tenant: req.apiKey.tenant, apiKey: req.apiKey._id, url, events, secret, createdBy: req.apiKey.createdBy });
   // Le secret de signature n'est retourné qu'à la création — jamais relu ensuite.
   res.status(201).json({ status: 'success', data: { subscription: { ...subscription.toObject(), secret } } });
 });

@@ -10,6 +10,7 @@ const CAMPAIGN_CHANNELS = ['email', 'push', 'notification', 'sms', 'whatsapp'];
 const CAMPAIGN_STATUSES = ['draft', 'approved', 'sending', 'sent', 'cancelled'];
 
 const schema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   name: { type: String, required: true, trim: true, maxlength: 200 },
   channel: { type: String, enum: CAMPAIGN_CHANNELS, required: true },
   template: { type: mongoose.Schema.Types.ObjectId, ref: 'MarketingTemplate', required: true },

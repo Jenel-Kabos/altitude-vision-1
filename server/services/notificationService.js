@@ -125,6 +125,7 @@ async function notify({
   destination = null,
   audience = 'user',
   dedupeKey = null,
+  platformTenantId = null,
 } = {}) {
   if (!recipient) {
     throw new Error('Destinataire et contenu de notification requis.');
@@ -145,6 +146,7 @@ async function notify({
   let notif;
   try {
     notif = await Notification.create({
+    platformTenant: platformTenantId,
     recipient: id,
     sender,
     type,
@@ -174,7 +176,7 @@ async function notify({
   Promise.resolve()
     .then(() => require('./crmAutomationEngine').handleEvent({
       type, recipient: id, sender, entityType: navigation.entityType, entityId: navigation.entityId,
-      metadata: resolvedMetadata, audience, dedupeKey, notificationId: notif._id,
+      metadata: resolvedMetadata, audience, dedupeKey, notificationId: notif._id, platformTenantId,
     }))
     .catch(() => {});
 
@@ -186,7 +188,7 @@ async function notify({
   // sont des no-op immédiats ici.
   Promise.resolve()
     .then(() => require('./publicApi/webhookDispatchService').dispatch({
-      type, entityType: navigation.entityType, entityId: navigation.entityId, metadata: resolvedMetadata,
+      type, entityType: navigation.entityType, entityId: navigation.entityId, metadata: resolvedMetadata, platformTenantId,
     }))
     .catch(() => {});
 

@@ -7,6 +7,7 @@ jest.mock('../services/zohoMailService', () => ({ sendEmail: jest.fn().mockResol
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const User = require('../models/User');
 const CrmCustomer = require('../models/CrmCustomer');
@@ -38,6 +39,12 @@ const makeUser = (overrides = {}) => {
   counter += 1;
   return User.create({ name: 'Test User', email: `mktauto${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
 };
+const attachTenant = async (member) => {
+  const admin = await makeUser({ role: 'Admin' });
+  const tenant = await require('../services/platformTenant/platformTenantService').createTenant({ name: `Marketing HTTP ${Date.now()} ${counter}`, actor: admin });
+  await require('../services/organizationService').grantMembership({ userId: member._id, orgUnitId: tenant.rootOrgUnit, actor: admin });
+  return tenant;
+};
 
 const makeCustomerForUser = (user, relations = ['prospect']) => CrmCustomer.create({
   displayName: user.name, emails: [user.email], identityKeys: [`user:${user._id}`, `email:${user.email}`],
@@ -45,12 +52,13 @@ const makeCustomerForUser = (user, relations = ['prospect']) => CrmCustomer.crea
 });
 
 const makeActiveTemplate = async (overrides = {}) => {
+  const tenantId = overrides.tenantId;
   const template = await createTemplateVersion({
     family: overrides.family || `famille-${Date.now()}-${Math.random()}`,
     name: 'Bienvenue', channel: 'email', subject: 'Bonjour {{prenom}}', body: 'Bienvenue {{prenom}} {{nom}} !',
     ...overrides,
   });
-  return activateTemplate(template._id, {});
+  return activateTemplate(template._id, { tenantId });
 };
 
 beforeAll(startFinancialMongo);
@@ -172,26 +180,30 @@ describe('marketingCampaignService — approbation humaine obligatoire (Phase 4)
 describe('crmAutomationActions.sendMarketingMessage — workflow (Phase 5, aucun second moteur)', () => {
   test('un workflow marketing sans modèle actif est "skipped", jamais une erreur', async () => {
     const admin = await makeUser({ role: 'Admin' });
-    await makeCustomerForUser(admin, ['prospect']);
+    const tenantId = new mongoose.Types.ObjectId();
+    const customer = await makeCustomerForUser(admin, ['prospect']);
+    await CrmCustomer.updateOne({ _id: customer._id }, { tenant: tenantId });
     await CrmAutomationRule.create({
-      ruleId: 'test-marketing-no-template', label: 'Test', triggerEvent: 'quote_received',
+      tenant: tenantId, ruleId: 'test-marketing-no-template', label: 'Test', triggerEvent: 'quote_received',
       actions: [{ actionId: 'marketing.message.send', params: { templateFamily: 'famille_inexistante', channel: 'email' } }],
     });
-    const results = await handleEvent({ type: 'quote_received', recipient: admin._id, sender: admin._id, metadata: {} });
+    const results = await handleEvent({ type: 'quote_received', recipient: admin._id, sender: admin._id, metadata: {}, platformTenantId: tenantId });
     expect(results[0].status).toBe('success'); // la règle "réussit" ; l'action interne est skipped
   });
 
   test('un workflow marketing avec modèle actif envoie et journalise un MarketingSend', async () => {
     const admin = await makeUser({ role: 'Admin' });
-    await makeCustomerForUser(admin, ['prospect']);
+    const tenantId = new mongoose.Types.ObjectId();
+    const customer = await makeCustomerForUser(admin, ['prospect']);
+    await CrmCustomer.updateOne({ _id: customer._id }, { tenant: tenantId });
     const family = `workflow-${Date.now()}`;
-    await makeActiveTemplate({ family, channel: 'notification' });
+    await makeActiveTemplate({ family, channel: 'notification', tenantId });
     await CrmAutomationRule.create({
-      ruleId: 'test-marketing-workflow', label: 'Test', triggerEvent: 'quote_received',
+      tenant: tenantId, ruleId: 'test-marketing-workflow', label: 'Test', triggerEvent: 'quote_received',
       actions: [{ actionId: 'marketing.message.send', params: { templateFamily: family, channel: 'notification' } }],
     });
 
-    const results = await handleEvent({ type: 'quote_received', recipient: admin._id, sender: admin._id, metadata: {} });
+    const results = await handleEvent({ type: 'quote_received', recipient: admin._id, sender: admin._id, metadata: {}, platformTenantId: tenantId });
     expect(results[0].status).toBe('success');
     expect(await MarketingSend.countDocuments({ workflowRuleId: 'quote_received' })).toBe(1);
   });
@@ -251,23 +263,25 @@ describe('HTTP /api/marketing — RBAC (Phase 8)', () => {
 
   test('un CommunityManager peut lister les segments et créer un modèle actif', async () => {
     const cm = await makeUser({ role: 'CommunityManager' });
+    const tenant = await attachTenant(cm);
     const token = `Bearer ${signToken(cm._id)}`;
-    const segRes = await request(app).get('/api/marketing/segments').set('Authorization', token);
+    const segRes = await request(app).get('/api/marketing/segments').set('Authorization', token).set('X-Platform-Tenant-Id', String(tenant._id));
     expect(segRes.status).toBe(200);
     expect(segRes.body.data.segments.length).toBe(14);
 
-    const createRes = await request(app).post('/api/marketing/templates').set('Authorization', token)
+    const createRes = await request(app).post('/api/marketing/templates').set('Authorization', token).set('X-Platform-Tenant-Id', String(tenant._id))
       .send({ family: `http-${Date.now()}`, name: 'HTTP', channel: 'email', body: 'Bonjour' });
     expect(createRes.status).toBe(201);
-    const activateRes = await request(app).patch(`/api/marketing/templates/${createRes.body.data.template._id}/activate`).set('Authorization', token);
+    const activateRes = await request(app).patch(`/api/marketing/templates/${createRes.body.data.template._id}/activate`).set('Authorization', token).set('X-Platform-Tenant-Id', String(tenant._id));
     expect(activateRes.status).toBe(200);
     expect(activateRes.body.data.template.status).toBe('active');
   });
 
   test('un Collaborateur (lecture Altcom) ne peut pas créer de campagne', async () => {
     const collab = await makeUser({ role: 'Collaborateur' });
+    const tenant = await attachTenant(collab);
     const token = `Bearer ${signToken(collab._id)}`;
-    const list = await request(app).get('/api/marketing/campaigns').set('Authorization', token);
+    const list = await request(app).get('/api/marketing/campaigns').set('Authorization', token).set('X-Platform-Tenant-Id', String(tenant._id));
     expect(list.status).toBe(200);
     const create = await request(app).post('/api/marketing/campaigns').set('Authorization', token).send({ name: 'X', channel: 'email', templateId: '000000000000000000000000', segmentKey: 'clients' });
     expect(create.status).toBe(403);
@@ -275,25 +289,28 @@ describe('HTTP /api/marketing — RBAC (Phase 8)', () => {
 
   test('cycle HTTP complet campagne : créer → approuver → envoyer', async () => {
     const cm = await makeUser({ role: 'CommunityManager' });
+    const tenant = await attachTenant(cm);
     const target = await makeUser();
-    await makeCustomerForUser(target, ['client_hotel']);
-    const template = await makeActiveTemplate();
+    await require('../services/organizationService').grantMembership({ userId: target._id, orgUnitId: tenant.rootOrgUnit, actor: cm });
+    await makeCustomerForUser(target, ['client_hotel']).then((customer) => CrmCustomer.updateOne({ _id: customer._id }, { tenant: tenant._id }));
+    const template = await makeActiveTemplate({ tenantId: tenant._id });
     const token = `Bearer ${signToken(cm._id)}`;
 
-    const createRes = await request(app).post('/api/marketing/campaigns').set('Authorization', token)
+    const scoped = (req) => req.set('Authorization', token).set('X-Platform-Tenant-Id', String(tenant._id));
+    const createRes = await scoped(request(app).post('/api/marketing/campaigns'))
       .send({ name: 'HTTP campagne', channel: 'email', templateId: template._id, segmentKey: 'clients' });
     expect(createRes.status).toBe(201);
     const campaignId = createRes.body.data.campaign._id;
 
-    const approveRes = await request(app).patch(`/api/marketing/campaigns/${campaignId}/approve`).set('Authorization', token);
+    const approveRes = await scoped(request(app).patch(`/api/marketing/campaigns/${campaignId}/approve`));
     expect(approveRes.status).toBe(200);
     expect(approveRes.body.data.campaign.status).toBe('approved');
 
-    const sendRes = await request(app).post(`/api/marketing/campaigns/${campaignId}/send`).set('Authorization', token);
+    const sendRes = await scoped(request(app).post(`/api/marketing/campaigns/${campaignId}/send`));
     expect(sendRes.status).toBe(200);
     expect(sendRes.body.data.campaign.status).toBe('sent');
 
-    const sendsRes = await request(app).get('/api/marketing/sends').set('Authorization', token).query({ campaignId });
+    const sendsRes = await scoped(request(app).get('/api/marketing/sends')).query({ campaignId });
     expect(sendsRes.status).toBe(200);
     expect(sendsRes.body.data.sends.length).toBeGreaterThanOrEqual(1);
   });

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const schema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   customerA: { type: mongoose.Schema.Types.ObjectId, ref: 'CrmCustomer', required: true, index: true },
   customerB: { type: mongoose.Schema.Types.ObjectId, ref: 'CrmCustomer', required: true, index: true },
   keptCustomer: { type: mongoose.Schema.Types.ObjectId, ref: 'CrmCustomer', default: null },

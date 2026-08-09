@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const schema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'CrmCustomer', required: true, index: true },
   opportunity: { type: mongoose.Schema.Types.ObjectId, ref: 'CrmOpportunity', default: null },
   type: { type: String, enum: ['rendez_vous', 'tache', 'rappel', 'relance', 'note', 'appel', 'email', 'sms', 'whatsapp'], required: true },

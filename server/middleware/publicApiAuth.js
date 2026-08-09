@@ -18,8 +18,18 @@ async function requireApiKey(req, res, next) {
   const apiKey = await verifyApiKey(rawKey);
   if (!apiKey) return res.status(401).json({ status: 'fail', message: 'Clé API invalide, expirée ou révoquée.' });
 
+  if (!apiKey.tenant) {
+    req.apiKey = apiKey;
+    req.apiKeyTenantScope = new Set();
+    touchLastUsed(apiKey._id);
+    return next();
+  }
+  const tenantScope = await resolveTenantScope(apiKey.tenant).catch(() => null);
+  if (!tenantScope?.tenant || !tenantScope.scopeUserIds) {
+    return res.status(403).json({ status: 'fail', code: 'API_KEY_TENANT_INACTIVE', message: 'Le tenant associé à cette clé est introuvable ou inactif.' });
+  }
   req.apiKey = apiKey;
-  req.apiKeyTenantScope = apiKey.tenant ? (await resolveTenantScope(apiKey.tenant).catch(() => null))?.scopeUserIds || null : null;
+  req.apiKeyTenantScope = tenantScope.scopeUserIds;
   touchLastUsed(apiKey._id); // fire-and-forget, jamais bloquant
   next();
 }

@@ -1,9 +1,10 @@
 const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/crmController');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 const STAFF = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'CommunityManager', 'Communicant'];
-router.use(auth.protect, auth.restrictTo(...STAFF));
+router.use(auth.protect, auth.restrictTo(...STAFF), requireTenantScope);
 router.post('/sync', controller.sync);
 router.get('/dashboard', controller.dashboard);
 router.get('/pipeline', controller.pipeline);

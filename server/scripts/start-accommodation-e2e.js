@@ -29,6 +29,8 @@ const ids = {
   proprietaireBienPropre: "66e200000000000000000040",
   contratFormPropertyMobile: "66e200000000000000000041",
   proprietaireBienPropreMobile: "66e200000000000000000042",
+  orgRoot: "66e200000000000000000043",
+  platformTenant: "66e200000000000000000044",
 };
 let mongo;
 let fakePaymentProvider;
@@ -60,6 +62,9 @@ async function seed(uri) {
   const Hotel = require("../models/Hotel");
   const RoomCategory = require("../models/RoomCategory");
   const PaiementTransaction = require("../models/PaiementTransaction");
+  const OrgUnit = require("../models/OrgUnit");
+  const OrgMembership = require("../models/OrgMembership");
+  const PlatformTenant = require("../models/PlatformTenant");
   await User.create([
     {
       _id: ids.owner,
@@ -88,6 +93,26 @@ async function seed(uri) {
       role: "Proprietaire",
       isEmailVerified: true,
     },
+  ]);
+  await OrgUnit.create({
+    _id: ids.orgRoot,
+    name: "Organisation E2E",
+    type: "organization",
+    path: "/",
+    status: "active",
+    createdBy: ids.owner,
+  });
+  await PlatformTenant.create({
+    _id: ids.platformTenant,
+    name: "Tenant E2E",
+    slug: "tenant-e2e",
+    rootOrgUnit: ids.orgRoot,
+    status: "active",
+    createdBy: ids.owner,
+  });
+  await OrgMembership.create([
+    { user: ids.owner, orgUnit: ids.orgRoot, roleInUnit: "owner", status: "active", grantedBy: ids.owner },
+    { user: ids.rentalOnboardingOwner, orgUnit: ids.orgRoot, roleInUnit: "member", status: "active", grantedBy: ids.owner },
   ]);
   await Property.create([
     {

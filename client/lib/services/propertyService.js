@@ -9,7 +9,11 @@ const apiFormHeaders = () => ({}); // On simule la fonction
  */
 export const getAllProperties = async (options = {}) => {
   try {
-    const { pole, status, limit, page, sort, type, dashboardClassification } = options;
+    const { pole, status, limit, page, sort, type, dashboardClassification, portfolio } = options;
+    if (portfolio) {
+      const response = await api.get('/properties/portfolio');
+      return response.data?.data?.items || [];
+    }
     let query = '?';
     if (pole) query += `pole=${encodeURIComponent(pole)}&`;
     if (status) query += `status=${encodeURIComponent(status)}&`;

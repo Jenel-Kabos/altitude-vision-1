@@ -5,11 +5,12 @@
 const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/crmAutomationController');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 const STAFF = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'CommunityManager', 'Communicant'];
 const MANAGERS = ['Admin', 'GestionnaireImmobilier'];
 
-router.use(auth.protect, auth.restrictTo(...STAFF));
+router.use(auth.protect, auth.restrictTo(...STAFF), requireTenantScope);
 
 router.get('/rules', controller.listRules);
 router.post('/rules', auth.restrictTo(...MANAGERS), controller.createRule);

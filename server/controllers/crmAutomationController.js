@@ -8,12 +8,12 @@ const { computeCustomerScore } = require('../services/crmScoreService');
 const { getCockpit } = require('../services/crmCockpitService');
 
 exports.listRules = asyncHandler(async (req, res) => {
-  const rules = await CrmAutomationRule.find().sort({ priority: 1, ruleId: 1 }).lean();
+  const rules = await CrmAutomationRule.find({ tenant: req.platformTenant._id }).sort({ priority: 1, ruleId: 1 }).lean();
   res.json({ status: 'success', data: { rules } });
 });
 
 exports.createRule = asyncHandler(async (req, res) => {
-  const rule = await CrmAutomationRule.create({ ...req.body, createdBy: req.user._id, updatedBy: req.user._id });
+  const rule = await CrmAutomationRule.create({ ...req.body, tenant: req.platformTenant._id, createdBy: req.user._id, updatedBy: req.user._id });
   res.status(201).json({ status: 'success', data: { rule } });
 });
 
@@ -22,7 +22,7 @@ exports.updateRule = asyncHandler(async (req, res) => {
   const updates = {};
   ALLOWED.forEach((key) => { if (req.body[key] !== undefined) updates[key] = req.body[key]; });
   updates.updatedBy = req.user._id;
-  const rule = await CrmAutomationRule.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
+  const rule = await CrmAutomationRule.findOneAndUpdate({ _id: req.params.id, tenant: req.platformTenant._id }, updates, { new: true, runValidators: true });
   if (!rule) return res.status(404).json({ status: 'fail', message: 'Règle introuvable.' });
   res.json({ status: 'success', data: { rule } });
 });
@@ -30,8 +30,8 @@ exports.updateRule = asyncHandler(async (req, res) => {
 // Activer/désactiver — endpoint dédié pour un toggle rapide côté admin,
 // distinct de updateRule (qui exige le payload complet des actions).
 exports.setEnabled = asyncHandler(async (req, res) => {
-  const rule = await CrmAutomationRule.findByIdAndUpdate(
-    req.params.id,
+  const rule = await CrmAutomationRule.findOneAndUpdate(
+    { _id: req.params.id, tenant: req.platformTenant._id },
     { enabled: Boolean(req.body.enabled), updatedBy: req.user._id },
     { new: true },
   );
@@ -46,12 +46,12 @@ exports.setEnabled = asyncHandler(async (req, res) => {
 exports.simulate = asyncHandler(async (req, res) => {
   const { type, recipient, entityType, entityId, metadata, audience } = req.body;
   if (!type || !recipient) return res.status(422).json({ status: 'fail', message: 'type et recipient sont requis pour une simulation.' });
-  const results = await handleEvent({ type, recipient, sender: req.user._id, entityType, entityId, metadata: metadata || {}, audience: audience || 'staff' }, { simulate: true });
+  const results = await handleEvent({ type, recipient, sender: req.user._id, entityType, entityId, metadata: metadata || {}, audience: audience || 'staff', platformTenantId: req.platformTenant._id }, { simulate: true });
   res.json({ status: 'success', data: { results } });
 });
 
 exports.listRuns = asyncHandler(async (req, res) => {
-  const filter = {};
+  const filter = { tenant: req.platformTenant._id };
   if (req.query.ruleId) filter.ruleId = req.query.ruleId;
   const runs = await CrmAutomationRun.find(filter).sort({ createdAt: -1 }).limit(100).lean();
   res.json({ status: 'success', data: { runs } });

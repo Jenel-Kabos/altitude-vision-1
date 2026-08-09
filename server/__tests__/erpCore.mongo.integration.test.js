@@ -18,6 +18,7 @@ const WebhookSubscription = require('../models/WebhookSubscription');
 const ActionLog = require('../models/ActionLog');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const organizationService = require('../services/organizationService');
+const platformTenantService = require('../services/platformTenant/platformTenantService');
 const { evaluateAlerts } = require('../services/erp/erpAlertsService');
 const erpService = require('../services/erp/erpService');
 const erpRoutes = require('../routes/erpRoutes');
@@ -223,17 +224,19 @@ describe('HTTP /api/erp — réservé Direction (Admin)', () => {
 describe('HTTP /api/action-logs — filtre organisationnel additif (Phase 7)', () => {
   test('orgUnitId isole les journaux aux seuls membres actifs de cette unité', async () => {
     const admin = await makeUser({ role: 'Admin' });
+    const tenant = await platformTenantService.createTenant({ name: `ERP logs ${Date.now()}`, actor: admin });
+    await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin });
     const insider = await makeUser({ role: 'Collaborateur' });
     const outsider = await makeUser({ role: 'Collaborateur' });
 
-    const orgUnit = await organizationService.createOrgUnit({ name: 'Pôle Test', type: 'organization', actor: admin });
+    const orgUnit = await organizationService.createOrgUnit({ name: 'Pôle Test', type: 'department', parentId: tenant.rootOrgUnit, actor: admin });
     await organizationService.grantMembership({ userId: insider._id, orgUnitId: orgUnit._id, actor: admin });
 
-    await logAction({ action: 'test.insider', description: 'Action insider', module: 'Dashboard', typeAction: 'MODIFICATION', auteur: buildAuteur(insider) });
-    await logAction({ action: 'test.outsider', description: 'Action outsider', module: 'Dashboard', typeAction: 'MODIFICATION', auteur: buildAuteur(outsider) });
+    await logAction({ action: 'test.insider', description: 'Action insider', module: 'Dashboard', typeAction: 'MODIFICATION', auteur: buildAuteur(insider), metadata: { platformTenantId: tenant._id } });
+    await logAction({ action: 'test.outsider', description: 'Action outsider', module: 'Dashboard', typeAction: 'MODIFICATION', auteur: buildAuteur(outsider), metadata: { platformTenantId: tenant._id } });
 
     const token = `Bearer ${signToken(admin._id)}`;
-    const res = await request(app).get('/api/action-logs').query({ orgUnitId: String(orgUnit._id) }).set('Authorization', token);
+    const res = await request(app).get('/api/action-logs').query({ orgUnitId: String(orgUnit._id) }).set('Authorization', token).set('X-Platform-Tenant-Id', String(tenant._id));
     expect(res.status).toBe(200);
     const actions = res.body.data.logs.map((l) => l.action);
     expect(actions).toContain('test.insider');
@@ -242,12 +245,14 @@ describe('HTTP /api/action-logs — filtre organisationnel additif (Phase 7)', (
 
   test('un orgUnitId sans membre ne renvoie jamais tout silencieusement', async () => {
     const admin = await makeUser({ role: 'Admin' });
+    const tenant = await platformTenantService.createTenant({ name: `ERP empty logs ${Date.now()}`, actor: admin });
+    await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin });
     const someone = await makeUser({ role: 'Collaborateur' });
-    await logAction({ action: 'test.anyone', description: 'x', module: 'Dashboard', typeAction: 'MODIFICATION', auteur: buildAuteur(someone) });
+    await logAction({ action: 'test.anyone', description: 'x', module: 'Dashboard', typeAction: 'MODIFICATION', auteur: buildAuteur(someone), metadata: { platformTenantId: tenant._id } });
 
-    const emptyOrgUnit = await organizationService.createOrgUnit({ name: 'Pôle Vide', type: 'organization', actor: admin });
+    const emptyOrgUnit = await organizationService.createOrgUnit({ name: 'Pôle Vide', type: 'department', parentId: tenant.rootOrgUnit, actor: admin });
     const token = `Bearer ${signToken(admin._id)}`;
-    const res = await request(app).get('/api/action-logs').query({ orgUnitId: String(emptyOrgUnit._id) }).set('Authorization', token);
+    const res = await request(app).get('/api/action-logs').query({ orgUnitId: String(emptyOrgUnit._id) }).set('Authorization', token).set('X-Platform-Tenant-Id', String(tenant._id));
     expect(res.status).toBe(200);
     expect(res.body.data.logs).toHaveLength(0);
     expect(await ActionLog.countDocuments()).toBeGreaterThanOrEqual(1); // la donnée existe bien, juste hors scope

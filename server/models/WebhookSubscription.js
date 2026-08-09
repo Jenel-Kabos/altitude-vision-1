@@ -16,6 +16,7 @@ const ALLOWED_WEBHOOK_EVENTS = [
 ];
 
 const schema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   apiKey: { type: mongoose.Schema.Types.ObjectId, ref: 'ApiKey', required: true, index: true },
   url: { type: String, required: true, trim: true, maxlength: 500 },
   events: { type: [String], enum: ALLOWED_WEBHOOK_EVENTS, required: true, validate: (v) => v.length > 0 },

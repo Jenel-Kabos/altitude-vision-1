@@ -6,11 +6,12 @@ const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/marketingController');
 const { ROLES_CM } = require('../utils/roles');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 const STAFF = ROLES_CM; // ['Admin', 'Collaborateur', 'CommunityManager'] — même périmètre qu'Altcom
 const MANAGERS = ['Admin', 'CommunityManager'];
 
-router.use(auth.protect, auth.restrictTo(...STAFF));
+router.use(auth.protect, auth.restrictTo(...STAFF), requireTenantScope);
 
 router.get('/segments', controller.listSegments);
 router.get('/segments/:key/preview', controller.previewSegment);

@@ -11,6 +11,8 @@ const { upload } = require('../config/cloudinary');
 
 // ✅ IMPORT 3 : Le contrôleur Property
 const propertyController = require('../controllers/propertyController');
+const propertyPortfolioController = require('../controllers/propertyPortfolioController');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 // ✅ IMPORT 4 : Contrôleur mobile (JSON pur, photos déjà uploadées)
 const { createPropertyMobile } = require('../controllers/propertyMobileController');
@@ -18,6 +20,14 @@ const { createPropertyMobile } = require('../controllers/propertyMobileControlle
 // ============================================================
 // 1️⃣ ROUTES SPÉCIFIQUES (Doivent être EN PREMIER)
 // ============================================================
+
+router.get(
+    '/portfolio',
+    authController.protect,
+    authController.restrictTo(...STAFF_IMMO),
+    requireTenantScope,
+    propertyPortfolioController.list
+);
 
 /**
  * @route GET /api/properties/latest

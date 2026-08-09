@@ -10,6 +10,7 @@ const TEMPLATE_CHANNELS = ['email', 'push', 'notification', 'sms', 'whatsapp'];
 const TEMPLATE_STATUSES = ['draft', 'active', 'archived'];
 
 const schema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   name: { type: String, required: true, trim: true, maxlength: 200 },
   channel: { type: String, enum: TEMPLATE_CHANNELS, required: true },
   subject: { type: String, trim: true, maxlength: 200, default: '' }, // email uniquement
@@ -30,8 +31,8 @@ const schema = new mongoose.Schema({
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 }, { timestamps: true });
 
-schema.index({ family: 1, version: -1 });
-schema.index({ family: 1, status: 1 });
+schema.index({ tenant: 1, family: 1, version: -1 });
+schema.index({ tenant: 1, family: 1, status: 1 });
 
 module.exports = mongoose.model('MarketingTemplate', schema);
 module.exports.TEMPLATE_CHANNELS = TEMPLATE_CHANNELS;

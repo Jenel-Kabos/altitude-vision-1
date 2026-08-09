@@ -23,7 +23,7 @@ exports.getLogs = async (req, res) => {
       search,
     } = req.query;
 
-    const filter = {};
+    const filter = { tenant: req.platformTenant._id };
     if (mod)        filter.module     = mod;
     if (typeAction) filter.typeAction = typeAction;
     if (auteurId)   filter['auteur.id'] = auteurId;
@@ -80,19 +80,20 @@ exports.getStats = async (req, res) => {
     const { days = 30 } = req.query;
     const since = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
 
+    const tenantMatch = { tenant: req.platformTenant._id, date: { $gte: since } };
     const [byModule, byType, byDay, total] = await Promise.all([
       ActionLog.aggregate([
-        { $match: { date: { $gte: since } } },
+        { $match: tenantMatch },
         { $group: { _id: '$module', count: { $sum: 1 } } },
         { $sort:  { count: -1 } },
       ]),
       ActionLog.aggregate([
-        { $match: { date: { $gte: since } } },
+        { $match: tenantMatch },
         { $group: { _id: '$typeAction', count: { $sum: 1 } } },
         { $sort:  { count: -1 } },
       ]),
       ActionLog.aggregate([
-        { $match: { date: { $gte: since } } },
+        { $match: tenantMatch },
         {
           $group: {
             _id:   { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
@@ -101,7 +102,7 @@ exports.getStats = async (req, res) => {
         },
         { $sort: { _id: 1 } },
       ]),
-      ActionLog.countDocuments({ date: { $gte: since } }),
+      ActionLog.countDocuments(tenantMatch),
     ]);
 
     res.json({
@@ -118,7 +119,7 @@ exports.getStats = async (req, res) => {
 exports.getRecent = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
-    const logs = await ActionLog.find({})
+    const logs = await ActionLog.find({ tenant: req.platformTenant._id })
       .sort({ date: -1 })
       .limit(parseInt(limit))
       .lean();
@@ -140,7 +141,7 @@ exports.exportCsv = async (req, res) => {
       dateTo,
     } = req.query;
 
-    const filter = {};
+    const filter = { tenant: req.platformTenant._id };
     if (mod)        filter.module     = mod;
     if (typeAction) filter.typeAction = typeAction;
     if (dateFrom || dateTo) {

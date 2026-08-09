@@ -25,11 +25,12 @@ const { buildTimeline } = require('./dossier/dossierRegistry');
 const { notify } = require('./notificationService');
 const { getBulkDerivedProfileUserIds } = require('./userBusinessProfileService'); // USER-ARCH-UX-1
 
-class CrmError extends Error { constructor(message, statusCode = 400, code = 'CRM_ERROR') { super(message); this.statusCode = statusCode; this.code = code; } }
+class CrmError extends Error { constructor(message, statusCode = 400, code = 'CRM_ERROR') { super(message); this.name = 'CrmError'; this.statusCode = statusCode; this.code = code; } }
 const clean = (value) => String(value || '').trim();
 const emailKey = (value) => { const v = clean(value).toLowerCase(); return v ? `email:${v}` : null; };
 const uniq = (values) => [...new Set(values.filter(Boolean))];
 const escapeRx = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const tenantFilter = (tenantId, extra = {}) => (tenantId ? { ...extra, tenant: tenantId } : extra);
 
 function sourceRecord(entityType, row, fields, relations, source) {
   const email = clean(row[fields.email]); const phone = clean(row[fields.phone]);
@@ -45,14 +46,16 @@ function sourceRecord(entityType, row, fields, relations, source) {
   };
 }
 
-async function loadIdentitySources() {
+async function loadIdentitySources(scopeUserIds = null) {
+  const userFilter = scopeUserIds ? { _id: { $in: [...scopeUserIds] } } : {};
+  const linkedUserFilter = scopeUserIds ? { user: { $in: [...scopeUserIds] } } : {};
   const [users, owners, tenants, contacts, quotes, projects, signalSets] = await Promise.all([
-    User.find({ isTechnical: { $ne: true } }).select('name email phone role').lean(),
-    Proprietaire.find().select('nom prenom email telephone adresse ville user').lean(),
-    Locataire.find().select('nom prenom email telephone adresse ville user').lean(),
-    ContactMessage.find().select('name email phone').lean(),
-    QuoteRequest.find().select('name email phone source projectDetails.clientInfo.company').lean(),
-    AltcomProject.find().select('contactName companyName email phone').lean(),
+    User.find({ ...userFilter, isTechnical: { $ne: true } }).select('name email phone role').lean(),
+    Proprietaire.find(linkedUserFilter).select('nom prenom email telephone adresse ville user').lean(),
+    Locataire.find(linkedUserFilter).select('nom prenom email telephone adresse ville user').lean(),
+    scopeUserIds ? [] : ContactMessage.find().select('name email phone').lean(),
+    scopeUserIds ? [] : QuoteRequest.find().select('name email phone source projectDetails.clientInfo.company').lean(),
+    scopeUserIds ? [] : AltcomProject.find().select('contactName companyName email phone').lean(),
     // USER-ARCH-UX-1 — même couche de lecture que partout ailleurs
     // (userBusinessProfileService) : lève l'ambiguïté 'Proprietaire' sans
     // dupliquer la règle ici — un utilisateur qui possède un bien
@@ -75,20 +78,20 @@ async function loadIdentitySources() {
   ];
 }
 
-async function synchronizeCustomers(actor = null) {
-  const records = await loadIdentitySources();
+async function synchronizeCustomers(actor = null, { tenantId, scopeUserIds } = {}) {
+  const records = await loadIdentitySources(scopeUserIds);
   const stats = { scanned: records.length, created: 0, updated: 0, skippedWithoutIdentity: 0, conflicts: [] };
   for (const record of records) {
     if (!record.identityKeys.length) { stats.skippedWithoutIdentity += 1; continue; }
-    const bySource = await CrmCustomer.findOne({ sourceRefs: { $elemMatch: { entityType: record.entityType, entityId: record.entityId } } });
-    const matches = await CrmCustomer.find({ identityKeys: { $in: record.identityKeys } }).limit(3);
+    const bySource = await CrmCustomer.findOne(tenantFilter(tenantId, { sourceRefs: { $elemMatch: { entityType: record.entityType, entityId: record.entityId } } }));
+    const matches = await CrmCustomer.find(tenantFilter(tenantId, { identityKeys: { $in: record.identityKeys } })).limit(3);
     const candidates = uniq([bySource?._id?.toString(), ...matches.map((c) => c._id.toString())]);
     if (candidates.length > 1) {
       await CrmCustomer.updateMany({ _id: { $in: candidates } }, { $set: { status: 'merge_review' } });
       stats.conflicts.push({ source: `${record.entityType}:${record.entityId}`, customerIds: candidates });
       continue;
     }
-    const customer = bySource || matches[0] || new CrmCustomer();
+    const customer = bySource || matches[0] || new CrmCustomer({ tenant: tenantId });
     customer.displayName = customer.displayName || record.displayName;
     customer.firstName = customer.firstName || record.firstName;
     customer.lastName = customer.lastName || record.lastName;
@@ -107,12 +110,12 @@ async function synchronizeCustomers(actor = null) {
   return stats;
 }
 
-async function listCustomers({ search = '', page = 1, limit = 25, relation, stage } = {}) {
-  const filter = { status: { $ne: 'archived' } };
+async function listCustomers({ search = '', page = 1, limit = 25, relation, stage } = {}, { tenantId } = {}) {
+  const filter = tenantFilter(tenantId, { status: { $ne: 'archived' } });
   if (relation) filter.relations = relation;
   if (search) { const rx = new RegExp(escapeRx(clean(search)), 'i'); filter.$or = [{ displayName: rx }, { company: rx }, { emails: rx }, { phones: rx }]; }
   if (stage) {
-    const ids = await CrmOpportunity.distinct('customer', { stage });
+    const ids = await CrmOpportunity.distinct('customer', tenantFilter(tenantId, { stage }));
     filter._id = { $in: ids };
   }
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 25)); const safePage = Math.max(1, Number(page) || 1);
@@ -120,14 +123,14 @@ async function listCustomers({ search = '', page = 1, limit = 25, relation, stag
     CrmCustomer.find(filter).populate('owner', 'name email').sort({ updatedAt: -1 }).skip((safePage - 1) * safeLimit).limit(safeLimit).lean(),
     CrmCustomer.countDocuments(filter),
   ]);
-  const opportunityCounts = await CrmOpportunity.aggregate([{ $match: { customer: { $in: customers.map((c) => c._id) } } }, { $group: { _id: '$customer', count: { $sum: 1 }, stages: { $addToSet: '$stage' } } }]);
+  const opportunityCounts = await CrmOpportunity.aggregate([{ $match: tenantFilter(tenantId, { customer: { $in: customers.map((c) => c._id) } }) }, { $group: { _id: '$customer', count: { $sum: 1 }, stages: { $addToSet: '$stage' } } }]);
   const map = new Map(opportunityCounts.map((x) => [String(x._id), x]));
   return { customers: customers.map((c) => ({ ...c, opportunities: map.get(String(c._id)) || { count: 0, stages: [] } })), total, page: safePage, limit: safeLimit };
 }
 
-async function getCustomer360(customerId) {
+async function getCustomer360(customerId, { tenantId } = {}) {
   if (!mongoose.isValidObjectId(customerId)) throw new CrmError('Identifiant Customer invalide.', 400);
-  const customer = await CrmCustomer.findById(customerId).populate('owner', 'name email').lean();
+  const customer = await CrmCustomer.findOne(tenantFilter(tenantId, { _id: customerId })).populate('owner', 'name email').lean();
   if (!customer) throw new CrmError('Customer introuvable.', 404);
   const refs = (type) => customer.sourceRefs.filter((r) => r.entityType === type).map((r) => r.entityId);
   const userIds = refs('User'); const ownerIds = refs('Proprietaire'); const tenantIds = refs('Locataire'); const emails = customer.emails || [];
@@ -142,8 +145,8 @@ async function getCustomer360(customerId) {
     Conversation.find({ participants: { $in: userIds } }).select('lastMessage relatedProperty relatedEvent updatedAt').lean(),
     Message.find({ $or: [{ sender: { $in: userIds } }, { receiver: { $in: userIds } }] }).select('subject content conversation createdAt').sort({ createdAt: -1 }).limit(50).lean(),
     Notification.find({ recipient: { $in: userIds } }).select('type title destination entityType entityId createdAt').sort({ createdAt: -1 }).limit(50).lean(),
-    CrmOpportunity.find({ customer: customer._id }).populate('assignedTo', 'name').sort({ updatedAt: -1 }).lean(),
-    CrmActivity.find({ customer: customer._id }).populate('assignedTo createdBy', 'name').sort({ dueAt: 1, createdAt: -1 }).lean(),
+    CrmOpportunity.find(tenantFilter(tenantId, { customer: customer._id })).populate('assignedTo', 'name').sort({ updatedAt: -1 }).lean(),
+    CrmActivity.find(tenantFilter(tenantId, { customer: customer._id })).populate('assignedTo createdBy', 'name').sort({ dueAt: 1, createdAt: -1 }).lean(),
     ContactMessage.find({ email: { $in: emails } }).select('subject status submittedAt').lean(),
     QuoteRequest.find({ email: { $in: emails } }).select('source service status date createdAt').lean(),
     AltcomProject.find({ email: { $in: emails } }).select('projectName projectType status submittedAt').lean(),
@@ -168,77 +171,75 @@ async function getCustomer360(customerId) {
   };
 }
 
-async function createOpportunity(customerId, payload, actor) {
-  if (!await CrmCustomer.exists({ _id: customerId })) throw new CrmError('Customer introuvable.', 404);
-  const opportunity = await CrmOpportunity.create({ customer: customerId, title: payload.title, pole: payload.pole, stage: payload.stage || 'prospect', valueMinor: payload.valueMinor || 0, currency: payload.currency || 'XAF', probability: payload.probability || 0, expectedCloseAt: payload.expectedCloseAt || null, assignedTo: payload.assignedTo || actor, sourceRef: payload.sourceRef, history: [{ to: payload.stage || 'prospect', actor, note: payload.note || 'Création' }] });
+async function createOpportunity(customerId, payload, actor, { tenantId } = {}) {
+  if (!await CrmCustomer.exists(tenantFilter(tenantId, { _id: customerId }))) throw new CrmError('Customer introuvable.', 404);
+  const opportunity = await CrmOpportunity.create({ tenant: tenantId, customer: customerId, title: payload.title, pole: payload.pole, stage: payload.stage || 'prospect', valueMinor: payload.valueMinor || 0, currency: payload.currency || 'XAF', probability: payload.probability || 0, expectedCloseAt: payload.expectedCloseAt || null, assignedTo: payload.assignedTo || actor, sourceRef: payload.sourceRef, history: [{ to: payload.stage || 'prospect', actor, note: payload.note || 'Création' }] });
   // CRM-AUTOMATION-1 — seul ajout d'observabilité : ni createOpportunity ni
   // moveOpportunity ni setOpportunityOutcome n'appelaient notify() avant ce
   // sprint (voir audit), rendant le pipeline invisible au moteur
   // d'automatisation. N'altère aucun comportement métier existant.
   if (opportunity.assignedTo) {
-    await notify({ recipient: opportunity.assignedTo, sender: actor, type: 'crm_opportunity_created', title: 'Nouvelle opportunité CRM', body: opportunity.title, destination: 'CRM_CUSTOMER_DETAILS', entityType: 'crmCustomer', entityId: customerId, audience: 'staff', metadata: { opportunityId: String(opportunity._id), stage: opportunity.stage }, dedupeKey: `crm-opportunity-created:${opportunity._id}` }).catch(() => {});
+    await notify({ recipient: opportunity.assignedTo, sender: actor, type: 'crm_opportunity_created', title: 'Nouvelle opportunité CRM', body: opportunity.title, destination: 'CRM_CUSTOMER_DETAILS', entityType: 'crmCustomer', entityId: customerId, audience: 'staff', metadata: { opportunityId: String(opportunity._id), stage: opportunity.stage }, dedupeKey: `crm-opportunity-created:${opportunity._id}`, platformTenantId: tenantId }).catch(() => {});
   }
   return opportunity;
 }
-async function moveOpportunity(id, { stage, note }, actor) {
-  const item = await CrmOpportunity.findById(id); if (!item) throw new CrmError('Opportunité introuvable.', 404);
+async function moveOpportunity(id, { stage, note }, actor, { tenantId } = {}) {
+  const item = await CrmOpportunity.findOne(tenantFilter(tenantId, { _id: id })); if (!item) throw new CrmError('Opportunité introuvable.', 404);
   const from = item.stage; item.stage = stage; item.history.push({ from, to: stage, actor, note });
   if (stage === 'ancien_client') item.closedAt = new Date(); await item.save();
   if (item.assignedTo) {
-    await notify({ recipient: item.assignedTo, sender: actor, type: 'crm_opportunity_stage_changed', title: 'Opportunité déplacée', body: `${item.title} → ${stage}`, destination: 'CRM_CUSTOMER_DETAILS', entityType: 'crmCustomer', entityId: item.customer, audience: 'staff', metadata: { opportunityId: String(item._id), from, to: stage }, dedupeKey: `crm-opportunity-stage:${item._id}:${from}:${stage}:${Date.now()}` }).catch(() => {});
+    await notify({ recipient: item.assignedTo, sender: actor, type: 'crm_opportunity_stage_changed', title: 'Opportunité déplacée', body: `${item.title} → ${stage}`, destination: 'CRM_CUSTOMER_DETAILS', entityType: 'crmCustomer', entityId: item.customer, audience: 'staff', metadata: { opportunityId: String(item._id), from, to: stage }, dedupeKey: `crm-opportunity-stage:${item._id}:${from}:${stage}:${Date.now()}`, platformTenantId: tenantId }).catch(() => {});
   }
   return item;
 }
-async function setOpportunityOutcome(id, { outcome, reason = '' }, actor) {
-  const item = await CrmOpportunity.findById(id); if (!item) throw new CrmError('Opportunité introuvable.', 404);
+async function setOpportunityOutcome(id, { outcome, reason = '' }, actor, { tenantId } = {}) {
+  const item = await CrmOpportunity.findOne(tenantFilter(tenantId, { _id: id })); if (!item) throw new CrmError('Opportunité introuvable.', 404);
   if (!['open', 'won', 'lost'].includes(outcome)) throw new CrmError('Résultat d’opportunité invalide.', 422);
   if (outcome === 'lost' && clean(reason).length < 3) throw new CrmError('Le motif de perte est requis.', 422);
   item.outcome = outcome; item.outcomeReason = clean(reason); item.closedAt = outcome === 'open' ? null : new Date();
   item.history.push({ from: item.stage, to: item.stage, actor, note: `Résultat : ${outcome}${reason ? ` — ${reason}` : ''}` });
   await item.save();
   if (item.assignedTo && (outcome === 'won' || outcome === 'lost')) {
-    await notify({ recipient: item.assignedTo, sender: actor, type: outcome === 'won' ? 'crm_opportunity_won' : 'crm_opportunity_lost', title: outcome === 'won' ? 'Opportunité gagnée' : 'Opportunité perdue', body: item.title, destination: 'CRM_CUSTOMER_DETAILS', entityType: 'crmCustomer', entityId: item.customer, audience: 'staff', metadata: { opportunityId: String(item._id), reason }, dedupeKey: `crm-opportunity-outcome:${item._id}:${outcome}` }).catch(() => {});
+    await notify({ recipient: item.assignedTo, sender: actor, type: outcome === 'won' ? 'crm_opportunity_won' : 'crm_opportunity_lost', title: outcome === 'won' ? 'Opportunité gagnée' : 'Opportunité perdue', body: item.title, destination: 'CRM_CUSTOMER_DETAILS', entityType: 'crmCustomer', entityId: item.customer, audience: 'staff', metadata: { opportunityId: String(item._id), reason }, dedupeKey: `crm-opportunity-outcome:${item._id}:${outcome}`, platformTenantId: tenantId }).catch(() => {});
   }
   return item;
 }
-async function createActivity(customerId, payload, actor) {
-  if (!await CrmCustomer.exists({ _id: customerId })) throw new CrmError('Customer introuvable.', 404);
-  const activity = await CrmActivity.create({ customer: customerId, opportunity: payload.opportunity || null, type: payload.type, title: payload.title, content: payload.content || '', dueAt: payload.dueAt || null, assignedTo: payload.assignedTo || actor, createdBy: actor, history: [{ action: 'created', actor }] });
-  await notify({ recipient: activity.assignedTo, sender: actor, type: 'crm_activity_assigned', title: 'Nouvelle activité CRM', body: activity.title, destination: 'CRM_CUSTOMER_DETAILS', entityType: 'crmCustomer', entityId: customerId, audience: 'staff', dedupeKey: `crm-activity:${activity._id}` }).catch(() => {});
+async function createActivity(customerId, payload, actor, { tenantId } = {}) {
+  if (!await CrmCustomer.exists(tenantFilter(tenantId, { _id: customerId }))) throw new CrmError('Customer introuvable.', 404);
+  const activity = await CrmActivity.create({ tenant: tenantId, customer: customerId, opportunity: payload.opportunity || null, type: payload.type, title: payload.title, content: payload.content || '', dueAt: payload.dueAt || null, assignedTo: payload.assignedTo || actor, createdBy: actor, history: [{ action: 'created', actor }] });
+  await notify({ recipient: activity.assignedTo, sender: actor, type: 'crm_activity_assigned', title: 'Nouvelle activité CRM', body: activity.title, destination: 'CRM_CUSTOMER_DETAILS', entityType: 'crmCustomer', entityId: customerId, audience: 'staff', dedupeKey: `crm-activity:${activity._id}`, platformTenantId: tenantId }).catch(() => {});
   return activity;
 }
-async function updateActivity(id, payload, actor) {
-  const item = await CrmActivity.findById(id); if (!item) throw new CrmError('Activité introuvable.', 404);
+async function updateActivity(id, payload, actor, { tenantId } = {}) {
+  const item = await CrmActivity.findOne(tenantFilter(tenantId, { _id: id })); if (!item) throw new CrmError('Activité introuvable.', 404);
   ['status', 'dueAt', 'assignedTo', 'title', 'content'].forEach((key) => { if (payload[key] !== undefined) item[key] = payload[key]; });
   if (item.status === 'terminee' && !item.completedAt) item.completedAt = new Date(); item.history.push({ action: 'updated', actor, metadata: payload }); await item.save(); return item;
 }
 
 const dayBounds = (date = new Date()) => { const start = new Date(date); start.setHours(0, 0, 0, 0); const end = new Date(start); end.setDate(end.getDate() + 1); return { start, end }; };
-async function getDashboard(now = new Date()) {
+async function getDashboard(now = new Date(), { tenantId } = {}) {
   const { start, end } = dayBounds(now); const weekEnd = new Date(start); weekEnd.setDate(weekEnd.getDate() + 7);
   const [prospects, opportunities, activeIds, inactiveIds, finance, pendingQuotes, contractsToSign, followupsToday, overdueTasks, meetingsToday, newContacts, outcomes, cycleRows, revenueByPole, bestCommercial, activityByCollaborator] = await Promise.all([
-    CrmCustomer.countDocuments({ status: { $ne: 'archived' }, relations: 'prospect' }),
-    CrmOpportunity.countDocuments({ outcome: 'open' }),
-    CrmOpportunity.distinct('customer', { stage: { $in: ['client_actif', 'fidelisation'] }, outcome: { $ne: 'lost' } }),
-    CrmOpportunity.distinct('customer', { stage: 'ancien_client' }),
-    FinancialDocument.aggregate([{ $match: { status: { $ne: 'cancelled' } } }, { $group: { _id: null, revenueMinor: { $sum: { $subtract: ['$amountAllocatedMinor', '$refundedAmountMinor'] } } } }]),
-    QuoteRequest.countDocuments({ status: { $in: ['Nouveau', 'En cours', 'Devis Envoyé'] } }),
-    Contrat.countDocuments({ statut: 'en_attente' }),
-    CrmActivity.countDocuments({ type: 'relance', status: { $in: ['a_faire', 'en_cours'] }, dueAt: { $gte: start, $lt: end } }),
-    CrmActivity.countDocuments({ type: { $in: ['tache', 'rappel', 'relance'] }, status: { $in: ['a_faire', 'en_cours'] }, dueAt: { $lt: start } }),
-    CrmActivity.countDocuments({ type: 'rendez_vous', status: { $in: ['a_faire', 'en_cours'] }, dueAt: { $gte: start, $lt: end } }),
-    ContactMessage.countDocuments({ submittedAt: { $gte: start, $lt: end } }),
-    CrmOpportunity.aggregate([{ $group: { _id: '$outcome', count: { $sum: 1 } } }]),
-    CrmOpportunity.find({ outcome: { $in: ['won', 'lost'] }, closedAt: { $ne: null } }).select('createdAt closedAt').lean(),
-    FinancialDocument.aggregate([{ $match: { status: { $ne: 'cancelled' } } }, { $group: { _id: '$domain', revenueMinor: { $sum: { $subtract: ['$amountAllocatedMinor', '$refundedAmountMinor'] } } } }, { $sort: { revenueMinor: -1 } }]),
-    CrmOpportunity.aggregate([{ $match: { outcome: 'won', assignedTo: { $ne: null } } }, { $group: { _id: '$assignedTo', won: { $sum: 1 }, valueMinor: { $sum: '$valueMinor' } } }, { $sort: { valueMinor: -1, won: -1 } }, { $limit: 1 }, { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } }, { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }]),
-    CrmActivity.aggregate([{ $group: { _id: '$assignedTo', total: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ['$status', 'terminee'] }, 1, 0] } } } }, { $sort: { total: -1 } }, { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } }, { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }]),
+    CrmCustomer.countDocuments(tenantFilter(tenantId, { status: { $ne: 'archived' }, relations: 'prospect' })),
+    CrmOpportunity.countDocuments(tenantFilter(tenantId, { outcome: 'open' })),
+    CrmOpportunity.distinct('customer', tenantFilter(tenantId, { stage: { $in: ['client_actif', 'fidelisation'] }, outcome: { $ne: 'lost' } })),
+    CrmOpportunity.distinct('customer', tenantFilter(tenantId, { stage: 'ancien_client' })),
+    Promise.resolve([]), Promise.resolve(0), Promise.resolve(0),
+    CrmActivity.countDocuments(tenantFilter(tenantId, { type: 'relance', status: { $in: ['a_faire', 'en_cours'] }, dueAt: { $gte: start, $lt: end } })),
+    CrmActivity.countDocuments(tenantFilter(tenantId, { type: { $in: ['tache', 'rappel', 'relance'] }, status: { $in: ['a_faire', 'en_cours'] }, dueAt: { $lt: start } })),
+    CrmActivity.countDocuments(tenantFilter(tenantId, { type: 'rendez_vous', status: { $in: ['a_faire', 'en_cours'] }, dueAt: { $gte: start, $lt: end } })),
+    Promise.resolve(0),
+    CrmOpportunity.aggregate([{ $match: tenantFilter(tenantId) }, { $group: { _id: '$outcome', count: { $sum: 1 } } }]),
+    CrmOpportunity.find(tenantFilter(tenantId, { outcome: { $in: ['won', 'lost'] }, closedAt: { $ne: null } })).select('createdAt closedAt').lean(),
+    Promise.resolve([]),
+    CrmOpportunity.aggregate([{ $match: tenantFilter(tenantId, { outcome: 'won', assignedTo: { $ne: null } }) }, { $group: { _id: '$assignedTo', won: { $sum: 1 }, valueMinor: { $sum: '$valueMinor' } } }, { $sort: { valueMinor: -1, won: -1 } }, { $limit: 1 }, { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } }, { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }]),
+    CrmActivity.aggregate([{ $match: tenantFilter(tenantId) }, { $group: { _id: '$assignedTo', total: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ['$status', 'terminee'] }, 1, 0] } } } }, { $sort: { total: -1 } }, { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } }, { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } }]),
   ]);
   const outcomeMap = Object.fromEntries(outcomes.map((x) => [x._id, x.count])); const decided = (outcomeMap.won || 0) + (outcomeMap.lost || 0);
   const durations = cycleRows.map((x) => x.closedAt - x.createdAt).filter((x) => x >= 0);
   return {
     generatedAt: now, window: { todayStart: start, todayEnd: end, weekEnd },
-    kpis: { prospects, opportunities, activeClients: activeIds.length, inactiveClients: inactiveIds.length, revenueMinor: finance[0]?.revenueMinor || 0, pendingQuotes, contractsToSign, followupsToday, overdueTasks, meetingsToday, newContacts },
+    kpis: { prospects, opportunities, activeClients: activeIds.length, inactiveClients: inactiveIds.length, revenueMinor: finance[0]?.revenueMinor ?? null, pendingQuotes: null, contractsToSign: null, followupsToday, overdueTasks, meetingsToday, newContacts: null },
     commercial: { conversionRate: decided ? Math.round(((outcomeMap.won || 0) / decided) * 10000) / 100 : null, averageCycleDays: durations.length ? Math.round((durations.reduce((a, b) => a + b, 0) / durations.length / 86400000) * 10) / 10 : null, won: outcomeMap.won || 0, lost: outcomeMap.lost || 0, revenueByPole, bestCommercial: bestCommercial[0] ? { userId: bestCommercial[0]._id, name: bestCommercial[0].user?.name || 'Collaborateur', won: bestCommercial[0].won, valueMinor: bestCommercial[0].valueMinor } : null, activityByCollaborator: activityByCollaborator.map((x) => ({ userId: x._id, name: x.user?.name || 'Non assigné', total: x.total, completed: x.completed })) },
   };
 }
@@ -248,19 +249,19 @@ async function getDashboard(now = new Date()) {
 // dédié aux exploitants) en s'appuyant sur `CrmCustomer.relations[]`, déjà
 // alimenté par `loadIdentitySources`/`getBulkDerivedProfileUserIds` — aucune
 // nouvelle donnée, aucune fusion automatique, juste un filtre de lecture.
-async function getPipeline({ relation } = {}) {
-  const filter = {};
+async function getPipeline({ relation } = {}, { tenantId } = {}) {
+  const filter = tenantFilter(tenantId);
   if (relation) {
-    const customerIds = await CrmCustomer.distinct('_id', { relations: relation });
+    const customerIds = await CrmCustomer.distinct('_id', tenantFilter(tenantId, { relations: relation }));
     filter.customer = { $in: customerIds };
   }
   const opportunities = await CrmOpportunity.find(filter).populate('customer', 'displayName company emails phones status relations').populate('assignedTo', 'name email').sort({ updatedAt: -1 }).lean();
   return { stages: require('../models/CrmOpportunity').STAGES, opportunities };
 }
 
-async function getActivities({ view = 'today', assignedTo } = {}, now = new Date()) {
+async function getActivities({ view = 'today', assignedTo } = {}, now = new Date(), { tenantId } = {}) {
   const { start, end } = dayBounds(now); const weekEnd = new Date(start); weekEnd.setDate(weekEnd.getDate() + 7);
-  const filter = {}; if (assignedTo && mongoose.isValidObjectId(assignedTo)) filter.assignedTo = assignedTo;
+  const filter = tenantFilter(tenantId); if (assignedTo && mongoose.isValidObjectId(assignedTo)) filter.assignedTo = assignedTo;
   if (view === 'today') filter.dueAt = { $gte: start, $lt: end };
   else if (view === 'week') filter.dueAt = { $gte: start, $lt: weekEnd };
   else if (view === 'overdue') { filter.dueAt = { $lt: start }; filter.status = { $in: ['a_faire', 'en_cours'] }; }
@@ -271,20 +272,13 @@ async function getActivities({ view = 'today', assignedTo } = {}, now = new Date
 }
 
 const result = (type, item, title, subtitle, destination, params = {}) => ({ type, id: String(item._id), title, subtitle, destination, params });
-async function globalSearch(query) {
+async function globalSearch(query, { tenantId, scopeUserIds } = {}) {
   const q = clean(query); if (q.length < 2) throw new CrmError('Saisissez au moins 2 caractères.', 422); const rx = new RegExp(escapeRx(q), 'i');
   const objectId = mongoose.isValidObjectId(q) ? new mongoose.Types.ObjectId(q) : null;
   const [customers, properties, contracts, accommodation, hotels, invoices, payments, projects, conversations, documents] = await Promise.all([
-    CrmCustomer.find({ status: { $ne: 'archived' }, $or: [{ displayName: rx }, { company: rx }, { emails: rx }, { phones: rx }] }).limit(10).lean(),
-    Property.find({ $or: [{ title: rx }, { 'address.city': rx }, ...(objectId ? [{ _id: objectId }] : [])] }).select('title type address').limit(10).lean(),
-    Contrat.find({ $or: [{ adresseBien: rx }, { villeBien: rx }, ...(objectId ? [{ _id: objectId }] : [])] }).select('type statut adresseBien villeBien').limit(10).lean(),
-    AccommodationReservation.find(objectId ? { _id: objectId } : { _id: null }).select('status createdAt').limit(5).lean(),
-    HotelReservation.find(objectId ? { _id: objectId } : { _id: null }).select('status createdAt').limit(5).lean(),
-    FinancialDocument.find({ $or: [{ documentNumber: rx }, { 'customer.name': rx }, { 'customer.email': rx }, ...(objectId ? [{ _id: objectId }] : [])] }).select('documentNumber documentType customer status').limit(10).lean(),
-    Paiement.find({ $or: [{ reference: rx }, ...(objectId ? [{ _id: objectId }] : [])] }).select('reference statut montant').limit(10).lean(),
-    AltcomProject.find({ $or: [{ projectName: rx }, { contactName: rx }, { companyName: rx }, { email: rx }] }).select('projectName companyName status').limit(10).lean(),
-    Conversation.find({ $or: [{ lastMessage: rx }, ...(objectId ? [{ _id: objectId }] : [])] }).select('lastMessage updatedAt').limit(10).lean(),
-    Document.find({ $or: [{ refNom: rx }, { notes: rx }, { content: rx }, ...(Number.isFinite(Number(q)) ? [{ docNumber: Number(q) }] : []), ...(objectId ? [{ _id: objectId }] : [])] }).select('docNumber refNom type status').limit(10).lean(),
+    CrmCustomer.find(tenantFilter(tenantId, { status: { $ne: 'archived' }, $or: [{ displayName: rx }, { company: rx }, { emails: rx }, { phones: rx }] })).limit(10).lean(),
+    Property.find({ ...(scopeUserIds ? { owner: { $in: [...scopeUserIds] } } : {}), $or: [{ title: rx }, { 'address.city': rx }, ...(objectId ? [{ _id: objectId }] : [])] }).select('title type address').limit(10).lean(),
+    Promise.resolve([]), Promise.resolve([]), Promise.resolve([]), Promise.resolve([]), Promise.resolve([]), Promise.resolve([]), Promise.resolve([]), Promise.resolve([]),
   ]);
   return { query: q, results: [
     ...customers.map((x) => result('customer', x, x.displayName, x.company || x.emails?.[0] || '', 'CRM_CUSTOMER_DETAILS', { id: x._id })),
@@ -314,23 +308,23 @@ function assessDuplicate(a, b) {
   if (sharedPhones.length) { score += 15; reasons.push('Téléphone identique, indice non décisif (+15)'); }
   return { score: Math.min(100, score), reasons, sharedEmails, sharedPhones, phoneOnly: sharedPhones.length > 0 && !sharedEmails.length && !sameName && !sameCompany, differences: { displayName: [a.displayName, b.displayName], company: [a.company, b.company], emails: [a.emails, b.emails], phones: [a.phones, b.phones], relations: [a.relations, b.relations], sources: [a.sourceRefs?.length || 0, b.sourceRefs?.length || 0] } };
 }
-async function findDuplicates({ minimumScore = 15 } = {}) {
-  const customers = await CrmCustomer.find({ status: { $ne: 'archived' } }).sort({ displayName: 1 }).lean(); const pairs = [];
+async function findDuplicates({ minimumScore = 15 } = {}, { tenantId } = {}) {
+  const customers = await CrmCustomer.find(tenantFilter(tenantId, { status: { $ne: 'archived' } })).sort({ displayName: 1 }).lean(); const pairs = [];
   for (let i = 0; i < customers.length; i += 1) for (let j = i + 1; j < customers.length; j += 1) { const assessment = assessDuplicate(customers[i], customers[j]); if (assessment.score >= Number(minimumScore)) pairs.push({ customerA: customers[i], customerB: customers[j], ...assessment }); }
   return { pairs: pairs.sort((a, b) => b.score - a.score), total: pairs.length };
 }
-async function compareCustomers(a, b) {
+async function compareCustomers(a, b, tenantScope = {}) {
   if (String(a) === String(b)) throw new CrmError('Sélectionnez deux Customers différents.', 422);
-  const [customerA, customerB] = await Promise.all([getCustomer360(a), getCustomer360(b)]);
+  const [customerA, customerB] = await Promise.all([getCustomer360(a, tenantScope), getCustomer360(b, tenantScope)]);
   return { customerA, customerB, assessment: assessDuplicate(customerA.customer, customerB.customer) };
 }
-async function consolidateCustomers({ customerA, customerB, decision, justification }, actor) {
+async function consolidateCustomers({ customerA, customerB, decision, justification }, actor, tenantScope = {}) {
   if (!['keep_a', 'keep_b', 'defer'].includes(decision)) throw new CrmError('Décision de consolidation invalide.', 422);
   if (clean(justification).length < 5) throw new CrmError('Une justification d’au moins 5 caractères est requise.', 422);
-  const comparison = await compareCustomers(customerA, customerB); const before = { customerA: comparison.customerA.customer, customerB: comparison.customerB.customer };
+  const comparison = await compareCustomers(customerA, customerB, tenantScope); const before = { customerA: comparison.customerA.customer, customerB: comparison.customerB.customer };
   if (decision === 'defer') {
     await CrmCustomer.updateMany({ _id: { $in: [customerA, customerB] } }, { $set: { status: 'merge_review' }, $push: { audit: { action: 'consolidation_deferred', actor, metadata: { justification } } } });
-    return CrmConsolidation.create({ customerA, customerB, decision, justification, actor, before, after: before, duplicateAssessment: comparison.assessment });
+    return CrmConsolidation.create({ tenant: tenantScope.tenantId, customerA, customerB, decision, justification, actor, before, after: before, duplicateAssessment: comparison.assessment });
   }
   const keptId = decision === 'keep_a' ? customerA : customerB; const archivedId = decision === 'keep_a' ? customerB : customerA; const session = await mongoose.startSession(); let journal;
   try {
@@ -346,12 +340,12 @@ async function consolidateCustomers({ customerA, customerB, decision, justificat
       for (const ref of archivedSnapshot.sourceRefs || []) if (!kept.sourceRefs.some((x) => x.entityType === ref.entityType && String(x.entityId) === String(ref.entityId))) kept.sourceRefs.push(ref);
       kept.status = 'active'; kept.audit.push({ action: 'consolidation_kept', actor, metadata: { archivedCustomer: archived._id, justification } }); await kept.save({ session });
       await Promise.all([CrmOpportunity.updateMany({ customer: archived._id }, { $set: { customer: kept._id } }, { session }), CrmActivity.updateMany({ customer: archived._id }, { $set: { customer: kept._id } }, { session })]);
-      [journal] = await CrmConsolidation.create([{ customerA, customerB, keptCustomer: kept._id, archivedCustomer: archived._id, decision, justification, actor, before, after: { kept: kept.toObject(), archived: archived.toObject() }, duplicateAssessment: comparison.assessment }], { session });
+      [journal] = await CrmConsolidation.create([{ tenant: tenantScope.tenantId, customerA, customerB, keptCustomer: kept._id, archivedCustomer: archived._id, decision, justification, actor, before, after: { kept: kept.toObject(), archived: archived.toObject() }, duplicateAssessment: comparison.assessment }], { session });
     });
   } finally { await session.endSession(); }
   return journal;
 }
 
-async function listConsolidations() { return CrmConsolidation.find().populate('actor', 'name email').populate('keptCustomer archivedCustomer', 'displayName status').sort({ decidedAt: -1 }).limit(200).lean(); }
+async function listConsolidations({ tenantId } = {}) { return CrmConsolidation.find(tenantFilter(tenantId)).populate('actor', 'name email').populate('keptCustomer archivedCustomer', 'displayName status').sort({ decidedAt: -1 }).limit(200).lean(); }
 
 module.exports = { CrmError, synchronizeCustomers, listCustomers, getCustomer360, createOpportunity, moveOpportunity, setOpportunityOutcome, createActivity, updateActivity, getDashboard, getPipeline, getActivities, globalSearch, assessDuplicate, findDuplicates, compareCustomers, consolidateCustomers, listConsolidations };

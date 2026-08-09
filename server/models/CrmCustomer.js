@@ -14,6 +14,7 @@ const auditSchema = new mongoose.Schema({
 }, { _id: false });
 
 const schema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   kind: { type: String, enum: ['person', 'organization'], default: 'person', index: true },
   displayName: { type: String, required: true, trim: true, maxlength: 200 },
   firstName: { type: String, trim: true, default: '' },
@@ -35,8 +36,8 @@ const schema = new mongoose.Schema({
   audit: [auditSchema],
 }, { timestamps: true });
 
-schema.index({ identityKeys: 1 }, { unique: true, name: 'one_crm_customer_per_identity_key' });
-schema.index({ 'sourceRefs.entityType': 1, 'sourceRefs.entityId': 1 }, { unique: true, name: 'one_crm_customer_per_source' });
+schema.index({ tenant: 1, identityKeys: 1 }, { unique: true, name: 'one_crm_customer_per_tenant_identity_key' });
+schema.index({ tenant: 1, 'sourceRefs.entityType': 1, 'sourceRefs.entityId': 1 }, { unique: true, name: 'one_crm_customer_per_tenant_source' });
 schema.index({ displayName: 'text', company: 'text', emails: 'text', phones: 'text' });
 
 module.exports = mongoose.model('CrmCustomer', schema);

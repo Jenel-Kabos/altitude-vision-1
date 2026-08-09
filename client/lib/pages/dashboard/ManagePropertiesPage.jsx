@@ -113,7 +113,7 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
   const fetchProperties = async () => {
     setLoading(true);
     try {
-      const res = await getAllProperties({ dashboardClassification: true });
+      const res = await getAllProperties({ portfolio: true });
       // `filteredProperties` est dérivé exclusivement par l'effet de filtrage
       // ci-dessous (searchTerm + statusFilter) — ne pas le fixer ici en
       // parallèle, sous peine de courte-circuiter le filtre ?status= au
@@ -494,6 +494,12 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
 
   const totalPages       = Math.ceil(filteredProperties.length / PROPERTIES_PER_PAGE);
   const currentProperties = filteredProperties.slice((currentPage - 1) * PROPERTIES_PER_PAGE, currentPage * PROPERTIES_PER_PAGE);
+  const portfolioKpis = [
+    { key: 'total', label: 'Biens éligibles', value: filteredProperties.length },
+    { key: 'value', label: 'Valeur totale', value: filteredProperties.reduce((sum, item) => sum + (Number(item.price) || 0), 0), format: 'money' },
+    { key: 'occupied', label: 'Occupés', value: filteredProperties.filter((item) => item.availability === 'Loué').length },
+    { key: 'alerts', label: 'Alertes', value: filteredProperties.filter((item) => item.assetCycle === 'travaux' || item.availability === 'En maintenance').length },
+  ];
 
   // ── ConfirmDialog ──────────────────────────────────────────
   const ConfirmDialog = () => {
@@ -517,7 +523,8 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
 
   // ── PropertyCard ───────────────────────────────────────────
   const PropertyCard = ({ property }) => {
-    return <PropertyManagementCard property={property} description={property.description} priceLabel={formatCurrencyXAF(property.price || 0)} badges={[{ label: property.type || 'Bien' }, { label: ({ vente: 'Vente', location: 'Location', hebergement: 'Hébergement' }[property.status] || 'Vente'), className: 'bg-gradient-to-r from-green-600 to-emerald-600' }]} footer={<>
+    const sourceLabel = ({ vente: 'Vente', location: 'Location', accommodation: 'Hébergement', hotel: 'Hôtel' })[property.source || property.status] || 'Bien';
+    return <PropertyManagementCard property={property} description={property.description} priceLabel={formatCurrencyXAF(property.price || 0)} badges={[{ label: property.category || property.type || 'Bien' }, { label: sourceLabel, className: 'bg-gradient-to-r from-green-600 to-emerald-600' }]} footer={<>
           {property.amenities?.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-1">
               {property.amenities.slice(0, 3).map((a, i) => (
@@ -609,7 +616,8 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
           </div>
         </div>
 
-        {isStaffDocs(user) && <PropertyPortfolioDashboard />}
+        {isStaffDocs(user) && !readOnly && <PropertyPortfolioDashboard />}
+        {readOnly && <DashboardKpis items={portfolioKpis} loading={false} note="Ces indicateurs utilisent exactement la projection affichée, après déduplication." />}
 
         {section === 'vente' && <DashboardKpis items={[
           { key: 'active', label: 'Biens actifs', value: analytics?.kpis?.active }, { key: 'drafts', label: 'Brouillons', value: analytics?.kpis?.drafts },

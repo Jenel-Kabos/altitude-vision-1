@@ -44,8 +44,9 @@ function matchesConditions(event, conditions = []) {
 // audience, dedupeKey, notificationId } — forme exacte du payload déjà
 // construit par notify() (voir notificationService.js).
 async function handleEvent(event, { simulate = false } = {}) {
-  if (!event?.type) return [];
-  const rules = await CrmAutomationRule.find({ triggerEvent: event.type, enabled: true }).sort({ priority: 1 }).lean();
+  if (!event?.type || !event.platformTenantId) return [];
+  const tenant = event.platformTenantId;
+  const rules = await CrmAutomationRule.find({ tenant, triggerEvent: event.type, enabled: true }).sort({ priority: 1 }).lean();
   const results = [];
   for (const rule of rules) {
     if (!matchesConditions(event, rule.conditions)) {
@@ -54,7 +55,7 @@ async function handleEvent(event, { simulate = false } = {}) {
     }
     if (simulate) {
       const run = await CrmAutomationRun.create({
-        rule: rule._id, ruleId: rule.ruleId, triggerEvent: event.type,
+        tenant, rule: rule._id, ruleId: rule.ruleId, triggerEvent: event.type,
         entityType: event.entityType || null, entityId: event.entityId || null,
         status: 'simulated', simulated: true, actionsRun: rule.actions.map((a) => a.actionId),
       });
@@ -84,7 +85,7 @@ async function handleEvent(event, { simulate = false } = {}) {
     // Le journal d'exécution ne doit jamais faire échouer l'automatisation
     // elle-même — même convention que l'audit trail USER-ARCH-1.
     const run = await CrmAutomationRun.create({
-      rule: rule._id, ruleId: rule.ruleId, triggerEvent: event.type,
+      tenant, rule: rule._id, ruleId: rule.ruleId, triggerEvent: event.type,
       entityType: event.entityType || null, entityId: event.entityId || null,
       status, actionsRun, error,
     }).catch(() => null);

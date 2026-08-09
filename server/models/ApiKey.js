@@ -29,7 +29,9 @@ const schema = new mongoose.Schema({
   // publicApiAuth.js). `null` par défaut = comportement STRICTEMENT
   // inchangé pour toute clé déjà émise (catalogue global, comme avant ce
   // sprint) — jamais une régression silencieuse d'une intégration partenaire
-  // existante.
+  // existante. TENANT-HARDENING-1 ferme désormais l'accès HTTP des clés
+  // historiques `null` jusqu'à rattachement explicite : jamais de catalogue
+  // global implicite.
   tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null },
   expiresAt: { type: Date, default: null },
   lastUsedAt: { type: Date, default: null },

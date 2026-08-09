@@ -35,6 +35,11 @@ async function createApiKey({ name, scopes, rateLimitPerMinute, organizationLabe
   const invalidScopes = (scopes || []).filter((s) => !API_KEY_SCOPES.includes(s));
   if (invalidScopes.length) fail('API_KEY_SCOPE_INVALID', `Scope(s) invalide(s) : ${invalidScopes.join(', ')}.`, 422);
 
+  if (tenant) {
+    const platformTenant = await require('../../models/PlatformTenant').findOne({ _id: tenant, status: { $in: ['trial', 'active'] } }).lean();
+    if (!platformTenant) fail('API_KEY_TENANT_INVALID', 'Tenant introuvable ou inactif.', 422);
+    await require('../platformTenant/tenantQuotaService').checkQuota(platformTenant, 'apiKeys');
+  }
   const { rawKey, keyPrefix } = generateRawKey();
   const apiKey = await ApiKey.create({
     name: name.trim(),
@@ -85,7 +90,7 @@ async function rotateApiKey(id, { actor, reason } = {}) {
   if (!oldKey) fail('API_KEY_NOT_ACTIVE', 'Aucune clé active avec cet identifiant.', 404);
   const { rawKey } = await createApiKey({
     name: oldKey.name, scopes: oldKey.scopes, rateLimitPerMinute: oldKey.rateLimitPerMinute,
-    organizationLabel: oldKey.organizationLabel, actor,
+    organizationLabel: oldKey.organizationLabel, tenant: oldKey.tenant, actor,
   }).then(async (result) => {
     await ApiKey.updateOne({ _id: result.apiKey._id }, { rotatedFrom: oldKey._id });
     return result;

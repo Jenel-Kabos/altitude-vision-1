@@ -2,6 +2,8 @@
 const mongoose = require('mongoose');
 
 const actionLogSchema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
+  organization: { type: mongoose.Schema.Types.ObjectId, ref: 'OrgUnit', default: null, index: true },
   action: {
     type:     String,
     required: true,

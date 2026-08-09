@@ -30,11 +30,13 @@ const logAction = async ({
     // Enrichir metadata avec IP et User-Agent si req est fourni
     const enrichedMetadata = { ...metadata };
     if (req) {
-      enrichedMetadata.ip        = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || req.ip;
-      enrichedMetadata.userAgent = req.headers['user-agent'] || '';
+      enrichedMetadata.ip        = req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || req.ip;
+      enrichedMetadata.userAgent = req.headers?.['user-agent'] || '';
     }
 
     const [created] = await ActionLog.create([{
+      tenant: req?.platformTenant?._id || metadata.platformTenantId || null,
+      organization: req?.platformTenant?.rootOrgUnit || metadata.orgUnitId || null,
       action,
       description,
       module:     moduleName,

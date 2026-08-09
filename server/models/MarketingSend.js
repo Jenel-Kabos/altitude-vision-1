@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const SEND_STATUSES = ['sent', 'failed', 'opened', 'clicked', 'unsubscribed'];
 
 const schema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   // Une campagne (envoi de masse, Phase 4) OU un déclenchement de workflow
   // individuel (Phase 5, ruleId CrmAutomationRule) — jamais les deux, l'un
   // des deux est toujours renseigné pour distinguer l'origine de l'envoi.

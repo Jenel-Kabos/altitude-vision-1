@@ -124,6 +124,7 @@ const NOTIFICATION_TYPES = [
 
 const notificationSchema = new mongoose.Schema(
   {
+    platformTenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
     recipient: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

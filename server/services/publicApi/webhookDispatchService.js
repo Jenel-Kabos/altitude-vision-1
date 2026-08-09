@@ -42,7 +42,9 @@ async function deliver(subscription, payload) {
 // crmAutomationEngine.handleEvent — {type, entityType, entityId, metadata, ...}.
 async function dispatch(event) {
   if (!event?.type || !ALLOWED_WEBHOOK_EVENTS.includes(event.type)) return;
-  const subscriptions = await WebhookSubscription.find({ status: 'active', events: event.type });
+  const platformTenantId = event.platformTenantId || event.metadata?.platformTenantId || null;
+  if (!platformTenantId) return;
+  const subscriptions = await WebhookSubscription.find({ tenant: platformTenantId, status: 'active', events: event.type });
   if (!subscriptions.length) return;
   const payload = { event: event.type, entityType: event.entityType || null, entityId: event.entityId || null, occurredAt: new Date().toISOString() };
   await Promise.all(subscriptions.map((sub) => deliver(sub, payload)));

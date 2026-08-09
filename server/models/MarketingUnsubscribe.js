@@ -6,10 +6,13 @@
 const mongoose = require('mongoose');
 
 const schema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
+  email: { type: String, required: true, lowercase: true, trim: true },
   channel: { type: String, default: 'email' },
   unsubscribedAt: { type: Date, default: Date.now },
   source: { type: String, default: 'campaign' }, // 'campaign' | 'manual' | 'complaint'
 }, { timestamps: true });
+
+schema.index({ tenant: 1, email: 1 }, { unique: true });
 
 module.exports = mongoose.model('MarketingUnsubscribe', schema);

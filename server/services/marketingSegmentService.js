@@ -130,11 +130,12 @@ function listSegments() {
   return Object.entries(SEGMENT_REGISTRY).map(([key, { label, description }]) => ({ key, label, description }));
 }
 
-async function resolveSegment(segmentKey, params = {}) {
+async function resolveSegment(segmentKey, params = {}, { tenantId } = {}) {
   const segment = SEGMENT_REGISTRY[segmentKey];
   if (!segment) { const err = new Error(`Segment inconnu : ${segmentKey}.`); err.statusCode = 422; throw err; }
   const ids = await segment.resolve(params);
-  return [...new Set(ids.map(String))];
+  const scopedIds = tenantId ? await CrmCustomer.distinct('_id', { _id: { $in: ids }, tenant: tenantId }) : ids;
+  return [...new Set(scopedIds.map(String))];
 }
 
 module.exports = { SEGMENT_REGISTRY, listSegments, resolveSegment };

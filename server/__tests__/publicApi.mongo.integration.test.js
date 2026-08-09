@@ -120,15 +120,15 @@ describe('HTTP /api/public/v1 — authentification, scope, quota (Phase 4/6)', (
     expect(res.status).toBe(401);
   });
 
-  test('200 avec une clé active et le bon scope, aucune fuite de champ interne via HTTP', async () => {
+  test('une clé historique sans tenant échoue fermée avec un catalogue vide', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const owner = await makeUser({ role: 'Proprietaire' });
     await makeValidatedProperty(owner._id);
     const { rawKey } = await createApiKey({ name: 'X', scopes: ['properties:read'], actor: admin });
     const res = await request(app).get('/api/public/v1/properties').set('X-API-Key', rawKey);
     expect(res.status).toBe(200);
-    expect(res.body.data.properties[0].owner).toBeUndefined();
-    expect(res.body.data.properties[0].commissionRate).toBeUndefined();
+    expect(res.body.data.properties).toEqual([]);
+    expect(res.body.data.total).toBe(0);
   });
 
   test('403 si le scope requis est absent de la clé', async () => {
@@ -187,6 +187,7 @@ describe('webhookDispatchService — Phase 8 (diffusion, jamais un second moteur
   test('un abonnement actif reçoit un POST signé HMAC pour un événement autorisé', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const { apiKey } = await createApiKey({ name: 'X', scopes: ['webhooks:manage'], actor: admin });
+    const tenantId = require('mongoose').Types.ObjectId.createFromTime(1);
     let receivedPayload = null; let receivedSignature = null;
     const originalFetch = global.fetch;
     global.fetch = jest.fn(async (url, opts) => {
@@ -194,9 +195,9 @@ describe('webhookDispatchService — Phase 8 (diffusion, jamais un second moteur
       receivedSignature = opts.headers['X-Altitude-Signature'];
       return { ok: true };
     });
-    const subscription = await WebhookSubscription.create({ apiKey: apiKey._id, url: 'https://partner.test/hook', events: ['bien_valide'], secret: 'test-secret' });
+    const subscription = await WebhookSubscription.create({ tenant: tenantId, apiKey: apiKey._id, url: 'https://partner.test/hook', events: ['bien_valide'], secret: 'test-secret' });
 
-    await dispatch({ type: 'bien_valide', entityType: 'property', entityId: 'abc' });
+    await dispatch({ type: 'bien_valide', entityType: 'property', entityId: 'abc', platformTenantId: tenantId });
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(receivedPayload.event).toBe('bien_valide');
     expect(receivedSignature).toBe(signPayload('test-secret', receivedPayload));
@@ -207,13 +208,14 @@ describe('webhookDispatchService — Phase 8 (diffusion, jamais un second moteur
   test('le hook notify() déclenche réellement la diffusion webhook, sans modifier le domaine producteur', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const { apiKey } = await createApiKey({ name: 'X', scopes: ['webhooks:manage'], actor: admin });
+    const tenantId = require('mongoose').Types.ObjectId.createFromTime(2);
     const originalFetch = global.fetch;
     global.fetch = jest.fn(async () => ({ ok: true }));
-    await WebhookSubscription.create({ apiKey: apiKey._id, url: 'https://partner.test/hook', events: ['bien_valide'], secret: 'test-secret' });
+    await WebhookSubscription.create({ tenant: tenantId, apiKey: apiKey._id, url: 'https://partner.test/hook', events: ['bien_valide'], secret: 'test-secret' });
 
     // Simule exactement ce qu'un domaine Immobilier ferait — un simple appel
     // à notify(), déjà existant, sans connaissance du webhook.
-    await notify({ recipient: admin._id, sender: admin._id, type: 'bien_valide', title: 'Bien validé', body: 'Test', audience: 'user' });
+    await notify({ recipient: admin._id, sender: admin._id, type: 'bien_valide', title: 'Bien validé', body: 'Test', audience: 'user', platformTenantId: tenantId });
     await new Promise((resolve) => setTimeout(resolve, 80));
     expect(global.fetch).toHaveBeenCalled();
     global.fetch = originalFetch;

@@ -71,6 +71,11 @@ const errorHandler = (err, req, res, next) => {
     message = err.message;
   }
 
+  if (['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError'].includes(err.name)) {
+    statusCode = err.statusCode || 400;
+    message = err.message;
+  }
+
   res.status(statusCode).json({
     status: statusCode >= 500 ? 'error' : 'fail',
     message,
@@ -78,6 +83,7 @@ const errorHandler = (err, req, res, next) => {
     ...(err.name === 'HotelAccessError' && { code: err.code }),
     ...(err.name === 'BusinessProfileError' && { code: err.code }),
     ...(err.name === 'OrganizationError' && { code: err.code }),
+    ...(['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError'].includes(err.name) && { code: err.code }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };

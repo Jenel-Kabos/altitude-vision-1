@@ -3,9 +3,11 @@ const express    = require('express');
 const router     = express.Router();
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 const ctrl       = require('../controllers/actionLogController');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 router.use(protect);
 router.use(restrictTo('Admin'));
+router.use(requireTenantScope);
 
 router.get('/',        ctrl.getLogs);
 router.get('/stats',   ctrl.getStats);
