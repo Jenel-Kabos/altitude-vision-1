@@ -14,17 +14,18 @@ const Accommodation = require('../models/Accommodation');
 const Hotel = require('../models/Hotel');
 const organizationService = require('../services/organizationService');
 const platformTenantService = require('../services/platformTenant/platformTenantService');
-const { resolveTenantForUser, resolveAvailableTenantsForUser } = require('../services/platformTenant/tenantContextService');
+const { resolveTenantForUser, resolveEffectiveTenantContext, resolveAvailableTenantsForUser } = require('../services/platformTenant/tenantContextService');
 const templateService = require('../services/marketingTemplateService');
 const { checkQuota } = require('../services/platformTenant/tenantQuotaService');
 const { getPropertyPortfolio } = require('../services/propertyPortfolioService');
 const { handleEvent } = require('../services/crmAutomationEngine');
 const crmRoutes = require('../routes/crmRoutes');
 const publicRoutes = require('../routes/publicApi/v1');
+const propertyRoutes = require('../routes/propertyRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 
 jest.setTimeout(120000);
-const app = express(); app.use(express.json()); app.use('/api/crm', crmRoutes); app.use('/api/public/v1', publicRoutes); app.use(errorHandler);
+const app = express(); app.use(express.json()); app.use('/api/crm', crmRoutes); app.use('/api/public/v1', publicRoutes); app.use('/api/properties', propertyRoutes); app.use(errorHandler);
 const token = (id) => `Bearer ${jwt.sign({ id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' })}`;
 let seq = 0;
 const user = (role = 'Collaborateur') => User.create({ name: `U${++seq}`, email: `hardening${seq}${Date.now()}@test.dev`, password: 'Password123!', passwordConfirm: 'Password123!', role });
@@ -54,6 +55,58 @@ test('résolution multi-tenant déterministe et fail-closed', async () => {
   expect(String((await resolveTenantForUser(userAB._id, tenantB._id))._id)).toBe(String(tenantB._id));
   expect(await resolveTenantForUser(userA._id, tenantB._id)).toBeNull();
   expect(await resolveAvailableTenantsForUser(userAB._id)).toHaveLength(2);
+});
+
+test('fallback legacy prouvé restaure GET /properties/portfolio et expose sa source sans accès global Admin', async () => {
+  const legacyAdmin = await user('Admin');
+  const tenant = await platformTenantService.createTenant({ name: `Altitude Vision Legacy ${seq}`, actor: legacyAdmin });
+  const property = await Property.create({
+    title: 'Portfolio Legacy Altitude Vision', description: 'Bien legacy utilisé pour la régression directe du contexte tenant.',
+    pole: 'Altimmo', type: 'Appartement', status: 'vente', price: 100000,
+    address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: -4.26, longitude: 15.28,
+    images: ['https://example.test/legacy.jpg'], surface: 80, owner: legacyAdmin._id,
+    statusAdmin: 'Validée', isPublished: true, availability: 'Disponible',
+  });
+
+  expect(await require('../models/OrgMembership').countDocuments({ user: legacyAdmin._id })).toBe(0);
+  const context = await resolveEffectiveTenantContext(legacyAdmin._id);
+  expect(String(context.tenant._id)).toBe(String(tenant._id));
+  expect(context.source).toBe('legacy_fallback');
+
+  const response = await request(app).get('/api/properties/portfolio').set('Authorization', token(legacyAdmin._id));
+  expect(response.status).toBe(200);
+  expect(response.body.data.items.map((item) => item.title)).toEqual(['Portfolio Legacy Altitude Vision']);
+  expect(String(response.body.data.items[0].owner)).toBe(String(property.owner));
+
+  const unrelatedAdmin = await user('Admin');
+  expect((await request(app).get('/api/properties/portfolio').set('Authorization', token(unrelatedAdmin._id))).status).toBe(403);
+});
+
+test('fallback legacy refuse ambiguïté, tenant explicite et toute appartenance inactive', async () => {
+  const ambiguousAdmin = await user('Admin');
+  await platformTenantService.createTenant({ name: `Legacy Ambigu A ${seq}`, actor: ambiguousAdmin });
+  const second = await platformTenantService.createTenant({ name: `Legacy Ambigu B ${seq}`, actor: ambiguousAdmin });
+  expect(await resolveEffectiveTenantContext(ambiguousAdmin._id)).toBeNull();
+  expect(await resolveEffectiveTenantContext(ambiguousAdmin._id, second._id)).toBeNull();
+
+  const membershipAdmin = await user('Admin');
+  const tenant = await platformTenantService.createTenant({ name: `Membership inactive ${seq}`, actor: ambiguousAdmin });
+  const membership = await organizationService.grantMembership({ userId: membershipAdmin._id, orgUnitId: tenant.rootOrgUnit, actor: ambiguousAdmin });
+  expect((await resolveEffectiveTenantContext(membershipAdmin._id)).source).toBe('single_membership');
+  await organizationService.suspendMembership({ membershipId: membership._id, actor: ambiguousAdmin, reason: 'test' });
+  expect(await resolveEffectiveTenantContext(membershipAdmin._id)).toBeNull();
+  await organizationService.revokeMembership({ membershipId: membership._id, actor: ambiguousAdmin, reason: 'test' });
+  expect(await resolveEffectiveTenantContext(membershipAdmin._id)).toBeNull();
+});
+
+test('tenant demandé doit être accessible et un tenant suspendu ou archivé reste exclu', async () => {
+  const { tenantA, tenantB, userA } = await fixture();
+  expect(String((await resolveEffectiveTenantContext(userA._id, tenantA._id)).tenant._id)).toBe(String(tenantA._id));
+  expect(await resolveEffectiveTenantContext(userA._id, tenantB._id)).toBeNull();
+  await require('../models/PlatformTenant').updateOne({ _id: tenantA._id }, { status: 'suspended' });
+  expect(await resolveEffectiveTenantContext(userA._id)).toBeNull();
+  await require('../models/PlatformTenant').updateOne({ _id: tenantA._id }, { status: 'archived' });
+  expect(await resolveEffectiveTenantContext(userA._id)).toBeNull();
 });
 
 test('CRM READ/SEARCH et IDOR WRITE restent dans le tenant sélectionné', async () => {

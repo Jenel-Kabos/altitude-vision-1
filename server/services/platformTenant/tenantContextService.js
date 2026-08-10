@@ -17,6 +17,7 @@
 const OrgMembership = require('../../models/OrgMembership');
 const OrgUnit = require('../../models/OrgUnit');
 const PlatformTenant = require('../../models/PlatformTenant');
+const User = require('../../models/User');
 const { getScopeUserIds } = require('../organizationService');
 
 // Remonte `ancestors` (déjà matérialisé par OrgUnit, voir models/OrgUnit.js)
@@ -47,14 +48,54 @@ async function resolveAvailableTenantsForUser(userId) {
   return PlatformTenant.find({ rootOrgUnit: { $in: roots }, status: { $in: ['trial', 'active'] } }).sort({ _id: 1 }).lean();
 }
 
+// Compatibilité strictement bornée pour les comptes ayant créé la racine
+// Altitude Vision avant l'introduction des OrgMembership. La double preuve
+// `PlatformTenant.createdBy` + `OrgUnit.createdBy`, l'antériorité du compte,
+// l'absence de TOUT membership et l'unicité du résultat empêchent qu'un rôle
+// (Admin ou autre) ne devienne un accès global implicite.
+async function resolveLegacyTenantForUser(userId) {
+  if (!userId) return null;
+  const [user, membershipCount] = await Promise.all([
+    User.findOne({ _id: userId, isActive: { $ne: false }, status: { $nin: ['Suspendu', 'Banni', 'Supprimé'] }, isTechnical: { $ne: true } })
+      .select('_id createdAt').lean(),
+    OrgMembership.countDocuments({ user: userId }),
+  ]);
+  if (!user || membershipCount !== 0) return null;
+
+  const roots = await OrgUnit.find({ type: 'organization', status: 'active', createdBy: userId })
+    .select('_id createdAt').lean();
+  if (!roots.length) return null;
+  const rootById = new Map(roots.map((root) => [String(root._id), root]));
+  const tenants = await PlatformTenant.find({
+    rootOrgUnit: { $in: roots.map((root) => root._id) },
+    createdBy: userId,
+    status: { $in: ['trial', 'active'] },
+  }).sort({ _id: 1 }).lean();
+  const proven = tenants.filter((tenant) => {
+    const root = rootById.get(String(tenant.rootOrgUnit));
+    return root && user.createdAt <= root.createdAt && user.createdAt <= tenant.createdAt;
+  });
+  return proven.length === 1 ? proven[0] : null;
+}
+
+async function resolveEffectiveTenantContext(userId, requestedTenantId = null) {
+  const tenants = await resolveAvailableTenantsForUser(userId);
+  if (requestedTenantId) {
+    const tenant = tenants?.find((item) => String(item._id) === String(requestedTenantId)) || null;
+    return tenant ? { tenant, source: 'explicit_membership' } : null;
+  }
+  if (tenants?.length === 1) return { tenant: tenants[0], source: 'single_membership' };
+  if (tenants?.length > 1) return null;
+  const legacyTenant = await resolveLegacyTenantForUser(userId);
+  return legacyTenant ? { tenant: legacyTenant, source: 'legacy_fallback' } : null;
+}
+
 // Une appartenance unique peut être résolue implicitement. Dès qu'un
 // utilisateur appartient à plusieurs tenants, le contexte doit être choisi
 // explicitement et validé côté serveur : jamais de `findOne()` arbitraire.
 async function resolveTenantForUser(userId, requestedTenantId = null) {
-  const tenants = await resolveAvailableTenantsForUser(userId);
-  if (!tenants?.length) return null;
-  if (requestedTenantId) return tenants.find((tenant) => String(tenant._id) === String(requestedTenantId)) || null;
-  return tenants.length === 1 ? tenants[0] : null;
+  const context = await resolveEffectiveTenantContext(userId, requestedTenantId);
+  return context?.tenant || null;
 }
 
 // Résout un `tenantId` explicite (ex: paramètre de requête) en
@@ -68,4 +109,11 @@ async function resolveTenantScope(tenantId) {
   return { tenant, scopeUserIds, rootOrgUnitId: String(tenant.rootOrgUnit) };
 }
 
-module.exports = { resolveTenantForUser, resolveAvailableTenantsForUser, resolveTenantScope, resolveRootOrgUnitId };
+module.exports = {
+  resolveTenantForUser,
+  resolveEffectiveTenantContext,
+  resolveLegacyTenantForUser,
+  resolveAvailableTenantsForUser,
+  resolveTenantScope,
+  resolveRootOrgUnitId,
+};
