@@ -55,6 +55,7 @@ const HOTEL_ACCOMMODATION_TYPES = ['hotel', 'residence_hoteliere', 'chambre_hote
 
 const accommodationSchema = new mongoose.Schema(
   {
+    tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
     // Property reste l'unique représentation du bien physique et de son
     // annonce (titre, description, adresse, coordonnées, images, owner).
     property: {

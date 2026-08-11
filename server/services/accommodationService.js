@@ -187,6 +187,7 @@ async function resolveHotel({ hotelInput, propertyId, actingUser }) {
       ...hotelInput.hotelData,
       property: propertyId,
       createdBy: actingUser.id,
+      tenant: actingUser.platformTenant?._id || actingUser.platformTenant || null,
     });
     return { hotelId: hotel._id, hotelWasCreated: true };
   } catch (error) {
@@ -246,6 +247,7 @@ async function createFullAccommodation({ propertyData, accommodationData, rateDa
       hotel: hotelId,
       property: property._id,
       createdBy: actingUser.id,
+      tenant: actingUser.platformTenant?._id || actingUser.platformTenant || null,
     });
   } catch (error) {
     await compensateHotel(hotelId, hotelWasCreated);
@@ -322,6 +324,7 @@ async function updateFullAccommodation({ property, accommodationData, rateData, 
       hotel: hotelId,
       property: property._id,
       createdBy: actingUser.id,
+      tenant: actingUser.platformTenant?._id || actingUser.platformTenant || null,
     });
   } else {
     const becomesNonHotel = accommodationData.accommodationType
@@ -422,6 +425,7 @@ async function duplicateAccommodation({ accommodation, property, actingUser }) {
     cleaningFee: accommodation.cleaningFee,
     currency: accommodation.currency,
     createdBy: actingUser.id,
+    tenant: actingUser.platformTenant?._id || actingUser.platformTenant || accommodation.tenant || null,
   });
 
   const activeRates = await RatePlan.find({ accommodation: accommodation._id, active: true });

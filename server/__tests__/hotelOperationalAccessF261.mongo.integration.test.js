@@ -11,19 +11,32 @@ const MaintenanceTicket = require('../models/MaintenanceTicket');
 const assignmentService = require('../services/hotel/hotelStaffAssignmentService');
 const { assertOperationalHotelAccess, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
+const { createTenantFixture, addTenantMember, tenantActor } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(180000);
 const id = () => new mongoose.Types.ObjectId();
 const admin = { role: 'Admin', _id: id() };
+let tenantFixture;
+async function ensureTenant() {
+  if (!tenantFixture) {
+    tenantFixture = await createTenantFixture({ label: 'Hotel operations', bootstrap: admin });
+    Object.assign(admin, tenantActor(admin, tenantFixture.tenant));
+  }
+  return tenantFixture;
+}
+const actorOf = (user) => tenantActor(user, tenantFixture.tenant);
 let userCounter = 0;
-const makeUser = (overrides = {}) => {
+const makeUser = async (overrides = {}) => {
   userCounter += 1;
-  return User.create({ name: 'Staff Member', email: `opstaff${userCounter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Collaborateur', ...overrides });
+  const context = await ensureTenant();
+  const user = await User.create({ name: 'Staff Member', email: `opstaff${userCounter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Collaborateur', ...overrides });
+  await addTenantMember({ tenant: context.tenant, user, bootstrap: admin });
+  return user;
 };
-const makeHotel = (overrides = {}) => { const managerId = id(); return Hotel.create({ name: 'Hôtel F261', brand: 'F261', email: 'f261@example.test', manager: managerId, createdBy: managerId, ...overrides }); };
+const makeHotel = async (overrides = {}) => { const managerId = id(); const { tenant } = await ensureTenant(); return Hotel.create({ name: 'Hôtel F261', tenant: tenant._id, brand: 'F261', email: 'f261@example.test', manager: managerId, createdBy: managerId, ...overrides }); };
 
 beforeAll(async () => { await startFinancialMongo(); await HotelStaffAssignment.syncIndexes(); });
-afterEach(clearFinancialMongo);
+afterEach(async () => { await clearFinancialMongo(); tenantFixture = null; delete admin.platformTenant; delete admin.tenantScopeUserIds; });
 afterAll(stopFinancialMongo);
 
 /** Prépare deux hôtels A/B, un staff rattaché à chacun, et une chambre par hôtel. */
@@ -43,7 +56,7 @@ async function twoHotelsFixture() {
 
 test('staff A opère sur les ressources de A, jamais sur celles de B (rooms/housekeeping/inspection/maintenance)', async () => {
   const { hotelA, hotelB, staffA, roomA, roomB } = await twoHotelsFixture();
-  const actorA = { role: 'Collaborateur', _id: staffA._id };
+  const actorA = actorOf(staffA);
 
   // rooms
   await expect(assertOperationalHotelAccess({ actor: actorA, hotelId: hotelA._id, capability: CAP.ROOM_MANAGE })).resolves.toEqual({});
@@ -69,7 +82,7 @@ test('staff A opère sur les ressources de A, jamais sur celles de B (rooms/hous
 
 test('identifiants croisés bloqués : hotelId A + ressource de B, quel que soit le domaine', async () => {
   const { hotelA, hotelB, staffA, roomB } = await twoHotelsFixture();
-  const actorA = { role: 'Collaborateur', _id: staffA._id };
+  const actorA = actorOf(staffA);
   const taskB = await HousekeepingTask.create({ room: roomB._id, hotel: hotelB._id, type: 'refresh', createdBy: staffA._id });
   const ticketB = await MaintenanceTicket.create({ room: roomB._id, hotel: hotelB._id, category: 'electricity', description: 'Panne' });
 
@@ -112,7 +125,7 @@ test('aucune écriture partielle après un refus : une chambre B reste inchangé
 
 test('suspension prend effet immédiatement, y compris en cours d’opération', async () => {
   const { hotelA, staffA, roomA } = await twoHotelsFixture();
-  const actorA = { role: 'Collaborateur', _id: staffA._id };
+  const actorA = actorOf(staffA);
   await expect(assertOperationalHotelAccess({ actor: actorA, hotelId: hotelA._id, capability: CAP.ROOM_MANAGE })).resolves.toEqual({});
 
   const assignment = await HotelStaffAssignment.findOne({ user: staffA._id, hotel: hotelA._id, status: 'active' });
@@ -124,7 +137,7 @@ test('suspension prend effet immédiatement, y compris en cours d’opération',
 
 test('révocation prend effet immédiatement et les lectures concurrentes restent refusées', async () => {
   const { hotelA, staffA } = await twoHotelsFixture();
-  const actorA = { role: 'Collaborateur', _id: staffA._id };
+  const actorA = actorOf(staffA);
   const assignment = await HotelStaffAssignment.findOne({ user: staffA._id, hotel: hotelA._id, status: 'active' });
   await assignmentService.revokeHotelStaffAssignment({ actor: admin, assignmentId: assignment._id, reason: 'Départ définitif confirmé par RH.' });
 
@@ -140,12 +153,12 @@ test('compatibilité Hotel.manager legacy : un manager legacy garde l’accès s
   expect(await HotelStaffAssignment.countDocuments({ hotel: hotel._id })).toBe(0);
 });
 
-test('Admin conserve un accès global mais reste scopé quand un hotelId précis est demandé', async () => {
+test('Admin reste borné au tenant actif quand un hotelId précis est demandé', async () => {
   const { hotelA, hotelB } = await twoHotelsFixture();
   await expect(assertOperationalHotelAccess({ actor: admin, hotelId: hotelA._id, capability: CAP.ROOM_MANAGE })).resolves.toEqual({});
   await expect(assertOperationalHotelAccess({ actor: admin, hotelId: hotelB._id, capability: CAP.ROOM_MANAGE })).resolves.toEqual({});
   const { globalAccess } = await listAccessibleHotels(admin);
-  expect(globalAccess).toBe(true);
+  expect(globalAccess).toBe(false);
 });
 
 test('roomAssignment : la cohérence réservation/chambre/hôtel est garantie (déjà appliquée par roomAssignmentService)', async () => {

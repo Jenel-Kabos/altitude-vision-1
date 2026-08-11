@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2 } from "lucide-react";
+import { Archive, BedDouble, Building2, CalendarDays, CreditCard, Edit3, ListChecks } from "lucide-react";
 import { toast } from "react-hot-toast";
 import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
 import DashboardKpis from "../../components/dashboard/DashboardKpis";
 import PropertyManagementCard from "../../components/dashboard/PropertyManagementCard";
-import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
+import { DashboardActionMenu, DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination, DashboardSection, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
 import { deactivateHotel, getHotelPortfolio } from "../../services/hotelService";
 import { getDashboardAnalytics } from "../../services/dashboardAnalyticsService";
 import { useAuth } from "../../context/AuthContext";
@@ -68,21 +68,27 @@ export default function ManageHotelsPage() {
       onSuccess={(result) => { setCreating(false); setEditing(null); toast.success(result?.proposedVersionPending ? "Les informations ordinaires sont enregistrées. Les modifications sensibles restent en attente dans Modération Hôtellerie ; la version publiée demeure active." : (editing ? "Établissement mis à jour." : "L’établissement a été soumis à la Modération Hôtellerie. Il apparaîtra ici après validation.")); load(); }}
       onCancel={() => { setCreating(false); setEditing(null); }} /></DashboardCard>}
 
-    <DashboardKpis loading={!analytics} note={analytics?.revenueBasis} items={[
-      { key: "active", label: "Établissements actifs", value: kpis.activeHotels },
-      { key: "closed", label: "Temporairement fermés", value: kpis.temporarilyClosedHotels },
-      { key: "available", label: "Chambres disponibles", value: kpis.availableRooms },
-      { key: "occupied", label: "Chambres occupées", value: kpis.occupiedRooms },
-      { key: "occupancy", label: "Taux d’occupation", value: `${kpis.occupancyRate || 0} %` },
-      { key: "checkin", label: "Arrivées du jour", value: kpis.checkInsToday },
-      { key: "checkout", label: "Départs du jour", value: kpis.checkOutsToday },
-      { key: "housekeeping", label: "Chambres à nettoyer", value: kpis.housekeeping },
-      { key: "maintenance", label: "Maintenances ouvertes", value: kpis.maintenance },
-      { key: "gross", label: "Montant brut encaissé", value: kpis.grossAmountCollected, format: "money" },
-      { key: "refunded", label: "Montant remboursé", value: kpis.refundedAmount, format: "money" },
-      { key: "net", label: "Montant net encaissé", value: kpis.netAmountCollected, format: "money" },
-      { key: "balance", label: "Solde à encaisser", value: kpis.remainingAmount, format: "money" },
-    ]} />
+    <DashboardSection title="Pilotage opérationnel" description="Disponibilité, occupation et tâches du jour.">
+      <DashboardKpis loading={!analytics} items={[
+        { key: "active", label: "Établissements actifs", value: kpis.activeHotels },
+        { key: "closed", label: "Temporairement fermés", value: kpis.temporarilyClosedHotels },
+        { key: "available", label: "Chambres disponibles", value: kpis.availableRooms },
+        { key: "occupied", label: "Chambres occupées", value: kpis.occupiedRooms },
+        { key: "occupancy", label: "Taux d’occupation", value: `${kpis.occupancyRate || 0} %` },
+        { key: "checkin", label: "Arrivées du jour", value: kpis.checkInsToday },
+        { key: "checkout", label: "Départs du jour", value: kpis.checkOutsToday },
+        { key: "housekeeping", label: "Chambres à nettoyer", value: kpis.housekeeping },
+        { key: "maintenance", label: "Maintenances ouvertes", value: kpis.maintenance },
+      ]} />
+    </DashboardSection>
+    <DashboardSection title="Situation financière" description="Montants officiels fournis par le service analytique.">
+      <DashboardKpis loading={!analytics} note={analytics?.revenueBasis} items={[
+        { key: "gross", label: "Montant brut encaissé", value: kpis.grossAmountCollected, format: "money" },
+        { key: "refunded", label: "Montant remboursé", value: kpis.refundedAmount, format: "money" },
+        { key: "net", label: "Montant net encaissé", value: kpis.netAmountCollected, format: "money" },
+        { key: "balance", label: "Solde à encaisser", value: kpis.remainingAmount, format: "money" },
+      ]} />
+    </DashboardSection>
 
     <DashboardToolbar label="Rechercher et filtrer">
       <input aria-label="Rechercher un établissement" value={filters.search} onChange={(event) => updateFilter("search", event.target.value)} placeholder="Nom de l’établissement" className="min-w-52 flex-1 rounded-lg border px-3 py-2 text-sm" />
@@ -103,13 +109,15 @@ export default function ManageHotelsPage() {
           priceLabel={hotel.minNightlyRate ? `Dès ${money.format(hotel.minNightlyRate)}` : undefined} capacity={hotel.totalCapacity}
           footer={<div className="mb-4 grid grid-cols-3 gap-2 text-center text-xs text-gray-600"><span><strong className="block text-base text-gray-900">{stats.totalRooms || hotel.totalRooms || 0}</strong>chambres</span><span><strong className="block text-base text-emerald-700">{stats.availableRooms || 0}</strong>disponibles</span><span><strong className="block text-base text-blue-700">{stats.occupancyRate || 0}%</strong>occupation</span></div>}
           actions={<>
-            <Link href={`/dashboard/etablissements/${hotel._id}`} className="rounded bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Voir</Link>
-            <button onClick={() => setEditing(hotel)} className="rounded bg-slate-100 px-3 py-2 text-xs font-semibold">Modifier</button>
-            <Link href={`/dashboard/hotels/${hotel._id}/rooms`} className="rounded bg-slate-100 px-3 py-2 text-xs font-semibold">Chambres</Link>
-            <Link href={`/dashboard/hotel-reservations?hotelId=${hotel._id}`} className="rounded bg-slate-100 px-3 py-2 text-xs font-semibold">Réservations</Link>
-            <Link href={`/dashboard/hotels/${hotel._id}/inventory`} className="rounded bg-slate-100 px-3 py-2 text-xs font-semibold">Calendrier</Link>
-            <Link href={`/dashboard/hotel-finance?hotelId=${hotel._id}`} className="rounded bg-slate-100 px-3 py-2 text-xs font-semibold">Finances</Link>
-            <button onClick={() => archive(hotel)} className="rounded bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Archiver</button>
+            <Link href={`/dashboard/etablissements/${hotel._id}`} className="rounded bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Ouvrir</Link>
+            <DashboardActionMenu label={`Actions pour ${hotel.name}`} items={[
+              { label: "Modifier", icon: Edit3, onSelect: () => setEditing(hotel) },
+              { label: "Chambres", icon: BedDouble, href: `/dashboard/hotels/${hotel._id}/rooms` },
+              { label: "Réservations", icon: ListChecks, href: `/dashboard/hotel-reservations?hotelId=${hotel._id}` },
+              { label: "Calendrier", icon: CalendarDays, href: `/dashboard/hotels/${hotel._id}/inventory` },
+              { label: "Finances", icon: CreditCard, href: `/dashboard/hotel-finance?hotelId=${hotel._id}` },
+              { label: "Archiver", icon: Archive, danger: true, onSelect: () => archive(hotel) },
+            ]} />
           </>} />;
       })}</div>}
     {totalPages > 1 && <DashboardPagination page={page} totalPages={totalPages} onPrevious={() => setPage((value) => value - 1)} onNext={() => setPage((value) => value + 1)} />}

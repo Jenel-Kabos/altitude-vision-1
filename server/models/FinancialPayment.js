@@ -1,5 +1,6 @@
 const mongoose = require('mongoose'); const C = require('../constants/financialConstants'); const ObjectId = mongoose.Schema.Types.ObjectId;
 const schema = new mongoose.Schema({
+  tenant: { type: ObjectId, ref: 'PlatformTenant', default: null, index: true },
   domain: { type: String, enum: C.FINANCIAL_DOMAINS, required: true }, establishmentType: { type: String, enum: C.FINANCIAL_ESTABLISHMENT_TYPES, required: true }, establishmentId: { type: ObjectId, required: true }, paymentReference: { type: String, required: true }, status: { type: String, enum: C.FINANCIAL_PAYMENT_STATUSES, default: 'pending' }, method: { type: String, enum: C.FINANCIAL_PAYMENT_METHODS, required: true }, provider: { type: String, default: 'manual' },
   currency: { type: String, enum: C.FINANCIAL_CURRENCIES, required: true }, amountMinor: { type: Number, required: true, min: 1 }, allocatedAmountMinor: { type: Number, default: 0, min: 0 }, refundedAmountMinor: { type: Number, default: 0, min: 0 }, availableAmountMinor: { type: Number, required: true, min: 0 },
   payer: { name: String, email: String, phone: String, userId: { type: ObjectId, ref: 'User' } }, subjectType: { type: String, enum: C.FINANCIAL_SUBJECT_TYPES }, subjectId: ObjectId,

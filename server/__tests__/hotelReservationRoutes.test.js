@@ -14,6 +14,22 @@ jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
 jest.mock('../services/zohoImapService', () => ({ pollZohoInbox: jest.fn() }));
 jest.mock('../services/alerteService', () => ({ verifierPaiementsEnRetard: jest.fn() }));
+jest.mock('../services/platformTenant/tenantContextService', () => ({
+  resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),
+  resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' }),
+  resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set(['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012']) }),
+}));
+jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
+  assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+  resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+}));
+jest.mock('../services/hotel/hotelAccessScopeService', () => ({
+  resolveHotelAccessScope: jest.fn(({ actor }) => actor?.role === 'Admin'
+    ? Promise.resolve({ globalAccess: false, hotelIds: ['707f1f77bcf86cd799439055'] })
+    : Promise.reject(new Error('Accès refusé'))),
+  assertOperationalHotelAccess: jest.fn().mockResolvedValue({}),
+  listAccessibleHotels: jest.fn().mockResolvedValue({ globalAccess: false, hotels: [] }),
+}));
 jest.mock('../utils/generateSitemap', () => jest.fn().mockResolvedValue('<xml/>'));
 jest.mock('../services/notificationService', () => ({
   notify: jest.fn().mockResolvedValue(), notifyStaff: jest.fn().mockResolvedValue(), notifyMany: jest.fn().mockResolvedValue(),
@@ -185,7 +201,7 @@ describe('Sécurité — accès inter-tenant interdit (Sprint C)', () => {
     expect(reservationService.createReservation).not.toHaveBeenCalled();
   });
 
-  test("200 — un admin peut créer une réservation pour n'importe quel hôtel (matrice existante)", async () => {
+  test('201 — un admin peut créer une réservation pour un hôtel attribué à son tenant', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
     Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, manager: OWNER_ID, name: 'Hôtel Test' });
     reservationService.createReservation.mockResolvedValue({ _id: RESERVATION_ID, reference: 'RES-2026-000002', source: 'admin_dashboard' });

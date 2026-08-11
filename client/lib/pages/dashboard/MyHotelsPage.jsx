@@ -12,8 +12,8 @@ import {
 } from "../../services/hotelService";
 import { HOTEL_PUBLICATION_STATUSES } from "../../constants/hotel";
 import HotelPropertyForm from "../../components/dashboard/HotelPropertyForm";
-import { Hotel } from "lucide-react";
-import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState } from "../../components/dashboard/DashboardUI";
+import { Archive, BedDouble, Copy, Edit3, Hotel, Send, Trash2 } from "lucide-react";
+import { DashboardActionMenu, DashboardBadge, DashboardCard, DashboardPage, DashboardPageHeader, DashboardState } from "../../components/dashboard/DashboardUI";
 
 const STATUS_CLASSES = {
   brouillon: "bg-gray-100 text-gray-700",
@@ -135,7 +135,7 @@ const MyHotelsPage = () => {
                 <p className="text-sm text-gray-500">{hotel.property?.address?.city}</p>
               </div>
               <div className="flex items-center gap-2">
-                {hotel.active === false && <span className="text-xs font-semibold px-2 py-1 rounded bg-gray-200 text-gray-600">Désactivé</span>}
+                {hotel.active === false && <DashboardBadge>Désactivé</DashboardBadge>}
                 <span className={`text-xs font-semibold px-2 py-1 rounded ${STATUS_CLASSES[hotel.publicationStatus] || "bg-gray-100"}`}>
                   {HOTEL_PUBLICATION_STATUSES.find((s) => s.value === hotel.publicationStatus)?.label || hotel.publicationStatus}
                 </span>
@@ -151,28 +151,21 @@ const MyHotelsPage = () => {
               <p className="text-red-600 text-sm mt-2">Motif du rejet : {hotel.rejectionReason}</p>
             )}
 
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap items-center gap-2 mt-3">
               <button onClick={() => { setCreating(false); setEditingHotel(hotel); }} className="bg-gold text-white px-3 py-1.5 rounded text-sm">
                 Modifier la fiche
               </button>
               <Link href={`/dashboard/hotels/${hotel._id}/room-categories`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
                 Catégories
               </Link>
-              <Link href={`/dashboard/hotels/${hotel._id}/rates`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
-                Tarifs
-              </Link>
-              {(hotel.publicationStatus === "brouillon" || hotel.publicationStatus === "rejete") && (
-                <button onClick={() => handleSubmit(hotel._id)} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm">
-                  Soumettre pour validation
-                </button>
-              )}
-              {hotel.publicationStatus === "publie" && (
-                <button onClick={() => handleToggleActive(hotel)} className={`px-3 py-1.5 rounded text-sm text-white ${hotel.active === false ? "bg-green-600" : "bg-gray-600"}`}>
-                  {hotel.active === false ? "Réactiver" : "Désactiver"}
-                </button>
-              )}
-              <button onClick={() => handleDuplicate(hotel._id)} className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded text-sm">Dupliquer</button>
-              <button onClick={() => handleDelete(hotel._id)} className="bg-red-600 text-white px-3 py-1.5 rounded text-sm">Supprimer</button>
+              <DashboardActionMenu label={`Actions pour ${hotel.name}`} items={[
+                { label: "Tarifs", icon: BedDouble, href: `/dashboard/hotels/${hotel._id}/rates` },
+                (hotel.publicationStatus === "brouillon" || hotel.publicationStatus === "rejete") && { label: "Soumettre pour validation", icon: Send, onSelect: () => handleSubmit(hotel._id) },
+                hotel.publicationStatus === "publie" && { label: hotel.active === false ? "Réactiver" : "Désactiver", icon: Archive, onSelect: () => handleToggleActive(hotel) },
+                { label: "Dupliquer", icon: Copy, onSelect: () => handleDuplicate(hotel._id) },
+                { label: "Modifier", icon: Edit3, onSelect: () => { setCreating(false); setEditingHotel(hotel); } },
+                { label: "Supprimer", icon: Trash2, danger: true, onSelect: () => handleDelete(hotel._id) },
+              ].filter(Boolean)} />
             </div>
           </DashboardCard>
         ))}

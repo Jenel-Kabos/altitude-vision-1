@@ -1,6 +1,21 @@
 const mongoose = require('mongoose');
 const Document = require('../models/Document');
 const Transaction = require('../models/Transaction');
+const Property = require('../models/Property');
+const { assertResourceTenant, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+
+const tenantId = (req) => req.platformTenant?._id;
+async function tenantDocumentFilter(req) {
+  const propertyIds = await Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+  return {
+    $or: [
+      { tenant: tenantId(req) },
+      { tenant: null, createdBy: { $in: req.tenantScopeUserIds || [] } },
+      { tenant: null, client: { $in: req.tenantScopeUserIds || [] } },
+      { tenant: null, relatedProperty: { $in: propertyIds } },
+    ],
+  };
+}
 
 // GL-DEBT-1 (Phase 4) — `{...req.query}` était injecté tel quel dans
 // Document.find(), acceptant n'importe quelle clé et n'importe quelle valeur
@@ -60,7 +75,7 @@ function buildDocumentFilter(query = {}) {
 // envoie `?page=`  bascule sur une liste bornée + `meta` (total/totalPages).
 exports.getAllDocuments = async (req, res) => {
   try {
-    const filter = buildDocumentFilter(req.query);
+    const filter = { $and: [buildDocumentFilter(req.query), await tenantDocumentFilter(req)] };
     const pageRaw = Number(req.query.page);
     const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : null;
     const limitRaw = Number(req.query.limit);
@@ -89,7 +104,7 @@ exports.getAllDocuments = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
+    res.status(error.statusCode || 500).json({ status: error.statusCode ? 'fail' : 'error', code: error.code, message: error.message });
   }
 };
 
@@ -98,7 +113,11 @@ exports.buildDocumentFilter = buildDocumentFilter;
 // --- CREATE A NEW DOCUMENT ---
 exports.createDocument = async (req, res) => {
   try {
-    const docData = { ...req.body, createdBy: req.user.id };
+    const docData = { ...req.body, tenant: tenantId(req), createdBy: req.user.id };
+    const attribution = await resolveResourceTenant({ resourceType: 'Document', resource: docData });
+    if (attribution.status !== 'resolved' || String(attribution.tenantId) !== String(tenantId(req))) {
+      return res.status(422).json({ status: 'fail', code: 'TENANT_RELATION_MISMATCH', message: 'Les relations du document ne correspondent pas au tenant actif.' });
+    }
 
     // --- Logic to calculate totals for Invoice/Quote ---
     if (docData.type === 'Devis' || docData.type === 'Facture') {
@@ -123,7 +142,7 @@ exports.createDocument = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(400).json({ status: 'fail', message: error.message });
+    res.status(error.statusCode || 400).json({ status: 'fail', code: error.code, message: error.message });
   }
 };
 
@@ -139,19 +158,30 @@ exports.getDocument = async (req, res) => {
         if (!document) {
             return res.status(404).json({ status: 'fail', message: 'No document found with that ID' });
         }
+        await assertResourceTenant({ resourceType: 'Document', resource: document, tenantId: tenantId(req) });
         res.status(200).json({
             status: 'success',
             data: { document }
         });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(error.statusCode || 500).json({ status: error.statusCode ? 'fail' : 'error', code: error.code, message: error.message });
     }
 };
 
 // --- UPDATE A DOCUMENT ---
 exports.updateDocument = async (req, res) => {
   try {
+    const existing = await Document.findById(req.params.id);
+    if (!existing) return res.status(404).json({ status: 'fail', message: 'No document found with that ID' });
+    await assertResourceTenant({ resourceType: 'Document', resource: existing, tenantId: tenantId(req) });
     const docData = { ...req.body };
+    delete docData.tenant;
+    const merged = { ...existing.toObject(), ...docData, tenant: existing.tenant || tenantId(req) };
+    const attribution = await resolveResourceTenant({ resourceType: 'Document', resource: merged });
+    if (attribution.status !== 'resolved' || String(attribution.tenantId) !== String(tenantId(req))) {
+      return res.status(422).json({ status: 'fail', code: 'TENANT_RELATION_MISMATCH', message: 'Les relations du document ne correspondent pas au tenant actif.' });
+    }
+    docData.tenant = existing.tenant || tenantId(req);
 
      // Recalculate totals if items are updated for an Invoice/Quote
      if ((docData.type === 'Devis' || docData.type === 'Facture') && docData.items) {
@@ -194,6 +224,7 @@ exports.deleteDocument = async (req, res) => {
         if (!document) {
             return res.status(404).json({ status: 'fail', message: 'No document found with that ID' });
         }
+        await assertResourceTenant({ resourceType: 'Document', resource: document, tenantId: tenantId(req) });
 
         // Un document porteur d'un businessOperationKey ou lié à une
         // Transaction finalisée est un artefact du Financial Core (facture

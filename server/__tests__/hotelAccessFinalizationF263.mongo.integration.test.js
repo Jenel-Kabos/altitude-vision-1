@@ -11,6 +11,7 @@ const { assertOperationalHotelAccess } = require('../services/hotel/hotelAccessS
 const { runHotelStaffAssignmentAudit } = require('../services/hotel/hotelStaffAssignmentAudit');
 const { runLegacyHotelManagerMigration } = require('../services/hotel/hotelStaffAssignmentMigration');
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
+const { createTenantFixture, tenantActor } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(180000);
 const id = () => new mongoose.Types.ObjectId();
@@ -175,13 +176,17 @@ test('aucune fuite inter-hôtel : le manager de l’hôtel A migré n’obtient 
 
 test('lectures concurrentes pendant un changement de manager restent cohérentes (jamais un état intermédiaire incohérent)', async () => {
   const hotel = await makeLegacyHotel();
+  const { tenant } = await createTenantFixture({ label: 'Hotel manager concurrency', bootstrap: admin });
+  hotel.tenant = tenant._id;
+  await hotel.save();
+  const tenantAdmin = tenantActor(admin, tenant);
   const oldManager = await User.create({ _id: hotel.manager, name: 'Ancien Manager Concurrent', email: `oldconcurrent${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire' });
   await ensureHotelManagerAssignment({ hotelId: hotel._id, managerId: oldManager._id, actor: admin });
   const newManager = await makeUser();
 
   const [, ...reads] = await Promise.all([
     changeHotelManager({ hotel, newManagerId: newManager._id, actor: admin }),
-    ...Array.from({ length: 4 }, () => assertOperationalHotelAccess({ actor: admin, hotelId: hotel._id, capability: CAP.HOTEL_MANAGE })),
+    ...Array.from({ length: 4 }, () => assertOperationalHotelAccess({ actor: tenantAdmin, hotelId: hotel._id, capability: CAP.HOTEL_MANAGE })),
   ]);
   reads.forEach((r) => expect(r).toEqual({})); // Admin reste toujours autorisé, quel que soit le timing
   expect(await HotelStaffAssignment.countDocuments({ hotel: hotel._id, assignmentRole: 'hotel_manager', status: 'active' })).toBe(1);

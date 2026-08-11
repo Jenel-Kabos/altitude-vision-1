@@ -268,7 +268,7 @@ const AdminDashboard = ({ children }) => {
         id="dashboard-navigation"
         aria-label="Navigation du tableau de bord"
         aria-hidden={isMobileViewport && !sidebarOpen}
-        inert={isMobileViewport && !sidebarOpen ? '' : undefined}
+        inert={isMobileViewport && !sidebarOpen ? true : undefined}
       >
 
         {/* Header sidebar */}

@@ -4,7 +4,8 @@ const ctrl = require('../controllers/financialController');
 const dashboardCtrl = require('../controllers/hotelFinancialDashboardController');
 const { STAFF_IMMO } = require('../utils/roles');
 const router = express.Router();
-router.use(auth.protect);
+const { requireTenantScope } = require('../middleware/tenantContext');
+router.use(auth.protect, requireTenantScope);
 // DOC-ARCH-2 — lecture seule, gardée au niveau route (pas d'établissement
 // précis à vérifier ici, contrairement aux routes /hotel/:hotelId/*).
 router.get('/accommodations/documents', auth.restrictTo(...STAFF_IMMO), ctrl.listAccommodationDocuments);

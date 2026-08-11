@@ -13,6 +13,7 @@ const AccommodationReservation = require('../models/AccommodationReservation');
 const HotelReservation = require('../models/HotelReservation');
 const financialRoutes = require('../routes/financialRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(120000);
 
@@ -24,12 +25,16 @@ app.use(errorHandler);
 const signToken = (id, tokenVersion = 0) => jwt.sign({ id, tokenVersion }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
 let counter = 0;
-const makeUser = (overrides = {}) => {
+let tenantFixture;
+const makeUser = async (overrides = {}) => {
   counter += 1;
-  return User.create({ name: 'Test User', email: `finacc${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
+  const user = await User.create({ name: 'Test User', email: `finacc${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
+  await addTenantMember({ tenant: tenantFixture.tenant, user, bootstrap: tenantFixture.bootstrap });
+  return user;
 };
 
 const makeAccommodationInvoice = (createdBy, overrides = {}) => FinancialDocument.create({
+  tenant: tenantFixture.tenant._id,
   domain: 'real_estate', establishmentType: 'Accommodation', establishmentId: new mongoose.Types.ObjectId(),
   documentType: 'invoice', status: 'issued', currency: 'XAF',
   subjectType: 'AccommodationReservation', subjectId: new mongoose.Types.ObjectId(),
@@ -39,6 +44,7 @@ const makeAccommodationInvoice = (createdBy, overrides = {}) => FinancialDocumen
 });
 
 beforeAll(startFinancialMongo);
+beforeEach(async () => { tenantFixture = await createTenantFixture({ label: 'Financial accommodation documents' }); });
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);
 
@@ -57,6 +63,7 @@ test.each(['Admin', 'GestionnaireImmobilier', 'Collaborateur'])('200 — %s peut
   const staff = await makeUser({ role });
   const invoice = await makeAccommodationInvoice(staff._id);
   await FinancialDocument.create({
+    tenant: tenantFixture.tenant._id,
     domain: 'hotel', establishmentType: 'Hotel', establishmentId: new mongoose.Types.ObjectId(), documentType: 'invoice',
     status: 'issued', currency: 'XAF', subjectType: 'HotelReservation', subjectId: new mongoose.Types.ObjectId(),
     totalMinor: 1000, businessOperationKey: `test:hotel-invoice:${Date.now()}`, createdBy: staff._id,
@@ -84,7 +91,7 @@ test('un voyageur peut lire uniquement la facture de sa réservation Accommodati
   const owner = await makeUser({ role: 'Proprietaire' }); const reservationId = new mongoose.Types.ObjectId();
   const invoice = await makeAccommodationInvoice(owner._id, { subjectId: reservationId });
   await AccommodationReservation.create({
-    _id: reservationId, accommodation: invoice.establishmentId, guest: guest._id, owner: owner._id,
+    _id: reservationId, tenant: tenantFixture.tenant._id, accommodation: invoice.establishmentId, guest: guest._id, owner: owner._id,
     checkInDate: new Date('2026-09-01'), checkOutDate: new Date('2026-09-03'), nights: 2,
     guestCount: 1, adults: 1, total: 5000000, financialDocument: invoice._id, createdBy: guest._id,
   });
@@ -101,7 +108,7 @@ test('un voyageur hôtel peut lire uniquement la facture de sa propre réservati
   const guest = await makeUser({ role: 'Client' }); const outsider = await makeUser({ role: 'Client' });
   const hotelId = new mongoose.Types.ObjectId();
   const reservation = await HotelReservation.create({
-    hotel: hotelId, roomCategory: new mongoose.Types.ObjectId(), guestUser: guest._id,
+    tenant: tenantFixture.tenant._id, hotel: hotelId, roomCategory: new mongoose.Types.ObjectId(), guestUser: guest._id,
     guest: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test', country: 'CG' },
     checkInDate: new Date('2026-10-01'), checkOutDate: new Date('2026-10-03'), roomsCount: 1, adults: 1,
     unitPrice: 30000, subtotal: 60000, totalAmount: 60000, currency: 'XAF',
@@ -109,7 +116,7 @@ test('un voyageur hôtel peut lire uniquement la facture de sa propre réservati
     status: 'confirmed', source: 'owner_dashboard', createdBy: guest._id,
   });
   const invoice = await FinancialDocument.create({
-    domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotelId, documentType: 'invoice', status: 'issued', currency: 'XAF',
+    tenant: tenantFixture.tenant._id, domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotelId, documentType: 'invoice', status: 'issued', currency: 'XAF',
     subjectType: 'HotelReservation', subjectId: reservation._id, totalMinor: 60000,
     businessOperationKey: `test:hotel-personal:${Date.now()}`, createdBy: guest._id,
   });

@@ -21,6 +21,47 @@ const RentalManagement = require('../models/RentalManagement');
 const Transaction = require('../models/Transaction');
 const Contrat = require('../models/Contrat');
 const { STAFF_IMMO } = require('../utils/roles');
+// TENANT-CERT-2 — Property n'appelait jusqu'ici jamais la couche canonique
+// d'attribution tenant (tenantResourceAttributionService), déjà utilisée par
+// Hotel/Accommodation/Finance/Documents/Conversations : un Admin de
+// n'importe quel tenant pouvait modifier/supprimer/modérer/désigner comme
+// recommandé n'importe quel bien d'un AUTRE tenant, uniquement parce que
+// `req.user.role === 'Admin'` (vulnérabilité confirmée par test adversarial,
+// voir __tests__/tenantCert2.property.adversarial.mongo.integration.test.js).
+// Un propriétaire agissant sur SON bien reste protégé par l'égalité
+// `property.owner === req.user.id`, qui ne nécessite aucune vérification
+// supplémentaire — seul le contournement par rôle Admin manquait de preuve
+// tenant.
+const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+
+// Pure prédicat, ne touche jamais `res` — utilisé par getProperty pour
+// calculer `isAdmin` sans risquer de laisser un `res.statusCode` erroné
+// derrière soi sur le chemin où la propriété est finalement bien visible
+// (bien public, ou propriétaire légitime).
+async function isPropertyInActorTenant(req, property) {
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+  if (!tenant) return false;
+  return assertResourceTenant({ resourceType: 'Property', resource: property, tenantId: tenant._id })
+    .then(() => true).catch(() => false);
+}
+
+// `res` est explicitement positionné AVANT le throw (même convention que le
+// reste de ce fichier, ex. updateProperty ci-dessous) : errorMiddleware.js
+// dérive son statusCode de `res.statusCode`, jamais de `err.statusCode`.
+async function assertPropertyTenantAccess(req, res, property) {
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+  if (!tenant) {
+    res.status(403);
+    throw new Error('Contexte tenant requis ou ambigu pour cette action.');
+  }
+  try {
+    await assertResourceTenant({ resourceType: 'Property', resource: property, tenantId: tenant._id });
+  } catch (error) {
+    res.status(error.statusCode || 403);
+    throw error;
+  }
+}
 
 /**
  * Projection publique de SaleManagement — jamais le document complet côté
@@ -553,9 +594,16 @@ const getProperty = asyncHandler(async (req, res) => {
     throw new Error('Bien immobilier non trouvé.');
   }
 
-  const isAdmin = req.user && req.user.role === 'Admin';
   const isOwner = req.user && property.owner &&
     property.owner._id.toString() === req.user.id.toString();
+  // Le rôle Admin n'accorde la visibilité privilégiée (bien non publié) qu'à
+  // l'intérieur du tenant de l'Admin — jamais un catalogue interne global.
+  // Résolu une seule fois pour tout le reste de la fonction (y compris la
+  // branche hébergement plus bas), afin qu'aucune combinaison d'état ne
+  // retombe silencieusement sur l'ancien bypass non vérifié.
+  const isAdmin = (req.user && req.user.role === 'Admin' && !isOwner)
+    ? await isPropertyInActorTenant(req, property)
+    : Boolean(req.user && req.user.role === 'Admin');
 
   // Les documents historiques hydratés par Mongoose reçoivent la valeur par
   // défaut "Disponible" ; le test explicite conserve néanmoins la lecture
@@ -722,6 +770,9 @@ const updateProperty = asyncHandler(async (req, res) => {
     res.status(403);
     throw new Error('Vous ne pouvez modifier que vos propres biens.');
   }
+  // Le rôle Admin autorise l'action fonctionnelle, jamais à lui seul la
+  // frontière tenant — voir assertPropertyTenantAccess en tête de fichier.
+  if (isAdmin && !isOwner) await assertPropertyTenantAccess(req, res, property);
 
   // Champs interdits à la modification directe
   const excludedFields = ['_id', 'owner', 'createdAt', 'reviewedAt', 'images'];
@@ -874,6 +925,15 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
     throw new Error('Action invalide (validate ou reject attendu).');
   }
 
+  const target = await Property.findById(id);
+  if (!target) {
+    res.status(404);
+    throw new Error('Propriété non trouvée.');
+  }
+  // Modération = action Admin par capacité, jamais un accès global — voir
+  // assertPropertyTenantAccess en tête de fichier.
+  await assertPropertyTenantAccess(req, res, target);
+
   const updatedProperty = await Property.findByIdAndUpdate(
     id,
     { statusAdmin: newStatusAdmin, reviewedAt: Date.now() },
@@ -966,6 +1026,7 @@ const deleteProperty = asyncHandler(async (req, res) => {
     res.status(403);
     throw new Error('Vous ne pouvez supprimer que vos propres biens.');
   }
+  if (isAdmin && !isOwner) await assertPropertyTenantAccess(req, res, property);
 
   const [transaction, contract] = await Promise.all([
     Transaction.exists({ property: property._id }),
@@ -1000,6 +1061,7 @@ const adminDeleteProperty = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Propriété non trouvée.');
   }
+  await assertPropertyTenantAccess(req, res, property);
   if (property.hasReservationHistory) {
     res.status(409);
     throw new Error('Ce bien possède un historique de réservation et ne peut pas être supprimé physiquement.');
@@ -1023,6 +1085,13 @@ const adminDeleteProperty = asyncHandler(async (req, res) => {
  * @route PATCH /api/properties/:id/recommande
  */
 const setRecommande = asyncHandler(async (req, res) => {
+  const target = await Property.findById(req.params.id);
+  if (!target) {
+    res.status(404);
+    throw new Error('Propriété non trouvée.');
+  }
+  await assertPropertyTenantAccess(req, res, target);
+
   const property = await Property.findByIdAndUpdate(
     req.params.id,
     { recommande: !!req.body.recommande },

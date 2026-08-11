@@ -9,10 +9,20 @@ const assignmentService = require('../services/hotel/hotelStaffAssignmentService
 const { resolveHotelAccessScope, assertHotelCapability, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
 const authz = require('../services/finance/financialAuthorizationService');
 const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
+const { createTenantFixture, addTenantMember, tenantActor } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(120000);
 const id = () => new mongoose.Types.ObjectId();
 const admin = { role: 'Admin', _id: id() };
+let tenantFixture;
+async function ensureTenant() {
+  if (!tenantFixture) {
+    tenantFixture = await createTenantFixture({ label: 'Hotel staff', bootstrap: admin });
+    Object.assign(admin, tenantActor(admin, tenantFixture.tenant));
+  }
+  return tenantFixture;
+}
+const actorOf = (user) => tenantActor(user, tenantFixture.tenant);
 
 // Format d'email volontairement simple (sans tiret ni TLD long) : le regex de validation
 // de User.js est vulnérable au ReDoS catastrophique sur certaines combinaisons
@@ -21,15 +31,19 @@ const admin = { role: 'Admin', _id: id() };
 let userCounter = 0;
 async function makeUser(overrides = {}) {
   userCounter += 1;
-  return User.create({ name: 'Ada Lovelace', email: `staffuser${userCounter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Collaborateur', ...overrides });
+  const context = await ensureTenant();
+  const user = await User.create({ name: 'Ada Lovelace', email: `staffuser${userCounter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Collaborateur', ...overrides });
+  await addTenantMember({ tenant: context.tenant, user, bootstrap: admin });
+  return user;
 }
 async function makeHotel(overrides = {}) {
   const managerId = id();
-  return Hotel.create({ name: 'Hôtel F2.6', brand: 'F26', email: 'f26@example.test', manager: managerId, createdBy: managerId, ...overrides });
+  const { tenant } = await ensureTenant();
+  return Hotel.create({ name: 'Hôtel F2.6', tenant: tenant._id, brand: 'F26', email: 'f26@example.test', manager: managerId, createdBy: managerId, ...overrides });
 }
 
 beforeAll(async () => { await startFinancialMongo(); await HotelStaffAssignment.syncIndexes(); });
-afterEach(clearFinancialMongo);
+afterEach(async () => { await clearFinancialMongo(); tenantFixture = null; delete admin.platformTenant; delete admin.tenantScopeUserIds; });
 afterAll(stopFinancialMongo);
 
 test('crée un rattachement, journalise dans ActionLog (historique) et respecte l’index d’unicité actif', async () => {
@@ -60,7 +74,7 @@ test('cycle suspension → réactivation → révocation reste auditable et imm�
   const hotel = await makeHotel();
   const user = await makeUser();
   const assignment = await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: user._id, assignmentRole: 'maintenance' });
-  const staffActor = { role: 'Collaborateur', _id: user._id };
+  const staffActor = actorOf(user);
 
   await assertHotelCapability({ actor: staffActor, requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.MAINTENANCE_VIEW, hotelId: hotel._id });
 
@@ -87,8 +101,8 @@ test('période de validité : rattachement futur et rattachement expiré n’acc
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: futureUser._id, assignmentRole: 'viewer', validFrom: new Date(Date.now() + 7 * 86400000) });
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: expiredUser._id, assignmentRole: 'viewer', validFrom: new Date(Date.now() - 10 * 86400000), validUntil: new Date(Date.now() - 1000) });
 
-  await expect(assertHotelCapability({ actor: { role: 'Collaborateur', _id: futureUser._id }, requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.HOTEL_VIEW, hotelId: hotel._id })).rejects.toMatchObject({ code: 'HOTEL_ACCESS_DENIED' });
-  await expect(assertHotelCapability({ actor: { role: 'Collaborateur', _id: expiredUser._id }, requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.HOTEL_VIEW, hotelId: hotel._id })).rejects.toMatchObject({ code: 'HOTEL_ACCESS_DENIED' });
+  await expect(assertHotelCapability({ actor: actorOf(futureUser), requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.HOTEL_VIEW, hotelId: hotel._id })).rejects.toMatchObject({ code: 'HOTEL_ACCESS_DENIED' });
+  await expect(assertHotelCapability({ actor: actorOf(expiredUser), requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.HOTEL_VIEW, hotelId: hotel._id })).rejects.toMatchObject({ code: 'HOTEL_ACCESS_DENIED' });
 });
 
 test('un utilisateur rattaché à plusieurs hôtels obtient uniquement ces hôtels dans son scope', async () => {
@@ -110,14 +124,14 @@ test('ressource hôtel étrangère : un rattachement sur l’hôtel A ne donne j
   const hotelB = await makeHotel();
   const user = await makeUser();
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotelA._id, userId: user._id, assignmentRole: 'reception' });
-  await expect(assertHotelCapability({ actor: { role: 'Collaborateur', _id: user._id }, requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.RESERVATION_VIEW, hotelId: hotelB._id })).rejects.toMatchObject({ code: 'HOTEL_ACCESS_DENIED' });
+  await expect(assertHotelCapability({ actor: actorOf(user), requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.RESERVATION_VIEW, hotelId: hotelB._id })).rejects.toMatchObject({ code: 'HOTEL_ACCESS_DENIED' });
 });
 
 test('accès dashboard, document financier et paiement via un rattachement local "finance" (sans être Hotel.manager)', async () => {
   const hotel = await makeHotel();
   const financeUser = await makeUser();
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: financeUser._id, assignmentRole: 'finance' });
-  const actor = { role: 'Collaborateur', _id: financeUser._id };
+  const actor = actorOf(financeUser);
 
   const dashboardScope = await resolveHotelAccessScope({ actor, requiredCapability: 'financial.hotel.dashboard.view', requestedHotelId: hotel._id });
   expect(dashboardScope.hotelIds).toEqual([String(hotel._id)]);
@@ -127,14 +141,14 @@ test('accès dashboard, document financier et paiement via un rattachement local
   // Un rattachement "housekeeping" (sans capacité finance) sur ce même hôtel doit être refusé.
   const housekeepingUser = await makeUser();
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: housekeepingUser._id, assignmentRole: 'housekeeping' });
-  await expect(authz.assertCanViewFinancialDocument({ role: 'Collaborateur', _id: housekeepingUser._id }, hotel._id)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
+  await expect(authz.assertCanViewFinancialDocument(actorOf(housekeepingUser), hotel._id)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
 });
 
 test('prévention d’escalade : un manager ne peut ni s’auto-modifier ni déléguer une capacité qu’il ne détient pas ni attribuer l’override financier', async () => {
   const hotel = await makeHotel();
   const managerUser = await makeUser();
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: managerUser._id, assignmentRole: 'hotel_manager', capabilities: [HOTEL_OPERATIONAL_CAPABILITIES.STAFF_ASSIGNMENT_MANAGE] });
-  const managerActor = { role: 'Collaborateur', _id: managerUser._id };
+  const managerActor = actorOf(managerUser);
 
   // Auto-escalade bloquée.
   await expect(assignmentService.createHotelStaffAssignment({ actor: managerActor, hotelId: hotel._id, userId: managerUser._id, assignmentRole: 'viewer' })).rejects.toMatchObject({ code: 'HOTEL_ASSIGNMENT_SELF_ESCALATION' });
@@ -158,7 +172,7 @@ test('aucune fuite : un document financier de l’hôtel B n’apparaît jamais 
   const userA = await makeUser();
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotelA._id, userId: userA._id, assignmentRole: 'finance' });
   const docB = await FinancialDocument.create({ domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotelB._id, documentType: 'invoice', status: 'issued', currency: 'XAF', subjectType: 'HotelReservation', subjectId: id(), totalMinor: 5000, balanceMinor: 5000, businessOperationKey: `f26-${id()}`, createdBy: hotelB.manager });
-  await expect(authz.assertCanViewFinancialDocument({ role: 'Collaborateur', _id: userA._id }, docB.establishmentId)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
+  await expect(authz.assertCanViewFinancialDocument(actorOf(userA), docB.establishmentId)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
 });
 
 test('lectures concurrentes pendant une révocation ne laissent jamais un accès fantôme', async () => {
@@ -167,6 +181,6 @@ test('lectures concurrentes pendant une révocation ne laissent jamais un accès
   const assignment = await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: user._id, assignmentRole: 'inspector' });
   await assignmentService.revokeHotelStaffAssignment({ actor: admin, assignmentId: assignment._id, reason: 'Ressource réaffectée définitivement ailleurs.' });
 
-  const reads = await Promise.allSettled(Array.from({ length: 8 }, () => assertHotelCapability({ actor: { role: 'Collaborateur', _id: user._id }, requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.INSPECTION_VIEW, hotelId: hotel._id })));
+  const reads = await Promise.allSettled(Array.from({ length: 8 }, () => assertHotelCapability({ actor: actorOf(user), requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.INSPECTION_VIEW, hotelId: hotel._id })));
   expect(reads.every((r) => r.status === 'rejected')).toBe(true);
 });

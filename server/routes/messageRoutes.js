@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 const { upload } = require('../config/cloudinary');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 const uploadAttachments = upload.array('attachments', 5);
 
@@ -17,27 +18,29 @@ const {
     getConversations,
 } = require('../controllers/messageController');
 
+router.use(protect, requireTenantScope);
+
 // ==========================================================
 // --- 📌 Routes spécifiques (Statiques) ---
 // ==========================================================
 
 // Liste des conversations
-router.get('/conversations', protect, getConversations);
+router.get('/conversations', getConversations);
 
 // ==========================================================
 // --- 🔗 Routes dynamiques ---
 // ==========================================================
 
 // Envoyer un message dans une conversation
-router.post('/', protect, uploadAttachments, sendMessage); 
+router.post('/', uploadAttachments, sendMessage);
 
 // Récupérer les messages d'une conversation spécifique
-router.get('/:conversationId', protect, getMessages); 
+router.get('/:conversationId', getMessages);
 
 // Marquer un message comme lu
-router.patch('/:messageId/read', protect, markAsRead);
+router.patch('/:messageId/read', markAsRead);
 
 // Supprimer un message
-router.delete('/:messageId', protect, deleteMessage);
+router.delete('/:messageId', deleteMessage);
 
 module.exports = router;

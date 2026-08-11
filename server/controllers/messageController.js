@@ -11,6 +11,7 @@ const { getIO } = require('../socket');
 const { notify, notifyStaff } = require('../services/notificationService');
 const { ALL_STAFF } = require('../utils/roles');
 const logger = require('../utils/logger');
+const { assertResourceTenant, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
 
 /**
  * @description Envoyer un message dans une conversation
@@ -81,6 +82,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             res.status(404);
             throw new Error('Conversation non trouvée.');
         }
+        await assertResourceTenant({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
 
         if (convDoc.isStaffInbox) {
             // CAS 2 : boîte partagée staff
@@ -116,6 +118,11 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             res.status(404);
             throw new Error('Destinataire non trouvé.');
         }
+        const receiverTenant = await resolveResourceTenant({ resourceType: 'User', resource: receiver });
+        if (receiverTenant.status !== 'resolved' || String(receiverTenant.tenantId) !== String(req.platformTenant._id)) {
+            res.status(404);
+            throw new Error('Destinataire non trouvé.');
+        }
     }
 
     // --- 3. Créer le message ---
@@ -125,6 +132,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         conversation: convDoc?._id || null,
         content,
         attachments: attachmentsData,
+        tenant: req.platformTenant._id,
     });
 
     await message.populate('sender', 'name email avatar');
@@ -140,6 +148,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         if (!convDoc) {
             convDoc = await Conversation.create({
                 participants: [req.user.id, targetUserId],
+                tenant: req.platformTenant._id,
             });
         }
     }
@@ -227,12 +236,16 @@ exports.getMessages = asyncHandler(async (req, res) => {
   let otherUserId = conversationId;
   const convDoc = await Conversation.findById(conversationId);
   if (convDoc) {
+    await assertResourceTenant({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
     const otherParticipant = convDoc.participants.find(
       (p) => p.toString() !== req.user.id.toString()
     );
     if (otherParticipant) {
       otherUserId = otherParticipant.toString();
     }
+  } else {
+    res.status(404);
+    throw new Error('Conversation non trouvée.');
   }
 
   // Requête prioritaire par conversation._id, fallback sender/receiver pour messages legacy
@@ -299,6 +312,8 @@ exports.markAsRead = asyncHandler(async (req, res) => {
     throw new Error('Message non trouvé.');
   }
 
+  await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+
   if (message.receiver.toString() !== req.user.id) {
     res.status(403);
     throw new Error('Non autorisé.');
@@ -331,6 +346,8 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
     throw new Error('Message non trouvé.');
   }
 
+  await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+
   if (
     message.sender.toString() !== req.user.id &&
     message.receiver.toString() !== req.user.id
@@ -357,12 +374,22 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
 exports.getConversations = asyncHandler(async (req, res) => {
   logger.info(`💬 [getConversations] User: ${req.user.id}`);
 
-  const messages = await Message.find({
-    $or: [{ sender: req.user.id }, { receiver: req.user.id }],
+  const candidates = await Message.find({
+    $and: [
+      { $or: [{ sender: req.user.id }, { receiver: req.user.id }] },
+      { $or: [{ tenant: req.platformTenant._id }, { tenant: null }] },
+    ],
   })
     .populate('sender', 'name email avatar')
     .populate('receiver', 'name email avatar')
     .sort({ createdAt: -1 });
+  const messages = [];
+  for (const message of candidates) {
+    try {
+      await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+      messages.push(message);
+    } catch {}
+  }
 
   const conversationsMap = new Map();
 

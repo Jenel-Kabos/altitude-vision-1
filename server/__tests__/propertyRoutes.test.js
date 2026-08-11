@@ -8,6 +8,23 @@ jest.mock('../models/SaleManagement');
 jest.mock('../models/RentalManagement');
 jest.mock('../models/Transaction');
 jest.mock('../models/Contrat');
+// TENANT-CERT-2 — propertyController.js vérifie désormais la frontière
+// tenant pour tout accès Admin non-propriétaire (voir
+// __tests__/tenantCert2.adversarial.mongo.integration.test.js pour la
+// vérification réelle, y compris le refus effectif d'un Admin hors
+// tenant). Mocké ici en "toujours résolu" pour préserver l'intention des
+// tests ci-dessous (logique métier SaleManagement/RentalManagement, sans
+// dépendre d'une vraie connexion Mongo).
+jest.mock('../services/platformTenant/tenantContextService', () => ({
+  resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439001' }),
+  resolveRootOrgUnitId: jest.fn().mockResolvedValue('607f1f77bcf86cd799439001'),
+  resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),
+  resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set() }),
+}));
+jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
+  assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+  resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+}));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));

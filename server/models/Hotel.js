@@ -27,6 +27,7 @@ const HOTEL_SERVICE_KEYS = [
 
 const hotelSchema = new mongoose.Schema(
   {
+    tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
     name: {
       type: String,
       required: [true, "Le nom de l'hôtel est requis."],

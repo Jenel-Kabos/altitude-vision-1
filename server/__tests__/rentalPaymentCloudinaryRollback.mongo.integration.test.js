@@ -45,7 +45,11 @@ function lostCasQuery() {
 }
 
 beforeAll(startFinancialMongo);
-afterEach(() => { clearFinancialMongo(); mockUploadToCloudinary.mockReset(); mockDestroyFromCloudinary.mockReset(); });
+afterEach(async () => {
+  await clearFinancialMongo();
+  mockUploadToCloudinary.mockReset();
+  mockDestroyFromCloudinary.mockReset();
+});
 afterAll(stopFinancialMongo);
 
 async function fixtureEcheance() {

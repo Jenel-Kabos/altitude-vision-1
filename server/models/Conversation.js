@@ -3,6 +3,7 @@
 const mongoose = require('mongoose');
 
 const conversationSchema = new mongoose.Schema({
+    tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
     participants: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

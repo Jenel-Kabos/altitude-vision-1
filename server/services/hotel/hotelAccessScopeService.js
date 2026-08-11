@@ -3,6 +3,7 @@ const Hotel = require('../../models/Hotel');
 const HotelStaffAssignment = require('../../models/HotelStaffAssignment');
 const { DEFAULT_CAPABILITIES_BY_ASSIGNMENT_ROLE } = require('../../constants/hotelAccessConstants');
 const { fail } = require('./hotelAccessError');
+const { assertResourceTenant } = require('../platformTenant/tenantResourceAttributionService');
 
 const id = (value) => String(value?._id || value?.id || value || '');
 
@@ -45,14 +46,30 @@ async function resolveHotelAccessScope({ actor, requiredCapability, requestedHot
   if (!actor) fail('HOTEL_ACCESS_DENIED', 'Authentification requise.', 401);
 
   if (actor.role === 'Admin') {
+    if (!actor.platformTenant) fail('HOTEL_SCOPE_REQUIRED', 'Contexte tenant requis.', 403);
     if (requestedHotelId) {
       const hotel = await (session ? Hotel.findById(requestedHotelId).session(session) : Hotel.findById(requestedHotelId));
       if (!hotel) fail('HOTEL_ACCESS_DENIED', 'Hôtel introuvable.', 404);
-      // Un Admin qui filtre sur un hôtel précis reste scopé à cet hôtel : ce n'est
-      // une consolidation globale que lorsqu'aucun hotelId n'est demandé.
+      await assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId: actor.platformTenant._id || actor.platformTenant })
+        .catch(() => fail('HOTEL_ACCESS_DENIED', 'Hôtel introuvable.', 404));
       return { globalAccess: false, hotelIds: [String(requestedHotelId)], assignment: null, effectiveCapabilities: null };
     }
-    return { globalAccess: true, hotelIds: null, assignment: null, effectiveCapabilities: null };
+    const tenantId = actor.platformTenant._id || actor.platformTenant;
+    const candidates = await Hotel.find({ $or: [
+      { tenant: tenantId },
+      { tenant: null, manager: { $in: actor.tenantScopeUserIds || [id(actor)] } },
+      { tenant: null, createdBy: { $in: actor.tenantScopeUserIds || [id(actor)] } },
+    ] }).select('tenant manager property createdBy').lean();
+    const allowed = [];
+    for (const hotel of candidates) {
+      try {
+        await assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId });
+        allowed.push(String(hotel._id));
+      } catch {}
+    }
+    if (allowed.length === 0) fail('HOTEL_SCOPE_REQUIRED', "Aucun hôtel accessible dans ce tenant.", 403);
+    if (allowed.length > 1) fail('HOTEL_SCOPE_REQUIRED', 'Plusieurs hôtels accessibles : un hotelId explicite est requis.', 409);
+    return { globalAccess: false, hotelIds: allowed, assignment: null, effectiveCapabilities: null };
   }
 
   const { effectiveAssignments, legacyHotels } = await loadAccessSources(id(actor), { session });
@@ -98,8 +115,21 @@ async function assertHotelCapability({ actor, requiredCapability, hotelId, sessi
 /** Liste les hôtels accessibles à l'acteur (pour le sélecteur frontend), sans capacité requise. */
 async function listAccessibleHotels(actor) {
   if (actor.role === 'Admin') {
-    const hotels = await Hotel.find({}).select('_id name brand').sort({ name: 1 }).lean();
-    return { globalAccess: true, hotels };
+    if (!actor.platformTenant) return { globalAccess: false, hotels: [] };
+    const tenantId = actor.platformTenant._id || actor.platformTenant;
+    const candidates = await Hotel.find({ $or: [
+      { tenant: tenantId },
+      { tenant: null, manager: { $in: actor.tenantScopeUserIds || [id(actor)] } },
+      { tenant: null, createdBy: { $in: actor.tenantScopeUserIds || [id(actor)] } },
+    ] }).select('_id tenant manager property createdBy name brand').sort({ name: 1 }).lean();
+    const hotels = [];
+    for (const hotel of candidates) {
+      try {
+        await assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId });
+        hotels.push(hotel);
+      } catch {}
+    }
+    return { globalAccess: false, hotels };
   }
   const { effectiveAssignments, legacyHotels } = await loadAccessSources(id(actor));
   const hotelIdSet = new Set([...effectiveAssignments.map((a) => String(a.hotel)), ...legacyHotels.map((h) => String(h._id))]);
@@ -121,6 +151,13 @@ async function assertOperationalHotelAccess({ actor, hotelId, capability }) {
   if (!actor) return { error: 403 };
   const hotel = await Hotel.findById(hotelId);
   if (!hotel) return { error: 404 };
+  if (!actor.platformTenant && hotel.manager && String(hotel.manager) === id(actor)) return {};
+  if (!actor.platformTenant) return { error: 403 };
+  try {
+    await assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId: actor.platformTenant._id || actor.platformTenant });
+  } catch {
+    return { error: 404 };
+  }
   if (actor.role === 'Admin' || (hotel.manager && String(hotel.manager) === id(actor))) return {};
   const scope = await resolveHotelAccessScope({ actor, requiredCapability: capability, requestedHotelId: hotelId }).catch(() => null);
   if (!scope) return { error: 403 };

@@ -4,6 +4,7 @@ const { ALL_STAFF } = require('../utils/roles');
 const router = express.Router();
 
 const authController = require('../controllers/authController');
+const { requireTenantScope } = require('../middleware/tenantContext');
 const { restrictTo } = require('../middleware/authMiddleware');
 const {
   getConversationById,
@@ -19,7 +20,7 @@ const {
 } = require('../controllers/conversationController');
 
 // 🔒 Toutes les routes nécessitent un token valide
-router.use(authController.protect);
+router.use(authController.protect, requireTenantScope);
 
 // ── Routes statiques (AVANT /:conversationId pour éviter les conflits) ──────
 

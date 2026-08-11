@@ -1,4 +1,7 @@
 jest.mock('../models/Hotel');
+jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
+  assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+}));
 const Hotel = require('../models/Hotel');
 const FinancialDocument = require('../models/FinancialDocument');
 const FinancialPayment = require('../models/FinancialPayment');
@@ -7,6 +10,7 @@ const { buildHotelReservationInvoiceLines, assertReservationCanBeBilled } = requ
 
 const HOTEL_ID = '507f1f77bcf86cd799439012';
 const OWNER_ID = '507f1f77bcf86cd799439015';
+const TENANT_ID = '607f1f77bcf86cd799439001';
 const query = (value) => ({ select: jest.fn().mockResolvedValue(value) });
 
 describe('Financial Core — isolation et permissions', () => {
@@ -44,9 +48,9 @@ describe('Financial Core — isolation et permissions', () => {
     Hotel.findById.mockReturnValue(query({ _id: HOTEL_ID, manager: OWNER_ID }));
     await expect(authz.assertCanCreateFinancialDraft({ id: '507f1f77bcf86cd799439099', role: 'Collaborateur' }, HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED', statusCode: 403 });
   });
-  test('Admin conserve une portée globale et toutes les capacités', async () => {
-    Hotel.findById.mockReturnValue(query({ _id: HOTEL_ID, manager: OWNER_ID }));
-    await expect(authz.assertCanIssueFinancialDocument({ id: '507f1f77bcf86cd799439099', role: 'Admin' }, HOTEL_ID)).resolves.toMatchObject({ _id: HOTEL_ID });
+  test('Admin conserve toutes les capacités dans son tenant', async () => {
+    Hotel.findById.mockReturnValue(query({ _id: HOTEL_ID, tenant: TENANT_ID, manager: OWNER_ID }));
+    await expect(authz.assertCanIssueFinancialDocument({ id: '507f1f77bcf86cd799439099', role: 'Admin', platformTenant: { _id: TENANT_ID } }, HOTEL_ID)).resolves.toMatchObject({ _id: HOTEL_ID });
     expect(Object.values(authz.CAPABILITIES).every((capability) => authz.hasFinancialCapability({ role: 'Admin' }, capability))).toBe(true);
   });
   test('le hash invité et les métadonnées fournisseur sont exclus par défaut', () => {

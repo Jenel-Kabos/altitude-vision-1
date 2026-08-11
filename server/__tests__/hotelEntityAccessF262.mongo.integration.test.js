@@ -7,19 +7,32 @@ const assignmentService = require('../services/hotel/hotelStaffAssignmentService
 const { assertOperationalHotelAccess, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
 const { listHotelsForAdmin } = require('../services/hotelService');
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
+const { createTenantFixture, addTenantMember, tenantActor } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(180000);
 const id = () => new mongoose.Types.ObjectId();
 const admin = { role: 'Admin', _id: id() };
+let tenantFixture;
+async function ensureTenant() {
+  if (!tenantFixture) {
+    tenantFixture = await createTenantFixture({ label: 'Hotel entity', bootstrap: admin });
+    Object.assign(admin, tenantActor(admin, tenantFixture.tenant));
+  }
+  return tenantFixture;
+}
+const actorOf = (user) => tenantActor(user, tenantFixture.tenant);
 let userCounter = 0;
-const makeUser = (overrides = {}) => {
+const makeUser = async (overrides = {}) => {
   userCounter += 1;
-  return User.create({ name: 'Entity Staff', email: `entitystaff${userCounter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Collaborateur', ...overrides });
+  const context = await ensureTenant();
+  const user = await User.create({ name: 'Entity Staff', email: `entitystaff${userCounter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Collaborateur', ...overrides });
+  await addTenantMember({ tenant: context.tenant, user, bootstrap: admin });
+  return user;
 };
-const makeHotel = (overrides = {}) => { const managerId = id(); return Hotel.create({ name: 'Hôtel F262', createdBy: managerId, manager: managerId, ...overrides }); };
+const makeHotel = async (overrides = {}) => { const managerId = id(); const { tenant } = await ensureTenant(); return Hotel.create({ name: 'Hôtel F262', tenant: tenant._id, createdBy: managerId, manager: managerId, ...overrides }); };
 
 beforeAll(async () => { await startFinancialMongo(); await HotelStaffAssignment.syncIndexes(); });
-afterEach(clearFinancialMongo);
+afterEach(async () => { await clearFinancialMongo(); tenantFixture = null; delete admin.platformTenant; delete admin.tenantScopeUserIds; });
 afterAll(stopFinancialMongo);
 
 test('liste scopée : Admin voit tout, manager legacy voit le sien, staff multi-hôtels voit uniquement ses hôtels autorisés, staff sans rattachement ne voit rien', async () => {
@@ -33,7 +46,7 @@ test('liste scopée : Admin voit tout, manager legacy voit le sien, staff multi-
   const noRattachement = await makeUser();
 
   const adminResult = await listAccessibleHotels(admin);
-  expect(adminResult.globalAccess).toBe(true);
+  expect(adminResult.globalAccess).toBe(false);
 
   const legacyResult = await listAccessibleHotels(managerLegacy);
   expect(legacyResult.hotels.map((h) => String(h._id))).toEqual([String(hotelA._id)]);
@@ -77,7 +90,7 @@ test('détail : staff A accède à A, refusé sur B ; hôtel inexistant → 404'
   const hotelB = await makeHotel();
   const staffA = await makeUser();
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotelA._id, userId: staffA._id, assignmentRole: 'hotel_manager' });
-  const actorA = { role: 'Collaborateur', _id: staffA._id };
+  const actorA = actorOf(staffA);
 
   await expect(assertOperationalHotelAccess({ actor: actorA, hotelId: hotelA._id, capability: CAP.HOTEL_VIEW })).resolves.toEqual({});
   expect((await assertOperationalHotelAccess({ actor: actorA, hotelId: hotelB._id, capability: CAP.HOTEL_VIEW })).error).toBe(403);
@@ -89,7 +102,7 @@ test('mise à jour : hotel.manage requis, hôtel étranger refusé, aucune mutat
   const hotelB = await makeHotel({ name: 'Nom original B' });
   const staffA = await makeUser();
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotelA._id, userId: staffA._id, assignmentRole: 'hotel_manager' });
-  const actorA = { role: 'Collaborateur', _id: staffA._id };
+  const actorA = actorOf(staffA);
 
   await expect(assertOperationalHotelAccess({ actor: actorA, hotelId: hotelA._id, capability: CAP.HOTEL_MANAGE })).resolves.toEqual({});
   const denied = await assertOperationalHotelAccess({ actor: actorA, hotelId: hotelB._id, capability: CAP.HOTEL_MANAGE });
@@ -102,7 +115,7 @@ test('viewer (hotel.view seul) ne peut pas obtenir hotel.manage', async () => {
   const hotel = await makeHotel();
   const viewerUser = await makeUser();
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: viewerUser._id, assignmentRole: 'viewer' });
-  const actor = { role: 'Collaborateur', _id: viewerUser._id };
+  const actor = actorOf(viewerUser);
   await expect(assertOperationalHotelAccess({ actor, hotelId: hotel._id, capability: CAP.HOTEL_VIEW })).resolves.toEqual({});
   expect((await assertOperationalHotelAccess({ actor, hotelId: hotel._id, capability: CAP.HOTEL_MANAGE })).error).toBe(403);
 });
@@ -111,7 +124,7 @@ test('révocation prend effet immédiatement (y compris lectures concurrentes)',
   const hotel = await makeHotel();
   const staffUser = await makeUser();
   const assignment = await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: staffUser._id, assignmentRole: 'hotel_manager' });
-  const actor = { role: 'Collaborateur', _id: staffUser._id };
+  const actor = actorOf(staffUser);
   await expect(assertOperationalHotelAccess({ actor, hotelId: hotel._id, capability: CAP.HOTEL_MANAGE })).resolves.toEqual({});
 
   await assignmentService.revokeHotelStaffAssignment({ actor: admin, assignmentId: assignment._id, reason: 'Fin de mandat confirmée par la direction.' });
@@ -148,7 +161,7 @@ test('une simple lecture (détail, liste) ne mute jamais la donnée', async () =
   const before = await Hotel.findById(hotel._id).lean();
   const staffUser = await makeUser();
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: staffUser._id, assignmentRole: 'hotel_manager' });
-  const actor = { role: 'Collaborateur', _id: staffUser._id };
+  const actor = actorOf(staffUser);
   await Promise.all(Array.from({ length: 5 }, () => assertOperationalHotelAccess({ actor, hotelId: hotel._id, capability: CAP.HOTEL_VIEW })));
   const after = await Hotel.findById(hotel._id).lean();
   expect(after).toEqual(before);

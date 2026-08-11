@@ -236,6 +236,7 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
           manager: ownerId,
           property: property._id,
           createdBy: ownerId,
+          tenant: user.platformTenant?._id || user.platformTenant || null,
           publicationStatus: 'soumis',
           submittedAt: new Date(),
         }], { session });
@@ -255,6 +256,7 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
         hotel: hotel?._id,
         property: property._id,
         createdBy: ownerId,
+        tenant: user.platformTenant?._id || user.platformTenant || null,
         publicationRequestId,
       }], { session });
 

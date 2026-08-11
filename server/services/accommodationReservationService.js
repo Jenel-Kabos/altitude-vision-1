@@ -5,6 +5,7 @@ const Block = require('../models/AccommodationAvailabilityBlock');
 const NightLock = require('../models/AccommodationNightLock');
 const CalendarMutex = require('../models/AccommodationCalendarMutex');
 const RatePlan = require('../models/RatePlan');
+const { resolveResourceTenant } = require('./platformTenant/tenantResourceAttributionService');
 
 const BLOCKING_STATUSES = ['confirmed', 'checked_in'];
 const TRANSITIONS = Object.freeze({ pending: ['confirmed', 'cancelled'], confirmed: ['checked_in', 'cancelled', 'no_show'], checked_in: ['checked_out'], draft: ['pending', 'cancelled'], cancelled: [], checked_out: [], no_show: [] });
@@ -55,8 +56,15 @@ async function quote(accommodation, start, end) {
 async function create({ input, user }) {
   const start = parseDate(input.checkInDate); const end = parseDate(input.checkOutDate); const nights = nightsBetween(start, end);
   const accommodation = await accommodationWithProperty(input.accommodation); await assertBookable(accommodation, input.adults, input.children);
+  let attribution = accommodation.tenant
+    ? { status: 'resolved', tenantId: String(accommodation.tenant) }
+    : { status: 'unresolved', tenantId: null };
+  if (!accommodation.tenant && user.platformTenant) attribution = await resolveResourceTenant({ resourceType: 'Accommodation', resource: accommodation });
+  if (user.platformTenant && (attribution.status !== 'resolved' || String(attribution.tenantId) !== String(user.platformTenant._id || user.platformTenant))) {
+    throw fail('Hébergement introuvable dans ce contexte tenant.', 404, 'TENANT_RESOURCE_NOT_FOUND');
+  }
   const pricing = await quote(accommodation, start, end);
-  return Reservation.create({ accommodation: accommodation._id, guest: user.id, owner: accommodation.property.owner, checkInDate: start, checkOutDate: end, nights,
+  return Reservation.create({ tenant: attribution.status === 'resolved' ? attribution.tenantId : null, accommodation: accommodation._id, guest: user.id, owner: accommodation.property.owner, checkInDate: start, checkOutDate: end, nights,
     guestCount: Number(input.guestCount || (Number(input.adults) + Number(input.children || 0))), adults: input.adults, children: input.children || 0,
     status: 'pending', subtotal: pricing.subtotal, fees: pricing.fees, total: pricing.total, currency: pricing.currency, specialRequests: input.specialRequests || '', source: input.source || 'public_web', createdBy: user.id });
 }

@@ -15,6 +15,11 @@ const Contrat = require('../models/Contrat');
 const RentalManagement = require('../models/RentalManagement');
 const contratRoutes = require('../routes/contratRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+// TENANT-CERT-2 — /api/contrats/:id vérifie désormais la frontière tenant
+// (voir __tests__/tenantCert2.adversarial.mongo.integration.test.js) : admin
+// et owner doivent partager un tenant pour que ce fixture reste fonctionnel.
+const organizationService = require('../services/organizationService');
+const platformTenantService = require('../services/platformTenant/platformTenantService');
 
 jest.setTimeout(120000);
 
@@ -38,6 +43,11 @@ afterAll(stopFinancialMongo);
 async function buildLeaseFixture() {
   const admin = await makeUser({ role: 'Admin' });
   const owner = await makeUser({ role: 'Proprietaire' });
+  const tenant = await platformTenantService.createTenant({ name: `GL-LIFE-1 ${Date.now()}`, actor: admin });
+  await Promise.all([
+    organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
+    organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
+  ]);
   const property = await Property.create({
     title: 'Villa Update Guard', description: 'Description suffisamment longue pour la validation du modèle Property.',
     pole: 'Altimmo', type: 'Villa', status: 'location', price: 300000,

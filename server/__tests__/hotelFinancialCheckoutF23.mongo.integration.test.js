@@ -2,10 +2,14 @@ const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const Hotel = require('../models/Hotel'); const HotelReservation = require('../models/HotelReservation'); const RoomCategory = require('../models/RoomCategory'); const Room = require('../models/Room'); const RoomAssignment = require('../models/RoomAssignment'); const HousekeepingTask = require('../models/HousekeepingTask'); const FinancialLedgerEntry = require('../models/FinancialLedgerEntry');
 const { performCheckOut } = require('../services/checkOutService');
+const { createTenantFixture, tenantActor } = require('./helpers/tenantAwareFixture');
 jest.setTimeout(120000); const id = () => new mongoose.Types.ObjectId();
 async function fixture() {
-  const admin = { id: id(), role: 'Admin' };
-  const hotel = await Hotel.create({ name: 'Hôtel F2.3', manager: id(), createdBy: admin.id });
+  const admin = { id: id(), _id: id(), role: 'Admin' };
+  admin._id = admin.id;
+  const { tenant } = await createTenantFixture({ label: 'Hotel checkout', bootstrap: admin });
+  Object.assign(admin, tenantActor(admin, tenant), { id: admin.id });
+  const hotel = await Hotel.create({ name: 'Hôtel F2.3', tenant: tenant._id, manager: id(), createdBy: admin.id });
   const category = await RoomCategory.create({ hotel: hotel._id, name: 'Standard', createdBy: admin.id });
   const room = await Room.create({ hotel: hotel._id, roomCategory: category._id, roomNumber: '101', status: 'occupied', createdBy: admin.id });
   const reservation = await HotelReservation.create({ hotel: hotel._id, roomCategory: category._id, guest: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test', country: 'CG' }, checkInDate: new Date('2026-09-01'), checkOutDate: new Date('2026-09-02'), roomsCount: 1, adults: 1, unitPrice: 30000, subtotal: 30000, totalAmount: 30000, currency: 'XAF', rateSnapshot: { rateType: 'nightly', amount: 30000, currency: 'XAF' }, status: 'checked_in', source: 'owner_dashboard', createdBy: admin.id });

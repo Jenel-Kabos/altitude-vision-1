@@ -36,6 +36,8 @@ describe('MyHotelsPage — Sprint B2 (dashboard propriétaire) — TEST DATA', (
     vi.clearAllMocks();
   });
 
+  const openActions = async () => fireEvent.click(await screen.findByRole('button', { name: 'Actions pour Hôtel Le Panorama' }));
+
   test("affiche le bouton 'Ajouter un hôtel' et le score de complétude", async () => {
     getMyHotels.mockResolvedValue([hotel()]);
     render(<MyHotelsPage />);
@@ -48,7 +50,8 @@ describe('MyHotelsPage — Sprint B2 (dashboard propriétaire) — TEST DATA', (
     getMyHotels.mockResolvedValue([hotel()]);
     submitHotel.mockResolvedValue({});
     render(<MyHotelsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Soumettre pour validation' }));
+    await openActions();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Soumettre pour validation' }));
     await waitFor(() => expect(submitHotel).toHaveBeenCalledWith('HOTEL-1'));
   });
 
@@ -56,7 +59,8 @@ describe('MyHotelsPage — Sprint B2 (dashboard propriétaire) — TEST DATA', (
     getMyHotels.mockResolvedValue([hotel({ publicationStatus: 'publie' })]);
     deactivateHotel.mockResolvedValue({});
     render(<MyHotelsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Désactiver' }));
+    await openActions();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Désactiver' }));
     await waitFor(() => expect(deactivateHotel).toHaveBeenCalledWith('HOTEL-1'));
   });
 
@@ -65,7 +69,8 @@ describe('MyHotelsPage — Sprint B2 (dashboard propriétaire) — TEST DATA', (
     reactivateHotel.mockResolvedValue({});
     render(<MyHotelsPage />);
     expect(await screen.findByText('Désactivé')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Réactiver' }));
+    await openActions();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Réactiver' }));
     await waitFor(() => expect(reactivateHotel).toHaveBeenCalledWith('HOTEL-1'));
   });
 
@@ -73,7 +78,8 @@ describe('MyHotelsPage — Sprint B2 (dashboard propriétaire) — TEST DATA', (
     getMyHotels.mockResolvedValue([hotel()]);
     duplicateHotel.mockResolvedValue({});
     render(<MyHotelsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Dupliquer' }));
+    await openActions();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Dupliquer' }));
     await waitFor(() => expect(duplicateHotel).toHaveBeenCalledWith('HOTEL-1'));
   });
 
@@ -82,7 +88,8 @@ describe('MyHotelsPage — Sprint B2 (dashboard propriétaire) — TEST DATA', (
     deleteHotel.mockResolvedValue();
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<MyHotelsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Supprimer' }));
+    await openActions();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Supprimer' }));
     expect(confirmSpy).toHaveBeenCalled();
     await waitFor(() => expect(deleteHotel).toHaveBeenCalledWith('HOTEL-1'));
     confirmSpy.mockRestore();

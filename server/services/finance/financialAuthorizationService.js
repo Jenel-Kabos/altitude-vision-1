@@ -1,6 +1,7 @@
 const Hotel = require('../../models/Hotel');
 const { fail } = require('./financialError');
 const { resolveHotelAccessScope } = require('../hotel/hotelAccessScopeService');
+const { assertResourceTenant } = require('../platformTenant/tenantResourceAttributionService');
 
 const CAPABILITIES = Object.freeze({
   DOCUMENT_VIEW: 'financial.document.view',
@@ -71,8 +72,14 @@ function assertFinancialCapability(user, capability) {
 // actif portant la capacite requise (quand elle est precisee par l'appelant).
 async function assertFinancialScope(user, hotelId, capability) {
   if (!user) fail('FINANCIAL_UNAUTHORIZED', 'Authentification requise.', 401);
-  const hotel = await Hotel.findById(hotelId).select('manager name brand email phone property');
+  const hotel = await Hotel.findById(hotelId).select('tenant manager name brand email phone property createdBy');
   if (!hotel) fail('FINANCIAL_UNAUTHORIZED', 'Etablissement inaccessible.', 404);
+  if (!user.platformTenant) {
+    if (id(hotel.manager) === id(user)) return hotel;
+    fail('FINANCIAL_UNAUTHORIZED', 'Contexte tenant requis.', 403);
+  }
+  await assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId: user.platformTenant._id || user.platformTenant })
+    .catch(() => fail('FINANCIAL_UNAUTHORIZED', 'Etablissement inaccessible.', 404));
   if (user.role === 'Admin' || id(hotel.manager) === id(user)) return hotel;
   const scope = await resolveHotelAccessScope({ actor: user, requiredCapability: capability, requestedHotelId: hotelId }).catch(() => null);
   if (!scope) fail('FINANCIAL_UNAUTHORIZED', 'Acces financier refuse.', 403);

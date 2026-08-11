@@ -10,16 +10,26 @@ const FinancialDocumentArtifact = require('../models/FinancialDocumentArtifact')
 const FinancialDocumentDelivery = require('../models/FinancialDocumentDelivery');
 const { HOTEL_CHECKOUT_FINANCIAL_OVERRIDE_EVENT } = require('../services/finance/hotelCheckoutFinancialReadinessService');
 const dashboard = require('../services/finance/hotelFinancialDashboardService');
+const { createTenantFixture, tenantActor } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(180000);
 const id = () => new mongoose.Types.ObjectId();
 const admin = { role: 'Admin', _id: id() };
+let tenantFixture;
+async function ensureTenant() {
+  if (!tenantFixture) {
+    tenantFixture = await createTenantFixture({ label: 'Hotel dashboard', bootstrap: admin });
+    Object.assign(admin, tenantActor(admin, tenantFixture.tenant));
+  }
+  return tenantFixture;
+}
 const farFuture = new Date(Date.now() + 2 * 86400000).toISOString();
 const farPast = new Date(Date.now() - 300 * 86400000).toISOString();
 
 async function makeHotel(overrides = {}) {
   const managerId = id();
-  return Hotel.create({ name: 'Hôtel F2.5', brand: 'F25', email: 'f25@example.test', manager: managerId, createdBy: managerId, ...overrides });
+  const { tenant } = await ensureTenant();
+  return Hotel.create({ name: 'Hôtel F2.5', tenant: tenant._id, brand: 'F25', email: 'f25@example.test', manager: managerId, createdBy: managerId, ...overrides });
 }
 async function makeReservation(hotel, overrides = {}) {
   return HotelReservation.create({ hotel: hotel._id, roomCategory: id(), guest: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test', country: 'CG' }, checkInDate: new Date('2026-01-01'), checkOutDate: new Date('2026-01-03'), roomsCount: 1, adults: 1, unitPrice: 30000, subtotal: 60000, taxes: 0, fees: 0, discount: 0, totalAmount: 60000, currency: 'XAF', rateSnapshot: { rateType: 'nightly', amount: 30000, currency: 'XAF', version: 1 }, status: 'confirmed', source: 'owner_dashboard', createdBy: hotel.manager, ...overrides });
@@ -52,7 +62,7 @@ async function makeAllocation(hotel, payment, document, overrides = {}) {
 }
 
 beforeAll(startFinancialMongo);
-afterEach(clearFinancialMongo);
+afterEach(async () => { await clearFinancialMongo(); tenantFixture = null; delete admin.platformTenant; delete admin.tenantScopeUserIds; });
 afterAll(stopFinancialMongo);
 
 test('agrège facturé/encaissé/alloué/restant sur un hôtel unique en distinguant surplus et allocations renversées', async () => {
@@ -110,15 +120,14 @@ test('isole strictement les données entre deux hôtels différents', async () =
   expect(autoScoped.totals.invoicedMinor).toBe(111000);
 });
 
-test('consolidation globale réservée à Admin (hotelId omis)', async () => {
+test('hotelId omis reste automatiquement borné à l’unique hôtel du tenant Admin', async () => {
   const hotelA = await makeHotel();
   const reservationA = await makeReservation(hotelA);
   await makeDocument(hotelA, reservationA, { totalMinor: 50000, balanceMinor: 0, amountAllocatedMinor: 50000 });
   const filters = dashboard.validateDashboardFilters({ dateFrom: farPast, dateTo: farFuture });
   const summary = await dashboard.getHotelFinancialDashboardSummary({ user: admin, filters });
-  expect(summary.scope.global).toBe(true);
-  expect(summary.documents.anomalyCount).toBeNull(); // pas de scan de réconciliation multi-hôtels non borné
-  expect(summary.dataStatus).toBe('unavailable');
+  expect(summary.scope.global).toBe(false);
+  expect(summary.scope.hotelId).toBe(String(hotelA._id));
 
   const managerNoHotel = { role: 'Collaborateur', _id: id() };
   await expect(dashboard.getHotelFinancialDashboardSummary({ user: managerNoHotel, filters })).rejects.toMatchObject({ code: 'FINANCIAL_DASHBOARD_ACCESS_DENIED' });

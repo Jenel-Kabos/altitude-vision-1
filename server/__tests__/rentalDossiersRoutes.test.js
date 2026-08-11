@@ -9,6 +9,7 @@ jest.mock('../models/Paiement');
 jest.mock('../models/RentalManagement');
 jest.mock('../models/Document');
 jest.mock('../models/User');
+jest.mock('../models/Property');
 jest.mock('../models/RentalPaymentReceipt', () => ({ create: jest.fn().mockResolvedValue({ _id: 'RECEIPT-1' }) }));
 // GL-DEBT-1 (Phase 5-9) : marquerPaye passe par runFinancialOperation
 // (session Mongo réelle) — sans DB (convention unit test), on simule le
@@ -21,6 +22,23 @@ jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
 jest.mock('../services/zohoImapService', () => ({ pollZohoInbox: jest.fn() }));
 jest.mock('../services/alerteService', () => ({ verifierPaiementsEnRetard: jest.fn() }));
+jest.mock('../services/platformTenant/tenantContextService', () => ({
+  resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),
+  resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' }),
+  resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set(['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439044']) }),
+  // TENANT-CERT-2 — la couche transversale de correction (Property/GL,
+  // voir __tests__/tenantCert2.adversarial.mongo.integration.test.js pour
+  // la vérification réelle) appelle désormais aussi `resolveTenantForUser`
+  // directement ; mocké ici pour ne jamais dépendre d'une vraie connexion
+  // Mongo dans ce test unitaire (modèles déjà mockés ci-dessus).
+  resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439001' }),
+  resolveRootOrgUnitId: jest.fn().mockResolvedValue('607f1f77bcf86cd799439001'),
+}));
+jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
+  assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+  assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+  resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+}));
 jest.mock('../utils/generateSitemap', () => jest.fn().mockResolvedValue('<xml/>'));
 jest.mock('../services/notificationService', () => ({
   notify: jest.fn().mockResolvedValue(), notifyStaff: jest.fn().mockResolvedValue(), notifyMany: jest.fn().mockResolvedValue(),
@@ -39,6 +57,9 @@ const Paiement = require('../models/Paiement');
 const RentalManagement = require('../models/RentalManagement');
 const Document = require('../models/Document');
 const User = require('../models/User');
+const Property = require('../models/Property');
+
+Property.find = jest.fn().mockReturnValue({ distinct: jest.fn().mockResolvedValue([]) });
 
 const ADMIN_ID = '507f1f77bcf86cd799439012';
 const GESTIONNAIRE_ID = '507f1f77bcf86cd799439044';

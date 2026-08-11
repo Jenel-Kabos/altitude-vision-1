@@ -29,7 +29,7 @@ describe('ManageHotelsPage — portefeuille hôtelier validé', () => {
     render(<ManageHotelsPage />);
     expect(await screen.findByText('Altitude Hôtel')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Voir' })).toHaveAttribute('href', '/dashboard/etablissements/HOTEL-1');
+    expect(screen.getByRole('link', { name: 'Ouvrir' })).toHaveAttribute('href', '/dashboard/etablissements/HOTEL-1');
   });
 
   test('ne propose aucune action de modération', async () => {
@@ -55,7 +55,8 @@ describe('ManageHotelsPage — portefeuille hôtelier validé', () => {
   test('archive via le cycle de vie hôtelier et retire ensuite la carte', async () => {
     deactivateHotel.mockResolvedValue({});
     render(<ManageHotelsPage />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Archiver' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions pour Altitude Hôtel' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archiver' }));
     await waitFor(() => expect(deactivateHotel).toHaveBeenCalledWith('HOTEL-1'));
   });
 });

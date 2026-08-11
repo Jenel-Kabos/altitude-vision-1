@@ -11,6 +11,7 @@ const { requireHotelCapability } = require('../middleware/hotelAccessMiddleware'
 const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
 const { ROLES_ALTIMMO, ROLES_MODERATION } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.get('/public/:id', ctrl.getPublic);
 router.get('/:hotelId/availability', auth.optionalAuth, reservationCtrl.getPublicAvailability);
 router.post('/:hotelId/reservations', auth.optionalAuth, reservationCtrl.createPublicReservation);
 
-router.use(auth.protect);
+router.use(auth.protect, requireTenantScope);
 
 // F2.6 — hôtels accessibles à l'utilisateur courant (Admin, manager legacy ou rattachement actif).
 // Placée avant '/:id' générique pour ne jamais être capturée par le paramètre.

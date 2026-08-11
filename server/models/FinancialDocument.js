@@ -3,6 +3,7 @@ const C = require('../constants/financialConstants');
 const ObjectId = mongoose.Schema.Types.ObjectId;
 const snapshot = { name: String, email: String, phone: String, address: String, taxIdentifier: String, userId: { type: ObjectId, ref: 'User', default: null }, legalInformation: String };
 const schema = new mongoose.Schema({
+  tenant: { type: ObjectId, ref: 'PlatformTenant', default: null, index: true },
   domain: { type: String, enum: C.FINANCIAL_DOMAINS, required: true }, establishmentType: { type: String, enum: C.FINANCIAL_ESTABLISHMENT_TYPES, required: true }, establishmentId: { type: ObjectId, required: true },
   documentType: { type: String, enum: C.FINANCIAL_DOCUMENT_TYPES, required: true, default: 'invoice' }, documentNumber: { type: String, default: null }, sequenceValue: { type: Number, default: null }, sequenceYear: { type: Number, default: null },
   status: { type: String, enum: C.FINANCIAL_DOCUMENT_STATUSES, default: 'draft' }, paymentStatus: { type: String, enum: C.FINANCIAL_PAYMENT_STATUSES_DERIVED, default: 'unpaid' }, currency: { type: String, enum: C.FINANCIAL_CURRENCIES, required: true },

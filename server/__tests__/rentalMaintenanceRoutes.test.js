@@ -11,6 +11,22 @@ jest.mock('../models/Paiement');
 jest.mock('../models/User');
 jest.mock('../services/rentalMaintenanceService');
 jest.mock('../services/rentalListingSyncService');
+// TENANT-CERT-2 — les routes `:id` de rentalManagementRoutes.js vérifient
+// désormais la frontière tenant via ces services (voir
+// __tests__/tenantCert2.adversarial.mongo.integration.test.js pour la
+// vérification réelle) ; mockés ici pour rester indépendant d'une vraie
+// connexion Mongo dans ce test unitaire (modèles déjà mockés ci-dessus).
+jest.mock('../services/platformTenant/tenantContextService', () => ({
+  resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439001' }),
+  resolveRootOrgUnitId: jest.fn().mockResolvedValue('607f1f77bcf86cd799439001'),
+  resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),
+  resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set() }),
+}));
+jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
+  assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+  assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+  resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+}));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
@@ -176,6 +192,13 @@ describe('PATCH /api/rental-maintenance/:id/assign|schedule|start|resolve|close 
 
 describe('POST /api/rental-management/:id/acknowledge-notice|cancel-notice (Sprint GL-B2)', () => {
   afterEach(() => jest.clearAllMocks());
+  // TENANT-CERT-2 — router.param('id', …) de rentalManagementRoutes.js
+  // charge désormais le dossier avant tout contrôleur (voir le fichier de
+  // routes) : sans ce mock, RentalManagement.findById(...).select(...)
+  // échoue sur l'automock par défaut (undefined).
+  beforeEach(() => {
+    RentalManagement.findById = jest.fn().mockResolvedValue({ _id: RENTAL_ID, property: PROPERTY_ID, owner: OWNER_ID });
+  });
 
   test('200 — le staff (ROLES_GL) accuse réception du préavis', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');

@@ -249,6 +249,7 @@ async function duplicateHotel({ hotel, property, actingUser }) {
     manager: hotel.manager,
     property: clonedProperty._id,
     createdBy: actingUser.id,
+    tenant: actingUser.platformTenant?._id || actingUser.platformTenant || hotel.tenant || null,
   });
 
   await Accommodation.create({
@@ -258,6 +259,7 @@ async function duplicateHotel({ hotel, property, actingUser }) {
     checkInTime: '14:00',
     checkOutTime: '11:00',
     createdBy: actingUser.id,
+    tenant: actingUser.platformTenant?._id || actingUser.platformTenant || clonedHotel.tenant || null,
   });
 
   const categories = await RoomCategory.find({ hotel: hotel._id, status: 'actif' });

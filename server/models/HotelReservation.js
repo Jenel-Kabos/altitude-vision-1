@@ -51,6 +51,7 @@ const statusHistoryEntrySchema = new mongoose.Schema(
 
 const hotelReservationSchema = new mongoose.Schema(
   {
+    tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
     // Généré par le plugin mongoose-sequence (même convention que
     // Document.js/docNumber — seule bibliothèque de numérotation atomique
     // déjà éprouvée dans ce codebase, aucune réinvention). `reference`

@@ -19,6 +19,27 @@ jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
 jest.mock('../services/zohoImapService', () => ({ pollZohoInbox: jest.fn() }));
 jest.mock('../services/alerteService', () => ({ verifierPaiementsEnRetard: jest.fn() }));
+jest.mock('../services/platformTenant/tenantContextService', () => ({
+  resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),
+  resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' }),
+  resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set(['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012']) }),
+}));
+jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
+  assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+  resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+}));
+jest.mock('../services/hotel/hotelAccessScopeService', () => ({
+  resolveHotelAccessScope: jest.fn(({ actor }) => {
+    if (actor?.role === 'Admin' || String(actor?._id || actor?.id) === '507f1f77bcf86cd799439011') {
+      return Promise.resolve({ globalAccess: false, hotelIds: ['707f1f77bcf86cd799439055'] });
+    }
+    return Promise.reject(new Error('Accès refusé'));
+  }),
+  assertOperationalHotelAccess: jest.fn(({ actor }) => Promise.resolve(
+    actor?.role === 'Admin' || String(actor?._id || actor?.id) === '507f1f77bcf86cd799439011' ? {} : { error: 403 },
+  )),
+  listAccessibleHotels: jest.fn().mockResolvedValue({ globalAccess: false, hotels: [] }),
+}));
 jest.mock('../utils/generateSitemap', () => jest.fn().mockResolvedValue('<xml/>'));
 jest.mock('../services/notificationService', () => ({
   notify: jest.fn().mockResolvedValue(), notifyStaff: jest.fn().mockResolvedValue(), notifyMany: jest.fn().mockResolvedValue(),

@@ -4,6 +4,38 @@ const Message = require('../models/Message');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const { ALL_STAFF } = require('../utils/roles');
+const { assertResourceTenant, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+
+const activeTenantId = (req) => req.platformTenant?._id;
+const tenantConversationFilter = (req) => ({
+  $or: [
+    { tenant: activeTenantId(req) },
+    { tenant: null, participants: { $in: req.tenantScopeUserIds || [] } },
+  ],
+});
+
+async function assertConversationAccess(req, conversation) {
+  await assertResourceTenant({ resourceType: 'Conversation', resource: conversation, tenantId: activeTenantId(req) });
+  const isStaff = ALL_STAFF.includes(req.user.role);
+  const isParticipant = (conversation.participants || []).some((participant) =>
+    String(participant?._id || participant) === String(req.user.id));
+  if (!isStaff && !isParticipant) {
+    const error = new Error('Accès refusé');
+    error.statusCode = 403;
+    throw error;
+  }
+}
+
+async function keepAttributedConversations(req, conversations) {
+  const allowed = [];
+  for (const conversation of conversations) {
+    try {
+      await assertResourceTenant({ resourceType: 'Conversation', resource: conversation, tenantId: activeTenantId(req) });
+      allowed.push(conversation);
+    } catch {}
+  }
+  return allowed;
+}
 
 /**
  * @description Récupérer une conversation par son ID (objet complet peuplé)
@@ -25,16 +57,7 @@ exports.getConversationById = asyncHandler(async (req, res) => {
     });
   }
 
-  const isStaff = ALL_STAFF.includes(req.user.role);
-  const isParticipant = conversation.participants
-    .some((p) => p._id.toString() === req.user.id);
-
-  if (!isStaff && !isParticipant) {
-    return res.status(403).json({
-      status: 'fail',
-      message: 'Accès refusé',
-    });
-  }
+  await assertConversationAccess(req, conversation);
 
   res.status(200).json({
     status: 'success',
@@ -48,13 +71,14 @@ exports.getConversationById = asyncHandler(async (req, res) => {
  * @access Protected
  */
 exports.getConversations = asyncHandler(async (req, res) => {
-  const conversations = await Conversation.find({
+  const candidates = await Conversation.find({ $and: [tenantConversationFilter(req), {
     participants: req.user.id,
     isArchived: { $ne: true },
     isStaffInbox: false, // les convs staff-inbox sont via GET /staff-inbox
-  })
+  }] })
     .populate('participants', 'name email photo role')
     .sort({ updatedAt: -1 });
+  const conversations = await keepAttributedConversations(req, candidates);
 
   const withUnread = conversations.map((conv) => {
     const obj = conv.toObject();
@@ -89,12 +113,17 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
   let otherUserId = conversationId;
   const convDoc = await Conversation.findById(conversationId);
   if (convDoc) {
+    await assertConversationAccess(req, convDoc);
     const otherParticipant = convDoc.participants.find(
       (p) => p.toString() !== req.user.id.toString()
     );
     if (otherParticipant) {
       otherUserId = otherParticipant.toString();
     }
+  } else {
+    const error = new Error('Conversation introuvable');
+    error.statusCode = 404;
+    throw error;
   }
 
   // Requête prioritaire par conversation._id (couvre staff-inbox + nouveaux messages)
@@ -160,6 +189,7 @@ exports.markConversationAsRead = asyncHandler(async (req, res) => {
   if (Conversation) {
     convDoc = await Conversation.findById(conversationId);
     if (convDoc) {
+      await assertConversationAccess(req, convDoc);
       const otherParticipant = convDoc.participants.find(
         (p) => p.toString() !== req.user.id.toString()
       );
@@ -210,6 +240,12 @@ exports.createOrGetConversation = asyncHandler(async (req, res) => {
     throw new Error('Participant non trouvé.');
   }
 
+  const participantAttribution = await resolveResourceTenant({ resourceType: 'User', resource: participant });
+  if (participantAttribution.status !== 'resolved' || String(participantAttribution.tenantId) !== String(activeTenantId(req))) {
+    res.status(404);
+    throw new Error('Participant non trouvé.');
+  }
+
   if (Conversation) {
     let conversation = await Conversation.findOne({
       participants: { $all: [req.user.id, targetUserId] },
@@ -219,6 +255,7 @@ exports.createOrGetConversation = asyncHandler(async (req, res) => {
       conversation = await Conversation.create({
         participants: [req.user.id, targetUserId],
         relatedProperty: req.body.relatedProperty || null,
+        tenant: activeTenantId(req),
       });
       await conversation.populate('participants', 'name email photo');
     } else if (!conversation.relatedProperty && req.body.relatedProperty) {
@@ -261,12 +298,15 @@ exports.deleteConversation = asyncHandler(async (req, res) => {
   if (Conversation) {
     const conversation = await Conversation.findById(conversationId);
     if (conversation) {
+      await assertConversationAccess(req, conversation);
       const otherParticipant = conversation.participants.find(
         (p) => p.toString() !== req.user.id.toString()
       );
       if (otherParticipant) {
         otherUserId = otherParticipant.toString();
       }
+    } else {
+      return res.status(404).json({ status: 'fail', message: 'Conversation introuvable' });
     }
   }
 
@@ -305,17 +345,18 @@ exports.getUnreadCount = asyncHandler(async (req, res) => {
   let unreadCount = await Message.countDocuments({
     receiver: req.user.id,
     isRead: false,
+    tenant: activeTenantId(req),
   });
 
   // Staff : ajoute les conversations de la boîte partagée où un message
   // client attend une réponse (clé Map 'staff') — ces messages ont
   // receiver: null et ne sont donc jamais comptés ci-dessus.
   if (ALL_STAFF.includes(req.user.role)) {
-    const staffInboxUnread = await Conversation.countDocuments({
+    const staffInboxUnread = await Conversation.countDocuments({ $and: [tenantConversationFilter(req), {
       isStaffInbox: true,
       isArchived: { $ne: true },
       'unreadCount.staff': { $gt: 0 },
-    });
+    }] });
     unreadCount += staffInboxUnread;
   }
 
@@ -374,6 +415,7 @@ exports.startConversation = async (req, res) => {
           participants: [req.user.id, recipientId],
           relatedProperty: propertyId || null,
           isStaffInbox: false,
+          tenant: activeTenantId(req),
         });
       } else if (propertyId && !conversation.relatedProperty) {
         conversation.relatedProperty = propertyId;
@@ -394,6 +436,7 @@ exports.startConversation = async (req, res) => {
           participants: [req.user.id],
           relatedProperty: propertyId || null,
           isStaffInbox: true,
+          tenant: activeTenantId(req),
         });
       }
     }
@@ -408,6 +451,7 @@ exports.startConversation = async (req, res) => {
         receiver: isSenderStaff ? recipientId : null,
         conversation: conversation._id,
         content: message.trim(),
+        tenant: activeTenantId(req),
       });
 
       conversation.lastMessage = message.trim();
@@ -459,13 +503,14 @@ exports.startConversation = async (req, res) => {
  * @access Protected
  */
 exports.getMyInbox = asyncHandler(async (req, res) => {
-  const conversations = await Conversation.find({
+  const candidates = await Conversation.find({ $and: [tenantConversationFilter(req), {
     participants: req.user.id,
     isStaffInbox: true,
     isArchived: { $ne: true },
-  })
+  }] })
     .populate('relatedProperty', 'title images')
     .sort('-updatedAt');
+  const conversations = await keepAttributedConversations(req, candidates);
 
   const withUnread = conversations.map((conv) => {
     const obj = conv.toObject();
@@ -491,10 +536,11 @@ exports.getStaffInbox = async (req, res) => {
       return res.status(403).json({ status: 'fail', message: 'Accès réservé au staff.' });
     }
 
-    const conversations = await Conversation.find({ isStaffInbox: true, isArchived: { $ne: true } })
+    const candidates = await Conversation.find({ $and: [tenantConversationFilter(req), { isStaffInbox: true, isArchived: { $ne: true } }] })
       .populate('participants', 'name email photo role')
       .populate('relatedProperty', 'title images')
       .sort('-updatedAt');
+    const conversations = await keepAttributedConversations(req, candidates);
 
     const withUnread = conversations.map((conv) => {
       const obj = conv.toObject();

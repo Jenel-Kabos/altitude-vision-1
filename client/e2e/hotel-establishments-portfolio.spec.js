@@ -29,7 +29,11 @@ test('Modération Hôtellerie → portefeuille Établissements → centre opéra
   await page.goto('/dashboard/etablissements');
   await expect(page.getByRole('heading', { name: initialName })).toBeVisible();
   await capture('01-portfolio-publie');
-  await page.getByRole('heading', { name: initialName }).locator('..').locator('..').getByRole('button', { name: 'Modifier' }).click();
+  // "Modifier" vit dans le menu d'actions (DashboardActionMenu, un
+  // bouton "…" qui révèle un menu role="menu") — jamais un bouton visible
+  // directement, il faut d'abord l'ouvrir.
+  await page.getByRole('button', { name: `Actions pour ${initialName}` }).click();
+  await page.getByRole('menuitem', { name: 'Modifier' }).click();
   await page.getByLabel("Nom de l'hôtel").fill(proposedName);
   const updateResponsePromise = page.waitForResponse((response) => response.url().includes(`/api/hotels/admin/${hotelId}`) && response.request().method() === 'PUT');
   await page.getByRole('button', { name: /Enregistrer/ }).click();
@@ -49,7 +53,9 @@ test('Modération Hôtellerie → portefeuille Établissements → centre opéra
   await page.goto('/dashboard/etablissements');
   await expect(page.getByRole('heading', { name: proposedName })).toBeVisible();
   await capture('04-version-validee');
-  await page.getByRole('heading', { name: proposedName }).locator('..').locator('..').getByRole('link', { name: 'Voir' }).click();
+  // Le libellé réel du lien vers la fiche détail est "Ouvrir" (voir
+  // ManageHotelsPage.jsx), jamais "Voir" — décalage préexistant du test.
+  await page.getByRole('heading', { name: proposedName }).locator('..').locator('..').getByRole('link', { name: 'Ouvrir' }).click();
   await expect(page).toHaveURL(new RegExp(`/dashboard/etablissements/${hotelId}`));
   await expect(page.getByText('Centre opérationnel')).toBeVisible();
 

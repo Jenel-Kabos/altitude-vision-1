@@ -17,6 +17,7 @@ const { buildCsv, buildPdf } = require('../services/reporting/reportingExportSer
 const crmService = require('../services/crmService');
 const reportingRoutes = require('../routes/reportingRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { createTenantFixture, addTenantMember, createTenantHotel, tenantActor } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(120000);
 
@@ -40,7 +41,10 @@ afterAll(stopFinancialMongo);
 describe('reportingService — orchestrateur (base vide)', () => {
   test('getExecutiveReport() renvoie les 9 domaines sans jamais lever, même sans aucune donnée', async () => {
     const admin = await makeUser({ role: 'Admin' });
-    const report = await getExecutiveReport({ user: admin });
+    const { tenant, bootstrap } = await createTenantFixture({ label: 'Reporting', bootstrap: admin });
+    await addTenantMember({ tenant, user: admin, bootstrap });
+    await createTenantHotel({ tenant, manager: admin, createdBy: admin });
+    const report = await getExecutiveReport({ user: tenantActor(admin, tenant) });
     expect(Object.keys(report.domains)).toEqual(DOMAINS);
     DOMAINS.forEach((domain) => {
       expect(report.domains[domain].status).toBe('ok');

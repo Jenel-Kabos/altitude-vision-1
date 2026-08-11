@@ -16,6 +16,13 @@ const Property = require('../models/Property');
 const RentalManagement = require('../models/RentalManagement');
 const propertyRoutes = require('../routes/propertyRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+// TENANT-CERT-2 — l'accès Admin (non-propriétaire) à une Property passe
+// désormais par la frontière tenant canonique (voir
+// __tests__/tenantCert2.adversarial.mongo.integration.test.js pour la
+// vulnérabilité corrigée). Un Admin et un Proprietaire du MÊME tenant
+// restent pleinement fonctionnels — fixture ajoutée ci-dessous.
+const organizationService = require('../services/organizationService');
+const platformTenantService = require('../services/platformTenant/platformTenantService');
 
 jest.setTimeout(120000);
 
@@ -95,6 +102,11 @@ describe('GL-ARCH-1 — PUT /api/properties/:id — availability (univers 1 vs u
   test('un Admin garde le contrôle total de availability, même sur un bien géré', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const owner = await makeUser({ role: 'Proprietaire' });
+    const tenant = await platformTenantService.createTenant({ name: `GL-ARCH-1 ${Date.now()}`, actor: admin });
+    await Promise.all([
+      organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
+      organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
+    ]);
     const property = await makeProperty(owner);
     await RentalManagement.create({ property: property._id, owner: owner._id, managementActivated: true, monthlyRent: property.price });
 

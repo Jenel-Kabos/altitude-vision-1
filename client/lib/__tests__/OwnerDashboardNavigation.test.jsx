@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import OwnerDashboard from '../pages/dashboard/OwnerDashboard';
 import { getOwnerVisitesUnreadCount } from '../services/visiteService';
 
+const pushMock = vi.fn();
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: pushMock }),
   usePathname: () => '/mes-biens',
 }));
 
@@ -21,6 +22,7 @@ const baseUser = { _id: 'TEST-OWNER', name: 'OWNER TEST', role: 'Proprietaire' }
 
 describe('Navigation propriétaire', () => {
   beforeEach(() => {
+    pushMock.mockReset();
     mockAuth = {
       user: baseUser,
       logout: vi.fn(),
@@ -37,23 +39,24 @@ describe('Navigation propriétaire', () => {
     const visits = screen.getByRole('link', { name: /Mes rendez-vous/i });
     expect(visits).toHaveAttribute('href', '/mes-biens/visites');
     expect(visits).not.toHaveAttribute('aria-current');
-    expect(screen.getByRole('link', { name: 'Toutes mes annonces' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Vue du patrimoine' })).toHaveAttribute('aria-current', 'page');
     expect(await screen.findByText('Nouveaux rendez-vous :')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Mes messages' })).toHaveAttribute('href', '/messages');
     expect(screen.getByRole('link', { name: 'Sécurité' })).toHaveAttribute('href', '/mes-biens/securite');
     await waitFor(() => expect(getOwnerVisitesUnreadCount).toHaveBeenCalled());
   });
 
-  test('un utilisateur portant les deux profils voit ses annonces immobilières ET ses établissements', async () => {
+  test('un utilisateur portant les deux profils voit un seul contexte à la fois et peut basculer explicitement', async () => {
     getOwnerVisitesUnreadCount.mockResolvedValue(0);
     render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
 
-    expect(screen.getByText('Mes annonces')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Vente' })).toHaveAttribute('href', '/mes-biens?status=vente');
-    expect(screen.getByRole('link', { name: 'Location' })).toHaveAttribute('href', '/mes-biens?status=location');
-    expect(screen.getByRole('link', { name: 'Hébergement' })).toHaveAttribute('href', '/mes-hebergements');
-    expect(screen.getByRole('link', { name: 'Mes hôtels' })).toHaveAttribute('href', '/mes-hotels');
+    expect(screen.getByText('Mon patrimoine')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Biens en vente' })).toHaveAttribute('href', '/mes-biens?status=vente');
+    expect(screen.getByRole('link', { name: 'Biens en location' })).toHaveAttribute('href', '/mes-biens?status=location');
+    expect(screen.queryByRole('link', { name: 'Mes établissements' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Mes paiements' })).toHaveAttribute('href', '/mes-biens/paiements');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Espace de travail' }), { target: { value: 'etablissement' } });
+    expect(pushMock).toHaveBeenCalledWith('/mes-hotels');
   });
 
   test('un utilisateur avec uniquement le profil immobilier ne voit pas les liens établissement', async () => {
@@ -61,10 +64,10 @@ describe('Navigation propriétaire', () => {
     getOwnerVisitesUnreadCount.mockResolvedValue(0);
     render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
 
-    expect(screen.getByRole('link', { name: 'Vente' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Location' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Hébergement' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Mes hôtels' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Biens en vente' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Biens en location' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Hébergements' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Mes établissements' })).not.toBeInTheDocument();
     // Les liens communs restent visibles quel que soit le profil.
     expect(screen.getByRole('link', { name: 'Mes messages' })).toBeInTheDocument();
   });
@@ -74,11 +77,11 @@ describe('Navigation propriétaire', () => {
     getOwnerVisitesUnreadCount.mockResolvedValue(0);
     render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
 
-    expect(screen.getByRole('link', { name: 'Mes hôtels' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Hébergement' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Vente' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Location' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Toutes mes annonces' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Mes établissements' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Hébergements' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Biens en vente' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Biens en location' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Vue du patrimoine' })).not.toBeInTheDocument();
   });
 
   test('un utilisateur sans aucun profil métier ne voit que les liens communs', async () => {
@@ -86,8 +89,8 @@ describe('Navigation propriétaire', () => {
     getOwnerVisitesUnreadCount.mockResolvedValue(0);
     render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
 
-    expect(screen.queryByRole('link', { name: 'Toutes mes annonces' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Mes hôtels' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Vue du patrimoine' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Mes établissements' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Mes messages' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Mon profil' })).toBeInTheDocument();
   });
@@ -97,7 +100,7 @@ describe('Navigation propriétaire', () => {
     getOwnerVisitesUnreadCount.mockResolvedValue(0);
     render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
 
-    expect(screen.getByRole('link', { name: 'Toutes mes annonces' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Mes hôtels' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Vue du patrimoine' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Mes établissements' })).toBeInTheDocument();
   });
 });

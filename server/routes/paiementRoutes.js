@@ -1,10 +1,17 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { ROLES_PAIEMENTS } = require('../utils/roles');
 const router  = express.Router();
 const auth    = require('../controllers/authController');
 const ctrl    = require('../controllers/paiementController');
 const cinetpay = require('../controllers/cinetpayController');
 const { upload } = require('../config/cloudinary');
+// TENANT-CERT-2 — même vulnérabilité et même correctif transversal que
+// contratRoutes.js/rentalManagementRoutes.js : GET/PUT/DELETE `:id`
+// chargeaient le Paiement sans vérification tenant.
+const Paiement = require('../models/Paiement');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 
 const protect   = [auth.protect, auth.restrictTo(...ROLES_PAIEMENTS)];
 const adminOnly = [auth.protect, auth.restrictTo('Admin')];
@@ -23,6 +30,34 @@ router.get( '/stats',              protect, ctrl.getStats);
 router.post('/calculer-penalites', protect, ctrl.calculerPenalites);
 // GL-DEBT-1.1 — un encaissement réparti sur plusieurs échéances du même contrat.
 router.post('/encaisser-multiple', protect, upload.single('preuve'), ctrl.encaisserMultiple);
+
+// TENANT-CERT-2 — `router.param('id', …)` s'exécute avant le tableau de
+// middlewares propre à chaque route ci-dessous (donc avant `auth.protect`) :
+// sans cette ligne, `req.user` serait encore indéfini au moment du contrôle
+// tenant (bug réel constaté lors de la certification). `/initier` et
+// `/webhook-cinetpay` restent inchangées (déclarées avant, aucune ne
+// consomme `:id`).
+router.use(auth.protect);
+
+router.param('id', async (req, res, next, paiementId) => {
+  try {
+    if (!mongoose.isValidObjectId(paiementId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
+    const paiement = await Paiement.findById(paiementId);
+    if (!paiement) return res.status(404).json({ status: 'fail', message: 'Paiement introuvable.' });
+    // Un Paiement dont le Contrat n'a lui-même aucune Property réellement
+    // liée (adresse en texte libre, données antérieures à PlatformTenant)
+    // n'a AUCUNE frontière tenant à faire respecter — voir
+    // assertResourceTenantOrUnattributed. Dès qu'une attribution existe,
+    // elle doit correspondre au tenant de l'acteur (`tenant?._id` reste
+    // `undefined` si l'acteur n'a lui-même aucun tenant : ne matche jamais
+    // un `tenantId` réel, donc refuse correctement sans branche séparée).
+    const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+    await assertResourceTenantOrUnattributed({ resourceType: 'Paiement', resource: paiement, tenantId: tenant?._id });
+    next();
+  } catch (error) {
+    res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Paiement introuvable.' });
+  }
+});
 
 router.get('/',       protect, ctrl.getAll);
 router.get('/:id',    protect, ctrl.getOne);

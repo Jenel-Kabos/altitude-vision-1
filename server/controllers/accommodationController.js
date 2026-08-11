@@ -302,6 +302,7 @@ exports.create = async (req, res) => {
       accommodation = await Accommodation.create({
         property: property._id,
         createdBy: req.user.id,
+        tenant: req.platformTenant?._id || null,
         ...details,
       });
     } catch (error) {

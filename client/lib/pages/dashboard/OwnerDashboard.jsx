@@ -10,6 +10,7 @@ import {
 import { toast } from "react-hot-toast";
 import { useAuth } from '../../context/AuthContext';
 import { getOwnerVisitesUnreadCount } from '../../services/visiteService';
+import { DashboardContextSwitcher } from '../../components/dashboard/DashboardUI';
 
 const BLUE  = '#2E7BB5';
 const GOLD  = '#C8960C';
@@ -28,17 +29,17 @@ const GREEN = '#16A34A';
 // voyait quand même "Vente"/"Location" et inversement — la navigation ne
 // distinguait jamais les deux identités portées par `User.role==='Proprietaire'`.
 const NAV_LINKS = [
-  { to: '/mes-biens',                    end: true,  Icon: Building,      label: 'Toutes mes annonces', accent: BLUE, section: 'Mes annonces',  profile: 'proprietaire_immobilier' },
-  { to: '/mes-biens?status=vente',       end: false, Icon: Landmark,      label: 'Vente',                accent: BLUE, section: 'Mes annonces',  profile: 'proprietaire_immobilier' },
-  { to: '/mes-biens?status=location',    end: false, Icon: KeyRound,      label: 'Location',             accent: BLUE, section: 'Mes annonces',  profile: 'proprietaire_immobilier' },
-  { to: '/mes-hebergements',             end: true,  Icon: Palmtree,      label: 'Hébergement',          accent: GOLD, section: 'Mes annonces',  profile: 'exploitant_etablissement' },
-  { to: '/mes-hotels',                   end: true,  Icon: Building2,     label: 'Mes hôtels',           accent: GOLD, section: null,            profile: 'exploitant_etablissement' },
-  { to: '/mes-hotels/reservations',       end: true,  Icon: BookOpenCheck, label: 'Mes réservations',     accent: GOLD, section: null,            profile: 'exploitant_etablissement' },
-  { to: '/mes-biens/visites',            end: false, Icon: Calendar,      label: 'Mes rendez-vous',      accent: GOLD, section: null,            profile: null },
-  { to: '/mes-biens/paiements',          end: false, Icon: CreditCard,    label: 'Mes paiements',        accent: GOLD, section: null,            profile: null },
-  { to: '/messages',                     end: false, Icon: MessageCircle, label: 'Mes messages',         accent: BLUE, section: null,            profile: null },
-  { to: '/profile',                      end: false, Icon: User,          label: 'Mon profil',           accent: GOLD, section: null,            profile: null },
-  { to: '/mes-biens/securite',           end: false, Icon: ShieldCheck,   label: 'Sécurité',              accent: GREEN, section: null,           profile: null },
+  { to: '/mes-biens',                 end: true, Icon: Building, label: 'Vue du patrimoine', accent: BLUE, section: 'Mon patrimoine', profile: 'proprietaire_immobilier' },
+  { to: '/mes-biens?status=vente',    end: false, Icon: Landmark, label: 'Biens en vente', accent: BLUE, section: 'Mon patrimoine', profile: 'proprietaire_immobilier' },
+  { to: '/mes-biens?status=location', end: false, Icon: KeyRound, label: 'Biens en location', accent: BLUE, section: 'Mon patrimoine', profile: 'proprietaire_immobilier' },
+  { to: '/mes-biens/visites',         end: false, Icon: Calendar, label: 'Mes rendez-vous', accent: GOLD, section: 'Activité', profile: 'proprietaire_immobilier' },
+  { to: '/mes-biens/paiements',       end: false, Icon: CreditCard, label: 'Mes paiements', accent: GOLD, section: 'Activité', profile: 'proprietaire_immobilier' },
+  { to: '/mes-hotels',                end: true, Icon: Building2, label: 'Mes établissements', accent: GOLD, section: 'Exploitation', profile: 'exploitant_etablissement' },
+  { to: '/mes-hebergements',          end: true, Icon: Palmtree, label: 'Hébergements', accent: GOLD, section: 'Exploitation', profile: 'exploitant_etablissement' },
+  { to: '/mes-hotels/reservations',   end: true, Icon: BookOpenCheck, label: 'Réservations', accent: GOLD, section: 'Opérations', profile: 'exploitant_etablissement' },
+  { to: '/messages',                  end: false, Icon: MessageCircle, label: 'Mes messages', accent: BLUE, section: 'Suivi', profile: null },
+  { to: '/profile',                   end: false, Icon: User, label: 'Mon profil', accent: GOLD, section: 'Suivi', profile: null },
+  { to: '/mes-biens/securite',        end: false, Icon: ShieldCheck, label: 'Sécurité', accent: GREEN, section: 'Suivi', profile: null },
 ];
 
 const OwnerDashboard = ({ children }) => {
@@ -49,13 +50,21 @@ const OwnerDashboard = ({ children }) => {
   // Tant que les profils métiers ne sont pas encore chargés (`null`), on
   // affiche tout — un utilisateur légitime ne doit jamais voir son menu
   // amputé pendant le chargement réseau.
-  const visibleNavLinks = businessProfiles === null
-    ? NAV_LINKS
-    : NAV_LINKS.filter(({ profile }) => (
-      profile === 'proprietaire_immobilier' ? isProprietaireImmobilier
-        : profile === 'exploitant_etablissement' ? isExploitantEtablissement
-          : true
-    ));
+  const profileOptions = businessProfiles === null ? [] : [
+    isProprietaireImmobilier && { value: 'patrimoine', label: 'Patrimoine immobilier' },
+    isExploitantEtablissement && { value: 'etablissement', label: "Exploitation d’établissement" },
+  ].filter(Boolean);
+  const pathContext = pathname.startsWith('/mes-hotels') || pathname.startsWith('/mes-hebergements') ? 'etablissement' : 'patrimoine';
+  const activeContext = businessProfiles !== null && !isProprietaireImmobilier && isExploitantEtablissement
+    ? 'etablissement'
+    : businessProfiles !== null && isProprietaireImmobilier && !isExploitantEtablissement
+      ? 'patrimoine'
+      : pathContext;
+  const visibleNavLinks = businessProfiles === null ? NAV_LINKS : NAV_LINKS.filter(({ profile }) => {
+    if (!profile) return true;
+    if (profile === 'proprietaire_immobilier') return isProprietaireImmobilier && activeContext === 'patrimoine';
+    return isExploitantEtablissement && activeContext === 'etablissement';
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [rendezVousBadge, setRendezVousBadge] = useState(0);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
@@ -131,7 +140,7 @@ const OwnerDashboard = ({ children }) => {
         id="owner-navigation"
         aria-label="Navigation propriétaire"
         aria-hidden={isMobileViewport && !sidebarOpen}
-        inert={isMobileViewport && !sidebarOpen ? '' : undefined}
+        inert={isMobileViewport && !sidebarOpen ? true : undefined}
       >
 
         <div>
@@ -173,10 +182,18 @@ const OwnerDashboard = ({ children }) => {
                 <p className="text-white text-xs font-semibold truncate"
                   style={{ fontFamily: "'DM Sans', sans-serif" }}>{user.name || 'Propriétaire'}</p>
                 <p className="text-white/35 text-xs truncate"
-                  style={{ fontFamily: "'DM Sans', sans-serif" }}>Espace Propriétaire</p>
+                  style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                  {activeContext === 'etablissement' ? 'Exploitation' : 'Patrimoine'}
+                </p>
               </div>
             </div>
           )}
+
+          <div className="px-3 pt-3">
+            <DashboardContextSwitcher value={activeContext} options={profileOptions}
+              loading={businessProfiles === null}
+              onChange={(context) => router.push(context === 'etablissement' ? '/mes-hotels' : '/mes-biens')} />
+          </div>
 
           {/* Nav */}
           <nav className="px-3 py-3 space-y-0.5">

@@ -41,6 +41,12 @@ const requireTenantScope = async (req, res, next) => {
   if (context.source === 'legacy_fallback' && !req.tenantScopeUserIds.some((id) => String(id) === String(userId))) {
     req.tenantScopeUserIds.push(userId);
   }
+  // Les services métier centraux reçoivent déjà `req.user`; enrichir cet
+  // acteur évite de disperser tenantId dans chaque signature sans jamais
+  // faire confiance à une valeur issue du body/query client.
+  req.user.platformTenant = req.platformTenant;
+  req.user.tenantScopeUserIds = req.tenantScopeUserIds;
+  req.user.tenantContextSource = req.tenantContextSource;
   return next();
 };
 

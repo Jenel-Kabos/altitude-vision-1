@@ -14,6 +14,7 @@ const User = require('../models/User');
 const Document = require('../models/Document');
 const documentRoutes = require('../routes/documentRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(120000);
 
@@ -33,9 +34,11 @@ async function fixture() {
   const admin = await User.create({ name: 'Admin', email: `docwl${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin' });
   const clientA = await User.create({ name: 'Client A', email: `docwla${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client' });
   const clientB = await User.create({ name: 'Client B', email: `docwlb${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client' });
-  await Document.create({ type: 'Facture', status: 'Envoyé', client: clientA._id, createdBy: admin._id, items: [{ description: 'x', quantity: 1, unitPrice: 100, total: 100 }] });
-  await Document.create({ type: 'Devis', status: 'Brouillon', client: clientB._id, createdBy: admin._id, items: [{ description: 'y', quantity: 1, unitPrice: 200, total: 200 }] });
-  return { admin, clientA, clientB, adminToken: signToken(admin._id) };
+  const { tenant, bootstrap } = await createTenantFixture({ label: 'Documents whitelist', bootstrap: admin });
+  await Promise.all([admin, clientA, clientB].map((user) => addTenantMember({ tenant, user, bootstrap })));
+  await Document.create({ tenant: tenant._id, type: 'Facture', status: 'Envoyé', client: clientA._id, createdBy: admin._id, items: [{ description: 'x', quantity: 1, unitPrice: 100, total: 100 }] });
+  await Document.create({ tenant: tenant._id, type: 'Devis', status: 'Brouillon', client: clientB._id, createdBy: admin._id, items: [{ description: 'y', quantity: 1, unitPrice: 200, total: 200 }] });
+  return { admin, clientA, clientB, tenant, adminToken: signToken(admin._id) };
 }
 
 test('filtre légitime (type/status) fonctionne normalement', async () => {
@@ -96,8 +99,8 @@ test('valeur enum invalide pour type : ignorée plutôt que provoquer une recher
 // sans ces champs reste visible sans filtre, jamais masqué par défaut.
 describe('filtres de classement DOC-ARCH-1 (pole/service/categorie/entityType/entityId)', () => {
   test('filtre par pole (enum whitelisté) fonctionne normalement', async () => {
-    const { adminToken, clientA } = await fixture();
-    await Document.create({ type: 'Facture', status: 'Envoyé', client: clientA._id, pole: 'Altimmo', service: 'gestion_locative' });
+    const { adminToken, clientA, tenant } = await fixture();
+    await Document.create({ tenant: tenant._id, type: 'Facture', status: 'Envoyé', client: clientA._id, pole: 'Altimmo', service: 'gestion_locative' });
     const res = await request(app).get('/api/documents').query({ pole: 'Altimmo' }).set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
     expect(res.body.results).toBe(1);
@@ -112,9 +115,9 @@ describe('filtres de classement DOC-ARCH-1 (pole/service/categorie/entityType/en
   });
 
   test('filtre combiné pole + service (texte libre whitelisté en scalaire)', async () => {
-    const { adminToken, clientA } = await fixture();
-    await Document.create({ type: 'Facture', status: 'Envoyé', client: clientA._id, pole: 'Altimmo', service: 'gestion_locative' });
-    await Document.create({ type: 'Facture', status: 'Envoyé', client: clientA._id, pole: 'Altimmo', service: 'proprietaires' });
+    const { adminToken, clientA, tenant } = await fixture();
+    await Document.create({ tenant: tenant._id, type: 'Facture', status: 'Envoyé', client: clientA._id, pole: 'Altimmo', service: 'gestion_locative' });
+    await Document.create({ tenant: tenant._id, type: 'Facture', status: 'Envoyé', client: clientA._id, pole: 'Altimmo', service: 'proprietaires' });
     const res = await request(app).get('/api/documents').query({ pole: 'Altimmo', service: 'gestion_locative' }).set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
     expect(res.body.results).toBe(1);

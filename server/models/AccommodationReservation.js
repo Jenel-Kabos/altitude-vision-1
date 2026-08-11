@@ -4,6 +4,7 @@ const STATUSES = ['draft', 'pending', 'confirmed', 'cancelled', 'checked_in', 'c
 const PAYMENT_STATUSES = ['unpaid', 'partially_paid', 'paid', 'partially_refunded', 'refunded'];
 
 const schema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   accommodation: { type: mongoose.Schema.Types.ObjectId, ref: 'Accommodation', required: true, index: true },
   guest: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },

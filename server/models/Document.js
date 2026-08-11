@@ -10,6 +10,7 @@ const itemSchema = new mongoose.Schema({
 
 const documentSchema = new mongoose.Schema(
   {
+    tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
     type: {
       type: String,
       required: true,

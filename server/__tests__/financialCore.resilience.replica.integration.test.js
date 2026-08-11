@@ -21,6 +21,7 @@ const { allocatePaymentToDocument, reversePaymentAllocation } = require('../serv
 const { scanFinancialConsistency, planFinancialReconciliation, applyFinancialReconciliation } = require('../services/finance/financialReconciliationService');
 const { registerProviderEvent } = require('../services/finance/financialIdempotencyService');
 const { createManualPayment } = require('../services/finance/financialPaymentService');
+const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
 const execFileAsync = promisify(execFile);
 
 jest.setTimeout(180000);
@@ -349,12 +350,24 @@ test('les routes JWT isolent deux propriétaires et refusent les mutations falsi
   const app = express(); app.use(express.json()); app.use('/api/financial', financialRoutes); app.use((error, _req, res, _next) => res.status(error.statusCode || res.statusCode || 500).json({ code: error.code, message: error.message }));
   const makeUser = (name, role) => User.create({ name, email: `${name.toLowerCase()}@example.com`, role, password: 'Password123!', passwordConfirm: 'Password123!', isEmailVerified: true });
   const [ownerA, ownerB] = await Promise.all([makeUser('OwnerA', 'Proprietaire'), makeUser('OwnerB', 'Proprietaire')]);
-  const [hotelA, hotelB] = await Promise.all([Hotel.create({ name: 'Hotel A', manager: ownerA._id, createdBy: ownerA._id }), Hotel.create({ name: 'Hotel B', manager: ownerB._id, createdBy: ownerB._id })]);
-  const { doc: documentA } = await document(scope(hotelA._id), 20000);
-  const { doc: documentB } = await document(scope(hotelB._id), 20000);
+  const [tenantA, tenantB] = await Promise.all([
+    createTenantFixture({ label: 'Financial route owner A' }),
+    createTenantFixture({ label: 'Financial route owner B' }),
+  ]);
+  await Promise.all([
+    addTenantMember({ tenant: tenantA.tenant, user: ownerA, bootstrap: tenantA.bootstrap }),
+    addTenantMember({ tenant: tenantB.tenant, user: ownerB, bootstrap: tenantB.bootstrap }),
+  ]);
+  const [hotelA, hotelB] = await Promise.all([
+    Hotel.create({ name: 'Hotel A', tenant: tenantA.tenant._id, manager: ownerA._id, createdBy: ownerA._id }),
+    Hotel.create({ name: 'Hotel B', tenant: tenantB.tenant._id, manager: ownerB._id, createdBy: ownerB._id }),
+  ]);
+  const { doc: documentA } = await document({ ...scope(hotelA._id), tenant: tenantA.tenant._id }, 20000);
+  const { doc: documentB } = await document({ ...scope(hotelB._id), tenant: tenantB.tenant._id }, 20000);
   const token = (user) => jwt.sign({ id: user._id, tokenVersion: user.tokenVersion }, process.env.JWT_SECRET, { expiresIn: '1h' });
   await request(app).get(`/api/financial/documents/${documentA._id}`).set('Authorization', `Bearer ${token(ownerA)}`).expect(200);
-  await request(app).get(`/api/financial/documents/${documentB._id}`).set('Authorization', `Bearer ${token(ownerA)}`).expect(403);
+  // Une ressource appartenant à un autre tenant est volontairement masquée.
+  await request(app).get(`/api/financial/documents/${documentB._id}`).set('Authorization', `Bearer ${token(ownerA)}`).expect(404);
   await request(app).get(`/api/financial/documents/${documentA._id}`).expect(401);
   await request(app).post('/api/financial/payments/manual').set('Authorization', `Bearer ${token(ownerA)}`).send({ establishmentId: hotelB._id, amountMinor: 1000, currency: 'XAF', method: 'cash', confirmed: true, createdBy: ownerA._id, status: 'succeeded' }).expect(403);
   expect(await FinancialPayment.countDocuments({ establishmentId: hotelB._id })).toBe(0);

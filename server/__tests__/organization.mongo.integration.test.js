@@ -18,6 +18,7 @@ const {
 const { getExecutiveReport, getDomainReport } = require('../services/reporting/reportingService');
 const organizationRoutes = require('../routes/organizationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { createTenantFixture, addTenantMember, tenantActor } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(120000);
 
@@ -213,13 +214,16 @@ describe('reportingService — intégration ORGANIZATION-1 (Phase 7/9, additive)
 
   test('un orgUnitId lié à un hôtel scope le détail financier hôtelier, jamais un calcul RevPAR/ADR approximé', async () => {
     const admin = await makeUser({ role: 'Admin' });
-    const hotel = await Hotel.create({ name: 'Hotel Reporting Org', manager: admin._id, createdBy: admin._id });
+    const { tenant, bootstrap } = await createTenantFixture({ label: 'Organization reporting', bootstrap: admin });
+    await addTenantMember({ tenant, user: admin, bootstrap });
+    const actor = tenantActor(admin, tenant);
+    const hotel = await Hotel.create({ name: 'Hotel Reporting Org', tenant: tenant._id, manager: admin._id, createdBy: admin._id });
     const org = await createOrgUnit({ name: 'Org', type: 'organization', actor: admin });
     const establishment = await createOrgUnit({
       name: 'Hotel Reporting Org', type: 'establishment', parentId: org._id, actor: admin,
       linkedEstablishment: { establishmentType: 'Hotel', establishmentId: hotel._id },
     });
-    const report = await getDomainReport('hotel', { user: admin, orgUnitId: establishment._id });
+    const report = await getDomainReport('hotel', { user: actor, orgUnitId: establishment._id });
     expect(report.orgScopeSupported).toBe(true);
     expect(report.revPARMinor).toBeNull(); // jamais un ratio faux (chambres non scopées)
     expect(report.finance.scope.hotelId).toBe(String(hotel._id));

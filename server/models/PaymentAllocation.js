@@ -1,5 +1,29 @@
-const mongoose = require('mongoose'); const C = require('../constants/financialConstants'); const ObjectId = mongoose.Schema.Types.ObjectId;
-const schema = new mongoose.Schema({ financialPayment: { type: ObjectId, ref: 'FinancialPayment', required: true }, financialDocument: { type: ObjectId, ref: 'FinancialDocument', required: true }, domain: { type: String, enum: C.FINANCIAL_DOMAINS, required: true }, establishmentType: { type: String, enum: C.FINANCIAL_ESTABLISHMENT_TYPES, required: true }, establishmentId: { type: ObjectId, required: true }, currency: { type: String, enum: C.FINANCIAL_CURRENCIES, required: true }, amountMinor: { type: Number, required: true, min: 1 }, status: { type: String, enum: C.FINANCIAL_ALLOCATION_STATUSES, default: 'active' }, businessOperationKey: { type: String, required: true }, allocatedAt: { type: Date, default: Date.now }, allocatedBy: { type: ObjectId, ref: 'User', required: true }, reversedAt: Date, reversedBy: { type: ObjectId, ref: 'User' }, reversalReason: String, metadata: { type: mongoose.Schema.Types.Mixed, default: {} } }, { timestamps: true });
+const mongoose = require('mongoose');
+const C = require('../constants/financialConstants');
+const ObjectId = mongoose.Schema.Types.ObjectId;
+
+const schema = new mongoose.Schema({
+  tenant: { type: ObjectId, ref: 'PlatformTenant', default: null, index: true },
+  financialPayment: { type: ObjectId, ref: 'FinancialPayment', required: true },
+  financialDocument: { type: ObjectId, ref: 'FinancialDocument', required: true },
+  domain: { type: String, enum: C.FINANCIAL_DOMAINS, required: true },
+  establishmentType: { type: String, enum: C.FINANCIAL_ESTABLISHMENT_TYPES, required: true },
+  establishmentId: { type: ObjectId, required: true },
+  currency: { type: String, enum: C.FINANCIAL_CURRENCIES, required: true },
+  amountMinor: { type: Number, required: true, min: 1 },
+  status: { type: String, enum: C.FINANCIAL_ALLOCATION_STATUSES, default: 'active' },
+  businessOperationKey: { type: String, required: true },
+  allocatedAt: { type: Date, default: Date.now },
+  allocatedBy: { type: ObjectId, ref: 'User', required: true },
+  reversedAt: Date,
+  reversedBy: { type: ObjectId, ref: 'User' },
+  reversalReason: String,
+  metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+}, { timestamps: true });
+
 schema.path('amountMinor').validate(Number.isSafeInteger, 'amountMinor doit être un entier sûr.');
-schema.index({ financialPayment: 1 }); schema.index({ financialDocument: 1 }); schema.index({ domain: 1, establishmentId: 1, businessOperationKey: 1 }, { unique: true });
+schema.index({ financialPayment: 1 });
+schema.index({ financialDocument: 1 });
+schema.index({ domain: 1, establishmentId: 1, businessOperationKey: 1 }, { unique: true });
+
 module.exports = mongoose.model('PaymentAllocation', schema);

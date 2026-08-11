@@ -7,6 +7,22 @@ jest.mock('../services/rentalAssetOnboardingService', () => ({
   getOptions: jest.fn(), activateExisting: jest.fn(),
   OnboardingError: class OnboardingError extends Error { constructor(message, statusCode, code, missingFields=[]) { super(message); Object.assign(this,{statusCode,code,missingFields}); } },
 }));
+// TENANT-CERT-2 — router.param('id', …) de rentalManagementRoutes.js
+// vérifie désormais la frontière tenant (voir
+// __tests__/tenantCert2.adversarial.mongo.integration.test.js pour la
+// vérification réelle) ; mocké ici pour rester indépendant d'une vraie
+// connexion Mongo dans ce test unitaire.
+jest.mock('../services/platformTenant/tenantContextService', () => ({
+  resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439001' }),
+  resolveRootOrgUnitId: jest.fn().mockResolvedValue('607f1f77bcf86cd799439001'),
+  resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),
+  resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set() }),
+}));
+jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
+  assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+  assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+  resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+}));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));

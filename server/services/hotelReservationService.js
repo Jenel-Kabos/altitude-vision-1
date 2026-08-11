@@ -123,6 +123,16 @@ async function createReservation({
 }) {
   const hotel = await Hotel.findById(hotelId);
   if (!hotel) { const err = new Error('Hôtel introuvable.'); err.statusCode = 404; throw err; }
+  let attribution = hotel.tenant
+    ? { status: 'resolved', tenantId: String(hotel.tenant) }
+    : { status: 'unresolved', tenantId: null };
+  if (!hotel.tenant && actingUser?.platformTenant) {
+    const { resolveResourceTenant } = require('./platformTenant/tenantResourceAttributionService');
+    attribution = await resolveResourceTenant({ resourceType: 'Hotel', resource: hotel });
+  }
+  if (actingUser?.platformTenant && (attribution.status !== 'resolved' || String(attribution.tenantId) !== String(actingUser.platformTenant._id || actingUser.platformTenant))) {
+    const err = new Error('Hôtel introuvable dans ce contexte tenant.'); err.code = 'TENANT_RESOURCE_NOT_FOUND'; err.statusCode = 404; throw err;
+  }
 
   const category = await RoomCategory.findOne({ _id: roomCategoryId, hotel: hotelId });
   if (!category) { const err = new Error("Catégorie de chambres introuvable pour cet hôtel."); err.statusCode = 404; throw err; }
@@ -163,6 +173,7 @@ async function createReservation({
     }
 
     const data = {
+      tenant: attribution.status === 'resolved' ? attribution.tenantId : null,
       hotel: hotelId,
       reservationRequestId: normalizedRequestId,
       reservationRequestHash: requestHash,
