@@ -329,31 +329,12 @@ describe('HTTP /api/platform-tenants — réservé Direction (Admin)', () => {
     expect(res.status).toBe(403);
   });
 
-  test('cycle HTTP complet : créer → suspendre → réactiver → activer un module → archiver', async () => {
+  test('un Admin sans capacité opérateur vérifiable ne peut créer un tenant par HTTP', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const token = `Bearer ${signToken(admin._id)}`;
 
     const createRes = await request(app).post('/api/platform-tenants').set('Authorization', token).send({ name: 'HTTP Lifecycle Test', plan: 'starter' });
-    expect(createRes.status).toBe(201);
-    const tenantId = createRes.body.data.tenant._id;
-
-    const overviewRes = await request(app).get(`/api/platform-tenants/${tenantId}`).set('Authorization', token);
-    expect(overviewRes.status).toBe(200);
-    expect(overviewRes.body.data.overview.subscription.plan).toBe('starter');
-
-    const suspendRes = await request(app).patch(`/api/platform-tenants/${tenantId}/suspend`).set('Authorization', token).send({ reason: 'Test' });
-    expect(suspendRes.status).toBe(200);
-    expect(suspendRes.body.data.tenant.status).toBe('suspended');
-
-    const reactivateRes = await request(app).patch(`/api/platform-tenants/${tenantId}/reactivate`).set('Authorization', token);
-    expect(reactivateRes.status).toBe(200);
-
-    const featureRes = await request(app).patch(`/api/platform-tenants/${tenantId}/features/crm`).set('Authorization', token).send({ enabled: true });
-    expect(featureRes.status).toBe(200);
-    expect(featureRes.body.data.feature.enabled).toBe(true);
-
-    const archiveRes = await request(app).patch(`/api/platform-tenants/${tenantId}/archive`).set('Authorization', token);
-    expect(archiveRes.status).toBe(200);
-    expect(archiveRes.body.data.tenant.status).toBe('archived');
+    expect(createRes.status).toBe(403);
+    expect(await require('../models/PlatformTenant').countDocuments({ name: 'HTTP Lifecycle Test' })).toBe(0);
   });
 });

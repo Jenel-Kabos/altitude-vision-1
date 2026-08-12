@@ -7,6 +7,7 @@ const mockUploadToCloudinary = jest.fn();
 const mockDestroyFromCloudinary = jest.fn();
 jest.mock('../config/cloudinary', () => ({
   ...jest.requireActual('../config/cloudinary'),
+  cloudinary: { ...jest.requireActual('../config/cloudinary').cloudinary, uploader: { ...jest.requireActual('../config/cloudinary').cloudinary.uploader, destroy: (...args) => mockDestroyFromCloudinary(...args) } },
   uploadToCloudinary: (...args) => mockUploadToCloudinary(...args),
   destroyFromCloudinary: (...args) => mockDestroyFromCloudinary(...args),
 }));
@@ -60,14 +61,16 @@ async function fixtureEcheance() {
 }
 
 test('upload réussi + écriture DB réussie : le fichier reste, aucun rollback appelé', async () => {
-  mockUploadToCloudinary.mockResolvedValue({ secure_url: 'https://cdn.test/ok.jpg', public_id: 'ok-id' });
+  mockUploadToCloudinary.mockResolvedValue({ secure_url: 'https://cdn.test/ok.jpg', public_id: 'ok-id', resource_type: 'image', version: 1, format: 'jpg', bytes: 3 });
   const { paiement, adminToken } = await fixtureEcheance();
   const res = await request(app).post(`/api/paiements/${paiement._id}/marquer-paye`).set('Authorization', `Bearer ${adminToken}`)
     .field('montantRecu', '150000').field('datePaiement', '2027-06-10').field('modePaiement', 'espèces')
     .attach('preuve', Buffer.from('img'), { filename: 'preuve.jpg', contentType: 'image/jpeg' });
   expect(res.status).toBe(200);
   expect(mockDestroyFromCloudinary).not.toHaveBeenCalled();
-  expect((await Paiement.findById(paiement._id)).preuvePaiement.url).toBe('https://cdn.test/ok.jpg');
+  const stored = await Paiement.findById(paiement._id).select('+preuvePaiement.asset.publicId +preuvePaiement.asset.deliveryType');
+  expect(stored.preuvePaiement.asset).toMatchObject({ publicId: 'ok-id', deliveryType: 'authenticated' });
+  expect(stored.preuvePaiement.url).toBeUndefined();
 });
 
 // Note méthodologique : les deux tests suivants forçaient initialement le
@@ -85,7 +88,7 @@ test('upload réussi + écriture DB réussie : le fichier reste, aucun rollback 
 // spy déterministe sur Paiement.findOneAndUpdate isole strictement le
 // comportement de rollback Cloudinary, sans dépendre d'une vraie course.
 test('upload réussi + écriture DB échoue (CAS perdue) : rollback Cloudinary appelé, erreur 409 propagée', async () => {
-  mockUploadToCloudinary.mockResolvedValue({ secure_url: 'https://cdn.test/rollback-me.jpg', public_id: 'rollback-me-id' });
+  mockUploadToCloudinary.mockResolvedValue({ secure_url: 'https://cdn.test/rollback-me.jpg', public_id: 'rollback-me-id', resource_type: 'image', version: 1, format: 'jpg', bytes: 3 });
   mockDestroyFromCloudinary.mockResolvedValue();
   const { paiement, adminToken } = await fixtureEcheance();
   const spy = jest.spyOn(Paiement, 'findOneAndUpdate').mockImplementationOnce(lostCasQuery);
@@ -95,14 +98,14 @@ test('upload réussi + écriture DB échoue (CAS perdue) : rollback Cloudinary a
     .attach('preuve', Buffer.from('img'), { filename: 'preuve.jpg', contentType: 'image/jpeg' });
 
   expect(res.status).toBe(409);
-  expect(mockDestroyFromCloudinary).toHaveBeenCalledWith('https://cdn.test/rollback-me.jpg');
+  expect(mockDestroyFromCloudinary).toHaveBeenCalledWith('rollback-me-id', expect.objectContaining({ type: 'authenticated', resource_type: 'image' }));
   expect(mockDestroyFromCloudinary).toHaveBeenCalledTimes(1);
   expect(await RentalPaymentReceipt.countDocuments({ paiement: paiement._id })).toBe(0);
   spy.mockRestore();
 });
 
 test('upload réussi + écriture DB échoue + le rollback Cloudinary échoue aussi : l’erreur métier d’origine reste renvoyée', async () => {
-  mockUploadToCloudinary.mockResolvedValue({ secure_url: 'https://cdn.test/double-fail.jpg', public_id: 'double-fail-id' });
+  mockUploadToCloudinary.mockResolvedValue({ secure_url: 'https://cdn.test/double-fail.jpg', public_id: 'double-fail-id', resource_type: 'image', version: 1, format: 'jpg', bytes: 3 });
   mockDestroyFromCloudinary.mockRejectedValue(new Error('Cloudinary indisponible'));
   const { paiement, adminToken } = await fixtureEcheance();
   const spy = jest.spyOn(Paiement, 'findOneAndUpdate').mockImplementationOnce(lostCasQuery);
@@ -119,7 +122,7 @@ test('upload réussi + écriture DB échoue + le rollback Cloudinary échoue aus
 });
 
 test('aucune double suppression Cloudinary sur un seul échec', async () => {
-  mockUploadToCloudinary.mockResolvedValue({ secure_url: 'https://cdn.test/once.jpg', public_id: 'once-id' });
+  mockUploadToCloudinary.mockResolvedValue({ secure_url: 'https://cdn.test/once.jpg', public_id: 'once-id', resource_type: 'image', version: 1, format: 'jpg', bytes: 3 });
   mockDestroyFromCloudinary.mockResolvedValue();
   const { paiement, adminToken } = await fixtureEcheance();
   await Paiement.findByIdAndUpdate(paiement._id, { statut: 'payé', montantRecu: 150000 });

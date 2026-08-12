@@ -22,6 +22,7 @@ router.get('/link-status', ctrl.getLinkStatus);
 
 router.get('/dashboard', ctrl.getDashboard);
 router.get('/me', ctrl.getMe);
+router.get('/me/identity-document', ctrl.downloadMyIdentityDocument);
 router.get('/lease', ctrl.getLease);
 router.get('/leases', ctrl.getLeases);
 router.get('/payments', ctrl.getPayments);
@@ -29,6 +30,7 @@ router.get('/documents', ctrl.getDocuments);
 router.get('/documents/:documentId/download', ctrl.downloadDocument);
 router.get('/notice', ctrl.getNotice);
 router.get('/maintenance', ctrl.getMaintenance);
+router.get('/maintenance/:ticketId/attachments/:attachmentIndex', ctrl.downloadMaintenanceAttachment);
 router.post('/maintenance', maintenanceUpload.array('photos', 5), ctrl.createMaintenanceRequest);
 
 module.exports = router;

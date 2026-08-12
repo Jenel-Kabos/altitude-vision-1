@@ -45,3 +45,10 @@ export const resolveLitige = async (id, decision) => {
   const res = await api.post(`/litiges/${id}/resolution`, { decision });
   return res.data;
 };
+
+export const previewLitigeProof = async (endpoint) => {
+  const res = await api.get(endpoint, { responseType: 'blob' });
+  const url = URL.createObjectURL(res.data);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+};

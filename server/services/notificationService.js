@@ -268,14 +268,34 @@ async function notify({
  * @returns {Promise<void>}
  */
 async function notifyStaff(payload) {
+  const attributionService = require('./platformTenant/tenantResourceAttributionService');
+  const { resolveTenantScope } = require('./platformTenant/tenantContextService');
+  let resolvedTenantId = payload.platformTenantId || null;
+  let resourceType = payload.entityType;
+  let resource = payload.entityId;
+  const data = payload.data || payload.metadata || {};
+  if (!resource && data.rentalManagementId) { resourceType = 'RentalManagement'; resource = data.rentalManagementId; }
+  if (!resource && data.hotelId) { resourceType = 'Hotel'; resource = data.hotelId; }
+  if (!resource && data.propertyId) { resourceType = 'Property'; resource = data.propertyId; }
+  if (!resource && data.reservationId && String(payload.type || '').startsWith('hotel_')) { resourceType = 'HotelReservation'; resource = data.reservationId; }
+  if (!resource && data.reservationId && String(payload.type || '').startsWith('accommodation_')) { resourceType = 'AccommodationReservation'; resource = data.reservationId; }
+  if (!resolvedTenantId && resourceType && resource) {
+    const attribution = await attributionService.resolveResourceTenant({ resourceType, resource }).catch(() => null);
+    if (attribution?.status === 'resolved') resolvedTenantId = attribution.tenantId;
+  }
+  if (!resolvedTenantId) return;
+  const scope = await resolveTenantScope(resolvedTenantId).catch(() => ({ scopeUserIds: null }));
+  const staffIds = [...(scope.scopeUserIds || [])];
+  if (!staffIds.length) return;
   const staffMembers = await User.find({
+    _id:      { $in: staffIds },
     role:     { $in: ALL_STAFF },
     isActive: true,
     status:   { $nin: ['Suspendu', 'Banni'] },
   }).select('_id').lean();
 
   await Promise.allSettled(
-    staffMembers.map((s) => notify({ ...payload, audience: 'staff', link: payload.link ?? null, recipient: s._id })),
+    staffMembers.map((s) => notify({ ...payload, platformTenantId: resolvedTenantId, audience: 'staff', link: payload.link ?? null, recipient: s._id })),
   );
 }
 

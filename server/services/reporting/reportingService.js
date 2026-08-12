@@ -110,22 +110,22 @@ async function getExecutiveReport({ user, dateFrom, dateTo, orgUnitId, tenantId 
   // propre appel (voir crmReport.js/financeReport.js/…) et échouera de façon
   // isolée via settle() ci-dessous, jamais en cascade.
   const [crmDashboard, { scopeUserIds, hotelId }] = await Promise.all([
-    crmService.getDashboard().catch(() => null),
+    crmService.getDashboard(new Date(), { tenantId }).catch(() => null),
     resolveOrgScope(effectiveOrgUnitId),
   ]);
 
   const [immobilier, location, patrimoine, accommodation, hotel, crm, finance, communication, evenementiel, marketing, users] = await Promise.all([
-    settle(withNoOrgScope(getImmobilierReport())),
-    settle(withNoOrgScope(getLocationReport())),
-    settle(withNoOrgScope(getPatrimoineReport({ dateFrom, dateTo }))),
-    settle(withNoOrgScope(getAccommodationReport())),
+    settle(withNoOrgScope(getImmobilierReport({ scopeUserIds }))),
+    settle(withNoOrgScope(getLocationReport({ scopeUserIds }))),
+    tenantId ? settle(Promise.resolve({ unavailable: true, reason: 'Tendance de marché globale masquée en contexte tenant.' })) : settle(withNoOrgScope(getPatrimoineReport({ dateFrom, dateTo }))),
+    settle(withNoOrgScope(getAccommodationReport({ tenantId }))),
     settle(getHotelReport({ user, dateFrom, dateTo, hotelId })),
-    settle(getCrmReport({ crmDashboard, scopeUserIds })),
-    settle(withNoOrgScope(getFinanceReport({ crmDashboard }))),
-    settle(withNoOrgScope(getCommunicationReport({ crmDashboard }))),
-    settle(withNoOrgScope(getEvenementielReport({ crmDashboard }))),
-    settle(getMarketingReport({ crmDashboard })),
-    settle(getUserKpiSummary()),
+    settle(getCrmReport({ crmDashboard, scopeUserIds, tenantId })),
+    settle(withNoOrgScope(getFinanceReport({ crmDashboard, tenantId }))),
+    tenantId ? settle(Promise.resolve({ unavailable: true, reason: 'Sources Communication historiques non attribuables au tenant.' })) : settle(withNoOrgScope(getCommunicationReport({ crmDashboard }))),
+    tenantId ? settle(Promise.resolve({ unavailable: true, reason: 'Événements historiques non attribuables au tenant.' })) : settle(withNoOrgScope(getEvenementielReport({ crmDashboard }))),
+    settle(getMarketingReport({ crmDashboard, tenantId })),
+    tenantId ? settle(Promise.resolve({ unavailable: true, reason: 'KPI utilisateurs globaux masqués en contexte tenant.' })) : settle(getUserKpiSummary()),
   ]);
 
   return {
@@ -140,19 +140,19 @@ async function getExecutiveReport({ user, dateFrom, dateTo, orgUnitId, tenantId 
 
 async function getDomainReport(domain, { user, dateFrom, dateTo, orgUnitId, tenantId } = {}) {
   const effectiveOrgUnitId = await resolveEffectiveOrgUnitId({ orgUnitId, tenantId });
-  const crmDashboard = ['finance', 'communication', 'evenementiel', 'marketing'].includes(domain) ? await crmService.getDashboard() : null;
+  const crmDashboard = ['finance', 'communication', 'evenementiel', 'marketing'].includes(domain) ? await crmService.getDashboard(new Date(), { tenantId }) : null;
   const { scopeUserIds, hotelId } = await resolveOrgScope(effectiveOrgUnitId);
   switch (domain) {
-    case 'immobilier': return withNoOrgScope(getImmobilierReport());
-    case 'location': return withNoOrgScope(getLocationReport());
-    case 'patrimoine': return withNoOrgScope(getPatrimoineReport({ dateFrom, dateTo }));
-    case 'accommodation': return withNoOrgScope(getAccommodationReport());
+    case 'immobilier': return withNoOrgScope(getImmobilierReport({ scopeUserIds }));
+    case 'location': return withNoOrgScope(getLocationReport({ scopeUserIds }));
+    case 'patrimoine': return tenantId ? { unavailable: true, reason: 'Tendance de marché globale masquée en contexte tenant.' } : withNoOrgScope(getPatrimoineReport({ dateFrom, dateTo }));
+    case 'accommodation': return withNoOrgScope(getAccommodationReport({ tenantId }));
     case 'hotel': return getHotelReport({ user, dateFrom, dateTo, hotelId });
-    case 'crm': return getCrmReport({ scopeUserIds });
-    case 'finance': return withNoOrgScope(getFinanceReport({ crmDashboard }));
-    case 'communication': return withNoOrgScope(getCommunicationReport({ crmDashboard }));
-    case 'evenementiel': return withNoOrgScope(getEvenementielReport({ crmDashboard }));
-    case 'marketing': return getMarketingReport({ crmDashboard });
+    case 'crm': return getCrmReport({ scopeUserIds, tenantId });
+    case 'finance': return withNoOrgScope(getFinanceReport({ crmDashboard, tenantId }));
+    case 'communication': return tenantId ? { unavailable: true, reason: 'Sources Communication historiques non attribuables au tenant.' } : withNoOrgScope(getCommunicationReport({ crmDashboard }));
+    case 'evenementiel': return tenantId ? { unavailable: true, reason: 'Événements historiques non attribuables au tenant.' } : withNoOrgScope(getEvenementielReport({ crmDashboard }));
+    case 'marketing': return getMarketingReport({ crmDashboard, tenantId });
     default: { const err = new Error(`Domaine de reporting inconnu : ${domain}.`); err.statusCode = 404; throw err; }
   }
 }

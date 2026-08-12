@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 const { Schema } = mongoose;
 const ObjectId  = Schema.Types.ObjectId;
 
@@ -38,6 +39,7 @@ const paiementTransactionSchema = new Schema(
     preuvePaiement: {
       url:      { type: String },
       publicId: { type: String },
+      asset:    { type: privateAssetSchema },
     },
 
     confirméPar: { type: ObjectId, ref: 'User' },
@@ -61,5 +63,6 @@ paiementTransactionSchema.index(
     name: 'one_open_payment_per_transaction_and_method',
   },
 );
+paiementTransactionSchema.set('toJSON', { transform: (_doc, ret) => { delete ret.preuvePaiement; return ret; } });
 
 module.exports = mongoose.model('PaiementTransaction', paiementTransactionSchema);

@@ -156,3 +156,17 @@ export const sendStaffReplyWithAttachments = async (conversationId, content, fil
     });
     return res.data?.data?.message;
 };
+
+export const openConversationAttachment = async (attachment, { download = false } = {}) => {
+    const endpoint = download ? attachment.downloadEndpoint : attachment.previewEndpoint;
+    if (!endpoint) throw new Error('Pièce jointe indisponible');
+    const response = await api.get(endpoint.replace(/^\/api/, ''), { responseType: 'blob' });
+    const objectUrl = URL.createObjectURL(response.data);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    if (download) anchor.download = attachment.nom || attachment.originalFilename || 'attachment';
+    else anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+};

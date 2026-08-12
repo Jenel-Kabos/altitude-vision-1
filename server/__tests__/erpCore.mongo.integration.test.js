@@ -202,20 +202,22 @@ describe('HTTP /api/erp — réservé Direction (Admin)', () => {
 
   test('un Admin obtient les 4 endpoints', async () => {
     const admin = await makeUser({ role: 'Admin' });
-    const token = `Bearer ${signToken(admin._id)}`;
-    const executive = await request(app).get('/api/erp/executive').set('Authorization', token);
+    const tenant = await platformTenantService.createTenant({ name: `ERP HTTP ${Date.now()}`, actor: admin });
+    await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin });
+    const headers = { Authorization: `Bearer ${signToken(admin._id)}`, 'X-Platform-Tenant-Id': String(tenant._id) };
+    const executive = await request(app).get('/api/erp/executive').set(headers);
     expect(executive.status).toBe(200);
     expect(executive.body.data.overview).toHaveProperty('alerts');
 
-    const alerts = await request(app).get('/api/erp/alerts').set('Authorization', token);
+    const alerts = await request(app).get('/api/erp/alerts').set(headers);
     expect(alerts.status).toBe(200);
     expect(Array.isArray(alerts.body.data.alerts)).toBe(true);
 
-    const decisions = await request(app).get('/api/erp/decisions').set('Authorization', token);
+    const decisions = await request(app).get('/api/erp/decisions').set(headers);
     expect(decisions.status).toBe(200);
     expect(decisions.body.data.decisions).toHaveProperty('risques');
 
-    const health = await request(app).get('/api/erp/health').set('Authorization', token);
+    const health = await request(app).get('/api/erp/health').set(headers);
     expect(health.status).toBe(200);
     expect(health.body.data.health.modules).toHaveLength(8);
   });

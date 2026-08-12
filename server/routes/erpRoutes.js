@@ -4,8 +4,9 @@
 const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/erpController');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
-router.use(auth.protect, auth.restrictTo('Admin'));
+router.use(auth.protect, auth.restrictTo('Admin'), requireTenantScope);
 
 router.get('/executive', controller.getExecutiveOverview);
 router.get('/alerts', controller.getAlerts);

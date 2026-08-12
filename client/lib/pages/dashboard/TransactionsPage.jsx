@@ -12,6 +12,7 @@ import Link from "next/link";
 import {
   getAllTransactions, getStats, getMyTransactions, getPaiements,
   finalizeTransaction, cancelTransaction, validerVirement,
+  previewTransactionPaymentProof,
 } from "../../services/transactionService";
 
 const BLUE  = "#2E7BB5";
@@ -209,7 +210,7 @@ function TransactionModal({ tx, onClose, onRefresh, isAdmin }) {
                     <p style={{ fontFamily: FONT, fontSize: 11, color: "#94A3B8", margin: "2px 0 0" }}>{fmt(p.montant)} — {dateStr(p.createdAt)}</p>
                     {p.telephone && <p style={{ fontFamily: FONT, fontSize: 11, color: "#64748B", margin: "2px 0 0" }}>Tél : {maskPhone(p.telephone)}</p>}
                     {p.referenceBancaire && <p style={{ fontFamily: FONT, fontSize: 11, color: "#64748B", margin: "2px 0 0" }}>Réf : {p.referenceBancaire}</p>}
-                    {p.preuvePaiement?.url && <a href={p.preuvePaiement.url} target="_blank" rel="noreferrer" style={{ fontFamily: FONT, fontSize: 11, color: BLUE }}>Voir justificatif</a>}
+                    {p.paymentProof?.canPreview && <button type="button" onClick={() => previewTransactionPaymentProof(tx._id, p._id)} style={{ fontFamily: FONT, fontSize: 11, color: BLUE, border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }}>Voir justificatif sécurisé</button>}
                   </div>
                   <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600, color: ps.color, background: `${ps.color}15`, padding: "3px 10px", borderRadius: 20, flexShrink: 0 }}>{ps.label}</span>
                   {isAdmin && p.methode === 'virement' && p.statut === 'en_attente' && (

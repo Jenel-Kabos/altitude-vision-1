@@ -44,8 +44,9 @@ const publicLease = (lease) => lease && ({
 
 async function getMyProfile(userId) {
   const l = await requireLocataire(userId);
-  const { nom, prenom, email, telephone, adresse, ville, profession, revenuMensuel, pieceIdentite, _id } = l;
-  return { _id, nom, prenom, email, telephone, adresse, ville, profession, revenuMensuel, pieceIdentite };
+  const { nom, prenom, email, telephone, adresse, ville, profession, revenuMensuel, _id } = l;
+  return { _id, nom, prenom, email, telephone, adresse, ville, profession, revenuMensuel,
+    identityDocument: (l.pieceIdentiteAsset || l.pieceIdentite) ? { canPreview: true, canDownload: true, legacy: !l.pieceIdentiteAsset, previewEndpoint: '/api/tenant-portal/me/identity-document', downloadEndpoint: '/api/tenant-portal/me/identity-document?download=1' } : null };
 }
 async function getMyLease(userId) { const l = await requireLocataire(userId); return publicLease(await getActiveLease(l._id)); }
 async function getMyLeases(userId) { const l = await requireLocataire(userId); return (await getLeases(l._id)).map(publicLease); }
@@ -68,8 +69,8 @@ async function getMyPaymentPage(userId, query = {}) {
 
 function documentRows(leases) {
   return leases.flatMap((lease) => [
-    ...(lease.documents || []).map((d) => ({ _id: d._id, leaseId: lease._id, nom: d.nom, type: d.type || 'autre', dateGeneration: d.dateGeneration, downloadPath: `/tenant-portal/documents/${d._id}/download` })),
-    ...(lease.etatsDesLieux || []).filter((e) => e.documentUrl).map((e, index) => ({ _id: `edl-${lease._id}-${index}`, leaseId: lease._id, nom: `État des lieux ${e.type}`, type: 'etat_des_lieux', dateGeneration: e.date, downloadPath: `/tenant-portal/documents/edl-${lease._id}-${index}/download` })),
+    ...(lease.documents || []).filter((d) => d.asset || d.url).map((d) => ({ _id: d._id, leaseId: lease._id, nom: d.nom, type: d.type || 'autre', dateGeneration: d.dateGeneration, downloadPath: `/tenant-portal/documents/${d._id}/download` })),
+    ...(lease.etatsDesLieux || []).filter((e) => e.documentAsset || e.documentUrl).map((e, index) => ({ _id: `edl-${lease._id}-${index}`, leaseId: lease._id, nom: `État des lieux ${e.type}`, type: 'etat_des_lieux', dateGeneration: e.date, downloadPath: `/tenant-portal/documents/edl-${lease._id}-${index}/download` })),
   ]).sort((a, b) => new Date(b.dateGeneration || 0) - new Date(a.dateGeneration || 0));
 }
 async function getMyDocuments(userId) { const l = await requireLocataire(userId); return documentRows(await getLeases(l._id)); }
@@ -79,11 +80,23 @@ async function getMyDocumentPage(userId, query = {}) {
 }
 async function getMyDocumentDownload(userId, documentId) {
   const l = await requireLocataire(userId); const leases = await getLeases(l._id);
-  for (const lease of leases) {
-    const document = (lease.documents || []).find((d) => String(d._id) === documentId);
+  const leaseIds = leases.map(asId);
+  if (!documentId.startsWith('edl-')) {
+    const lease = await Contrat.findOne({ _id: { $in: leaseIds }, 'documents._id': documentId })
+      .select('+documents.asset.publicId +documents.asset.resourceType +documents.asset.deliveryType +documents.asset.version +documents.asset.format');
+    const document = lease?.documents?.id(documentId);
+    if (document?.asset) return { asset: document.asset.toObject(), name: document.nom || 'document' };
     if (document?.url) return { url: document.url, name: document.nom || 'document' };
+  }
+  for (const leaseSummary of leases) {
+    const lease = await Contrat.findById(leaseSummary._id)
+      .select('+etatsDesLieux.documentAsset.publicId +etatsDesLieux.documentAsset.resourceType +etatsDesLieux.documentAsset.deliveryType +etatsDesLieux.documentAsset.version +etatsDesLieux.documentAsset.format');
     const prefix = `edl-${lease._id}-`;
-    if (documentId.startsWith(prefix)) { const item = lease.etatsDesLieux?.[Number(documentId.slice(prefix.length))]; if (item?.documentUrl) return { url: item.documentUrl, name: `etat-des-lieux-${item.type}` }; }
+    if (documentId.startsWith(prefix)) {
+      const item = lease.etatsDesLieux?.[Number(documentId.slice(prefix.length))];
+      if (item?.documentAsset) return { asset: item.documentAsset.toObject(), name: `etat-des-lieux-${item.type}` };
+      if (item?.documentUrl) return { url: item.documentUrl, name: `etat-des-lieux-${item.type}` };
+    }
   }
   throw fail('Document introuvable.', 404);
 }
@@ -99,7 +112,14 @@ async function getMyMaintenance(userId, query = {}) {
   const l = await requireLocataire(userId); const { page, limit } = pageOptions(query); const match = { tenant: l._id };
   if (query.status === 'open') match.status = { $in: RentalMaintenanceTicket.OPEN_RENTAL_MAINTENANCE_STATUSES }; else if (query.status === 'completed') match.status = { $in: ['resolu', 'cloture'] };
   const [tickets, total] = await Promise.all([RentalMaintenanceTicket.find(match).select('property lease category priority status description scheduledFor attachments resolvedAt createdAt updatedAt').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(), RentalMaintenanceTicket.countDocuments(match)]);
-  return { tickets, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  const safeTickets = tickets.map((ticket) => ({ ...ticket, attachments: (ticket.attachments || []).map((attachment, index) => ({
+    nom: attachment.nom, mimeType: attachment.asset?.mimeType, size: attachment.asset?.size,
+    canPreview: Boolean(attachment.asset || attachment.url), canDownload: Boolean(attachment.asset || attachment.url),
+    previewEndpoint: `/api/tenant-portal/maintenance/${ticket._id}/attachments/${index}`,
+    downloadEndpoint: `/api/tenant-portal/maintenance/${ticket._id}/attachments/${index}?download=1`,
+    legacy: !attachment.asset,
+  })) }));
+  return { tickets: safeTickets, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
 }
 async function createMyMaintenanceRequest(userId, { category, description, attachments = [] }) {
   const l = await requireLocataire(userId); const lease = await getActiveLease(l._id);

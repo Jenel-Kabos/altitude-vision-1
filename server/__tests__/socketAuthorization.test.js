@@ -29,11 +29,23 @@ describe('Socket conversation authorization', () => {
     await expect(canAccessConversation({ _id: userId, role: 'Client' }, conversationId)).resolves.toBe(false);
   });
 
-  test('autorise le staff, mais pas un autre client, dans la boîte partagée', async () => {
-    mockConversation({ participants: [], isStaffInbox: true });
-    await expect(canAccessConversation({ _id: userId, role: 'Collaborateur' }, conversationId)).resolves.toBe(true);
+  test('autorise le staff uniquement dans la boîte partagée de son tenant actif', async () => {
+    const tenantA = new mongoose.Types.ObjectId();
+    const tenantB = new mongoose.Types.ObjectId();
+    mockConversation({ participants: [], isStaffInbox: true, tenant: tenantA });
+    await expect(canAccessConversation({ _id: userId, role: 'Collaborateur' }, conversationId, tenantA)).resolves.toBe(true);
 
-    mockConversation({ participants: [], isStaffInbox: true });
-    await expect(canAccessConversation({ _id: userId, role: 'Client' }, conversationId)).resolves.toBe(false);
+    mockConversation({ participants: [], isStaffInbox: true, tenant: tenantB });
+    await expect(canAccessConversation({ _id: userId, role: 'Collaborateur' }, conversationId, tenantA)).resolves.toBe(false);
+
+    mockConversation({ participants: [], isStaffInbox: true, tenant: tenantA });
+    await expect(canAccessConversation({ _id: userId, role: 'Client' }, conversationId, tenantA)).resolves.toBe(false);
+  });
+
+  test('un utilisateur multi-tenant dans le contexte A ne rejoint pas une conversation B même s’il est participant', async () => {
+    const tenantA = new mongoose.Types.ObjectId();
+    const tenantB = new mongoose.Types.ObjectId();
+    mockConversation({ participants: [userId], isStaffInbox: false, tenant: tenantB });
+    await expect(canAccessConversation({ _id: userId, role: 'Client' }, conversationId, tenantA)).resolves.toBe(false);
   });
 });

@@ -11,6 +11,7 @@
 // un cycle déjà en place (voir RENTAL_MANAGEMENT_V2.md, §décisions).
 
 const mongoose = require('mongoose');
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 
 const RENTAL_MAINTENANCE_CATEGORIES = ['plomberie', 'electricite', 'structure', 'equipement', 'nuisible', 'serrurerie', 'peinture', 'autre'];
 const RENTAL_MAINTENANCE_PRIORITIES = ['basse', 'normale', 'haute', 'urgente'];
@@ -27,7 +28,8 @@ const RENTAL_MAINTENANCE_STATUS_TRANSITIONS = {
 };
 
 const attachmentSchema = new mongoose.Schema({
-  url: { type: String, required: true },
+  url: { type: String },
+  asset: { type: privateAssetSchema },
   nom: { type: String, trim: true, default: '' },
 }, { _id: false });
 
@@ -68,6 +70,14 @@ const rentalMaintenanceTicketSchema = new mongoose.Schema(
 rentalMaintenanceTicketSchema.index({ property: 1 });
 rentalMaintenanceTicketSchema.index({ status: 1 });
 rentalMaintenanceTicketSchema.index({ owner: 1, status: 1 });
+rentalMaintenanceTicketSchema.set('toJSON', { transform: (_doc, ret) => {
+  ret.attachments = (ret.attachments || []).map(({ url, asset, ...metadata }, index) => ({
+    ...metadata, canPreview: Boolean(url || asset), canDownload: Boolean(url || asset), legacy: Boolean(url && !asset),
+    ...(ret._id && { previewEndpoint: `/api/rental-maintenance/${ret._id}/attachments/${index}`,
+      downloadEndpoint: `/api/rental-maintenance/${ret._id}/attachments/${index}?download=1` }),
+  }));
+  return ret;
+} });
 
 const RentalMaintenanceTicket = mongoose.model('RentalMaintenanceTicket', rentalMaintenanceTicketSchema);
 RentalMaintenanceTicket.RENTAL_MAINTENANCE_CATEGORIES = RENTAL_MAINTENANCE_CATEGORIES;

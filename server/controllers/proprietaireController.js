@@ -1,9 +1,13 @@
+const mongoose = require('mongoose');
 const Proprietaire = require('../models/Proprietaire');
 const Document     = require('../models/Document');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
+const { uploadPrivateAsset, deletePrivateAsset, readPrivateAsset, safePrivateDescriptor } = require('../services/storage/secureStorageService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const logger = require('../utils/logger');
 const { importBienPropreVersGestion, ImportError } = require('../services/proprietaireGestionImportService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { streamRemoteDocument } = require('./rentalDocumentController');
 
 const rollbackUploads = async (urls, tag) => {
   const list = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
@@ -12,10 +16,16 @@ const rollbackUploads = async (urls, tag) => {
     logger.error(`proprietaire.cloudinary_rollback_failed.${tag}`, { url, error: rollbackError.message });
   })));
 };
+const rollbackPrivate = async (asset, tag) => {
+  if (!asset) return;
+  await deletePrivateAsset(asset).catch((rollbackError) => {
+    logger.error(`proprietaire.private_asset_rollback_failed.${tag}`, { resourceType: 'Proprietaire', error: rollbackError.message });
+  });
+};
 
 // DOC-ARCH-2 — classement automatique : déclenché par le workflow métier
 // (fiche propriétaire), jamais une saisie manuelle.
-const saveIdentiteDocument = async ({ url, nom, type, personneId, personneNom, createdBy }) => {
+const saveIdentiteDocument = async ({ asset, nom, type, personneId, personneNom, createdBy, tenant }) => {
   try {
     await Document.create({
       type:      "Pièce d'identité",
@@ -24,7 +34,8 @@ const saveIdentiteDocument = async ({ url, nom, type, personneId, personneNom, c
       refId:     personneId,
       refNom:    personneNom,
       createdBy: createdBy || undefined,
-      content:   url,
+      tenant: tenant || null,
+      privateAsset: asset,
       notes:     `Pièce d'identité — ${personneNom} — ${nom || type || ''}`,
       issueDate: new Date(),
       pole: 'Altimmo',
@@ -43,20 +54,50 @@ const saveIdentiteDocument = async ({ url, nom, type, personneId, personneNom, c
 
 const uploadPiece = async (file) => {
   if (!file) return undefined;
-  const result = await uploadToCloudinary(file.buffer, {
-    folder:        'altitude-vision/proprietaires/pieces-identite',
-    resource_type: 'auto',
-    quality:       undefined, // ne pas compresser les documents PDF
-    fetch_format:  undefined,
-    width:         undefined,
-    crop:          undefined,
+  const asset = await uploadPrivateAsset(file.buffer, {
+    purpose: 'identity', ownerType: 'Proprietaire', ownerId: new mongoose.Types.ObjectId(),
+    filename: file.originalname, mimeType: file.mimetype,
   });
   const ext = (file.originalname || '').split('.').pop().toLowerCase();
   return {
-    url:  result.secure_url,
+    asset,
     type: ext === 'pdf' ? 'pdf' : (['jpg','jpeg'].includes(ext) ? 'jpeg' : 'png'),
     nom:  file.originalname || '',
   };
+};
+
+const serializeProprietaire = (value) => {
+  const data = value?.toObject ? value.toObject() : { ...value };
+  const hasPrivate = Boolean(data.pieceIdentiteAsset);
+  const hasDocument = Boolean(hasPrivate || data.pieceIdentite);
+  delete data.pieceIdentite;
+  delete data.pieceIdentiteAsset;
+  return { ...data, identityDocument: hasDocument ? { ...safePrivateDescriptor(value.pieceIdentiteAsset || {}, {
+    previewEndpoint: `/api/proprietaires/${value._id}/identity-document`,
+    downloadEndpoint: `/api/proprietaires/${value._id}/identity-document?download=1`,
+  }), legacy: !hasPrivate } : null };
+};
+
+exports.downloadIdentityDocument = async (req, res) => {
+  try {
+    const proprietaire = await Proprietaire.findById(req.params.id)
+      .select('+pieceIdentiteAsset.publicId +pieceIdentiteAsset.resourceType +pieceIdentiteAsset.deliveryType +pieceIdentiteAsset.version +pieceIdentiteAsset.format');
+    if (!proprietaire) return res.status(404).json({ status: 'fail', message: 'Propriétaire introuvable' });
+    await assertResourceTenantOrUnattributed({ resourceType: 'Proprietaire', resource: proprietaire, tenantId: req.platformTenant?._id });
+    if (!proprietaire.pieceIdentiteAsset && proprietaire.pieceIdentite) {
+      return streamRemoteDocument({ url: proprietaire.pieceIdentite, name: proprietaire.pieceIdentiteNom || 'identity-document', res, context: { proprietaireId: proprietaire._id } });
+    }
+    if (!proprietaire.pieceIdentiteAsset) return res.status(404).json({ status: 'fail', message: 'Pièce d’identité privée introuvable.' });
+    const buffer = await readPrivateAsset(proprietaire.pieceIdentiteAsset.toObject());
+    res.setHeader('Content-Type', proprietaire.pieceIdentiteAsset.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="identity-document"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.send(buffer);
+  } catch (error) {
+    logger.warn('proprietaire.identity_document_access_denied', { proprietaireId: req.params.id, actorId: req.user?.id, error: error.message });
+    return res.status(error.statusCode || 403).json({ status: 'fail', message: 'Accès refusé.' });
+  }
 };
 
 const uploadBienPhotos = async (files = [], proprietaireId, bienIndex) => {
@@ -89,7 +130,7 @@ const parseBiens = (raw) => {
 exports.getAll = async (req, res) => {
   try {
     const proprietaires = await Proprietaire.find().sort({ createdAt: -1 });
-    res.json({ status: 'success', data: { proprietaires } });
+    res.json({ status: 'success', data: { proprietaires: proprietaires.map(serializeProprietaire) } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
@@ -99,7 +140,7 @@ exports.getOne = async (req, res) => {
   try {
     const p = await Proprietaire.findById(req.params.id);
     if (!p) return res.status(404).json({ status: 'error', message: 'Propriétaire introuvable' });
-    res.json({ status: 'success', data: { proprietaire: p } });
+    res.json({ status: 'success', data: { proprietaire: serializeProprietaire(p) } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
@@ -111,7 +152,7 @@ exports.create = async (req, res) => {
     const data = { ...req.body };
     if (req.file) {
       piece = await uploadPiece(req.file);
-      data.pieceIdentite     = piece.url;
+      data.pieceIdentiteAsset = piece.asset;
       data.pieceIdentiteType = piece.type;
       data.pieceIdentiteNom  = piece.nom;
     }
@@ -120,12 +161,12 @@ exports.create = async (req, res) => {
     const p = await Proprietaire.create(data);
     if (piece) {
       await saveIdentiteDocument({
-        url: piece.url, nom: piece.nom, type: piece.type,
+        asset: piece.asset, nom: piece.nom, type: piece.type,
         personneId: p._id, personneNom: `${p.prenom || ''} ${p.nom || ''}`.trim(),
-        createdBy: req.user?._id,
+        createdBy: req.user?._id, tenant: req.platformTenant?._id,
       });
     }
-    res.status(201).json({ status: 'success', data: { proprietaire: p } });
+    res.status(201).json({ status: 'success', data: { proprietaire: serializeProprietaire(p) } });
     logAction({
       action: 'Propriétaire ajouté',
       description: `Propriétaire ${p.prenom || ''} ${p.nom || ''} enregistré`,
@@ -136,7 +177,7 @@ exports.create = async (req, res) => {
       req,
     });
   } catch (err) {
-    await rollbackUploads(piece?.url, 'create');
+    await rollbackPrivate(piece?.asset, 'create');
     res.status(400).json({ status: 'error', message: err.message });
   }
 };
@@ -147,7 +188,7 @@ exports.update = async (req, res) => {
     const data = { ...req.body };
     if (req.file) {
       piece = await uploadPiece(req.file);
-      data.pieceIdentite     = piece.url;
+      data.pieceIdentiteAsset = piece.asset;
       data.pieceIdentiteType = piece.type;
       data.pieceIdentiteNom  = piece.nom;
     }
@@ -157,17 +198,17 @@ exports.update = async (req, res) => {
       new: true, runValidators: true,
     });
     if (!p) {
-      await rollbackUploads(piece?.url, 'update');
+      await rollbackPrivate(piece?.asset, 'update');
       return res.status(404).json({ status: 'error', message: 'Propriétaire introuvable' });
     }
     if (piece) {
       await saveIdentiteDocument({
-        url: piece.url, nom: piece.nom, type: piece.type,
+        asset: piece.asset, nom: piece.nom, type: piece.type,
         personneId: p._id, personneNom: `${p.prenom || ''} ${p.nom || ''}`.trim(),
-        createdBy: req.user?._id,
+        createdBy: req.user?._id, tenant: req.platformTenant?._id,
       });
     }
-    res.json({ status: 'success', data: { proprietaire: p } });
+    res.json({ status: 'success', data: { proprietaire: serializeProprietaire(p) } });
     logAction({
       action: 'Propriétaire modifié',
       description: `Propriétaire ${p.prenom || ''} ${p.nom || ''} mis à jour`,
@@ -178,7 +219,7 @@ exports.update = async (req, res) => {
       req,
     });
   } catch (err) {
-    await rollbackUploads(piece?.url, 'update');
+    await rollbackPrivate(piece?.asset, 'update');
     res.status(400).json({ status: 'error', message: err.message });
   }
 };
@@ -258,7 +299,7 @@ exports.deleteBien = async (req, res) => {
 
     p.biensPropres.splice(idx, 1);
     await p.save();
-    res.json({ status: 'success', data: { proprietaire: p } });
+    res.json({ status: 'success', data: { proprietaire: serializeProprietaire(p) } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }

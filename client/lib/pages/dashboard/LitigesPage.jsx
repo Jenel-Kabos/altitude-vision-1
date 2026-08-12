@@ -5,7 +5,7 @@ import {
   Scale, AlertTriangle, CheckCircle, Clock, ChevronUp,
   X, MessageSquare, Loader2, RefreshCw, Flag,
 } from "lucide-react";
-import { getLitiges, getLitige, getLitigeStats, updateLitigeStatut, addLitigeMessage, resolveLitige } from "../../services/litigeService";
+import { getLitiges, getLitige, getLitigeStats, updateLitigeStatut, addLitigeMessage, resolveLitige, previewLitigeProof } from "../../services/litigeService";
 import { getAllSignalements, traiterSignalement } from "../../services/signalementService";
 
 const BLUE = '#2E7BB5';
@@ -220,12 +220,12 @@ const LitigeModal = ({ litige, onClose, onRefresh }) => {
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Preuves</p>
               <div className="space-y-1.5">
                 {litige.preuves.map((p, i) => (
-                  <a key={i} href={p.url} target="_blank" rel="noopener noreferrer"
+                  <button key={i} type="button" onClick={() => previewLitigeProof(p.previewEndpoint)}
                     className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 text-sm text-blue-600 hover:bg-blue-50 transition-colors">
                     <span>📄</span>
                     <span className="flex-1 truncate">{p.nom}</span>
                     <span className="text-xs text-gray-400">Voir</span>
-                  </a>
+                  </button>
                 ))}
               </div>
             </div>
@@ -374,12 +374,12 @@ const SignalementModal = ({ signalement, onClose, onRefresh }) => {
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Preuves</p>
               <div className="space-y-1.5">
                 {signalement.preuves.map((p, i) => (
-                  <a key={i} href={p.url} target="_blank" rel="noopener noreferrer"
+                  <button key={i} type="button" onClick={() => previewLitigeProof(p.previewEndpoint)}
                     className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 text-sm text-blue-600 hover:bg-blue-50 transition-colors">
                     <span>📄</span>
                     <span className="flex-1 truncate">{p.nom}</span>
                     <span className="text-xs text-gray-400">Voir</span>
-                  </a>
+                  </button>
                 ))}
               </div>
             </div>

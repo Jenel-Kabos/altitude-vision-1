@@ -45,6 +45,13 @@ export const getPaiements = async (transactionId) => {
   return res.data?.data?.paiements || [];
 };
 
+export const previewTransactionPaymentProof = async (transactionId, paiementId) => {
+  const res = await api.get(`/transactions/${transactionId}/paiements/${paiementId}/proof`, { responseType: 'blob' });
+  const url = URL.createObjectURL(res.data);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 export const initierPaiement = async (transactionId, { phone, operator, firstName, lastName }) => {
   const res = await api.post(`/transactions/${transactionId}/paiements/initier`, { phone, operator, firstName, lastName });
   return res.data?.data;

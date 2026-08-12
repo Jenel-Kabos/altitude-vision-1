@@ -1,5 +1,14 @@
 // server/models/Litige.js
 const mongoose = require('mongoose');
+const privateAssetSchema = require('./schemas/privateAssetSchema');
+
+const proofSchema = new mongoose.Schema({
+  url: String,
+  asset: { type: privateAssetSchema },
+  nom: String,
+  type: String,
+  dateAjout: { type: Date, default: Date.now },
+}, { _id: true });
 
 const litigeSchema = new mongoose.Schema({
   reference: { type: String, unique: true },
@@ -41,12 +50,7 @@ const litigeSchema = new mongoose.Schema({
 
   description: { type: String, required: [true, 'La description est requise'] },
 
-  preuves: [{
-    url:       String,
-    nom:       String,
-    type:      String,
-    dateAjout: { type: Date, default: Date.now },
-  }],
+  preuves: [proofSchema],
 
   timeline: [{
     action: String,
@@ -69,5 +73,12 @@ const litigeSchema = new mongoose.Schema({
   dateOuverture:   { type: Date, default: Date.now },
   dateDerniereMaj: Date,
 }, { timestamps: true });
+
+litigeSchema.set('toJSON', { transform: (_doc, ret) => {
+  ret.preuves = (ret.preuves || []).map(({ url, asset, ...metadata }, index) => ({ ...metadata,
+    canPreview: Boolean(url || asset), canDownload: Boolean(url || asset), legacy: Boolean(url && !asset),
+    previewEndpoint: `/api/litiges/${ret._id}/proofs/${index}`, downloadEndpoint: `/api/litiges/${ret._id}/proofs/${index}?download=1` }));
+  return ret;
+} });
 
 module.exports = mongoose.model('Litige', litigeSchema);

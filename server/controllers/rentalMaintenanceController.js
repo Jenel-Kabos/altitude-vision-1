@@ -10,6 +10,9 @@ const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
 const rentalMaintenanceService = require('../services/rentalMaintenanceService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { ROLES_GL } = require('../utils/roles');
+const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { readPrivateAsset } = require('../services/storage/secureStorageService');
+const { streamRemoteDocument } = require('./rentalDocumentController');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
@@ -19,8 +22,22 @@ async function assertPropertyAccess(req, propertyId) {
   if (!property) return { error: 404 };
   const isOwner = property.owner && String(property.owner) === String(req.user.id);
   if (!isOwner && !ROLES_GL.includes(req.user.role)) return { error: 403 };
+  if (ROLES_GL.includes(req.user.role)) {
+    try { await assertResourceTenant({ resourceType: 'Property', resource: property, tenantId: req.platformTenant?._id }); }
+    catch { return { error: 403 }; }
+  }
   return { property };
 }
+
+const safeTicket = (value) => {
+  const data = value?.toObject ? value.toObject() : { ...value };
+  data.attachments = (data.attachments || []).map((attachment, index) => ({ nom: attachment.nom,
+    mimeType: attachment.asset?.mimeType, size: attachment.asset?.size, legacy: !attachment.asset,
+    canPreview: Boolean(attachment.asset || attachment.url), canDownload: Boolean(attachment.asset || attachment.url),
+    previewEndpoint: `/api/rental-maintenance/${data._id}/attachments/${index}`,
+    downloadEndpoint: `/api/rental-maintenance/${data._id}/attachments/${index}?download=1` }));
+  return data;
+};
 
 async function loadTicketWithAccess(req, ticketId) {
   if (!mongoose.isValidObjectId(ticketId)) return { error: 400 };
@@ -60,7 +77,7 @@ exports.list = async (req, res) => {
       .populate('assignedTo', 'name')
       .sort({ createdAt: -1 });
 
-    res.json({ status: 'success', data: { tickets } });
+    res.json({ status: 'success', data: { tickets: tickets.map(safeTicket) } });
   } catch (error) {
     fail(res, 500, error.message);
   }
@@ -92,10 +109,28 @@ exports.create = async (req, res) => {
       cible: { id: String(ticket._id), type: 'RentalMaintenanceTicket', nom: property.title }, req,
     });
 
-    res.status(201).json({ status: 'success', data: { ticket } });
+    res.status(201).json({ status: 'success', data: { ticket: safeTicket(ticket) } });
   } catch (error) {
     fail(res, error.statusCode || 500, error.message);
   }
+};
+
+exports.downloadAttachment = async (req, res) => {
+  try {
+    const { error, ticket } = await loadTicketWithAccess(req, req.params.id);
+    if (error) return fail(res, error, 'Pièce jointe introuvable.');
+    const secured = await RentalMaintenanceTicket.findById(ticket._id)
+      .select('+attachments.asset.publicId +attachments.asset.resourceType +attachments.asset.deliveryType +attachments.asset.version +attachments.asset.format');
+    const attachment = secured?.attachments?.[Number(req.params.attachmentIndex)];
+    if (!attachment?.asset && attachment?.url) return streamRemoteDocument({ url: attachment.url, name: attachment.nom, res, context: { ticketId: secured._id } });
+    if (!attachment?.asset) return fail(res, 404, 'Pièce jointe introuvable.');
+    const buffer = await readPrivateAsset(attachment.asset.toObject());
+    res.setHeader('Content-Type', attachment.asset.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="maintenance-evidence"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.send(buffer);
+  } catch (error) { return fail(res, 502, 'Impossible de récupérer la pièce jointe.'); }
 };
 
 // ─────────────────────────────────────────────

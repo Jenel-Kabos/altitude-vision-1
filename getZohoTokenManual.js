@@ -1,9 +1,20 @@
 const axios = require('axios');
 const readline = require('readline');
 
-// REMPLACEZ PAR VOS VRAIES VALEURS
-const CLIENT_ID = '1000.EOU6UR6A2JMAHZ98UJMQ7GNPZ3SMST';
-const CLIENT_SECRET = '05212dc9f751bd54a7c4904350617cc58e5ed65974';
+// PREP-2 — ce script contenait auparavant un CLIENT_ID/CLIENT_SECRET Zoho
+// réels codés en dur (déjà exposés en historique Git, commit 3b4c3ea, jamais
+// remédié contrairement à getZohoOrgId.js) : corrigé pour lire les
+// identifiants depuis l'environnement, jamais depuis le code source, même
+// convention que getZohoOrgId.js. Ces credentials doivent être révoqués/
+// roués côté Zoho indépendamment de ce correctif — voir
+// SECRET_ROTATION_CHECKLIST.md.
+const CLIENT_ID = process.env.ZOHO_CLIENT_ID;
+const CLIENT_SECRET = process.env.ZOHO_CLIENT_SECRET;
+
+if (!CLIENT_ID || !CLIENT_SECRET) {
+  console.log('\n❌ ZOHO_CLIENT_ID et ZOHO_CLIENT_SECRET doivent être définis dans l\'environnement avant d\'exécuter ce script.\n');
+  process.exit(1);
+}
 
 const SCOPES = 'ZohoMail.accounts.ALL,ZohoMail.messages.ALL,ZohoMail.organization.accounts.READ';
 

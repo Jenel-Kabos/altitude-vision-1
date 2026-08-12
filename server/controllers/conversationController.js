@@ -1,6 +1,7 @@
 // server/controllers/conversationController.js
 const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
+const { serializeMessage } = require('./messageController');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const { ALL_STAFF } = require('../utils/roles');
@@ -171,7 +172,7 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
     total,
     page: parseInt(page),
     totalPages: Math.ceil(total / limit),
-    data: { messages },
+    data: { messages: messages.map(serializeMessage) },
   });
 });
 

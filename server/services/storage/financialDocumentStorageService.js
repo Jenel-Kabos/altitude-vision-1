@@ -1,25 +1,20 @@
-const axios = require('axios');
-const { cloudinary, uploadToCloudinary } = require('../../config/cloudinary');
+const { uploadPrivateAsset, readPrivateAsset } = require('./secureStorageService');
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
 async function storeOfficialPdf(buffer, { documentId, artifactId }) {
   if (!Buffer.isBuffer(buffer) || !buffer.length || buffer.length > MAX_PDF_BYTES) throw new Error('FINANCIAL_PDF_SIZE_INVALID');
   const publicId = `altitude-vision/financial/hotel/${documentId}/${artifactId}`;
-  const result = await uploadToCloudinary(buffer, {
-    public_id: publicId, resource_type: 'raw', type: 'authenticated', format: 'pdf',
-    overwrite: false, invalidate: false,
+  const asset = await uploadPrivateAsset(buffer, {
+    purpose: 'financial', ownerType: 'FinancialDocument', ownerId: documentId,
+    filename: `${artifactId}.pdf`, mimeType: 'application/pdf', publicId,
   });
-  return { provider: 'cloudinary', storageKey: result.public_id, storageVersion: String(result.version || '') };
+  return { provider: 'cloudinary', storageKey: asset.publicId, storageVersion: asset.version };
 }
 
 async function readOfficialPdf({ storageKey, storageVersion }) {
-  const url = cloudinary.url(storageKey, {
-    resource_type: 'raw', type: 'authenticated', version: storageVersion || undefined,
-    sign_url: true, secure: true, format: 'pdf', expires_at: Math.floor(Date.now() / 1000) + 60,
-  });
-  const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000, maxContentLength: MAX_PDF_BYTES });
-  return Buffer.from(response.data);
+  return readPrivateAsset({ assetClass: 'PRIVATE_DOCUMENT', purpose: 'financial', provider: 'cloudinary', publicId: storageKey,
+    resourceType: 'raw', deliveryType: 'authenticated', version: storageVersion || '', format: 'pdf', mimeType: 'application/pdf' });
 }
 
 module.exports = { MAX_PDF_BYTES, storeOfficialPdf, readOfficialPdf };

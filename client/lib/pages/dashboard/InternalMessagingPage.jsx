@@ -28,6 +28,7 @@ import {
   saveDraft,
   updateDraft,
   deleteDraft,
+  previewInternalMailAttachment,
   countUnread
 } from '../../services/messageService';
 import { getAllUsers } from '../../services/userService';
@@ -36,7 +37,6 @@ import toast from '@/lib/utils/toast';
 import confirmDialog from '@/lib/utils/confirm';
 import BackButton from '../../components/navigation/BackButton';
 
-const UPLOAD_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api').replace('/api', '');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 5;
 
@@ -384,7 +384,6 @@ const InternalMessagingPage = () => {
                 onToggleStar={handleToggleStar}
                 onDelete={handleDelete}
                 onRestore={activeView === 'trash' ? handleRestore : null}
-                uploadBaseUrl={UPLOAD_BASE_URL}
                 isTrash={activeView === 'trash'}
                 isDraft={activeView === 'drafts'}
               />
@@ -500,7 +499,7 @@ const MessageItem = ({ message, selected, onClick, onEdit, activeView }) => {
 // =============================================================
 // 📄 MessageDetail
 // =============================================================
-const MessageDetail = ({ message, onToggleStar, onDelete, onRestore, uploadBaseUrl, isTrash, isDraft }) => {
+const MessageDetail = ({ message, onToggleStar, onDelete, onRestore, isTrash, isDraft }) => {
   const formatFullDate = (date) =>
     new Date(date).toLocaleDateString('fr-FR', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -618,19 +617,15 @@ const MessageDetail = ({ message, onToggleStar, onDelete, onRestore, uploadBaseU
               </h3>
               <div className="space-y-3">
                 {message.attachments.map((att, index) => {
-                  const fileUrl  = att.url || (att.filepath ? `${uploadBaseUrl}/${att.filepath}` : null);
                   const isImage  = att.mimetype?.startsWith('image/');
                   return (
                     <div key={index}
                       className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200 hover:bg-gray-100 transition">
                       {/* Miniature ou icône */}
-                      {isImage && fileUrl ? (
-                        <img
-                          src={fileUrl}
-                          alt={att.filename}
-                          className="w-16 h-16 object-cover rounded-lg flex-shrink-0 cursor-pointer hover:opacity-80 transition"
-                          onClick={() => window.open(fileUrl, '_blank')}
-                        />
+                      {isImage ? (
+                        <button type="button" aria-label={`Prévisualiser ${att.filename}`} onClick={() => previewInternalMailAttachment(att.previewEndpoint)} className="w-16 h-16 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Eye className="w-6 h-6 text-blue-500" />
+                        </button>
                       ) : (
                         <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-blue-100">
                           <Paperclip className="w-6 h-6 text-blue-500" />
@@ -640,23 +635,20 @@ const MessageDetail = ({ message, onToggleStar, onDelete, onRestore, uploadBaseU
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-800 truncate">{att.filename}</p>
                         <p className="text-sm text-gray-500 mt-0.5">{formatFileSize(att.size)}</p>
-                        {fileUrl && (
+                        {att.canPreview && (
                           <div className="flex gap-2 mt-2">
-                            <a
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button type="button"
+                              onClick={() => previewInternalMailAttachment(att.previewEndpoint)}
                               className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition"
                             >
                               <Eye className="w-3.5 h-3.5" /> Voir
-                            </a>
-                            <a
-                              href={fileUrl}
-                              download={att.filename}
+                            </button>
+                            <button type="button"
+                              onClick={() => previewInternalMailAttachment(att.downloadEndpoint)}
                               className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 transition"
                             >
                               <Download className="w-3.5 h-3.5" /> Télécharger
-                            </a>
+                            </button>
                           </div>
                         )}
                       </div>

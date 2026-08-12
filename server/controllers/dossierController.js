@@ -11,7 +11,10 @@ const { searchDossiers } = require('../services/dossier/dossierSearchService');
 // niveau route (voir dossierRoutes.js).
 exports.search = async (req, res) => {
   try {
-    const results = await searchDossiers(req.query.q);
+    const results = await searchDossiers(req.query.q, {
+      tenantId: req.platformTenant._id,
+      scopeUserIds: req.tenantScopeUserIds,
+    });
     res.status(200).json({ status: 'success', results: results.length, data: { results } });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });

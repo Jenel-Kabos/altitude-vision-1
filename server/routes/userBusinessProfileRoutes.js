@@ -6,26 +6,56 @@ const express = require('express');
 const auth = require('../middleware/authMiddleware');
 const { ROLES_DOCS } = require('../utils/roles');
 const ctrl = require('../controllers/userBusinessProfileController');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const User = require('../models/User');
 
 const router = express.Router();
 router.use(auth.protect);
 
-function selfOrStaff(req, res, next) {
+async function assertTargetInActorTenant(req) {
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, req.headers['x-platform-tenant-id']);
+  if (!tenant) {
+    const error = new Error('Contexte tenant requis ou ambigu pour cette action.');
+    error.statusCode = 403;
+    throw error;
+  }
+  const target = await User.findById(req.params.userId).select('_id').lean();
+  if (!target) {
+    const error = new Error('Ressource inaccessible dans ce contexte tenant.');
+    error.statusCode = 404;
+    throw error;
+  }
+  await assertResourceTenant({ resourceType: 'User', resource: target, tenantId: tenant._id });
+}
+
+function tenantBoundaryResponse(res, error) {
+  return res.status(error.statusCode === 403 ? 403 : 404).json({
+    status: 'fail', message: 'Ressource inaccessible dans ce contexte tenant.',
+  });
+}
+
+async function selfOrStaff(req, res, next) {
   const isSelf = String(req.user._id || req.user.id) === String(req.params.userId);
   const isStaff = ROLES_DOCS.includes(req.user.role);
   if (!isSelf && !isStaff) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
-  next();
+  if (isSelf) return next();
+  try { await assertTargetInActorTenant(req); return next(); } catch (error) { return tenantBoundaryResponse(res, error); }
 }
 
-function staffOnly(req, res, next) {
+async function staffOnly(req, res, next) {
   if (!ROLES_DOCS.includes(req.user.role)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
-  next();
+  try { await assertTargetInActorTenant(req); return next(); } catch (error) { return tenantBoundaryResponse(res, error); }
+}
+
+async function adminTargetOnly(req, res, next) {
+  try { await assertTargetInActorTenant(req); return next(); } catch (error) { return tenantBoundaryResponse(res, error); }
 }
 
 router.get('/:userId', selfOrStaff, ctrl.list);
 router.get('/:userId/history', staffOnly, ctrl.history);
-router.post('/:userId', auth.restrictTo('Admin'), ctrl.grant);
-router.post('/:userId/:profileType/suspend', auth.restrictTo('Admin'), ctrl.suspend);
-router.post('/:userId/:profileType/revoke', auth.restrictTo('Admin'), ctrl.revoke);
+router.post('/:userId', auth.restrictTo('Admin'), adminTargetOnly, ctrl.grant);
+router.post('/:userId/:profileType/suspend', auth.restrictTo('Admin'), adminTargetOnly, ctrl.suspend);
+router.post('/:userId/:profileType/revoke', auth.restrictTo('Admin'), adminTargetOnly, ctrl.revoke);
 
 module.exports = router;

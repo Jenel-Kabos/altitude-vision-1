@@ -5,6 +5,7 @@ const auth       = require('../controllers/authController');
 const ctrl       = require('../controllers/proprietaireController');
 const { upload } = require('../config/cloudinary');
 const { STAFF_IMMO } = require('../utils/roles');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 const protect    = [auth.protect, auth.restrictTo(...STAFF_IMMO)];
 const readAll    = [auth.protect, auth.restrictTo(...STAFF_IMMO, 'Secretaire')];
@@ -25,6 +26,7 @@ const single = multer({
 
 // ── CRUD Proprietaire ─────────────────────────────────────────
 router.get('/',       readAll,   ctrl.getAll);
+router.get('/:id/identity-document', auth.protect, requireTenantScope, auth.restrictTo(...STAFF_IMMO, 'Secretaire'), ctrl.downloadIdentityDocument);
 router.get('/:id',    readAll,   ctrl.getOne);
 router.post('/',      protect,   single, ctrl.create);
 router.put('/:id',    protect, single, ctrl.update);

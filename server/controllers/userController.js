@@ -5,6 +5,27 @@ const { destroyFromCloudinary, uploadToCloudinary } = require('../config/cloudin
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { COLLAB_ROLES, ROLE_LABELS } = require('../utils/roles');
 const userKpiService = require('../services/userKpiService'); // USER-KPI-1
+const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
+const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+
+exports.downloadContractDocument = async (req, res) => {
+    try {
+        const requestedId = req.params.id || req.user.id;
+        if (String(requestedId) !== String(req.user.id) && req.user.role !== 'Admin') {
+            return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+        }
+        const user = await User.findById(requestedId).select('+contratPdfAsset');
+        if (!user) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
+        if (String(requestedId) !== String(req.user.id)) await assertResourceTenant({ resourceType: 'User', resource: user, tenantId: req.platformTenant?._id });
+        if (!user.contratPdfAsset) return res.status(409).json({ status: 'fail', code: 'LEGACY_ASSET_MIGRATION_REQUIRED', message: 'Ce contrat historique doit être migré.' });
+        const buffer = await readPrivateAsset(user.contratPdfAsset.toObject());
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `${req.query.download === '0' ? 'inline' : 'attachment'}; filename="contract.pdf"`);
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        return res.send(buffer);
+    } catch (error) { return res.status(502).json({ status: 'error', message: 'Impossible de récupérer le contrat.' }); }
+};
 
 // ── Email de notification de changement de rôle ──────────────
 
@@ -383,13 +404,11 @@ exports.renvoyerContrat = async (req, res) => {
 
         const pdfBuffer = await generateContratHebergement(user);
 
-        const uploadResult = await uploadToCloudinary(pdfBuffer, {
-            folder:        `altitude-vision/contrats/proprietaires/${user._id}`,
-            resource_type: 'raw',
-            public_id:     `contrat-hebergement-${user._id}-${Date.now()}`,
-            format:        'pdf',
+        const contractAsset = await uploadPrivateAsset(pdfBuffer, {
+            purpose: 'administrative', ownerType: 'User', ownerId: user._id,
+            filename: `contrat-hebergement-${user._id}-${Date.now()}.pdf`, mimeType: 'application/pdf',
         });
-        await User.findByIdAndUpdate(user._id, { contratPdfUrl: uploadResult.secure_url });
+        await User.findByIdAndUpdate(user._id, { $set: { contratPdfAsset: contractAsset }, $unset: { contratPdfUrl: 1 } });
 
         const ref      = `CONTRAT-${String(user._id).slice(-8).toUpperCase()}-v1.0`;
         const dateStr  = user.contratAccepteLe
@@ -426,7 +445,7 @@ exports.renvoyerContrat = async (req, res) => {
         res.status(200).json({
             status:  'success',
             message: 'Contrat renvoyé avec succès.',
-            contratPdfUrl: uploadResult.secure_url,
+            documentAccess: { canDownload: true, downloadEndpoint: `/api/users/${user._id}/contract-document` },
         });
     } catch (error) {
         console.error('❌ renvoyerContrat error:', error);

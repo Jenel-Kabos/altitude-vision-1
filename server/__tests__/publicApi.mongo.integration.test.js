@@ -14,6 +14,7 @@ const Hotel = require('../models/Hotel');
 const ApiKey = require('../models/ApiKey');
 const ApiCallLog = require('../models/ApiCallLog');
 const WebhookSubscription = require('../models/WebhookSubscription');
+const PlatformTenantSubscription = require('../models/PlatformTenantSubscription');
 const { createApiKey, verifyApiKey, rotateApiKey, revokeApiKey } = require('../services/publicApi/apiKeyService');
 const { listPublicProperties, getPublicPropertyById } = require('../services/publicApi/publicPropertyService');
 const { dispatch, signPayload } = require('../services/publicApi/webhookDispatchService');
@@ -22,6 +23,7 @@ const publicApiV1Routes = require('../routes/publicApi/v1');
 const publicApiDocsRoutes = require('../routes/publicApi/docs');
 const devPortalRoutes = require('../routes/apiPlatformAdminRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(120000);
 
@@ -232,18 +234,28 @@ describe('HTTP /api/dev-portal — administration (Phase 9)', () => {
   });
 
   test('un Admin peut créer, tourner puis révoquer une clé via le portail', async () => {
-    const admin = await makeUser({ role: 'Admin' });
+    const fixture = await createTenantFixture({ label: 'Public API HTTP' });
+    const { user: admin } = await createTenantUser({
+      tenant: fixture.tenant,
+      bootstrap: fixture.bootstrap,
+      overrides: { role: 'Admin' },
+    });
+    await PlatformTenantSubscription.updateOne(
+      { tenant: fixture.tenant._id, status: { $in: ['trialing', 'active'] } },
+      { 'quotas.maxApiKeys': 2 },
+    );
     const token = `Bearer ${signToken(admin._id)}`;
-    const createRes = await request(app).post('/api/dev-portal/keys').set('Authorization', token).send({ name: 'Partenaire HTTP', scopes: ['properties:read'] });
+    const tenantHeader = { Authorization: token, 'X-Platform-Tenant-Id': String(fixture.tenant._id) };
+    const createRes = await request(app).post('/api/dev-portal/keys').set(tenantHeader).send({ name: 'Partenaire HTTP', scopes: ['properties:read'] });
     expect(createRes.status).toBe(201);
     expect(createRes.body.data.rawKey).toMatch(/^pk_live_/);
     const keyId = createRes.body.data.apiKey._id;
 
-    const rotateRes = await request(app).post(`/api/dev-portal/keys/${keyId}/rotate`).set('Authorization', token).send({});
+    const rotateRes = await request(app).post(`/api/dev-portal/keys/${keyId}/rotate`).set(tenantHeader).send({});
     expect(rotateRes.status).toBe(200);
     const newKeyId = rotateRes.body.data.apiKey._id;
 
-    const revokeRes = await request(app).post(`/api/dev-portal/keys/${newKeyId}/revoke`).set('Authorization', token).send({ reason: 'Test' });
+    const revokeRes = await request(app).post(`/api/dev-portal/keys/${newKeyId}/revoke`).set(tenantHeader).send({ reason: 'Test' });
     expect(revokeRes.status).toBe(200);
     expect(revokeRes.body.data.apiKey.status).toBe('revoked');
   });

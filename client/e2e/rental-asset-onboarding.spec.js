@@ -10,7 +10,9 @@ async function login(page) {
 test('active un Property non publié en Gestion locative, actualise liste et KPI sans publication',async({page,request},testInfo)=>{
   const title=testInfo.project.name==='mobile-chromium'?'Bien privé Gestion E2E Mobile':'Bien privé Gestion E2E';
   await login(page); await page.goto('/dashboard/gestion-locative');
-  await page.getByRole('button',{name:/Biens gérés/i}).click();
+  const managedTab=page.getByRole('button',{name:/Biens gérés/i});
+  const managedBefore=Number((await managedTab.textContent()).match(/\d+/)?.[0]||0);
+  await managedTab.click();
   await page.getByRole('button',{name:'Ajouter un bien à la gestion locative'}).first().click({force:true});
   const select=page.getByRole('combobox').nth(1);
   const option=select.locator('option',{hasText:title}).first();
@@ -19,5 +21,5 @@ test('active un Property non publié en Gestion locative, actualise liste et KPI
   const body=await response.json(); expect(response.status(),JSON.stringify(body)).toBe(201); expect(body.data.property.isPublished).toBe(false); expect(body.data.rental.managementActivated).toBe(true);
   await expect(page.getByText('Le bien a été ajouté à la Gestion locative.')).toBeVisible(); await expect(page.getByText(title,{exact:true})).toBeVisible();
   const publicList=await request.get('http://localhost:5000/api/properties?status=location&limit=1000'); expect((await publicList.json()).data.properties.some(p=>p.title===title)).toBe(false);
-  await expect(page.getByText('1',{exact:true}).first()).toBeVisible();
+  await expect(managedTab).toContainText(String(managedBefore+1));
 });

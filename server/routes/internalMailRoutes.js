@@ -28,6 +28,7 @@ router.get('/unread', internalMailController.getUnread);
 router.get('/starred', internalMailController.getStarred);
 router.get('/drafts', internalMailController.getDrafts);
 router.get('/trash', internalMailController.getTrash);
+router.get('/:mailId/attachments/:attachmentIndex', internalMailController.downloadAttachment);
 
 
 // ==========================================================

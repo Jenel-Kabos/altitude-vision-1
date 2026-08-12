@@ -114,6 +114,13 @@ export const countUnread = async () => {
     }
 };
 
+export const previewInternalMailAttachment = async (endpoint) => {
+    const response = await api.get(endpoint, { responseType: 'blob' });
+    const url = URL.createObjectURL(response.data);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+};
+
 export const markAsRead = async (mailId) => {
     try {
         const response = await api.patch(`/internal-mails/${mailId}/read`);

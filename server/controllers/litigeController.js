@@ -2,7 +2,8 @@
 const Litige   = require('../models/Litige');
 const User     = require('../models/User');
 const sendEmail = require('../utils/email');
-const { uploadToCloudinary } = require('../config/cloudinary');
+const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
+const { streamRemoteDocument } = require('./rentalDocumentController');
 const { ROLES_LITIGES } = require('../utils/roles');
 
 const ADMIN_EMAIL = process.env.ZOHO_FROM_EMAIL || 'contact@altitudevision.agency';
@@ -54,12 +55,11 @@ exports.createLitige = async (req, res) => {
     const preuves = [];
     if (req.files?.length) {
       for (const file of req.files) {
-        const result = await uploadToCloudinary(file.buffer, {
-          folder:    'altitude-vision/litiges',
-          public_id: `litige-${ref}-${Date.now()}`,
-          resource_type: file.mimetype.startsWith('image/') ? 'image' : 'raw',
+        const asset = await uploadPrivateAsset(file.buffer, {
+          purpose: 'administrative', ownerType: 'Litige', ownerId: ref,
+          filename: file.originalname, mimeType: file.mimetype,
         });
-        preuves.push({ url: result.secure_url, nom: file.originalname, type: file.mimetype });
+        preuves.push({ asset, nom: file.originalname, type: file.mimetype });
       }
     }
 
@@ -198,6 +198,36 @@ exports.getLitige = async (req, res) => {
     }
 
     res.json({ status: 'success', data: { litige } });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+};
+
+exports.downloadProof = async (req, res) => {
+  try {
+    const litige = await Litige.findById(req.params.id)
+      .select('+preuves.asset.publicId +preuves.asset.resourceType +preuves.asset.deliveryType +preuves.asset.version +preuves.asset.format');
+    if (!litige) return res.status(404).json({ status: 'fail', message: 'Litige introuvable.' });
+
+    const isStaff = ROLES_LITIGES.includes(req.user?.role);
+    const isPart = litige.plaignant?.userId?.equals(req.user._id) || litige.accusé?.userId?.equals(req.user._id);
+    if (!isStaff && !isPart) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+
+    const proof = litige.preuves?.[Number(req.params.proofIndex)];
+    if (!proof) return res.status(404).json({ status: 'fail', message: 'Preuve introuvable.' });
+    if (!proof.asset && proof.url) {
+      return streamRemoteDocument({ url: proof.url, name: proof.nom, res, context: { litigeId: litige._id } });
+    }
+    if (!proof.asset) return res.status(404).json({ status: 'fail', message: 'Preuve introuvable.' });
+
+    const buffer = await readPrivateAsset(proof.asset.toObject());
+    const safeName = String(proof.nom || 'preuve').replace(/[\r\n"\\]/g, '_');
+    res.set({
+      'Content-Type': proof.asset.mimeType || proof.type || 'application/octet-stream',
+      'Content-Disposition': `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="${safeName}"`,
+      'Cache-Control': 'private, no-store, max-age=0',
+      'X-Content-Type-Options': 'nosniff',
+    }).send(buffer);
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }

@@ -6,12 +6,28 @@ const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
-const { uploadToCloudinary } = require('../config/cloudinary');
+const { uploadPrivateAsset, readPrivateAsset, safePrivateDescriptor } = require('../services/storage/secureStorageService');
 const { getIO } = require('../socket');
 const { notify, notifyStaff } = require('../services/notificationService');
 const { ALL_STAFF } = require('../utils/roles');
 const logger = require('../utils/logger');
 const { assertResourceTenant, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { streamRemoteDocument } = require('./rentalDocumentController');
+
+const serializeMessage = (value) => {
+    const data = value?.toObject ? value.toObject() : { ...value };
+    data.attachments = (data.attachments || []).map((attachment) => {
+        const { asset, url: legacyUrl, ...metadata } = attachment;
+        if (asset) return { ...metadata, ...safePrivateDescriptor(asset, {
+            previewEndpoint: `/api/messages/${data._id}/attachments/${attachment._id}`,
+            downloadEndpoint: `/api/messages/${data._id}/attachments/${attachment._id}?download=1`,
+        }) };
+        return { ...metadata, legacy: true, previewEndpoint: `/api/messages/${data._id}/attachments/${attachment._id}`,
+            downloadEndpoint: `/api/messages/${data._id}/attachments/${attachment._id}?download=1`, canPreview: Boolean(legacyUrl), canDownload: Boolean(legacyUrl) };
+    });
+    return data;
+};
+exports.serializeMessage = serializeMessage;
 
 /**
  * @description Envoyer un message dans une conversation
@@ -45,12 +61,9 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             const isVideo = file.mimetype.startsWith('video/');
             const isAudio = file.mimetype.startsWith('audio/');
             const isImage = file.mimetype.startsWith('image/');
-            // Cloudinary n'a pas de resource_type dédié à l'audio — 'video' couvre les deux.
-            const resourceType = (isVideo || isAudio) ? 'video' : isImage ? 'image' : 'raw';
-
-            const result = await uploadToCloudinary(file.buffer, {
-                folder:        'altitude-vision/messages',
-                resource_type: resourceType,
+            const asset = await uploadPrivateAsset(file.buffer, {
+                purpose: 'conversation', ownerType: 'Conversation', ownerId: conversationId || receiverId,
+                filename: file.originalname, mimeType: file.mimetype,
             });
 
             let attDuration;
@@ -60,7 +73,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             }
 
             attachmentsData.push({
-                url:      result.secure_url,
+                asset,
                 type:     isVideo ? 'video' : isAudio ? 'audio' : isImage ? 'image' : 'file',
                 nom:      file.originalname,
                 size:     file.size,
@@ -210,8 +223,33 @@ exports.sendMessage = asyncHandler(async (req, res) => {
 
     res.status(201).json({
         status: 'success',
-        data: { message },
+        data: { message: serializeMessage(message) },
     });
+});
+
+exports.downloadAttachment = asyncHandler(async (req, res) => {
+    const message = await Message.findById(req.params.messageId)
+        .select('+attachments.asset.publicId +attachments.asset.resourceType +attachments.asset.deliveryType +attachments.asset.version +attachments.asset.format');
+    if (!message) { res.status(404); throw new Error('Message non trouvé.'); }
+    await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+    const conversation = message.conversation ? await Conversation.findById(message.conversation) : null;
+    const userId = String(req.user.id);
+    const participant = conversation?.participants?.some((id) => String(id) === userId)
+        || String(message.sender) === userId || String(message.receiver || '') === userId;
+    const staffAllowed = ALL_STAFF.includes(req.user.role) && conversation?.tenant
+        && String(conversation.tenant) === String(req.platformTenant._id);
+    if (!participant && !staffAllowed) { res.status(403); throw new Error('Accès refusé à cette pièce jointe.'); }
+    const attachment = message.attachments.id(req.params.attachmentId);
+    if (!attachment) { res.status(404); throw new Error('Pièce jointe introuvable.'); }
+    if (!attachment.asset && attachment.url) {
+        return streamRemoteDocument({ url: attachment.url, name: attachment.nom, res, context: { messageId: message._id } });
+    }
+    const buffer = await readPrivateAsset(attachment.asset.toObject());
+    res.setHeader('Content-Type', attachment.asset.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="attachment"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.send(buffer);
 });
 
 /**
@@ -294,7 +332,7 @@ exports.getMessages = asyncHandler(async (req, res) => {
     page: parseInt(page),
     totalPages: Math.ceil(total / limit),
     data: {
-      messages,
+      messages: messages.map(serializeMessage),
     },
   });
 });

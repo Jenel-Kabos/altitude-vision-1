@@ -14,7 +14,7 @@
 // est mocké, sinon le test de preuve de paiement ne teste rien de réel.
 jest.mock('../config/cloudinary', () => ({
   ...jest.requireActual('../config/cloudinary'),
-  uploadToCloudinary: jest.fn().mockResolvedValue({ secure_url: 'https://res.cloudinary.test/preuve.jpg', public_id: 'preuve-test-id' }),
+  uploadToCloudinary: jest.fn().mockResolvedValue({ secure_url: 'https://res.cloudinary.test/preuve.jpg', public_id: 'preuve-test-id', resource_type: 'image', version: 1, format: 'jpg', bytes: 16 }),
   destroyFromCloudinary: jest.fn(),
 }));
 jest.mock('../services/rentalTenantNotificationService', () => ({ notifyContractTenant: jest.fn().mockResolvedValue(null) }));
@@ -102,7 +102,11 @@ test('preuve de paiement jointe : acceptée et conservée (champ optionnel, rét
     .field('montantRecu', '150000').field('datePaiement', '2027-06-10').field('modePaiement', 'espèces')
     .attach('preuve', Buffer.from('fake-image-bytes'), { filename: 'preuve.jpg', contentType: 'image/jpeg' });
   expect(res.status).toBe(200);
-  expect(res.body.data.paiement.preuvePaiement).toMatchObject({ url: 'https://res.cloudinary.test/preuve.jpg', publicId: 'preuve-test-id' });
+  expect(res.body.data.paiement).not.toHaveProperty('preuvePaiement');
+  expect(res.body.data.paiement.paymentProof).toMatchObject({ canPreview: true, canDownload: true });
+  const stored = await Paiement.findById(paiement._id).select('+preuvePaiement.asset.publicId +preuvePaiement.asset.deliveryType');
+  expect(stored.preuvePaiement.asset).toMatchObject({ assetClass: 'PRIVATE_DOCUMENT', publicId: 'preuve-test-id', deliveryType: 'authenticated' });
+  expect(stored.preuvePaiement.url).toBeUndefined();
 
   // Ancien document sans preuvePaiement : doit rester lisible normalement.
   const legacy = await fixtureEcheance();

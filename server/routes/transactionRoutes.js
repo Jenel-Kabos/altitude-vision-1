@@ -32,6 +32,7 @@ router.patch ('/:id/notes',    staffOnly, ctrl.updateNotes);
 
 // Paiements
 router.get   ('/:id/paiements',                                        protect,   pCtrl.getPaiements);
+router.get   ('/:id/paiements/:pId/proof',                             protect,   pCtrl.downloadProof);
 router.post  ('/:id/paiements/initier',                                protect,   pCtrl.initierPaiement);
 router.get   ('/:id/paiements/verifier/:intentId',                     protect,   pCtrl.verifierPaiement);
 router.post  ('/:id/paiements/virement', upload.single('preuve'),      protect,   pCtrl.soumettreVirement);

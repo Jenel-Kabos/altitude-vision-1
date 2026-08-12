@@ -102,12 +102,14 @@ async function load({ entityId, user }) {
     ...(contrat.documents || []).map((doc) => ({
       id: String(doc._id), label: doc.nom || DOC_TYPE_LABELS[doc.type] || doc.type, date: doc.dateGeneration,
       meta: { type: doc.type, invalidated: doc.invalidated || false },
-      previewUrl: doc.url ? `/api/rental-documents/${doc._id}/download` : null,
+      previewUrl: (doc.asset || doc.url) ? `/api/rental-documents/${doc._id}/download` : null,
     })),
     ...identiteDocs.map((doc) => ({
       id: String(doc._id), label: doc.notes || `Pièce d'identité — ${doc.refNom || ''}`.trim(), date: doc.issueDate || doc.createdAt,
       meta: { type: 'piece_identite', refType: doc.refType },
-      previewUrl: doc.content && doc.content.startsWith('http') ? doc.content : null,
+      previewUrl: doc.privateAsset && doc.refType && doc.refId
+        ? `/api/${doc.refType === 'Locataire' ? 'locataires' : 'proprietaires'}/${doc.refId}/identity-document`
+        : null,
     })),
   ];
 

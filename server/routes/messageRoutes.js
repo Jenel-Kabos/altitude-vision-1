@@ -16,6 +16,7 @@ const {
     markAsRead,
     deleteMessage,
     getConversations,
+    downloadAttachment,
 } = require('../controllers/messageController');
 
 router.use(protect, requireTenantScope);
@@ -26,6 +27,7 @@ router.use(protect, requireTenantScope);
 
 // Liste des conversations
 router.get('/conversations', getConversations);
+router.get('/:messageId/attachments/:attachmentId', downloadAttachment);
 
 // ==========================================================
 // --- 🔗 Routes dynamiques ---

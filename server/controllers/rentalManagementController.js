@@ -82,8 +82,8 @@ exports.list = async (req, res) => {
     // doit pas apparaître dans le module Gestion Locative tant qu'elle n'a
     // pas été explicitement activée. `?managementActivated=false` permet de
     // consulter les annonces en attente d'activation si un écran futur en a besoin.
-    const filter = { managementActivated: true };
-    ['occupancyStatus', 'availabilityStatus', 'publicationStatus', 'owner', 'active', 'managementActivated'].forEach((key) => {
+    const filter = { managementActivated: true, owner: { $in: req.tenantScopeUserIds || [] } };
+    ['occupancyStatus', 'availabilityStatus', 'publicationStatus', 'active', 'managementActivated'].forEach((key) => {
       if (req.query[key] !== undefined) {
         filter[key] = key === 'managementActivated' || key === 'active' ? req.query[key] === 'true' : req.query[key];
       }
@@ -110,19 +110,21 @@ exports.list = async (req, res) => {
   } catch (error) { fail(res, error); }
 };
 
-exports.stats = async (_req, res) => {
+exports.stats = async (req, res) => {
   try {
     const windowDays = contractAlertWindowDays();
     const soon = new Date(Date.now() + windowDays * 24 * 60 * 60 * 1000);
+    const propertyIds = await Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+    const contractIds = await Contrat.find({ bien: { $in: propertyIds }, type: 'location' }).distinct('_id');
     const [grouped, overduePayments, partialPayments, expiringContracts, expiredContracts, biensInscrits] = await Promise.all([
       // Sprint A : n'agrège que les dossiers réellement activés — une
       // simple annonce Location ne doit jamais gonfler les statistiques de
       // gestion locative (voir server/docs/PROPERTY_TRANSACTION_ARCHITECTURE.md).
-      RentalManagement.aggregate([{ $match: { managementActivated: true } }, { $group: { _id: null, total: { $sum: 1 }, vacant: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'vacant'] }, 1, 0] } }, available: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'disponible'] }, 1, 0] } }, occupied: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'occupe'] }, 1, 0] } }, notice: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'preavis'] }, 1, 0] } }, scheduledExits: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'sortie_programmee'] }, 1, 0] } }, inModeration: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'en_attente_moderation'] }, 1, 0] } }, published: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'publie'] }, 1, 0] } }, maintenance: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'maintenance'] }, 1, 0] } }, blockingInspections: { $sum: { $cond: [{ $and: [{ $eq: ['$occupancyStatus', 'sortie_programmee'] }, { $eq: [{ $ifNull: ['$exitInspectionClearedAt', null] }, null] }] }, 1, 0] } }, readyToRepublish: { $sum: { $cond: [{ $and: [{ $eq: ['$occupancyStatus', 'vacant'] }, { $eq: ['$publicationReadiness.ready', true] }, { $ne: ['$publicationStatus', 'publie'] }] }, 1, 0] } } } }]),
-      Paiement.countDocuments({ statut: { $in: ['impayé', 'en_retard'] } }),
-      Paiement.countDocuments({ statut: 'partiel' }),
-      Contrat.countDocuments({ type: 'location', statut: 'actif', dateFinBail: { $gte: new Date(), $lte: soon } }),
-      Contrat.countDocuments({ type: 'location', $or: [{ statut: 'expiré' }, { statut: 'actif', dateFinBail: { $lt: new Date() } }] }),
+      RentalManagement.aggregate([{ $match: { managementActivated: true, property: { $in: propertyIds } } }, { $group: { _id: null, total: { $sum: 1 }, vacant: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'vacant'] }, 1, 0] } }, available: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'disponible'] }, 1, 0] } }, occupied: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'occupe'] }, 1, 0] } }, notice: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'preavis'] }, 1, 0] } }, scheduledExits: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'sortie_programmee'] }, 1, 0] } }, inModeration: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'en_attente_moderation'] }, 1, 0] } }, published: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'publie'] }, 1, 0] } }, maintenance: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'maintenance'] }, 1, 0] } }, blockingInspections: { $sum: { $cond: [{ $and: [{ $eq: ['$occupancyStatus', 'sortie_programmee'] }, { $eq: [{ $ifNull: ['$exitInspectionClearedAt', null] }, null] }] }, 1, 0] } }, readyToRepublish: { $sum: { $cond: [{ $and: [{ $eq: ['$occupancyStatus', 'vacant'] }, { $eq: ['$publicationReadiness.ready', true] }, { $ne: ['$publicationStatus', 'publie'] }] }, 1, 0] } } } }]),
+      Paiement.countDocuments({ contrat: { $in: contractIds }, statut: { $in: ['impayé', 'en_retard'] } }),
+      Paiement.countDocuments({ contrat: { $in: contractIds }, statut: 'partiel' }),
+      Contrat.countDocuments({ _id: { $in: contractIds }, statut: 'actif', dateFinBail: { $gte: new Date(), $lte: soon } }),
+      Contrat.countDocuments({ _id: { $in: contractIds }, $or: [{ statut: 'expiré' }, { statut: 'actif', dateFinBail: { $lt: new Date() } }] }),
       // "Biens inscrits" (Sprint GL-UX1, affiné GL-DEBT-1) — distinct de
       // "biens sous gestion" (RentalManagement.managementActivated:true
       // ci-dessus) : biens de LOCATION réellement rattachés à un
@@ -137,7 +139,7 @@ exports.stats = async (_req, res) => {
       // entrées invisibles partout ailleurs dans le module. Voir
       // server/docs/PROPERTY_TRANSACTION_ARCHITECTURE.md.
       Property.aggregate([
-        { $match: { status: 'location', availability: { $ne: 'Retiré' }, owner: { $exists: true, $ne: null } } },
+        { $match: { _id: { $in: propertyIds }, status: 'location', availability: { $ne: 'Retiré' }, owner: { $exists: true, $ne: null } } },
         { $lookup: { from: 'users', localField: 'owner', foreignField: '_id', as: 'ownerDoc' } },
         { $unwind: '$ownerDoc' },
         { $match: { 'ownerDoc.role': 'Proprietaire' } },

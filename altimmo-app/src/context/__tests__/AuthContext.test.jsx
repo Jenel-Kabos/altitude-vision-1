@@ -23,6 +23,7 @@ jest.mock('../../services/notificationsService', () => ({
   enregistrerNotifications: jest.fn(),
   dissocierNotifications: jest.fn(),
 }));
+jest.mock('../../services/cacheService', () => ({ cache: { clear: jest.fn() } }));
 
 import { disconnectSocket as mockDisconnectSocket } from '../../services/socketService';
 import {
@@ -30,6 +31,7 @@ import {
   enregistrerNotifications as mockRegisterPush,
 } from '../../services/notificationsService';
 import { AuthProvider, restoreStoredSession, useAuth } from '../AuthContext';
+import { cache as mockCache } from '../../services/cacheService';
 
 const mockDeleteToken = mockApi.deleteToken;
 const mockGetToken = mockApi.getToken;
@@ -97,5 +99,6 @@ describe('AuthProvider', () => {
     expect(mockUnregisterPush).toHaveBeenCalled();
     expect(mockDeleteToken).toHaveBeenCalled();
     expect(mockDisconnectSocket).toHaveBeenCalled();
+    expect(mockCache.clear).toHaveBeenCalled();
   });
 });

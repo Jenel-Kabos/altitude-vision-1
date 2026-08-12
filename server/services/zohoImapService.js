@@ -7,7 +7,7 @@ const { ImapFlow }          = require('imapflow');
 const { simpleParser }      = require('mailparser');
 const InternalMail          = require('../models/InternalMail');
 const User                  = require('../models/User');
-const { uploadToCloudinary } = require('../config/cloudinary');
+const { uploadPrivateAsset } = require('./storage/secureStorageService');
 const logger                = require('../utils/logger');
 
 let isPolling = false;
@@ -78,19 +78,13 @@ const processFetchedMessage = async (message, context) => {
     for (const att of (parsed.attachments || [])) {
         if (!att.content || !att.filename) continue;
         try {
-            const safeId = `${Date.now()}-${att.filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-            const result = await uploadToCloudinary(att.content, {
-                resource_type: 'auto',
-                folder: 'altitude-vision/email-attachments',
-                public_id: safeId,
-                quality: undefined,
-                fetch_format: undefined,
-                width: undefined,
-                crop: undefined,
+            const asset = await uploadPrivateAsset(att.content, {
+                purpose: 'administrative', ownerType: 'InternalMail', ownerId: messageId,
+                filename: att.filename, mimeType: att.contentType || 'application/octet-stream',
             });
             attachmentDocs.push({
                 filename: att.filename,
-                url: result.secure_url,
+                asset,
                 mimetype: att.contentType || 'application/octet-stream',
                 size: att.size || att.content.length || 0,
             });

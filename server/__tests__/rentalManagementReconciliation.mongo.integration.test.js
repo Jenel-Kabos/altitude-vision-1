@@ -15,6 +15,9 @@ const Locataire = require('../models/Locataire');
 const Proprietaire = require('../models/Proprietaire');
 const Paiement = require('../models/Paiement');
 const ActionLog = require('../models/ActionLog');
+const OrgUnit = require('../models/OrgUnit');
+const OrgMembership = require('../models/OrgMembership');
+const PlatformTenant = require('../models/PlatformTenant');
 const {
   scanRentalManagementConsistency,
   planRentalManagementReconciliation,
@@ -56,10 +59,11 @@ const makeHistoricalActiveContract = async (property, overrides = {}) => {
   });
 };
 
-const callStats = async () => {
+const callStats = async ({ tenant, scopeUserIds } = {}) => {
   let payload;
   const res = { json: (body) => { payload = body; return res; }, status: () => res };
-  await getStats({}, res);
+  await getStats({ platformTenant: tenant || null, tenantScopeUserIds: scopeUserIds || [] }, res);
+  if (!payload?.data?.stats) throw new Error(payload?.message || 'Rental management stats unavailable');
   return payload.data.stats;
 };
 
@@ -160,10 +164,17 @@ describe('GL-ARCH-1.1 — réconciliation (plan + apply) : idempotente, jamais d
   test('le KPI « Biens gérés » passe de 0 à 1 après application, et reflète désormais le bail actif historique', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const owner = await makeUser({ role: 'Proprietaire' });
+    const root = await OrgUnit.create({ name: `GL reconciliation ${Date.now()}`, type: 'organization', status: 'active' });
+    const tenant = await PlatformTenant.create({ name: root.name, slug: `gl-reconciliation-${Date.now()}`, rootOrgUnit: root._id, status: 'active' });
+    await OrgMembership.create([
+      { user: admin._id, orgUnit: root._id, status: 'active' },
+      { user: owner._id, orgUnit: root._id, status: 'active' },
+    ]);
+    const statsContext = { tenant, scopeUserIds: [admin._id, owner._id] };
     const property = await makeManagedProperty(owner);
     await makeHistoricalActiveContract(property);
 
-    expect((await callStats()).total).toBe(0);
+    expect((await callStats(statsContext)).total).toBe(0);
 
     const report = await scanRentalManagementConsistency();
     const plan = planRentalManagementReconciliation(report);
@@ -180,7 +191,7 @@ describe('GL-ARCH-1.1 — réconciliation (plan + apply) : idempotente, jamais d
     const updatedProperty = await Property.findById(property._id);
     expect(updatedProperty.availability).toBe('Loué');
 
-    expect((await callStats()).total).toBe(1);
+    expect((await callStats(statsContext)).total).toBe(1);
     expect(result.verification.items[0].status).toBe('CONSISTENT');
     const log = await ActionLog.findOne({ action: 'Réconciliation Gestion locative' });
     expect(log).toBeTruthy();

@@ -61,6 +61,7 @@ router.param('id', async (req, res, next, paiementId) => {
 
 router.get('/',       protect, ctrl.getAll);
 router.get('/:id',    protect, ctrl.getOne);
+router.get('/:id/proof', protect, ctrl.downloadProof);
 router.put('/:id',    protect, ctrl.update);
 // upload.single ne touche req.body/req.file que pour une requête
 // multipart/form-data réelle — un appel JSON existant (sans preuve jointe)

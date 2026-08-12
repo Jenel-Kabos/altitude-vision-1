@@ -12,6 +12,7 @@ import {
   sendStaffReply,
   sendStaffReplyWithAttachments,
   markConversationAsRead,
+  openConversationAttachment,
 } from "../../services/conversationService";
 import { useAuth } from "../../context/AuthContext";
 import BackButton from "../../components/navigation/BackButton";
@@ -31,25 +32,12 @@ const EMOJIS = [
 ];
 
 const renderAttachment = (att) => {
-  switch (att.type) {
-    case 'image':
-      return (
-        <img src={att.url} alt={att.nom}
-          className="max-w-xs rounded-lg cursor-pointer"
-          onClick={() => window.open(att.url, '_blank')} />
-      );
-    case 'video':
-      return <video src={att.url} controls className="max-w-xs rounded-lg" />;
-    case 'audio':
-      return <audio src={att.url} controls className="w-48" />;
-    default:
-      return (
-        <a href={att.url} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-1 text-blue-400 underline text-sm">
-          <Paperclip size={12} /> {att.nom || 'Fichier'}
-        </a>
-      );
-  }
+  return (
+    <button type="button" onClick={() => openConversationAttachment(att)}
+      className="flex items-center gap-1 text-blue-400 underline text-sm">
+      <Paperclip size={12} /> {att.nom || att.originalFilename || 'Pièce jointe sécurisée'}
+    </button>
+  );
 };
 
 const formatTime = (d) => {

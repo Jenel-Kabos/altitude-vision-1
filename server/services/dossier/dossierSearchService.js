@@ -14,7 +14,7 @@ const FinancialDocument = require('../../models/FinancialDocument');
 const MAX_RESULTS_PER_SOURCE = 10;
 const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-async function searchDossiers(rawQuery) {
+async function searchDossiers(rawQuery, { tenantId, scopeUserIds = [] } = {}) {
   const q = String(rawQuery || '').trim();
   // Une requête purement numérique (ex: "7") est une recherche de référence
   // exacte (docNumber, N° de facture) — toujours autorisée, même à un seul
@@ -26,8 +26,9 @@ async function searchDossiers(rawQuery) {
   const results = [];
 
   // ── Gestion locative (bail = dossier) — par bien, locataire, propriétaire ──
+  const ownerScope = { owner: { $in: scopeUserIds } };
   const [properties, locataires, proprietaires] = await Promise.all([
-    Property.find({ title: regex }).select('_id').limit(MAX_RESULTS_PER_SOURCE).lean(),
+    Property.find({ title: regex, ...ownerScope }).select('_id').limit(MAX_RESULTS_PER_SOURCE).lean(),
     Locataire.find({ $or: [{ nom: regex }, { prenom: regex }] }).select('_id').limit(MAX_RESULTS_PER_SOURCE).lean(),
     Proprietaire.find({ $or: [{ nom: regex }, { prenom: regex }] }).select('_id').limit(MAX_RESULTS_PER_SOURCE).lean(),
   ]);
@@ -36,7 +37,9 @@ async function searchDossiers(rawQuery) {
   const proprietaireIds = proprietaires.map((p) => p._id);
 
   if (propertyIds.length || locataireIds.length || proprietaireIds.length) {
+    const tenantPropertyIds = await Property.find(ownerScope).distinct('_id');
     const contrats = await Contrat.find({
+      bien: { $in: tenantPropertyIds },
       $or: [
         propertyIds.length && { bien: { $in: propertyIds } },
         locataireIds.length && { locataire: { $in: locataireIds } },
@@ -55,19 +58,20 @@ async function searchDossiers(rawQuery) {
   }
 
   // ── Document (devis/facture/contrat/EDL/pièce d'identité) ──
-  const docs = await Document.find({ $or: [{ refNom: regex }, { notes: regex }] })
+  const documentScope = { $or: [{ tenant: tenantId }, { tenant: null, createdBy: { $in: scopeUserIds } }, { tenant: null, client: { $in: scopeUserIds } }] };
+  const docs = await Document.find({ $and: [documentScope, { $or: [{ refNom: regex }, { notes: regex }] }] })
     .select('_id type refNom notes docNumber').limit(MAX_RESULTS_PER_SOURCE).lean();
   docs.forEach((d) => {
     results.push({ label: `${d.type}${d.docNumber ? ` #${d.docNumber}` : ''} — ${d.refNom || d.notes || ''}`.trim(), kind: 'document', documentId: String(d._id) });
   });
   if (isNumericQuery) {
-    const byNumber = await Document.find({ docNumber: Number(q) }).select('_id type refNom docNumber').limit(MAX_RESULTS_PER_SOURCE).lean();
+    const byNumber = await Document.find({ $and: [documentScope, { docNumber: Number(q) }] }).select('_id type refNom docNumber').limit(MAX_RESULTS_PER_SOURCE).lean();
     byNumber.forEach((d) => results.push({ label: `${d.type} #${d.docNumber} — ${d.refNom || ''}`.trim(), kind: 'document', documentId: String(d._id) }));
   }
 
   // ── FinancialDocument (factures hôtel/hébergement/vente/location) ──
   const financialDocs = await FinancialDocument.find({
-    $or: [{ documentNumber: regex }, { 'customer.name': regex }],
+    tenant: tenantId, $or: [{ documentNumber: regex }, { 'customer.name': regex }],
   }).select('_id domain establishmentType documentNumber customer subjectType subjectId').limit(MAX_RESULTS_PER_SOURCE).lean();
   const DOSSIER_DOMAIN_BY_ESTABLISHMENT = { Hotel: 'hotellerie', Accommodation: 'hebergement' };
   financialDocs.forEach((doc) => {

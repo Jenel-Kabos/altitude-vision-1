@@ -15,6 +15,7 @@ const Document = require('../models/Document');
 const FinancialDocument = require('../models/FinancialDocument');
 const dossierRoutes = require('../routes/dossierRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(120000);
 const id = () => new mongoose.Types.ObjectId();
@@ -27,12 +28,16 @@ app.use(errorHandler);
 const signToken = (userId) => jwt.sign({ id: userId, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
 let counter = 0;
-const makeUser = (overrides = {}) => {
+let tenantFixture;
+const makeUser = async (overrides = {}) => {
   counter += 1;
-  return User.create({ name: 'Test User', email: `dsearch${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
+  const user = await User.create({ name: 'Test User', email: `dsearch${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
+  await addTenantMember({ tenant: tenantFixture.tenant, user, bootstrap: tenantFixture.bootstrap });
+  return user;
 };
 
 beforeAll(startFinancialMongo);
+beforeEach(async () => { tenantFixture = await createTenantFixture({ label: 'Dossier Search' }); });
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);
 
@@ -80,14 +85,14 @@ test('retrouve le dossier de bail par nom de locataire, propriétaire ou bien', 
 
 test('retrouve un Document par numéro exact', async () => {
   const admin = await makeUser({ role: 'Admin' });
-  const doc = await Document.create({ type: 'Facture', status: 'Envoyé', refNom: 'Client Recherche Doc', notes: 'note' });
+  const doc = await Document.create({ tenant: tenantFixture.tenant._id, type: 'Facture', status: 'Envoyé', refNom: 'Client Recherche Doc', notes: 'note' });
   const res = await request(app).get('/api/dossiers/search').query({ q: String(doc.docNumber) }).set('Authorization', `Bearer ${signToken(admin._id)}`);
   expect(res.body.data.results.some((r) => r.documentId === String(doc._id))).toBe(true);
 });
 
 test('recherche vide/trop courte : un seul chiffre reste autorisé (référence exacte)', async () => {
   const admin = await makeUser({ role: 'Admin' });
-  const doc = await Document.create({ type: 'Facture', status: 'Envoyé', refNom: 'Client X' });
+  const doc = await Document.create({ tenant: tenantFixture.tenant._id, type: 'Facture', status: 'Envoyé', refNom: 'Client X' });
   const res = await request(app).get('/api/dossiers/search').query({ q: '1' }).set('Authorization', `Bearer ${signToken(admin._id)}`);
   expect(res.status).toBe(200);
   expect(res.body.data.results.some((r) => r.documentId === String(doc._id))).toBe(true);
@@ -97,6 +102,7 @@ test('retrouve une facture hôtelière par numéro et renvoie un lien vers le do
   const admin = await makeUser({ role: 'Admin' });
   const subjectId = id();
   await FinancialDocument.create({
+    tenant: tenantFixture.tenant._id,
     domain: 'hotel', establishmentType: 'Hotel', establishmentId: id(), documentType: 'invoice', status: 'issued', currency: 'XAF',
     subjectType: 'HotelReservation', subjectId, documentNumber: 'INV-SEARCH-001',
     totalMinor: 100000, businessOperationKey: `search-test-${subjectId}`, createdBy: admin._id,

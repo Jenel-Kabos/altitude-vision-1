@@ -4,6 +4,21 @@ const Transaction = require('../models/Transaction');
 const Property = require('../models/Property');
 const { assertResourceTenant, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
 
+const safeDocument = (value) => {
+  const data = value?.toObject ? value.toObject() : { ...value };
+  const sensitiveUrl = typeof data.content === 'string' && /^https?:\/\//i.test(data.content);
+  const hasPrivate = Boolean(data.privateAsset || sensitiveUrl);
+  delete data.privateAsset;
+  if (sensitiveUrl) delete data.content;
+  if (hasPrivate && data.refType && data.refId) {
+    data.canPreview = true; data.canDownload = true;
+    data.previewEndpoint = `/api/${data.refType === 'Locataire' ? 'locataires' : 'proprietaires'}/${data.refId}/identity-document`;
+    data.downloadEndpoint = `${data.previewEndpoint}?download=1`;
+    data.legacy = !value.privateAsset;
+  }
+  return data;
+};
+
 const tenantId = (req) => req.platformTenant?._id;
 async function tenantDocumentFilter(req) {
   const propertyIds = await Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
@@ -100,7 +115,7 @@ exports.getAllDocuments = async (req, res) => {
       results: documents.length,
       ...(meta && { meta }),
       data: {
-        documents,
+        documents: documents.map(safeDocument),
       },
     });
   } catch (error) {
@@ -114,6 +129,7 @@ exports.buildDocumentFilter = buildDocumentFilter;
 exports.createDocument = async (req, res) => {
   try {
     const docData = { ...req.body, tenant: tenantId(req), createdBy: req.user.id };
+    delete docData.privateAsset;
     const attribution = await resolveResourceTenant({ resourceType: 'Document', resource: docData });
     if (attribution.status !== 'resolved' || String(attribution.tenantId) !== String(tenantId(req))) {
       return res.status(422).json({ status: 'fail', code: 'TENANT_RELATION_MISMATCH', message: 'Les relations du document ne correspondent pas au tenant actif.' });
@@ -138,7 +154,7 @@ exports.createDocument = async (req, res) => {
     res.status(201).json({
       status: 'success',
       data: {
-        document: newDocument,
+        document: safeDocument(newDocument),
       },
     });
   } catch (error) {
@@ -161,7 +177,7 @@ exports.getDocument = async (req, res) => {
         await assertResourceTenant({ resourceType: 'Document', resource: document, tenantId: tenantId(req) });
         res.status(200).json({
             status: 'success',
-            data: { document }
+            data: { document: safeDocument(document) }
         });
     } catch (error) {
         res.status(error.statusCode || 500).json({ status: error.statusCode ? 'fail' : 'error', code: error.code, message: error.message });
@@ -176,6 +192,7 @@ exports.updateDocument = async (req, res) => {
     await assertResourceTenant({ resourceType: 'Document', resource: existing, tenantId: tenantId(req) });
     const docData = { ...req.body };
     delete docData.tenant;
+    delete docData.privateAsset;
     const merged = { ...existing.toObject(), ...docData, tenant: existing.tenant || tenantId(req) };
     const attribution = await resolveResourceTenant({ resourceType: 'Document', resource: merged });
     if (attribution.status !== 'resolved' || String(attribution.tenantId) !== String(tenantId(req))) {
@@ -207,7 +224,7 @@ exports.updateDocument = async (req, res) => {
     res.status(200).json({
       status: 'success',
       data: {
-        document,
+        document: safeDocument(document),
       },
     });
   } catch (error) {

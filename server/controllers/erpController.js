@@ -25,7 +25,7 @@
 // REPORTING-1/ERP-CORE-1 existantes sans une revue dédiée.
 const asyncHandler = require('express-async-handler');
 const erpService = require('../services/erp/erpService');
-const { resolveAvailableTenantsForUser, resolveRootOrgUnitId } = require('../services/platformTenant/tenantContextService');
+const { resolveRootOrgUnitId } = require('../services/platformTenant/tenantContextService');
 
 // `orgUnitId` peut légitimement désigner une unité non-racine (business
 // unit/département) DANS le tenant de l'acteur — on vérifie donc que sa
@@ -33,16 +33,11 @@ const { resolveAvailableTenantsForUser, resolveRootOrgUnitId } = require('../ser
 // pour cet acteur (même logique que `assertOrgUnitInActorTenant` côté
 // organizationController.js).
 async function trustedScopeParams(req) {
-  const { orgUnitId, tenantId } = req.query;
-  if (!orgUnitId && !tenantId) return { orgUnitId: undefined, tenantId: undefined };
-  const available = await resolveAvailableTenantsForUser(req.user._id || req.user.id).catch(() => []);
-  const availableRootIds = new Set((available || []).map((t) => String(t.rootOrgUnit)));
-  const availableTenantIds = new Set((available || []).map((t) => String(t._id)));
+  const { orgUnitId } = req.query;
+  const activeTenant = req.platformTenant;
   const orgUnitRoot = orgUnitId ? await resolveRootOrgUnitId(orgUnitId).catch(() => null) : null;
-  return {
-    orgUnitId: orgUnitRoot && availableRootIds.has(orgUnitRoot) ? orgUnitId : undefined,
-    tenantId: tenantId && availableTenantIds.has(String(tenantId)) ? tenantId : undefined,
-  };
+  if (orgUnitRoot && String(orgUnitRoot) === String(activeTenant.rootOrgUnit)) return { orgUnitId, tenantId: String(activeTenant._id) };
+  return { tenantId: String(activeTenant._id) };
 }
 
 const parseQuery = async (req) => ({
@@ -53,7 +48,9 @@ const parseQuery = async (req) => ({
 });
 
 exports.getExecutiveOverview = asyncHandler(async (req, res) => {
-  const overview = await erpService.getExecutiveOverview(await parseQuery(req));
+  const params = await parseQuery(req);
+  const overview = await erpService.getExecutiveOverview(params);
+  overview.scope = { tenantId: params.tenantId || String(req.platformTenant._id), orgUnitId: params.orgUnitId || String(req.platformTenant.rootOrgUnit) };
   res.json({ status: 'success', data: { overview } });
 });
 

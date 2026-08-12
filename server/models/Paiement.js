@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 
 const paiementSchema = new mongoose.Schema({
   contrat:     { type: mongoose.Schema.Types.ObjectId, ref: 'Contrat', required: true },
@@ -23,6 +24,7 @@ const paiementSchema = new mongoose.Schema({
   preuvePaiement: {
     url:      { type: String },
     publicId: { type: String },
+    asset:    { type: privateAssetSchema },
   },
 
   // ── Retard & Pénalités ─────────────────────────────────────
@@ -33,5 +35,11 @@ const paiementSchema = new mongoose.Schema({
   dateDebutRetard:   { type: Date },
   retardJours:       { type: Number, default: 0 },
 }, { timestamps: true });
+paiementSchema.set('toJSON', { transform: (_doc, ret) => {
+  const available = Boolean(ret.preuvePaiement?.asset || ret.preuvePaiement?.url);
+  delete ret.preuvePaiement;
+  if (available) ret.paymentProof = { canPreview: true, canDownload: true, previewEndpoint: `/api/paiements/${ret._id}/proof`, downloadEndpoint: `/api/paiements/${ret._id}/proof?download=1` };
+  return ret;
+} });
 
 module.exports = mongoose.model('Paiement', paiementSchema);

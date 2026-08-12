@@ -9,7 +9,7 @@
 
 jest.mock('../config/cloudinary', () => ({
   ...jest.requireActual('../config/cloudinary'),
-  uploadToCloudinary: jest.fn().mockResolvedValue({ secure_url: 'https://res.cloudinary.test/preuve.jpg', public_id: 'preuve-test-id' }),
+  uploadToCloudinary: jest.fn().mockResolvedValue({ secure_url: 'https://res.cloudinary.test/preuve.jpg', public_id: 'preuve-test-id', resource_type: 'image', version: 1, format: 'jpg', bytes: 16 }),
   destroyFromCloudinary: jest.fn().mockResolvedValue(),
 }));
 jest.mock('../services/rentalTenantNotificationService', () => ({ notifyContractTenant: jest.fn().mockResolvedValue(null) }));

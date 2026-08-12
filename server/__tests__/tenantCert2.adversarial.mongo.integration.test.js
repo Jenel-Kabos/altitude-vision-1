@@ -306,6 +306,20 @@ describe('TENANT-CERT-2 — ORGANIZATION (§17)', () => {
 });
 
 describe('TENANT-CERT-2 — REPORTING / ERP (§15/§16/§29 tenant explicite hostile)', () => {
+  test('Admin A sans paramètre reçoit obligatoirement le scope Tenant A, jamais le global', async () => {
+    const { adminA, tenantA } = await buildThreatModel();
+    const res = await request(app).get('/api/reporting/executive').set('Authorization', auth(adminA._id));
+    expect(res.status).toBe(200);
+    expect(String(res.body.data.report.tenantId)).toBe(String(tenantA._id));
+    expect(String(res.body.data.report.orgUnitId)).toBe(String(tenantA.rootOrgUnit));
+  });
+
+  test('ERP Admin A sans paramètre est borné au Tenant A', async () => {
+    const { adminA, tenantA } = await buildThreatModel();
+    const res = await request(app).get('/api/erp/executive').set('Authorization', auth(adminA._id));
+    expect(res.status).toBe(200);
+    expect(String(res.body.data.overview.scope?.tenantId || res.body.data.overview.report?.tenantId || '')).toBe(String(tenantA._id));
+  });
   test('Admin A fournissant tenantId=B : le paramètre hostile est ignoré, jamais transmis tel quel', async () => {
     const { adminA, tenantB } = await buildThreatModel();
     const res = await request(app).get('/api/reporting/executive').query({ tenantId: String(tenantB._id) }).set('Authorization', auth(adminA._id));

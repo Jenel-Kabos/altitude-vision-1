@@ -4,6 +4,7 @@ const router     = express.Router();
 const auth       = require('../controllers/authController');
 const ctrl       = require('../controllers/locataireController');
 const { upload } = require('../config/cloudinary');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 const protect    = [auth.protect, auth.restrictTo(...STAFF_IMMO)];
 const readAll    = [auth.protect, auth.restrictTo(...STAFF_IMMO, 'Secretaire')];
@@ -21,6 +22,7 @@ router.patch('/link-requests/:requestId/review', protect, ctrl.reviewLinkRequest
 router.patch('/invitations/:requestId/cancel', protect, ctrl.cancelInvitation);
 router.post('/invitations/:requestId/resend', protect, ctrl.resendInvitation);
 router.get('/:id/dossier', readAll, ctrl.getDossier);
+router.get('/:id/identity-document', auth.protect, requireTenantScope, auth.restrictTo(...STAFF_IMMO, 'Secretaire'), ctrl.downloadIdentityDocument);
 router.post('/:id/invite', protect, ctrl.invite);
 router.get('/:id',    readAll,   ctrl.getOne);
 router.post('/',      protect,   fileField, ctrl.create);

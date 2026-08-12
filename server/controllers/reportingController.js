@@ -16,19 +16,16 @@
 const asyncHandler = require('express-async-handler');
 const { getExecutiveReport, getDomainReport, DOMAINS } = require('../services/reporting/reportingService');
 const { buildCsv, buildPdf } = require('../services/reporting/reportingExportService');
-const { resolveAvailableTenantsForUser, resolveRootOrgUnitId } = require('../services/platformTenant/tenantContextService');
+const { resolveRootOrgUnitId } = require('../services/platformTenant/tenantContextService');
 
 async function scopeParams(req) {
-  const { orgUnitId, tenantId } = req.query;
-  if (!orgUnitId && !tenantId) return { orgUnitId: undefined, tenantId: undefined };
-  const available = await resolveAvailableTenantsForUser(req.user._id || req.user.id).catch(() => []);
-  const availableRootIds = new Set((available || []).map((t) => String(t.rootOrgUnit)));
-  const availableTenantIds = new Set((available || []).map((t) => String(t._id)));
+  const { orgUnitId } = req.query;
+  const activeTenant = req.platformTenant;
   const orgUnitRoot = orgUnitId ? await resolveRootOrgUnitId(orgUnitId).catch(() => null) : null;
-  return {
-    orgUnitId: orgUnitRoot && availableRootIds.has(orgUnitRoot) ? orgUnitId : undefined,
-    tenantId: tenantId && availableTenantIds.has(String(tenantId)) ? tenantId : undefined,
-  };
+  if (orgUnitRoot && String(orgUnitRoot) === String(activeTenant.rootOrgUnit)) return { orgUnitId, tenantId: String(activeTenant._id) };
+  // L'absence de scope et tout identifiant hostile retombent TOUJOURS sur
+  // le tenant courant résolu par le middleware, jamais sur le global.
+  return { tenantId: String(activeTenant._id) };
 }
 
 exports.getExecutive = asyncHandler(async (req, res) => {

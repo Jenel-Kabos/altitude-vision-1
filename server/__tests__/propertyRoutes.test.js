@@ -16,6 +16,7 @@ jest.mock('../models/Contrat');
 // tests ci-dessous (logique métier SaleManagement/RentalManagement, sans
 // dépendre d'une vraie connexion Mongo).
 jest.mock('../services/platformTenant/tenantContextService', () => ({
+  resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439001' }, source: 'single_membership' }),
   resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439001' }),
   resolveRootOrgUnitId: jest.fn().mockResolvedValue('607f1f77bcf86cd799439001'),
   resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),

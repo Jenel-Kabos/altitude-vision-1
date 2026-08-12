@@ -1,11 +1,11 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { toast } from 'react-hot-toast';
 import RentalDocumentsPage from '../pages/dashboard/RentalDocumentsPage';
-import { getContrats, previewRentalDocument } from '../services/gestionLocativeService';
+import { getContrats, previewRentalDocument, previewSecureDocumentEndpoint } from '../services/gestionLocativeService';
 import { getAllDocuments } from '../services/documentService';
 
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('../services/gestionLocativeService', () => ({ getContrats: vi.fn(), previewRentalDocument: vi.fn() }));
+vi.mock('../services/gestionLocativeService', () => ({ getContrats: vi.fn(), previewRentalDocument: vi.fn(), previewSecureDocumentEndpoint: vi.fn() }));
 // DOC-ARCH-2 — RentalDocumentsPage fusionne désormais aussi les documents
 // génériques (Document) classés automatiquement pole=Altimmo/service=
 // gestion_locative (ex: pièces d'identité), sans jamais dupliquer leur
@@ -105,13 +105,14 @@ describe('RentalDocumentsPage — Sprint GL-UX1 — TEST DATA', () => {
   // Contrat.documents[]) : fusionnée dans la même vue, sans duplication.
   test('fusionne les pièces d’identité classées automatiquement (Document pole=Altimmo/service=gestion_locative)', async () => {
     getAllDocuments.mockResolvedValue([
-      { _id: 'PD1', refType: 'Locataire', refNom: 'Paul Moke', notes: "Pièce d'identité — Paul Moke", content: 'https://cdn.test/cni.pdf', issueDate: '2027-03-01' },
+      { _id: 'PD1', refType: 'Locataire', refNom: 'Paul Moke', notes: "Pièce d'identité — Paul Moke", previewEndpoint: '/api/locataires/L1/identity-document', issueDate: '2027-03-01' },
     ]);
     render(<RentalDocumentsPage />);
     expect(await screen.findByText("Pièce d'identité — Paul Moke")).toBeInTheDocument();
     expect(getAllDocuments).toHaveBeenCalledWith({ pole: 'Altimmo', service: 'gestion_locative' });
-    const link = screen.getByRole('link', { name: 'Ouvrir' });
-    expect(link).toHaveAttribute('href', 'https://cdn.test/cni.pdf');
+    const button = screen.getAllByRole('button', { name: 'Ouvrir' })[0];
+    fireEvent.click(button);
+    expect(previewSecureDocumentEndpoint).toHaveBeenCalledWith('/api/locataires/L1/identity-document');
   });
 
   test('la pièce d’identité générique est exclue quand on filtre sur un contrat précis (?contratId)', async () => {

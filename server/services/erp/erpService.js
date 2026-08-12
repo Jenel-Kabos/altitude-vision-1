@@ -29,13 +29,13 @@ const PACKAGE_VERSION = require('../../package.json').version;
 // d'un champ déjà réel et déjà indexé, jamais une valeur inventée ; si la
 // période précédente est vide, la variation est explicitement `null`
 // plutôt qu'une division par zéro déguisée.
-async function computeGrowth() {
+async function computeGrowth(scopeUserIds = null) {
   const now = new Date();
   const startCurrent = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const startPrevious = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
   const [newUsersThisMonth, newUsersPreviousMonth] = await Promise.all([
-    User.countDocuments({ createdAt: { $gte: startCurrent } }),
-    User.countDocuments({ createdAt: { $gte: startPrevious, $lt: startCurrent } }),
+    User.countDocuments({ ...(scopeUserIds ? { _id: { $in: scopeUserIds } } : {}), createdAt: { $gte: startCurrent } }),
+    User.countDocuments({ ...(scopeUserIds ? { _id: { $in: scopeUserIds } } : {}), createdAt: { $gte: startPrevious, $lt: startCurrent } }),
   ]);
   const newUsersGrowthPercent = newUsersPreviousMonth > 0
     ? Math.round(((newUsersThisMonth - newUsersPreviousMonth) / newUsersPreviousMonth) * 10000) / 100
@@ -45,10 +45,11 @@ async function computeGrowth() {
 
 // Résolution du scope organisationnel — réutilise organizationService tel
 // quel (ORGANIZATION-1), jamais une seconde implémentation.
-async function getOrganizationSummary() {
+async function getOrganizationSummary({ rootOrgUnitId = null, scopeUserIds = null } = {}) {
+  const unitFilter = rootOrgUnitId ? { $or: [{ _id: rootOrgUnitId }, { ancestors: rootOrgUnitId }] } : {};
   const [units, activeMemberships] = await Promise.all([
-    organizationService.listOrgUnits({}),
-    OrgMembership.countDocuments({ status: 'active' }),
+    rootOrgUnitId ? OrgUnit.find({ ...unitFilter, status: 'active' }).lean() : organizationService.listOrgUnits({}),
+    OrgMembership.countDocuments({ status: 'active', ...(scopeUserIds ? { user: { $in: scopeUserIds } } : {}) }),
   ]);
   const byType = units.reduce((acc, u) => { acc[u.type] = (acc[u.type] || 0) + 1; return acc; }, {});
   return { totalUnits: units.length, byType, activeMemberships };
@@ -56,10 +57,11 @@ async function getOrganizationSummary() {
 
 // ── Phase 3 — Vue exécutive ────────────────────────────────────────────
 async function getExecutiveOverview({ user, dateFrom, dateTo, orgUnitId, tenantId } = {}) {
+  const scopeUserIds = user?.tenantScopeUserIds || null;
   const [report, growth, organisation] = await Promise.all([
     getExecutiveReport({ user, dateFrom, dateTo, orgUnitId, tenantId }),
-    computeGrowth(),
-    getOrganizationSummary(),
+    computeGrowth(scopeUserIds),
+    getOrganizationSummary({ rootOrgUnitId: user?.platformTenant?.rootOrgUnit, scopeUserIds }),
   ]);
   const alerts = await evaluateAlerts({ domains: report.domains, growth });
   return {
@@ -77,7 +79,7 @@ async function getExecutiveOverview({ user, dateFrom, dateTo, orgUnitId, tenantI
 async function getAlerts({ user, dateFrom, dateTo, orgUnitId, tenantId } = {}) {
   const [report, growth] = await Promise.all([
     getExecutiveReport({ user, dateFrom, dateTo, orgUnitId, tenantId }),
-    computeGrowth(),
+    computeGrowth(user?.tenantScopeUserIds || null),
   ]);
   return evaluateAlerts({ domains: report.domains, growth });
 }
@@ -87,7 +89,7 @@ async function getAlerts({ user, dateFrom, dateTo, orgUnitId, tenantId } = {}) {
 // (CRM-AUTOMATION-1) et erpAlertsService — aucune nouvelle règle de gestion.
 async function getDecisionCenter({ user, dateFrom, dateTo, orgUnitId, tenantId } = {}) {
   const [cockpit, alerts] = await Promise.all([
-    getCockpit(),
+    tenantId ? Promise.resolve({ actionsPrioritaires: [], risques: [], unavailable: true }) : getCockpit(),
     getAlerts({ user, dateFrom, dateTo, orgUnitId, tenantId }),
   ]);
   return {
@@ -137,19 +139,19 @@ async function moduleHealth(key, { countQuery, lastSyncQuery, alertDomains = [] 
 
 async function getPlatformHealth({ user, dateFrom, dateTo, orgUnitId, tenantId } = {}) {
   const alerts = await getAlerts({ user, dateFrom, dateTo, orgUnitId, tenantId });
-  const latestOf = (Model, field = 'createdAt') => async () => {
-    const doc = await Model.findOne().sort({ [field]: -1 }).select(field).lean();
+  const latestOf = (Model, field = 'createdAt', filter = {}) => async () => {
+    const doc = await Model.findOne(filter).sort({ [field]: -1 }).select(field).lean();
     return doc?.[field] || null;
   };
 
   const modules = await Promise.all([
-    moduleHealth('crm', { countQuery: () => CrmCustomer.countDocuments(), lastSyncQuery: latestOf(CrmCustomer, 'updatedAt'), alertDomains: ['crm'] }, alerts),
-    moduleHealth('marketing', { countQuery: () => MarketingCampaign.countDocuments(), lastSyncQuery: latestOf(MarketingCampaign, 'updatedAt'), alertDomains: ['marketing'] }, alerts),
+    moduleHealth('crm', { countQuery: () => CrmCustomer.countDocuments(tenantId ? { tenant: tenantId } : {}), lastSyncQuery: latestOf(CrmCustomer, 'updatedAt', tenantId ? { tenant: tenantId } : {}), alertDomains: ['crm'] }, alerts),
+    moduleHealth('marketing', { countQuery: () => MarketingCampaign.countDocuments(tenantId ? { tenant: tenantId } : {}), lastSyncQuery: latestOf(MarketingCampaign, 'updatedAt', tenantId ? { tenant: tenantId } : {}), alertDomains: ['marketing'] }, alerts),
     moduleHealth('finance', { countQuery: () => Promise.resolve(null), lastSyncQuery: () => Promise.resolve(null), alertDomains: ['finance', 'location'] }, alerts),
-    moduleHealth('organisation', { countQuery: () => OrgUnit.countDocuments({ status: 'active' }), lastSyncQuery: latestOf(OrgUnit, 'updatedAt'), alertDomains: ['organisation'] }, alerts),
-    moduleHealth('api', { countQuery: () => ApiCallLog.countDocuments(), lastSyncQuery: latestOf(ApiCallLog), alertDomains: ['api'] }, alerts),
-    moduleHealth('notifications', { countQuery: () => Notification.countDocuments(), lastSyncQuery: latestOf(Notification), alertDomains: [] }, alerts),
-    moduleHealth('audit', { countQuery: () => ActionLog.countDocuments(), lastSyncQuery: latestOf(ActionLog, 'date'), alertDomains: [] }, alerts),
+    moduleHealth('organisation', { countQuery: () => OrgUnit.countDocuments(tenantId ? { status: 'active', $or: [{ _id: user.platformTenant.rootOrgUnit }, { ancestors: user.platformTenant.rootOrgUnit }] } : { status: 'active' }), lastSyncQuery: () => Promise.resolve(null), alertDomains: ['organisation'] }, alerts),
+    moduleHealth('api', { countQuery: () => ApiCallLog.countDocuments(tenantId ? { tenant: tenantId } : {}), lastSyncQuery: latestOf(ApiCallLog, 'createdAt', tenantId ? { tenant: tenantId } : {}), alertDomains: ['api'] }, alerts),
+    moduleHealth('notifications', { countQuery: () => Notification.countDocuments(tenantId ? { platformTenant: tenantId } : {}), lastSyncQuery: latestOf(Notification, 'createdAt', tenantId ? { platformTenant: tenantId } : {}), alertDomains: [] }, alerts),
+    moduleHealth('audit', { countQuery: () => ActionLog.countDocuments(tenantId ? { tenant: tenantId } : {}), lastSyncQuery: latestOf(ActionLog, 'date', tenantId ? { tenant: tenantId } : {}), alertDomains: [] }, alerts),
     moduleHealth('mobile', { countQuery: () => Promise.resolve(null), lastSyncQuery: () => Promise.resolve(null), alertDomains: [] }, alerts),
   ]);
   // ApiKey.API_KEY_SCOPES sert de témoin réel que le module API existe et

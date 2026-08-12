@@ -8,7 +8,10 @@ const mongoose = require('mongoose');
 const tenantPortalService = require('../services/tenantPortalService');
 const tenantLinkService = require('../services/tenantLinkService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
-const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
+const { destroyFromCloudinary } = require('../config/cloudinary');
+const { uploadPrivateAsset, deletePrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
+const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
+const Locataire = require('../models/Locataire');
 const { streamRemoteDocument } = require('./rentalDocumentController');
 
 const fail = (res, statusCode, message) =>
@@ -21,6 +24,25 @@ exports.getMe = async (req, res) => {
   } catch (error) {
     fail(res, error.statusCode || 500, error.message);
   }
+};
+
+exports.downloadMyIdentityDocument = async (req, res) => {
+  try {
+    const linked = await tenantPortalService.requireLocataire(req.user.id);
+    const locataire = await Locataire.findById(linked._id)
+      .select('+pieceIdentiteAsset.publicId +pieceIdentiteAsset.resourceType +pieceIdentiteAsset.deliveryType +pieceIdentiteAsset.version +pieceIdentiteAsset.format');
+    if (!locataire?.pieceIdentiteAsset && locataire?.pieceIdentite) {
+      return streamRemoteDocument({ url: locataire.pieceIdentite, name: 'identity-document', res, context: { userId: req.user.id, source: 'tenant_portal' } });
+    }
+    if (!locataire?.pieceIdentiteAsset) return fail(res, 404, 'Pièce d’identité introuvable.');
+    const buffer = await readPrivateAsset(locataire.pieceIdentiteAsset.toObject());
+    res.set({
+      'Content-Type': locataire.pieceIdentiteAsset.mimeType || 'application/octet-stream',
+      'Content-Disposition': `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="identity-document"`,
+      'Cache-Control': 'private, no-store, max-age=0',
+      'X-Content-Type-Options': 'nosniff',
+    }).send(buffer);
+  } catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.'); }
 };
 
 exports.getLease = async (req, res) => {
@@ -58,6 +80,14 @@ exports.getDocuments = async (req, res) => {
 exports.downloadDocument = async (req, res) => {
   try {
     const document = await tenantPortalService.getMyDocumentDownload(req.user.id, req.params.documentId);
+    if (document.asset) {
+      const buffer = await readPrivateAsset(document.asset);
+      res.setHeader('Content-Type', document.asset.mimeType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `inline; filename="document"`);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.send(buffer);
+    }
     return streamRemoteDocument({
       url: document.url,
       name: document.name || 'document',
@@ -85,15 +115,35 @@ exports.createMaintenanceRequest = async (req, res) => {
   try {
     const { category, description } = req.body;
     for (const file of (req.files || [])) {
-      const uploaded = await uploadToCloudinary(file.buffer, { folder: 'altitude-vision/rental-maintenance', resource_type: 'image' });
-      attachments.push({ url: uploaded.secure_url, nom: file.originalname });
+      const asset = await uploadPrivateAsset(file.buffer, {
+        purpose: 'maintenance', ownerType: 'Locataire', ownerId: req.user.id,
+        filename: file.originalname, mimeType: file.mimetype,
+      });
+      attachments.push({ asset, nom: file.originalname });
     }
     const ticket = await tenantPortalService.createMyMaintenanceRequest(req.user.id, { category, description, attachments });
     res.status(201).json({ status: 'success', data: { ticket } });
   } catch (error) {
-    await Promise.allSettled(attachments.map((file) => destroyFromCloudinary(file.url)));
+    await Promise.allSettled(attachments.map((file) => file.asset ? deletePrivateAsset(file.asset) : destroyFromCloudinary(file.url)));
     fail(res, error.statusCode || 500, error.message);
   }
+};
+
+exports.downloadMaintenanceAttachment = async (req, res) => {
+  try {
+    const locataire = await tenantPortalService.requireLocataire(req.user.id);
+    const ticket = await RentalMaintenanceTicket.findOne({ _id: req.params.ticketId, tenant: locataire._id })
+      .select('+attachments.asset.publicId +attachments.asset.resourceType +attachments.asset.deliveryType +attachments.asset.version +attachments.asset.format');
+    const attachment = ticket?.attachments?.[Number(req.params.attachmentIndex)];
+    if (!attachment) return fail(res, 404, 'Pièce jointe introuvable.');
+    if (!attachment.asset && attachment.url) return streamRemoteDocument({ url: attachment.url, name: attachment.nom, res, context: { ticketId: ticket._id } });
+    const buffer = await readPrivateAsset(attachment.asset.toObject());
+    res.setHeader('Content-Type', attachment.asset.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="maintenance-evidence"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.send(buffer);
+  } catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.'); }
 };
 exports.getLinkStatus = async (req, res) => {
   try { res.json({ status: 'success', data: await tenantPortalService.getLinkStatus(req.user.id) }); }

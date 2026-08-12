@@ -4,6 +4,7 @@ import api, { saveToken, getToken, deleteToken, setSessionInvalidatedHandler } f
 import { enregistrerNotifications, dissocierNotifications } from '../services/notificationsService';
 import { disconnectSocket } from '../services/socketService';
 import { getEffectiveProfiles } from '../services/userBusinessProfileService';
+import { cache } from '../services/cacheService';
 
 const AuthContext = createContext({});
 
@@ -63,6 +64,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     setSessionInvalidatedHandler(() => {
       disconnectSocket();
+      cache.clear();
       setToken(null);
       setUser(null);
       setNeedsProfileCompletion(false);
@@ -90,6 +92,7 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post('/auth/login', { email, password });
       const token = response.data.token;
       const user = response.data.data?.user || response.data.user;
+      cache.clear();
       await saveToken(token);
       setToken(token);
       setUser(user);
@@ -116,6 +119,7 @@ export const AuthProvider = ({ children }) => {
       const user      = response.data.data?.user || response.data.user;
       const isNewUser = response.data?.isNewUser ?? false;
       if (!token) throw new Error('Token manquant dans la réponse /auth/google');
+      cache.clear();
       await saveToken(token);
       setToken(token);
       setUser(user);
@@ -152,6 +156,7 @@ export const AuthProvider = ({ children }) => {
     await dissocierNotifications().catch(() => {});
     await deleteToken();
     disconnectSocket();
+    cache.clear();
     setToken(null);
     setUser(null);
     setNeedsProfileCompletion(false);

@@ -23,6 +23,7 @@ import {
   leaveConversation,
 } from '../../services/socketService';
 import { fonts, fontSize, spacing, radius } from '../../theme';
+import { downloadSecureAttachment } from '../../services/secureAttachmentService';
 
 const EMOJIS = [
   '😊', '😂', '❤️', '👍', '🙏', '😍', '😭',
@@ -323,29 +324,13 @@ export default function ChatScreen({ route, navigation }) {
 
   // ─── Rendu d'une pièce jointe dans une bulle ───
   const renderAttachment = useCallback((att, i) => {
-    switch (att.type) {
-      case 'image':
-        return (
-          <Image key={i} source={{ uri: att.url }} style={styles.attachImage}
-            contentFit="cover" cachePolicy="memory-disk" />
-        );
-      case 'video':
-        return (
-          <VideoPlayer key={i} source={att.url}
-            nativeControls contentFit="contain"
-            style={styles.attachVideo} />
-        );
-      case 'audio':
-        return <AudioPlayer key={i} url={att.url} nom={att.nom} styles={styles} />;
-      default:
-        return (
-          <TouchableOpacity key={i} onPress={() => Linking.openURL(att.url)}
-            style={styles.attachFileRow} activeOpacity={0.8}>
-            <Ionicons name="document-attach-outline" size={16} color={c.gold} />
-            <Text style={styles.attachFileText} numberOfLines={1}>{att.nom || 'Fichier'}</Text>
-          </TouchableOpacity>
-        );
-    }
+    return (
+      <TouchableOpacity key={i} onPress={() => downloadSecureAttachment(att)}
+        style={styles.attachFileRow} activeOpacity={0.8}>
+        <Ionicons name="shield-checkmark-outline" size={16} color={c.gold} />
+        <Text style={styles.attachFileText} numberOfLines={1}>{att.nom || att.originalFilename || 'Pièce jointe sécurisée'}</Text>
+      </TouchableOpacity>
+    );
   }, [styles, c]);
 
   // Indicateur de frappe mémorisé — évite unmount/remount à chaque render FlatList

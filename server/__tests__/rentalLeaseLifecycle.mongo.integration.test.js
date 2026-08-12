@@ -12,6 +12,9 @@ const Contrat = require('../models/Contrat');
 const RentalManagement = require('../models/RentalManagement');
 const Paiement = require('../models/Paiement');
 const Notification = require('../models/Notification');
+const OrgUnit = require('../models/OrgUnit');
+const OrgMembership = require('../models/OrgMembership');
+const PlatformTenant = require('../models/PlatformTenant');
 const lifecycle = require('../services/rentalLeaseLifecycleService');
 const { addAvenant } = require('../services/rentalLeaseAmendmentService');
 const { renewLease } = require('../services/rentalLeaseRenewalService');
@@ -201,8 +204,14 @@ describe('rentalLeaseCautionService — Phase 5/6', () => {
     // notifyStaff() (server/services/notificationService.js) ne notifie que
     // les User dont le rôle est staff — il faut au moins un destinataire
     // réel pour que la notification soit persistée.
-    await makeUser({ role: 'Admin' });
+    const root = await OrgUnit.create({ name: `GL LIFE notifications ${Date.now()}`, type: 'organization', status: 'active' });
+    const tenant = await PlatformTenant.create({ name: root.name, slug: `gl-life-notifications-${Date.now()}`, rootOrgUnit: root._id, status: 'active' });
+    const staff = await makeUser({ role: 'Admin' });
     const { contrat, owner } = await buildActiveLease();
+    await OrgMembership.create([
+      { user: staff._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
+      { user: owner._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
+    ]);
     await caution.encaisserCaution(contrat._id, { actor: owner._id });
     // La notification est envoyée en "fire-and-forget" (même convention que
     // contratController.create/update) pour ne jamais ralentir l'opération

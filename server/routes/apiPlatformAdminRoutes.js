@@ -3,9 +3,10 @@
 // périmètre que la gestion des utilisateurs).
 const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
+const { requireTenantScope } = require('../middleware/tenantContext');
 const controller = require('../controllers/apiPlatformAdminController');
 
-router.use(auth.protect, auth.restrictTo('Admin'));
+router.use(auth.protect, auth.restrictTo('Admin'), requireTenantScope);
 
 router.get('/keys', controller.listKeys);
 router.post('/keys', controller.createKey);

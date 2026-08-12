@@ -1,8 +1,10 @@
 const mongoose = require('mongoose');
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 
 const documentSchema = new mongoose.Schema({
   nom:            { type: String },
   url:            { type: String },
+  asset:          { type: privateAssetSchema },
   type:           { type: String },
   dateGeneration: { type: Date, default: Date.now },
   envoiEmail:     { type: Boolean, default: false },
@@ -29,6 +31,7 @@ const etatDesLieuxSchema = new mongoose.Schema({
   date:        { type: Date, default: Date.now },
   pieces:      [pieceEdlSchema],
   documentUrl: { type: String },
+  documentAsset: { type: privateAssetSchema },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   validatedByStaff: { type: Boolean, default: false },
   validatedAt: Date,
@@ -186,5 +189,19 @@ contratSchema.index(
   { reservation: 1 },
   { unique: true, partialFilterExpression: { reservation: { $type: 'objectId' } }, name: 'one_contract_per_real_estate_reservation' },
 );
+
+// Aucun sérialiseur API ne doit pouvoir réexposer accidentellement une URL
+// Cloudinary permanente ou une clé de stockage privée imbriquée.
+contratSchema.set('toJSON', { transform: (_doc, ret) => {
+  ret.documents = (ret.documents || []).map((item) => {
+    const { url, asset, ...safe } = item;
+    const available = Boolean(url || asset);
+    return { ...safe, canPreview: available, canDownload: available,
+      ...(available && { previewEndpoint: `/api/rental-documents/${item._id}/download`, downloadEndpoint: `/api/rental-documents/${item._id}/download?download=1` }),
+      legacy: Boolean(url && !asset) };
+  });
+  ret.etatsDesLieux = (ret.etatsDesLieux || []).map(({ documentUrl, documentAsset, ...safe }) => ({ ...safe, hasDocument: Boolean(documentUrl || documentAsset) }));
+  return ret;
+} });
 
 module.exports = mongoose.model('Contrat', contratSchema);

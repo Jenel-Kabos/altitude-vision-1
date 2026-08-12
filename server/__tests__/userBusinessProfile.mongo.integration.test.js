@@ -18,6 +18,7 @@ const {
 } = require('../services/userBusinessProfileService');
 const userBusinessProfileRoutes = require('../routes/userBusinessProfileRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(120000);
 
@@ -216,13 +217,16 @@ describe('HTTP /api/user-business-profiles — RBAC', () => {
   // suspendu/révoqué (contrairement à `list`, qui ne renvoie que l'effectif),
   // nécessaire pour permettre une réactivation depuis l'écran d'administration.
   test('le staff consulte l\'historique complet (actif/suspendu/révoqué) via /history', async () => {
-    const admin = await makeUser({ role: 'Admin' });
-    const secretaire = await makeUser({ role: 'Secretaire' });
-    const target = await makeUser();
+    const fixture = await createTenantFixture({ label: 'USER-ARCH history' });
+    const admin = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Admin' } })).user;
+    const secretaire = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Secretaire' } })).user;
+    const target = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Client' } })).user;
     await grantProfile({ userId: target._id, profileType: 'client', actor: admin });
     await suspendProfile({ userId: target._id, profileType: 'client', actor: admin, reason: 'Test historique' });
 
-    const res = await request(app).get(`/api/user-business-profiles/${target._id}/history`).set('Authorization', `Bearer ${signToken(secretaire._id)}`);
+    const res = await request(app).get(`/api/user-business-profiles/${target._id}/history`)
+      .set('Authorization', `Bearer ${signToken(secretaire._id)}`)
+      .set('X-Platform-Tenant-Id', String(fixture.tenant._id));
     expect(res.status).toBe(200);
     expect(res.body.data.profiles).toHaveLength(1);
     expect(res.body.data.profiles[0].status).toBe('suspended');
@@ -232,16 +236,18 @@ describe('HTTP /api/user-business-profiles — RBAC', () => {
   });
 
   test('un Admin peut accorder, suspendre puis révoquer un profil via l\'API', async () => {
-    const admin = await makeUser({ role: 'Admin' });
-    const target = await makeUser();
-    const grantRes = await request(app).post(`/api/user-business-profiles/${target._id}`).set('Authorization', `Bearer ${signToken(admin._id)}`).send({ profileType: 'proprietaire_immobilier' });
+    const fixture = await createTenantFixture({ label: 'USER-ARCH lifecycle' });
+    const admin = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Admin' } })).user;
+    const target = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Client' } })).user;
+    const tenantHeader = String(fixture.tenant._id);
+    const grantRes = await request(app).post(`/api/user-business-profiles/${target._id}`).set('Authorization', `Bearer ${signToken(admin._id)}`).set('X-Platform-Tenant-Id', tenantHeader).send({ profileType: 'proprietaire_immobilier' });
     expect(grantRes.status).toBe(201);
 
-    const suspendRes = await request(app).post(`/api/user-business-profiles/${target._id}/proprietaire_immobilier/suspend`).set('Authorization', `Bearer ${signToken(admin._id)}`).send({ reason: 'Test' });
+    const suspendRes = await request(app).post(`/api/user-business-profiles/${target._id}/proprietaire_immobilier/suspend`).set('Authorization', `Bearer ${signToken(admin._id)}`).set('X-Platform-Tenant-Id', tenantHeader).send({ reason: 'Test' });
     expect(suspendRes.status).toBe(200);
     expect(suspendRes.body.data.profile.status).toBe('suspended');
 
-    const revokeRes = await request(app).post(`/api/user-business-profiles/${target._id}/proprietaire_immobilier/revoke`).set('Authorization', `Bearer ${signToken(admin._id)}`).send({ reason: 'Test' });
+    const revokeRes = await request(app).post(`/api/user-business-profiles/${target._id}/proprietaire_immobilier/revoke`).set('Authorization', `Bearer ${signToken(admin._id)}`).set('X-Platform-Tenant-Id', tenantHeader).send({ reason: 'Test' });
     expect(revokeRes.status).toBe(200);
     expect(revokeRes.body.data.profile.status).toBe('revoked');
   });

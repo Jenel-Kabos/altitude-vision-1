@@ -7,6 +7,7 @@ const express = require('express');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/dossierController');
 const { STAFF_DOC } = require('../utils/roles');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 const router = express.Router();
 // DOC-EVO-1 — recherche globale : réservée au staff documentaire (même
@@ -15,7 +16,7 @@ const router = express.Router();
 // dynamique ci-dessous par convention, même si `/search` (un seul segment)
 // ne peut de toute façon pas être capturée par `/:domain/:entityId` (deux
 // segments requis).
-router.get('/search', auth.protect, auth.restrictTo(...STAFF_DOC), ctrl.search);
+router.get('/search', auth.protect, auth.restrictTo(...STAFF_DOC), requireTenantScope, ctrl.search);
 router.get('/:domain/:entityId', auth.protect, ctrl.getDossier);
 
 module.exports = router;

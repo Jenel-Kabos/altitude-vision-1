@@ -1,5 +1,6 @@
 // server/models/User.js
 const mongoose = require('mongoose');
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 const bcrypt   = require('bcryptjs');
 const crypto   = require('crypto');
 const { isSimpleValidEmail, EMAIL_MAX_LENGTH } = require('../utils/emailValidation');
@@ -140,7 +141,8 @@ const userSchema = new mongoose.Schema(
             dateCertification:    { type: Date },
         },
         ipInscription: { type: String },
-        contratPdfUrl: { type: String },
+        contratPdfUrl: { type: String, select: false },
+        contratPdfAsset: { type: privateAssetSchema, select: false },
 
         // 🔹 Historique des changements de rôle
         historiqueRoles: [{

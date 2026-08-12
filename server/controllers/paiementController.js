@@ -5,9 +5,20 @@ const RentalPaymentReceipt = require('../models/RentalPaymentReceipt');
 const { verifierPaiementsEnRetard } = require('../services/alerteService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { notifyContractTenant } = require('../services/rentalTenantNotificationService');
-const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
+const { uploadPrivateAsset, deletePrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
 const { runFinancialOperation } = require('../services/finance/financialTransactionService');
 const logger = require('../utils/logger');
+const { streamRemoteDocument } = require('./rentalDocumentController');
+
+const safePaiement = (value) => {
+  const data = value?.toObject ? value.toObject() : { ...value };
+  const hasProof = Boolean(data.preuvePaiement?.asset || data.preuvePaiement?.url);
+  delete data.preuvePaiement;
+  if (hasProof) data.paymentProof = { canPreview: true, canDownload: true,
+    previewEndpoint: `/api/paiements/${data._id}/proof`, downloadEndpoint: `/api/paiements/${data._id}/proof?download=1` };
+  return data;
+};
+const safeReceipt = (value) => { const data = value?.toObject ? value.toObject() : { ...value }; delete data.preuvePaiement; return data; };
 
 exports.getAll = async (req, res) => {
   try {
@@ -40,8 +51,8 @@ exports.getAll = async (req, res) => {
     res.json({
       status: 'success',
       data: hasPagination
-        ? { paiements, total, page, totalPages: Math.ceil(total / limit) }
-        : { paiements },
+        ? { paiements: paiements.map(safePaiement), total, page, totalPages: Math.ceil(total / limit) }
+        : { paiements: paiements.map(safePaiement) },
     });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
@@ -85,9 +96,30 @@ exports.getOne = async (req, res) => {
   try {
     const p = await Paiement.findById(req.params.id).populate('contrat');
     if (!p) return res.status(404).json({ status: 'error', message: 'Paiement introuvable' });
-    res.json({ status: 'success', data: { paiement: p } });
+    res.json({ status: 'success', data: { paiement: safePaiement(p) } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
+  }
+};
+
+exports.downloadProof = async (req, res) => {
+  try {
+    const paiement = await Paiement.findById(req.params.id)
+      .select('+preuvePaiement.asset.publicId +preuvePaiement.asset.resourceType +preuvePaiement.asset.deliveryType +preuvePaiement.asset.version +preuvePaiement.asset.format');
+    if (!paiement) return res.status(404).json({ status: 'fail', message: 'Paiement introuvable.' });
+    if (!paiement.preuvePaiement?.asset && paiement.preuvePaiement?.url) {
+      return streamRemoteDocument({ url: paiement.preuvePaiement.url, name: 'payment-proof', res, context: { paymentId: paiement._id } });
+    }
+    if (!paiement.preuvePaiement?.asset) return res.status(404).json({ status: 'fail', message: 'Preuve introuvable.' });
+    const buffer = await readPrivateAsset(paiement.preuvePaiement.asset.toObject());
+    res.setHeader('Content-Type', paiement.preuvePaiement.asset.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="payment-proof"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.send(buffer);
+  } catch (error) {
+    logger.warn('rental_payment.proof_access_failed', { paymentId: req.params.id, actorId: req.user?.id, error: error.message });
+    return res.status(502).json({ status: 'error', message: 'Impossible de récupérer la preuve.' });
   }
 };
 
@@ -107,7 +139,7 @@ exports.update = async (req, res) => {
       new: true, runValidators: true,
     });
     if (!p) return res.status(409).json({ status: 'fail', code: 'PAYMENT_CONCURRENT_UPDATE', message: 'Cette échéance vient d’être modifiée.' });
-    res.json({ status: 'success', data: { paiement: p } });
+    res.json({ status: 'success', data: { paiement: safePaiement(p) } });
   } catch (err) {
     res.status(400).json({ status: 'error', message: err.message });
   }
@@ -176,11 +208,11 @@ exports.marquerPaye = async (req, res) => {
     // req.file n'existe que pour une requête multipart réelle, aucun impact
     // sur les appels JSON existants sans pièce jointe).
     if (req.file) {
-      const result = await uploadToCloudinary(req.file.buffer, {
-        folder: 'altitude-vision/gestion-locative/preuves-paiement',
-        resource_type: 'auto',
+      const asset = await uploadPrivateAsset(req.file.buffer, {
+        purpose: 'financial', ownerType: 'Contrat', ownerId: p.contrat,
+        filename: req.file.originalname, mimeType: req.file.mimetype,
       });
-      preuvePaiement = { url: result.secure_url, publicId: result.public_id };
+      preuvePaiement = { asset };
     }
 
     let updated;
@@ -217,9 +249,9 @@ exports.marquerPaye = async (req, res) => {
       // Rollback Cloudinary (Phase 10) : l'upload a réussi mais l'écriture
       // finale a échoué — ne jamais laisser un fichier orphelin, mais ne
       // jamais masquer l'erreur métier d'origine si le rollback lui-même échoue.
-      if (preuvePaiement?.url) {
-        await destroyFromCloudinary(preuvePaiement.url).catch((rollbackError) => {
-          logger.error('rental_payment.cloudinary_rollback_failed', { url: preuvePaiement.url, error: rollbackError.message });
+      if (preuvePaiement?.asset) {
+        await deletePrivateAsset(preuvePaiement.asset).catch((rollbackError) => {
+          logger.error('rental_payment.cloudinary_rollback_failed', { resourceType: 'Paiement', error: rollbackError.message });
         });
       }
       if (error.code === 'CONCURRENT' || String(error.message || '').includes('E11000')) {
@@ -234,7 +266,7 @@ exports.marquerPaye = async (req, res) => {
       dedupeKey: `tenant:payment:${updated._id}:${statut}`, metadata: { paymentId: String(updated._id), status: statut },
     }).catch(() => {});
 
-    res.json({ status: 'success', data: { paiement: updated, receipt } });
+    res.json({ status: 'success', data: { paiement: safePaiement(updated), receipt: safeReceipt(receipt) } });
     const moisLabel = updated.mois ? updated.mois + '/' + updated.annee : String(updated.annee || '');
     logAction({
       action: 'Paiement enregistré',
@@ -307,11 +339,11 @@ exports.encaisserMultiple = async (req, res) => {
     }
 
     if (req.file) {
-      const result = await uploadToCloudinary(req.file.buffer, {
-        folder: 'altitude-vision/gestion-locative/preuves-paiement',
-        resource_type: 'auto',
+      const asset = await uploadPrivateAsset(req.file.buffer, {
+        purpose: 'financial', ownerType: 'Contrat', ownerId: paiements[0]?.contrat,
+        filename: req.file.originalname, mimeType: req.file.mimetype,
       });
-      preuvePaiement = { url: result.secure_url, publicId: result.public_id };
+      preuvePaiement = { asset };
     }
 
     const encaissementId = new mongoose.Types.ObjectId();
@@ -353,9 +385,9 @@ exports.encaisserMultiple = async (req, res) => {
         return created;
       });
     } catch (error) {
-      if (preuvePaiement?.url) {
-        await destroyFromCloudinary(preuvePaiement.url).catch((rollbackError) => {
-          logger.error('rental_payment.cloudinary_rollback_failed', { url: preuvePaiement.url, error: rollbackError.message });
+      if (preuvePaiement?.asset) {
+        await deletePrivateAsset(preuvePaiement.asset).catch((rollbackError) => {
+          logger.error('rental_payment.cloudinary_rollback_failed', { resourceType: 'Paiement', error: rollbackError.message });
         });
       }
       if (error.code === 'CONCURRENT' || String(error.message || '').includes('E11000')) {
@@ -364,7 +396,7 @@ exports.encaisserMultiple = async (req, res) => {
       throw error;
     }
 
-    res.json({ status: 'success', data: { receipts } });
+    res.json({ status: 'success', data: { receipts: receipts.map(safeReceipt) } });
     logAction({
       action: 'Encaissement multi-échéances enregistré',
       description: `${receipts.length} échéance(s) réglées en un encaissement`,
@@ -386,7 +418,8 @@ exports.listReceipts = async (req, res) => {
     const receipts = await RentalPaymentReceipt.find({ paiement: req.params.id })
       .populate('auteur', 'name').populate('cancelledBy', 'name')
       .sort({ createdAt: -1 });
-    res.json({ status: 'success', results: receipts.length, data: { receipts } });
+    const safeReceipts = receipts.map(safeReceipt);
+    res.json({ status: 'success', results: receipts.length, data: { receipts: safeReceipts } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }

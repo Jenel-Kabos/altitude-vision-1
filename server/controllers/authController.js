@@ -10,6 +10,7 @@ const Document              = require('../models/Document');
 const sendEmail = require('../utils/email');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 const logger = require('../utils/logger');
+const { uploadPrivateAsset } = require('../services/storage/secureStorageService');
 // Source unique de vérité pour protect/restrictTo (voir middleware/authMiddleware.js) —
 // réexportés ici pour les ~20 routes qui importent encore auth.protect/auth.restrictTo
 // depuis ce contrôleur, sans avoir à modifier chaque fichier de routes.
@@ -251,13 +252,11 @@ exports.verifyEmail = async (req, res) => {
                     const pdfBuffer = await generateContratHebergement(newUser);
 
                     // Upload PDF vers Cloudinary
-                    const uploadResult = await uploadToCloudinary(pdfBuffer, {
-                        folder:        `altitude-vision/contrats/proprietaires/${userId}`,
-                        resource_type: 'raw',
-                        public_id:     `contrat-hebergement-${userId}`,
-                        format:        'pdf',
+                    const contractAsset = await uploadPrivateAsset(pdfBuffer, {
+                        purpose: 'administrative', ownerType: 'User', ownerId: userId,
+                        filename: `contrat-hebergement-${userId}.pdf`, mimeType: 'application/pdf',
                     });
-                    await User.findByIdAndUpdate(userId, { contratPdfUrl: uploadResult.secure_url });
+                    await User.findByIdAndUpdate(userId, { $set: { contratPdfAsset: contractAsset }, $unset: { contratPdfUrl: 1 } });
 
                     // ── Sauvegarde dans la collection Document ────────
                     try {
@@ -268,7 +267,7 @@ exports.verifyEmail = async (req, res) => {
                             createdBy:  userId,
                             issueDate:  acceptDate,
                             notes:      `Contrat de partenariat propriétaire — Réf. ${ref} — signé le ${dateStr} à ${timeStr}`,
-                            content:    uploadResult.secure_url,
+                            privateAsset: contractAsset,
                         });
                         logger.info(`📄 [Auth] Contrat sauvegardé dans Documents pour ${userEmail}`);
                     } catch (docErr) {

@@ -8,16 +8,16 @@ const AccommodationReservation = require('../../../models/AccommodationReservati
 // nouvelle de ce sprint pour ce domaine — `nights` est déjà un champ stocké
 // sur AccommodationReservation (calculé à la création), jamais recalculé
 // depuis les dates ici.
-async function averageStayLength() {
+async function averageStayLength(tenantId = null) {
   const [row] = await AccommodationReservation.aggregate([
-    { $match: { status: { $in: ['confirmed', 'checked_in', 'checked_out'] } } },
+    { $match: { status: { $in: ['confirmed', 'checked_in', 'checked_out'] }, ...(tenantId ? { tenant: tenantId } : {}) } },
     { $group: { _id: null, averageNights: { $avg: '$nights' } } },
   ]);
   return row ? Math.round(row.averageNights * 10) / 10 : null;
 }
 
-async function getAccommodationReport() {
-  const [data, avgStay] = await Promise.all([accommodations(), averageStayLength()]);
+async function getAccommodationReport({ tenantId } = {}) {
+  const [data, avgStay] = await Promise.all([accommodations(null, { tenantId }), averageStayLength(tenantId)]);
   return { domain: 'accommodation', periodSupported: false, ...data, averageStayNights: avgStay };
 }
 

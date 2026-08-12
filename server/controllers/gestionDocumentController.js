@@ -1,6 +1,7 @@
 const Contrat  = require('../models/Contrat');
 const Paiement = require('../models/Paiement');
-const { uploadToCloudinary } = require('../config/cloudinary');
+const mongoose = require('mongoose');
+const { uploadPrivateAsset, safePrivateDescriptor } = require('../services/storage/secureStorageService');
 const zohoMailService        = require('../services/zohoMailService');
 const pdfService             = require('../services/pdfService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
@@ -22,32 +23,28 @@ const notifyVisibleDocument = (contract, saved, kind = 'document') => notifyCont
   title: kind === 'receipt' ? 'Nouvelle quittance disponible' : 'Nouveau document disponible',
   body: `« ${saved.nom} » est disponible dans votre espace locataire.`,
   entityType: 'Contrat', entityId: contract._id,
-  dedupeKey: `tenant:${kind}:${contract._id}:${saved.url}`,
+  dedupeKey: `tenant:${kind}:${contract._id}:${saved._id}`,
   metadata: { contractId: String(contract._id), documentType: saved.type },
 }).catch(() => {});
 
 // ── Helper : upload PDF buffer to Cloudinary ─────────────────
 const uploadPdf = async (buffer, folder, filename) => {
-  const result = await uploadToCloudinary(buffer, {
-    folder,
-    resource_type: 'raw',
-    public_id: filename,
-    format: 'pdf',
-    quality: undefined,
-    fetch_format: undefined,
-    width: undefined,
-    crop: undefined,
+  return uploadPrivateAsset(buffer, {
+    purpose: 'lease', ownerType: 'Contrat', ownerId: folder.split('/').pop(),
+    filename: `${filename}.pdf`, mimeType: 'application/pdf', folder,
   });
-  return result.secure_url;
 };
 
 // ── Helper : push document to contrat.documents[] ────────────
 // `extra` (GL-DEBT-1) reste optionnel — les 5 appels existants sans 4e
 // argument continuent de produire exactement le même document qu'avant.
-const saveDocToContrat = async (contratId, nom, url, type, extra = {}) => {
-  const doc = { nom, url, type, dateGeneration: new Date(), ...extra };
+const saveDocToContrat = async (contratId, nom, asset, type, extra = {}) => {
+  const doc = { _id: new mongoose.Types.ObjectId(), nom, asset, type, dateGeneration: new Date(), ...extra };
   await Contrat.findByIdAndUpdate(contratId, { $push: { documents: doc } });
-  return doc;
+  return { ...doc, ...safePrivateDescriptor(asset, {
+    previewEndpoint: `/api/rental-documents/${doc._id}/download`,
+    downloadEndpoint: `/api/rental-documents/${doc._id}/download?download=1`,
+  }), asset: undefined };
 };
 
 // ═════════════════════════════════════════════════════════════
@@ -58,7 +55,11 @@ exports.getDocuments = async (req, res) => {
     const c = await Contrat.findById(req.params.contratId)
       .select('documents etatsDesLieux');
     if (!c) return res.status(404).json({ status:'error', message:'Contrat introuvable' });
-    res.json({ status:'success', data:{ documents: c.documents, etatsDesLieux: c.etatsDesLieux } });
+    const documents = c.documents.map((doc) => ({ _id: doc._id, nom: doc.nom, type: doc.type, dateGeneration: doc.dateGeneration,
+      invalidated: doc.invalidated, canPreview: Boolean(doc.asset || doc.url), canDownload: Boolean(doc.asset || doc.url),
+      previewEndpoint: `/api/rental-documents/${doc._id}/download`, downloadEndpoint: `/api/rental-documents/${doc._id}/download?download=1`, legacy: !doc.asset }));
+    const etatsDesLieux = c.etatsDesLieux.map(({ type, date, pieces, validatedByStaff, validatedAt, degradationReported, maintenanceRequired, blockingReason }) => ({ type, date, pieces, validatedByStaff, validatedAt, degradationReported, maintenanceRequired, blockingReason }));
+    res.json({ status:'success', data:{ documents, etatsDesLieux } });
   } catch (err) {
     res.status(500).json({ status:'error', message: err.message });
   }
@@ -78,8 +79,8 @@ exports.generateBail = async (req, res) => {
 
     const folder  = `altitude-vision/documents/bail/${c._id}`;
     const fname   = `bail_${Date.now()}`;
-    const url     = await uploadPdf(buffer, folder, fname);
-    const saved   = await saveDocToContrat(c._id, 'Contrat de bail', url, 'bail');
+    const asset   = await uploadPdf(buffer, folder, fname);
+    const saved   = await saveDocToContrat(c._id, 'Contrat de bail', asset, 'bail');
     await notifyVisibleDocument(c, saved);
 
     res.json({ status:'success', data:{ document: saved } });
@@ -117,9 +118,9 @@ exports.generateQuittance = async (req, res) => {
     const moisLabel = p.mois ? MOIS_FR[p.mois - 1] : '';
     const folder    = `altitude-vision/documents/quittances/${c._id}`;
     const fname     = `quittance_${moisLabel}_${p.annee}_${Date.now()}`;
-    const url       = await uploadPdf(buffer, folder, fname);
+    const asset     = await uploadPdf(buffer, folder, fname);
     const nom       = `Quittance ${moisLabel} ${p.annee}`;
-    const saved     = await saveDocToContrat(c._id, nom, url, 'quittance', { sourcePaiement: p._id });
+    const saved     = await saveDocToContrat(c._id, nom, asset, 'quittance', { sourcePaiement: p._id });
     await notifyVisibleDocument(c, saved, 'receipt');
 
     res.json({ status:'success', data:{ document: saved } });
@@ -154,9 +155,9 @@ exports.generateMiseEnDemeure = async (req, res) => {
     const moisLabel = p.mois ? MOIS_FR[p.mois - 1] : '';
     const folder    = `altitude-vision/documents/mises-en-demeure/${c._id}`;
     const fname     = `med_${moisLabel}_${p.annee}_${Date.now()}`;
-    const url       = await uploadPdf(buffer, folder, fname);
+    const asset     = await uploadPdf(buffer, folder, fname);
     const nom       = `Mise en demeure — ${moisLabel} ${p.annee}`;
-    const saved     = await saveDocToContrat(c._id, nom, url, 'mise_en_demeure');
+    const saved     = await saveDocToContrat(c._id, nom, asset, 'mise_en_demeure');
     await notifyVisibleDocument(c, saved);
 
     // Envoi automatique par email si locataire a un email
@@ -170,7 +171,7 @@ exports.generateMiseEnDemeure = async (req, res) => {
           `<p>Bonjour ${c.locataire.prenom} ${c.locataire.nom},</p>
            <p>Veuillez trouver ci-joint votre mise en demeure concernant le loyer du mois de <strong>${moisLabel} ${p.annee}</strong>.</p>
            <p>Montant total dû : <strong style="color:#D42B2B">${fmt(p.montantTotal || p.montant)}</strong></p>
-           <p>Vous pouvez télécharger le document ici : <a href="${url}">Télécharger la mise en demeure</a></p>
+           <p>Le document est disponible après connexion dans votre espace locataire sécurisé.</p>
            <p>Merci de régulariser votre situation dans les 8 jours.<br/>Altitude Vision — Altimmo</p>`,
         );
       } catch (emailErr) {
@@ -210,11 +211,11 @@ exports.generatePreavis = async (req, res) => {
 
     const folder = `altitude-vision/documents/preavis/${c._id}`;
     const fname  = `preavis_${typeInitiateur}_${Date.now()}`;
-    const url    = await uploadPdf(buffer, folder, fname);
+    const asset  = await uploadPdf(buffer, folder, fname);
     const saved  = await saveDocToContrat(
       c._id,
       `Préavis — initiateur ${typeInitiateur}`,
-      url,
+      asset,
       'preavis',
     );
     await notifyVisibleDocument(c, saved);
@@ -259,18 +260,18 @@ exports.generateEtatDesLieux = async (req, res) => {
 
     const folder = `altitude-vision/documents/etats-des-lieux/${c._id}`;
     const fname  = `edl_${type}_${Date.now()}`;
-    const url    = await uploadPdf(buffer, folder, fname);
+    const asset  = await uploadPdf(buffer, folder, fname);
 
     // Mettre à jour l'URL du document dans etatsDesLieux
     await Contrat.findOneAndUpdate(
       { _id: c._id, 'etatsDesLieux.type': type },
-      { $set: { 'etatsDesLieux.$.documentUrl': url } },
+      { $set: { 'etatsDesLieux.$.documentAsset': asset } },
     );
 
     const saved = await saveDocToContrat(
       c._id,
       `État des lieux d'${type === 'entree' ? 'entrée' : 'sortie'}`,
-      url,
+      asset,
       `etat_${type}`,
     );
     await notifyVisibleDocument(c, saved);
@@ -320,9 +321,7 @@ exports.envoyerDocument = async (req, res) => {
       destinataire,
       sujetFinal,
       `<p>${messageFinal}</p>
-       <p><a href="${doc.url}" style="padding:10px 20px;background:#2E7BB5;color:#fff;text-decoration:none;border-radius:6px">
-         📄 Télécharger ${doc.nom}
-       </a></p>
+       <p>Le document est disponible après connexion dans votre espace sécurisé.</p>
        <br/><p>Cordialement,<br/>Altitude Vision — Altimmo</p>`,
     );
 

@@ -10,8 +10,12 @@ const { getCockpit } = require('../../crmCockpitService');
 // `scopeUserIds` (ORGANIZATION-1, Phase 9) : Set d'identifiants utilisateurs
 // résolus par organizationService.getScopeUserIds — filtre le pipeline déjà
 // chargé par `assignedTo`, ne relance JAMAIS l'agrégation CRM sous-jacente.
-async function getCrmReport({ crmDashboard, scopeUserIds } = {}) {
-  const [dashboard, pipeline, cockpit] = await Promise.all([crmDashboard ? Promise.resolve(crmDashboard) : getDashboard(), getPipeline(), getCockpit()]);
+async function getCrmReport({ crmDashboard, scopeUserIds, tenantId } = {}) {
+  const [dashboard, pipeline, cockpit] = await Promise.all([
+    crmDashboard ? Promise.resolve(crmDashboard) : getDashboard(new Date(), { tenantId }),
+    getPipeline({}, { tenantId }),
+    tenantId ? Promise.resolve({ unavailable: true, reason: 'Cockpit global masqué en contexte tenant.' }) : getCockpit(),
+  ]);
   const scopedPipeline = scopeUserIds
     ? pipeline.opportunities.filter((o) => o.assignedTo && scopeUserIds.has(String(o.assignedTo._id || o.assignedTo)))
     : pipeline.opportunities;

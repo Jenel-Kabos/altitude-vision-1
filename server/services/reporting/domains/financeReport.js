@@ -11,8 +11,8 @@ const { getDashboard } = require('../../crmService');
 
 // `crmDashboard` peut être injecté par l'orchestrateur pour éviter un second
 // appel à la même agrégation (voir reportingService.js) ; sinon recalculé.
-async function getFinanceReport({ crmDashboard } = {}) {
-  const dashboard = crmDashboard || await getDashboard();
+async function getFinanceReport({ crmDashboard, tenantId } = {}) {
+  const dashboard = crmDashboard || await getDashboard(new Date(), { tenantId });
   return {
     domain: 'finance', periodSupported: false,
     revenueByPole: dashboard.commercial.revenueByPole,

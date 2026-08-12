@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Signalement  = require('../models/Signalement');
-const { uploadToCloudinary } = require('../config/cloudinary');
+const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
+const { streamRemoteDocument } = require('./rentalDocumentController');
 const { notifyStaff } = require('../services/notificationService');
 
 exports.creerSignalement = asyncHandler(async (req, res) => {
@@ -20,12 +21,11 @@ exports.creerSignalement = asyncHandler(async (req, res) => {
   const preuves = [];
   if (req.files?.length) {
     for (const file of req.files) {
-      const result = await uploadToCloudinary(file.buffer, {
-        folder:        'altitude-vision/signalements',
-        public_id:     `signalement-${propertyId}-${Date.now()}`,
-        resource_type: file.mimetype.startsWith('image/') ? 'image' : 'raw',
+      const asset = await uploadPrivateAsset(file.buffer, {
+        purpose: 'administrative', ownerType: 'Property', ownerId: propertyId,
+        filename: file.originalname, mimeType: file.mimetype,
       });
-      preuves.push({ url: result.secure_url, nom: file.originalname, type: file.mimetype });
+      preuves.push({ asset, nom: file.originalname, type: file.mimetype });
     }
   }
 
@@ -101,4 +101,33 @@ exports.traiterSignalement = asyncHandler(async (req, res) => {
   }
 
   res.json({ status: 'success', data: signalement });
+});
+
+exports.downloadProof = asyncHandler(async (req, res) => {
+  const signalement = await Signalement.findById(req.params.id)
+    .select('+preuves.asset.publicId +preuves.asset.resourceType +preuves.asset.deliveryType +preuves.asset.version +preuves.asset.format');
+  if (!signalement) {
+    res.status(404);
+    throw new Error('Signalement non trouvé.');
+  }
+  const proof = signalement.preuves?.[Number(req.params.proofIndex)];
+  if (!proof) {
+    res.status(404);
+    throw new Error('Preuve introuvable.');
+  }
+  if (!proof.asset && proof.url) {
+    return streamRemoteDocument({ url: proof.url, name: proof.nom, res, context: { signalementId: signalement._id } });
+  }
+  if (!proof.asset) {
+    res.status(404);
+    throw new Error('Preuve introuvable.');
+  }
+  const buffer = await readPrivateAsset(proof.asset.toObject());
+  const safeName = String(proof.nom || 'preuve').replace(/[\r\n"\\]/g, '_');
+  res.set({
+    'Content-Type': proof.asset.mimeType || proof.type || 'application/octet-stream',
+    'Content-Disposition': `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="${safeName}"`,
+    'Cache-Control': 'private, no-store, max-age=0',
+    'X-Content-Type-Options': 'nosniff',
+  }).send(buffer);
 });

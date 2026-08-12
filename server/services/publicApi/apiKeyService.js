@@ -70,8 +70,8 @@ async function touchLastUsed(apiKeyId) {
   await ApiKey.updateOne({ _id: apiKeyId }, { lastUsedAt: new Date() }).catch(() => {});
 }
 
-async function revokeApiKey(id, { actor, reason } = {}) {
-  const apiKey = await ApiKey.findOne({ _id: id, status: 'active' });
+async function revokeApiKey(id, { actor, reason, tenant } = {}) {
+  const apiKey = await ApiKey.findOne({ _id: id, status: 'active', ...(tenant ? { tenant } : {}) });
   if (!apiKey) fail('API_KEY_NOT_ACTIVE', 'Aucune clé active avec cet identifiant.', 404);
   apiKey.status = 'revoked';
   apiKey.revokedBy = actor?._id || actor?.id || null;
@@ -84,9 +84,9 @@ async function revokeApiKey(id, { actor, reason } = {}) {
 // Rotation (Phase 4) : révoque l'ancienne clé et en crée une nouvelle avec
 // les mêmes attributs (scopes/quota/label), liée via `rotatedFrom` — jamais
 // une ré-émission du même secret.
-async function rotateApiKey(id, { actor, reason } = {}) {
+async function rotateApiKey(id, { actor, reason, tenant } = {}) {
   if (!mongoose.isValidObjectId(id)) fail('API_KEY_ID_INVALID', 'Identifiant invalide.', 400);
-  const oldKey = await ApiKey.findOne({ _id: id, status: 'active' });
+  const oldKey = await ApiKey.findOne({ _id: id, status: 'active', ...(tenant ? { tenant } : {}) });
   if (!oldKey) fail('API_KEY_NOT_ACTIVE', 'Aucune clé active avec cet identifiant.', 404);
   const { rawKey } = await createApiKey({
     name: oldKey.name, scopes: oldKey.scopes, rateLimitPerMinute: oldKey.rateLimitPerMinute,
@@ -95,13 +95,13 @@ async function rotateApiKey(id, { actor, reason } = {}) {
     await ApiKey.updateOne({ _id: result.apiKey._id }, { rotatedFrom: oldKey._id });
     return result;
   });
-  await revokeApiKey(oldKey._id, { actor, reason: reason || 'Rotation de clé' });
+  await revokeApiKey(oldKey._id, { actor, reason: reason || 'Rotation de clé', tenant });
   const newKey = await ApiKey.findOne({ hashedKey: hashKey(rawKey) });
   return { apiKey: newKey, rawKey };
 }
 
-async function listApiKeys() {
-  return ApiKey.find().sort({ createdAt: -1 }).select('-hashedKey').lean();
+async function listApiKeys({ tenant } = {}) {
+  return ApiKey.find(tenant ? { tenant } : {}).sort({ createdAt: -1 }).select('-hashedKey').lean();
 }
 
 module.exports = { ApiKeyError, createApiKey, verifyApiKey, touchLastUsed, revokeApiKey, rotateApiKey, listApiKeys, hashKey };

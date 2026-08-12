@@ -2,7 +2,7 @@ const crypto              = require('crypto');
 const Transaction         = require('../models/Transaction');
 const PaiementTransaction = require('../models/PaiementTransaction');
 const yabetooService      = require('../services/yabetooService');
-const { uploadToCloudinary } = require('../config/cloudinary');
+const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
 const { notify, notifyStaff } = require('../services/notificationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { ALL_STAFF } = require('../utils/roles');
@@ -10,6 +10,16 @@ const { registerProviderEvent, claimProviderEvent, completeProviderEvent, failPr
 
 const OPERATOR_LABEL = { AIRTEL: 'Airtel Money', MTN: 'MTN Mobile Money' };
 const YABETOO_WEBHOOK_TOLERANCE_SECONDS = 300;
+
+const safePayment = (value, transactionId) => {
+  const data = value?.toObject ? value.toObject() : { ...value };
+  const hasProof = Boolean(data.preuvePaiement?.asset || data.preuvePaiement?.url);
+  delete data.preuvePaiement;
+  if (hasProof) data.paymentProof = { canPreview: true, canDownload: true,
+    previewEndpoint: `/api/transactions/${transactionId}/paiements/${data._id}/proof`,
+    downloadEndpoint: `/api/transactions/${transactionId}/paiements/${data._id}/proof?download=1` };
+  return data;
+};
 
 const canAccessTransaction = (transaction, user) => {
   const clientId = transaction?.client?._id || transaction?.client;
@@ -355,11 +365,11 @@ exports.soumettreVirement = async (req, res) => {
 
     let preuvePaiement = {};
     if (req.file) {
-      const result = await uploadToCloudinary(req.file.buffer, {
-        folder:        'altitude-vision/paiements/virements',
-        resource_type: 'auto',
+      const asset = await uploadPrivateAsset(req.file.buffer, {
+        purpose: 'financial', ownerType: 'Transaction', ownerId: tx._id,
+        filename: req.file.originalname, mimeType: req.file.mimetype,
       });
-      preuvePaiement = { url: result.secure_url, publicId: result.public_id };
+      preuvePaiement = { asset };
     }
 
     const paiement = await PaiementTransaction.create({
@@ -497,8 +507,25 @@ exports.getPaiements = async (req, res) => {
       .populate('confirméPar', 'name')
       .sort({ createdAt: -1 });
 
-    res.json({ status: 'success', results: paiements.length, data: { paiements } });
+    res.json({ status: 'success', results: paiements.length, data: { paiements: paiements.map((p) => safePayment(p, req.params.id)) } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
+};
+
+exports.downloadProof = async (req, res) => {
+  try {
+    const transaction = await Transaction.findById(req.params.id).select('client');
+    if (!transaction || !canAccessTransaction(transaction, req.user)) return denyTransactionAccess(res);
+    const paiement = await PaiementTransaction.findOne({ _id: req.params.pId, transaction: transaction._id })
+      .select('+preuvePaiement.asset.publicId +preuvePaiement.asset.resourceType +preuvePaiement.asset.deliveryType +preuvePaiement.asset.version +preuvePaiement.asset.format');
+    if (!paiement) return res.status(404).json({ status: 'fail', message: 'Paiement introuvable.' });
+    if (!paiement.preuvePaiement?.asset) return res.status(409).json({ status: 'fail', code: 'LEGACY_ASSET_MIGRATION_REQUIRED', message: 'Cette preuve historique doit être migrée.' });
+    const buffer = await readPrivateAsset(paiement.preuvePaiement.asset.toObject());
+    res.setHeader('Content-Type', paiement.preuvePaiement.asset.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="payment-proof"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.send(buffer);
+  } catch (error) { return res.status(502).json({ status: 'error', message: 'Impossible de récupérer la preuve.' }); }
 };

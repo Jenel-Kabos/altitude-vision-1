@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 
 const messageSchema = new mongoose.Schema({
   tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
@@ -40,7 +41,8 @@ const messageSchema = new mongoose.Schema({
     default: false,
   },
   attachments: [{
-    url:      { type: String, required: true },
+    url:      { type: String },
+    asset:    { type: privateAssetSchema },
     type:     { type: String, enum: ['image', 'video', 'audio', 'file'], required: true },
     nom:      { type: String },
     size:     { type: Number },
@@ -63,5 +65,14 @@ messageSchema.index({ receiver: 1, createdAt: -1 });
 messageSchema.index({ receiver: 1, isRead: 1 });
 messageSchema.index({ receiver: 1, isStarred: 1 });
 messageSchema.index({ conversation: 1, createdAt: 1 }); // pour staff-inbox
+
+messageSchema.set('toJSON', { transform: (_doc, ret) => {
+  ret.attachments = (ret.attachments || []).map(({ url, asset, ...metadata }) => ({
+    ...metadata, hasPrivateFile: Boolean(asset || url), legacy: Boolean(url && !asset),
+    ...(ret._id && metadata._id && { previewEndpoint: `/api/messages/${ret._id}/attachments/${metadata._id}`,
+      downloadEndpoint: `/api/messages/${ret._id}/attachments/${metadata._id}?download=1` }),
+  }));
+  return ret;
+} });
 
 module.exports = mongoose.model('Message', messageSchema);

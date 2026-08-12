@@ -27,6 +27,7 @@ app.use('/api/reporting', reportingRoutes);
 app.use(errorHandler);
 
 const signToken = (userId) => jwt.sign({ id: userId, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' });
+const tenantHeaders = (user, tenant) => ({ Authorization: `Bearer ${signToken(user._id)}`, 'X-Platform-Tenant-Id': String(tenant._id) });
 
 let counter = 0;
 const makeUser = (overrides = {}) => {
@@ -138,27 +139,33 @@ describe('HTTP /api/reporting — réservé à la Direction', () => {
 
   test('200 pour un Admin, avec les 9 domaines', async () => {
     const admin = await makeUser({ role: 'Admin' });
-    const res = await request(app).get('/api/reporting/executive').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const { tenant, bootstrap } = await createTenantFixture({ label: 'Reporting HTTP', bootstrap: admin });
+    await addTenantMember({ tenant, user: admin, bootstrap });
+    const res = await request(app).get('/api/reporting/executive').set(tenantHeaders(admin, tenant));
     expect(res.status).toBe(200);
     expect(Object.keys(res.body.data.report.domains)).toEqual(DOMAINS);
   });
 
   test('GET /domains/:domain renvoie 404 pour un domaine inconnu, 200 pour un domaine valide', async () => {
     const admin = await makeUser({ role: 'Admin' });
-    const token = `Bearer ${signToken(admin._id)}`;
-    const unknown = await request(app).get('/api/reporting/domains/inexistant').set('Authorization', token);
+    const { tenant, bootstrap } = await createTenantFixture({ label: 'Reporting Domain', bootstrap: admin });
+    await addTenantMember({ tenant, user: admin, bootstrap });
+    const headers = tenantHeaders(admin, tenant);
+    const unknown = await request(app).get('/api/reporting/domains/inexistant').set(headers);
     expect(unknown.status).toBe(404);
-    const known = await request(app).get('/api/reporting/domains/crm').set('Authorization', token);
+    const known = await request(app).get('/api/reporting/domains/crm').set(headers);
     expect(known.status).toBe(200);
   });
 
   test('GET /export/csv et /export/pdf répondent avec les bons Content-Type', async () => {
     const admin = await makeUser({ role: 'Admin' });
-    const token = `Bearer ${signToken(admin._id)}`;
-    const csvRes = await request(app).get('/api/reporting/export/csv').set('Authorization', token);
+    const { tenant, bootstrap } = await createTenantFixture({ label: 'Reporting Export', bootstrap: admin });
+    await addTenantMember({ tenant, user: admin, bootstrap });
+    const headers = tenantHeaders(admin, tenant);
+    const csvRes = await request(app).get('/api/reporting/export/csv').set(headers);
     expect(csvRes.status).toBe(200);
     expect(csvRes.headers['content-type']).toContain('text/csv');
-    const pdfRes = await request(app).get('/api/reporting/export/pdf').set('Authorization', token);
+    const pdfRes = await request(app).get('/api/reporting/export/pdf').set(headers);
     expect(pdfRes.status).toBe(200);
     expect(pdfRes.headers['content-type']).toContain('application/pdf');
   });

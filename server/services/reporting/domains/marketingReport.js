@@ -9,14 +9,17 @@ const MarketingCampaign = require('../../../models/MarketingCampaign');
 const MarketingUnsubscribe = require('../../../models/MarketingUnsubscribe');
 const { getCommunicationReport } = require('./communicationReport');
 
-async function getMarketingReport({ crmDashboard } = {}) {
+async function getMarketingReport({ crmDashboard, tenantId } = {}) {
+  const tenantMatch = tenantId ? { tenant: tenantId } : {};
   const [communication, sendsByStatus, sendsByChannel, campaignsByStatus, unsubscribedCount, campaigns] = await Promise.all([
-    getCommunicationReport({ crmDashboard }),
-    MarketingSend.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-    MarketingSend.aggregate([{ $match: { status: { $in: ['sent', 'opened', 'clicked'] } } }, { $group: { _id: '$channel', count: { $sum: 1 } } }]),
-    MarketingCampaign.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-    MarketingUnsubscribe.countDocuments(),
-    MarketingCampaign.find({ status: 'sent' }).select('name channel stats costMinor sentAt').sort({ sentAt: -1 }).limit(20).lean(),
+    tenantId
+      ? Promise.resolve({ unavailable: true, reason: 'Sources Communication historiques non attribuables au tenant.' })
+      : getCommunicationReport({ crmDashboard }),
+    MarketingSend.aggregate([{ $match: tenantMatch }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    MarketingSend.aggregate([{ $match: { ...tenantMatch, status: { $in: ['sent', 'opened', 'clicked'] } } }, { $group: { _id: '$channel', count: { $sum: 1 } } }]),
+    MarketingCampaign.aggregate([{ $match: tenantMatch }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    MarketingUnsubscribe.countDocuments(tenantMatch),
+    MarketingCampaign.find({ ...tenantMatch, status: 'sent' }).select('name channel stats costMinor sentAt').sort({ sentAt: -1 }).limit(20).lean(),
   ]);
 
   const statusMap = Object.fromEntries(sendsByStatus.map((r) => [r._id, r.count]));

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 
 const locataireSchema = new mongoose.Schema({
   nom:            { type: String, required: [true, 'Le nom est requis'], trim: true },
@@ -8,6 +9,7 @@ const locataireSchema = new mongoose.Schema({
   adresse:        { type: String, trim: true },
   ville:          { type: String, trim: true },
   pieceIdentite:  { type: String }, // URL Cloudinary
+  pieceIdentiteAsset: { type: privateAssetSchema },
   profession:     { type: String, trim: true },
   revenuMensuel:  { type: Number, min: 0 },
   notes:          { type: String, trim: true },
@@ -27,5 +29,10 @@ const locataireSchema = new mongoose.Schema({
 // `null` toujours présente, même convention que RoomAssignment/
 // HousekeepingTask, Sprints D/E).
 locataireSchema.index({ user: 1 }, { unique: true, partialFilterExpression: { user: { $type: 'objectId' } } });
+locataireSchema.set('toJSON', { transform: (_doc, ret) => {
+  const available = Boolean(ret.pieceIdentiteAsset || ret.pieceIdentite); delete ret.pieceIdentite; delete ret.pieceIdentiteAsset;
+  if (available) ret.identityDocument = { canPreview: true, canDownload: true, previewEndpoint: `/api/locataires/${ret._id}/identity-document`, downloadEndpoint: `/api/locataires/${ret._id}/identity-document?download=1` };
+  return ret;
+} });
 
 module.exports = mongoose.model('Locataire', locataireSchema);

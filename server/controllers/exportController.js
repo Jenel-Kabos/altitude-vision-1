@@ -44,14 +44,14 @@ const buildDateFilter = (dateDebut, dateFin, field = 'createdAt') => {
 
 // ── Collect contacts ──────────────────────────────────────────
 
-const collectContacts = async ({ source, dateDebut, dateFin, ville }) => {
+const collectContacts = async ({ source, dateDebut, dateFin, ville, scopeUserIds = null }) => {
   const all = [];
   const sources = (source === 'tous' || !source)
     ? ['proprietaires', 'locataires', 'clients', 'devis', 'contacts']
     : source.split(',').map(s => s.trim());
 
   if (sources.includes('proprietaires')) {
-    const filter = { ...buildDateFilter(dateDebut, dateFin) };
+    const filter = { ...buildDateFilter(dateDebut, dateFin), ...(scopeUserIds ? { user: { $in: scopeUserIds } } : {}) };
     if (ville) filter.ville = new RegExp(ville, 'i');
     const docs = await Proprietaire.find(filter).select('nom prenom email telephone ville createdAt').lean();
     docs.forEach(d => all.push({
@@ -66,7 +66,7 @@ const collectContacts = async ({ source, dateDebut, dateFin, ville }) => {
   }
 
   if (sources.includes('locataires')) {
-    const filter = { ...buildDateFilter(dateDebut, dateFin) };
+    const filter = { ...buildDateFilter(dateDebut, dateFin), ...(scopeUserIds ? { user: { $in: scopeUserIds } } : {}) };
     if (ville) filter.ville = new RegExp(ville, 'i');
     const docs = await Locataire.find(filter).select('nom prenom email telephone ville createdAt').lean();
     docs.forEach(d => all.push({
@@ -85,6 +85,7 @@ const collectContacts = async ({ source, dateDebut, dateFin, ville }) => {
       role:   { $in: ['User', 'Client', 'Proprietaire'] },
       status: { $ne: 'Supprimé' },
       ...buildDateFilter(dateDebut, dateFin),
+      ...(scopeUserIds ? { _id: { $in: scopeUserIds } } : {}),
     };
     const docs = await User.find(filter).select('name email phone createdAt').lean();
     docs.forEach(d => {
@@ -101,7 +102,9 @@ const collectContacts = async ({ source, dateDebut, dateFin, ville }) => {
     });
   }
 
-  if (sources.includes('devis')) {
+  // Ces sources historiques n'ont aucune attribution tenant fiable. Elles
+  // sont donc exclues d'un export tenant-scopé plutôt que diffusées globales.
+  if (sources.includes('devis') && !scopeUserIds) {
     const filter = { ...buildDateFilter(dateDebut, dateFin) };
     const docs = await QuoteRequest.find(filter).select('name email phone createdAt').lean();
     docs.forEach(d => {
@@ -118,7 +121,7 @@ const collectContacts = async ({ source, dateDebut, dateFin, ville }) => {
     });
   }
 
-  if (sources.includes('contacts')) {
+  if (sources.includes('contacts') && !scopeUserIds) {
     const filter = { ...buildDateFilter(dateDebut, dateFin, 'submittedAt') };
     const docs = await ContactMessage.find(filter).select('name email submittedAt').lean();
     docs.forEach(d => {
@@ -149,7 +152,7 @@ const collectContacts = async ({ source, dateDebut, dateFin, ville }) => {
 exports.getContacts = async (req, res) => {
   try {
     const { source, dateDebut, dateFin, ville, requireEmail, requirePhone } = req.query;
-    let contacts = await collectContacts({ source, dateDebut, dateFin, ville });
+    let contacts = await collectContacts({ source, dateDebut, dateFin, ville, scopeUserIds: req.tenantScopeUserIds || [] });
 
     if (requireEmail === '1')      contacts = contacts.filter(c => c.email);
     if (requirePhone === '1')      contacts = contacts.filter(c => c.phone);
@@ -172,7 +175,7 @@ exports.getContacts = async (req, res) => {
 exports.getStats = async (req, res) => {
   try {
     const { source, dateDebut, dateFin, ville, requireEmail, requirePhone } = req.query;
-    let contacts = await collectContacts({ source, dateDebut, dateFin, ville });
+    let contacts = await collectContacts({ source, dateDebut, dateFin, ville, scopeUserIds: req.tenantScopeUserIds || [] });
 
     if (requireEmail === '1')                               contacts = contacts.filter(c => c.email);
     if (requirePhone === '1')                               contacts = contacts.filter(c => c.phone);
@@ -212,7 +215,7 @@ exports.getStats = async (req, res) => {
 exports.exportCsv = async (req, res) => {
   try {
     const { source, dateDebut, dateFin, ville, format = 'standard', requireEmail, requirePhone } = req.query;
-    let contacts = await collectContacts({ source, dateDebut, dateFin, ville });
+    let contacts = await collectContacts({ source, dateDebut, dateFin, ville, scopeUserIds: req.tenantScopeUserIds || [] });
 
     if (requireEmail === '1')                         contacts = contacts.filter(c => c.email);
     if (requirePhone === '1')                         contacts = contacts.filter(c => c.phone);

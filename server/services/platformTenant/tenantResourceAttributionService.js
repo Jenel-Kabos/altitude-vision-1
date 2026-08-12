@@ -79,6 +79,36 @@ async function fromContract(contractId) {
   return contract?.bien ? fromProperty(contract.bien, `contract:${contractId}.property`) : unresolved([`contract:${contractId}→no_property`]);
 }
 
+// STORAGE-LEGACY-1 — extensions additives, même patron que ci-dessus,
+// nécessaires pour attribuer un tenant aux ressources de stockage legacy
+// (pièces jointes maintenance, candidatures, litiges, signalements, preuves
+// de paiement, identités Locataire/Proprietaire). Aucune de ces branches ne
+// modifie le comportement des `resourceType` déjà gérés au-dessus ; elles
+// n'ajoutent que des cas nouveaux à l'aiguillage de `resolveResourceTenant`.
+const RentalManagement = require('../../models/RentalManagement');
+const Transaction = require('../../models/Transaction');
+
+async function fromRentalManagementId(rentalId, label = 'rentalManagement') {
+  if (!validId(rentalId)) return unresolved([`${label}:missing`]);
+  const rental = await RentalManagement.findById(validId(rentalId)).select('property owner manager').lean();
+  if (!rental) return unresolved([`${label}:${rentalId}→missing`]);
+  return resolveResourceTenant({ resourceType: 'RentalManagement', resource: rental });
+}
+
+// Un Locataire/Proprietaire n'a lui-même aucun champ tenant/property direct
+// — l'unique preuve relationnelle fiable est le(s) Contrat(s) qui le
+// référence(nt) (jamais nom/email/téléphone, interdits comme preuve). Si
+// plusieurs contrats pointent vers des Property de tenants différents, le
+// résultat est `ambiguous` (fail-closed), jamais un choix arbitraire.
+async function fromContractsReferencing(field, personId, label) {
+  if (!validId(personId)) return unresolved([`${label}:missing`]);
+  const contracts = await Contrat.find({ [field]: validId(personId) }).select('bien').lean();
+  if (!contracts.length) return unresolved([`${label}:${personId}→no_contract`]);
+  return mergeProofs(await Promise.all(
+    contracts.filter((c) => c.bien).map((c) => fromProperty(c.bien, `${label}:${personId}.contract(${c._id}).property`)),
+  ));
+}
+
 async function resolveResourceTenant({ resourceType, resource }) {
   if (!resource) return unresolved([`${resourceType}:missing`]);
   const direct = resource.tenant || resource.platformTenant
@@ -137,6 +167,29 @@ async function resolveResourceTenant({ resourceType, resource }) {
     if (resource.establishmentType === 'Accommodation') return mergeProofs([direct, await fromAccommodation(resource.establishmentId)]);
     if (resource.establishmentType === 'Property') return mergeProofs([direct, await fromProperty(resource.establishmentId, 'financial.property')]);
     return unresolved([`${resourceType}.establishment:unsupported`]);
+  }
+  // STORAGE-LEGACY-1 — mêmes garanties que ci-dessus : preuve relationnelle
+  // uniquement, `ambiguous`/`unresolved` toujours fail-closed.
+  if (resourceType === 'FinancialDocumentArtifact') {
+    if (resource.domain === 'hotel') return mergeProofs([direct, await fromHotel(resource.establishmentId)]);
+    if (resource.domain === 'rental') return mergeProofs([direct, await fromRentalManagementId(resource.establishmentId, 'financialDocumentArtifact.rental')]);
+    if (resource.domain === 'real_estate') return mergeProofs([direct, await fromProperty(resource.establishmentId, 'financialDocumentArtifact.property')]);
+    return unresolved([`${resourceType}.domain:unsupported`]);
+  }
+  if (resourceType === 'RentalMaintenanceTicket') return mergeProofs([direct, await fromProperty(resource.property, 'rentalMaintenanceTicket.property')]);
+  if (resourceType === 'RentalPaymentReceipt') return mergeProofs([direct, await fromContract(rawId(resource.contrat))]);
+  if (resourceType === 'RealEstateApplication') return mergeProofs([direct, await fromProperty(resource.property, 'realEstateApplication.property')]);
+  if (resourceType === 'Litige') return mergeProofs([direct, await fromProperty(resource.bienConcerné, 'litige.bienConcerné')]);
+  if (resourceType === 'Signalement') return mergeProofs([direct, await fromProperty(resource.property, 'signalement.property')]);
+  if (resourceType === 'Locataire') return mergeProofs([direct, await fromContractsReferencing('locataire', rawId(resource), 'locataire')]);
+  if (resourceType === 'Proprietaire') {
+    const viaUser = resource.user ? await fromUser(resource.user, 'proprietaire.user') : unresolved();
+    return mergeProofs([direct, viaUser, await fromContractsReferencing('proprietaire', rawId(resource), 'proprietaire')]);
+  }
+  if (resourceType === 'PaiementTransaction') {
+    if (!resource.transaction) return mergeProofs([direct, unresolved(['paiementTransaction.transaction:missing'])]);
+    const transaction = validId(resource.transaction) ? await Transaction.findById(validId(resource.transaction)).select('property').lean() : resource.transaction;
+    return mergeProofs([direct, transaction?.property ? await fromProperty(transaction.property, 'paiementTransaction.transaction.property') : unresolved(['paiementTransaction.transaction→no_property'])]);
   }
   return unresolved([`${resourceType}:unsupported`]);
 }

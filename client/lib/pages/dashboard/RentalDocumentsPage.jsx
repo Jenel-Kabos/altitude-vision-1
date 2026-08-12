@@ -16,7 +16,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { FolderOpen, Search } from "lucide-react";
-import { getContrats, previewRentalDocument } from "../../services/gestionLocativeService";
+import { getContrats, previewRentalDocument, previewSecureDocumentEndpoint } from "../../services/gestionLocativeService";
 import { getAllDocuments } from "../../services/documentService";
 import {
   DashboardPage, DashboardPageHeader, DashboardToolbar, DashboardCard, DashboardState,
@@ -91,7 +91,7 @@ const RentalDocumentsContent = ({ embedded = false }) => {
       for (const d of genericDocs) {
         rows.push({
           key: `doc-${d._id}`,
-          directUrl: d.content, nom: d.notes || d.refNom || d.type, type: 'piece_identite', date: d.issueDate || d.createdAt,
+          previewEndpoint: d.previewEndpoint, nom: d.notes || d.refNom || d.type, type: 'piece_identite', date: d.issueDate || d.createdAt,
           bien: '—',
           proprietaire: d.refType === 'Proprietaire' ? d.refNom : '—',
           locataire: d.refType === 'Locataire' ? d.refNom : '—',
@@ -224,8 +224,8 @@ const RentalDocumentsContent = ({ embedded = false }) => {
                   <td className="py-2 pr-3">
                     {d.url && d.documentId
                       ? <button onClick={() => handleOpen(d.documentId)} className="text-blue-600 underline text-xs">Ouvrir</button>
-                      : d.directUrl
-                        ? <a href={d.directUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">Ouvrir</a>
+                      : d.previewEndpoint
+                        ? <button type="button" onClick={() => previewSecureDocumentEndpoint(d.previewEndpoint)} className="text-blue-600 underline text-xs">Ouvrir</button>
                         : <span className="text-xs text-gray-400">Indisponible</span>}
                   </td>
                 </tr>

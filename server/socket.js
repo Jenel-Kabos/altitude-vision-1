@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('./models/User');
 const Conversation = require('./models/Conversation');
+const { resolveEffectiveTenantContext } = require('./services/platformTenant/tenantContextService');
 const logger = require('./utils/logger');
 
 let _io = null;
@@ -14,12 +15,17 @@ const onlineUsers = new Map();
 
 const STAFF_ROLES = new Set(['Admin', 'Collaborateur']);
 
-const canAccessConversation = async (user, conversationId) => {
+const canAccessConversation = async (user, conversationId, activeTenantId = null) => {
   if (!mongoose.isValidObjectId(conversationId)) return false;
   const conversation = await Conversation.findById(conversationId)
-    .select('participants isStaffInbox')
+    .select('participants isStaffInbox tenant')
     .lean();
   if (!conversation) return false;
+
+  // Une room est une frontière de données au même titre qu'une route HTTP.
+  // Si la conversation est attribuée, le contexte socket actif doit être le
+  // même avant de considérer participant ou rôle staff.
+  if (conversation.tenant && (!activeTenantId || String(conversation.tenant) !== String(activeTenantId))) return false;
 
   const userId = user?._id?.toString();
   const isParticipant = conversation.participants?.some(
@@ -60,6 +66,14 @@ const initSocket = (httpServer, corsOptions) => {
 
       socket.userId = user._id.toString();
       socket.user = user;
+      const requestedTenantId = socket.handshake.auth?.platformTenantId
+        || socket.handshake.headers?.['x-platform-tenant-id']
+        || socket.handshake.headers?.['x-tenant-id']
+        || null;
+      const tenantContext = await resolveEffectiveTenantContext(user._id, requestedTenantId);
+      if (!tenantContext?.tenant) return next(new Error('Contexte tenant requis'));
+      socket.platformTenantId = String(tenantContext.tenant._id);
+      socket.tenantContextSource = tenantContext.source;
       next();
     } catch {
       next(new Error('Token invalide ou expiré'));
@@ -93,7 +107,7 @@ const initSocket = (httpServer, corsOptions) => {
     // Une room n'est accessible qu'à ses membres (ou au staff pour la boîte partagée).
     socket.on('join-room', async (conversationId, acknowledge) => {
       try {
-        const allowed = await canAccessConversation(socket.user, conversationId);
+        const allowed = await canAccessConversation(socket.user, conversationId, socket.platformTenantId);
         if (!allowed) {
           acknowledge?.({ ok: false, error: 'Accès refusé' });
           return;

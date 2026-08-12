@@ -15,6 +15,9 @@ const Contrat = require('../models/Contrat');
 const RentalManagement = require('../models/RentalManagement');
 const Paiement = require('../models/Paiement');
 const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
+const OrgUnit = require('../models/OrgUnit');
+const OrgMembership = require('../models/OrgMembership');
+const PlatformTenant = require('../models/PlatformTenant');
 const propertyAssetRoutes = require('../routes/propertyAssetRoutes');
 const dossierRoutes = require('../routes/dossierRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
@@ -219,7 +222,13 @@ describe('GET /portfolio/dashboard — agrégation portefeuille (Phase 8)', () =
 // notification orpheline.
 test('la transition de cycle de vie du bien notifie le staff avec un lien vers sa propre fiche', async () => {
   const admin = await makeUser({ role: 'Admin' });
-  const { property } = await buildManagedProperty({ availability: 'Disponible' });
+  const { owner, property } = await buildManagedProperty({ availability: 'Disponible' });
+  const root = await OrgUnit.create({ name: `Property asset notification ${Date.now()}`, type: 'organization', status: 'active' });
+  const tenant = await PlatformTenant.create({ name: root.name, slug: `property-asset-notification-${Date.now()}`, rootOrgUnit: root._id, status: 'active' });
+  await OrgMembership.create([
+    { user: admin._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
+    { user: owner._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
+  ]);
   await request(app).post(`/api/property-asset/${property._id}/transition`).set('Authorization', `Bearer ${signToken(admin._id)}`).send({ target: 'travaux' });
 
   const Notification = require('../models/Notification');

@@ -26,6 +26,12 @@ export const previewRentalDocument = async (documentId) => {
   const url = URL.createObjectURL(response.data);
   window.open(url, '_blank', 'noopener,noreferrer');
 };
+export const previewSecureDocumentEndpoint = async (endpoint) => {
+  const response = await api.get(String(endpoint).replace(/^\/api/, ''), { responseType: 'blob' });
+  const url = URL.createObjectURL(response.data);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
 
 // ── Dossiers locatifs synchronisés avec Property ─────────────
 export const getRentalManagement = async (params = {}) => {

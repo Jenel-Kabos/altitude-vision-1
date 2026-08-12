@@ -23,32 +23,41 @@ const { listAccessibleHotels } = require('../services/hotel/hotelAccessScopeServ
 const dayBounds = () => { const start = new Date(); start.setHours(0, 0, 0, 0); const end = new Date(start); end.setDate(end.getDate() + 1); return { start, end }; };
 const periodStarts = () => { const { start: today, end: tomorrow } = dayBounds(); const month = new Date(today.getFullYear(), today.getMonth(), 1); const year = new Date(today.getFullYear(), 0, 1); return { today, tomorrow, month, year }; };
 
-async function sales() {
+async function sales({ scopeUserIds = null } = {}) {
   const now = new Date();
-  const ids = await Property.find({ status: 'vente' }).distinct('_id');
+  if (scopeUserIds instanceof Set) scopeUserIds = [...scopeUserIds];
+  if (scopeUserIds) scopeUserIds = scopeUserIds.map((id) => new mongoose.Types.ObjectId(String(id)));
+  const propertyFilter = { status: 'vente', ...(scopeUserIds ? { owner: { $in: scopeUserIds } } : {}) };
+  const ids = await Property.find(propertyFilter).distinct('_id');
   const [properties, visits, transactions, recent] = await Promise.all([
-    Property.aggregate([{ $match: { status: 'vente' } }, { $group: { _id: null, total: { $sum: 1 }, published: { $sum: { $cond: [{ $eq: ['$statusAdmin', 'Validée'] }, 1, 0] } }, drafts: { $sum: { $cond: [{ $ne: ['$statusAdmin', 'Validée'] }, 1, 0] } }, sold: { $sum: { $cond: [{ $eq: ['$availability', 'Vendu'] }, 1, 0] } }, active: { $sum: { $cond: [{ $eq: ['$availability', 'Disponible'] }, 1, 0] } } } }]),
+    Property.aggregate([{ $match: propertyFilter }, { $group: { _id: null, total: { $sum: 1 }, published: { $sum: { $cond: [{ $eq: ['$statusAdmin', 'Validée'] }, 1, 0] } }, drafts: { $sum: { $cond: [{ $ne: ['$statusAdmin', 'Validée'] }, 1, 0] } }, sold: { $sum: { $cond: [{ $eq: ['$availability', 'Vendu'] }, 1, 0] } }, active: { $sum: { $cond: [{ $eq: ['$availability', 'Disponible'] }, 1, 0] } } } }]),
     Visite.countDocuments({ property: { $in: ids }, scheduledStartAt: { $gte: now }, statut: { $nin: ['Terminée', 'Annulée'] } }),
-    Transaction.aggregate([{ $match: { transactionType: 'vente' } }, { $group: { _id: null, pendingOffers: { $sum: { $cond: [{ $in: ['$status', ['En cours', 'Paiement en attente']] }, 1, 0] } }, salesAmount: { $sum: { $cond: [{ $eq: ['$status', 'Réussie'] }, '$finalAmount', 0] } }, commissions: { $sum: { $cond: [{ $eq: ['$status', 'Réussie'] }, '$commission.agencyNet', 0] } } } }]),
-    Transaction.find({ transactionType: 'vente', status: 'Réussie' }).sort({ transactionDate: -1 }).limit(5).select('property finalAmount commission.agencyNet transactionDate').populate('property', 'title').lean(),
+    Transaction.aggregate([{ $match: { transactionType: 'vente', property: { $in: ids } } }, { $group: { _id: null, pendingOffers: { $sum: { $cond: [{ $in: ['$status', ['En cours', 'Paiement en attente']] }, 1, 0] } }, salesAmount: { $sum: { $cond: [{ $eq: ['$status', 'Réussie'] }, '$finalAmount', 0] } }, commissions: { $sum: { $cond: [{ $eq: ['$status', 'Réussie'] }, '$commission.agencyNet', 0] } } } }]),
+    Transaction.find({ transactionType: 'vente', status: 'Réussie', property: { $in: ids } }).sort({ transactionDate: -1 }).limit(5).select('property finalAmount commission.agencyNet transactionDate').populate('property', 'title').lean(),
   ]);
   return { kpis: { ...(properties[0] || { total: 0, published: 0, drafts: 0, sold: 0, active: 0 }), scheduledVisits: visits, ...(transactions[0] || { pendingOffers: 0, salesAmount: 0, commissions: 0 }) }, recent };
 }
 
-async function rentals() {
+async function rentals({ scopeUserIds = null } = {}) {
   const now = new Date(); const soon = new Date(now.getTime() + 30 * 86400000);
+  if (scopeUserIds instanceof Set) scopeUserIds = [...scopeUserIds];
+  if (scopeUserIds) scopeUserIds = scopeUserIds.map((id) => new mongoose.Types.ObjectId(String(id)));
+  const properties = scopeUserIds ? await Property.find({ owner: { $in: scopeUserIds } }).distinct('_id') : null;
+  const rentalFilter = properties ? { property: { $in: properties } } : {};
+  const contractFilter = properties ? { bien: { $in: properties } } : {};
+  const contractsInScope = properties ? await Contrat.find(contractFilter).distinct('_id') : null;
   const [management, contracts, payments, maintenance] = await Promise.all([
-    RentalManagement.aggregate([{ $match: { managementActivated: true } }, { $group: { _id: null, available: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'disponible'] }, 1, 0] } }, occupied: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'occupe'] }, 1, 0] } }, notices: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'preavis'] }, 1, 0] } } } }]),
-    Contrat.aggregate([{ $match: { type: 'location' } }, { $group: { _id: null, activeContracts: { $sum: { $cond: [{ $eq: ['$statut', 'actif'] }, 1, 0] } }, expiringContracts: { $sum: { $cond: [{ $and: [{ $eq: ['$statut', 'actif'] }, { $gte: ['$dateFinBail', now] }, { $lte: ['$dateFinBail', soon] }] }, 1, 0] } } } }]),
-    Paiement.aggregate([{ $group: { _id: null, rentCollected: { $sum: { $ifNull: ['$montantRecu', 0] } }, unpaidRent: { $sum: { $cond: [{ $in: ['$statut', ['impayé', 'en_retard', 'partiel']] }, { $max: [{ $subtract: [{ $ifNull: ['$montantTotal', '$montant'] }, { $ifNull: ['$montantRecu', 0] }] }, 0] }, 0] } }, penalties: { $sum: { $cond: ['$penaliteAppliquee', '$penaliteMontant', 0] } } } }]),
-    RentalMaintenanceTicket.countDocuments({ status: { $in: RentalMaintenanceTicket.OPEN_RENTAL_MAINTENANCE_STATUSES } }),
+    RentalManagement.aggregate([{ $match: { managementActivated: true, ...rentalFilter } }, { $group: { _id: null, available: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'disponible'] }, 1, 0] } }, occupied: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'occupe'] }, 1, 0] } }, notices: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'preavis'] }, 1, 0] } } } }]),
+    Contrat.aggregate([{ $match: { type: 'location', ...contractFilter } }, { $group: { _id: null, activeContracts: { $sum: { $cond: [{ $eq: ['$statut', 'actif'] }, 1, 0] } }, expiringContracts: { $sum: { $cond: [{ $and: [{ $eq: ['$statut', 'actif'] }, { $gte: ['$dateFinBail', now] }, { $lte: ['$dateFinBail', soon] }] }, 1, 0] } } } }]),
+    Paiement.aggregate([{ $match: contractsInScope ? { contrat: { $in: contractsInScope } } : {} }, { $group: { _id: null, rentCollected: { $sum: { $ifNull: ['$montantRecu', 0] } }, unpaidRent: { $sum: { $cond: [{ $in: ['$statut', ['impayé', 'en_retard', 'partiel']] }, { $max: [{ $subtract: [{ $ifNull: ['$montantTotal', '$montant'] }, { $ifNull: ['$montantRecu', 0] }] }, 0] }, 0] } }, penalties: { $sum: { $cond: ['$penaliteAppliquee', '$penaliteMontant', 0] } } } }]),
+    RentalMaintenanceTicket.countDocuments({ status: { $in: RentalMaintenanceTicket.OPEN_RENTAL_MAINTENANCE_STATUSES }, ...(properties ? { property: { $in: properties } } : {}) }),
   ]);
   return { kpis: { ...(management[0] || { available: 0, occupied: 0, notices: 0 }), ...(contracts[0] || { activeContracts: 0, expiringContracts: 0 }), ...(payments[0] || { rentCollected: 0, unpaidRent: 0, penalties: 0 }), maintenance } };
 }
 
-async function accommodations(accommodationId = null) {
+async function accommodations(accommodationId = null, { tenantId = null } = {}) {
   const { today, tomorrow, month, year } = periodStarts(); const week = new Date(today.getTime() + 7 * 86400000); const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const independent = { $or: [{ hotel: null }, { hotel: { $exists: false } }], ...(accommodationId ? { _id: accommodationId } : {}) };
+  const independent = { $or: [{ hotel: null }, { hotel: { $exists: false } }], ...(accommodationId ? { _id: accommodationId } : {}), ...(tenantId ? { tenant: tenantId } : {}) };
   const publishedIds = await Accommodation.find({ ...independent, publicationStatus: 'publie' }).distinct('_id');
   const [rows, reservationRows, reservationNights, blockedNights, documents, allocations, refunds] = await Promise.all([
     Accommodation.aggregate([{ $match: independent }, { $lookup: { from: 'properties', localField: 'property', foreignField: '_id', as: 'property' } }, { $unwind: '$property' }, { $group: { _id: null, total: { $sum: 1 }, published: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'publie'] }, 1, 0] } }, drafts: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'brouillon'] }, 1, 0] } }, unavailable: { $sum: { $cond: [{ $ne: ['$property.availability', 'Disponible'] }, 1, 0] } }, maintenance: { $sum: { $cond: [{ $eq: ['$property.availability', 'En maintenance'] }, 1, 0] } } } }]),
@@ -79,7 +88,9 @@ async function hotels(actor) {
   const { today, tomorrow } = periodStarts();
   const activeReservation = ['confirmed', 'checked_in', 'checked_out'];
   let scopedIds;
-  if (actor?.role !== 'Admin') {
+  if (actor?.platformTenant?._id || actor?.platformTenant) {
+    scopedIds = await Hotel.find({ tenant: actor.platformTenant._id || actor.platformTenant }).distinct('_id');
+  } else if (actor?.role !== 'Admin') {
     const scoped = await listAccessibleHotels(actor);
     scopedIds = scoped.hotels.map((hotel) => hotel._id);
   }
@@ -122,6 +133,10 @@ exports.getModuleAnalytics = async (req, res) => {
     if (!allowedRoles.includes(req.user?.role)) return res.status(403).json({ status: 'fail', message: 'Accès refusé à ce module.' });
     const requestedAccommodationId = req.query?.accommodationId;
     const accommodationId = req.params.module === 'accommodations' && mongoose.isValidObjectId(requestedAccommodationId) ? new mongoose.Types.ObjectId(requestedAccommodationId) : null;
-    res.json({ status: 'success', data: await (req.params.module === 'hotels' ? handlers.hotels(req.user) : handlers[req.params.module](accommodationId)) });
+    let data;
+    if (req.params.module === 'hotels') data = await handlers.hotels(req.user);
+    else if (req.params.module === 'accommodations') data = await handlers.accommodations(accommodationId);
+    else data = await handlers[req.params.module]();
+    res.json({ status: 'success', data });
   } catch (error) { res.status(500).json({ status: 'error', message: error.message }); }
 };

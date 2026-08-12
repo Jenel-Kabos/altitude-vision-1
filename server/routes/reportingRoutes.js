@@ -4,9 +4,10 @@
 const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/reportingController');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 const DIRECTION = ['Admin', 'GestionnaireImmobilier'];
-router.use(auth.protect, auth.restrictTo(...DIRECTION));
+router.use(auth.protect, auth.restrictTo(...DIRECTION), requireTenantScope);
 
 router.get('/executive', controller.getExecutive);
 router.get('/domains/:domain', controller.getDomain);

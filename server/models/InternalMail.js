@@ -1,5 +1,6 @@
 // server/models/InternalMail.js
 const mongoose = require('mongoose');
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 
 const internalMailSchema = new mongoose.Schema({
 
@@ -62,6 +63,7 @@ const internalMailSchema = new mongoose.Schema({
       filename: { type: String, required: true },
       url:      { type: String, default: null }, // Cloudinary URL (emails IMAP entrants)
       filepath: { type: String, default: null }, // Chemin local (messages internes)
+      asset:    { type: privateAssetSchema },
       mimetype: { type: String },
       size:     { type: Number },
     },
@@ -83,6 +85,18 @@ internalMailSchema.index({ sender:   1, isDraft:   1  });
 internalMailSchema.index({ receiver: 1, isDeleted: 1  });
 // ✅ Index sur les emails externes pour requêtes rapides
 internalMailSchema.index({ isExternalMail: 1, createdAt: -1 });
+
+internalMailSchema.set('toJSON', { transform: (_doc, ret) => {
+  ret.attachments = (ret.attachments || []).map(({ url, filepath, asset, ...metadata }, index) => ({
+    ...metadata,
+    canPreview: Boolean(asset || url || filepath),
+    canDownload: Boolean(asset || url || filepath),
+    legacy: Boolean(!asset && (url || filepath)),
+    previewEndpoint: `/api/internal-mails/${ret._id}/attachments/${index}`,
+    downloadEndpoint: `/api/internal-mails/${ret._id}/attachments/${index}?download=1`,
+  }));
+  return ret;
+} });
 
 // ── Méthodes statiques ────────────────────────────────────────
 

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 
 const bienSchema = new mongoose.Schema({
   typeBien: {
@@ -95,6 +96,7 @@ const proprietaireSchema = new mongoose.Schema({
   adresse:        { type: String, trim: true },
   ville:          { type: String, trim: true },
   pieceIdentite:     { type: String },
+  pieceIdentiteAsset: { type: privateAssetSchema },
   pieceIdentiteType: { type: String }, // 'pdf', 'jpeg', 'png'
   pieceIdentiteNom:  { type: String }, // nom original du fichier
   notes:             { type: String, trim: true },
@@ -110,5 +112,10 @@ const proprietaireSchema = new mongoose.Schema({
   // satisfaire la relation obligatoire Property.owner → User.
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 }, { timestamps: true });
+proprietaireSchema.set('toJSON', { transform: (_doc, ret) => {
+  const available = Boolean(ret.pieceIdentiteAsset || ret.pieceIdentite); delete ret.pieceIdentite; delete ret.pieceIdentiteAsset;
+  if (available) ret.identityDocument = { canPreview: true, canDownload: true, previewEndpoint: `/api/proprietaires/${ret._id}/identity-document`, downloadEndpoint: `/api/proprietaires/${ret._id}/identity-document?download=1` };
+  return ret;
+} });
 
 module.exports = mongoose.model('Proprietaire', proprietaireSchema);

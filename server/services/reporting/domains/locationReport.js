@@ -4,8 +4,8 @@
 // /api/dashboard-analytics/rentals.
 const { rentals } = require('../../../controllers/dashboardAnalyticsController');
 
-async function getLocationReport() {
-  const data = await rentals();
+async function getLocationReport({ scopeUserIds } = {}) {
+  const data = await rentals({ scopeUserIds });
   return { domain: 'location', periodSupported: false, ...data };
 }
 

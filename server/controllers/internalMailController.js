@@ -3,6 +3,18 @@ const asyncHandler = require('express-async-handler');
 const InternalMail = require('../models/InternalMail');
 const User = require('../models/User');
 const { sendEmailViaZoho } = require('../services/emailService');
+const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
+const { streamRemoteDocument } = require('./rentalDocumentController');
+
+const storeAttachments = (files, ownerId) => Promise.all(files.map(async (file) => ({
+  filename: file.originalname,
+  mimetype: file.mimetype,
+  size: file.size,
+  asset: await uploadPrivateAsset(file.buffer, {
+    purpose: 'administrative', ownerType: 'InternalMail', ownerId,
+    filename: file.originalname, mimeType: file.mimetype,
+  }),
+})));
 
 // ═══════════════════════════════════════════════════════════════
 // MISE À JOUR DU SCHÉMA MONGOOSE REQUISE
@@ -29,6 +41,7 @@ exports.sendInternalMail = asyncHandler(async (req, res) => {
     priority = 'Normale',
   } = req.body;
   const uploadedFiles = req.files || [];
+  const uploadOwnerId = `pending-${req.user.id}-${Date.now()}`;
 
   // ══════════════════════════════════════════
   // CAS 1 — Envoi EXTERNE via Zoho
@@ -59,6 +72,7 @@ exports.sendInternalMail = asyncHandler(async (req, res) => {
     await sendEmailViaZoho(fromEmail, receiverEmail, subject || 'Sans objet', emailContent);
 
     // Sauvegarder une trace dans "Messages envoyés"
+    const attachmentsData = await storeAttachments(uploadedFiles, uploadOwnerId);
     const sentRecord = await InternalMail.create({
       sender:         req.user.id,
       receiverEmail:  receiverEmail,
@@ -69,6 +83,7 @@ exports.sendInternalMail = asyncHandler(async (req, res) => {
       isRead:         true,
       isDraft:        false,
       isDeleted:      false,
+      attachments:    attachmentsData,
     });
 
     await sentRecord.populate('sender', 'name email photo');
@@ -95,12 +110,7 @@ exports.sendInternalMail = asyncHandler(async (req, res) => {
     throw new Error('Destinataire non trouvé.');
   }
 
-  const attachmentsData = uploadedFiles.map(file => ({
-    filename: file.originalname,
-    filepath: file.path,
-    mimetype: file.mimetype,
-    size:     file.size,
-  }));
+  const attachmentsData = await storeAttachments(uploadedFiles, uploadOwnerId);
 
   const mail = await InternalMail.create({
     sender:      req.user.id,
@@ -198,12 +208,7 @@ exports.saveDraft = asyncHandler(async (req, res) => {
     throw new Error('Le brouillon doit contenir au moins du texte ou une pièce jointe.');
   }
 
-  const attachmentsData = uploadedFiles.map(file => ({
-    filename: file.originalname,
-    filepath: file.path,
-    mimetype: file.mimetype,
-    size:     file.size,
-  }));
+  const attachmentsData = await storeAttachments(uploadedFiles, `draft-${req.user.id}-${Date.now()}`);
 
   const draft = await InternalMail.create({
     sender:      req.user.id,
@@ -250,12 +255,7 @@ exports.updateDraft = asyncHandler(async (req, res) => {
   if (priority   !== undefined) draft.priority  = priority;
 
   if (uploadedFiles.length > 0) {
-    const newAttachments = uploadedFiles.map(file => ({
-      filename: file.originalname,
-      filepath: file.path,
-      mimetype: file.mimetype,
-      size:     file.size,
-    }));
+    const newAttachments = await storeAttachments(uploadedFiles, draft._id);
     draft.attachments = [...draft.attachments, ...newAttachments];
   }
 
@@ -648,4 +648,38 @@ exports.emptyTrash = asyncHandler(async (req, res) => {
     status: 'success',
     data:   { deletedCount: result.deletedCount },
   });
+});
+
+exports.downloadAttachment = asyncHandler(async (req, res) => {
+  const mail = await InternalMail.findById(req.params.mailId)
+    .select('+attachments.asset.publicId +attachments.asset.resourceType +attachments.asset.deliveryType +attachments.asset.version +attachments.asset.format');
+  if (!mail) {
+    res.status(404);
+    throw new Error('Email non trouvé.');
+  }
+  const userId = String(req.user.id || req.user._id);
+  if (String(mail.sender || '') !== userId && String(mail.receiver || '') !== userId) {
+    res.status(403);
+    throw new Error('Non autorisé.');
+  }
+  const attachment = mail.attachments?.[Number(req.params.attachmentIndex)];
+  if (!attachment) {
+    res.status(404);
+    throw new Error('Pièce jointe introuvable.');
+  }
+  if (!attachment.asset && attachment.url) {
+    return streamRemoteDocument({ url: attachment.url, name: attachment.filename, res, context: { mailId: mail._id } });
+  }
+  if (!attachment.asset) {
+    res.status(409);
+    throw new Error('Cette pièce jointe locale historique doit être migrée.');
+  }
+  const buffer = await readPrivateAsset(attachment.asset.toObject());
+  const safeName = String(attachment.filename || 'attachment').replace(/[\r\n"\\]/g, '_');
+  res.set({
+    'Content-Type': attachment.asset.mimeType || attachment.mimetype || 'application/octet-stream',
+    'Content-Disposition': `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="${safeName}"`,
+    'Cache-Control': 'private, no-store, max-age=0',
+    'X-Content-Type-Options': 'nosniff',
+  }).send(buffer);
 });

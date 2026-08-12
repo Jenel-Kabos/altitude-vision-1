@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const AutoIncrement = require('mongoose-sequence')(mongoose);
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 
 const itemSchema = new mongoose.Schema({
   description: { type: String, required: true },
@@ -55,6 +56,7 @@ const documentSchema = new mongoose.Schema(
     content: {
       type: String,
     },
+    privateAsset: { type: privateAssetSchema },
 
     issueDate: { type: Date, default: Date.now },
     dueDate: { type: Date }, // Relevant for invoices
@@ -88,6 +90,12 @@ documentSchema.plugin(AutoIncrement, { inc_field: 'docNumber' });
 documentSchema.index({ businessOperationKey: 1 }, { unique: true, partialFilterExpression: { businessOperationKey: { $type: 'string' } } });
 documentSchema.index({ pole: 1, service: 1, categorie: 1 });
 documentSchema.index({ entityType: 1, entityId: 1 });
+documentSchema.set('toJSON', { transform: (_doc, ret) => {
+  if (ret.privateAsset || (typeof ret.content === 'string' && /^https?:\/\//i.test(ret.content))) {
+    delete ret.content; delete ret.privateAsset;
+  }
+  return ret;
+} });
 
 const Document = mongoose.model('Document', documentSchema);
 

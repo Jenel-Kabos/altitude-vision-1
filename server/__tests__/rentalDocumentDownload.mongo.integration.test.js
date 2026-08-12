@@ -3,6 +3,10 @@
 // de streaming (http.get réel, pas mocké) sans dépendre du réseau externe.
 
 const http = require('http');
+jest.mock('../services/storage/secureStorageService', () => ({
+  ...jest.requireActual('../services/storage/secureStorageService'),
+  readPrivateAsset: jest.fn().mockResolvedValue(Buffer.from('%PDF-1.4 authenticated private content')),
+}));
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
@@ -13,6 +17,8 @@ const Locataire = require('../models/Locataire');
 const Contrat = require('../models/Contrat');
 const rentalDocumentRoutes = require('../routes/rentalDocumentRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const platformTenantService = require('../services/platformTenant/platformTenantService');
+const organizationService = require('../services/organizationService');
 
 jest.setTimeout(120000);
 
@@ -75,6 +81,57 @@ test('admin autorisé : reçoit le flux du document', async () => {
   // supertest bufferise application/pdf dans res.body (Buffer), pas res.text.
   expect(Buffer.isBuffer(res.body) ? res.body.toString('utf8') : res.text).toContain('fake bail content');
   expect(res.headers['content-disposition']).toContain('Bail');
+});
+
+test('contrôle tenant staff : Admin B lit son document B, Admin A connaissant son URL/ID est refusé', async () => {
+  const bootstrap = await makeUser({ role: 'Admin' });
+  const tenantA = await platformTenantService.createTenant({ name: `Rental Doc A ${Date.now()}`, actor: bootstrap });
+  const tenantB = await platformTenantService.createTenant({ name: `Rental Doc B ${Date.now()}`, actor: bootstrap });
+  const adminA = await makeUser({ role: 'Admin' });
+  const adminB = await makeUser({ role: 'Admin' });
+  const ownerB = await makeUser({ role: 'Proprietaire' });
+  await Promise.all([
+    organizationService.grantMembership({ userId: adminA._id, orgUnitId: tenantA.rootOrgUnit, actor: bootstrap }),
+    organizationService.grantMembership({ userId: adminB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrap }),
+    organizationService.grantMembership({ userId: ownerB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrap }),
+  ]);
+  const propertyB = await Property.create({ title: 'Bien document B', description: 'Description suffisamment longue pour le document B.', pole: 'Altimmo', type: 'Maison', status: 'location', price: 300000, address: { city: 'Brazzaville', arrondissement: 'Centre' }, latitude: -4.2, longitude: 15.2, images: ['https://placehold.co/1200x800/png'], surface: 80, statusAdmin: 'Validée', owner: ownerB._id });
+  const contratB = await Contrat.create({ type: 'location', statut: 'actif', bien: propertyB._id, documents: [{ nom: 'Bail B privé', type: 'bail', url: fakeCdnUrl }] });
+  const id = contratB.documents[0]._id;
+  const positive = await request(app).get(`/api/rental-documents/${id}/download`).set('Authorization', `Bearer ${signToken(adminB._id)}`);
+  expect(positive.status).toBe(200);
+  const attack = await request(app).get(`/api/rental-documents/${id}/download`).set('Authorization', `Bearer ${signToken(adminA._id)}`);
+  expect(attack.status).toBe(403);
+});
+
+test('nouvel asset authenticated : B peut le streamer, A connaissant documentId et publicId est refusé avant lecture', async () => {
+  const { readPrivateAsset } = require('../services/storage/secureStorageService');
+  readPrivateAsset.mockClear();
+  const bootstrap = await makeUser({ role: 'Admin' });
+  const tenantA = await platformTenantService.createTenant({ name: `Private Doc A ${Date.now()}`, actor: bootstrap });
+  const tenantB = await platformTenantService.createTenant({ name: `Private Doc B ${Date.now()}`, actor: bootstrap });
+  const adminA = await makeUser({ role: 'Admin' }); const adminB = await makeUser({ role: 'Admin' }); const ownerB = await makeUser({ role: 'Proprietaire' });
+  await Promise.all([
+    organizationService.grantMembership({ userId: adminA._id, orgUnitId: tenantA.rootOrgUnit, actor: bootstrap }),
+    organizationService.grantMembership({ userId: adminB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrap }),
+    organizationService.grantMembership({ userId: ownerB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrap }),
+  ]);
+  const propertyB = await Property.create({ title: 'Bien coffre B', description: 'Description suffisamment longue pour le coffre B.', pole: 'Altimmo', type: 'Maison', status: 'location', price: 300000, address: { city: 'Brazzaville', arrondissement: 'Centre' }, latitude: -4.2, longitude: 15.2, images: ['https://placehold.co/1200x800/png'], surface: 80, statusAdmin: 'Validée', owner: ownerB._id });
+  const contratB = await Contrat.create({ type: 'location', statut: 'actif', bien: propertyB._id, documents: [{ nom: 'Bail authenticated', type: 'bail', asset: { assetClass: 'PRIVATE_DOCUMENT', purpose: 'lease', provider: 'cloudinary', publicId: 'tenant-b/known-public-id', resourceType: 'raw', deliveryType: 'authenticated', version: '1', format: 'pdf', mimeType: 'application/pdf', originalFilename: 'bail.pdf', size: 42 } }] });
+  expect(contratB.documents[0].url).toBeUndefined();
+  const positive = await request(app).get(`/api/rental-documents/${contratB.documents[0]._id}/download`).set('Authorization', `Bearer ${signToken(adminB._id)}`);
+  expect(positive.status).toBe(200);
+  expect(readPrivateAsset).toHaveBeenCalledTimes(1);
+  const attack = await request(app).get(`/api/rental-documents/${contratB.documents[0]._id}/download`).set('Authorization', `Bearer ${signToken(adminA._id)}`);
+  expect(attack.status).toBe(403);
+  expect(readPrivateAsset).toHaveBeenCalledTimes(1);
+});
+
+test('limitation de stockage démontrée : une URL CDN publique exacte contourne nécessairement le RBAC backend', async () => {
+  const body = await new Promise((resolve, reject) => http.get(fakeCdnUrl, (res) => {
+    let value = ''; res.setEncoding('utf8'); res.on('data', (chunk) => { value += chunk; }); res.on('end', () => resolve(value));
+  }).on('error', reject));
+  expect(body).toContain('fake bail content');
 });
 
 test('propriétaire du bail autorisé', async () => {

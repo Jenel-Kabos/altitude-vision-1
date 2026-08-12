@@ -19,6 +19,7 @@ import {
   deactivateRentalManagement,
   getRentalOnboardingOptions, onboardRentalProperty,
   getLocataireDossiers, getPaiementsStats,
+  previewRentalDocument, downloadRentalDocument,
 } from "../../services/gestionLocativeService";
 import {
   getContratDocuments, generateBail, generateQuittance, generateMiseEnDemeure,
@@ -1330,7 +1331,8 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
       else if (action === 'preavis_pro') doc = await generatePreavis(contrat._id, 'proprietaire');
       if (doc) {
         setDocs(prev => [...prev, doc]);
-        if (win) win.location.href = doc.url; else window.open(doc.url, '_blank');
+        if (win) win.close();
+        await previewRentalDocument(doc._id);
       } else if (win) win.close();
     } catch (e) { if (win) win.close(); alert('Erreur : ' + e.message); }
     finally { setGenerating(''); }
@@ -1342,7 +1344,8 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
     try {
       const doc = await generateMiseEnDemeure(paiementId);
       setDocs(prev => [...prev, doc]);
-      if (win) win.location.href = doc.url; else window.open(doc.url, '_blank');
+      if (win) win.close();
+      await previewRentalDocument(doc._id);
       setMedModal(null);
     } catch (e) { if (win) win.close(); alert('Erreur : ' + e.message); }
     finally { setGenerating(''); }
@@ -1359,7 +1362,8 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
       setDocs(prev => [...prev, doc]);
       setEdls(prev => [...prev, { type: edlModal, pieces }]);
       setEdlModal(null);
-      if (win) win.location.href = doc.url; else window.open(doc.url, '_blank');
+      if (win) win.close();
+      await previewRentalDocument(doc._id);
     } catch (e) { if (win) win.close(); alert('Erreur : ' + e.message); }
     finally { setGenerating(''); }
   };
@@ -1466,7 +1470,7 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
                         </p>
                       </div>
                       <div className="flex gap-1">
-                        <Btn small outline color={BLUE} onClick={() => window.open(doc.url, '_blank')}>
+                        <Btn small outline color={BLUE} onClick={() => previewRentalDocument(doc._id)}>
                           <Eye size={12}/> Voir
                         </Btn>
                         {canDoc && (
@@ -1474,11 +1478,9 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
                             <Send size={12}/> Envoyer
                           </Btn>
                         )}
-                        <a href={doc.url} download target="_blank" rel="noreferrer">
-                          <Btn small outline color={GRAY}>
+                          <Btn small outline color={GRAY} onClick={() => downloadRentalDocument(doc._id, doc.nom)}>
                             <Download size={12}/>
                           </Btn>
-                        </a>
                       </div>
                     </div>
                   ))}
@@ -1502,7 +1504,8 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
                         try {
                           const doc = await generateQuittance(p._id);
                           setDocs(prev => [...prev, doc]);
-                          if (win) win.location.href = doc.url; else window.open(doc.url, '_blank');
+                          if (win) win.close();
+                          await previewRentalDocument(doc._id);
                         } catch (e) { if (win) win.close(); alert(e.message); }
                         finally { setGenerating(''); }
                       }}>
@@ -1529,8 +1532,8 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
                     {existing ? (
                       <div className="space-y-2">
                         <p className="text-xs text-gray-400">{existing.pieces?.length || 0} pièce(s) enregistrée(s)</p>
-                        {existing.documentUrl && (
-                          <Btn small outline color={BLUE} onClick={() => window.open(existing.documentUrl, '_blank')}>
+                        {docs.find((doc) => doc.type === `etat_${type}`) && (
+                          <Btn small outline color={BLUE} onClick={() => previewRentalDocument(docs.find((doc) => doc.type === `etat_${type}`)._id)}>
                             <Eye size={12}/> Voir le PDF
                           </Btn>
                         )}
@@ -1561,7 +1564,8 @@ const ContratDetailModal = ({ contrat, paiements = [], onClose }) => {
                   const sortie = edls.find(e => e.type === 'sortie');
                   const doc    = await generateEtatDesLieux(contrat._id, 'sortie', sortie?.pieces || []);
                   setDocs(prev => [...prev, doc]);
-                  if (win) win.location.href = doc.url; else window.open(doc.url, '_blank');
+                  if (win) win.close();
+                  await previewRentalDocument(doc._id);
                 } catch (e) { if (win) win.close(); alert(e.message); }
                 finally { setGenerating(''); }
               }} loading={generating === 'edl_compare'}>
@@ -2527,8 +2531,8 @@ const GestionLocativePage = () => {
                                           try {
                                             const doc = await generateQuittance(p._id);
                                             toast('Quittance générée');
-                                            if (doc?.url) { if (win) win.location.href = doc.url; else window.open(doc.url, '_blank'); }
-                                            else if (win) win.close();
+                                            if (win) win.close();
+                                            if (doc?._id) await previewRentalDocument(doc._id);
                                           } catch { if (win) win.close(); toast('Erreur génération quittance', 'error'); }
                                         }}><Receipt size={12}/> Quittance</Btn>
                                       )}

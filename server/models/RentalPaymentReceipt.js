@@ -21,6 +21,7 @@
 // créerait la confusion que la mission demande explicitement d'éviter.
 
 const mongoose = require('mongoose');
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 
 const STATUSES = ['confirmed', 'cancelled'];
 
@@ -35,6 +36,7 @@ const rentalPaymentReceiptSchema = new mongoose.Schema({
   preuvePaiement: {
     url:      { type: String },
     publicId: { type: String },
+    asset:    { type: privateAssetSchema },
   },
 
   auteur: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

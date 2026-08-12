@@ -15,7 +15,7 @@ jest.mock('../services/finance/financialTransactionService', () => ({
 jest.mock('../services/rentalListingSyncService');
 jest.mock('../services/pdfService');
 jest.mock('../services/zohoMailService', () => ({ sendEmail: jest.fn().mockResolvedValue() }));
-jest.mock('../config/cloudinary', () => ({ uploadToCloudinary: jest.fn().mockResolvedValue({ secure_url: 'https://cdn.test/document.pdf' }) }));
+jest.mock('../config/cloudinary', () => ({ uploadToCloudinary: jest.fn().mockResolvedValue({ secure_url: 'https://cdn.test/document.pdf', public_id: 'private/lease', resource_type: 'raw', version: 1, format: 'pdf', bytes: 16 }) }));
 jest.mock('../services/actionLogService', () => ({ logAction: jest.fn(), buildAuteur: jest.fn() }));
 jest.mock('../services/notificationService', () => ({ notify: jest.fn(), notifyStaff: jest.fn() }));
 jest.mock('../services/rentalTenantNotificationService', () => ({ notifyContractTenant: jest.fn().mockResolvedValue({}) }));

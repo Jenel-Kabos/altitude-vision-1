@@ -17,10 +17,17 @@ jest.mock('../services/platformTenant/tenantContextService', () => ({
   resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),
   resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' }),
   resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set(['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012']) }),
+  // TENANT-CERT-3-PRE — accommodationController.assertAccommodationAccessible
+  // appelle désormais resolveTenantForUser (tenant boundary sur Accommodation,
+  // vulnérabilité corrigée ce sprint) ; ce test unitaire mocke les modèles,
+  // donc la sécurité réelle est prouvée par tenantCert3Pre.adversarial.mongo.
+  // integration.test.js — ici on ne fait que ne pas casser le mock existant.
+  resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001' }),
 }));
 jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
   assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
   resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+  assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
 }));
 jest.mock('../utils/generateSitemap', () => jest.fn().mockResolvedValue('<xml/>'));
 jest.mock('../services/notificationService', () => ({

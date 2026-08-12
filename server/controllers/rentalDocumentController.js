@@ -18,6 +18,9 @@ const https = require('https');
 const Contrat = require('../models/Contrat');
 const logger = require('../utils/logger');
 const { ROLES_DOCS } = require('../utils/roles');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { readPrivateAsset } = require('../services/storage/secureStorageService');
 
 const isStaffDoc = (role) => ROLES_DOCS.includes(role);
 
@@ -52,6 +55,7 @@ exports.download = async (req, res) => {
   if (!mongoose.isValidObjectId(documentId)) return fail(res, 400, 'Identifiant de document invalide.');
 
   const contrat = await Contrat.findOne({ 'documents._id': documentId })
+    .select('+documents.asset.publicId +documents.asset.resourceType +documents.asset.deliveryType +documents.asset.version +documents.asset.format')
     .populate('bien', 'owner title')
     .populate('locataire', 'user');
   if (!contrat) return fail(res, 404, 'Document introuvable.');
@@ -67,14 +71,24 @@ exports.download = async (req, res) => {
   // précis est le seul contrôle nécessaire, indépendant du rôle affiché.
   const isOwnerMatch = user.role === 'Proprietaire' && contrat.bien?.owner && String(contrat.bien.owner) === userId;
   const isTenantMatch = Boolean(contrat.locataire?.user) && String(contrat.locataire.user) === userId;
-  const allowed = isStaffDoc(user.role) || isOwnerMatch || isTenantMatch;
+  let staffTenantMatch = false;
+  if (isStaffDoc(user.role)) {
+    try {
+      const tenant = await resolveTenantForUser(user._id || user.id);
+      await assertResourceTenantOrUnattributed({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
+      staffTenantMatch = true;
+    } catch {
+      staffTenantMatch = false;
+    }
+  }
+  const allowed = staffTenantMatch || isOwnerMatch || isTenantMatch;
 
   if (!allowed) {
     logger.warn('rental_document.access_denied', { documentId, contratId: String(contrat._id), userId, role: user.role });
     return fail(res, 403, 'Accès refusé à ce document.');
   }
 
-  if (!doc.url) return fail(res, 404, 'Ce document n’a pas de fichier associé.');
+  if (!doc.url && !doc.asset) return fail(res, 404, 'Ce document n’a pas de fichier associé.');
 
   // Journal d'accès — jamais l'URL/publicId, seulement les identifiants et
   // le contexte métier (voir utils/logger.js pour la rédaction automatique
@@ -83,6 +97,19 @@ exports.download = async (req, res) => {
     documentId, contratId: String(contrat._id), docType: doc.type, userId, role: user.role,
   });
 
+  if (doc.asset) {
+    try {
+      const buffer = await readPrivateAsset(doc.asset.toObject());
+      res.setHeader('Content-Type', doc.asset.mimeType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="${safeFilename(doc.asset.originalFilename || `${doc.nom}.pdf`)}"`);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.send(buffer);
+    } catch (error) {
+      logger.error('rental_document.private_stream_failed', { documentId, contratId: String(contrat._id), error: error.message });
+      return fail(res, 502, 'Impossible de récupérer le document.');
+    }
+  }
   return streamRemoteDocument({ url: doc.url, name: `${doc.nom}.pdf`, res, context: { documentId } });
 };
 

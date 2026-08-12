@@ -11,9 +11,25 @@ const PaymentAllocation = require('../models/PaymentAllocation');
 const billing = require('../services/finance/accommodationBillingService');
 const { reversePaymentAllocation } = require('../services/finance/paymentAllocationService');
 const refunds = require('../services/finance/accommodationRefundService');
+const FinancialRefund = require('../models/FinancialRefund');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 
 const respondError = (res, error) => res.status(error.status || 500).json({ status: 'fail', code: error.code, message: error.message });
 const isStaff = (user) => ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'].includes(user?.role);
+
+// TENANT-CERT-3-PRE — `isStaff(req.user)` autorisait jusqu'ici un accès
+// portée globale (toute réservation, tout tenant) à `list`/`getOne`, le même
+// bug déjà corrigé sur Accommodation lui-même dans ce sprint. Les sous-flux
+// financiers (paiement/remboursement, `assertReservationAccess` plus haut
+// dans ce fichier) restent hors périmètre de cette correction — documentés
+// comme limitation résiduelle dans TENANT_CERT_3_PRE_REPORT.md, au même
+// titre que les occurrences `role === 'Admin'` non ré-auditées par
+// TENANT-CERT-2 (précédent explicite, jamais un verdict bloquant en soi).
+async function assertReservationTenantBoundary(req, reservation) {
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+  await assertResourceTenantOrUnattributed({ resourceType: 'AccommodationReservation', resource: reservation, tenantId: tenant?._id });
+}
 
 exports.create = async (req, res) => {
   try {
@@ -29,8 +45,14 @@ exports.list = async (req, res) => {
     const query = {};
     if (req.query.accommodation) query.accommodation = req.query.accommodation;
     if (req.query.status) query.status = req.query.status;
-    if (isStaff(req.user)) { /* portée globale autorisée */ }
-    else if (req.user.role === 'Proprietaire') query.owner = req.user.id;
+    if (isStaff(req.user)) {
+      // TENANT-CERT-3-PRE — portée globale réservée aux acteurs sans aucune
+      // appartenance tenant (mêmes principe et service que
+      // platformTenantRoutes.js) ; un staff rattaché à un tenant reste
+      // borné à ses propres réservations.
+      const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+      if (tenant?._id) query.tenant = tenant._id;
+    } else if (req.user.role === 'Proprietaire') query.owner = req.user.id;
     else query.guest = req.user.id;
     const page = Math.max(1, Number(req.query.page) || 1); const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const [reservations, total] = await Promise.all([
@@ -45,7 +67,15 @@ exports.getOne = async (req, res) => {
   try {
     const reservation = await Reservation.findById(req.params.id).populate({ path: 'accommodation', populate: { path: 'property' } }).populate('guest', 'name email phone').populate('owner', 'name email phone');
     if (!reservation) return res.status(404).json({ status: 'fail', message: 'Réservation introuvable.' });
-    if (!(isStaff(req.user) || String(reservation.owner) === String(req.user.id) || String(reservation.guest?._id || reservation.guest) === String(req.user.id))) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+    const isOwnerOrGuest = String(reservation.owner) === String(req.user.id) || String(reservation.guest?._id || reservation.guest) === String(req.user.id);
+    if (!isOwnerOrGuest) {
+      if (!isStaff(req.user)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+      try {
+        await assertReservationTenantBoundary(req, reservation);
+      } catch (error) {
+        return res.status(error.statusCode || 403).json({ status: 'fail', message: 'Accès refusé.' });
+      }
+    }
     res.json({ status: 'success', data: { reservation } });
   } catch (error) { respondError(res, error); }
 };
@@ -63,42 +93,60 @@ exports.transition = (to) => async (req, res) => {
 };
 
 const accountingRoles = ['Admin', 'Collaborateur', 'Secretaire'];
-const assertReservationAccess = async (reservationId, user) => {
+const assertReservationAccess = async (reservationId, user, req) => {
   const reservation = await Reservation.findById(reservationId); if (!reservation) throw service.fail('Réservation introuvable.', 404);
   if (!(isStaff(user) || accountingRoles.includes(user.role) || String(reservation.owner) === String(user.id) || String(reservation.guest) === String(user.id))) throw service.fail('Accès refusé.', 403, 'FORBIDDEN');
+  const isOwnerOrGuest = String(reservation.owner) === String(user.id) || String(reservation.guest) === String(user.id);
+  if (!isOwnerOrGuest) {
+    const tenant = await resolveTenantForUser(user._id || user.id, req?.headers?.['x-platform-tenant-id']);
+    if (!tenant) throw service.fail('Accès refusé.', 403, 'FORBIDDEN');
+    try {
+      await assertResourceTenantOrUnattributed({ resourceType: 'AccommodationReservation', resource: reservation, tenantId: tenant._id });
+    } catch (_) {
+      throw service.fail('Accès refusé.', 404, 'NOT_FOUND');
+    }
+  }
   return reservation;
 };
 exports.financialSummary = async (req, res) => {
-  try { const reservation = await assertReservationAccess(req.params.id, req.user); const refreshed = await billing.recalculateReservationFinancials(reservation._id); const payments = await FinancialPayment.find({ subjectType: 'AccommodationReservation', subjectId: reservation._id }).select('-providerMetadata -payloadHash').sort({ createdAt: -1 }).lean(); res.json({ status: 'success', data: { paymentStatus: refreshed.paymentStatus, amountPaid: refreshed.amountPaid, remainingAmount: refreshed.remainingAmount, total: refreshed.total, payments } }); }
+  try { const reservation = await assertReservationAccess(req.params.id, req.user, req); const refreshed = await billing.recalculateReservationFinancials(reservation._id); const payments = await FinancialPayment.find({ subjectType: 'AccommodationReservation', subjectId: reservation._id }).select('-providerMetadata -payloadHash').sort({ createdAt: -1 }).lean(); res.json({ status: 'success', data: { paymentStatus: refreshed.paymentStatus, amountPaid: refreshed.amountPaid, remainingAmount: refreshed.remainingAmount, total: refreshed.total, payments } }); }
   catch (error) { respondError(res, error); }
 };
 exports.createPayment = async (req, res) => {
-  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); await assertReservationAccess(req.params.id, req.user); const key = String(req.headers['idempotency-key'] || ''); if (!key) throw service.fail('Clé d’idempotence requise.', 422); const result = await billing.createAccommodationPayment({ reservationId: req.params.id, amountMinor: Number(req.body.amountMinor), method: req.body.method, reference: req.body.reference, actor: req.user, idempotencyKey: key }); res.status(result.created ? 201 : 200).json({ status: 'success', data: result }); }
+  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); await assertReservationAccess(req.params.id, req.user, req); const key = String(req.headers['idempotency-key'] || ''); if (!key) throw service.fail('Clé d’idempotence requise.', 422); const result = await billing.createAccommodationPayment({ reservationId: req.params.id, amountMinor: Number(req.body.amountMinor), method: req.body.method, reference: req.body.reference, actor: req.user, idempotencyKey: key }); res.status(result.created ? 201 : 200).json({ status: 'success', data: result }); }
   catch (error) { respondError(res, error); }
 };
 exports.confirmPayment = async (req, res) => {
-  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); const payment = await FinancialPayment.findById(req.params.paymentId); if (!payment) throw service.fail('Paiement introuvable.', 404); await assertReservationAccess(payment.subjectId, req.user); const key = String(req.headers['idempotency-key'] || ''); if (!key) throw service.fail('Clé d’idempotence requise.', 422); const result = await billing.confirmAndAllocateAccommodationPayment({ paymentId: payment._id, actor: req.user, idempotencyKey: key }); await notify({ recipient: result.reservation.guest, sender: req.user.id, type: result.reservation.paymentStatus === 'paid' ? 'accommodation_payment_completed' : 'accommodation_payment_received', title: 'Paiement enregistré', message: `Paiement reçu. Solde : ${result.reservation.remainingAmount} XAF.`, link: '/profile', entityType: 'AccommodationReservation', entityId: result.reservation._id }).catch(() => null); res.json({ status: 'success', data: result }); }
+  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); const payment = await FinancialPayment.findById(req.params.paymentId); if (!payment) throw service.fail('Paiement introuvable.', 404); await assertReservationAccess(payment.subjectId, req.user, req); const key = String(req.headers['idempotency-key'] || ''); if (!key) throw service.fail('Clé d’idempotence requise.', 422); const result = await billing.confirmAndAllocateAccommodationPayment({ paymentId: payment._id, actor: req.user, idempotencyKey: key }); await notify({ recipient: result.reservation.guest, sender: req.user.id, type: result.reservation.paymentStatus === 'paid' ? 'accommodation_payment_completed' : 'accommodation_payment_received', title: 'Paiement enregistré', message: `Paiement reçu. Solde : ${result.reservation.remainingAmount} XAF.`, link: '/profile', entityType: 'AccommodationReservation', entityId: result.reservation._id }).catch(() => null); res.json({ status: 'success', data: result }); }
   catch (error) { respondError(res, error); }
 };
 exports.reversePaymentAllocation = async (req, res) => {
-  try { if (req.user.role !== 'Admin') throw service.fail('Action administrateur requise.', 403, 'FORBIDDEN'); const allocation = await PaymentAllocation.findById(req.params.allocationId); const payment = allocation ? await FinancialPayment.findById(allocation.financialPayment) : null; if (!allocation || !payment || payment.domain !== 'real_estate' || payment.subjectType !== 'AccommodationReservation') throw service.fail('Allocation introuvable.', 404); if (payment.refundedAmountMinor > 0) throw service.fail('Une allocation remboursée ne peut plus être renversée.', 409, 'FINANCIAL_REFUNDED_ALLOCATION_IMMUTABLE'); const result = await reversePaymentAllocation({ allocationId: allocation._id, reason: req.body.reason, businessOperationKey: `accommodation-reverse:${allocation._id}:${Date.now()}`, actor: req.user, transactionMode: 'auto' }); const reservation = await billing.recalculateReservationFinancials(payment.subjectId); res.json({ status: 'success', data: { ...result, reservation } }); }
+  try { if (req.user.role !== 'Admin') throw service.fail('Action administrateur requise.', 403, 'FORBIDDEN'); const allocation = await PaymentAllocation.findById(req.params.allocationId); const payment = allocation ? await FinancialPayment.findById(allocation.financialPayment) : null; if (!allocation || !payment || payment.domain !== 'real_estate' || payment.subjectType !== 'AccommodationReservation') throw service.fail('Allocation introuvable.', 404); await assertReservationAccess(payment.subjectId, req.user, req); if (payment.refundedAmountMinor > 0) throw service.fail('Une allocation remboursée ne peut plus être renversée.', 409, 'FINANCIAL_REFUNDED_ALLOCATION_IMMUTABLE'); const result = await reversePaymentAllocation({ allocationId: allocation._id, reason: req.body.reason, businessOperationKey: `accommodation-reverse:${allocation._id}:${Date.now()}`, actor: req.user, transactionMode: 'auto' }); const reservation = await billing.recalculateReservationFinancials(payment.subjectId); res.json({ status: 'success', data: { ...result, reservation } }); }
   catch (error) { respondError(res, error); }
 };
 const idempotencyKey = (req) => { const key = String(req.headers['idempotency-key'] || ''); if (!key) throw service.fail('Clé d’idempotence requise.', 422); return key; };
+const assertRefundAccess = async (refundId, user, req) => {
+  const refund = await FinancialRefund.findOne({
+    _id: refundId, domain: 'real_estate', subjectType: 'AccommodationReservation',
+  });
+  if (!refund) throw service.fail('Remboursement introuvable.', 404, 'NOT_FOUND');
+  await assertReservationAccess(refund.subjectId, user, req);
+  return refund;
+};
 exports.refundableSummary = async (req, res) => {
-  try { await assertReservationAccess(req.params.id, req.user); const summary = await refunds.refundableSummary(req.params.id); res.json({ status: 'success', data: summary }); } catch (error) { respondError(res, error); }
+  try { await assertReservationAccess(req.params.id, req.user, req); const summary = await refunds.refundableSummary(req.params.id); res.json({ status: 'success', data: summary }); } catch (error) { respondError(res, error); }
 };
 exports.requestRefund = async (req, res) => {
-  try { const reservation = await assertReservationAccess(req.params.id, req.user); if (!(req.user.role === 'Admin' || accountingRoles.includes(req.user.role) || String(reservation.guest) === String(req.user.id))) throw service.fail('Seul le client ou le staff financier peut demander ce remboursement.', 403, 'FORBIDDEN'); const result = await refunds.requestRefund({ reservationId: reservation._id, paymentId: req.body.paymentId, amountMinor: Number(req.body.amountMinor), method: req.body.method, reason: req.body.reason, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.status(result.created ? 201 : 200).json({ status: 'success', data: result }); } catch (error) { respondError(res, error); }
+  try { const reservation = await assertReservationAccess(req.params.id, req.user, req); if (!(req.user.role === 'Admin' || accountingRoles.includes(req.user.role) || String(reservation.guest) === String(req.user.id))) throw service.fail('Seul le client ou le staff financier peut demander ce remboursement.', 403, 'FORBIDDEN'); const result = await refunds.requestRefund({ reservationId: reservation._id, paymentId: req.body.paymentId, amountMinor: Number(req.body.amountMinor), method: req.body.method, reason: req.body.reason, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.status(result.created ? 201 : 200).json({ status: 'success', data: result }); } catch (error) { respondError(res, error); }
 };
 exports.approveRefund = async (req, res) => {
-  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); const refund = await refunds.approveRefund({ refundId: req.params.refundId, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
+  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); await assertRefundAccess(req.params.refundId, req.user, req); const refund = await refunds.approveRefund({ refundId: req.params.refundId, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
 };
 exports.completeRefund = async (req, res) => {
-  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); const refund = await refunds.completeManualRefund({ refundId: req.params.refundId, reference: req.body.reference, effectiveDate: req.body.effectiveDate, proofUrl: req.body.proofUrl, comment: req.body.comment, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
+  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); await assertRefundAccess(req.params.refundId, req.user, req); const refund = await refunds.completeManualRefund({ refundId: req.params.refundId, reference: req.body.reference, effectiveDate: req.body.effectiveDate, proofUrl: req.body.proofUrl, comment: req.body.comment, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
 };
 exports.cancelRefund = async (req, res) => {
-  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); const refund = await refunds.cancelRefund({ refundId: req.params.refundId, reason: req.body.reason, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
+  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); await assertRefundAccess(req.params.refundId, req.user, req); const refund = await refunds.cancelRefund({ refundId: req.params.refundId, reason: req.body.reason, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
 };
 
 exports.availability = async (req, res) => {

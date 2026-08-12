@@ -12,6 +12,12 @@ jest.mock('../models/RentalManagement');
 jest.mock('../models/Contrat');
 jest.mock('../models/Paiement');
 jest.mock('../models/User');
+jest.mock('../services/platformTenant/tenantContextService', () => ({
+  resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439002' }),
+  resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439002' }, source: 'single_membership' }),
+  resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439002' }]),
+  resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set(['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011']) }),
+}));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
@@ -81,6 +87,7 @@ describe('RentalManagement — annonce simple vs dossier activé (Sprint A, audi
   test("l'activation explicite (POST /api/rental-management) marque managementActivated=true sur le dossier existant, sans le dupliquer", async () => {
     mockUserAuth(ADMIN_ID, 'GestionnaireImmobilier');
     Property.findById = jest.fn().mockResolvedValue({ _id: PROPERTY_ID, status: 'location', owner: OWNER_ID, price: 150000 });
+    Property.find = jest.fn().mockReturnValue({ distinct: jest.fn().mockResolvedValue([PROPERTY_ID]) });
     const rental = {
       _id: 'rental1', occupancyStatus: 'vacant', workflowHistory: [], save: jest.fn().mockResolvedValue(),
       toObject() { return { ...this, toObject: undefined, save: undefined }; },
@@ -117,7 +124,7 @@ describe('RentalManagement — annonce simple vs dossier activé (Sprint A, audi
       .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
 
     expect(res.statusCode).toBe(200);
-    expect(RentalManagement.find).toHaveBeenCalledWith(expect.objectContaining({ managementActivated: true }));
+    expect(RentalManagement.find).toHaveBeenCalledWith(expect.objectContaining({ managementActivated: true, owner: { $in: expect.any(Array) } }));
   });
 
   test('GET /api/rental-management/stats agrège uniquement les dossiers activés', async () => {
@@ -128,6 +135,8 @@ describe('RentalManagement — annonce simple vs dossier activé (Sprint A, audi
     Contrat.countDocuments = jest.fn().mockResolvedValue(0);
     Paiement.countDocuments = jest.fn().mockResolvedValue(0);
     Property.aggregate = jest.fn().mockResolvedValue([]);
+    Property.find = jest.fn().mockReturnValue({ distinct: jest.fn().mockResolvedValue([PROPERTY_ID]) });
+    Contrat.find = jest.fn().mockReturnValue({ distinct: jest.fn().mockResolvedValue([]) });
 
     const res = await request(app)
       .get('/api/rental-management/stats')
@@ -135,6 +144,6 @@ describe('RentalManagement — annonce simple vs dossier activé (Sprint A, audi
 
     expect(res.statusCode).toBe(200);
     const pipeline = RentalManagement.aggregate.mock.calls[0][0];
-    expect(pipeline[0]).toEqual({ $match: { managementActivated: true } });
+    expect(pipeline[0]).toEqual({ $match: { managementActivated: true, property: { $in: [PROPERTY_ID] } } });
   });
 });

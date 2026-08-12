@@ -5,22 +5,24 @@ const Paiement = require('../models/Paiement');
 const RentalManagement = require('../models/RentalManagement');
 const Document  = require('../models/Document');
 const TenantLinkRequest = require('../models/TenantLinkRequest');
-const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
+const { uploadPrivateAsset, deletePrivateAsset, readPrivateAsset, safePrivateDescriptor } = require('../services/storage/secureStorageService');
 const logger = require('../utils/logger');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const tenantLinkService = require('../services/tenantLinkService');
 const tenantPortalEmailService = require('../services/tenantPortalEmailService');
 const User = require('../models/User');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { streamRemoteDocument } = require('./rentalDocumentController');
 
 const uploadPiece = async (file) => {
   if (!file) return undefined;
-  const result = await uploadToCloudinary(file.buffer, {
-    folder: 'altitude-vision/locataires/pieces-identite',
-    resource_type: 'auto',
+  const asset = await uploadPrivateAsset(file.buffer, {
+    purpose: 'identity', ownerType: 'Locataire', ownerId: new mongoose.Types.ObjectId(),
+    filename: file.originalname, mimeType: file.mimetype,
   });
   const ext = (file.originalname || '').split('.').pop().toLowerCase();
   return {
-    url:  result.secure_url,
+    asset,
     type: ext === 'pdf' ? 'pdf' : 'image',
     nom:  file.originalname || '',
   };
@@ -30,7 +32,7 @@ const uploadPiece = async (file) => {
 // workflow métier (fiche locataire), jamais une saisie manuelle dans le
 // Centre documentaire — pole/service/categorie sont donc déduits ici,
 // jamais demandés à l'utilisateur.
-const saveIdentiteDocument = async ({ url, nom, personneId, personneNom, createdBy }) => {
+const saveIdentiteDocument = async ({ asset, nom, personneId, personneNom, createdBy, tenant }) => {
   try {
     await Document.create({
       type:      "Pièce d'identité",
@@ -39,7 +41,8 @@ const saveIdentiteDocument = async ({ url, nom, personneId, personneNom, created
       refId:     personneId,
       refNom:    personneNom,
       createdBy: createdBy || undefined,
-      content:   url,
+      tenant: tenant || null,
+      privateAsset: asset,
       notes:     `Pièce d'identité — ${personneNom} — ${nom || ''}`,
       issueDate: new Date(),
       pole: 'Altimmo',
@@ -54,10 +57,44 @@ const saveIdentiteDocument = async ({ url, nom, personneId, personneNom, created
   }
 };
 
+const serializeLocataire = (value) => {
+  const data = value?.toObject ? value.toObject() : { ...value };
+  const hasPrivate = Boolean(data.pieceIdentiteAsset);
+  const hasDocument = Boolean(hasPrivate || data.pieceIdentite);
+  delete data.pieceIdentite;
+  delete data.pieceIdentiteAsset;
+  return { ...data, identityDocument: hasDocument ? { ...safePrivateDescriptor(value.pieceIdentiteAsset || {}, {
+    previewEndpoint: `/api/locataires/${value._id}/identity-document`,
+    downloadEndpoint: `/api/locataires/${value._id}/identity-document?download=1`,
+  }), legacy: !hasPrivate } : null };
+};
+
+exports.downloadIdentityDocument = async (req, res) => {
+  try {
+    const locataire = await Locataire.findById(req.params.id)
+      .select('+pieceIdentiteAsset.publicId +pieceIdentiteAsset.resourceType +pieceIdentiteAsset.deliveryType +pieceIdentiteAsset.version +pieceIdentiteAsset.format');
+    if (!locataire) return res.status(404).json({ status: 'fail', message: 'Locataire introuvable' });
+    await assertResourceTenantOrUnattributed({ resourceType: 'Locataire', resource: locataire, tenantId: req.platformTenant?._id });
+    if (!locataire.pieceIdentiteAsset && locataire.pieceIdentite) {
+      return streamRemoteDocument({ url: locataire.pieceIdentite, name: 'identity-document', res, context: { locataireId: locataire._id } });
+    }
+    if (!locataire.pieceIdentiteAsset) return res.status(404).json({ status: 'fail', message: 'Pièce d’identité privée introuvable.' });
+    const buffer = await readPrivateAsset(locataire.pieceIdentiteAsset.toObject());
+    res.setHeader('Content-Type', locataire.pieceIdentiteAsset.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `${req.query.download === '1' ? 'attachment' : 'inline'}; filename="identity-document"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.send(buffer);
+  } catch (error) {
+    logger.warn('locataire.identity_document_access_denied', { locataireId: req.params.id, actorId: req.user?.id, error: error.message });
+    return res.status(error.statusCode || 403).json({ status: 'fail', message: 'Accès refusé.' });
+  }
+};
+
 exports.getAll = async (req, res) => {
   try {
     const locataires = await Locataire.find().sort({ createdAt: -1 });
-    res.json({ status: 'success', data: { locataires } });
+    res.json({ status: 'success', data: { locataires: locataires.map(serializeLocataire) } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
@@ -67,7 +104,7 @@ exports.getOne = async (req, res) => {
   try {
     const l = await Locataire.findById(req.params.id);
     if (!l) return res.status(404).json({ status: 'error', message: 'Locataire introuvable' });
-    res.json({ status: 'success', data: { locataire: l } });
+    res.json({ status: 'success', data: { locataire: serializeLocataire(l) } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
@@ -160,7 +197,7 @@ exports.listDossiers = async (req, res) => {
     ]);
 
     const getDossierFor = await loadDossierData(locataires.map((l) => l._id));
-    const dossiers = locataires.map((l) => ({ ...l.toObject(), ...getDossierFor(l._id) }));
+    const dossiers = locataires.map((l) => ({ ...serializeLocataire(l), ...getDossierFor(l._id) }));
 
     res.json({ status: 'success', data: { locataires: dossiers, total, page: pageNum, totalPages: Math.ceil(total / limitNum) } });
   } catch (err) {
@@ -176,7 +213,7 @@ exports.getDossier = async (req, res) => {
     const l = await Locataire.findById(req.params.id);
     if (!l) return res.status(404).json({ status: 'error', message: 'Locataire introuvable' });
     const getDossierFor = await loadDossierData([l._id]);
-    res.json({ status: 'success', data: { locataire: { ...l.toObject(), ...getDossierFor(l._id) } } });
+    res.json({ status: 'success', data: { locataire: { ...serializeLocataire(l), ...getDossierFor(l._id) } } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
@@ -188,17 +225,17 @@ exports.create = async (req, res) => {
     const data = { ...req.body };
     if (req.file) {
       piece = await uploadPiece(req.file);
-      data.pieceIdentite = piece.url;
+      data.pieceIdentiteAsset = piece.asset;
     }
     const l = await Locataire.create(data);
     if (piece) {
       await saveIdentiteDocument({
-        url: piece.url, nom: piece.nom,
+        asset: piece.asset, nom: piece.nom,
         personneId: l._id, personneNom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
-        createdBy: req.user?._id,
+        createdBy: req.user?._id, tenant: req.platformTenant?._id,
       });
     }
-    res.status(201).json({ status: 'success', data: { locataire: l } });
+    res.status(201).json({ status: 'success', data: { locataire: serializeLocataire(l) } });
     logAction({
       action: 'Locataire ajouté',
       description: `Locataire ${l.prenom || ''} ${l.nom || ''} enregistré`,
@@ -209,9 +246,9 @@ exports.create = async (req, res) => {
       req,
     });
   } catch (err) {
-    if (piece?.url) {
-      await destroyFromCloudinary(piece.url).catch((rollbackError) => {
-        logger.error('locataire.cloudinary_rollback_failed', { url: piece.url, error: rollbackError.message });
+    if (piece?.asset) {
+      await deletePrivateAsset(piece.asset).catch((rollbackError) => {
+        logger.error('locataire.cloudinary_rollback_failed', { resourceType: 'Locataire', error: rollbackError.message });
       });
     }
     res.status(400).json({ status: 'error', message: err.message });
@@ -224,25 +261,25 @@ exports.update = async (req, res) => {
     const data = { ...req.body };
     if (req.file) {
       piece = await uploadPiece(req.file);
-      data.pieceIdentite = piece.url;
+      data.pieceIdentiteAsset = piece.asset;
     }
     const l = await Locataire.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true });
     if (!l) {
-      if (piece?.url) {
-        await destroyFromCloudinary(piece.url).catch((rollbackError) => {
-          logger.error('locataire.cloudinary_rollback_failed', { url: piece.url, error: rollbackError.message });
+      if (piece?.asset) {
+        await deletePrivateAsset(piece.asset).catch((rollbackError) => {
+          logger.error('locataire.cloudinary_rollback_failed', { resourceType: 'Locataire', error: rollbackError.message });
         });
       }
       return res.status(404).json({ status: 'error', message: 'Locataire introuvable' });
     }
     if (piece) {
       await saveIdentiteDocument({
-        url: piece.url, nom: piece.nom,
+        asset: piece.asset, nom: piece.nom,
         personneId: l._id, personneNom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
-        createdBy: req.user?._id,
+        createdBy: req.user?._id, tenant: req.platformTenant?._id,
       });
     }
-    res.json({ status: 'success', data: { locataire: l } });
+    res.json({ status: 'success', data: { locataire: serializeLocataire(l) } });
     logAction({
       action: 'Locataire modifié',
       description: `Locataire ${l.prenom || ''} ${l.nom || ''} mis à jour`,
@@ -253,9 +290,9 @@ exports.update = async (req, res) => {
       req,
     });
   } catch (err) {
-    if (piece?.url) {
-      await destroyFromCloudinary(piece.url).catch((rollbackError) => {
-        logger.error('locataire.cloudinary_rollback_failed', { url: piece.url, error: rollbackError.message });
+    if (piece?.asset) {
+      await deletePrivateAsset(piece.asset).catch((rollbackError) => {
+        logger.error('locataire.cloudinary_rollback_failed', { resourceType: 'Locataire', error: rollbackError.message });
       });
     }
     res.status(400).json({ status: 'error', message: err.message });

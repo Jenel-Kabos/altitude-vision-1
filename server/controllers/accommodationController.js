@@ -18,6 +18,42 @@ const {
 } = require('./propertyController');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+
+// TENANT-CERT-3-PRE — vulnérabilité critique découverte et corrigée : chaque
+// route staff/Admin de ce contrôleur (getOne/update/submit/reviewDecision/
+// deactivate/reactivate/remove/duplicate/deactivateRate) autorisait
+// `req.user.role === 'Admin'` (ou tout rôle staff pour la lecture) à agir
+// sur N'IMPORTE QUEL Accommodation, sans aucune vérification tenant — le
+// même bug que celui corrigé sur Property par TENANT-CERT-2, jamais
+// appliqué ici. `accommodationRoutes.js` n'a par ailleurs jamais eu de
+// `requireTenantScope`. Corrigé en réutilisant le moteur d'attribution
+// canonique existant (jamais une seconde implémentation) : le propriétaire
+// (`createdBy`) garde toujours accès à ses propres hébergements ; tout
+// autre acteur (staff/Admin) doit appartenir au même tenant que la
+// ressource, ou la ressource doit être `unresolved` (donnée historique
+// sans aucune frontière tenant à faire respecter — même principe que
+// `assertResourceTenantOrUnattributed` partout ailleurs dans ce dépôt).
+// `allowedStaffRoles` reproduit fidèlement le périmètre de rôle que chaque
+// route autorisait déjà AVANT ce correctif (ex. seul `Admin` contournait la
+// propriété sur update/deactivate/reactivate/remove/duplicate/submit/
+// deactivateRate/listRates ; les 4 rôles `isStaff` pouvaient déjà lire via
+// getOne) — le tenant est une frontière SUPPLÉMENTAIRE pour ces rôles,
+// jamais une extension du périmètre de rôle lui-même. Un rôle non listé ici
+// (ex. un autre `Proprietaire`) doit continuer à être refusé, quel que soit
+// son tenant — sans quoi deux propriétaires du même tenant pourraient agir
+// l'un sur l'autre, une régression distincte de celle visée par ce sprint.
+async function assertAccommodationAccessible(req, accommodation, allowedStaffRoles = ['Admin']) {
+  if (accommodation.createdBy && accommodation.createdBy.toString() === req.user.id.toString()) return;
+  if (!allowedStaffRoles.includes(req.user.role)) {
+    const error = new Error('Accès refusé.');
+    error.statusCode = 403;
+    throw error;
+  }
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+  await assertResourceTenantOrUnattributed({ resourceType: 'Accommodation', resource: accommodation, tenantId: tenant?._id });
+}
 
 const fail = (res, statusCode, message, extra = {}) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...extra });
@@ -389,9 +425,11 @@ exports.getOne = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const accommodation = await Accommodation.findById(req.params.id).populate('property');
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
-    const isOwner = accommodation.createdBy.toString() === req.user.id.toString();
-    const isStaff = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'].includes(req.user.role);
-    if (!isOwner && !isStaff) return fail(res, 403, 'Accès refusé.');
+    try {
+      await assertAccommodationAccessible(req, accommodation, ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager']);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, 'Accès refusé.');
+    }
     const rates = await getActiveRates(accommodation._id);
     const completion = computeCompletionScore(accommodation, accommodation.property, rates);
     res.json({ status: 'success', data: { accommodation: serializeAccommodation(accommodation, rates), completion } });
@@ -408,8 +446,10 @@ exports.update = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const accommodation = await Accommodation.findById(req.params.id);
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
-    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez modifier que vos propres hébergements.");
+    try {
+      await assertAccommodationAccessible(req, accommodation);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, "Vous ne pouvez modifier que vos propres hébergements.");
     }
     ALLOWED_FIELDS.forEach((key) => { if (req.body[key] !== undefined) accommodation[key] = req.body[key]; });
     // Une modification après rejet repart en brouillon, jamais republiée
@@ -434,8 +474,10 @@ exports.submit = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const accommodation = await Accommodation.findById(req.params.id).populate('property', 'bedrooms bathrooms');
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
-    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez soumettre que vos propres hébergements.");
+    try {
+      await assertAccommodationAccessible(req, accommodation);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, "Vous ne pouvez soumettre que vos propres hébergements.");
     }
     if (!['brouillon', 'rejete'].includes(accommodation.publicationStatus)) {
       return fail(res, 409, 'Cet hébergement a déjà été soumis.');
@@ -533,6 +575,15 @@ exports.reviewDecision = async (req, res) => {
 
     const accommodation = await Accommodation.findById(id).populate('property', 'title owner images bedrooms bathrooms');
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
+    // TENANT-CERT-3-PRE — route staff-only (aucun propriétaire self-service
+    // ici, déjà restreinte à ROLES_ALTIMMO par la route) : n'avait jusqu'ici
+    // aucune vérification tenant, un staff du Tenant A pouvait valider/
+    // rejeter/suspendre un hébergement du Tenant B.
+    try {
+      await assertAccommodationAccessible(req, accommodation, ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager']);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, 'Accès refusé.');
+    }
 
     if (['validate', 'reject'].includes(action) && accommodation.publicationStatus !== 'soumis') {
       return fail(res, 409, 'Seul un hébergement soumis peut être validé ou rejeté.');
@@ -608,8 +659,10 @@ exports.deactivate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const accommodation = await Accommodation.findById(req.params.id);
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
-    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez modifier que vos propres hébergements.");
+    try {
+      await assertAccommodationAccessible(req, accommodation);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, "Vous ne pouvez modifier que vos propres hébergements.");
     }
     // Contrôle final Sprint B2 — pour un hébergement 'hotel', ce levier doit
     // passer par PATCH /api/hotels/:id/deactivate (qui synchronise aussi
@@ -631,8 +684,10 @@ exports.reactivate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const accommodation = await Accommodation.findById(req.params.id);
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
-    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez modifier que vos propres hébergements.");
+    try {
+      await assertAccommodationAccessible(req, accommodation);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, "Vous ne pouvez modifier que vos propres hébergements.");
     }
     if (accommodation.accommodationType === 'hotel') {
       return fail(res, 409, "Un établissement hôtelier se réactive depuis le domaine Hôtellerie (Mes hôtels).");
@@ -654,8 +709,10 @@ exports.duplicate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const accommodation = await Accommodation.findById(req.params.id).populate('property');
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
-    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez dupliquer que vos propres hébergements.");
+    try {
+      await assertAccommodationAccessible(req, accommodation);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, "Vous ne pouvez dupliquer que vos propres hébergements.");
     }
     // Contrôle final Sprint B2 — un hébergement de type 'hotel' est
     // l'adaptateur d'un Hotel (domaine Hôtellerie), qui possède ses propres
@@ -698,8 +755,10 @@ exports.remove = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const accommodation = await Accommodation.findById(req.params.id).populate('property');
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
-    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez supprimer que vos propres hébergements.");
+    try {
+      await assertAccommodationAccessible(req, accommodation);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, "Vous ne pouvez supprimer que vos propres hébergements.");
     }
     // Contrôle final Sprint B2 — supprimer ici ne nettoierait QUE
     // Accommodation + Property, en laissant orphelins le Hotel, ses
@@ -736,6 +795,16 @@ exports.remove = async (req, res) => {
 exports.listRates = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    // TENANT-CERT-3-PRE — cette route ne vérifiait jusqu'ici AUCUNE
+    // autorisation (ni propriétaire, ni tenant) : n'importe quel utilisateur
+    // authentifié pouvait lire les tarifs de n'importe quel hébergement.
+    const accommodation = await Accommodation.findById(req.params.id);
+    if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
+    try {
+      await assertAccommodationAccessible(req, accommodation);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, 'Accès refusé.');
+    }
     const rates = await getActiveRates(req.params.id);
     res.json({ status: 'success', data: { rates } });
   } catch (error) {
@@ -749,8 +818,10 @@ exports.upsertRate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const accommodation = await Accommodation.findById(req.params.id);
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
-    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez modifier que vos propres hébergements.");
+    try {
+      await assertAccommodationAccessible(req, accommodation);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, "Vous ne pouvez modifier que vos propres hébergements.");
     }
     const { mode, amount, currency } = req.body;
     if (!RatePlan.RATE_MODES.includes(mode)) return fail(res, 422, 'Mode tarifaire invalide.');
@@ -784,8 +855,10 @@ exports.deactivateRate = async (req, res) => {
     }
     const accommodation = await Accommodation.findById(req.params.id);
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
-    if (accommodation.createdBy.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
-      return fail(res, 403, "Vous ne pouvez modifier que vos propres hébergements.");
+    try {
+      await assertAccommodationAccessible(req, accommodation);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, "Vous ne pouvez modifier que vos propres hébergements.");
     }
     const rate = await RatePlan.findOneAndUpdate(
       { _id: req.params.rateId, accommodation: accommodation._id },

@@ -5,7 +5,7 @@
 // sans aucune intervention du staff.
 jest.mock('../config/cloudinary', () => {
   const actual = jest.requireActual('../config/cloudinary');
-  return { ...actual, uploadToCloudinary: jest.fn().mockResolvedValue({ secure_url: 'https://cdn.test/piece-identite.pdf' }) };
+  return { ...actual, uploadToCloudinary: jest.fn().mockResolvedValue({ secure_url: 'https://cdn.test/piece-identite.pdf', public_id: 'private/identity', resource_type: 'raw', version: 1, format: 'pdf', bytes: 16 }) };
 });
 
 const express = require('express');
