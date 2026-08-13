@@ -7,6 +7,7 @@ const { COLLAB_ROLES, ROLE_LABELS } = require('../utils/roles');
 const userKpiService = require('../services/userKpiService'); // USER-KPI-1
 const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
 const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { getOperatorByUserId } = require('../services/platformOperator/platformOperatorService');
 
 exports.downloadContractDocument = async (req, res) => {
     try {
@@ -119,7 +120,12 @@ exports.getMe = (req, res, next) => {
 // ======================================================
 exports.getAllUsers = async (req, res) => {
     try {
-        const users = await User.find().select('-password');
+        // PLATFORM-ADMIN-CERT-1 (V1) — `req.tenantScopeUserIds` (posé par
+        // `requireTenantScope`, monté sur ce routeur) borne la liste aux
+        // utilisateurs réellement membres du tenant actif. Un PlatformOperator
+        // sans capacité tenant sélectionnée n'atteint jamais ce contrôleur
+        // (403 en amont) — jamais de `User.find()` global implicite.
+        const users = await User.find({ _id: { $in: req.tenantScopeUserIds || [] } }).select('-password');
         res.status(200).json({ status: 'success', results: users.length, data: { users } });
     } catch (error) {
         console.error('Erreur getAllUsers:', error);
@@ -136,7 +142,11 @@ exports.getAllOwners = async (req, res) => {
         // server/routes/dashboardRoutes.js pour la justification de la règle
         // d'union propriétaire immobilier + exploitant d'établissement).
         const ownerIds = await userKpiService.getProprietaireUserIds();
-        const owners = await User.find({ _id: { $in: ownerIds } }).select('-password');
+        // PLATFORM-ADMIN-CERT-1 (V1) — intersection avec le scope tenant actif,
+        // même principe que getAllUsers ci-dessus.
+        const scopeSet = new Set((req.tenantScopeUserIds || []).map(String));
+        const scopedOwnerIds = ownerIds.filter((id) => scopeSet.has(String(id)));
+        const owners = await User.find({ _id: { $in: scopedOwnerIds } }).select('-password');
         res.status(200).json({ status: 'success', results: owners.length, data: { owners } });
     } catch (error) {
         console.error('Erreur getAllOwners:', error);
@@ -153,7 +163,18 @@ exports.getUser = async (req, res) => {
         if (!user) {
             return res.status(404).json({ status: 'fail', message: 'Aucun utilisateur trouvé avec cet ID.' });
         }
-        res.status(200).json({ status: 'success', data: { user } });
+        const payload = { user };
+        // PLATFORM-ADMIN-1 — n'expose le statut opérateur QUE sur /me (jamais
+        // en consultant un autre utilisateur au passage) : évite une requête
+        // supplémentaire systématique sur getAllUsers/getOwner/etc., et évite
+        // de révéler à un Tenant Admin qui d'autre est opérateur via cette
+        // route générique (la liste complète reste réservée à
+        // platform-operators, elle-même gated par `platform.operators.manage`).
+        const requesterId = String(req.user?._id || req.user?.id || '');
+        if (requesterId && requesterId === String(user._id)) {
+            payload.platformOperator = await getOperatorByUserId(user._id).catch(() => null);
+        }
+        res.status(200).json({ status: 'success', data: payload });
     } catch (error) {
         console.error('Erreur getUser:', error);
         res.status(500).json({ status: 'error', message: "Erreur serveur lors de la récupération de l'utilisateur." });

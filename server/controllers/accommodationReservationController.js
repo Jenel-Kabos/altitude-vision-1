@@ -27,7 +27,9 @@ const isStaff = (user) => ['Admin', 'Collaborateur', 'GestionnaireImmobilier', '
 // titre que les occurrences `role === 'Admin'` non ré-auditées par
 // TENANT-CERT-2 (précédent explicite, jamais un verdict bloquant en soi).
 async function assertReservationTenantBoundary(req, reservation) {
-  const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+  // PLATFORM-ADMIN-CERT-1 — voir accommodationController.js pour la même justification.
+  const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
   await assertResourceTenantOrUnattributed({ resourceType: 'AccommodationReservation', resource: reservation, tenantId: tenant?._id });
 }
 
@@ -50,7 +52,8 @@ exports.list = async (req, res) => {
       // appartenance tenant (mêmes principe et service que
       // platformTenantRoutes.js) ; un staff rattaché à un tenant reste
       // borné à ses propres réservations.
-      const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+      const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+      const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
       if (tenant?._id) query.tenant = tenant._id;
     } else if (req.user.role === 'Proprietaire') query.owner = req.user.id;
     else query.guest = req.user.id;

@@ -1,0 +1,4808 @@
+{
+  "resetId": "data-reset-1-20260813",
+  "database": "altitudevision",
+  "strategy": "DROP_DATABASE_THEN_RECREATE_MODEL_INDEXES_AND_BOOTSTRAP_MINIMUM",
+  "collections": [
+    {
+      "collection": "accommodationavailabilityblocks",
+      "countBefore": 0,
+      "model": "AccommodationAvailabilityBlock",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "accommodationcalendarmutexes",
+      "countBefore": 0,
+      "model": "AccommodationCalendarMutex",
+      "category": "A — RESET INFRASTRUCTURE RUNTIME",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "accommodationnightlocks",
+      "countBefore": 0,
+      "model": "AccommodationNightLock",
+      "category": "A — RESET INFRASTRUCTURE RUNTIME",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "accommodationreservations",
+      "countBefore": 0,
+      "model": "AccommodationReservation",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "accommodations",
+      "countBefore": 4,
+      "model": "Accommodation",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "actionlogs",
+      "countBefore": 169,
+      "model": "ActionLog",
+      "category": "B — RESET STRUCTUREL PUIS REBOOTSTRAP",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": "bootstrap-audit-logs"
+    },
+    {
+      "collection": "altcomprojects",
+      "countBefore": 2,
+      "model": "AltcomProject",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "apicalllogs",
+      "countBefore": 0,
+      "model": "ApiCallLog",
+      "category": "A — RESET SÉCURITÉ TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "apikeys",
+      "countBefore": 0,
+      "model": "ApiKey",
+      "category": "A — RESET SÉCURITÉ TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "chatmessages",
+      "countBefore": 0,
+      "model": "ChatMessage",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "comments",
+      "countBefore": 3,
+      "model": "Comment",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "companyemails",
+      "countBefore": 1,
+      "model": "CompanyEmail",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "constructioncostreferences",
+      "countBefore": 0,
+      "model": "ConstructionCostReference",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "contactmessages",
+      "countBefore": 6,
+      "model": "ContactMessage",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "contrats",
+      "countBefore": 17,
+      "model": "Contrat",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "conversations",
+      "countBefore": 23,
+      "model": "Conversation",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "counters",
+      "countBefore": 1,
+      "model": "Counter_sequenceNumber",
+      "category": "A — RESET INFRASTRUCTURE RUNTIME",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "crmactivities",
+      "countBefore": 0,
+      "model": "CrmActivity",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "crmautomationrules",
+      "countBefore": 0,
+      "model": "CrmAutomationRule",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "crmautomationruns",
+      "countBefore": 0,
+      "model": "CrmAutomationRun",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "crmconsolidations",
+      "countBefore": 0,
+      "model": "CrmConsolidation",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "crmcustomers",
+      "countBefore": 0,
+      "model": "CrmCustomer",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "crmopportunities",
+      "countBefore": 0,
+      "model": "CrmOpportunity",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "devis",
+      "countBefore": 3,
+      "model": "Devis",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "documents",
+      "countBefore": 5,
+      "model": "Document",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "emails",
+      "countBefore": 2,
+      "model": "Email",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "estimations",
+      "countBefore": 4,
+      "model": "Estimation",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "events",
+      "countBefore": 0,
+      "model": "Event",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "facebookposts",
+      "countBefore": 14,
+      "model": null,
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "financialdocumentartifacts",
+      "countBefore": 0,
+      "model": "FinancialDocumentArtifact",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "financialdocumentdeliveries",
+      "countBefore": 0,
+      "model": "FinancialDocumentDelivery",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "financialdocumentlines",
+      "countBefore": 0,
+      "model": "FinancialDocumentLine",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "financialdocuments",
+      "countBefore": 0,
+      "model": "FinancialDocument",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "financialledgerentries",
+      "countBefore": 0,
+      "model": "FinancialLedgerEntry",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "financialpayments",
+      "countBefore": 0,
+      "model": "FinancialPayment",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "financialproviderevents",
+      "countBefore": 0,
+      "model": "FinancialProviderEvent",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "financialrefunds",
+      "countBefore": 0,
+      "model": "FinancialRefund",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "financialsequences",
+      "countBefore": 0,
+      "model": "FinancialSequence",
+      "category": "A — RESET INFRASTRUCTURE RUNTIME",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "hotelreservationnotifications",
+      "countBefore": 0,
+      "model": "HotelReservationNotification",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "hotelreservations",
+      "countBefore": 0,
+      "model": "HotelReservation",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "hotels",
+      "countBefore": 3,
+      "model": "Hotel",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "hotelstaffassignments",
+      "countBefore": 0,
+      "model": "HotelStaffAssignment",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "housekeepingtasks",
+      "countBefore": 0,
+      "model": "HousekeepingTask",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "internalmails",
+      "countBefore": 31,
+      "model": "InternalMail",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "internalmessages",
+      "countBefore": 0,
+      "model": "InternalMessage",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "inventoryoperationlocks",
+      "countBefore": 0,
+      "model": "InventoryOperationLock",
+      "category": "A — RESET INFRASTRUCTURE RUNTIME",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "likes",
+      "countBefore": 13,
+      "model": "Like",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "litiges",
+      "countBefore": 1,
+      "model": "Litige",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "locataires",
+      "countBefore": 34,
+      "model": "Locataire",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "maintenancetickets",
+      "countBefore": 0,
+      "model": "MaintenanceTicket",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "marketingcampaigns",
+      "countBefore": 0,
+      "model": "MarketingCampaign",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "marketingsends",
+      "countBefore": 0,
+      "model": "MarketingSend",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "marketingtemplates",
+      "countBefore": 0,
+      "model": "MarketingTemplate",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "marketingunsubscribes",
+      "countBefore": 0,
+      "model": "MarketingUnsubscribe",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "marketpricereferences",
+      "countBefore": 0,
+      "model": "MarketPriceReference",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "messages",
+      "countBefore": 106,
+      "model": "Message",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "notifications",
+      "countBefore": 163,
+      "model": "Notification",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "orgmemberships",
+      "countBefore": 1,
+      "model": "OrgMembership",
+      "category": "B — RESET STRUCTUREL PUIS REBOOTSTRAP",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 1
+    },
+    {
+      "collection": "orgunits",
+      "countBefore": 1,
+      "model": "OrgUnit",
+      "category": "B — RESET STRUCTUREL PUIS REBOOTSTRAP",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 1
+    },
+    {
+      "collection": "paiements",
+      "countBefore": 0,
+      "model": "Paiement",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "paiementtransactions",
+      "countBefore": 0,
+      "model": "PaiementTransaction",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "paymentallocations",
+      "countBefore": 0,
+      "model": "PaymentAllocation",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "pendingregistrations",
+      "countBefore": 0,
+      "model": "PendingRegistration",
+      "category": "A — RESET SÉCURITÉ TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "platformoperators",
+      "countBefore": 1,
+      "model": "PlatformOperator",
+      "category": "B — RESET STRUCTUREL PUIS REBOOTSTRAP",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 1
+    },
+    {
+      "collection": "platformtenantdomains",
+      "countBefore": 0,
+      "model": "PlatformTenantDomain",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "platformtenantfeatures",
+      "countBefore": 0,
+      "model": "PlatformTenantFeature",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "platformtenants",
+      "countBefore": 1,
+      "model": "PlatformTenant",
+      "category": "B — RESET STRUCTUREL PUIS REBOOTSTRAP",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 1
+    },
+    {
+      "collection": "platformtenantsettings",
+      "countBefore": 1,
+      "model": "PlatformTenantSettings",
+      "category": "B — RESET STRUCTUREL PUIS REBOOTSTRAP",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 1
+    },
+    {
+      "collection": "platformtenantsubscriptions",
+      "countBefore": 1,
+      "model": "PlatformTenantSubscription",
+      "category": "B — RESET STRUCTUREL PUIS REBOOTSTRAP",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 1
+    },
+    {
+      "collection": "platformtenantthemes",
+      "countBefore": 1,
+      "model": "PlatformTenantTheme",
+      "category": "B — RESET STRUCTUREL PUIS REBOOTSTRAP",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 1
+    },
+    {
+      "collection": "portfolioitems",
+      "countBefore": 1,
+      "model": "PortfolioItem",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "privateassetmigrations",
+      "countBefore": 0,
+      "model": "PrivateAssetMigration",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "projects",
+      "countBefore": 0,
+      "model": "Project",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "properties",
+      "countBefore": 7,
+      "model": "Property",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "proprietaires",
+      "countBefore": 2,
+      "model": "Proprietaire",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "publicites",
+      "countBefore": 2,
+      "model": "Publicite",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "quoterequests",
+      "countBefore": 8,
+      "model": "QuoteRequest",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "quotes",
+      "countBefore": 0,
+      "model": "Quote",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "rateplans",
+      "countBefore": 22,
+      "model": "RatePlan",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "realestateapplications",
+      "countBefore": 0,
+      "model": "RealEstateApplication",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "realestatereservations",
+      "countBefore": 0,
+      "model": "RealEstateReservation",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "realisations",
+      "countBefore": 0,
+      "model": "Realisation",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "rentalcontractreconciliations",
+      "countBefore": 0,
+      "model": "RentalContractReconciliation",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "rentalmaintenancetickets",
+      "countBefore": 0,
+      "model": "RentalMaintenanceTicket",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "rentalmanagements",
+      "countBefore": 1,
+      "model": "RentalManagement",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "rentalpaymentreceipts",
+      "countBefore": 0,
+      "model": "RentalPaymentReceipt",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "reviews",
+      "countBefore": 2,
+      "model": "Review",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "roomassignments",
+      "countBefore": 0,
+      "model": "RoomAssignment",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "roomcategories",
+      "countBefore": 8,
+      "model": "RoomCategory",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "roominspections",
+      "countBefore": 0,
+      "model": "RoomInspection",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "roominventories",
+      "countBefore": 32,
+      "model": "RoomInventory",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "rooms",
+      "countBefore": 0,
+      "model": "Room",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "salemanagements",
+      "countBefore": 0,
+      "model": "SaleManagement",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "services",
+      "countBefore": 0,
+      "model": "Service",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "signalements",
+      "countBefore": 1,
+      "model": "Signalement",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "tenantlinkrequests",
+      "countBefore": 0,
+      "model": "TenantLinkRequest",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "transactions",
+      "countBefore": 0,
+      "model": "Transaction",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "userbusinessprofiles",
+      "countBefore": 0,
+      "model": "UserBusinessProfile",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "users",
+      "countBefore": 11,
+      "model": "User",
+      "category": "B — RESET STRUCTUREL PUIS REBOOTSTRAP",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 1
+    },
+    {
+      "collection": "valuationcalculations",
+      "countBefore": 0,
+      "model": "ValuationCalculation",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "valuationcoefficients",
+      "countBefore": 0,
+      "model": "ValuationCoefficient",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "visites",
+      "countBefore": 9,
+      "model": "Visite",
+      "category": "A — RESET MÉTIER/TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "webhooksubscriptions",
+      "countBefore": 0,
+      "model": "WebhookSubscription",
+      "category": "A — RESET SÉCURITÉ TEST",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    },
+    {
+      "collection": "writewindows",
+      "countBefore": 0,
+      "model": "WriteWindow",
+      "category": "A — RESET INFRASTRUCTURE RUNTIME",
+      "action": "DROP_WITH_DATABASE",
+      "expectedAfterBootstrap": 0
+    }
+  ],
+  "preservedCollections": [],
+  "bootstrapEntities": {
+    "User": 1,
+    "PlatformTenant": 1,
+    "OrgUnit": 1,
+    "OrgMembership": 1,
+    "PlatformOperator": 1,
+    "PlatformTenantSettings": 1,
+    "PlatformTenantTheme": 1,
+    "PlatformTenantSubscription": 1
+  },
+  "adminStrategy": "DELETE_ALL_USERS_AND_CREATE_NEW_ADMIN_FROM_EXPLICIT_EMAIL_AND_SECURE_PASSWORD_INPUT",
+  "indexDefinitions": [
+    {
+      "collection": "accommodationavailabilityblocks",
+      "model": "AccommodationAvailabilityBlock",
+      "indexes": [
+        {
+          "key": {
+            "accommodation": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "accommodation": 1,
+            "startDate": 1,
+            "endDate": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "accommodationcalendarmutexes",
+      "model": "AccommodationCalendarMutex",
+      "indexes": []
+    },
+    {
+      "collection": "accommodationnightlocks",
+      "model": "AccommodationNightLock",
+      "indexes": [
+        {
+          "key": {
+            "accommodation": 1,
+            "date": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "sourceType": 1,
+            "sourceId": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "operationToken": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "accommodationreservations",
+      "model": "AccommodationReservation",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "accommodation": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "guest": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "owner": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "accommodation": 1,
+            "checkInDate": 1,
+            "checkOutDate": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "owner": 1,
+            "status": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "guest": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1,
+            "checkInDate": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1,
+            "checkOutDate": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "accommodations",
+      "model": "Accommodation",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "property": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "hotel": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "publicationStatus": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "publicationRequestId": 1
+          },
+          "options": {
+            "unique": true,
+            "sparse": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "actionlogs",
+      "model": "ActionLog",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "organization": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "date": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "module": 1,
+            "date": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "typeAction": 1,
+            "date": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "auteur.id": 1,
+            "date": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "metadata.regularization.batchId": 1,
+            "metadata.regularization.resourceType": 1,
+            "metadata.regularization.resourceId": 1,
+            "metadata.regularization.operation": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "metadata.regularization.batchId": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "altcomprojects",
+      "model": "AltcomProject",
+      "indexes": [
+        {
+          "key": {
+            "email": 1,
+            "submittedAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "apicalllogs",
+      "model": "ApiCallLog",
+      "indexes": [
+        {
+          "key": {
+            "apiKey": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "apiKey": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "createdAt": 1
+          },
+          "options": {
+            "expireAfterSeconds": 7776000,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "apikeys",
+      "model": "ApiKey",
+      "indexes": [
+        {
+          "key": {
+            "keyPrefix": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "hashedKey": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "chatmessages",
+      "model": "ChatMessage",
+      "indexes": []
+    },
+    {
+      "collection": "comments",
+      "model": "Comment",
+      "indexes": [
+        {
+          "key": {
+            "targetType": 1,
+            "targetId": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "author": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "companyemails",
+      "model": "CompanyEmail",
+      "indexes": [
+        {
+          "key": {
+            "email": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "emailType": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "assignedTo": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "isActive": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "constructioncostreferences",
+      "model": "ConstructionCostReference",
+      "indexes": [
+        {
+          "key": {
+            "city": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "contactmessages",
+      "model": "ContactMessage",
+      "indexes": [
+        {
+          "key": {
+            "email": 1,
+            "submittedAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "submittedAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "contrats",
+      "model": "Contrat",
+      "indexes": [
+        {
+          "key": {
+            "bien": 1,
+            "type": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "bien": {
+                "$type": "objectId"
+              },
+              "statut": {
+                "$in": [
+                  "en_attente",
+                  "actif"
+                ]
+              }
+            },
+            "name": "one_open_contract_per_property_and_type",
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "reservation": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "reservation": {
+                "$type": "objectId"
+              }
+            },
+            "name": "one_contract_per_real_estate_reservation",
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "conversations",
+      "model": "Conversation",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "counters",
+      "model": "Counter_docNumber",
+      "indexes": [
+        {
+          "key": {
+            "id": 1,
+            "reference_value": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "counters",
+      "model": "Counter_sequenceNumber",
+      "indexes": [
+        {
+          "key": {
+            "id": 1,
+            "reference_value": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "crmactivities",
+      "model": "CrmActivity",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "customer": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "dueAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "assignedTo": 1,
+            "status": 1,
+            "dueAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "crmautomationrules",
+      "model": "CrmAutomationRule",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "triggerEvent": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "enabled": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1,
+            "ruleId": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1,
+            "triggerEvent": 1,
+            "enabled": 1,
+            "priority": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "crmautomationruns",
+      "model": "CrmAutomationRun",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "rule": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1,
+            "ruleId": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "crmconsolidations",
+      "model": "CrmConsolidation",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "customerA": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "customerB": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "customerA": 1,
+            "customerB": 1,
+            "decidedAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "crmcustomers",
+      "model": "CrmCustomer",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "kind": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "mergedInto": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1,
+            "identityKeys": 1
+          },
+          "options": {
+            "unique": true,
+            "name": "one_crm_customer_per_tenant_identity_key",
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1,
+            "sourceRefs.entityType": 1,
+            "sourceRefs.entityId": 1
+          },
+          "options": {
+            "unique": true,
+            "name": "one_crm_customer_per_tenant_source",
+            "partialFilterExpression": {
+              "sourceRefs.entityType": {
+                "$type": "string"
+              },
+              "sourceRefs.entityId": {
+                "$type": "objectId"
+              }
+            },
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "displayName": "text",
+            "company": "text",
+            "emails": "text",
+            "phones": "text"
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "crmopportunities",
+      "model": "CrmOpportunity",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "customer": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "stage": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "outcome": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "stage": 1,
+            "updatedAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "outcome": 1,
+            "closedAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "devis",
+      "model": "Devis",
+      "indexes": []
+    },
+    {
+      "collection": "documents",
+      "model": "Document",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "businessOperationKey": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "businessOperationKey": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "pole": 1,
+            "service": 1,
+            "categorie": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "entityType": 1,
+            "entityId": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "emails",
+      "model": "Email",
+      "indexes": [
+        {
+          "key": {
+            "email": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "estimations",
+      "model": "Estimation",
+      "indexes": [
+        {
+          "key": {
+            "staffViewedAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "report.verificationCode": 1
+          },
+          "options": {
+            "unique": true,
+            "sparse": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "statut": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "location.city": 1,
+            "typeBien": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "location.district": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "events",
+      "model": "Event",
+      "indexes": [
+        {
+          "key": {
+            "date": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1,
+            "date": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "category": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "featured": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "financialdocumentartifacts",
+      "model": "FinancialDocumentArtifact",
+      "indexes": [
+        {
+          "key": {
+            "financialDocument": 1,
+            "artifactType": 1,
+            "templateVersion": 1,
+            "snapshotHash": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "status": {
+                "$in": [
+                  "pending",
+                  "ready"
+                ]
+              }
+            },
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "establishmentId": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "idempotencyKeyHash": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "idempotencyKeyHash": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "financialdocumentdeliveries",
+      "model": "FinancialDocumentDelivery",
+      "indexes": [
+        {
+          "key": {
+            "idempotencyKeyHash": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "financialDocument": 1,
+            "requestedAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "financialdocumentlines",
+      "model": "FinancialDocumentLine",
+      "indexes": [
+        {
+          "key": {
+            "financialDocument": 1,
+            "lineNumber": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "sourceType": 1,
+            "sourceId": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "financialdocuments",
+      "model": "FinancialDocument",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "domain": 1,
+            "establishmentId": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "domain": 1,
+            "establishmentId": 1,
+            "documentNumber": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "documentNumber": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "domain": 1,
+            "subjectType": 1,
+            "subjectId": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "documentType": 1,
+            "sequenceYear": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "domain": 1,
+            "businessOperationKey": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "financialledgerentries",
+      "model": "FinancialLedgerEntry",
+      "indexes": [
+        {
+          "key": {
+            "establishmentId": 1,
+            "occurredAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "entityType": 1,
+            "entityId": 1,
+            "occurredAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "businessOperationKey": 1,
+            "eventType": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "financialpayments",
+      "model": "FinancialPayment",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "domain": 1,
+            "establishmentId": 1,
+            "paymentReference": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "provider": 1,
+            "providerPaymentId": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "providerPaymentId": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "subjectType": 1,
+            "subjectId": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "domain": 1,
+            "establishmentId": 1,
+            "businessOperationKey": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "businessOperationKey": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "financialproviderevents",
+      "model": "FinancialProviderEvent",
+      "indexes": [
+        {
+          "key": {
+            "provider": 1,
+            "providerEventId": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "financialPayment": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "provider": 1,
+            "providerTransactionId": 1,
+            "receivedAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "financialrefunds",
+      "model": "FinancialRefund",
+      "indexes": [
+        {
+          "key": {
+            "financialPayment": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "subjectId": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "domain": 1,
+            "establishmentId": 1,
+            "businessOperationKey": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "financialPayment": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "financialsequences",
+      "model": "FinancialSequence",
+      "indexes": [
+        {
+          "key": {
+            "domain": 1,
+            "establishmentType": 1,
+            "establishmentId": 1,
+            "documentType": 1,
+            "year": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "hotelreservationnotifications",
+      "model": "HotelReservationNotification",
+      "indexes": [
+        {
+          "key": {
+            "reservation": 1,
+            "eventKey": 1,
+            "channel": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "hotelreservations",
+      "model": "HotelReservation",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "reference": 1
+          },
+          "options": {
+            "unique": true,
+            "sparse": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "requiresRoomReassignment": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "hotel": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "roomCategory": 1,
+            "checkInDate": 1,
+            "checkOutDate": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "guestUser": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1,
+            "pendingExpiresAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "hotel": 1,
+            "reservationRequestId": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "reservationRequestId": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "hotels",
+      "model": "Hotel",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "manager": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "publicationStatus": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "hotelstaffassignments",
+      "model": "HotelStaffAssignment",
+      "indexes": [
+        {
+          "key": {
+            "user": 1,
+            "hotel": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "hotel": 1,
+            "status": 1,
+            "assignmentRole": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "user": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "validUntil": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "user": 1,
+            "hotel": 1,
+            "assignmentRole": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "status": "active"
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "housekeepingtasks",
+      "model": "HousekeepingTask",
+      "indexes": [
+        {
+          "key": {
+            "room": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "open": true
+            },
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "hotel": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "internalmails",
+      "model": "InternalMail",
+      "indexes": [
+        {
+          "key": {
+            "zohoMessageId": 1
+          },
+          "options": {
+            "unique": true,
+            "sparse": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "sender": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "receiver": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "receiver": 1,
+            "isRead": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "receiver": 1,
+            "isStarred": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "sender": 1,
+            "isDraft": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "receiver": 1,
+            "isDeleted": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "isExternalMail": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "internalmessages",
+      "model": "InternalMessage",
+      "indexes": [
+        {
+          "key": {
+            "sender": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "recipients": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "threadId": 1,
+            "createdAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "readBy.user": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "inventoryoperationlocks",
+      "model": "InventoryOperationLock",
+      "indexes": [
+        {
+          "key": {
+            "key": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "hotel": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "expiresAt": 1
+          },
+          "options": {
+            "expireAfterSeconds": 0,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "likes",
+      "model": "Like",
+      "indexes": [
+        {
+          "key": {
+            "user": 1,
+            "targetType": 1,
+            "targetId": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "targetType": 1,
+            "targetId": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "user": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "litiges",
+      "model": "Litige",
+      "indexes": [
+        {
+          "key": {
+            "reference": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "staffViewedAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "locataires",
+      "model": "Locataire",
+      "indexes": [
+        {
+          "key": {
+            "email": 1
+          },
+          "options": {
+            "unique": true,
+            "sparse": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "user": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "user": {
+                "$type": "objectId"
+              }
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "maintenancetickets",
+      "model": "MaintenanceTicket",
+      "indexes": [
+        {
+          "key": {
+            "room": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "hotel": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "marketingcampaigns",
+      "model": "MarketingCampaign",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "marketingsends",
+      "model": "MarketingSend",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "campaign": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "workflowRuleId": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "campaign": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "marketingtemplates",
+      "model": "MarketingTemplate",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "family": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1,
+            "family": 1,
+            "version": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1,
+            "family": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "marketingunsubscribes",
+      "model": "MarketingUnsubscribe",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1,
+            "email": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "marketpricereferences",
+      "model": "MarketPriceReference",
+      "indexes": [
+        {
+          "key": {
+            "city": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "propertyType": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "priceType": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "active": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "active": 1,
+            "city": 1,
+            "propertyType": 1,
+            "transactionType": 1,
+            "validFrom": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "city": 1,
+            "district": 1,
+            "neighborhood": 1,
+            "priceType": 1,
+            "validFrom": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "messages",
+      "model": "Message",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "sender": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "receiver": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "receiver": 1,
+            "isRead": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "receiver": 1,
+            "isStarred": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "conversation": 1,
+            "createdAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "notifications",
+      "model": "Notification",
+      "indexes": [
+        {
+          "key": {
+            "platformTenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "recipient": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "destination": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "read": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "recipient": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "recipient": 1,
+            "read": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "recipient": 1,
+            "dedupeKey": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "dedupeKey": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "createdAt": 1
+          },
+          "options": {
+            "expireAfterSeconds": 7776000,
+            "partialFilterExpression": {
+              "read": true
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "orgmemberships",
+      "model": "OrgMembership",
+      "indexes": [
+        {
+          "key": {
+            "user": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "orgUnit": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "user": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "orgUnit": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "user": 1,
+            "orgUnit": 1,
+            "roleInUnit": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "status": "active"
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "orgunits",
+      "model": "OrgUnit",
+      "indexes": [
+        {
+          "key": {
+            "path": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "parent": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "type": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "paiements",
+      "model": "Paiement",
+      "indexes": []
+    },
+    {
+      "collection": "paiementtransactions",
+      "model": "PaiementTransaction",
+      "indexes": [
+        {
+          "key": {
+            "transaction": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "cinetpayTransactionId": 1
+          },
+          "options": {
+            "sparse": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "yabetooIntentId": 1
+          },
+          "options": {
+            "sparse": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "transaction": 1,
+            "methode": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "statut": {
+                "$in": [
+                  "En attente",
+                  "Payé",
+                  "en_attente",
+                  "confirmé"
+                ]
+              }
+            },
+            "name": "one_open_payment_per_transaction_and_method",
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "paymentallocations",
+      "model": "PaymentAllocation",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "financialPayment": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "financialDocument": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "domain": 1,
+            "establishmentId": 1,
+            "businessOperationKey": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "pendingregistrations",
+      "model": "PendingRegistration",
+      "indexes": [
+        {
+          "key": {
+            "expiresAt": 1
+          },
+          "options": {
+            "expireAfterSeconds": 0,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "email": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "platformoperators",
+      "model": "PlatformOperator",
+      "indexes": [
+        {
+          "key": {
+            "user": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "platformtenantdomains",
+      "model": "PlatformTenantDomain",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "domain": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1,
+            "isPrimary": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "platformtenantfeatures",
+      "model": "PlatformTenantFeature",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1,
+            "module": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "platformtenants",
+      "model": "PlatformTenant",
+      "indexes": [
+        {
+          "key": {
+            "slug": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "rootOrgUnit": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "platformtenantsettings",
+      "model": "PlatformTenantSettings",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "platformtenantsubscriptions",
+      "model": "PlatformTenantSubscription",
+      "indexes": [
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "status": {
+                "$in": [
+                  "trialing",
+                  "active"
+                ]
+              }
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "platformtenantthemes",
+      "model": "PlatformTenantTheme",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "portfolioitems",
+      "model": "PortfolioItem",
+      "indexes": [
+        {
+          "key": {
+            "category": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "projectDate": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "averageRating": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "isPublished": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "client": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "privateassetmigrations",
+      "model": "PrivateAssetMigration",
+      "indexes": [
+        {
+          "key": {
+            "resource": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "resourceId": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "resource": 1,
+            "resourceId": 1,
+            "field": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "projects",
+      "model": "Project",
+      "indexes": []
+    },
+    {
+      "collection": "properties",
+      "model": "Property",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "internalManagedOnly": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "owner": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "statusAdmin": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "sourceOwnerAssetId": 1
+          },
+          "options": {
+            "unique": true,
+            "sparse": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "onboardingFingerprint": 1
+          },
+          "options": {
+            "unique": true,
+            "sparse": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "location": "2dsphere"
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "pole": 1,
+            "status": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "statusAdmin": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "owner": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1,
+            "price": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "proprietaires",
+      "model": "Proprietaire",
+      "indexes": [
+        {
+          "key": {
+            "email": 1
+          },
+          "options": {
+            "unique": true,
+            "sparse": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "publicites",
+      "model": "Publicite",
+      "indexes": []
+    },
+    {
+      "collection": "quoterequests",
+      "model": "QuoteRequest",
+      "indexes": [
+        {
+          "key": {
+            "status": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "email": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "source": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "requestType": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "date": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "quotes",
+      "model": "Quote",
+      "indexes": []
+    },
+    {
+      "collection": "rateplans",
+      "model": "RatePlan",
+      "indexes": [
+        {
+          "key": {
+            "accommodation": 1,
+            "mode": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "active": true,
+              "accommodation": {
+                "$type": "objectId"
+              },
+              "mode": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "roomCategory": 1,
+            "rateType": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "active": true,
+              "roomCategory": {
+                "$type": "objectId"
+              },
+              "rateType": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "realestateapplications",
+      "model": "RealEstateApplication",
+      "indexes": [
+        {
+          "key": {
+            "kind": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "property": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "applicant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "owner": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "validUntil": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "property": 1,
+            "status": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "applicant": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "owner": 1,
+            "kind": 1,
+            "status": 1,
+            "createdAt": -1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "realestatereservations",
+      "model": "RealEstateReservation",
+      "indexes": [
+        {
+          "key": {
+            "property": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "client": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "application": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "expiresAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "idempotencyKey": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1,
+            "expiresAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "property": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "status": "active"
+            },
+            "name": "one_active_real_estate_reservation_per_property",
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "realisations",
+      "model": "Realisation",
+      "indexes": []
+    },
+    {
+      "collection": "rentalcontractreconciliations",
+      "model": "RentalContractReconciliation",
+      "indexes": [
+        {
+          "key": {
+            "contract": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "rentalmaintenancetickets",
+      "model": "RentalMaintenanceTicket",
+      "indexes": [
+        {
+          "key": {
+            "property": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "owner": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "rentalmanagements",
+      "model": "RentalManagement",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "property": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "owner": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "active": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "managementActivated": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "occupancyStatus": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "availabilityStatus": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "publicationStatus": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "owner": 1,
+            "occupancyStatus": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "publicationStatus": 1,
+            "availabilityStatus": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "rentalpaymentreceipts",
+      "model": "RentalPaymentReceipt",
+      "indexes": [
+        {
+          "key": {
+            "paiement": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "contrat": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "encaissementId": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "statut": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "paiement": 1,
+            "statut": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "paiement": 1,
+            "idempotencyKey": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "idempotencyKey": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "reviews",
+      "model": "Review",
+      "indexes": [
+        {
+          "key": {
+            "pole": 1,
+            "author": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "roomassignments",
+      "model": "RoomAssignment",
+      "indexes": [
+        {
+          "key": {
+            "room": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "releasedAt": {
+                "$type": "null"
+              }
+            },
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "reservation": 1,
+            "releasedAt": 1,
+            "assignedAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "roomcategories",
+      "model": "RoomCategory",
+      "indexes": [
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "hotel": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "hotel": 1,
+            "code": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "code": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "roominspections",
+      "model": "RoomInspection",
+      "indexes": [
+        {
+          "key": {
+            "room": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "result": null
+            },
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "housekeepingTask": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "roominventories",
+      "model": "RoomInventory",
+      "indexes": [
+        {
+          "key": {
+            "roomCategory": 1,
+            "date": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "hotel": 1,
+            "date": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "rooms",
+      "model": "Room",
+      "indexes": [
+        {
+          "key": {
+            "hotel": 1,
+            "roomNumber": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "salemanagements",
+      "model": "SaleManagement",
+      "indexes": [
+        {
+          "key": {
+            "property": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "owner": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "publicationStatus": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "services",
+      "model": "Service",
+      "indexes": [
+        {
+          "key": {
+            "title": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "signalements",
+      "model": "Signalement",
+      "indexes": [
+        {
+          "key": {
+            "property": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "property": 1,
+            "signalePar": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "tenantlinkrequests",
+      "model": "TenantLinkRequest",
+      "indexes": [
+        {
+          "key": {
+            "locataire": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "status": "pending"
+            },
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "user": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "transactions",
+      "model": "Transaction",
+      "indexes": [
+        {
+          "key": {
+            "reservation": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "client": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "property": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "property": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "status": {
+                "$in": [
+                  "En cours",
+                  "Paiement en attente",
+                  "Réussie",
+                  "Litigée"
+                ]
+              }
+            },
+            "name": "one_active_real_estate_transaction_per_property",
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "finalization.operationKey": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "finalization.operationKey": {
+                "$type": "string"
+              }
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "userbusinessprofiles",
+      "model": "UserBusinessProfile",
+      "indexes": [
+        {
+          "key": {
+            "user": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "profileType": 1,
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "user": 1,
+            "profileType": 1
+          },
+          "options": {
+            "unique": true,
+            "partialFilterExpression": {
+              "status": "active"
+            },
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "users",
+      "model": "User",
+      "indexes": [
+        {
+          "key": {
+            "email": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "googleId": 1
+          },
+          "options": {
+            "sparse": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "valuationcalculations",
+      "model": "ValuationCalculation",
+      "indexes": [
+        {
+          "key": {
+            "estimationId": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "estimationId": 1,
+            "version": -1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "valuationcoefficients",
+      "model": "ValuationCoefficient",
+      "indexes": [
+        {
+          "key": {
+            "code": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "active": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "visites",
+      "model": "Visite",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "owner": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "scheduledStartAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "ownerViewedAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "staffViewedAt": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "webhooksubscriptions",
+      "model": "WebhookSubscription",
+      "indexes": [
+        {
+          "key": {
+            "tenant": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "apiKey": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "status": 1
+          },
+          "options": {
+            "background": true
+          }
+        }
+      ]
+    },
+    {
+      "collection": "writewindows",
+      "model": "WriteWindow",
+      "indexes": [
+        {
+          "key": {
+            "userId": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "resourceId": 1
+          },
+          "options": {
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "createdAt": 1
+          },
+          "options": {
+            "expireAfterSeconds": 600,
+            "background": true
+          }
+        },
+        {
+          "key": {
+            "userId": 1,
+            "resourceId": 1
+          },
+          "options": {
+            "unique": true,
+            "background": true
+          }
+        }
+      ]
+    }
+  ],
+  "cloudinary": "NO_CHANGE",
+  "fingerprint": "e675ec0df7301effde02ddf71a4fc5768976c5cdb0344247bd5283439d0012b1",
+  "generatedAt": "2026-08-13T15:12:00.002Z",
+  "writes": 0
+}

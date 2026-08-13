@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const visiteSchema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   property: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Property',

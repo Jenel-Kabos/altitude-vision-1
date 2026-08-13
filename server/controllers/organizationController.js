@@ -33,7 +33,12 @@ class OrgTenantBoundaryError extends Error {
 }
 
 async function actorTenantRootId(req) {
-  const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+  // PLATFORM-ADMIN-CERT-1 — sans transmission de l'en-tête, un PlatformOperator
+  // (zéro OrgMembership par construction) ne pouvait JAMAIS administrer
+  // l'Organisation d'aucun tenant, même après sélection explicite dans l'UI —
+  // même correctif que paiementRoutes.js/contratRoutes.js/gestionDocumentRoutes.js.
+  const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
   if (!tenant) throw new OrgTenantBoundaryError('Contexte tenant requis ou ambigu pour cette action.');
   return String(tenant.rootOrgUnit);
 }

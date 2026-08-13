@@ -43,7 +43,9 @@ router.param('id', async (req, res, next, rentalId) => {
     // tenant traçable (données antérieures à PlatformTenant) n'a aucune
     // frontière tenant à faire respecter — voir
     // assertResourceTenantOrUnattributed.
-    const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+    // PLATFORM-ADMIN-CERT-1 — voir accommodationController.js pour la même justification.
+    const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+    const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
     await assertResourceTenantOrUnattributed({ resourceType: 'RentalManagement', resource: rental, tenantId: tenant?._id });
     next();
   } catch (error) {

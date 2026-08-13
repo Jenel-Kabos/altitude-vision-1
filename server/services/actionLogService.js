@@ -17,6 +17,7 @@ const logAction = async ({
   cible,
   typeAction,
   metadata = {},
+  scopeMode = null,
   req,
   session,
 }) => {
@@ -43,6 +44,7 @@ const logAction = async ({
       auteur,
       cible,
       typeAction,
+      scopeMode,
       metadata:   enrichedMetadata,
     }], { session });
     return created;

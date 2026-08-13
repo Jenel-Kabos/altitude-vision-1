@@ -37,7 +37,11 @@ router.param('id', async (req, res, next, contratId) => {
     // Un Contrat sans `bien` réellement lié (adresse en texte libre,
     // données antérieures à PlatformTenant) n'a aucune frontière tenant à
     // faire respecter — voir assertResourceTenantOrUnattributed.
-    const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+    // PLATFORM-ADMIN-1 — voir paiementRoutes.js pour la même justification :
+    // sans transmission explicite, un PlatformOperator resterait bloqué même
+    // après sélection d'un tenant dans l'UI.
+    const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+    const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
     await assertResourceTenantOrUnattributed({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
     next();
   } catch (error) {

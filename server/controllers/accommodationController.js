@@ -51,7 +51,10 @@ async function assertAccommodationAccessible(req, accommodation, allowedStaffRol
     error.statusCode = 403;
     throw error;
   }
-  const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+  // PLATFORM-ADMIN-CERT-1 — sans l'en-tête, un PlatformOperator ne pouvait
+  // jamais administrer l'Accommodation d'aucun tenant après sélection.
+  const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
   await assertResourceTenantOrUnattributed({ resourceType: 'Accommodation', resource: accommodation, tenantId: tenant?._id });
 }
 

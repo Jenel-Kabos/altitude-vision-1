@@ -30,10 +30,24 @@ const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/platformTenantController');
 const PlatformTenantDomain = require('../models/PlatformTenantDomain');
 const { resolveAvailableTenantsForUser } = require('../services/platformTenant/tenantContextService');
+const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
 
 router.use(auth.protect, auth.restrictTo('Admin'));
 
-async function assertOwnTenantOrPlatformOperator(req, targetTenantId) {
+// PLATFORM-ADMIN-1 — remplace l'ancienne vérification par appartenance
+// seule. Un PlatformOperator ACTIF détenant `platform.tenants.read` (ou
+// `.manage` pour les mutations, vérifié séparément par route) peut agir sur
+// N'IMPORTE QUEL tenant, y compris suspendu/archivé (jamais filtré par
+// statut ici — un opérateur doit pouvoir réactiver un tenant suspendu).
+// Sans capacité opérateur active, comportement STRICTEMENT inchangé depuis
+// TENANT-CERT-3-FINAL : appartenance requise, aucune exception.
+async function assertOwnTenantOrPlatformOperator(req, targetTenantId, { capability = 'platform.tenants.read' } = {}) {
+  const operator = await resolveActiveOperator(req.user._id || req.user.id);
+  if (operator && hasCapability(operator, capability)) {
+    req.isPlatformOperatorContext = true;
+    req.platformOperatorCapabilities = operator.capabilities || [];
+    return;
+  }
   const tenants = await resolveAvailableTenantsForUser(req.user._id || req.user.id);
   if (!tenants || tenants.length === 0) {
     const error = new Error('Action refusée : aucune capacité opérateur plateforme vérifiable.');
@@ -48,10 +62,16 @@ async function assertOwnTenantOrPlatformOperator(req, targetTenantId) {
   }
 }
 
+// GET → capacité lecture suffit ; toute autre méthode (PATCH/POST/DELETE)
+// mute l'état d'un tenant → capacité `.manage` requise. Sans objet pour la
+// branche "Admin de son propre tenant" (aucune capacité vérifiée dans ce
+// cas, comportement historique inchangé).
+const mutationCapability = (req) => (req.method === 'GET' ? 'platform.tenants.read' : 'platform.tenants.manage');
+
 router.param('id', async (req, res, next, tenantId) => {
   try {
     if (!mongoose.isValidObjectId(tenantId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
-    await assertOwnTenantOrPlatformOperator(req, tenantId);
+    await assertOwnTenantOrPlatformOperator(req, tenantId, { capability: mutationCapability(req) });
     next();
   } catch (error) {
     res.status(error.statusCode || 403).json({ status: 'fail', message: error.statusCode ? error.message : 'Action refusée.' });
@@ -65,19 +85,30 @@ router.param('domainId', async (req, res, next, domainId) => {
     if (!mongoose.isValidObjectId(domainId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
     const domain = await PlatformTenantDomain.findById(domainId).select('tenant').lean();
     if (!domain) return res.status(404).json({ status: 'fail', message: 'Domaine introuvable.' });
-    await assertOwnTenantOrPlatformOperator(req, domain.tenant);
+    await assertOwnTenantOrPlatformOperator(req, domain.tenant, { capability: mutationCapability(req) });
     next();
   } catch (error) {
     res.status(error.statusCode || 403).json({ status: 'fail', message: error.statusCode ? error.message : 'Action refusée.' });
   }
 });
 
-const rejectUnprovenPlatformOperation = (req, res) => res.status(403).json({
-  status: 'fail', message: 'Action refusée : aucune capacité opérateur plateforme vérifiable.',
-});
+// PLATFORM-ADMIN-1 — `GET /` (liste) et `POST /` (création) restent
+// inaccessibles à quiconque n'est PAS un PlatformOperator actif avec la
+// capacité requise. Un Tenant Admin (même avec de multiples memberships)
+// continue de recevoir 403 ici, exactement comme avant — seule l'existence
+// d'un opérateur réel change l'issue.
+const requirePlatformOperatorCapability = (capability) => async (req, res, next) => {
+  const operator = await resolveActiveOperator(req.user._id || req.user.id).catch(() => null);
+  if (!operator || !hasCapability(operator, capability)) {
+    return res.status(403).json({ status: 'fail', message: 'Action refusée : aucune capacité opérateur plateforme vérifiable.' });
+  }
+  req.isPlatformOperatorContext = true;
+  req.platformOperatorCapabilities = operator.capabilities || [];
+  next();
+};
 
-router.get('/', rejectUnprovenPlatformOperation);
-router.post('/', rejectUnprovenPlatformOperation);
+router.get('/', requirePlatformOperatorCapability('platform.tenants.read'), controller.listTenants);
+router.post('/', requirePlatformOperatorCapability('platform.tenants.manage'), controller.createTenant);
 router.get('/:id', controller.getTenantOverview);
 router.patch('/:id/suspend', controller.suspendTenant);
 router.patch('/:id/reactivate', controller.reactivateTenant);

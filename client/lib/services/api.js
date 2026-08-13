@@ -29,6 +29,16 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+    // PLATFORM-ADMIN-1 — sélection de tenant explicite par un PlatformOperator
+    // (voir platformOperatorService.js côté client). N'a aucun effet pour un
+    // utilisateur ordinaire : le backend n'accorde cette portée qu'à un
+    // opérateur réellement actif, jamais déduit de la seule présence de cet
+    // en-tête (voir server/middleware/tenantContext.js).
+    const selectedTenantId = typeof window !== "undefined" ? localStorage.getItem("platformOperatorTenantId") : null;
+    if (selectedTenantId) {
+      config.headers["X-Platform-Tenant-Id"] = selectedTenantId;
+    }
+
     if (config.data instanceof FormData) {
       delete config.headers["Content-Type"];
     }

@@ -37,7 +37,23 @@ const schema = new mongoose.Schema({
 }, { timestamps: true });
 
 schema.index({ tenant: 1, identityKeys: 1 }, { unique: true, name: 'one_crm_customer_per_tenant_identity_key' });
-schema.index({ tenant: 1, 'sourceRefs.entityType': 1, 'sourceRefs.entityId': 1 }, { unique: true, name: 'one_crm_customer_per_tenant_source' });
+// CRM-INDEX-GATE-1 — seules les fiches portant une vraie source externe
+// doivent participer à l'unicité. Sans filtre, Mongo matérialise
+// missing/null/[] comme le tuple (tenant, null, null), interdisant à tort
+// plusieurs Customers manuels dans un même tenant. Les deux tests `$type`
+// conservent l'unicité multikey de chaque vraie paire source, sans indexer
+// les fiches sans source.
+schema.index(
+  { tenant: 1, 'sourceRefs.entityType': 1, 'sourceRefs.entityId': 1 },
+  {
+    unique: true,
+    name: 'one_crm_customer_per_tenant_source',
+    partialFilterExpression: {
+      'sourceRefs.entityType': { $type: 'string' },
+      'sourceRefs.entityId': { $type: 'objectId' },
+    },
+  },
+);
 schema.index({ displayName: 'text', company: 'text', emails: 'text', phones: 'text' });
 
 module.exports = mongoose.model('CrmCustomer', schema);

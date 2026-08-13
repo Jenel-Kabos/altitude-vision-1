@@ -6,6 +6,8 @@ const Conversation = require('../../models/Conversation');
 const HotelReservation = require('../../models/HotelReservation');
 const AccommodationReservation = require('../../models/AccommodationReservation');
 const Contrat = require('../../models/Contrat');
+const CrmCustomer = require('../../models/CrmCustomer');
+const FinancialDocument = require('../../models/FinancialDocument');
 const { resolveAvailableTenantsForUser } = require('./tenantContextService');
 
 const rawId = (value) => value?._id || value?.id || value || null;
@@ -191,6 +193,37 @@ async function resolveResourceTenant({ resourceType, resource }) {
     const transaction = validId(resource.transaction) ? await Transaction.findById(validId(resource.transaction)).select('property').lean() : resource.transaction;
     return mergeProofs([direct, transaction?.property ? await fromProperty(transaction.property, 'paiementTransaction.transaction.property') : unresolved(['paiementTransaction.transaction→no_property'])]);
   }
+  // TENANT-DATA-REGULARIZATION-1 — extensions additives (même patron que
+  // STORAGE-LEGACY-1 ci-dessus) pour couvrir le graphe CRM/Marketing/Visite/
+  // Transaction/Finance-ligne-comptable lors de l'audit read-only des
+  // données historiques. Aucune de ces branches ne modifie le comportement
+  // des `resourceType` déjà gérés plus haut.
+  if (resourceType === 'Transaction') return mergeProofs([direct, await fromProperty(resource.property, 'transaction.property')]);
+  if (resourceType === 'Visite') return mergeProofs([direct, await fromProperty(resource.property, 'visite.property'), await fromUser(resource.owner, 'visite.owner')]);
+  if (resourceType === 'CrmCustomer') return direct; // seule source de vérité : le tenant est créé par le service CRM lui-même, aucune meilleure preuve relationnelle n'existe.
+  if (['CrmOpportunity', 'CrmActivity'].includes(resourceType)) {
+    if (!resource.customer) return mergeProofs([direct, unresolved([`${resourceType}.customer:missing`])]);
+    const customer = validId(resource.customer) ? await CrmCustomer.findById(validId(resource.customer)).select('tenant').lean() : resource.customer;
+    return mergeProofs([direct, customer ? resolveResourceTenant({ resourceType: 'CrmCustomer', resource: customer }) : unresolved([`${resourceType}.customer→missing`])]);
+  }
+  // CrmAutomationRun.ruleId est une chaîne dénormalisée (survit à la
+  // suppression de la règle), jamais un ObjectId fiable — le champ `tenant`
+  // direct est ici la seule preuve exploitable, jamais une hypothèse sur ruleId.
+  if (['CrmAutomationRule', 'CrmAutomationRun', 'MarketingCampaign', 'MarketingSend', 'MarketingTemplate'].includes(resourceType)) return direct;
+  if (resourceType === 'FinancialDocumentLine') {
+    if (!resource.financialDocument) return mergeProofs([direct, unresolved(['financialDocumentLine.financialDocument:missing'])]);
+    const doc = validId(resource.financialDocument)
+      ? await FinancialDocument.findById(validId(resource.financialDocument)).select('tenant establishmentType establishmentId').lean()
+      : resource.financialDocument;
+    return mergeProofs([direct, doc ? await resolveResourceTenant({ resourceType: 'FinancialDocument', resource: doc }) : unresolved(['financialDocumentLine.financialDocument→missing'])]);
+  }
+  if (resourceType === 'FinancialLedgerEntry') {
+    if (resource.establishmentType === 'Hotel') return mergeProofs([direct, await fromHotel(resource.establishmentId)]);
+    if (resource.establishmentType === 'Accommodation') return mergeProofs([direct, await fromAccommodation(resource.establishmentId)]);
+    if (resource.establishmentType === 'Property') return mergeProofs([direct, await fromProperty(resource.establishmentId, 'financialLedgerEntry.property')]);
+    return unresolved([`${resourceType}.establishmentType:unsupported`]);
+  }
+  if (resourceType === 'Notification') return direct; // platformTenant direct uniquement — recipient/sender ne sont jamais une preuve suffisante (mission §17-18).
   return unresolved([`${resourceType}:unsupported`]);
 }
 

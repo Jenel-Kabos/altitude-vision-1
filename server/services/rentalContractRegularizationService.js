@@ -11,6 +11,24 @@ class RegularizationError extends Error {
   constructor(message, statusCode = 409, code = 'REGULARIZATION_ERROR') { super(message); this.statusCode = statusCode; this.code = code; }
 }
 
+// PLATFORM-ADMIN-CERT-1 (V3) \u2014 un contrat dont `proprietaire.user` est
+// r\u00e9solvable appartient au tenant de ce user ; ce centre ne doit jamais
+// exposer ou laisser agir un acteur d'un AUTRE tenant sur un tel dossier.
+// Un contrat sans `proprietaire.user` li\u00e9 reste authentiquement non
+// attribuable (aucun tenant \u00e0 faire respecter) \u2014 c'est le cas d'usage m\u00eame
+// de ce centre, rest\u00e9 ouvert \u00e0 tout staff autoris\u00e9, comme avant ce correctif.
+function isContractInScope(contract, tenantScopeUserIds) {
+  const ownerUserId = contract.proprietaire?.user;
+  if (!ownerUserId) return true;
+  return (tenantScopeUserIds || []).some((id) => String(id) === String(ownerUserId));
+}
+
+function assertContractInScope(contract, tenantScopeUserIds) {
+  if (!isContractInScope(contract, tenantScopeUserIds)) {
+    throw new RegularizationError('Ce contrat n\u2019est plus r\u00e9gularisable.', 409, 'CASE_NOT_PENDING');
+  }
+}
+
 const normalize = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 const snapshot = (contract, property, rental) => ({
   contract: { bien: contract.bien || null, statut: contract.statut, cycleVie: contract.cycleVie || null },
@@ -38,7 +56,7 @@ function scoreProperty(contract, property, ownerUserId) {
   return { score, reasons };
 }
 
-async function getCases() {
+async function getCases({ tenantScopeUserIds = [] } = {}) {
   const decisions = await Reconciliation.find({}).lean();
   const contracts = await Contrat.find({
     type: 'location',
@@ -50,9 +68,10 @@ async function getCases() {
     .populate('locataire', 'nom prenom email telephone')
     .populate('proprietaire', 'nom prenom email telephone ville user biensPropres')
     .sort({ createdAt: 1 }).lean();
+  const scopedContracts = contracts.filter((contract) => isContractInScope(contract, tenantScopeUserIds));
   const properties = await Property.find({ status: 'location' }).select('title type price address owner availability assetCycle internalManagedOnly').lean();
   const decisionByContract = new Map(decisions.map((decision) => [String(decision.contract), decision]));
-  return contracts.map((contract) => {
+  return scopedContracts.map((contract) => {
     const scored = properties.map((property) => ({ ...property, ...scoreProperty(contract, property, contract.proprietaire?.user) }))
       .filter((property) => property.score > 0 && !['Vendu', 'Retiré'].includes(property.availability) && !['vendu', 'archive'].includes(property.assetCycle))
       .sort((a, b) => b.score - a.score).slice(0, 8);
@@ -66,10 +85,11 @@ async function getCases() {
   });
 }
 
-async function loadOpenCase(contractId) {
+async function loadOpenCase(contractId, tenantScopeUserIds = []) {
   if (!mongoose.isValidObjectId(contractId)) throw new RegularizationError('Contrat invalide.', 400, 'INVALID_CONTRACT');
   const contract = await Contrat.findOne({ _id: contractId, type: 'location', statut: { $in: ['actif', 'en_attente'] }, bien: null }).populate('proprietaire');
   if (!contract) throw new RegularizationError('Ce contrat n’est plus régularisable.', 409, 'CASE_NOT_PENDING');
+  assertContractInScope(contract, tenantScopeUserIds);
   const existing = await Reconciliation.findOne({ contract: contract._id });
   if (existing && existing.status !== 'pending' && existing.status !== 'reverted') throw new RegularizationError('Une décision active existe déjà.', 409, 'DECISION_ALREADY_EXISTS');
   return { contract, record: existing || new Reconciliation({ contract: contract._id }) };
@@ -101,10 +121,10 @@ async function finish({ contract, record, decision, property, rental, actor, rea
   return record;
 }
 
-async function decide({ contractId, action, data, actor }) {
+async function decide({ contractId, action, data, actor, tenantScopeUserIds = [] }) {
   const reason = String(data.reason || '').trim();
   if (reason.length < 5) throw new RegularizationError('Un motif explicite est obligatoire.', 422, 'REASON_REQUIRED');
-  const { contract, record } = await loadOpenCase(contractId);
+  const { contract, record } = await loadOpenCase(contractId, tenantScopeUserIds);
 
   if (action === 'flag_anomaly') return finish({ contract, record, decision: action, actor, reason, before: snapshot(contract), createdProperty: false });
   if (action === 'close_historical') {
@@ -142,14 +162,16 @@ async function decide({ contractId, action, data, actor }) {
   throw new RegularizationError('Décision inconnue.', 422, 'UNKNOWN_DECISION');
 }
 
-async function revert({ contractId, reason, actor }) {
+async function revert({ contractId, reason, actor, tenantScopeUserIds = [] }) {
   if (actor.role !== 'Admin') throw new RegularizationError('Réversion réservée à l’Administrateur.', 403, 'ADMIN_REQUIRED');
   if (String(reason || '').trim().length < 5) throw new RegularizationError('Un motif de réversion est obligatoire.', 422, 'REASON_REQUIRED');
   const record = await Reconciliation.findOne({ contract: contractId });
   if (!record || !['resolved', 'anomaly'].includes(record.status)) throw new RegularizationError('Aucune décision réversible.', 409, 'NOT_REVERSIBLE');
   const event = record.events[record.events.length - 1];
-  const contract = await Contrat.findById(contractId);
+  const contract = await Contrat.findById(contractId).populate('proprietaire');
   if (!contract) throw new RegularizationError('Contrat introuvable.', 404, 'CONTRACT_NOT_FOUND');
+  // PLATFORM-ADMIN-CERT-1 (V3) — même garde qu'à la décision initiale.
+  assertContractInScope(contract, tenantScopeUserIds);
   if (record.property && contract.bien && String(contract.bien) !== String(record.property)) throw new RegularizationError('Le contrat a divergé depuis la décision.', 409, 'STATE_DIVERGED');
   const beforeRevert = snapshot(contract);
   const original = event.before?.contract || {};

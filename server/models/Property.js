@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 
 const propertySchema = new mongoose.Schema(
   {
+    // TENANT-DATA-REGULARIZATION-EXEC-1 — frontière SaaS explicite,
+    // additive et sans effet sur la publication ou le cycle métier.
+    tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
     title: {
       type: String,
       required: [true, 'Un titre est requis pour la propriété'],

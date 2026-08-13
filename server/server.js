@@ -524,6 +524,11 @@ app.use('/api/erp', require('./routes/erpRoutes'));
 // du rapport de sprint. Réservé Admin.
 app.use('/api/platform-tenants', require('./routes/platformTenantRoutes'));
 
+// PLATFORM-ADMIN-1 — Gestion de l'identité PlatformOperator elle-même,
+// distincte de la gestion des tenants (routeur ci-dessus). Réservé Admin +
+// capacité `platform.operators.manage` (voir platformOperatorRoutes.js).
+app.use('/api/platform-operators', require('./routes/platformOperatorRoutes'));
+
 // 💬 Messagerie & Emails
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/messages", messageRoutes);

@@ -74,7 +74,9 @@ exports.download = async (req, res) => {
   let staffTenantMatch = false;
   if (isStaffDoc(user.role)) {
     try {
-      const tenant = await resolveTenantForUser(user._id || user.id);
+      // PLATFORM-ADMIN-CERT-1 — voir accommodationController.js pour la même justification.
+      const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+      const tenant = await resolveTenantForUser(user._id || user.id, explicitTenantId);
       await assertResourceTenantOrUnattributed({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
       staffTenantMatch = true;
     } catch {

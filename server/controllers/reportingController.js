@@ -18,9 +18,27 @@ const { getExecutiveReport, getDomainReport, DOMAINS } = require('../services/re
 const { buildCsv, buildPdf } = require('../services/reporting/reportingExportService');
 const { resolveRootOrgUnitId } = require('../services/platformTenant/tenantContextService');
 
+// PLATFORM-ADMIN-1 — un PlatformOperator sans tenant sélectionné
+// (`req.isPlatformOperatorContext` vrai ET `req.platformTenant` absent) est
+// la SEULE situation où `tenantId` reste volontairement `undefined` :
+// `reportingService.js` supporte nativement ce mode consolidé (paramètre
+// déjà optionnel partout, voir PLATFORM_ADMIN_1_AUDIT.md §1.6) — aucune
+// agrégation n'est fabriquée ici, seul le passthrough déjà existant est
+// débloqué pour un acteur dont la capacité vient d'être vérifiée par
+// `requireTenantScope`. Un opérateur AYANT sélectionné un tenant, et tout
+// utilisateur non-opérateur, gardent le comportement forcé historique
+// (jamais un `orgUnitId`/`tenantId` client de confiance).
 async function scopeParams(req) {
   const { orgUnitId } = req.query;
   const activeTenant = req.platformTenant;
+  if (!activeTenant) {
+    if (req.isPlatformOperatorContext) return {};
+    // Ne devrait jamais arriver (requireTenantScope aurait déjà 403), mais
+    // ne jamais retomber sur un scope global par défaut si ce n'est pas le cas.
+    const error = new Error('Contexte tenant requis.');
+    error.statusCode = 403;
+    throw error;
+  }
   const orgUnitRoot = orgUnitId ? await resolveRootOrgUnitId(orgUnitId).catch(() => null) : null;
   if (orgUnitRoot && String(orgUnitRoot) === String(activeTenant.rootOrgUnit)) return { orgUnitId, tenantId: String(activeTenant._id) };
   // L'absence de scope et tout identifiant hostile retombent TOUJOURS sur

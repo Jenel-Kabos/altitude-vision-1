@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDashboardBadges } from '../../hooks/useDashboardBadges';
 import DashboardBadge from '../../components/dashboard/DashboardBadge';
 import { resolveWebDestination } from '../../navigation/navigationSdk';
+import PlatformOperatorContextSwitcher from '../../components/dashboard/PlatformOperatorContextSwitcher';
 
 const GOLD = '#C8960C';
 const BLUE = '#2E7BB5';
@@ -352,6 +353,14 @@ const AdminDashboard = ({ children }) => {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* PLATFORM-ADMIN-1 — invisible pour tout utilisateur qui n'est pas
+              un PlatformOperator actif (voir le composant lui-même). */}
+          {user?.role === 'Admin' && (
+            <div className="px-3 pt-3">
+              <PlatformOperatorContextSwitcher />
             </div>
           )}
 

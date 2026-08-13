@@ -19,6 +19,7 @@ const OrgUnit = require('../../models/OrgUnit');
 const PlatformTenant = require('../../models/PlatformTenant');
 const User = require('../../models/User');
 const { getScopeUserIds } = require('../organizationService');
+const { resolveActiveOperator } = require('../platformOperator/platformOperatorService');
 
 // Remonte `ancestors` (déjà matérialisé par OrgUnit, voir models/OrgUnit.js)
 // jusqu'à la racine (type:'organization') — au maximum une lecture, aucune
@@ -78,7 +79,38 @@ async function resolveLegacyTenantForUser(userId) {
   return proven.length === 1 ? proven[0] : null;
 }
 
+// PLATFORM-ADMIN-1 — Un PlatformOperator actif n'appartient, par construction
+// correcte, à AUCUN tenant (voir PLATFORM_ADMIN_1_AUDIT.md §2 — c'est
+// exactement la cause des 403 historiques). Cette fonction est le SEUL point
+// où la capacité opérateur influence la résolution — jamais dupliquée
+// ailleurs (middleware, contrôleurs) pour garder une unique source de
+// vérité. Deux issues possibles, jamais une troisième :
+//   - tenant demandé + opérateur actif → tenant résolu par ID SEUL (aucun
+//     filtre de statut ni d'appartenance — un opérateur doit pouvoir
+//     administrer un tenant suspendu/en archivage), source distincte
+//     `platform_operator_selection` pour audit ;
+//   - aucun tenant demandé + opérateur actif → AUCUN tenant retourné
+//     (`tenant: null`), mais avec `source: 'platform_operator_unscoped'` —
+//     jamais confondu avec l'échec ordinaire (`null` complet) : un appelant
+//     qui sait lire cette source peut légitimement basculer en mode
+//     plateforme pour les capacités qui le permettent nativement (ex.
+//     reporting exécutif) ; un appelant qui l'ignore traite `tenant: null`
+//     exactement comme avant (fail-closed inchangé pour tout code qui ne
+//     connaît pas encore cette distinction).
+async function resolvePlatformOperatorTenantContext(userId, requestedTenantId) {
+  const operator = await resolveActiveOperator(userId).catch(() => null);
+  if (!operator) return undefined; // undefined = « pas un opérateur », laisse la résolution normale se poursuivre
+  if (requestedTenantId) {
+    const tenant = await PlatformTenant.findById(requestedTenantId).lean().catch(() => null);
+    return tenant ? { tenant, source: 'platform_operator_selection', operator } : { tenant: null, source: 'platform_operator_tenant_not_found', operator };
+  }
+  return { tenant: null, source: 'platform_operator_unscoped', operator };
+}
+
 async function resolveEffectiveTenantContext(userId, requestedTenantId = null) {
+  const operatorContext = await resolvePlatformOperatorTenantContext(userId, requestedTenantId);
+  if (operatorContext !== undefined) return operatorContext;
+
   const tenants = await resolveAvailableTenantsForUser(userId);
   if (requestedTenantId) {
     const tenant = tenants?.find((item) => String(item._id) === String(requestedTenantId)) || null;
@@ -101,9 +133,20 @@ async function resolveTenantForUser(userId, requestedTenantId = null) {
 // Résout un `tenantId` explicite (ex: paramètre de requête) en
 // `{ tenant, scopeUserIds }` — même forme que `resolveOrgScope` déjà
 // utilisé par reportingService.js, pour un branchement immédiat.
-async function resolveTenantScope(tenantId) {
+//
+// `allowAnyStatus` (PLATFORM-ADMIN-1) : par défaut, seul un tenant
+// `trial`/`active` est scopable (comportement historique inchangé pour tout
+// appelant existant). Un PlatformOperator qui a explicitement sélectionné un
+// tenant (déjà résolu par ID seul, sans filtre de statut, voir
+// `resolvePlatformOperatorTenantContext`) doit pouvoir administrer un tenant
+// `suspended`/`archived` — sinon `req.platformTenant` serait renseigné mais
+// `req.tenantScopeUserIds` resterait `null`, une incohérence silencieuse.
+// Seul `requireTenantScope` passe `true`, et uniquement pour une source
+// `platform_operator_*` déjà authentifiée comme telle.
+async function resolveTenantScope(tenantId, { allowAnyStatus = false } = {}) {
   if (!tenantId) return { tenant: null, scopeUserIds: null, rootOrgUnitId: null };
-  const tenant = await PlatformTenant.findOne({ _id: tenantId, status: { $in: ['trial', 'active'] } }).lean();
+  const query = allowAnyStatus ? { _id: tenantId } : { _id: tenantId, status: { $in: ['trial', 'active'] } };
+  const tenant = await PlatformTenant.findOne(query).lean();
   if (!tenant) return { tenant: null, scopeUserIds: null, rootOrgUnitId: null };
   const scopeUserIds = await getScopeUserIds(tenant.rootOrgUnit).catch(() => null);
   return { tenant, scopeUserIds, rootOrgUnitId: String(tenant.rootOrgUnit) };
@@ -116,4 +159,5 @@ module.exports = {
   resolveAvailableTenantsForUser,
   resolveTenantScope,
   resolveRootOrgUnitId,
+  resolvePlatformOperatorTenantContext,
 };

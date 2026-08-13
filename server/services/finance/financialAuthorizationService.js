@@ -57,7 +57,34 @@ const ACCOUNTING_ROLES = ['Admin', 'Collaborateur', 'Secretaire'];
 const HOTEL_FINANCE_ROLES = Object.keys(FINANCIAL_CAPABILITIES);
 const id = (value) => String(value?._id || value?.id || value || '');
 
+// PLATFORM-ADMIN-1 — mission §26 : "ne jamais transformer PlatformOperator
+// en permission financière implicite non auditée". Un opérateur ne reçoit
+// donc PAS automatiquement les capacités `Admin` : il doit détenir
+// explicitement `platform.finance.manage` (équivalent complet des capacités
+// Admin) ou `platform.finance.read` (lecture seule, sous-ensemble) — les
+// deux SEULES capacités PlatformOperator qui influencent ce module. Chaque
+// action reste par ailleurs journalisée par `financialController`/`actionLogService`
+// exactement comme pour tout autre acteur, aucune exception d'audit créée ici.
+const readOnlyFinanceCapabilities = [
+  CAPABILITIES.DOCUMENT_VIEW, CAPABILITIES.PAYMENT_VIEW, CAPABILITIES.LEDGER_VIEW,
+  CAPABILITIES.RECONCILIATION_VIEW, CAPABILITIES.HOTEL_CHECKOUT_VIEW,
+  CAPABILITIES.DOCUMENT_PDF_DOWNLOAD, CAPABILITIES.DOCUMENT_DELIVERY_VIEW,
+  CAPABILITIES.DASHBOARD_VIEW, CAPABILITIES.DASHBOARD_ALERTS_VIEW,
+];
+
+function hasPlatformOperatorFinanceCapability(user, capability) {
+  if (!user?.isPlatformOperatorContext) return false;
+  const capabilities = user.platformOperatorCapabilities || [];
+  // `.manage` = équivalent complet des capacités Admin (émission, override,
+  // reconciliation.run inclus). `.read` = strictement les capacités de
+  // consultation, jamais une action qui modifie/émet/override.
+  if (capabilities.includes('platform.finance.manage')) return adminCapabilities.includes(capability);
+  if (capabilities.includes('platform.finance.read')) return readOnlyFinanceCapabilities.includes(capability);
+  return false;
+}
+
 function hasFinancialCapability(user, capability) {
+  if (hasPlatformOperatorFinanceCapability(user, capability)) return true;
   return Boolean(user && FINANCIAL_CAPABILITIES[user.role]?.includes(capability));
 }
 
@@ -80,7 +107,11 @@ async function assertFinancialScope(user, hotelId, capability) {
   }
   await assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId: user.platformTenant._id || user.platformTenant })
     .catch(() => fail('FINANCIAL_UNAUTHORIZED', 'Etablissement inaccessible.', 404));
-  if (user.role === 'Admin' || id(hotel.manager) === id(user)) return hotel;
+  // PLATFORM-ADMIN-1 — additif : un opérateur n'atteint cette ligne QUE s'il
+  // a explicitement sélectionné le tenant du présent hôtel (sinon
+  // `user.platformTenant` serait `null`, branche ci-dessus) ET détient la
+  // capacité finance requise — jamais un bypass tenant, jamais implicite.
+  if (user.role === 'Admin' || id(hotel.manager) === id(user) || hasPlatformOperatorFinanceCapability(user, capability)) return hotel;
   const scope = await resolveHotelAccessScope({ actor: user, requiredCapability: capability, requestedHotelId: hotelId }).catch(() => null);
   if (!scope) fail('FINANCIAL_UNAUTHORIZED', 'Acces financier refuse.', 403);
   return hotel;

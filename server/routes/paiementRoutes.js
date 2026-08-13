@@ -51,7 +51,12 @@ router.param('id', async (req, res, next, paiementId) => {
     // elle doit correspondre au tenant de l'acteur (`tenant?._id` reste
     // `undefined` si l'acteur n'a lui-même aucun tenant : ne matche jamais
     // un `tenantId` réel, donc refuse correctement sans branche séparée).
-    const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+    // PLATFORM-ADMIN-1 — transmet l'en-tête de sélection explicite : sans
+    // cela, un PlatformOperator (zéro membership par construction) resterait
+    // bloqué ici même après sélection d'un tenant dans l'UI, puisque
+    // `resolveTenantForUser` sans second argument ignore totalement l'en-tête.
+    const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+    const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
     await assertResourceTenantOrUnattributed({ resourceType: 'Paiement', resource: paiement, tenantId: tenant?._id });
     next();
   } catch (error) {

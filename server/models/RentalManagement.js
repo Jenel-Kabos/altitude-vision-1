@@ -49,6 +49,7 @@ const actionRequestSchema = new mongoose.Schema({
 });
 
 const rentalManagementSchema = new mongoose.Schema({
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
   // Property reste l'unique représentation du bien physique et de son annonce.
   property: { type: mongoose.Schema.Types.ObjectId, ref: 'Property', required: true, unique: true, index: true },
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },

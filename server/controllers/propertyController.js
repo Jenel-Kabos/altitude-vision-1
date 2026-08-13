@@ -40,7 +40,9 @@ const { resolveTenantForUser } = require('../services/platformTenant/tenantConte
 // derrière soi sur le chemin où la propriété est finalement bien visible
 // (bien public, ou propriétaire légitime).
 async function isPropertyInActorTenant(req, property) {
-  const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+  // PLATFORM-ADMIN-CERT-1 — voir accommodationController.js pour la même justification.
+  const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
   if (!tenant) return false;
   return assertResourceTenant({ resourceType: 'Property', resource: property, tenantId: tenant._id })
     .then(() => true).catch(() => false);
@@ -50,7 +52,9 @@ async function isPropertyInActorTenant(req, property) {
 // reste de ce fichier, ex. updateProperty ci-dessous) : errorMiddleware.js
 // dérive son statusCode de `res.statusCode`, jamais de `err.statusCode`.
 async function assertPropertyTenantAccess(req, res, property) {
-  const tenant = await resolveTenantForUser(req.user._id || req.user.id);
+  // PLATFORM-ADMIN-CERT-1 — voir accommodationController.js pour la même justification.
+  const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
   if (!tenant) {
     res.status(403);
     throw new Error('Contexte tenant requis ou ambigu pour cette action.');

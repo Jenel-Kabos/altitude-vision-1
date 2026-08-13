@@ -1,0 +1,42 @@
+{
+  "resetId": "data-reset-1-20260813",
+  "database": "altitudevision",
+  "manifestHash": "e675ec0df7301effde02ddf71a4fc5768976c5cdb0344247bd5283439d0012b1",
+  "completedAt": "2026-08-13T15:27:13.663Z",
+  "admin": {
+    "id": "6a7de24d48d42c4c87f893d5",
+    "emailMasked": "al***@gmail.com"
+  },
+  "tenant": {
+    "id": "6a7de24e48d42c4c87f893dc",
+    "rootOrgUnit": "6a7de24e48d42c4c87f893d8"
+  },
+  "counts": {
+    "User": 1,
+    "PlatformTenant": 1,
+    "OrgUnit": 1,
+    "OrgMembership": 1,
+    "PlatformOperator": 1,
+    "CrmCustomer": 0
+  },
+  "crmIndex": {
+    "name": "one_crm_customer_per_tenant_source",
+    "key": {
+      "tenant": 1,
+      "sourceRefs.entityType": 1,
+      "sourceRefs.entityId": 1
+    },
+    "unique": true,
+    "partialFilterExpression": {
+      "sourceRefs.entityType": {
+        "$type": "string"
+      },
+      "sourceRefs.entityId": {
+        "$type": "objectId"
+      }
+    }
+  },
+  "recreatedCollectionCount": 103,
+  "cloudinary": "NO_CHANGE",
+  "result": "RESET_AND_BOOTSTRAP_COMPLETE"
+}

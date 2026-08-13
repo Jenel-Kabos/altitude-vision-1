@@ -1,0 +1,1527 @@
+{
+  "version": 1,
+  "reason": "TENANT_DATA_REGULARIZATION_EXEC_1",
+  "database": "altitudevision",
+  "tenantId": "6a7d05552db41d7c7223837c",
+  "actorId": "68f8edbad1e9333e12874f8c",
+  "batchId": "tdr-exec-1-20260813-033616z",
+  "generatedAt": "2026-08-13T03:44:53.404Z",
+  "manifestHash": "01a3fbe64b566d52ebf4219b7c97d976fc5704ae1383b4d2b678b58622ef882f",
+  "entries": [
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Property",
+      "resourceId": "6a563d4f6132ad740c860328",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "f30f4e7599c11afe4e3c11e506b1214427c780c076e7d09774864d9efb8e4280",
+      "attributionFingerprintAfter": "b1f74e561308eb3556116d53217a557fe7c535077a697b6b1cba7556b96e59f0"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Property",
+      "resourceId": "6a69a4d9ff48057876dd5ca9",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "property:6a69a4d9ff48057876dd5ca9.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "bcd4efeff7a4f94689396035064e660c36d0b169d3f4ff5f52d0029ae60bd403",
+      "attributionFingerprintAfter": "a2ede4020d8df5ec9d248e96ac12683d82f62080c14f36620007defaea6177b9"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "RentalManagement",
+      "resourceId": "6a72a8d97ebfbd6f90bb6a00",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "rentalManagement.property:6a72a8d97ebfbd6f90bb69fe→missing",
+        "rentalManagement.owner:6a72a8d77ebfbd6f90bb69de→no_tenant",
+        "rentalManagement.manager:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "da717b9ce3f395af9e63907bde385f23add1d66cef24eba8e42107db23d47358",
+      "attributionFingerprintAfter": "e7e850f6f10186f026bf3c5e9211cc4d33fccf8acbc679cd297c43125d4c1e5b"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Visite",
+      "resourceId": "6a570054bbcc8a085af4379f",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "visite.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "visite.owner:missing"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Property",
+          "resourceId": "6a563d4f6132ad740c860328"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "ee8f328462fe8dbcbf1ae92dc3d50424093329c84715372dc98dfff9ee39d1ea",
+      "attributionFingerprintAfter": "c711fba43ec852a8d2dfa4c5eade704dc166da9f7c382deab286505cbdc770bb"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Visite",
+      "resourceId": "6a6530ca9b59c1c74959a84d",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "visite.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "visite.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Property",
+          "resourceId": "6a563d4f6132ad740c860328"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "8806e44937ddd1b82956672deec7370d3af22478ff64634e9f5f8bb572ad2611",
+      "attributionFingerprintAfter": "47681d24182ce6f497e5e1670c926ece3b4b7a4703c5356670bd4cdff27fd93e"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Conversation",
+      "resourceId": "69375f667d90014fe2c1f0a6",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:69375f667d90014fe2c1f0a6.participant:69037b2939ef69653def9470→no_tenant",
+        "conversation:69375f667d90014fe2c1f0a6.participant:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "a2d1b7a1b1ba6e84253b4f688508f3b15587d417a1e19ecbff27253eef6f16d3",
+      "attributionFingerprintAfter": "615cc4a86b0974fa018d55a0c5be903be19c67e47c5c4cf33c79d8f0c4a319f8"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Conversation",
+      "resourceId": "693dc82d3a026d9617a562fc",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:693dc82d3a026d9617a562fc.participant:68fd96b4666c4df74b463bb1→no_tenant",
+        "conversation:693dc82d3a026d9617a562fc.participant:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "f897ea83cd11e8d60f377c36b47b5d11314e9a5e67e449f9e70274ba8628feb0",
+      "attributionFingerprintAfter": "8727741fd3951bd41c5c58cf1aff8757e916c27d885d874a3b990f66da0c0c2f"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Conversation",
+      "resourceId": "693dd1013a026d9617a567ac",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:693dd1013a026d9617a567ac.participant:690d72c22e4bf6077279c4c5→no_tenant",
+        "conversation:693dd1013a026d9617a567ac.participant:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "92b52b428fa763193ac3d5ced5f7c3d7eb686a61e0bd1df5fd1734a7d06ed580",
+      "attributionFingerprintAfter": "518c7df4521013bbcde7338cb2a3b0771948439d8ac7dcbcaa78482044eb27ec"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Conversation",
+      "resourceId": "69c9e3e1f22b1e2dc5a6ca7e",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:69c9e3e1f22b1e2dc5a6ca7e.participant:69a266aeb67cd198cce83f25→no_tenant",
+        "conversation:69c9e3e1f22b1e2dc5a6ca7e.participant:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "444871c02288c8c0c26a49b5294f27cca41f72c701aa892345f3969f7309cf6c",
+      "attributionFingerprintAfter": "8a27bd446d24f7cb142a7a780a1176d72881fa2b240295d3277b3fc5a0ab2121"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Conversation",
+      "resourceId": "69d03ae7de9a55d35b6f26e1",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:69d03ae7de9a55d35b6f26e1.participant:69d03615de9a55d35b6f246c→no_tenant",
+        "conversation:69d03ae7de9a55d35b6f26e1.participant:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "902e8ad08cae52343e0c73405beb14501f508bcf07483dfaac66464e3396991b",
+      "attributionFingerprintAfter": "fc368ff102b648d5191941a7b6a62ad7751621452fc1b247a128b8bd0fced213"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Conversation",
+      "resourceId": "6a570052bbcc8a085af4378c",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a570052bbcc8a085af4378c.participant:6a56ff8dbbcc8a085af436bf→no_tenant",
+        "conversation:6a570052bbcc8a085af4378c.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "e066f9198798bcbc25281a2a7b9b5c9b8973d0d47aa7219541a08edb05fad454",
+      "attributionFingerprintAfter": "9297e139e16bbab1d3c0c0eacedbfc800b6cf517e2c83db38ea83ca83ff04b32"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Conversation",
+      "resourceId": "6a5b9e7970176f661068a50a",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a5b9e7970176f661068a50a.participant:69ac5cf3a70283ce78585943→no_tenant",
+        "conversation:6a5b9e7970176f661068a50a.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "40495d0f5b1e8df655cd679c8e5e6d5f50d8403ce34def369f6e2d8488559e0b",
+      "attributionFingerprintAfter": "a831b9938196b35f5d4ebeb10e55bb6cb6c6d944ae229450e8743f110bbcde96"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Conversation",
+      "resourceId": "6a5bdfdec8067a764b6a4941",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a5bdfdec8067a764b6a4941.participant:6a5bdf94c8067a764b6a4903→no_tenant",
+        "conversation:6a5bdfdec8067a764b6a4941.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "e09ff84684750468fb9939c6498fffbe8517f4c1161454959ad81ad5ab3c5446",
+      "attributionFingerprintAfter": "12ee7dc6bb9d84356c21fd989183da02ebbf45aff2240a14b650c596af9b2f73"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Conversation",
+      "resourceId": "6a6530239b59c1c74959a7f4",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a6530239b59c1c74959a7f4.participant:6a54c44df99ccfdc726d4c84→no_tenant",
+        "conversation:6a6530239b59c1c74959a7f4.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "292b7c1a5c80ef785be488e91a7b531afba209f8dd00ad413d7b6765afbadf4d",
+      "attributionFingerprintAfter": "ffd04005ab140ab851787c556d3438db2ee2790c7ef4c083943822cb6d5c8d78"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6937d719241d82a4d926588b",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:69375f667d90014fe2c1f0a6.participant:69037b2939ef69653def9470→no_tenant",
+        "conversation:69375f667d90014fe2c1f0a6.participant:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "69375f667d90014fe2c1f0a6"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "7da6ece04e8afe08bdb4961a041a77d6d16bcba9b0327b47f2db5d6e7b972756",
+      "attributionFingerprintAfter": "d4db4942ca6ae7a20432bcb349651d0cd30ca6009fdda970ce9dccca0e2353dc"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6937d73c241d82a4d9265892",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:69375f667d90014fe2c1f0a6.participant:69037b2939ef69653def9470→no_tenant",
+        "conversation:69375f667d90014fe2c1f0a6.participant:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "69375f667d90014fe2c1f0a6"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "a14caa49f90a4348320431e1696967709781f04d1fdca663b40d9e054f3238a4",
+      "attributionFingerprintAfter": "4359508c0d4142ccf5f9df5d86702554ccc6cbd9eeaab15573a9a47c0b7ec94e"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6937d798241d82a4d92658d4",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:69375f667d90014fe2c1f0a6.participant:69037b2939ef69653def9470→no_tenant",
+        "conversation:69375f667d90014fe2c1f0a6.participant:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "69375f667d90014fe2c1f0a6"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "876cc498730bf3914b123441865fcbd1aabe2db0a66b96b370702f54526bc216",
+      "attributionFingerprintAfter": "990a9356483b2622cc6e72cb4ef92f8202b2d8aaa37743299e5fac91c80e1d93"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6937e49e241d82a4d926594b",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:69375f667d90014fe2c1f0a6.participant:69037b2939ef69653def9470→no_tenant",
+        "conversation:69375f667d90014fe2c1f0a6.participant:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "69375f667d90014fe2c1f0a6"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "9e67b4d2688e9e54bcc5bb1624a2f17423af1b7f02f99b8b68c111be131de4b8",
+      "attributionFingerprintAfter": "182b407d50e1fd829e66d45bce6608b2b8822bbb9489697880bcbc5a0445a064"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693daa4b80c47d161302c09b",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "0ddaf89ce0a0d986196d244a263fcaed06656c50bc628fc30bc133806bd8c677",
+      "attributionFingerprintAfter": "90aea5f37151a1caa4f44c7279d551cc629e770b40b188dab57cf6acc0af1008"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dac594338a14b2116b008",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "d6aee6a1e973039ea2ca4da4613ecfb6b441674af6ae5a126286809af3eafe12",
+      "attributionFingerprintAfter": "ba381cfddd847ae32fdb1a11c02775649a5ad04a73080437e96d33432cef48d0"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dacc44338a14b2116b07d",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "9a386d83feb4d327669318f5c6adb746ec88315ccc5e3b87d7e8d0990fab9d8a",
+      "attributionFingerprintAfter": "22a6041df99f53804c65c3023ac0e40370f1910ca772e1df6d8412eab3facfc8"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693db33a43b5b966b936544f",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "7df759dfaa12375081145264b334d96b2b3723634b6647bfcde1fde298095a32",
+      "attributionFingerprintAfter": "1aba8cc517dc81adbf367a43720294f4a80deb8b6243463b8349f4e814f4785b"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693db35243b5b966b936545a",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "8844dfe1f08bc28798fbb82eb2f7c080da74c8502bcb3cc41a62901006e7fc4c",
+      "attributionFingerprintAfter": "24de1ccc0b1f67469f7dff0904a12ba339005f43b29944eac031c2b5ff3943b3"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693db36843b5b966b9365461",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "ceac12346a9a0a1b320a085e10f2c357bc0d60afe52de2d5f126c54163eb59a7",
+      "attributionFingerprintAfter": "b744300207fae88c3a29d53cba4b47ed13d87ec8186144f9a33094ca8c2dd8d9"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693db4445e04480f7d2cb124",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "425197b57827eaf3a40e8ba38726cce911716c57ca5cab9b8017471a1d2e194d",
+      "attributionFingerprintAfter": "38f61527de67e9fd4c7f57e29fc5cdfad6284ceae1bbc4a06f6f357ff0107a44"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693db4555e04480f7d2cb12f",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "9611d2269df2d058193a7e22e4cdfe564fee2cd129cb5bf1c5f15d73489670a8",
+      "attributionFingerprintAfter": "ddf5071394ecaf23202ea335ce3a1628c162a61024a96ff5b6ed9e89f2d6a5d9"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693db4685e04480f7d2cb137",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "1ed243f66e693eaa7d59395ad55d5cb0f8ce0fab52f200bb6b852b07b7062d69",
+      "attributionFingerprintAfter": "d2aec088935b33e577fb66f438041039a1a005eb5820088a695f123ac299f920"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693db638e9e1c0e9cb7bdeb5",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "message.receiver:69037b2939ef69653def9470→no_tenant"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "9c083aeb7a9fed68cc59c3f5128a8e8ac78b0bfd579a1899551105095c22c6fb",
+      "attributionFingerprintAfter": "615244083b1b134b72f9174463c3778988ecd778274f91a9538e6272377cd501"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693db650e9e1c0e9cb7bdec0",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "message.receiver:69037b2939ef69653def9470→no_tenant"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "635f35d6604641a3ad416b96c8b9c97b3cf9d6612aa244bf5cbeb2c75fb47c08",
+      "attributionFingerprintAfter": "83b7cb2ab1caf63e15b4e50d37777022ed79c3fc5f3e30c03bcb93aa4c7eb59b"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693db941e9e1c0e9cb7bdf72",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "bae5f7426fc34080634b86908cbc412f8ad058a5d6f8a724555063025b926bf8",
+      "attributionFingerprintAfter": "9af6758fa15b7e2325a4e5e798a0bf4188103a075cdb35c144158484948d1768"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693db953e9e1c0e9cb7bdf95",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "682ee6f139565743e873409227c19e7e29ab4fcd294320ffb99cc0f080d37ace",
+      "attributionFingerprintAfter": "3963333b0b019091a150d3a086f621d84e507e1b8b4243a6d880045d904d4ae2"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693db96de9e1c0e9cb7bdfd3",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "58033dc74d1a53e2a9c8369a1d22c34b4ae5a7c9b392653bfdbfebac262f422d",
+      "attributionFingerprintAfter": "d4d9374df1c1502004f86c3a44c8025379de81ea5d4d13a323ff02d05fd84b62"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dba52e9e1c0e9cb7be0dd",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "a92bd121aa9f86d7c03680db7d879c24b1019ef92ba86f6cdf07b67e1e74342c",
+      "attributionFingerprintAfter": "7fe145cf1fa678b093697b7706be6d5b00f1d4492c04a4edddf6603770c9f425"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dbb25ea383f94849b6993",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "a03f891e2a611045f5dda665b3d5879c1a005986ccdacfa07e0e6f6d560a4000",
+      "attributionFingerprintAfter": "6289c0a38f7cd266814ed94e1fa45810e4daecfc7ce9772357280a344824a644"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dbb32ea383f94849b69b2",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "581d36f76987e47b14a9a0a082e8febc009feaf0ef0d70b1c1674a74f8942304",
+      "attributionFingerprintAfter": "1ee9cf40510a426c41dc3bca8be67b53b169dd71febf7bb3d20a8de146dd3b5c"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dbc34c634a93f447b40ea",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "6557e570b77238b3202343df8b7c77d320274a63f69367c8f5e2fb6e1988a820",
+      "attributionFingerprintAfter": "f1f89787d434bf8fb21af077b31edbd8f2f6ef45b2c76091892dbac2edf58ac5"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dbd60c634a93f447b41b4",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "cbee1b4652377b9db9abadcab1bdab73124c7e198f83b53fc5ed4bacb6eb3c99",
+      "attributionFingerprintAfter": "b13883d5b10429766d1d027a0bd83a55ae6518b4e862ef21b829283813798ca8"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dc79b3a026d9617a561f1",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "message.receiver:69037b2939ef69653def9470→no_tenant"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "e5bfc6ae56800bf412ad1895581cf32b20f1c5bdce16d736d5f7f16d765295af",
+      "attributionFingerprintAfter": "e6fc7565fd7d04a0f283dc60abfa6c3f3c46bb24c7deaa09a63fff05e1fa4795"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dc9b43a026d9617a56444",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:68fd96b4666c4df74b463bb1→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "4fe815dcbb392077f396423adf3c3b63a3da811a2818f608a45c2a1d8790c7d6",
+      "attributionFingerprintAfter": "68515c31ce5a5b83a06c0992f49528852aad672d39648130595dc9142e7af239"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dc9d33a026d9617a56496",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:68fd96b4666c4df74b463bb1→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "f6a3b0d4b445c9fd0d8dcc71df0690582ba208b7fd2661eeaa2c2e51182841ce",
+      "attributionFingerprintAfter": "388b85443827fc8c6611e2a84dbef03774563e77fc0a8b3d421ec66b47e7eea1"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dd1553a026d9617a56810",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:690d72c22e4bf6077279c4c5→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "335fdcf770cfc114e860f3cb8f16116ac1726f0f367fb42852096c42eed69c18",
+      "attributionFingerprintAfter": "013b7543f69d1d4d2fd629b178938a8298a78b381f42c9f428ba41ac1e495a6e"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "693dd1a33a026d9617a568ca",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "message.receiver:690d72c22e4bf6077279c4c5→no_tenant"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "e101c7ae6eceb8b246c517c1ade0bcb06d77a7af96cffe389a570c5f84107b3a",
+      "attributionFingerprintAfter": "e9018eed745d2022d91319be5eab873f07ee5b93873600fd0df1ba0c07063342"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "69506e726a6f3286ccdab13b",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "message.receiver:690d72c22e4bf6077279c4c5→no_tenant"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "969252a04d4b764e820f880811bfcc14442ec924daca86115c2b3e8c0fb0b7e1",
+      "attributionFingerprintAfter": "339a240f3321ae90d27bf713b4d21538e6af8b2e85e7da4f743f4122fe44a1a3"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "698dbb8234f370c983bc55ae",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "aeeff9f1071c37aedab0f48d4b1d7d81c40307b24092ac7575828d4e42975eca",
+      "attributionFingerprintAfter": "05c7da49261cd2e9e46bc1fc7053c6ab3db7d225cf57368260071e5c166568f8"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "698dbbc434f370c983bc5660",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69037b2939ef69653def9470→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "5582604ed716de9fcedad6a8a263cae7e4ab9698b904ed27d5e6e02d047dae89",
+      "attributionFingerprintAfter": "269abe5874705a9532cb4115efbc4e8b1caea336cd09e58ab87bdeb6830cd169"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "699160772621f866aeafc116",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "message.receiver:69037b2939ef69653def9470→no_tenant"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "6d97bd2abf0e27dd49ff0880e98aadf4c2d74158e05f6d6c26256617e7f871ca",
+      "attributionFingerprintAfter": "dfd1a2feb31ff2ad8821a0365f3480736899ebed28d67d81887876cd71dc9fc9"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "69c9f0a2a26ac9a5c552e38f",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69a266aeb67cd198cce83f25→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "25588922679b580dccfbfd4e8f56e7194d8bd8942e452c1d709bc48082cf2210",
+      "attributionFingerprintAfter": "62e14244f1849b14ed93d821e3610c9b3204591e6c51b2cc1e4c273e5a7b2d2d"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "69cef76ade9a55d35b6f0269",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "message.receiver:69a266aeb67cd198cce83f25→no_tenant"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "f6e847dcabb79663949512c36cce45c89741155efc3844fdf2171748ceb8ed73",
+      "attributionFingerprintAfter": "d8e133615be184bd9c8d540e4343869e425a3ecdab0869af8b5fbe4c7e0934ca"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "69cef814de9a55d35b6f0503",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69a266aeb67cd198cce83f25→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "11b49293c7eae86298c84d2684095fcd94c5dd13add98cfcaae8a483ef099ee6",
+      "attributionFingerprintAfter": "aad864f40b68faae85ecf7611aac76bba32c2f5ff325758ceb17223a163db332"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "69d03b0cde9a55d35b6f2737",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:69d03615de9a55d35b6f246c→no_tenant",
+        "message.receiver:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "ba7c871453e415c6a8fa509351a3821c9ce0b7a0a4044451c481e3fc3d53b112",
+      "attributionFingerprintAfter": "a188af889e068fdae1425a18081f54691844f0c0f7e745d8ac04bf9798881d7c"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "69d03b83de9a55d35b6f280d",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "message.sender:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "message.receiver:69d03615de9a55d35b6f246c→no_tenant"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "d16a06ebdea226be49fa5e6682c6faaaf5df90cf304dcf278e2107f9fad65896",
+      "attributionFingerprintAfter": "c3f5cad6a3e60f2bc318027ffd78dfd07fd0a5fa29ec23e55274577add7c541f"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a570053bbcc8a085af4378e",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a570052bbcc8a085af4378c.participant:6a56ff8dbbcc8a085af436bf→no_tenant",
+        "conversation:6a570052bbcc8a085af4378c.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a570052bbcc8a085af4378c"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "fafc7418d03052bb47207636946e7e20fafeb2a58bf33ae55394e491c5c905ce",
+      "attributionFingerprintAfter": "dd93e7b5ca3c4633fc60924ee52e5cfd3a4e6acdb853c4fbf03333373105ca53"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a572a40178119ffb473d6fd",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a570052bbcc8a085af4378c.participant:6a56ff8dbbcc8a085af436bf→no_tenant",
+        "conversation:6a570052bbcc8a085af4378c.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a570052bbcc8a085af4378c"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "1538b2ca8e6d16cb13ea95e240c692d485192c6fc99c1f494e314f5494dbe3b8",
+      "attributionFingerprintAfter": "8c1c065dc76c8b35d0e8f36907a681ae54334a6c66e22b758a8e820842ce645a"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a5b9e7a70176f661068a50c",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a5b9e7970176f661068a50a.participant:69ac5cf3a70283ce78585943→no_tenant",
+        "conversation:6a5b9e7970176f661068a50a.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a5b9e7970176f661068a50a"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "f4cbc3582ea89c81cc067ab696719ddee977e01f778a9719398923c924ef75c6",
+      "attributionFingerprintAfter": "491f0ac0c272ef9df162fc109197f65a9adcebb4f856e7860c5fcd7fa6b7340a"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a5bdfdec8067a764b6a4943",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a5bdfdec8067a764b6a4941.participant:6a5bdf94c8067a764b6a4903→no_tenant",
+        "conversation:6a5bdfdec8067a764b6a4941.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a5bdfdec8067a764b6a4941"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "de35012cb931a19a4ca2ab7857d48f2b67c893bcaac41a9f506af43b4e7a572d",
+      "attributionFingerprintAfter": "ba5389afa7a04f9c95c9c4d9665846723d25ac27ba2dc58f08d48469c9bebf37"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a5bdfffc8067a764b6a4960",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a5bdfdec8067a764b6a4941.participant:6a5bdf94c8067a764b6a4903→no_tenant",
+        "conversation:6a5bdfdec8067a764b6a4941.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a5bdfdec8067a764b6a4941"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "a30e2f0fb332fdc923b8a55ba5da01c0c4bd05ba3274c2a7616801d66f2d4a0b",
+      "attributionFingerprintAfter": "ab7fe7860ba27706d8352887352881cc886c3f98f862565404fdb2df5499e5db"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a5c0b24c8067a764b6a4b24",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a5bdfdec8067a764b6a4941.participant:6a5bdf94c8067a764b6a4903→no_tenant",
+        "conversation:6a5bdfdec8067a764b6a4941.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a5bdfdec8067a764b6a4941"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "cd341e163e99519862f23d6a157c38d3f7732cf3f5a615d6277e57affa4046c5",
+      "attributionFingerprintAfter": "6d9691149b3001388fd5c8181f64cda997a82bf7819f695fb42fc79fa30ec606"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a5c0b39c8067a764b6a4b3e",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a5bdfdec8067a764b6a4941.participant:6a5bdf94c8067a764b6a4903→no_tenant",
+        "conversation:6a5bdfdec8067a764b6a4941.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a5bdfdec8067a764b6a4941"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "5e85d4c01ba749c4ea609ef327b07f36a27beb702626fea883b05fbc20d5f488",
+      "attributionFingerprintAfter": "4fe2b7885328f88edb6e3522123a26db62c43dea4f3b5cb3c07496bef3826491"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a5c0b88c8067a764b6a4b5a",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a5bdfdec8067a764b6a4941.participant:6a5bdf94c8067a764b6a4903→no_tenant",
+        "conversation:6a5bdfdec8067a764b6a4941.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a5bdfdec8067a764b6a4941"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "626fa32da55200305c8bb00613e04e23b43eabd785452151f95240b8ccbccde3",
+      "attributionFingerprintAfter": "f60a2240437b8be1464a647e02055537d66f20a2b55f4a532d0948032f6d1f9f"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a5c16c8c8067a764b6a4d65",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a5bdfdec8067a764b6a4941.participant:6a5bdf94c8067a764b6a4903→no_tenant",
+        "conversation:6a5bdfdec8067a764b6a4941.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a5bdfdec8067a764b6a4941"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "0290583629a6aa02962ed95e492c7186e428c70f15d8a2522cd3a5f40eb4d396",
+      "attributionFingerprintAfter": "370e67028aec50bb1a1a266682c8a33a3c51745ec8529cb6b22c8eb3ac032ad7"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a5c1901c8067a764b6a4dbd",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a5bdfdec8067a764b6a4941.participant:6a5bdf94c8067a764b6a4903→no_tenant",
+        "conversation:6a5bdfdec8067a764b6a4941.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a5bdfdec8067a764b6a4941"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "3257da5054e0172b455c6e37e3c1539be0dc522cb3cf2d024428346a9be05a4c",
+      "attributionFingerprintAfter": "5afbaaa184a43baa0b46f030762330e3c5882355725bc1c4e76a13ce7072b185"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a6530239b59c1c74959a7f6",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a6530239b59c1c74959a7f4.participant:6a54c44df99ccfdc726d4c84→no_tenant",
+        "conversation:6a6530239b59c1c74959a7f4.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a6530239b59c1c74959a7f4"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "92991bb5b920a005ca17c53951148c0382556d2ce1933170f094f315b5029ae5",
+      "attributionFingerprintAfter": "883376bfa6ded1110798603bf258b5bddf06ad474ae9984e5d6f7785ac6407b9"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a65303b9b59c1c74959a814",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a6530239b59c1c74959a7f4.participant:6a54c44df99ccfdc726d4c84→no_tenant",
+        "conversation:6a6530239b59c1c74959a7f4.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a6530239b59c1c74959a7f4"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "a20c106b4a43f140c8b4b7c90ade47e5167d23542ec50b41825b97386eab1b2c",
+      "attributionFingerprintAfter": "3a37e46e0eed0d0600c7ef5bc4ecd6275a9207945763093738db6a9bfc43d884"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Message",
+      "resourceId": "6a6530c89b59c1c74959a837",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "conversation:6a6530239b59c1c74959a7f4.participant:6a54c44df99ccfdc726d4c84→no_tenant",
+        "conversation:6a6530239b59c1c74959a7f4.property:6a563d4f6132ad740c860328.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Conversation",
+          "resourceId": "6a6530239b59c1c74959a7f4"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "1ec9549cd4db31131884101dfd9380b1c7308bf91c18980597e567de82b06049",
+      "attributionFingerprintAfter": "c8b250a33c25e336fced31840e199fd326113d3da0d3e4a4c8f392776ede4e1c"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Document",
+      "resourceId": "6a4d60dca8115c1e5453e625",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "document.createdBy:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "document.client:69ac5cf3a70283ce78585943→no_tenant",
+        "document.relatedProperty:null→missing"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "109d493456d187bb85b29f270e7a3f0594c4a662ed57502b39cd5091baec0f19",
+      "attributionFingerprintAfter": "d7a4de6fec9619792ec2e92212b59c704ff8e05010e964e62dc356bb94742776"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Hotel",
+      "resourceId": "6a69a4d9ff48057876dd5cab",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "hotel:6a69a4d9ff48057876dd5cab.manager:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "hotel:6a69a4d9ff48057876dd5cab.property:6a69a4d9ff48057876dd5ca9.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "hotel:6a69a4d9ff48057876dd5cab.createdBy:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "2cdcbc236036858bff3c112e678c2ed49f460d95c30d35dee408155da3771df4",
+      "attributionFingerprintAfter": "4b0a409fe4b0b862401bf06f69cfefa7890755f2b2ac739160ea953390ef28db"
+    },
+    {
+      "batchId": "tdr-exec-1-20260813-033616z",
+      "resourceType": "Accommodation",
+      "resourceId": "6a69a4d9ff48057876dd5caf",
+      "currentTenant": null,
+      "targetTenant": "6a7d05552db41d7c7223837c",
+      "classification": "A",
+      "proofs": [
+        "accommodation:6a69a4d9ff48057876dd5caf.property:6a69a4d9ff48057876dd5ca9.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "hotel:6a69a4d9ff48057876dd5cab.manager:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "hotel:6a69a4d9ff48057876dd5cab.property:6a69a4d9ff48057876dd5ca9.owner:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "hotel:6a69a4d9ff48057876dd5cab.createdBy:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c",
+        "accommodation:6a69a4d9ff48057876dd5caf.createdBy:68f8edbad1e9333e12874f8c→membership→6a7d05552db41d7c7223837c"
+      ],
+      "dependencies": [
+        {
+          "resourceType": "Property",
+          "resourceId": "6a69a4d9ff48057876dd5ca9"
+        },
+        {
+          "resourceType": "Hotel",
+          "resourceId": "6a69a4d9ff48057876dd5cab"
+        }
+      ],
+      "expectedBefore": {
+        "tenant": null
+      },
+      "intendedAfter": {
+        "tenant": "6a7d05552db41d7c7223837c"
+      },
+      "attributionFingerprint": "d356a79d8d2bd243b2cccfe2edb7710e664c7020e2ea187a7a264f49a56f3b77",
+      "attributionFingerprintAfter": "4b064d9108934b3029c98a077d2236f6f8959f94b9c6cf779d5528cc28e7c454"
+    }
+  ]
+}
