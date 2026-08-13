@@ -39,6 +39,7 @@ test('deux réservations concurrentes différentes sur la dernière unité : une
     guest: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test' },
     checkInDate: '2026-10-10', checkOutDate: '2026-10-12', roomsCount: 1, adults: 1, children: 0,
     source: 'public_web', actingUser: {},
+    notificationDependencies: { emailSender: jest.fn().mockResolvedValue({ success: true }) },
   };
 
   const results = await Promise.allSettled([

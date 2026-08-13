@@ -45,14 +45,15 @@ test('deux check-in concurrents sur la même réservation : une seule chambre pa
     guest: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test' },
     checkInDate: '2026-09-10', checkOutDate: '2026-09-13', roomsCount: 1, adults: 1, children: 0,
     source: 'public_web', actingUser: {}, reservationRequestId: 'checkin-race-001',
+    notificationDependencies: { emailSender: jest.fn().mockResolvedValue({ success: true }) },
   });
   reservation.status = 'confirmed';
   await reservation.save();
   await autoAssignRooms({ reservationId: reservation._id, reservation, actingUser: f.actor, transactionMode: 'transactional' });
 
   const results = await Promise.allSettled([
-    performCheckIn({ reservationId: reservation._id, actingUser: f.actor, transactionMode: 'auto' }),
-    performCheckIn({ reservationId: reservation._id, actingUser: f.actor, transactionMode: 'auto' }),
+    performCheckIn({ reservationId: reservation._id, actingUser: f.actor, transactionMode: 'auto', notificationDependencies: { emailSender: jest.fn().mockResolvedValue({ success: true }) } }),
+    performCheckIn({ reservationId: reservation._id, actingUser: f.actor, transactionMode: 'auto', notificationDependencies: { emailSender: jest.fn().mockResolvedValue({ success: true }) } }),
   ]);
 
   expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);

@@ -74,11 +74,11 @@ async function performCheckOutCore({ reservationId, reservationSeed, actingUser,
   return { reservation, room, rooms, readiness, overrideApplied, overrideAuditId };
 }
 
-async function performCheckOut({ reservation, reservationId, actingUser, reason = '', financialOverride, transactionMode = 'fallback' }) {
+async function performCheckOut({ reservation, reservationId, actingUser, reason = '', financialOverride, transactionMode = 'fallback', notificationDependencies = {} }) {
   const id = reservationId || reservation?._id;
   const result = await runFinancialOperation({ operationName: 'hotel.checkout.financial', transactionMode }, ({ session }) => performCheckOutCore({ reservationId: id, reservationSeed: reservation, actingUser, reason, financialOverride, session }));
   if (result.rooms.length) await notifyStaff({ type: 'housekeeping_task_created', title: '🧹 Nouvelles tâches de ménage', body: `${result.rooms.length} tâche(s) de ménage ont été créées.`, data: { roomIds: result.rooms.map((room) => String(room._id)) } }).catch((error) => logger.error('hotel_checkout.post_commit_effect_failed', { reservationId: id, effect: 'housekeeping_notification', errorCode: error.code }));
-  await notifyReservationGuest({ reservation: result.reservation, eventKey: 'checked_out', type: 'hotel_reservation_checked_out', title: '👋 Check-out effectué', body: `Votre séjour ${result.reservation.reference} est terminé. Merci de votre visite !` }).catch((error) => logger.error('hotel_checkout.post_commit_effect_failed', { reservationId: id, effect: 'guest_notification', errorCode: error.code }));
+  await notifyReservationGuest({ reservation: result.reservation, eventKey: 'checked_out', type: 'hotel_reservation_checked_out', title: '👋 Check-out effectué', body: `Votre séjour ${result.reservation.reference} est terminé. Merci de votre visite !`, ...notificationDependencies }).catch((error) => logger.error('hotel_checkout.post_commit_effect_failed', { reservationId: id, effect: 'guest_notification', errorCode: error.code }));
   logger.info('hotel_checkout.completed', { reservationId: id, hotelId: result.reservation.hotel, actorId: actorId(actingUser), overrideApplied: result.overrideApplied });
   return { reservation: result.reservation, room: result.room, rooms: result.rooms, financialCheckout: { status: result.overrideApplied ? 'overridden' : result.readiness.status, warnings: result.readiness.warnings, overrideApplied: result.overrideApplied, overrideAuditId: result.overrideAuditId } };
 }

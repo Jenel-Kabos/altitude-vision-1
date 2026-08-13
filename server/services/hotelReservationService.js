@@ -120,6 +120,7 @@ async function createReservation({
   hotelId, roomCategoryId, ratePlanId, guest, guestUserId,
   checkInDate, checkOutDate, roomsCount = 1, adults = 1, children = 0,
   specialRequests = '', source, actingUser = {}, allowPast = false, reservationRequestId = null,
+  notificationDependencies = {},
 }) {
   const hotel = await Hotel.findById(hotelId);
   if (!hotel) { const err = new Error('Hôtel introuvable.'); err.statusCode = 404; throw err; }
@@ -235,7 +236,7 @@ async function createReservation({
     // notification persistée est encore en course avec un retry/cleanup.
     await Promise.allSettled([
       notifyNewReservation(reservation, hotel),
-      notifyReservationGuest({ reservation, eventKey: 'created', type: 'hotel_reservation_created', title: 'Demande de réservation reçue', body: `Votre demande ${reservation.reference} a bien été enregistrée.` }),
+      notifyReservationGuest({ reservation, eventKey: 'created', type: 'hotel_reservation_created', title: 'Demande de réservation reçue', body: `Votre demande ${reservation.reference} a bien été enregistrée.`, ...notificationDependencies }),
     ]);
   }
   return reservation;

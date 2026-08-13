@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './external-network.fixture';
 
 // DOC-ARCH-1 — un seul Centre documentaire pour toute la plateforme.
 // Vérifie en conditions réelles de navigateur : (1) l'ancien lien
@@ -25,7 +25,7 @@ test('l’ancien lien Gestion locative → Documents redirige vers le Centre doc
   await login(page);
   await page.goto('/dashboard/gestion-locative/documents?contratId=abc123');
   await expect(page).toHaveURL(/\/dashboard\/documents\?pole=Altimmo&service=gestion_locative&contratId=abc123/);
-  await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Documents', exact: true })).toBeVisible();
 });
 
 test('l’ancien lien sans contratId redirige aussi correctement', async ({ page }) => {

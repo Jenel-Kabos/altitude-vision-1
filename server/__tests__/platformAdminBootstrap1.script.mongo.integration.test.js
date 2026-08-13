@@ -11,6 +11,7 @@ const mongoose = require('mongoose');
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const User = require('../models/User');
 const PlatformOperator = require('../models/PlatformOperator');
+const { safeTestEnv } = require('../test-utils/safeTestEnv');
 
 jest.setTimeout(180000);
 
@@ -24,12 +25,11 @@ const SCRIPT = path.resolve(__dirname, '../scripts/bootstrapPlatformOperator.js'
 function runScript(args, envOverrides = {}) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [SCRIPT, ...args], {
-      env: {
-        ...process.env,
+      env: safeTestEnv(process.env, {
         MONGO_URI: mongoUri,
         NODE_ENV: envOverrides.NODE_ENV ?? 'test',
         ALLOW_PLATFORM_OPERATOR_BOOTSTRAP_APPLY: envOverrides.ALLOW_PLATFORM_OPERATOR_BOOTSTRAP_APPLY,
-      },
+      }),
       cwd: path.resolve(__dirname, '..'),
     });
     let stdout = '';

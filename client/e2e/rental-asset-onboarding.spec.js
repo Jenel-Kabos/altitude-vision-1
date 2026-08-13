@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './external-network.fixture';
 
 const admin = { email:'owner-e2e@example.test', password:'E2eOwner!2026' };
 async function login(page) {

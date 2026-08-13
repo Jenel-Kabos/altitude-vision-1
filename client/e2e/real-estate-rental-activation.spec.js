@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './external-network.fixture';
 
 // Parcours Location complet (Sprint IM-2.2, phase 9) : le paiement initial
 // n'est pas un prérequis métier réel de l'activation du bail — voir

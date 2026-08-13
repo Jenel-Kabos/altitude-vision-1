@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './external-network.fixture';
 
 const sizes = [{ name: 'desktop', width: 1440, height: 1000 }, { name: 'tablet', width: 900, height: 1100 }, { name: 'mobile', width: 390, height: 844 }];
 

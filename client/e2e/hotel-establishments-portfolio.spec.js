@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './external-network.fixture';
 
 const credentials = { email: 'owner-e2e@example.test', password: 'E2eOwner!2026' };
 

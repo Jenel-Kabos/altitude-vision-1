@@ -83,14 +83,14 @@ async function performCheckInCore({ reservationId, reservationSeed, roomId, room
   return { reservation, rooms: resultRooms };
 }
 
-async function performCheckIn({ reservation, reservationId, roomId, roomIds, autoAssign = false, actingUser, reason = '', transactionMode = 'fallback' }) {
+async function performCheckIn({ reservation, reservationId, roomId, roomIds, autoAssign = false, actingUser, reason = '', transactionMode = 'fallback', notificationDependencies = {} }) {
   const id = reservationId || reservation?._id;
   const result = await runFinancialOperation(
     { operationName: 'hotel.check_in', transactionMode },
     ({ session }) => performCheckInCore({ reservationId: id, reservationSeed: reservation, roomId, roomIds, autoAssign, actingUser, reason, session }),
   );
 
-  await notifyReservationGuest({ reservation: result.reservation, eventKey: 'checked_in', type: 'hotel_reservation_checked_in', title: '🔑 Check-in effectué', body: `Votre check-in pour ${result.reservation.reference} est enregistré.` }).catch(() => {});
+  await notifyReservationGuest({ reservation: result.reservation, eventKey: 'checked_in', type: 'hotel_reservation_checked_in', title: '🔑 Check-in effectué', body: `Votre check-in pour ${result.reservation.reference} est enregistré.`, ...notificationDependencies }).catch(() => {});
 
   let financialDocument;
   try {

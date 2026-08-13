@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './external-network.fixture';
 
 const API = 'http://localhost:5000/api';
 const client = { email: 'client-e2e@example.test', password: 'E2eClient!2026' };

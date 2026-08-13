@@ -10,4 +10,5 @@ module.exports = {
   ],
   coverageReporters: ['text', 'lcov'],
   setupFiles: ['<rootDir>/__tests__/setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/__tests__/externalIsolationAfterEnv.js'],
 };

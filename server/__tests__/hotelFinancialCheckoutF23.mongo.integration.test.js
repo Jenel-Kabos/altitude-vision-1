@@ -26,13 +26,15 @@ test('document absent bloque sans aucune mutation métier', async () => {
 
 test('override Admin rend audit, réservation, chambre et housekeeping atomiques sans fait financier artificiel', async () => {
   const f = await fixture();
-  const result = await performCheckOut({ reservationId: f.reservation._id, actingUser: f.admin, financialOverride: { requested: true, reason: 'Départ exceptionnel validé par la direction', ticket: 'INC-23' }, transactionMode: 'transactional' });
+  const emailSender = jest.fn().mockResolvedValue({ success: true, messageId: 'fake-checkout-email' });
+  const result = await performCheckOut({ reservationId: f.reservation._id, actingUser: f.admin, financialOverride: { requested: true, reason: 'Départ exceptionnel validé par la direction', ticket: 'INC-23' }, transactionMode: 'transactional', notificationDependencies: { emailSender } });
   expect(result.financialCheckout).toMatchObject({ status: 'overridden', overrideApplied: true });
+  expect(emailSender).toHaveBeenCalledWith(undefined, 'ada@example.test', expect.stringContaining('Check-out'), expect.stringContaining('Référence'));
   expect(await HotelReservation.findById(f.reservation._id)).toMatchObject({ status: 'checked_out' }); expect(await Room.findById(f.room._id)).toMatchObject({ status: 'cleaning' }); expect(await HousekeepingTask.countDocuments({ reservation: f.reservation._id, open: true })).toBe(1); expect(await FinancialLedgerEntry.countDocuments({ entityId: f.reservation._id, eventType: 'hotel_checkout.financial_override' })).toBe(1);
 });
 
 test('deux check-outs dérogés simultanés produisent une clôture, une tâche et un audit uniques', async () => {
-  const f = await fixture(); const input = { reservationId: f.reservation._id, actingUser: f.admin, financialOverride: { requested: true, reason: 'Départ exceptionnel validé par la direction' }, transactionMode: 'transactional' };
+  const f = await fixture(); const emailSender = jest.fn().mockResolvedValue({ success: true }); const input = { reservationId: f.reservation._id, actingUser: f.admin, financialOverride: { requested: true, reason: 'Départ exceptionnel validé par la direction' }, transactionMode: 'transactional', notificationDependencies: { emailSender } };
   const results = await Promise.allSettled([performCheckOut(input), performCheckOut(input)]);
   expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1); expect(await HousekeepingTask.countDocuments({ reservation: f.reservation._id })).toBe(1); expect(await FinancialLedgerEntry.countDocuments({ entityId: f.reservation._id, eventType: 'hotel_checkout.financial_override' })).toBe(1); expect(await RoomAssignment.countDocuments({ reservation: f.reservation._id, releasedAt: { $ne: null } })).toBe(1);
 });

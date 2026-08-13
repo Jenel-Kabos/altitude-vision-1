@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './external-network.fixture';
 const propertyPath='/immobilier/property/66e200000000000000000003'; const credentials={email:'client-e2e@example.test',password:'E2eClient!2026'}; const dates={'desktop-chromium':['2028-07-10','2028-07-12'],'mobile-chromium':['2028-08-10','2028-08-13']};
 async function login(page){await page.locator('#email').fill(credentials.email);await page.locator('#password').fill(credentials.password);await page.getByRole('button',{name:/se connecter/i}).click();}
 test.describe('Réservation publique hébergement isolée',()=>{

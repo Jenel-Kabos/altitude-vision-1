@@ -16,6 +16,7 @@ const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financial
 const { createTenantFixture } = require('./helpers/tenantAwareFixture');
 const User = require('../models/User');
 const PlatformOperator = require('../models/PlatformOperator');
+const { safeTestEnv } = require('../test-utils/safeTestEnv');
 
 const propertyRoutes = require('../routes/propertyRoutes');
 const conversationRoutes = require('../routes/conversationRoutes');
@@ -51,7 +52,7 @@ const SCRIPT = path.resolve(__dirname, '../scripts/bootstrapPlatformOperator.js'
 function runScript(args, mongoUri) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [SCRIPT, ...args], {
-      env: { ...process.env, MONGO_URI: mongoUri, NODE_ENV: 'test' },
+      env: safeTestEnv(process.env, { MONGO_URI: mongoUri }),
       cwd: path.resolve(__dirname, '..'),
     });
     let stdout = ''; let stderr = '';

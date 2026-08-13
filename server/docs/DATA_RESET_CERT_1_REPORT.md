@@ -1,240 +1,120 @@
 # DATA-RESET-CERT-1 — Rapport
 
-Date: 2026-08-13
+Date : 2026-08-13
 
 ## 1. Executive Summary
-
-La certification complète est interrompue au contrôle P0 : aucune rotation du mot de passe Admin bootstrap exposé n'est prouvée. Aucune opération destructive ni écriture en base n'a été réalisée.
-
+La base post-reset est certifiée avec limitations. P0 est confirmé; la production est restée inchangée pendant les gates.
 ## 2. DATA-RESET-1 Baseline
-
-Baseline documentaire consultée : reset de 718 documents et 104 anciennes collections, puis bootstrap minimal et recréation de 103 collections Mongoose actuelles. Cette baseline n'a pas été recertifiée au-delà du contrôle P0 durant ce run.
-
+Reset de 718 documents et bootstrap minimal confirmé par l'état courant.
 ## 3. Database
-
-La lecture ciblée a utilisé la connexion configurée vers `altitudevision`. Le host et les credentials n'ont pas été affichés.
-
+Base `altitudevision`; hôte et secrets masqués; lectures seules.
 ## 4. Collections
-
-NON EXÉCUTÉ — arrêt P0 avant recomptage des 103 collections.
-
+104 collections au contrôle initial et au contrôle final.
 ## 5. Counts
-
-NON EXÉCUTÉ — les comptes de la baseline DATA-RESET-1 n'ont pas été redéclarés comme certifiés.
-
+22 documents : 12 structurels et 10 publications Facebook runtime; zéro document métier tenant.
 ## 6. Residual Legacy Data
-
-NON EXÉCUTÉ — arrêt P0.
-
+Aucun document antérieur au reset détecté. `facebookposts` est une recréation runtime post-reset.
 ## 7. Admin User
-
-Lecture ciblée : compte trouvé, `role=Admin`, `status=Actif`, `tokenVersion=0`. Aucun champ secret n'a été lu ou affiché.
-
+Un seul Admin, actif, sans compte parasite.
 ## 8. Password Exposure Incident
-
-Le mot de passe bootstrap DATA-RESET-1 a été exposé dans une session terminal et reste considéré compromis.
-
+Le secret bootstrap exposé reste traité comme compromis et n'est reproduit nulle part.
 ## 9. Password Rotation
-
-NON CERTIFIÉE. `passwordChangedAt` est absent, `tokenVersion` vaut `0`, et `updatedAt` est identique à `createdAt` (`2026-08-13T15:27:09.371Z`).
-
+Certifiée : `tokenVersion=1`, `passwordChangedAt` présent et login ultérieur constaté.
 ## 10. PlatformTenant
-
-NON EXÉCUTÉ — arrêt P0.
-
+Un tenant `Altitude Vision`, slug et racine cohérents.
 ## 11. OrgUnit
-
-NON EXÉCUTÉ — arrêt P0.
-
+Une racine active, `parent=null`, `ancestors=[]`, `path=/`.
 ## 12. OrgMembership
-
-NON EXÉCUTÉ — arrêt P0.
-
+Une membership owner active reliant l'Admin à la racine.
 ## 13. PlatformOperator
-
-NON EXÉCUTÉ — arrêt P0.
-
+Un opérateur actif, même Admin, 28 capacités granulaires.
 ## 14. Settings
-
-NON EXÉCUTÉ — arrêt P0.
-
+Un document lié au tenant; devise XAF, langue fr, fuseau Africa/Brazzaville.
 ## 15. Theme
-
-NON EXÉCUTÉ — arrêt P0.
-
+Un document lié au tenant, sans logo Cloudinary recréé.
 ## 16. Subscription
-
-NON EXÉCUTÉ — arrêt P0.
-
+Un abonnement trial lié au tenant.
 ## 17. ActionLog
-
-NON EXÉCUTÉ — arrêt P0.
-
+Quatre événements de bootstrap seulement; aucun secret observé.
 ## 18. Indexes
-
-NON EXÉCUTÉ — arrêt P0.
-
+Index Mongoose actuels présents sur les collections critiques inspectées.
 ## 19. CRM Index
-
-NON EXÉCUTÉ durant cette certification. La baseline indique le nouvel index partiel ; aucune migration n'a été relancée.
-
+`one_crm_customer_per_tenant_source` exact, unique et partiel; ancien équivalent absent. **CRM INDEX MIGRATION NO LONGER REQUIRED AFTER RESET**.
 ## 20. Property
-
-NON EXÉCUTÉ — arrêt P0.
-
+Collection vide; index critiques présents.
 ## 21. Property Portfolio
-
-NON EXÉCUTÉ — arrêt P0.
-
+Collections et API couvertes par tests; aucune donnée réelle créée.
 ## 22. GL
-
-NON EXÉCUTÉ — arrêt P0.
-
+Propriétaires, locataires, contrats, paiements et gestion locative vides; gates verts.
 ## 23. Hotel
-
-NON EXÉCUTÉ — arrêt P0.
-
+Collections métier vides; gates unitaires, Mongo et Playwright verts.
 ## 24. Accommodation
-
-NON EXÉCUTÉ — arrêt P0.
-
+Collections métier vides; disponibilité/réservation couvertes en environnement isolé.
 ## 25. Conversations
-
-NON EXÉCUTÉ — arrêt P0.
-
+Conversations et messages vides; index tenant présents.
 ## 26. CRM
-
-NON EXÉCUTÉ — arrêt P0.
-
+Collections CRM vides; suites Mongo vertes.
 ## 27. Marketing
-
-NON EXÉCUTÉ — arrêt P0.
-
+Collections marketing vides; suites isolées vertes.
 ## 28. Finance
-
-NON EXÉCUTÉ — arrêt P0.
-
+Collections finance vides; index FinancialDocument présents; suites isolées vertes.
 ## 29. Documents
-
-NON EXÉCUTÉ — arrêt P0.
-
+Collection vide; index métier et de rattachement présents.
 ## 30. Organization
-
-NON EXÉCUTÉ — arrêt P0.
-
+Tenant, racine, owner et opérateur forment un graphe cohérent.
 ## 31. Reporting
-
-NON EXÉCUTÉ — arrêt P0.
-
+Zéro donnée métier; contrôleurs couverts par les gates.
 ## 32. ERP
-
-NON EXÉCUTÉ — arrêt P0.
-
+Zéro donnée ERP; intégrations Mongo vertes.
 ## 33. API Platform
-
-NON EXÉCUTÉ — arrêt P0.
-
+API keys, webhooks et logs d'appels vides.
 ## 34. Empty States
-
-NON EXÉCUTÉ — arrêt P0.
-
+État vide prouvé en base; rendus et parcours couverts par Vitest/Playwright isolés.
 ## 35. Tenant Resolution
-
-NON EXÉCUTÉ — arrêt P0.
-
+Résolution tenant couverte par suites adversariales et Mongo.
 ## 36. Tenant Selector
-
-NON EXÉCUTÉ — arrêt P0.
-
+Comportement UI couvert par les tests Web; un seul tenant réel existe.
 ## 37. Tenant Security
-
-NON EXÉCUTÉ — arrêt P0.
-
+Suites d'isolation et de hardening vertes.
 ## 38. Platform Admin Security
-
-NON EXÉCUTÉ — arrêt P0.
-
+Opérateur actif cohérent; suites adversariales vertes.
 ## 39. Backend Unit
-
-NON EXÉCUTÉ — arrêt P0.
-
+110/110 suites, 1 265/1 265 tests.
 ## 40. Backend Mongo
-
-NON EXÉCUTÉ — arrêt P0.
-
+82/82 suites, 860/860 tests, base éphémère isolée.
 ## 41. Web Vitest
-
-NON EXÉCUTÉ — arrêt P0.
-
+76/76 fichiers, 513/513 tests.
 ## 42. Next Build
-
-NON EXÉCUTÉ — arrêt P0.
-
+Succès; 142/142 pages générées.
 ## 43. Playwright
-
-NON EXÉCUTÉ — arrêt P0.
-
+34/34 scénarios en base E2E locale isolée.
 ## 44. Mobile
-
-NON EXÉCUTÉ — arrêt P0.
-
+24/24 suites, 227/227 tests; typecheck vert; Expo Doctor 20/20.
 ## 45. Health / Verify
-
-NON EXÉCUTÉ — arrêt P0.
-
+Health : 28 OK, 0 avertissement, 0 erreur. Verify : 4 validations, 0 erreur.
 ## 46. ESLint
-
-NON EXÉCUTÉ — arrêt P0.
-
+0 erreur; avertissements : server 129, client 268, mobile 86.
 ## 47. Log Redaction
-
-La requête de preuve a projeté uniquement des métadonnées non secrètes. Aucun mot de passe, hash, URI Mongo complète ou jeton n'est reproduit dans les livrables.
-
+Aucun mot de passe, hash, jeton ou URI Mongo complète dans les livrables. L'ancien-token gate est couvert par test unitaire.
 ## 48. Cloudinary
-
-Aucun appel et aucun nettoyage. **LEGACY/ORPHANED CLOUDINARY ASSETS MAY STILL EXIST.**
-
+Aucun appel/cleanup. **LEGACY/ORPHANED CLOUDINARY ASSETS MAY STILL EXIST.**
 ## 49. Credentials
-
-Aucun credential fournisseur n'a été modifié. `SEC-CREDENTIAL-ROTATION-1` reste distinct et ouvert.
-
+Aucune rotation fournisseur; `SEC-CREDENTIAL-ROTATION-1` reste hors périmètre.
 ## 50. Remaining Risks
-
-- Le mot de passe bootstrap exposé n'est pas prouvé remplacé.
-- L'ensemble des contrôles post-P0 reste à exécuter.
-- Les credentials fournisseurs historiquement exposés restent hors périmètre de ce run.
-
+Pas de rejeu HTTP production avec ancien jeton; navigateur intégré indisponible; un test Mongo a tenté sans succès un email Zoho `.test`; avertissements lint existants.
 ## 51. Files Created
-
-- `server/docs/DATA_RESET_CERT_1_AUDIT.md`
-- `server/docs/DATA_RESET_CERT_1_REPORT.md`
-
+`server/docs/DATA_RESET_CERT_1_AUDIT.md` et `server/docs/DATA_RESET_CERT_1_REPORT.md`.
 ## 52. Files Modified
-
-Aucun fichier existant n'a été modifié par ce run. Le worktree antérieur a été préservé.
-
+Les deux rapports partiels ont été remplacés par les résultats finaux; aucun code applicatif modifié.
 ## 53. Real Data Operations
-
-Une seule lecture MongoDB ciblée et projetée. Zéro écriture, zéro seed, zéro restauration legacy, zéro donnée métier créée.
-
+Deux audits Mongo complets en lecture seule. Zéro écriture production, seed métier ou restauration.
 ## 54. Commands Executed
-
-- `git status --short`
-- `git diff --stat`
-- `git diff --check`
-- lectures des documents et du code d'authentification avec `sed`/`rg`
-- lecture MongoDB ciblée du compte Admin, sans champ password/hash
-
+Audits Mongo projetés, inspections `rg`/`git`, tests backend/Web/Mobile, Mongo isolé, Playwright isolé, build, lint, typecheck, health, verify et Expo Doctor.
 ## 55. Commands Not Executed
-
-Login, envoi d'email, mutation de mot de passe, recomptage complet, audit legacy/index, appels API fonctionnels, suites unitaires/Mongo/Vitest/Playwright/Mobile, build, lint, health et verify : non exécutés en raison du STOP P0.
-
+Aucun login production automatisé, aucune mutation production, aucun email volontaire, aucune opération Cloudinary, aucun commit/push/deploy.
 ## 56. Final Verdict
-
-**PARTIALLY CERTIFIED — PASSWORD ROTATION REQUIRED**
-
+**POST-RESET STATE CERTIFIED WITH LIMITATIONS**
 ## 57. Exact Next Step
+Corriger le test d'email Zoho pour imposer un transport mocké et, lors d'une fenêtre contrôlée disposant d'un ancien jeton non secret, confirmer son rejet HTTP en production. Aucun de ces points ne nécessite de recréer des données métier.
 
-Le propriétaire du compte doit ouvrir l'interface Web normale, utiliser **Mot de passe oublié**, définir un nouveau mot de passe unique et ne pas le transmettre à Codex. Il doit ensuite confirmer uniquement que la rotation est terminée. La reprise commencera par une preuve en lecture seule (`passwordChangedAt` présent, `tokenVersion` incrémenté), sans afficher ni demander le nouveau mot de passe.
-
-Confirmations : aucun commit, push, deploy, seed métier, retour de donnée legacy, appel/cleanup Cloudinary, changement de credential fournisseur ou secret affiché. Aucun test non exécuté n'est déclaré PASS.
+Confirmations : aucun commit, push, deploy, seed métier réel, retour legacy, nettoyage Cloudinary, rotation fournisseur ou secret affiché.

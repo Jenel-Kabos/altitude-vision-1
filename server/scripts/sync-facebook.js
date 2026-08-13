@@ -72,7 +72,7 @@ async function recupererPosts(pageId) {
 // ============================================================
 // 🔄 SYNCHRONISATION PRINCIPALE
 // ============================================================
-async function syncFacebook() {
+async function syncFacebook({ fetchPosts = recupererPosts, PostModel = FacebookPost } = {}) {
   // 🔒 Vérification du token avant tout appel
   if (!ACCESS_TOKEN) {
     throw new Error(
@@ -88,7 +88,7 @@ async function syncFacebook() {
 
     let posts;
     try {
-      posts = await recupererPosts(page.id);
+      posts = await fetchPosts(page.id);
     } catch (error) {
       // On log l'erreur mais on ne bloque pas les autres pages
       console.error(`❌ Échec pour la page ${page.name} : ${error.message}`);
@@ -105,7 +105,7 @@ async function syncFacebook() {
     let synced = 0;
     for (const post of posts) {
       try {
-        await FacebookPost.findOneAndUpdate(
+        await PostModel.findOneAndUpdate(
           { facebook_id: post.id },
           {
             facebook_id: post.id,
@@ -133,4 +133,4 @@ async function syncFacebook() {
   return resultats;
 }
 
-module.exports = { syncFacebook };
+module.exports = { syncFacebook, recupererPosts };

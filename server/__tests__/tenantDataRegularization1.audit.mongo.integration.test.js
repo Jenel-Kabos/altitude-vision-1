@@ -21,6 +21,7 @@ const FinancialLedgerEntry = require('../models/FinancialLedgerEntry');
 const Notification = require('../models/Notification');
 const OrgMembership = require('../models/OrgMembership');
 const PlatformOperator = require('../models/PlatformOperator');
+const { safeTestEnv } = require('../test-utils/safeTestEnv');
 
 jest.setTimeout(180000);
 
@@ -28,7 +29,7 @@ const SCRIPT = path.resolve(__dirname, '../scripts/auditTenantLegacyData.js');
 function runScript(args, mongoUri) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [SCRIPT, ...args], {
-      env: { ...process.env, MONGO_URI: mongoUri, NODE_ENV: 'test' },
+      env: safeTestEnv(process.env, { MONGO_URI: mongoUri }),
       cwd: path.resolve(__dirname, '..'),
     });
     let stdout = ''; let stderr = '';

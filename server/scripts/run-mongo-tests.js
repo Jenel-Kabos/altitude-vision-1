@@ -1,6 +1,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
+const { safeTestEnv } = require('../test-utils/safeTestEnv');
 
 const startedAt = Date.now();
 let replSet;
@@ -30,7 +31,7 @@ async function main() {
   ];
   jestProcess = spawn(process.execPath, args, {
     cwd: path.resolve(__dirname, '..'),
-    env: { ...process.env, MONGODB_FINANCIAL_INTEGRATION_URI: uri },
+    env: safeTestEnv(process.env, { MONGODB_FINANCIAL_INTEGRATION_URI: uri }),
     stdio: 'inherit',
   });
   const exitCode = await new Promise((resolve, reject) => {

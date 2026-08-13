@@ -3,6 +3,7 @@ const path = require("path");
 const http = require("http");
 const mongoose = require("mongoose");
 const { MongoMemoryReplSet } = require("mongodb-memory-server");
+const { safeTestEnv } = require("../test-utils/safeTestEnv");
 const root = path.resolve(__dirname, "../..");
 const serverDir = path.join(root, "server");
 const clientDir = path.join(root, "client");
@@ -36,6 +37,7 @@ let mongo;
 let fakePaymentProvider;
 let shuttingDown = false;
 const children = [];
+const E2E_IMAGE = 'http://127.0.0.1:5051/fixture.svg';
 const waitFor = (url, timeout = 120000) =>
   new Promise((resolve, reject) => {
     const started = Date.now();
@@ -127,7 +129,7 @@ async function seed(uri) {
       address: { arrondissement: "Bacongo", city: "Brazzaville" },
       latitude: -4.26,
       longitude: 15.28,
-      images: ["https://placehold.co/1200x800/png?text=E2E"],
+      images: [E2E_IMAGE],
       surface: 100,
       bedrooms: 2,
       bathrooms: 1,
@@ -148,7 +150,7 @@ async function seed(uri) {
       latitude: -4.27,
       longitude: 15.29,
       surface: 500,
-      images: ["https://placehold.co/1200x800/png?text=Hotel-1", "https://placehold.co/1200x800/png?text=Hotel-2", "https://placehold.co/1200x800/png?text=Hotel-3"],
+      images: [E2E_IMAGE, E2E_IMAGE, E2E_IMAGE],
       statusAdmin: "En attente",
       availability: "Disponible",
       owner: ids.owner,
@@ -165,7 +167,7 @@ async function seed(uri) {
       latitude: -4.27,
       longitude: 15.29,
       surface: 500,
-      images: ["https://placehold.co/1200x800/png?text=Mobile-1", "https://placehold.co/1200x800/png?text=Mobile-2", "https://placehold.co/1200x800/png?text=Mobile-3"],
+      images: [E2E_IMAGE, E2E_IMAGE, E2E_IMAGE],
       statusAdmin: "En attente",
       availability: "Disponible",
       owner: ids.owner,
@@ -181,7 +183,7 @@ async function seed(uri) {
       address: { arrondissement: "Centre-ville", city: "Brazzaville" },
       latitude: -4.27,
       longitude: 15.29,
-      images: ["https://placehold.co/1200x800/png?text=Vente"],
+      images: [E2E_IMAGE],
       surface: 120,
       bedrooms: 3,
       bathrooms: 2,
@@ -201,7 +203,7 @@ async function seed(uri) {
       address: { arrondissement: "Moungali", city: "Brazzaville" },
       latitude: -4.25,
       longitude: 15.27,
-      images: ["https://placehold.co/1200x800/png?text=Location"],
+      images: [E2E_IMAGE],
       surface: 90,
       bedrooms: 2,
       bathrooms: 1,
@@ -221,7 +223,7 @@ async function seed(uri) {
       address: { arrondissement: "Moungali", city: "Brazzaville" },
       latitude: -4.25,
       longitude: 15.27,
-      images: ["https://placehold.co/1200x800/png?text=Location"],
+      images: [E2E_IMAGE],
       surface: 90,
       bedrooms: 2,
       bathrooms: 1,
@@ -241,7 +243,7 @@ async function seed(uri) {
       address: { arrondissement: "Bacongo", city: "Brazzaville" },
       latitude: -4.28,
       longitude: 15.27,
-      images: ["https://placehold.co/1200x800/png?text=Finalisation"],
+      images: [E2E_IMAGE],
       surface: 180,
       bedrooms: 4,
       bathrooms: 3,
@@ -261,7 +263,7 @@ async function seed(uri) {
       address: { arrondissement: "Bacongo", city: "Brazzaville" },
       latitude: -4.28,
       longitude: 15.27,
-      images: ["https://placehold.co/1200x800/png?text=Finalisation-Mobile"],
+      images: [E2E_IMAGE],
       surface: 180,
       bedrooms: 4,
       bathrooms: 3,
@@ -281,7 +283,7 @@ async function seed(uri) {
       address: { arrondissement: "Poto-Poto", city: "Brazzaville" },
       latitude: -4.26,
       longitude: 15.28,
-      images: ["https://placehold.co/1200x800/png?text=Location-Activation"],
+      images: [E2E_IMAGE],
       surface: 35,
       bedrooms: 1,
       bathrooms: 1,
@@ -301,7 +303,7 @@ async function seed(uri) {
       address: { arrondissement: "Poto-Poto", city: "Brazzaville" },
       latitude: -4.26,
       longitude: 15.28,
-      images: ["https://placehold.co/1200x800/png?text=Location-Activation-Mobile"],
+      images: [E2E_IMAGE],
       surface: 35,
       bedrooms: 1,
       bathrooms: 1,
@@ -317,7 +319,7 @@ async function seed(uri) {
       _id, title, description: "Bien privé fictif dédié à l'onboarding Gestion locative.",
       pole: "Altimmo", type: "Appartement", status: "location", price: 225000,
       address: { street: "12 rue E2E", arrondissement: "Bacongo", city: "Brazzaville" },
-      latitude: -4.27, longitude: 15.28, images: ["https://placehold.co/1200x800/png?text=Gestion-Locative"], surface: 65, bedrooms: 2, bathrooms: 1,
+      latitude: -4.27, longitude: 15.28, images: [E2E_IMAGE], surface: 65, bedrooms: 2, bathrooms: 1,
       statusAdmin: "En attente", isPublished: false, recommande: false, availability: "Disponible",
       owner: ids.rentalOnboardingOwner,
     })),
@@ -420,7 +422,7 @@ async function seed(uri) {
       adresse: "12 rue du bien propre", ville: "Brazzaville",
       description: "Description e2e suffisamment longue pour la validation du modèle Property.",
       superficie: 90, nombreChambres: 3, nombreSDB: 1, prixLoyer: 275000,
-      photos: ["https://placehold.co/1200x800/png?text=BienPropreE2E"],
+      photos: [E2E_IMAGE],
     }],
   });
   await Proprietaire.create({
@@ -431,15 +433,17 @@ async function seed(uri) {
       adresse: "13 rue du bien propre mobile", ville: "Brazzaville",
       description: "Description e2e suffisamment longue pour la validation du modèle Property (fiche dédiée mobile-chromium).",
       superficie: 88, nombreChambres: 3, nombreSDB: 1, prixLoyer: 270000,
-      photos: ["https://placehold.co/1200x800/png?text=BienPropreE2EMobile"],
+      photos: [E2E_IMAGE],
     }],
   });
   await mongoose.disconnect();
 }
 function start(command, args, cwd, env) {
+  const guardPath = path.resolve(serverDir, 'test-utils/externalNetworkGuard.js');
+  const nodeOptions = [process.env.NODE_OPTIONS, `--require=${guardPath}`].filter(Boolean).join(' ');
   const child = spawn(command, args, {
     cwd,
-    env: { ...process.env, ...env },
+    env: safeTestEnv(process.env, { NODE_ENV: env.NODE_ENV || 'e2e', NODE_OPTIONS: nodeOptions, ...env }),
     stdio: "inherit",
     detached: true,
   });
@@ -452,6 +456,11 @@ function startFakePaymentProvider() {
     const chunks = [];
     req.on('data', (chunk) => chunks.push(chunk));
     req.on('end', () => {
+      if (req.method === 'GET' && req.url === '/fixture.svg') {
+        res.setHeader('Content-Type', 'image/svg+xml');
+        res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="100%" height="100%" fill="#d1d5db"/></svg>');
+        return;
+      }
       res.setHeader('Content-Type', 'application/json');
       if (req.method === 'POST' && req.url === '/v1/payment-intents') {
         sequence += 1;

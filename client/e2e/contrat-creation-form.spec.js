@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './external-network.fixture';
 
 // REG-GL-1.1 — Deux incompatibilités frontend/backend empêchaient toute
 // création de contrat manuelle depuis GestionLocativePage.jsx :
