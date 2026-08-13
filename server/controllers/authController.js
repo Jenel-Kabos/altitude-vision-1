@@ -2,7 +2,6 @@
 const crypto    = require('crypto');
 const bcrypt    = require('bcryptjs');
 const jwt       = require('jsonwebtoken');
-const { promisify } = require('util');
 const { OAuth2Client } = require('google-auth-library');
 const User                  = require('../models/User');
 const PendingRegistration   = require('../models/PendingRegistration');
@@ -14,7 +13,15 @@ const { uploadPrivateAsset } = require('../services/storage/secureStorageService
 // Source unique de vérité pour protect/restrictTo (voir middleware/authMiddleware.js) —
 // réexportés ici pour les ~20 routes qui importent encore auth.protect/auth.restrictTo
 // depuis ce contrôleur, sans avoir à modifier chaque fichier de routes.
-const { protect: mwProtect, restrictTo: mwRestrictTo } = require('../middleware/authMiddleware');
+const { protect: mwProtect, optionalAuth: mwOptionalAuth, restrictTo: mwRestrictTo } = require('../middleware/authMiddleware');
+
+const PUBLIC_SIGNUP_ROLES = new Set(['Client', 'Proprietaire']);
+const isAccountEnabled = (user) => Boolean(user?.isActive && (user.status === undefined || user.status === 'Actif'));
+const rejectDisabledAccount = (user, res) => {
+    if (isAccountEnabled(user)) return false;
+    res.status(403).json({ status: 'fail', message: 'Accès refusé : compte inactif.' });
+    return true;
+};
 
 // ======================================================
 // 🔐 VÉRIFICATION IDTOKEN GOOGLE (google-auth-library)
@@ -91,6 +98,12 @@ exports.signup = async (req, res) => {
             return res.status(400).json({
                 status: 'fail',
                 message: 'Les mots de passe ne sont pas identiques.',
+            });
+        }
+        if (role !== undefined && !PUBLIC_SIGNUP_ROLES.has(role)) {
+            return res.status(400).json({
+                status: 'fail',
+                message: "Ce rôle ne peut pas être demandé lors d'une inscription publique.",
             });
         }
         if (role === 'Proprietaire' && !contratAccepte) {
@@ -414,6 +427,8 @@ exports.login = async (req, res) => {
             return res.status(401).json({ status: 'fail', message: 'Email ou mot de passe incorrect.' });
         }
 
+        if (rejectDisabledAccount(user, res)) return;
+
         if (!user.isEmailVerified) {
             return res.status(401).json({
                 status:  'fail',
@@ -435,27 +450,7 @@ exports.login = async (req, res) => {
 // ======================================================
 // 5. AUTH OPTIONNELLE
 // ======================================================
-exports.optionalAuth = async (req, res, next) => {
-    try {
-        let token;
-        if (req.headers.authorization?.startsWith('Bearer')) {
-            token = req.headers.authorization.split(' ')[1];
-        }
-        if (!token) return next();
-
-        const decoded     = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
-        const currentUser = await User.findById(decoded.id);
-
-        if (!currentUser)                                     return next();
-        if (currentUser.tokenVersion > decoded.tokenVersion) return next();
-        if (currentUser.changedPasswordAfter(decoded.iat))   return next();
-
-        req.user = currentUser;
-        return next();
-    } catch {
-        return next();
-    }
-};
+exports.optionalAuth = mwOptionalAuth;
 
 // ======================================================
 // 6. PROTECT (Auth obligatoire)
@@ -687,6 +682,7 @@ exports.googleToken = async (req, res) => {
         const existingUser = await User.findOne({ email: payload.email });
 
         if (existingUser) {
+            if (rejectDisabledAccount(existingUser, res)) return;
             if (!existingUser.googleId) {
                 // Compte existant (email/mot de passe) sans Google — on le lie
                 existingUser.googleId = payload.sub;
@@ -755,6 +751,8 @@ exports.googleGetToken = async (req, res) => {
         if (!user) {
             return res.status(404).json({ status: 'fail', message: 'Utilisateur non trouvé.' });
         }
+
+        if (rejectDisabledAccount(user, res)) return;
 
         const token = signToken(user._id, user.tokenVersion);
         res.status(200).json({

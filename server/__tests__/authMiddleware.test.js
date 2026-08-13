@@ -5,7 +5,7 @@ jest.mock('../models/Property');
 
 const User     = require('../models/User');
 const Property = require('../models/Property');
-const { protect, restrictTo, adminOnly, checkPropertyOwnership } = require('../middleware/authMiddleware');
+const { protect, optionalAuth, restrictTo, adminOnly, checkPropertyOwnership } = require('../middleware/authMiddleware');
 
 // ── Helpers ──────────────────────────────────────────────────
 const makeToken = (payload = {}) =>
@@ -94,6 +94,31 @@ describe('protect', () => {
     const res  = makeRes();
     const next = await runMiddleware(protect, req, res);
     // next() appelé sans argument = pas d'erreur
+    expect(next).toHaveBeenCalledWith();
+    expect(req.user).toBe(fakeUser);
+  });
+});
+
+describe('optionalAuth', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  it.each([
+    [{ tokenVersion: 2, status: 'Actif', isActive: true }, { tokenVersion: 1 }],
+    [{ tokenVersion: 0, status: 'Suspendu', isActive: true }, {}],
+    [{ tokenVersion: 0, status: 'Banni', isActive: false }, {}],
+  ])('continue anonymement si la session est révoquée ou le compte désactivé', async (fakeUser, payload) => {
+    User.findById.mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: 'user123', ...fakeUser }) });
+    const req = makeReq(makeToken(payload));
+    const next = await runMiddleware(optionalAuth, req, makeRes());
+    expect(next).toHaveBeenCalledWith();
+    expect(req.user).toBeNull();
+  });
+
+  it('attache un compte actif avec une session courante', async () => {
+    const fakeUser = { _id: 'user123', tokenVersion: 0, status: 'Actif', isActive: true };
+    User.findById.mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser) });
+    const req = makeReq(makeToken());
+    const next = await runMiddleware(optionalAuth, req, makeRes());
     expect(next).toHaveBeenCalledWith();
     expect(req.user).toBe(fakeUser);
   });

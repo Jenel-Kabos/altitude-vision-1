@@ -33,7 +33,7 @@ const { STAFF_IMMO } = require('../utils/roles');
 // supplémentaire — seul le contournement par rôle Admin manquait de preuve
 // tenant.
 const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
-const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const { resolveTenantForUser, resolveTenantScope } = require('../services/platformTenant/tenantContextService');
 
 // Pure prédicat, ne touche jamais `res` — utilisé par getProperty pour
 // calculer `isAdmin` sans risquer de laisser un `res.statusCode` erroné
@@ -61,6 +61,7 @@ async function assertPropertyTenantAccess(req, res, property) {
   }
   try {
     await assertResourceTenant({ resourceType: 'Property', resource: property, tenantId: tenant._id });
+    return tenant;
   } catch (error) {
     res.status(error.statusCode || 403);
     throw error;
@@ -936,7 +937,7 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
   }
   // Modération = action Admin par capacité, jamais un accès global — voir
   // assertPropertyTenantAccess en tête de fichier.
-  await assertPropertyTenantAccess(req, res, target);
+  const tenant = await assertPropertyTenantAccess(req, res, target);
 
   const updatedProperty = await Property.findByIdAndUpdate(
     id,
@@ -961,7 +962,9 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
       notify({ recipient: updatedProperty.owner,
         type:  'bien_valide',
         title: '✅ Bien validé',
-        body:  `"${updatedProperty.title}" est maintenant visible sur la plateforme.`,
+        body: updatedProperty.isPublished === true
+          ? `"${updatedProperty.title}" est maintenant visible sur la plateforme.`
+          : `"${updatedProperty.title}" a été validé. Sa publication reste à activer.`,
         data:  { propertyId: updatedProperty._id.toString(), screen: 'Annonces' },
       }).catch(() => {});
     } else if (newStatusAdmin === 'Rejetée') {
@@ -974,10 +977,13 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
     }
   }
 
-  // Broadcast "nouveau bien publié" à tous les utilisateurs actifs
-  if (newStatusAdmin === 'Validée') {
+  // Broadcast uniquement si le bien est réellement public. Validation et
+  // publication sont deux états distincts dans le modèle Property.
+  if (newStatusAdmin === 'Validée' && updatedProperty.isPublished === true) {
     try {
+      const { scopeUserIds } = await resolveTenantScope(tenant._id);
       const allUsers = await User.find({
+        _id: { $in: Array.from(scopeUserIds || []) },
         status: { $nin: ['Suspendu', 'Banni'] },
       }).select('_id').lean();
 
@@ -994,6 +1000,7 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
           title: '🏠 Nouveau bien disponible !',
           body:  [propertyTitle, ville, prix].filter(Boolean).join(' · '),
           data:  { screen: 'DetailAnnonce', params: { id: updatedProperty._id.toString() } },
+          platformTenantId: tenant._id,
         },
       ).catch(() => {});
     } catch (err) {

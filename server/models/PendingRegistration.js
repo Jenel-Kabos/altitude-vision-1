@@ -6,7 +6,9 @@ const pendingRegistrationSchema = new mongoose.Schema(
     name:     { type: String, required: true, trim: true },
     email:    { type: String, required: true, lowercase: true, trim: true },
     password: { type: String, required: true }, // déjà hashé avant stockage
-    role:     { type: String, default: 'Client' },
+    // Défense en profondeur : une inscription publique ne peut jamais
+    // transporter un rôle staff jusqu'à la création du User vérifié.
+    role:     { type: String, enum: ['Client', 'Proprietaire'], default: 'Client' },
     phone:    { type: String, trim: true },
     ipInscription: { type: String },
 

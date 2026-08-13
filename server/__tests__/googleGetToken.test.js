@@ -80,6 +80,8 @@ describe('POST /api/auth/google-token', () => {
       email:        'user@test.com',
       role:         'Collaborateur',
       tokenVersion: 0,
+      isActive:     true,
+      status:       'Actif',
     };
     User.findOne = jest.fn().mockResolvedValue(fakeUser);
 
@@ -97,5 +99,18 @@ describe('POST /api/auth/google-token', () => {
     const decoded = jwt.verify(res.body.token, process.env.JWT_SECRET);
     expect(decoded.id).toBe(fakeUser._id);
     expect(decoded.tokenVersion).toBe(0);
+  });
+
+  test('403 sans token pour un utilisateur suspendu', async () => {
+    User.findOne = jest.fn().mockResolvedValue({
+      _id: '507f1f77bcf86cd799439011', email: 'user@test.com', role: 'Client',
+      tokenVersion: 1, isActive: false, status: 'Suspendu',
+    });
+    const res = await request(app)
+      .post('/api/auth/google-token')
+      .set('x-nextauth-secret', NEXTAUTH_SECRET)
+      .send({ email: 'user@test.com' });
+    expect(res.statusCode).toBe(403);
+    expect(res.body.token).toBeUndefined();
   });
 });

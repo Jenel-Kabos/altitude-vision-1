@@ -18,9 +18,9 @@ jest.mock('../models/Contrat');
 jest.mock('../services/platformTenant/tenantContextService', () => ({
   resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439001' }, source: 'single_membership' }),
   resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439001' }),
+  resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set(['507f1f77bcf86cd799439011']) }),
   resolveRootOrgUnitId: jest.fn().mockResolvedValue('607f1f77bcf86cd799439001'),
   resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),
-  resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set() }),
 }));
 jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
   assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
@@ -42,6 +42,12 @@ jest.mock('../services/actionLogService', () => ({
   logAction:   jest.fn(),
   buildAuteur: jest.fn(),
 }));
+const mockNotify = jest.fn().mockResolvedValue({});
+const mockNotifyMany = jest.fn().mockResolvedValue();
+jest.mock('../services/notificationService', () => ({
+  notify: (...args) => mockNotify(...args),
+  notifyMany: (...args) => mockNotifyMany(...args),
+}));
 
 const request  = require('supertest');
 const jwt      = require('jsonwebtoken');
@@ -51,6 +57,7 @@ const User     = require('../models/User');
 const Accommodation = require('../models/Accommodation');
 const SaleManagement = require('../models/SaleManagement');
 const RentalManagement = require('../models/RentalManagement');
+const { resolveTenantScope } = require('../services/platformTenant/tenantContextService');
 
 // Par défaut, aucune fiche Vente/Location (property.status indéfini dans la
 // plupart des tests existants de ce fichier) — évite tout appel réel non
@@ -133,6 +140,58 @@ describe('GET /api/properties', () => {
     // Limitation connue : total (2) > results.length (1) quand un hébergement
     // non publié est retiré après pagination.
     expect(res.body.results).toBe(1);
+  });
+});
+
+describe('PATCH /api/properties/admin/:id/:action', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('borne le broadcast de publication aux utilisateurs du tenant validé', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    Property.findById = jest.fn().mockResolvedValue({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012' });
+    Property.findByIdAndUpdate = jest.fn().mockResolvedValue({
+      ...fakeProp, owner: '507f1f77bcf86cd799439012', isPublished: true,
+      address: { city: 'Brazzaville' },
+    });
+    const userQuery = { select: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([{ _id: '507f1f77bcf86cd799439011' }]) };
+    User.find = jest.fn().mockReturnValue(userQuery);
+
+    const res = await request(app)
+      .patch(`/api/properties/admin/${fakeProp._id}/validate`)
+      .set('Authorization', `Bearer ${makeToken('Admin')}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(resolveTenantScope).toHaveBeenCalledWith('607f1f77bcf86cd799439001');
+    expect(User.find).toHaveBeenCalledWith(expect.objectContaining({
+      _id: { $in: ['507f1f77bcf86cd799439011'] },
+    }));
+    expect(mockNotifyMany).toHaveBeenCalledWith(
+      ['507f1f77bcf86cd799439011'],
+      expect.objectContaining({ platformTenantId: '607f1f77bcf86cd799439001' }),
+    );
+  });
+
+  test('ne diffuse pas un bien seulement validé et indique que sa publication reste à activer', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    Property.findById = jest.fn().mockResolvedValue({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012' });
+    Property.findByIdAndUpdate = jest.fn().mockResolvedValue({
+      ...fakeProp, owner: '507f1f77bcf86cd799439012', isPublished: false,
+    });
+    User.find = jest.fn();
+
+    const res = await request(app)
+      .patch(`/api/properties/admin/${fakeProp._id}/validate`)
+      .set('Authorization', `Bearer ${makeToken('Admin')}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(mockNotify).toHaveBeenCalledWith(expect.objectContaining({
+      recipient: '507f1f77bcf86cd799439012',
+      body: expect.stringContaining('publication reste à activer'),
+    }));
+    expect(User.find).not.toHaveBeenCalled();
+    expect(mockNotifyMany).not.toHaveBeenCalled();
   });
 });
 
@@ -290,16 +349,15 @@ describe('GET /api/properties/:id', () => {
     expect(res.body.data.property.sale).toBeUndefined();
   });
 
-  // authController.optionalAuth (utilisé par GET /api/properties/:id) résout
-  // `User.findById(id)` DIRECTEMENT (pas de `.select()` chaîné, contrairement
-  // à `.protect`) et appelle `currentUser.changedPasswordAfter(...)` — un
-  // mock non conforme est silencieusement avalé par son try/catch et
-  // n'échoue jamais la requête, il retombe juste en accès anonyme (piège
-  // découvert en écrivant ce test).
+  // optionalAuth partage désormais le middleware canonique et sa requête
+  // Mongoose `.select('-password')`, comme protect.
   const fakeAuthenticatedUser = (role) => ({ ...fakeUser(role), changedPasswordAfter: () => false });
+  const mockAuthenticatedUser = (role) => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeAuthenticatedUser(role)) });
+  };
 
   test("200 (Admin authentifié) — la fiche SaleManagement complète est renvoyée (préremplissage édition dashboard)", async () => {
-    User.findById = jest.fn().mockResolvedValue(fakeAuthenticatedUser('Admin'));
+    mockAuthenticatedUser('Admin');
     const document = {
       _id: '507f191e810c19729de860ea', title: 'TEST DATA VILLA', statusAdmin: 'Validée',
       status: 'vente', images: [], address: {},
@@ -316,7 +374,7 @@ describe('GET /api/properties/:id', () => {
   });
 
   test("200 (Admin authentifié) — la fiche RentalManagement complète est renvoyée (préremplissage édition dashboard)", async () => {
-    User.findById = jest.fn().mockResolvedValue(fakeAuthenticatedUser('Admin'));
+    mockAuthenticatedUser('Admin');
     const document = {
       _id: '507f191e810c19729de860ea', title: 'TEST DATA APPART', statusAdmin: 'Validée',
       status: 'location', images: [], address: {},
@@ -334,7 +392,7 @@ describe('GET /api/properties/:id', () => {
   });
 
   test("200 (Admin) — fallback legacy : un RentalManagement non activé (valeurs par défaut) n'écrase pas les vraies valeurs historiques de Property", async () => {
-    User.findById = jest.fn().mockResolvedValue(fakeAuthenticatedUser('Admin'));
+    mockAuthenticatedUser('Admin');
     const document = {
       _id: '507f191e810c19729de860ea', title: 'TEST DATA APPART ANCIEN', statusAdmin: 'Validée',
       status: 'location', images: [], address: {},
@@ -360,7 +418,7 @@ describe('GET /api/properties/:id', () => {
   });
 
   test("200 (Admin) — un RentalManagement réellement activé fait foi, même si Property porte d'anciennes valeurs différentes", async () => {
-    User.findById = jest.fn().mockResolvedValue(fakeAuthenticatedUser('Admin'));
+    mockAuthenticatedUser('Admin');
     const document = {
       _id: '507f191e810c19729de860ea', title: 'TEST DATA APPART GÉRÉ', statusAdmin: 'Validée',
       status: 'location', images: [], address: {},
@@ -383,7 +441,7 @@ describe('GET /api/properties/:id', () => {
   });
 
   test("200 (Admin) — une ancienne annonce Location sans RentalManagement conserve ses valeurs legacy directement sur Property", async () => {
-    User.findById = jest.fn().mockResolvedValue(fakeAuthenticatedUser('Admin'));
+    mockAuthenticatedUser('Admin');
     const document = {
       _id: '507f191e810c19729de860ea', title: 'TEST DATA APPART TRÈS ANCIEN', statusAdmin: 'Validée',
       status: 'location', images: [], address: {},

@@ -79,7 +79,11 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
 
       const user = await User.findById(decoded.id).select('-password');
 
-      if (user && user.isActive) {
+      const tokenRevoked = user && decoded.tokenVersion !== undefined && decoded.tokenVersion < user.tokenVersion;
+      const passwordChanged = user && typeof user.changedPasswordAfter === 'function' && user.changedPasswordAfter(decoded.iat);
+      const accountDisabled = user && (user.status === 'Suspendu' || user.status === 'Banni' || user.status === 'Supprimé' || !user.isActive);
+
+      if (user && !tokenRevoked && !passwordChanged && !accountDisabled) {
         req.user = user;
         logger.success('[OptionalAuth] Utilisateur connecté', { email: user.email });
       } else {

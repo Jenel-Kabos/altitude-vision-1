@@ -93,6 +93,23 @@ describe('POST /api/auth/login', () => {
     // Le mot de passe ne doit JAMAIS apparaître dans la réponse
     expect(JSON.stringify(res.body)).not.toContain('password');
   });
+
+  test.each([
+    ['Suspendu', true],
+    ['Banni', false],
+    ['Actif', false],
+  ])('403 sans token si compte status=%s isActive=%s', async (status, isActive) => {
+    User.findOne = jest.fn().mockReturnValue({
+      select: jest.fn().mockResolvedValue({
+        _id: '507f1f77bcf86cd799439011', email: 'user@test.com', role: 'Client',
+        isEmailVerified: true, isActive, status, tokenVersion: 0,
+        matchPassword: jest.fn().mockResolvedValue(true), save: jest.fn(),
+      }),
+    });
+    const res = await request(app).post('/api/auth/login').send({ email: 'user@test.com', password: 'BonMotDePasse123!' });
+    expect(res.statusCode).toBe(403);
+    expect(res.body.token).toBeUndefined();
+  });
 });
 
 // ─── POST /api/auth/signup ──────────────────────────────────────────────────

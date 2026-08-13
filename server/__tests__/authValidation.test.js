@@ -54,4 +54,15 @@ describe('signup — validation des champs', () => {
     expect(res._status).toBe(400);
     expect(res._body.message).toMatch(/contrat/i);
   });
+
+  it.each(['Admin', 'Collaborateur', 'Secretaire', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant', 'Prestataire', 'User'])(
+    'refuse le rôle public privilégié %s',
+    async (role) => {
+      const req = { body: { name: 'Test', email: 'test@test.com', password: 'motdepasse1', passwordConfirm: 'motdepasse1', role }, headers: {}, socket: {}, ip: '127.0.0.1' };
+      const res = makeRes();
+      await authController.signup(req, res);
+      expect(res._status).toBe(400);
+      expect(PendingRegistration.findOneAndUpdate).not.toHaveBeenCalled();
+    },
+  );
 });
