@@ -23,6 +23,9 @@ vi.mock('../context/AuthContext', () => ({
 }));
 
 vi.mock('../hooks/useDashboardBadges', () => ({ useDashboardBadges: () => ({ badges: {} }) }));
+vi.mock('../context/PlatformTenantRuntimeContext', () => ({
+  usePlatformTenantRuntime: () => ({ tenantReady: true, tenantRequired: false, selectedTenantId: null }),
+}));
 
 vi.mock('socket.io-client', () => ({
   io: () => ({ on: vi.fn(), disconnect: vi.fn() }),

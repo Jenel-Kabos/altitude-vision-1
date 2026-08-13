@@ -16,6 +16,7 @@ import { useDashboardBadges } from '../../hooks/useDashboardBadges';
 import DashboardBadge from '../../components/dashboard/DashboardBadge';
 import { resolveWebDestination } from '../../navigation/navigationSdk';
 import PlatformOperatorContextSwitcher from '../../components/dashboard/PlatformOperatorContextSwitcher';
+import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeContext';
 
 const GOLD = '#C8960C';
 const BLUE = '#2E7BB5';
@@ -185,12 +186,14 @@ const AdminDashboard = ({ children }) => {
   const pathname = usePathname();
   const isActive = (to, end = false) => end ? pathname === to : pathname.startsWith(to);
   const { logout, user, isCollaborateur, activeWrites, timeLeft } = useAuth();
+  const { tenantReady, tenantRequired, selectedTenantId } = usePlatformTenantRuntime();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const menuButtonRef = useRef(null);
   const closeButtonRef = useRef(null);
   const sidebarRef = useRef(null);
-  const { badges } = useDashboardBadges(!!user);
+  const tenantScopedReady = tenantReady && (!tenantRequired || Boolean(selectedTenantId));
+  const { badges } = useDashboardBadges(!!user && tenantScopedReady);
 
   const activeWriteCount = Object.keys(activeWrites).length;
   // Plus petit temps restant parmi toutes les fenêtres actives

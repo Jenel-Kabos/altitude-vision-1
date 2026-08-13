@@ -15,6 +15,7 @@ import {
   openConversationAttachment,
 } from "../../services/conversationService";
 import { useAuth } from "../../context/AuthContext";
+import { usePlatformTenantRuntime } from "../../context/PlatformTenantRuntimeContext";
 import BackButton from "../../components/navigation/BackButton";
 
 const GOLD = "#C8960C";
@@ -52,6 +53,7 @@ const formatTime = (d) => {
 
 const StaffInboxPage = () => {
   const { user } = useAuth();
+  const { selectedTenantId } = usePlatformTenantRuntime();
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected]           = useState(null);
   const [messages, setMessages]           = useState([]);
@@ -89,7 +91,7 @@ const StaffInboxPage = () => {
     if (!token) return;
 
     const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
-    const socket = io(SOCKET_URL, { auth: { token } });
+    const socket = io(SOCKET_URL, { auth: { token, platformTenantId: selectedTenantId || undefined } });
 
     socket.on('new-staff-message', ({ conversationId, message }) => {
       setSelected(prevSelected => {
@@ -106,7 +108,7 @@ const StaffInboxPage = () => {
     });
 
     return () => socket.disconnect();
-  }, [user?.id, user?._id]);
+  }, [user?.id, user?._id, selectedTenantId]);
 
   // Charger les messages d'une conversation sélectionnée
   const openConversation = async (conv) => {

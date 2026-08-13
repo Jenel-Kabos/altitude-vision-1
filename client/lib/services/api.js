@@ -11,6 +11,10 @@ const SILENT_URLS = [
 
 // Evite que plusieurs 401 simultanement declenchent plusieurs redirects
 let _autoLogoutPending = false;
+let _validatedPlatformTenantId = null;
+
+export const setValidatedPlatformTenant = (tenantId) => { _validatedPlatformTenantId = tenantId || null; };
+export const clearValidatedPlatformTenant = () => { _validatedPlatformTenantId = null; };
 
 // Instance Axios principale
 const api = axios.create({
@@ -34,9 +38,8 @@ api.interceptors.request.use(
     // utilisateur ordinaire : le backend n'accorde cette portée qu'à un
     // opérateur réellement actif, jamais déduit de la seule présence de cet
     // en-tête (voir server/middleware/tenantContext.js).
-    const selectedTenantId = typeof window !== "undefined" ? localStorage.getItem("platformOperatorTenantId") : null;
-    if (selectedTenantId) {
-      config.headers["X-Platform-Tenant-Id"] = selectedTenantId;
+    if (_validatedPlatformTenantId) {
+      config.headers["X-Platform-Tenant-Id"] = _validatedPlatformTenantId;
     }
 
     if (config.data instanceof FormData) {
@@ -67,6 +70,9 @@ api.interceptors.response.use(
           if (typeof window !== "undefined" && localStorage.getItem("token")) {
             localStorage.removeItem("token");
             localStorage.removeItem("user");
+            localStorage.removeItem("platformOperatorTenantSelection");
+            localStorage.removeItem("platformOperatorTenantId");
+            clearValidatedPlatformTenant();
             window.dispatchEvent(new CustomEvent("altimmo:auth:expired"));
           }
         } else if (!_autoLogoutPending && typeof window !== "undefined") {
@@ -74,6 +80,9 @@ api.interceptors.response.use(
           console.warn("🔒 Token invalide (401) — Deconnexion automatique");
           localStorage.removeItem("token");
           localStorage.removeItem("user");
+          localStorage.removeItem("platformOperatorTenantSelection");
+          localStorage.removeItem("platformOperatorTenantId");
+          clearValidatedPlatformTenant();
           const AUTH_PAGES = ["/login", "/register", "/"];
           if (!AUTH_PAGES.includes(window.location.pathname)) {
             window.location.href = "/login";

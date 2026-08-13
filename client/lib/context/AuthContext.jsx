@@ -66,6 +66,8 @@ export const AuthProvider = ({ children }) => {
                 console.error("❌ Erreur restauration session:", error);
                 localStorage.removeItem('user');
                 localStorage.removeItem('token');
+                localStorage.removeItem('platformOperatorTenantSelection');
+                localStorage.removeItem('platformOperatorTenantId');
             } finally {
                 if (isMounted) {
                     setLoading(false);
@@ -115,6 +117,8 @@ export const AuthProvider = ({ children }) => {
     const logout = useCallback(async () => {
         localStorage.removeItem('user');
         localStorage.removeItem('token');
+        localStorage.removeItem('platformOperatorTenantSelection');
+        localStorage.removeItem('platformOperatorTenantId');
         setUser(null);
         loggedOutRef.current = true;
         await signOut({ redirect: false });

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useAuth } from '@/lib/context/AuthContext';
+import { usePlatformTenantRuntime } from '@/lib/context/PlatformTenantRuntimeContext';
 import AdminDashboard from "@/lib/pages/dashboard/AdminDashboard";
 import { Loader2 } from 'lucide-react';
 import './dashboard.css';
@@ -26,11 +27,12 @@ const REDIRECT_BY_ROLE = {
 export default function DashboardLayout({ children }) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { tenantLoading, tenantRequired, selectedTenantId } = usePlatformTenantRuntime();
   const { data: session, status: sessionStatus } = useSession();
 
   // Resolve role from either auth system (email/password or Google OAuth)
   const role = user?.role ?? session?.user?.role;
-  const isLoading = authLoading || sessionStatus === 'loading';
+  const isLoading = authLoading || sessionStatus === 'loading' || tenantLoading;
   // Utiliser uniquement user (JWT local) pour décider de l'accès
   // sessionStatus 'authenticated' (Google OAuth) sans user local → redirection login
   const isAuthenticated = !!user;
@@ -60,5 +62,14 @@ export default function DashboardLayout({ children }) {
     return null;
   }
 
-  return <AdminDashboard>{children}</AdminDashboard>;
+  return (
+    <AdminDashboard>
+      {tenantRequired && !selectedTenantId ? (
+        <div className="mx-auto max-w-xl rounded-xl border border-amber-300 bg-amber-50 p-6 text-center text-amber-950">
+          <h1 className="text-lg font-bold">Sélectionnez un tenant à administrer</h1>
+          <p className="mt-2 text-sm">Les modules du dashboard restent en attente afin qu’aucune requête tenant-scoped ne parte sans contexte valide.</p>
+        </div>
+      ) : children}
+    </AdminDashboard>
+  );
 }

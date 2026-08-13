@@ -5,55 +5,26 @@
 // `getMyOperatorStatus()` ne retourne pas un opérateur `active` — la
 // visibilité de cette UI suit exactement la même source de vérité que le
 // backend (aucune déduction séparée côté client).
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { Building2, Globe2 } from 'lucide-react';
-import {
-  getMyOperatorStatus,
-  getSelectedPlatformTenantId,
-  setSelectedPlatformTenantId,
-} from '../../services/platformOperatorService';
-import { listTenants } from '../../services/platformTenantService';
+import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeContext';
 
 const GOLD = '#C8960C';
 
 export default function PlatformOperatorContextSwitcher() {
-  const [operator, setOperator] = useState(null);
-  const [tenants, setTenants] = useState([]);
-  const [selectedTenantId, setSelectedTenantIdState] = useState(getSelectedPlatformTenantId());
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const status = await getMyOperatorStatus();
-        if (cancelled) return;
-        setOperator(status);
-        if (status?.status === 'active') {
-          const list = await listTenants();
-          if (!cancelled) setTenants(list || []);
-        }
-      } catch {
-        if (!cancelled) setOperator(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const { operator, tenants, selectedTenantId, selectTenant, tenantLoading } = usePlatformTenantRuntime();
 
   const handleChange = useCallback((event) => {
     const value = event.target.value || null;
-    setSelectedPlatformTenantId(value);
-    setSelectedTenantIdState(value);
+    selectTenant(value);
     // Le contexte tenant affecte toutes les requêtes déjà en cache/à venir —
     // un rechargement complet évite un état d'affichage incohérent entre
     // plusieurs composants qui auraient déjà chargé des données de l'ancien
     // contexte avant le changement.
     if (typeof window !== 'undefined') window.location.reload();
-  }, []);
+  }, [selectTenant]);
 
-  if (loading || !operator || operator.status !== 'active') return null;
+  if (tenantLoading || !operator || operator.status !== 'active') return null;
 
   const currentTenant = tenants.find((t) => String(t._id) === String(selectedTenantId));
 
