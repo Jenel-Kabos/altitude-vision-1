@@ -41,7 +41,16 @@ async function clearFinancialMongo() {
 }
 
 async function stopFinancialMongo() {
-  if (connected) await mongoose.disconnect();
+  // Le runner Mongo global injecte une URI unique partagée séquentiellement
+  // par toutes les suites Jest. Un simple disconnect laisse les fixtures de
+  // la suite terminée dans cette base et pollue le premier test de la suite
+  // suivante (QA-1 : tenantCert3Final → altimmoSearch). Nettoyer avant de
+  // rendre la connexion garantit l'isolation même si une suite conserve des
+  // fixtures en beforeAll et n'utilise pas clearFinancialMongo en afterEach.
+  if (connected) {
+    await clearFinancialMongo();
+    await mongoose.disconnect();
+  }
   if (replSet) await replSet.stop();
   if (standalone) await standalone.stop();
   replSet = null;

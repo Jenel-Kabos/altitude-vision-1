@@ -5,17 +5,18 @@ const express = require('express');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/rentalMaintenanceController');
 const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireCapabilityForStaff } = require('../middleware/capabilityMiddleware');
 
 const router = express.Router();
 router.use(auth.protect, requireTenantScope);
 
-router.get('/', ctrl.list);
-router.get('/:id/attachments/:attachmentIndex', ctrl.downloadAttachment);
-router.post('/', ctrl.create);
-router.patch('/:id/assign', ctrl.assign);
-router.patch('/:id/schedule', ctrl.schedule);
-router.patch('/:id/start', ctrl.start);
-router.patch('/:id/resolve', ctrl.resolve);
-router.patch('/:id/close', ctrl.close);
+router.get('/', requireCapabilityForStaff('maintenance.read'), ctrl.list);
+router.get('/:id/attachments/:attachmentIndex', requireCapabilityForStaff('maintenance.read'), ctrl.downloadAttachment);
+router.post('/', requireCapabilityForStaff('maintenance.manage'), ctrl.create);
+router.patch('/:id/assign', requireCapabilityForStaff('maintenance.manage'), ctrl.assign);
+router.patch('/:id/schedule', requireCapabilityForStaff('maintenance.manage'), ctrl.schedule);
+router.patch('/:id/start', requireCapabilityForStaff('maintenance.manage'), ctrl.start);
+router.patch('/:id/resolve', requireCapabilityForStaff('maintenance.manage'), ctrl.resolve);
+router.patch('/:id/close', requireCapabilityForStaff('maintenance.manage'), ctrl.close);
 
 module.exports = router;

@@ -1,6 +1,5 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const { STAFF_DOC, STAFF_IMMO } = require('../utils/roles');
 const router  = express.Router();
 const auth    = require('../controllers/authController');
 const ctrl    = require('../controllers/contratController');
@@ -15,10 +14,11 @@ const ctrl    = require('../controllers/contratController');
 const Contrat = require('../models/Contrat');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const { requireCapability } = require('../middleware/capabilityMiddleware');
 
-const protect   = [auth.protect, auth.restrictTo(...STAFF_IMMO)];
-const readAll   = [auth.protect, auth.restrictTo(...STAFF_IMMO, 'Secretaire')];
-const docOnly   = [auth.protect, auth.restrictTo(...STAFF_DOC)];
+const manageLeases = [auth.protect, requireCapability('leases.manage')];
+const readLeases = [auth.protect, requireCapability('leases.read')];
+const managePayments = [auth.protect, requireCapability('payments.manage')];
 const adminOnly = [auth.protect, auth.restrictTo('Admin')];
 
 // TENANT-CERT-2 — `router.param('id', …)` s'exécute AVANT le tableau de
@@ -49,14 +49,14 @@ router.param('id', async (req, res, next, contratId) => {
   }
 });
 
-router.get('/',       readAll,  ctrl.getAll);
-router.get('/:id',    readAll,  ctrl.getOne);
-router.post('/',      protect,  ctrl.create);
-router.put('/:id',    protect,  ctrl.update);
+router.get('/', readLeases, ctrl.getAll);
+router.get('/:id', readLeases, ctrl.getOne);
+router.post('/', manageLeases, ctrl.create);
+router.put('/:id', manageLeases, ctrl.update);
 router.delete('/:id', adminOnly, ctrl.delete);
 
 // Paiements liés à un contrat
-router.get( '/:id/paiements', readAll,  ctrl.getPaiements);
-router.post('/:id/paiements', docOnly,  ctrl.createPaiement);
+router.get('/:id/paiements', requireCapability('leases.read', 'payments.read'), ctrl.getPaiements);
+router.post('/:id/paiements', managePayments, ctrl.createPaiement);
 
 module.exports = router;

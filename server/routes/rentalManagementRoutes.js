@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/rentalManagementController');
-const { ROLES_GL } = require('../utils/roles');
 // TENANT-CERT-2 — audit adversarial : chaque route `:id` de ce routeur
 // (getOne/update/deactivate/publish/suspend/mark-*/maintenance/notice/
 // validate-exit/resolve) chargeait le RentalManagement demandé SANS aucune
@@ -19,6 +18,7 @@ const RentalManagement = require('../models/RentalManagement');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireCapability } = require('../middleware/capabilityMiddleware');
 
 const router = express.Router();
 router.use(auth.protect);
@@ -27,10 +27,14 @@ router.post('/:id/owner/:action', auth.restrictTo('Proprietaire'), ctrl.ownerReq
 router.use(requireTenantScope);
 router.get('/onboarding/options', auth.restrictTo('Admin', 'GestionnaireImmobilier'), ctrl.onboardingOptions);
 router.post('/onboarding', auth.restrictTo('Admin', 'GestionnaireImmobilier'), ctrl.onboard);
-router.use(auth.restrictTo(...ROLES_GL));
 
 router.param('id', async (req, res, next, rentalId) => {
   try {
+    // Les routes staff appliquent ensuite leur capability. Ne pas révéler
+    // l'existence d'un dossier (404) à un compte non-staff avant son 403.
+    // La route self-service propriétaire conserve son contrôle ressource.
+    const staffRoles = ['Admin', 'Collaborateur', 'Secretaire', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant'];
+    if (!staffRoles.includes(req.user?.role) && !req.path.includes('/owner/')) return next();
     if (!mongoose.isValidObjectId(rentalId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
     const rental = await RentalManagement.findById(rentalId);
     if (!rental) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
@@ -53,23 +57,23 @@ router.param('id', async (req, res, next, rentalId) => {
   }
 });
 
-router.get('/stats', ctrl.stats);
-router.get('/', ctrl.list);
-router.post('/', ctrl.create);
-router.get('/:id', ctrl.getOne);
-router.patch('/:id', ctrl.update);
+router.get('/stats', requireCapability('rental.read'), ctrl.stats);
+router.get('/', requireCapability('rental.read'), ctrl.list);
+router.post('/', requireCapability('rental.manage'), ctrl.create);
+router.get('/:id', requireCapability('rental.read'), ctrl.getOne);
+router.patch('/:id', requireCapability('rental.manage'), ctrl.update);
 router.post('/:id/deactivate', auth.restrictTo('Admin', 'GestionnaireImmobilier'), ctrl.deactivate);
-router.get('/:id/history', ctrl.history);
-router.post('/:id/publish', ctrl.publish);
-router.post('/:id/suspend-listing', ctrl.suspend);
-router.post('/:id/mark-rented', ctrl.markRented);
-router.post('/:id/mark-vacant', ctrl.markVacant);
-router.post('/:id/maintenance', ctrl.markMaintenance);
-router.post('/:id/complete-maintenance', ctrl.completeMaintenance);
-router.post('/:id/start-notice', ctrl.startNotice);
-router.post('/:id/acknowledge-notice', ctrl.acknowledgeNotice);
-router.post('/:id/cancel-notice', ctrl.cancelNotice);
-router.post('/:id/validate-exit', ctrl.validateExitInspection);
-router.post('/:id/requests/:requestId/resolve', ctrl.resolveRequest);
+router.get('/:id/history', requireCapability('rental.read'), ctrl.history);
+router.post('/:id/publish', requireCapability('rental.manage'), ctrl.publish);
+router.post('/:id/suspend-listing', requireCapability('rental.manage'), ctrl.suspend);
+router.post('/:id/mark-rented', requireCapability('occupancy.manage'), ctrl.markRented);
+router.post('/:id/mark-vacant', requireCapability('occupancy.manage'), ctrl.markVacant);
+router.post('/:id/maintenance', requireCapability('maintenance.manage'), ctrl.markMaintenance);
+router.post('/:id/complete-maintenance', requireCapability('maintenance.manage'), ctrl.completeMaintenance);
+router.post('/:id/start-notice', requireCapability('notice.manage'), ctrl.startNotice);
+router.post('/:id/acknowledge-notice', requireCapability('notice.manage'), ctrl.acknowledgeNotice);
+router.post('/:id/cancel-notice', requireCapability('notice.manage'), ctrl.cancelNotice);
+router.post('/:id/validate-exit', requireCapability('occupancy.manage'), ctrl.validateExitInspection);
+router.post('/:id/requests/:requestId/resolve', requireCapability('rental.manage'), ctrl.resolveRequest);
 
 module.exports = router;

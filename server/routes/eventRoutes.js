@@ -1,11 +1,11 @@
 // server/routes/eventRoutes.js
 const express = require('express');
-const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
 const eventController = require('../controllers/eventController');
 const authController = require('../controllers/authController');
 const { upload, uploadToCloudinary } = require('../config/cloudinary');
 
 const writeWindowMiddleware = require('../middleware/writeWindowMiddleware');
+const { requireCapability } = require('../middleware/capabilityMiddleware');
 
 const router = express.Router();
 
@@ -19,7 +19,7 @@ router.get('/:id', eventController.getEvent);
 // 🔒 PROTECTION - Routes suivantes réservées aux admins/collaborateurs
 // ======================================================
 router.use(authController.protect);
-router.use(authController.restrictTo(...STAFF_CM));
+router.use(requireCapability('events.manage'));
 router.use(writeWindowMiddleware);
 
 // ======================================================

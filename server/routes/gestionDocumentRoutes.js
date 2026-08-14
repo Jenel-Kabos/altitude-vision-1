@@ -1,6 +1,5 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
 const router  = express.Router();
 const auth    = require('../controllers/authController');
 const ctrl    = require('../controllers/gestionDocumentController');
@@ -14,9 +13,8 @@ const Contrat = require('../models/Contrat');
 const Paiement = require('../models/Paiement');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const { requireCapability } = require('../middleware/capabilityMiddleware');
 
-const protect   = [auth.protect, auth.restrictTo(...STAFF_DOC)];
-const adminOnly = [auth.protect, auth.restrictTo('Admin')];
 
 router.use(auth.protect);
 
@@ -37,12 +35,12 @@ const guardParam = (paramName, Model, resourceType, notFoundMessage) => async (r
 router.param('contratId', guardParam('contratId', Contrat, 'Contrat', 'Contrat introuvable.'));
 router.param('paiementId', guardParam('paiementId', Paiement, 'Paiement', 'Paiement introuvable.'));
 
-router.get('/contrat/:contratId',               protect, ctrl.getDocuments);
-router.post('/bail/:contratId',                 protect, ctrl.generateBail);
-router.post('/quittance/:paiementId',           protect, ctrl.generateQuittance);
-router.post('/mise-en-demeure/:paiementId',     protect, ctrl.generateMiseEnDemeure);
-router.post('/preavis/:contratId',              protect, ctrl.generatePreavis);
-router.post('/etat-des-lieux/:contratId',       protect, ctrl.generateEtatDesLieux);
-router.post('/envoyer/:contratId/:docIndex',    protect, ctrl.envoyerDocument);
+router.get('/contrat/:contratId', requireCapability('documents.read'), ctrl.getDocuments);
+router.post('/bail/:contratId', requireCapability('documents.manage'), ctrl.generateBail);
+router.post('/quittance/:paiementId', requireCapability('documents.manage'), ctrl.generateQuittance);
+router.post('/mise-en-demeure/:paiementId', requireCapability('documents.manage'), ctrl.generateMiseEnDemeure);
+router.post('/preavis/:contratId', requireCapability('documents.manage'), ctrl.generatePreavis);
+router.post('/etat-des-lieux/:contratId', requireCapability('documents.manage'), ctrl.generateEtatDesLieux);
+router.post('/envoyer/:contratId/:docIndex', requireCapability('documents.manage'), ctrl.envoyerDocument);
 
 module.exports = router;

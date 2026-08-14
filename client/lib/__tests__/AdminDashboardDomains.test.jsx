@@ -51,14 +51,16 @@ describe('AdminDashboard — domaines métier Altimmo (Sprint 0) — TEST DATA',
     expect(screen.getByRole('link', { name: /Établissements/i })).toHaveAttribute('href', '/dashboard/etablissements');
   });
 
-  test("CommunityManager voit Immobilier/Hôtellerie mais pas Gestion locative (ROLES_GL exclu) ni Modération Hébergement (harmonisé sur ROLES_MODERATION)", async () => {
+  test("IAM-3 — CommunityManager ne voit que ses domaines communication, sans Immobilier/Hôtellerie/GL", async () => {
     renderAsRole('CommunityManager');
     const { default: Dashboard } = await import('../pages/dashboard/AdminDashboard');
     render(<Dashboard><p>CONTENU</p></Dashboard>);
 
-    expect(screen.getByText('Immobilier')).toBeInTheDocument();
-    expect(screen.getByText('Hôtellerie')).toBeInTheDocument();
+    expect(screen.queryByText('Immobilier')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hôtellerie')).not.toBeInTheDocument();
     expect(screen.queryByText('Gestion locative')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Mila Events/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Altcom$/i })).toBeInTheDocument();
     // Harmonisation (audit de sécurité) : "Modération Hébergement" utilisait
     // ROLES_ALTIMMO (incluait CommunityManager) — désormais ROLES_MODERATION
     // comme ses deux liens voisins, pour un périmètre cohérent.

@@ -13,6 +13,7 @@ import {
     ScrollText, ChevronDown, Shield,
 } from "lucide-react";
 import { contratHebergement } from "../data/contratHebergement";
+import { getPostAuthDestination } from '../navigation/postAuthDestination';
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
@@ -80,12 +81,7 @@ const RegisterPage = () => {
 
     useEffect(() => {
         if (!auth.user) return;
-        const COLLAB_ROLES = ['Collaborateur','Secretaire','GestionnaireImmobilier','CommunityManager','Communicant'];
-        router.push(
-            auth.user.role === 'Admin'            ? '/dashboard' :
-            COLLAB_ROLES.includes(auth.user.role) ? '/dashboard' :
-            auth.user.role === 'Proprietaire'     ? '/mes-biens' : '/'
-        );
+        router.push(getPostAuthDestination(auth.user));
     }, [router, auth.user]);
 
     const set     = (k, v) => setForm(f => ({ ...f, [k]: v }));

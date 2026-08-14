@@ -750,14 +750,14 @@ describe('POST /api/accommodations/admin — création complète (dashboard admi
     expect(res.body.data.rate.amount).toBe(35000);
   });
 
-  test("un Collaborateur/CommunityManager (ROLES_ALTIMMO) peut aussi créer", async () => {
+  test("IAM-3 — CommunityManager ne peut plus créer un hébergement administratif", async () => {
     mockUserAuth('507f1f77bcf86cd799439033', 'CommunityManager');
     mockCreatedDocs();
     const res = await request(app)
       .post('/api/accommodations/admin')
       .set('Authorization', `Bearer ${makeToken('507f1f77bcf86cd799439033')}`)
       .send(validBody());
-    expect(res.statusCode).toBe(201);
+    expect(res.statusCode).toBe(403);
   });
 
   test("aucun RatePlan n'est créé si le tarif optionnel est absent", async () => {

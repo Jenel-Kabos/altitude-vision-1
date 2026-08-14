@@ -81,13 +81,13 @@ test('idempotence par clé : rejouer la même requête avec la même clé ne cr�
 });
 
 test('annulation d’un encaissement : recalcule l’échéance et repasse en impayé/partiel', async () => {
-  const { paiement, adminToken, gestionnaireToken } = await fixtureEcheance();
+  const { paiement, adminToken } = await fixtureEcheance();
   const record = await request(app).post(`/api/paiements/${paiement._id}/marquer-paye`).set('Authorization', `Bearer ${adminToken}`)
     .send({ montantRecu: 150000, datePaiement: '2027-06-10', modePaiement: 'espèces' });
   expect(record.body.data.paiement.statut).toBe('payé');
   const receiptId = record.body.data.receipt._id;
 
-  const cancelled = await request(app).post(`/api/paiements/${paiement._id}/receipts/${receiptId}/cancel`).set('Authorization', `Bearer ${gestionnaireToken}`)
+  const cancelled = await request(app).post(`/api/paiements/${paiement._id}/receipts/${receiptId}/cancel`).set('Authorization', `Bearer ${adminToken}`)
     .send({ reason: 'Chèque rejeté par la banque' });
   expect(cancelled.status).toBe(200);
   expect(cancelled.body.data.paiement.statut).toBe('impayé');
@@ -101,24 +101,24 @@ test('annulation d’un encaissement : recalcule l’échéance et repasse en im
 });
 
 test('annulation d’un seul encaissement parmi plusieurs repasse l’échéance en partiel, pas en impayé', async () => {
-  const { paiement, adminToken, gestionnaireToken } = await fixtureEcheance();
+  const { paiement, adminToken } = await fixtureEcheance();
   const first = await request(app).post(`/api/paiements/${paiement._id}/marquer-paye`).set('Authorization', `Bearer ${adminToken}`)
     .send({ montantRecu: 60000, datePaiement: '2027-06-05', modePaiement: 'espèces' });
   await request(app).post(`/api/paiements/${paiement._id}/marquer-paye`).set('Authorization', `Bearer ${adminToken}`)
     .send({ montantRecu: 150000, datePaiement: '2027-06-20', modePaiement: 'virement' });
 
   const firstReceiptId = first.body.data.receipt._id;
-  const cancelled = await request(app).post(`/api/paiements/${paiement._id}/receipts/${firstReceiptId}/cancel`).set('Authorization', `Bearer ${gestionnaireToken}`)
+  const cancelled = await request(app).post(`/api/paiements/${paiement._id}/receipts/${firstReceiptId}/cancel`).set('Authorization', `Bearer ${adminToken}`)
     .send({ reason: 'Doublon de saisie' });
   expect(cancelled.body.data.paiement.statut).toBe('partiel');
   expect(cancelled.body.data.paiement.montantRecu).toBe(90000);
 });
 
 test('un motif d’annulation est obligatoire', async () => {
-  const { paiement, adminToken, gestionnaireToken } = await fixtureEcheance();
+  const { paiement, adminToken } = await fixtureEcheance();
   const record = await request(app).post(`/api/paiements/${paiement._id}/marquer-paye`).set('Authorization', `Bearer ${adminToken}`)
     .send({ montantRecu: 150000, datePaiement: '2027-06-10', modePaiement: 'espèces' });
-  const res = await request(app).post(`/api/paiements/${paiement._id}/receipts/${record.body.data.receipt._id}/cancel`).set('Authorization', `Bearer ${gestionnaireToken}`).send({});
+  const res = await request(app).post(`/api/paiements/${paiement._id}/receipts/${record.body.data.receipt._id}/cancel`).set('Authorization', `Bearer ${adminToken}`).send({});
   expect(res.status).toBe(422);
 });
 
@@ -133,15 +133,24 @@ test('IDOR/permissions : Secretaire (ROLES_PAIEMENTS mais pas CANCEL_ROLES) ne p
   expect((await Paiement.findById(paiement._id)).statut).toBe('payé');
 });
 
-test('double annulation du même reçu : la seconde échoue proprement (pas de double-recalcul)', async () => {
+test('IAM-3 : GestionnaireImmobilier ne peut pas annuler un encaissement', async () => {
   const { paiement, adminToken, gestionnaireToken } = await fixtureEcheance();
+  const record = await request(app).post(`/api/paiements/${paiement._id}/marquer-paye`).set('Authorization', `Bearer ${adminToken}`)
+    .send({ montantRecu: 150000, datePaiement: '2027-06-10', modePaiement: 'espèces' });
+  const res = await request(app).post(`/api/paiements/${paiement._id}/receipts/${record.body.data.receipt._id}/cancel`).set('Authorization', `Bearer ${gestionnaireToken}`)
+    .send({ reason: 'Test non autorisé IAM-3' });
+  expect(res.status).toBe(403);
+});
+
+test('double annulation du même reçu : la seconde échoue proprement (pas de double-recalcul)', async () => {
+  const { paiement, adminToken } = await fixtureEcheance();
   const record = await request(app).post(`/api/paiements/${paiement._id}/marquer-paye`).set('Authorization', `Bearer ${adminToken}`)
     .send({ montantRecu: 150000, datePaiement: '2027-06-10', modePaiement: 'espèces' });
   const receiptId = record.body.data.receipt._id;
 
   const [a, b] = await Promise.all([
-    request(app).post(`/api/paiements/${paiement._id}/receipts/${receiptId}/cancel`).set('Authorization', `Bearer ${gestionnaireToken}`).send({ reason: 'Annulation concurrente A' }),
-    request(app).post(`/api/paiements/${paiement._id}/receipts/${receiptId}/cancel`).set('Authorization', `Bearer ${gestionnaireToken}`).send({ reason: 'Annulation concurrente B' }),
+    request(app).post(`/api/paiements/${paiement._id}/receipts/${receiptId}/cancel`).set('Authorization', `Bearer ${adminToken}`).send({ reason: 'Annulation concurrente A' }),
+    request(app).post(`/api/paiements/${paiement._id}/receipts/${receiptId}/cancel`).set('Authorization', `Bearer ${adminToken}`).send({ reason: 'Annulation concurrente B' }),
   ]);
   const statuses = [a.status, b.status].sort((x, y) => x - y);
   expect(statuses).toEqual([200, 409]);

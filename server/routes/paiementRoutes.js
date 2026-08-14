@@ -1,6 +1,5 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const { ROLES_PAIEMENTS } = require('../utils/roles');
 const router  = express.Router();
 const auth    = require('../controllers/authController');
 const ctrl    = require('../controllers/paiementController');
@@ -12,24 +11,26 @@ const { upload } = require('../config/cloudinary');
 const Paiement = require('../models/Paiement');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const { requireCapability } = require('../middleware/capabilityMiddleware');
 
-const protect   = [auth.protect, auth.restrictTo(...ROLES_PAIEMENTS)];
+const readPayments = [auth.protect, requireCapability('payments.read')];
+const managePayments = [auth.protect, requireCapability('payments.manage')];
 const adminOnly = [auth.protect, auth.restrictTo('Admin')];
 // Annulation d'encaissement (GL-DEBT-1, Phase 8) : plus restrictif que
 // ROLES_PAIEMENTS — jamais Secretaire/Collaborateur, jamais propriétaire ou
 // locataire (qui n'atteignent de toute façon aucune route /paiements).
-const cancelReceipt = [auth.protect, auth.restrictTo('Admin', 'GestionnaireImmobilier')];
+const cancelReceipt = [auth.protect, requireCapability('payments.reverse')];
 
 // CinetPay
 router.post('/initier',           auth.protect, cinetpay.initierPaiement);
 router.post('/webhook-cinetpay',               cinetpay.webhookCinetpay);
 
 // Routes spécifiques AVANT /:id pour éviter les conflits
-router.get( '/alertes',            protect, ctrl.getAlertes);
-router.get( '/stats',              protect, ctrl.getStats);
-router.post('/calculer-penalites', protect, ctrl.calculerPenalites);
+router.get( '/alertes', readPayments, ctrl.getAlertes);
+router.get( '/stats', readPayments, ctrl.getStats);
+router.post('/calculer-penalites', managePayments, ctrl.calculerPenalites);
 // GL-DEBT-1.1 — un encaissement réparti sur plusieurs échéances du même contrat.
-router.post('/encaisser-multiple', protect, upload.single('preuve'), ctrl.encaisserMultiple);
+router.post('/encaisser-multiple', managePayments, upload.single('preuve'), ctrl.encaisserMultiple);
 
 // TENANT-CERT-2 — `router.param('id', …)` s'exécute avant le tableau de
 // middlewares propre à chaque route ci-dessous (donc avant `auth.protect`) :
@@ -64,16 +65,16 @@ router.param('id', async (req, res, next, paiementId) => {
   }
 });
 
-router.get('/',       protect, ctrl.getAll);
-router.get('/:id',    protect, ctrl.getOne);
-router.get('/:id/proof', protect, ctrl.downloadProof);
-router.put('/:id',    protect, ctrl.update);
+router.get('/', readPayments, ctrl.getAll);
+router.get('/:id', readPayments, ctrl.getOne);
+router.get('/:id/proof', readPayments, ctrl.downloadProof);
+router.put('/:id', managePayments, ctrl.update);
 // upload.single ne touche req.body/req.file que pour une requête
 // multipart/form-data réelle — un appel JSON existant (sans preuve jointe)
 // traverse ce middleware sans aucun changement de comportement.
-router.post('/:id/marquer-paye', protect, upload.single('preuve'), ctrl.marquerPaye);
+router.post('/:id/marquer-paye', managePayments, upload.single('preuve'), ctrl.marquerPaye);
 // Historique détaillé des versements (Phase 6) et annulation contrôlée (Phase 8).
-router.get( '/:id/receipts',                protect,       ctrl.listReceipts);
+router.get( '/:id/receipts', readPayments, ctrl.listReceipts);
 router.post('/:id/receipts/:receiptId/cancel', cancelReceipt, ctrl.cancelReceipt);
 // Une échéance financière ne peut être supprimée que par un administrateur
 // et seulement tant qu'aucun encaissement n'a été enregistré (contrôle dans

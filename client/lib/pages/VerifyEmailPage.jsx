@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { getPostAuthDestination } from '../navigation/postAuthDestination';
 
 const VerifyEmailPage = ({ token }) => {
   const router = useRouter();
@@ -24,12 +25,7 @@ const VerifyEmailPage = ({ token }) => {
 
           // Redirection selon le rôle
           setTimeout(() => {
-            const role = data.data.user.role;
-            const redirect =
-              role === 'Admin' ? '/dashboard' :
-              role === 'Proprietaire' ? '/dashboard' :
-              '/';
-            router.push(redirect);
+            router.push(getPostAuthDestination(data.data.user));
           }, 3000);
         } else {
           setStatus('error');

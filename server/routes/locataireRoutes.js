@@ -1,6 +1,5 @@
 const express    = require('express');
 const mongoose   = require('mongoose');
-const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
 const router     = express.Router();
 const auth       = require('../controllers/authController');
 const ctrl       = require('../controllers/locataireController');
@@ -16,10 +15,10 @@ const { requireTenantScope } = require('../middleware/tenantContext');
 const Locataire = require('../models/Locataire');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const { requireCapability } = require('../middleware/capabilityMiddleware');
 
-const protect    = [auth.protect, auth.restrictTo(...STAFF_IMMO)];
-const readAll    = [auth.protect, auth.restrictTo(...STAFF_IMMO, 'Secretaire')];
-const adminOnly  = [auth.protect, auth.restrictTo('Admin')];
+const manageTenants = [auth.protect, requireCapability('tenants.manage')];
+const readTenants = [auth.protect, requireCapability('tenants.read')];
 const fileField  = upload.single('pieceIdentite');
 
 router.use(auth.protect);
@@ -50,22 +49,22 @@ async function assertLocataireInScope(req, res, next) {
   }
 }
 
-router.get('/',       readAll,   ctrl.getAll);
+router.get('/', readTenants, ctrl.getAll);
 // Sprint GL-B2 — littéraux/2-segments AVANT le fallback générique /:id
 // (convention de routage déjà établie dans ce projet, voir hotelRoutes.js).
-router.get('/dossiers', readAll, ctrl.listDossiers);
+router.get('/dossiers', readTenants, ctrl.listDossiers);
 // Dette technique GL-B2 — liaison User ↔ Locataire (Missions 1 & 3),
 // littéraux avant /:id également.
-router.get('/link-requests', protect, ctrl.listLinkRequests);
-router.patch('/link-requests/:requestId/review', protect, ctrl.reviewLinkRequest);
-router.patch('/invitations/:requestId/cancel', protect, ctrl.cancelInvitation);
-router.post('/invitations/:requestId/resend', protect, ctrl.resendInvitation);
-router.get('/:id/dossier', readAll, ctrl.getDossier);
-router.get('/:id/identity-document', requireTenantScope, auth.restrictTo(...STAFF_IMMO, 'Secretaire'), ctrl.downloadIdentityDocument);
-router.post('/:id/invite', protect, ctrl.invite);
-router.get('/:id',    readAll,   assertLocataireInScope, ctrl.getOne);
-router.post('/',      protect,   fileField, ctrl.create);
-router.put('/:id',    protect,   assertLocataireInScope, fileField, ctrl.update);
-router.delete('/:id', protect,   assertLocataireInScope, ctrl.delete);
+router.get('/link-requests', readTenants, ctrl.listLinkRequests);
+router.patch('/link-requests/:requestId/review', manageTenants, ctrl.reviewLinkRequest);
+router.patch('/invitations/:requestId/cancel', manageTenants, ctrl.cancelInvitation);
+router.post('/invitations/:requestId/resend', manageTenants, ctrl.resendInvitation);
+router.get('/:id/dossier', readTenants, ctrl.getDossier);
+router.get('/:id/identity-document', requireTenantScope, requireCapability('tenants.read'), ctrl.downloadIdentityDocument);
+router.post('/:id/invite', manageTenants, ctrl.invite);
+router.get('/:id', readTenants, assertLocataireInScope, ctrl.getOne);
+router.post('/', manageTenants, fileField, ctrl.create);
+router.put('/:id', manageTenants, assertLocataireInScope, fileField, ctrl.update);
+router.delete('/:id', manageTenants, assertLocataireInScope, ctrl.delete);
 
 module.exports = router;

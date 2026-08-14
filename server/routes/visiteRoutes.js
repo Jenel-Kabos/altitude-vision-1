@@ -1,8 +1,8 @@
 const express = require('express');
-const { ROLES_UNIVERSAL } = require('../utils/roles');
 const router = express.Router();
 
 const { protect, restrictTo } = require('../middleware/authMiddleware');
+const { requireCapability } = require('../middleware/capabilityMiddleware');
 const {
   createVisite,
   getMyVisites,
@@ -37,7 +37,7 @@ router.get('/owner', restrictTo('Proprietaire', 'Admin'), getOwnerVisites);
 router.get('/owner/unread-count', restrictTo('Proprietaire', 'Admin'), getOwnerUnreadCount);
 
 // Staff : voir toutes les visites avec paiement requis
-router.get('/all-payments', restrictTo(...ROLES_UNIVERSAL), getAllPayments);
+router.get('/all-payments', requireCapability('visits.read'), getAllPayments);
 
 // Client : voir ses propres visites avec paiement requis
 router.get('/my-payments', getMyPayments);
@@ -46,8 +46,8 @@ router.get('/my-payments', getMyPayments);
 router.get('/paiement/verifier/:intentId', verifierPaiementVisite);
 
 // Staff : voir toutes les visites
-router.get('/unread-count', restrictTo(...ROLES_UNIVERSAL), getUnreadCount);
-router.get('/', restrictTo(...ROLES_UNIVERSAL), getAllVisites);
+router.get('/unread-count', requireCapability('visits.read'), getUnreadCount);
+router.get('/', requireCapability('visits.read'), getAllVisites);
 
 // Client : créer une demande de visite
 router.post('/', createVisite);
@@ -58,10 +58,10 @@ router.post('/', createVisite);
 router.post('/:id/paiement/initier', initierPaiementVisite);
 
 // Staff : mettre à jour (dateProposee, dateConfirmee, statut, notes)
-router.patch('/:id', restrictTo(...ROLES_UNIVERSAL), updateVisite);
+router.patch('/:id', requireCapability('visits.manage'), updateVisite);
 
 // Staff : mettre à jour le paiement (paiementStatus, paiementRef)
-router.patch('/:id/paiement', restrictTo(...ROLES_UNIVERSAL), updatePaiementVisite);
+router.patch('/:id/paiement', requireCapability('visits.manage'), updatePaiementVisite);
 
 // Client : annuler sa propre visite
 router.patch('/:id/cancel', cancelVisite);

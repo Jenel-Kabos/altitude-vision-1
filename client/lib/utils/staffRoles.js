@@ -15,6 +15,6 @@ export const isStaffImmo = (user) => STAFF_IMMO_ROLES.includes(user?.role);
 // `isStaffImmo` (plus strict, réservé aux actions d'ÉCRITURE — transition
 // de cycle de vie) : un Secretaire peut consulter le cockpit patrimonial
 // mais ne peut pas faire transitionner le bien.
-export const STAFF_DOCS_ROLES = ['Admin', 'Secretaire', 'Collaborateur', 'GestionnaireImmobilier'];
+export const STAFF_DOCS_ROLES = ['Admin', 'Secretaire', 'Collaborateur'];
 
 export const isStaffDocs = (user) => STAFF_DOCS_ROLES.includes(user?.role);

@@ -26,7 +26,7 @@ const STAFF_ALL  = ['Admin', ...COLLAB_ROLES];
 // (gestionDocumentRoutes/contratRoutes docOnly, toutes basées sur STAFF_DOC)
 // — incohérence entre navigation et API, corrigée ici plutôt qu'en
 // dupliquant une nouvelle constante.
-const STAFF_DOC  = ['Admin', 'Secretaire', 'Collaborateur', 'GestionnaireImmobilier'];
+const STAFF_DOC  = ['Admin', 'Secretaire', 'Collaborateur'];
 
 // Gestion immobilière : proprio, biens, locataires, contrats
 const STAFF_IMMO = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
@@ -78,7 +78,6 @@ const ROLES_ESTIMATION = [
 // Altimmo (biens)
 const ROLES_ALTIMMO = [
   'Admin', 'Collaborateur', 'GestionnaireImmobilier',
-  'CommunityManager',
 ];
 
 // Mila Events + Altcom
@@ -88,7 +87,7 @@ const ROLES_CM = [
 
 // Gestion Locative (lecture + gestion)
 const ROLES_GL = [
-  'Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire',
+  'Admin', 'Collaborateur', 'GestionnaireImmobilier',
 ];
 
 // Paiements Gestion Locative
@@ -98,7 +97,7 @@ const ROLES_PAIEMENTS = [
 
 // Documents
 const ROLES_DOCS = [
-  'Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire',
+  'Admin', 'Collaborateur', 'Secretaire',
 ];
 
 // Litiges (+ GestionnaireImmobilier)

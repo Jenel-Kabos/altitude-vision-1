@@ -214,7 +214,7 @@ describe('Contrats — protection de l’historique financier', () => {
 describe('GET /api/documents — correctif permission GestionnaireImmobilier (Sprint GL-B2)', () => {
   afterEach(() => jest.clearAllMocks());
 
-  test('200 — GestionnaireImmobilier a maintenant accès (STAFF_DOC corrigé)', async () => {
+  test('403 — IAM-3 interdit le centre documentaire général au GestionnaireImmobilier', async () => {
     mockUserAuth(GESTIONNAIRE_ID, 'GestionnaireImmobilier');
     // Document.find(...).sort(...).populate(...).populate(...) doit résoudre un tableau.
     const chain = { sort: jest.fn(), populate: jest.fn() };
@@ -222,7 +222,7 @@ describe('GET /api/documents — correctif permission GestionnaireImmobilier (Sp
     chain.populate.mockReturnValueOnce(chain).mockResolvedValueOnce([]);
     Document.find = jest.fn().mockReturnValue(chain);
     const res = await request(app).get('/api/documents').set('Authorization', `Bearer ${makeToken(GESTIONNAIRE_ID)}`);
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(403);
   });
 
   test('403 — un client n\'a toujours pas accès', async () => {

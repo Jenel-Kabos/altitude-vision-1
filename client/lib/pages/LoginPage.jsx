@@ -8,6 +8,7 @@ import { FiMail, FiLock, FiAlertTriangle, FiEye, FiEyeOff } from 'react-icons/fi
 import { signIn } from 'next-auth/react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api.js';
+import { getPostAuthDestination } from '../navigation/postAuthDestination';
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -41,12 +42,7 @@ const LoginPage = () => {
       const token = response.data?.token;
       if (user && token) {
         auth.login(user, token);
-        const COLLAB_ROLES = ['Collaborateur','Secretaire','GestionnaireImmobilier','CommunityManager','Communicant'];
-        const targetPath = safeRedirect || (
-          user.role === 'Admin'              ? '/dashboard'
-          : COLLAB_ROLES.includes(user.role) ? '/dashboard'
-          : user.role === 'Proprietaire'     ? '/mes-biens'
-          : '/');
+        const targetPath = safeRedirect || getPostAuthDestination(user);
         router.replace(targetPath);
       } else {
         setError('Connexion réussie mais impossible de récupérer les informations utilisateur.');

@@ -17,6 +17,7 @@ import DashboardBadge from '../../components/dashboard/DashboardBadge';
 import { resolveWebDestination } from '../../navigation/navigationSdk';
 import PlatformOperatorContextSwitcher from '../../components/dashboard/PlatformOperatorContextSwitcher';
 import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeContext';
+import { hasStaffCapability } from '../../utils/staffCapabilities';
 
 const GOLD = '#C8960C';
 const BLUE = '#2E7BB5';
@@ -27,10 +28,9 @@ const BLUE = '#2E7BB5';
 // Groupes de rôles collaborateurs (miroir de server/utils/roles.js)
 const ALL_STAFF     = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'CommunityManager', 'Communicant'];
 const ROLES_ESTIM   = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'Communicant'];
-const ROLES_ALTIMMO = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'];
+const ROLES_ALTIMMO = ['Admin', 'Collaborateur', 'GestionnaireImmobilier'];
 const ROLES_CM      = ['Admin', 'Collaborateur', 'CommunityManager'];
-const ROLES_GL      = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire'];
-const ROLES_DOCS    = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire'];
+const ROLES_DOCS    = ['Admin', 'Collaborateur', 'Secretaire'];
 const ROLES_LITIGES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier'];
 const ROLES_MOD     = ['Admin', 'Collaborateur'];
 const CRM_ROUTE     = resolveWebDestination('CRM_CUSTOMERS');
@@ -76,8 +76,8 @@ const NAV_SECTIONS = [
       { to: '/dashboard/hebergements',       end: true,  Icon: Palmtree,   label: 'Hébergements',         accent: GOLD, roles: ROLES_ALTIMMO },
       { to: '/dashboard/estimations',        end: false, Icon: Calculator, label: 'Estimations',  accent: GOLD, roles: ROLES_ESTIM, badge: 'estimations' },
       { to: '/dashboard/devis',              end: false, Icon: FileText,   label: 'Devis locatif', accent: GOLD, roles: ROLES_ESTIM },
-      { to: '/dashboard/visites',            end: false, Icon: Calendar,   label: 'Visites',       accent: GOLD, roles: ALL_STAFF, badge: 'visites' },
-      { to: '/dashboard/paiements',          end: false, Icon: CreditCard, label: 'Paiements visites', accent: GOLD, roles: ALL_STAFF },
+      { to: '/dashboard/visites', end: false, Icon: Calendar, label: 'Visites', accent: GOLD, capability: 'visits.read', badge: 'visites' },
+      { to: '/dashboard/paiements', end: false, Icon: CreditCard, label: 'Paiements visites', accent: GOLD, capability: 'visits.read' },
       { to: '/dashboard/proprietaires',      end: false, Icon: Users2,     label: 'Propriétaires', accent: BLUE, roles: ROLES_ALTIMMO },
     ],
   },
@@ -88,18 +88,17 @@ const NAV_SECTIONS = [
     // (voir RentalManagement, server/docs/PROPERTY_TRANSACTION_ARCHITECTURE.md).
     label: 'Gestion locative',
     links: [
-      { to: '/dashboard/gestion-locative',            end: true,  Icon: Building,       label: "Vue d'ensemble", accent: BLUE, roles: ROLES_GL },
-      { to: '/dashboard/gestion-locative/baux',        end: false, Icon: FileSignature, label: 'Baux',           accent: BLUE, roles: ROLES_GL },
+      { to: '/dashboard/gestion-locative', end: true, Icon: Building, label: "Vue d'ensemble", accent: BLUE, capability: 'rental.read' },
+      { to: '/dashboard/gestion-locative/baux', end: false, Icon: FileSignature, label: 'Baux', accent: BLUE, capability: 'leases.read' },
       { to: '/dashboard/gestion-locative/regularisation', end: false, Icon: History, label: 'Régularisation', accent: '#B45309', roles: ['Admin', 'GestionnaireImmobilier', 'Collaborateur'] },
-      { to: '/dashboard/gestion-locative/locataires',  end: false, Icon: Users,         label: 'Locataires',     accent: BLUE, roles: ROLES_GL },
-      { to: '/dashboard/gestion-locative/paiements',   end: false, Icon: CreditCard,    label: 'Paiements',      accent: BLUE, roles: ROLES_GL },
-      { to: '/dashboard/gestion-locative/preavis',     end: false, Icon: Clock,         label: 'Préavis',        accent: BLUE, roles: ROLES_GL },
-      { to: '/dashboard/gestion-locative/maintenance', end: false, Icon: Wrench,        label: 'Maintenance',    accent: BLUE, roles: ROLES_GL },
+      { to: '/dashboard/gestion-locative/locataires', end: false, Icon: Users, label: 'Locataires', accent: BLUE, capability: 'tenants.read' },
+      { to: '/dashboard/gestion-locative/paiements', end: false, Icon: CreditCard, label: 'Paiements', accent: BLUE, capability: 'payments.read' },
+      { to: '/dashboard/gestion-locative/preavis', end: false, Icon: Clock, label: 'Préavis', accent: BLUE, capability: 'notice.read' },
+      { to: '/dashboard/gestion-locative/maintenance', end: false, Icon: Wrench, label: 'Maintenance', accent: BLUE, capability: 'maintenance.read' },
       // DOC-ARCH-1 — un seul Centre documentaire pour toute la plateforme :
       // ce point d'entrée ouvre désormais /dashboard/documents déjà filtré
       // (pole=Altimmo&service=gestion_locative), jamais un écran séparé.
-      { to: '/dashboard/documents?pole=Altimmo&service=gestion_locative', end: false, Icon: FolderOpen, label: 'Documents', accent: BLUE, roles: ROLES_GL },
-      { to: '/dashboard/documents',                    end: false, Icon: FolderOpen,    label: 'Documents',      accent: GOLD, roles: ROLES_DOCS },
+      { to: '/dashboard/documents', end: false, Icon: FolderOpen, label: 'Documents', accent: GOLD, capability: 'documents.read' },
     ],
   },
   {
@@ -123,8 +122,8 @@ const NAV_SECTIONS = [
   {
     label: null,
     links: [
-      { to: '/dashboard/events',             end: false, Icon: Calendar,     label: 'Mila Events',         accent: '#D42B2B', roles: ROLES_CM   },
-      { to: '/dashboard/altcom',             end: false, Icon: Briefcase,    label: 'Altcom',              accent: GOLD,      roles: ROLES_CM   },
+      { to: '/dashboard/events', end: false, Icon: Calendar, label: 'Mila Events', accent: '#D42B2B', capability: 'events.read' },
+      { to: '/dashboard/altcom', end: false, Icon: Briefcase, label: 'Altcom', accent: GOLD, capability: 'altcom.read' },
       // MARKETING-AUTOMATION-1 — même périmètre rôles qu'Altcom (ROLES_CM) :
       // segments, modèles, campagnes, journal d'envoi.
       { to: '/dashboard/altcom/marketing',   end: false, Icon: Megaphone,    label: 'Marketing Automation', accent: GOLD,      roles: ROLES_CM   },
@@ -371,7 +370,9 @@ const AdminDashboard = ({ children }) => {
           <nav className="px-3 py-3 space-y-0.5 overflow-y-auto"
             style={{ maxHeight: 'calc(100dvh - 220px)' }}>
             {NAV_SECTIONS.map((section, si) => {
-              const visibleLinks = section.links.filter(link => !link.roles || link.roles.includes(user?.role));
+              const visibleLinks = section.links.filter(link => (
+                link.capability ? hasStaffCapability(user, link.capability) : (!link.roles || link.roles.includes(user?.role))
+              ));
               // Une section dont aucun lien n'est visible pour le rôle
               // courant ne doit jamais afficher un en-tête "orphelin" sans
               // rien en dessous (bug pré-existant, révélé par les nouveaux
