@@ -15,6 +15,7 @@ import {
   DMSans_700Bold,
 } from '@expo-google-fonts/dm-sans';
 import { AuthProvider } from './src/context/AuthContext';
+import { PlatformTenantRuntimeProvider } from './src/context/PlatformTenantRuntimeContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
@@ -65,7 +66,9 @@ function AppInner() {
         <ErrorBoundary>
           <ThemeProvider>
             <AuthProvider>
-              <AppNavigator />
+              <PlatformTenantRuntimeProvider>
+                <AppNavigator />
+              </PlatformTenantRuntimeProvider>
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>

@@ -18,6 +18,9 @@ import MyHotelReservationsScreen from '../../screens/Hotels/MyHotelReservationsS
 import HotelReservationDetailScreen from '../../screens/Hotels/HotelReservationDetailScreen';
 import HotelBookingScreen from '../../screens/Hotels/HotelBookingScreen';
 import HotelOperationsScreen from '../../screens/Hotels/HotelOperationsScreen';
+import HotelCockpitScreen from '../../screens/Hotels/HotelCockpitScreen';
+import HotelHousekeepingScreen from '../../screens/Hotels/HotelHousekeepingScreen';
+import HotelMaintenanceScreen from '../../screens/Hotels/HotelMaintenanceScreen';
 import RealEstateApplicationsScreen from '../../screens/Profil/RealEstateApplicationsScreen';
 import RealEstateApplicationDetailScreen from '../../screens/Profil/RealEstateApplicationDetailScreen';
 import SubmitRealEstateApplicationScreen from '../../screens/Annonces/SubmitRealEstateApplicationScreen';
@@ -56,6 +59,9 @@ export default function ProfilStack() {
       <Stack.Screen name="HotelReservationDetail" component={HotelReservationDetailScreen} />
       <Stack.Screen name="HotelBooking" component={HotelBookingScreen} />
       <Stack.Screen name="HotelOperations" component={HotelOperationsScreen} />
+      <Stack.Screen name="HotelCockpit" component={HotelCockpitScreen} />
+      <Stack.Screen name="HotelHousekeeping" component={HotelHousekeepingScreen} />
+      <Stack.Screen name="HotelMaintenance" component={HotelMaintenanceScreen} />
       <Stack.Screen name="TenantPortal" component={TenantPortalScreen} />
       <Stack.Screen name="MyAccommodationReservations" component={MyAccommodationReservationsScreen} />
       <Stack.Screen name="AccommodationReservationDetail" component={AccommodationReservationDetailScreen} />

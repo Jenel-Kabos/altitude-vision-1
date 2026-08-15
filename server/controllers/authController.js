@@ -19,7 +19,11 @@ const PUBLIC_SIGNUP_ROLES = new Set(['Client', 'Proprietaire']);
 const isAccountEnabled = (user) => Boolean(user?.isActive && (user.status === undefined || user.status === 'Actif'));
 const rejectDisabledAccount = (user, res) => {
     if (isAccountEnabled(user)) return false;
-    res.status(403).json({ status: 'fail', message: 'Accès refusé : compte inactif.' });
+    // SYNC-2A : `code` structuré (même convention qu'AccountStatusError côté
+    // middleware protect) pour que les clients distinguent ce refus d'un 403
+    // d'autorisation ordinaire, sans se fier au message texte.
+    const code = user?.status === 'Suspendu' ? 'ACCOUNT_SUSPENDED' : user?.status === 'Banni' ? 'ACCOUNT_BANNED' : 'ACCOUNT_INACTIVE';
+    res.status(403).json({ status: 'fail', message: 'Accès refusé : compte inactif.', code });
     return true;
 };
 

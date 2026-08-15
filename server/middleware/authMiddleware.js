@@ -40,19 +40,25 @@ const protect = asyncHandler(async (req, res, next) => {
   // Invalidation par tokenVersion (logout global, reset password)
   if (decoded.tokenVersion !== undefined && decoded.tokenVersion < user.tokenVersion) {
     res.status(401);
-    throw new Error('Session expirée, veuillez vous reconnecter.');
+    throw Object.assign(new Error('Session expirée, veuillez vous reconnecter.'), { name: 'AuthSessionError', code: 'SESSION_REVOKED' });
   }
 
   // Changement de mot de passe après émission du token
   if (typeof user.changedPasswordAfter === 'function' && user.changedPasswordAfter(decoded.iat)) {
     res.status(401);
-    throw new Error('Mot de passe modifié. Veuillez vous reconnecter.');
+    throw Object.assign(new Error('Mot de passe modifié. Veuillez vous reconnecter.'), { name: 'AuthSessionError', code: 'SESSION_REVOKED' });
   }
 
-  // Compte suspendu ou banni
+  // Compte suspendu ou banni — SYNC-2A : `code` structuré ajouté (name
+  // `AccountStatusError`) pour que les clients distinguent ce 403
+  // ("session mid-vie devenue invalide") d'un 403 d'autorisation ordinaire
+  // (ownership/capability) sans jamais se fier au texte du message. Aucun
+  // client existant (Web) ne dépendait du message brut : ajout additif, non
+  // cassant.
   if (user.status === 'Suspendu' || user.status === 'Banni' || !user.isActive) {
     res.status(403);
-    throw new Error(`Accès refusé : votre compte est ${(user.status || 'inactif').toLowerCase()}.`);
+    const statusCode = user.status === 'Suspendu' ? 'ACCOUNT_SUSPENDED' : user.status === 'Banni' ? 'ACCOUNT_BANNED' : 'ACCOUNT_INACTIVE';
+    throw Object.assign(new Error(`Accès refusé : votre compte est ${(user.status || 'inactif').toLowerCase()}.`), { name: 'AccountStatusError', code: statusCode });
   }
 
   // Mise à jour de l'activité (non bloquante)

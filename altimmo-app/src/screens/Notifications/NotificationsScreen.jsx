@@ -12,7 +12,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { fonts, fontSize, spacing } from '../../theme';
-import api from '../../services/api';
 import {
   getNotifications,
   markRead,
@@ -20,8 +19,7 @@ import {
   clearRead,
 } from '../../services/notificationApiService';
 import { connectSocket, getSocket } from '../../services/socketService';
-import { getCurrentUserId } from '../../services/notificationsService';
-import { resolveNotificationMobileTarget } from '../../navigation/navigationSdk';
+import { resolveNavigation } from '../../services/notificationsService';
 
 // ─── Config icônes par type ───────────────────────────────────────────────────
 
@@ -80,50 +78,14 @@ const formatRelativeTime = (dateStr) => {
   return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 };
 
-// ─── Navigation helper ────────────────────────────────────────────────────────
-
-function getNavTarget(notif) {
-  const { type, data = {}, entityId } = notif;
-
-  const registeredTarget = resolveNotificationMobileTarget(notif);
-  if (registeredTarget) return registeredTarget;
-
-  // 'Chat' est imbriqué dans MessagerieStack (onglet 'Messages') — naviguer
-  // directement vers 'Chat' depuis un autre onglet (Annonces) échoue, il faut
-  // passer par le tab parent avec les params imbriqués.
-  if (data?.screen === 'Chat') {
-    return { screen: 'Messages', params: { screen: 'Chat', params: data.params } };
-  }
-  if (data?.screen) return { screen: data.screen, params: data.params };
-
-  const MAP = {
-    new_message:           { screen: 'Messages', params: { screen: 'Chat' } },
-    new_staff_message:     { screen: 'Messages', params: { screen: 'Chat' } },
-    visite_new:            { screen: 'Visites'  },
-    visite_status:         { screen: 'Visites'  },
-    visite_cancelled:      { screen: 'Visites'  },
-    visite_demandee:       { screen: 'Visites'  },
-    visite_a_confirmer:    { screen: 'Visites'  },
-    visite_reprogrammee:   { screen: 'Visites'  },
-    visite_rappel:         { screen: 'Visites'  },
-    visite_en_cours:       { screen: 'Visites'  },
-    visite_terminee:       { screen: 'Visites'  },
-    visite_annulation_demandee: { screen: 'Visites' },
-    visite_client_absent:  { screen: 'Visites' },
-    visite_incident:       { screen: 'Visites' },
-    transaction_created:   { screen: 'Profil',  params: { screen: 'Transactions' } },
-    transaction_finalized: { screen: 'Profil',  params: { screen: 'Transactions' } },
-    payment_success:       { screen: 'Profil',  params: { screen: 'Transactions' } },
-    payment_failed:        { screen: 'Profil',  params: { screen: 'Transactions' } },
-    real_estate_application_under_review: { screen: 'Profil', params: { screen: 'RealEstateApplicationDetail', params: { applicationId: data.applicationId || entityId } } },
-    real_estate_application_accepted: { screen: 'Profil', params: { screen: 'RealEstateApplicationDetail', params: { applicationId: data.applicationId || entityId } } },
-    real_estate_application_rejected: { screen: 'Profil', params: { screen: 'RealEstateApplicationDetail', params: { applicationId: data.applicationId || entityId } } },
-    real_estate_reservation_expiring: { screen: 'Profil', params: { screen: 'RealEstateApplications' } },
-    real_estate_reservation_expired: { screen: 'Profil', params: { screen: 'RealEstateApplications' } },
-    real_estate_reservation_cancelled: { screen: 'Profil', params: { screen: 'RealEstateApplications' } },
-  };
-  return MAP[type] || null;
-}
+// SYNC-2C — la résolution notification → écran est désormais UNIQUEMENT
+// `resolveNavigation()` (notificationsService.js), la même fonction que le
+// tap sur push. Un `getNavTarget`/`MAP` local existait ici auparavant et
+// avait dérivé (types absents : quote_*, contrat_*, loyer_*, rental_*,
+// account_*, bien_*, hospitality PMS...) — un tap sur ces notifications
+// dans la LISTE ne naviguait nulle part alors que le push fonctionnait
+// déjà, un bug réel démontré et corrigé en supprimant la duplication
+// plutôt qu'en resynchronisant deux tables manuellement.
 
 // ─── NotifRow ─────────────────────────────────────────────────────────────────
 
@@ -272,36 +234,16 @@ export default function NotificationsScreen({ navigation }) {
       markRead(notif._id).catch(() => {});
     }
 
-    // Enrichir la navigation pour les messages — data ne contient que
-    // conversationId, il faut charger la conversation complète (participants,
-    // relatedProperty) avant de naviguer vers ChatScreen.
-    const { type, data = {} } = notif;
-    const MESSAGE_TYPES = ['new_message', 'new_staff_message', 'message_staff'];
-    if (MESSAGE_TYPES.includes(type) && data.conversationId) {
-      try {
-        const res = await api.get(`/conversations/${data.conversationId}`);
-        const conversation = res.data?.data?.conversation;
-        if (conversation) {
-          const currentUserId = await getCurrentUserId();
-          const contact = conversation.participants?.find(
-            (p) => p._id?.toString() !== currentUserId
-          ) || { name: 'Équipe Altitude Vision' };
-          navigation.navigate('Messages', {
-            screen: 'Chat',
-            params: { conversation, contact },
-          });
-          return;
-        }
-      } catch {}
-      // Fallback : ouvre la liste des conversations
-      navigation.navigate('Messages', {});
-      return;
-    }
-
-    // Autres types : navigation standard
-    const target = getNavTarget(notif);
+    // SYNC-2C — source unique : même résolveur que le tap sur push
+    // (setupNotificationListeners), y compris l'enrichissement message
+    // (chargement de la conversation complète avant ChatScreen). `notif`
+    // (document Notification tel que renvoyé par la liste) porte déjà
+    // `type`/`data`/`destination`/`entityId`, exactement le contrat attendu.
+    const target = await resolveNavigation(notif);
     if (target) {
-      navigation.navigate(target.screen, target.params);
+      const [screen, params] = target;
+      if (params) navigation.navigate(screen, params);
+      else navigation.navigate(screen);
     }
   }, [navigation]);
 

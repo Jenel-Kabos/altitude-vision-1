@@ -1,22 +1,34 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Screen from '../../components/Screen';
 import Button from '../../components/Button';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../../theme';
+import useHotelRealtime from '../../hooks/useHotelRealtime';
 import {
   assignHotelRoom, autoAssignHotelRooms, changeHotelRoom, checkInHotelReservation,
-  checkOutHotelReservation, getAccessibleHotels, getHotelInventory, getHotelRooms, getOwnerHotelReservations, getReservationAssignments,
-  updateHotelInventory,
+  checkOutHotelReservation, getAccessibleHotels, getCheckoutFinancialReadiness, getHotelInventory, getHotelRooms,
+  getOwnerHotelReservations, getReservationAssignments, updateHotelInventory,
 } from '../../services/hotelReservationService';
 
 const isoDay = (offset = 0) => { const day = new Date(); day.setUTCDate(day.getUTCDate() + offset); return day.toISOString().slice(0, 10); };
+// SYNC-2B — même libellé que client/lib/components/RoomAssignmentPanel.jsx (E2E-1).
+const READINESS_LABELS = { ready: 'Prêt pour check-out', warning: 'Prêt avec avertissements', blocked: 'Check-out bloqué' };
 
-export default function HotelOperationsScreen() {
+export default function HotelOperationsScreen({ navigation, route }) {
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
-  const [hotelId, setHotelId] = useState('');
+  const [hotelId, setHotelId] = useState(route?.params?.hotelId || '');
+  // SYNC-2C — `useState(route.params.hotelId)` ne lit la valeur initiale
+  // qu'au premier montage ; sans cette synchronisation, taper une
+  // notification Hôtel B alors que l'écran est déjà ouvert sur Hôtel A (donc
+  // déjà monté, jamais démonté/remonté) laisserait `hotelId` figé sur A —
+  // bug réel démontré (mandat SYNC-2C §51 : switch hôtel via notification).
+  useEffect(() => {
+    if (route?.params?.hotelId && route.params.hotelId !== hotelId) setHotelId(route.params.hotelId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route?.params?.hotelId]);
   const [hotels, setHotels] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -24,15 +36,33 @@ export default function HotelOperationsScreen() {
   const [oldRoomIds, setOldRoomIds] = useState({});
   const [rooms, setRooms] = useState({});
   const [inventory, setInventory] = useState(null);
+  const [readiness, setReadiness] = useState({}); // reservationId -> financialReadiness
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const data = await getOwnerHotelReservations({ hotelId: hotelId || undefined, limit: 50 }); setItems(data.reservations || []); }
-    catch (error) { Alert.alert('Erreur', error.response?.data?.message || 'Opérations indisponibles.'); }
+    try {
+      const data = await getOwnerHotelReservations({ hotelId: hotelId || undefined, limit: 50 });
+      const list = data.reservations || [];
+      setItems(list);
+      // SYNC-2B — E2E-1 a démontré qu'afficher l'état financier AVANT le
+      // check-out (pas seulement au clic) évite un check-out « à l'aveugle ».
+      const checkedIn = list.filter((item) => item.status === 'checked_in');
+      const entries = await Promise.all(checkedIn.map((item) => getCheckoutFinancialReadiness(item._id).then((value) => [item._id, value]).catch(() => [item._id, null])));
+      setReadiness(Object.fromEntries(entries));
+    } catch (error) { Alert.alert('Erreur', error.response?.data?.message || 'Opérations indisponibles.'); }
     finally { setLoading(false); }
   }, [hotelId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+  // SYNC-2C — voir HotelHousekeepingScreen.jsx : recharge aussi hors
+  // transition de focus (switch hôtel via notification sans quitter l'écran).
+  useEffect(() => { load(); }, [hotelId]); // eslint-disable-line react-hooks/exhaustive-deps
   useFocusEffect(useCallback(() => { getAccessibleHotels().then(setHotels).catch(() => setHotels([])); }, []));
+  // Signal de rafraîchissement uniquement (mandat §34) — un événement
+  // réservation/finance recharge la liste ET l'état financier via HTTP,
+  // jamais une mutation locale directe à partir du payload socket.
+  useHotelRealtime(hotelId, useCallback((event) => {
+    if (String(event?.eventType || '').startsWith('reservation.') || String(event?.eventType || '').includes('financial')) load();
+  }, [load]));
 
   const run = async (action, success) => {
     setLoading(true);
@@ -81,8 +111,24 @@ export default function HotelOperationsScreen() {
         <Button label="Changer de chambre" variant="outline" disabled={!oldRoomIds[item._id] || !roomIds[item._id]} onPress={() => run(() => changeHotelRoom(item._id, oldRoomIds[item._id], roomIds[item._id], 'Changement Mobile'), 'Chambre changée.')} />
         <Button label="Check-in de toutes les chambres" onPress={() => run(() => checkInHotelReservation(item._id, { autoAssign: true }), 'Check-in effectué.')} />
       </>}
-      {item.status === 'checked_in' && <Button label="Check-out / départ anticipé" variant="danger" onPress={() => run(() => checkOutHotelReservation(item._id), 'Check-out effectué.')} />}
+      {item.status === 'checked_in' && <>
+        {readiness[item._id] && <View accessibilityLabel="État financier avant check-out" style={styles.readiness}>
+          <Text style={styles.readinessLabel}>{READINESS_LABELS[readiness[item._id].status] || readiness[item._id].status}</Text>
+          {(readiness[item._id].blockers || []).map((b) => <Text key={b.code} style={styles.readinessBlocker}>{b.code}</Text>)}
+        </View>}
+        <Button
+          label="Check-out / départ anticipé"
+          variant="danger"
+          disabled={readiness[item._id]?.status === 'blocked'}
+          onPress={() => run(() => checkOutHotelReservation(item._id), 'Check-out effectué.')}
+        />
+      </>}
     </View>)}
+    {hotelId && <View style={styles.row}>
+      <Button label="Cockpit" variant="outline" onPress={() => navigation.navigate('HotelCockpit', { hotelId })} />
+      <Button label="Ménage" variant="outline" onPress={() => navigation.navigate('HotelHousekeeping', { hotelId })} />
+      <Button label="Maintenance" variant="outline" onPress={() => navigation.navigate('HotelMaintenance', { hotelId })} />
+    </View>}
   </Screen>;
 }
 
@@ -92,4 +138,6 @@ const makeStyles = (c) => StyleSheet.create({
   card: { backgroundColor: c.bgCard, borderColor: c.border, borderWidth: 1, borderRadius: radius.sm, padding: spacing.md, gap: spacing.sm },
   reference: { color: c.text, fontFamily: fonts.bodyBold }, text: { color: c.textSub, fontFamily: fonts.body },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, inventoryLine: { borderTopWidth: 1, borderTopColor: c.border, paddingTop: spacing.sm, gap: spacing.xs },
+  readiness: { borderTopWidth: 1, borderTopColor: c.border, paddingTop: spacing.sm, gap: spacing.xs },
+  readinessLabel: { color: c.text, fontFamily: fonts.bodyBold }, readinessBlocker: { color: c.danger || '#B91C1C', fontFamily: fonts.body, fontSize: fontSize.sm },
 });

@@ -77,4 +77,47 @@ describe('registre de navigation NAV-CORE-1', () => {
       expect(result.data.deepLink).toBe('altimmo://mes-hebergements/reservation-1');
     });
   });
+
+  // SYNC-2C — notifications hospitality opérationnelles (housekeeping/inspection/
+  // maintenance/réservation propriétaire), envoyées par `notify`/`notifyStaff` avec
+  // les `type` réels de server/services/housekeepingService.js, inspectionService.js,
+  // maintenanceService.js, hotelReservationService.js — jamais un type inventé.
+  test('une notification housekeeping/inspection (audience staff) ouvre HotelHousekeepingScreen contextualisé', () => {
+    ['housekeeping_task_created', 'housekeeping_task_assigned', 'housekeeping_task_completed', 'room_inspection_failed', 'room_returned_to_service'].forEach((type) => {
+      const result = buildNotificationNavigation({ type, audience: 'staff', entityId: 'task-1', data: { hotelId: 'hotel-1' } });
+      expect(result.destination).toBe('HOUSEKEEPING');
+      expect(result.data.params).toEqual({ screen: 'HotelHousekeeping', params: { hotelId: 'hotel-1' } });
+    });
+  });
+
+  test('une notification maintenance hôtelière (audience staff) ouvre HotelMaintenanceScreen, jamais RENTAL_MAINTENANCE', () => {
+    ['maintenance_ticket_created', 'maintenance_ticket_assigned', 'maintenance_ticket_resolved'].forEach((type) => {
+      const result = buildNotificationNavigation({ type, audience: 'staff', entityId: 'ticket-1', data: { hotelId: 'hotel-1' } });
+      expect(result.destination).toBe('HOTEL_MAINTENANCE');
+      expect(result.data.params).toEqual({ screen: 'HotelMaintenance', params: { hotelId: 'hotel-1' } });
+    });
+    // Non-régression : la maintenance LOCATIVE reste sur sa propre destination.
+    const rental = buildNotificationNavigation({ type: 'rental_maintenance_ticket_created', audience: 'staff', entityId: 'ticket-2' });
+    expect(rental.destination).toBe('RENTAL_MAINTENANCE');
+  });
+
+  test('hotel_reservation_pending (propriétaire, audience user par défaut) ouvre HotelOperationsScreen, jamais l’écran voyageur', () => {
+    const result = buildNotificationNavigation({ type: 'hotel_reservation_pending', entityId: 'res-1', data: { hotelId: 'hotel-1' } });
+    expect(result.destination).toBe('HOTEL_OPERATIONS');
+    expect(result.data.params).toEqual({ screen: 'HotelOperations', params: { hotelId: 'hotel-1' } });
+  });
+
+  test('les événements voyageur hotel_reservation_* restent sur HOTEL_RESERVATIONS (écran voyageur)', () => {
+    ['hotel_reservation_created', 'hotel_reservation_checked_in', 'hotel_reservation_checked_out', 'hotel_reservation_modified', 'hotel_reservation_confirmed'].forEach((type) => {
+      const result = buildNotificationNavigation({ type, entityId: 'res-1' });
+      expect(result.destination).toBe('HOTEL_RESERVATIONS');
+      expect(result.data.params).toEqual({ screen: 'MyHotelReservations' });
+    });
+  });
+
+  test('hotel_financial_draft_failed reste volontairement sans destination (finance Web/Admin-only)', () => {
+    const result = buildNotificationNavigation({ type: 'hotel_financial_draft_failed', audience: 'staff', data: { hotelId: 'hotel-1' } });
+    expect(result.destination).toBeNull();
+    expect(result.data.screen).toBeUndefined();
+  });
 });

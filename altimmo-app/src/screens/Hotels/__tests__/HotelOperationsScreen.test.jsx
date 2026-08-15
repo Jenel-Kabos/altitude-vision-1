@@ -3,7 +3,8 @@ import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import HotelOperationsScreen from '../HotelOperationsScreen';
 import {
-  assignHotelRoom, getAccessibleHotels, getHotelRooms, getOwnerHotelReservations, getReservationAssignments,
+  assignHotelRoom, checkOutHotelReservation, getAccessibleHotels, getCheckoutFinancialReadiness,
+  getHotelRooms, getOwnerHotelReservations, getReservationAssignments,
 } from '../../../services/hotelReservationService';
 
 jest.mock('@expo/vector-icons', () => { const ReactActual = require('react'); const RN = require('react-native'); return { Ionicons: (props) => ReactActual.createElement(RN.Text, props, props.name) }; });
@@ -14,7 +15,9 @@ jest.mock('../../../services/hotelReservationService', () => ({
   assignHotelRoom: jest.fn().mockResolvedValue({}), autoAssignHotelRooms: jest.fn().mockResolvedValue([]), changeHotelRoom: jest.fn().mockResolvedValue({}),
   checkInHotelReservation: jest.fn().mockResolvedValue({}), checkOutHotelReservation: jest.fn().mockResolvedValue({}),
   getAccessibleHotels: jest.fn(), getHotelInventory: jest.fn(), getHotelRooms: jest.fn(), getOwnerHotelReservations: jest.fn(), getReservationAssignments: jest.fn(), updateHotelInventory: jest.fn(),
+  getCheckoutFinancialReadiness: jest.fn().mockResolvedValue(null), getHotelCockpitAnalytics: jest.fn().mockResolvedValue({ kpis: {} }),
 }));
+jest.mock('../../../hooks/useHotelRealtime', () => jest.fn());
 
 describe('HotelOperationsScreen — exploitation Mobile C/D.1.2', () => {
   beforeEach(() => {
@@ -36,5 +39,25 @@ describe('HotelOperationsScreen — exploitation Mobile C/D.1.2', () => {
     fireEvent.press(screen.getByLabelText('Chambre 101 · étage 1'));
     fireEvent.press(screen.getByLabelText('Affecter'));
     await waitFor(() => expect(assignHotelRoom).toHaveBeenCalledWith('reservation-1', 'room-101'));
+  });
+
+  test('un check-out bloqué financièrement affiche l’état et désactive le bouton (E2E-1)', async () => {
+    getOwnerHotelReservations.mockResolvedValue({ reservations: [{ _id: 'reservation-2', reference: 'RES-002', status: 'checked_in', roomsCount: 1, hotel: { _id: 'hotel-1', name: 'Altitude Hôtel' }, guest: { firstName: 'Ada', lastName: 'Lovelace' } }] });
+    getCheckoutFinancialReadiness.mockResolvedValue({ status: 'blocked', blockers: [{ code: 'FINANCIAL_BALANCE_REMAINING' }] });
+    render(<HotelOperationsScreen />);
+    await waitFor(() => expect(screen.getByText('Check-out bloqué')).toBeTruthy());
+    expect(screen.getByText('FINANCIAL_BALANCE_REMAINING')).toBeTruthy();
+    expect(screen.getByLabelText('Check-out / départ anticipé').props.accessibilityState.disabled).toBe(true);
+  });
+
+  test('un check-out prêt reste actionnable et appelle réellement le check-out', async () => {
+    getOwnerHotelReservations.mockResolvedValue({ reservations: [{ _id: 'reservation-3', reference: 'RES-003', status: 'checked_in', roomsCount: 1, hotel: { _id: 'hotel-1', name: 'Altitude Hôtel' }, guest: { firstName: 'Ada', lastName: 'Lovelace' } }] });
+    getCheckoutFinancialReadiness.mockResolvedValue({ status: 'ready', blockers: [] });
+    render(<HotelOperationsScreen />);
+    await waitFor(() => expect(screen.getByText('Prêt pour check-out')).toBeTruthy());
+    const button = screen.getByLabelText('Check-out / départ anticipé');
+    expect(button.props.accessibilityState?.disabled).toBeFalsy();
+    fireEvent.press(button);
+    await waitFor(() => expect(checkOutHotelReservation).toHaveBeenCalledWith('reservation-3'));
   });
 });

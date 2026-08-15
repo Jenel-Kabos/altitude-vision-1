@@ -45,6 +45,14 @@ const USER_DESTINATIONS = {
   tenant_document_added: 'MY_DOCUMENT_DETAILS', tenant_receipt_added: 'MY_DOCUMENT_DETAILS', tenant_payment_recorded: 'TENANT_PAYMENTS',
   tenant_maintenance_created: 'TENANT_MAINTENANCE', tenant_maintenance_scheduled: 'TENANT_MAINTENANCE', tenant_maintenance_resolved: 'TENANT_MAINTENANCE',
   tenant_notice_recorded: 'TENANT_NOTICE', tenant_notice_acknowledged: 'TENANT_NOTICE', tenant_notice_cancelled: 'TENANT_NOTICE', tenant_notice_closed: 'TENANT_NOTICE',
+  // SYNC-2C — `hotel_reservation_pending` va au propriétaire (`notify({recipient: hotel.manager}, ...)`,
+  // audience par défaut 'user', jamais 'staff' malgré le nom) : contexte opérationnel HOTEL_OPERATIONS
+  // (mobile : HotelOperationsScreen), jamais HOTEL_RESERVATIONS (réservé au voyageur). Les 4 événements
+  // guest ci-dessous (`notifyReservationGuest`) complètent hotel_reservation_confirmed/rejected/cancelled/
+  // expired déjà mappés, jamais réécrits.
+  hotel_reservation_pending: 'HOTEL_OPERATIONS',
+  hotel_reservation_created: 'HOTEL_RESERVATIONS', hotel_reservation_checked_in: 'HOTEL_RESERVATIONS',
+  hotel_reservation_checked_out: 'HOTEL_RESERVATIONS', hotel_reservation_modified: 'HOTEL_RESERVATIONS',
 };
 
 const STAFF_DESTINATIONS = {
@@ -63,6 +71,19 @@ const STAFF_DESTINATIONS = {
   rental_deposit_returned: 'LEASES', rental_exit_inspection_cleared: 'LEASES', rental_lease_archived: 'LEASES',
   rental_maintenance_ticket_created: 'RENTAL_MAINTENANCE', rental_maintenance_ticket_resolved: 'RENTAL_MAINTENANCE',
   crm_activity_assigned: 'CRM_CUSTOMER_DETAILS',
+  // SYNC-2C — housekeeping/inspection/maintenance HÔTELIÈRE (jamais confondue avec
+  // RENTAL_MAINTENANCE, gestion locative). Toutes envoyées via `notifyStaff`/`notify({audience:'staff'})`
+  // (server/services/housekeepingService.js, inspectionService.js, maintenanceService.js). L'inspection
+  // n'a pas d'écran dédié (Web ni Mobile) — réutilise HOUSEKEEPING, même contrat que
+  // HousekeepingDashboardPage.jsx/HotelHousekeepingScreen.jsx (mandat SYNC-2C §33 : ne jamais créer un
+  // écran seulement pour satisfaire un deep-link).
+  housekeeping_task_created: 'HOUSEKEEPING', housekeeping_task_assigned: 'HOUSEKEEPING', housekeeping_task_completed: 'HOUSEKEEPING',
+  room_inspection_failed: 'HOUSEKEEPING', room_returned_to_service: 'HOUSEKEEPING',
+  maintenance_ticket_created: 'HOTEL_MAINTENANCE', maintenance_ticket_assigned: 'HOTEL_MAINTENANCE', maintenance_ticket_resolved: 'HOTEL_MAINTENANCE',
+  // `hotel_financial_draft_failed` reste volontairement NON mappé : le volet financier hôtelier est
+  // Web/Admin-only (E2E-1, SYNC-2B §12-13) — le mobile propriétaire affiche la notification (titre/corps)
+  // sans jamais proposer de destination qui laisserait croire à une capacité de gestion financière absente
+  // côté mobile (mandat SYNC-2C §35).
 };
 
 function destinationForNotification(type, audience = 'user') {

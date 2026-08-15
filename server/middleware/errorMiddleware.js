@@ -76,6 +76,15 @@ const errorHandler = (err, req, res, next) => {
     message = err.message;
   }
 
+  // SYNC-2A — AccountStatusError (compte suspendu/banni/inactif, 403) et
+  // AuthSessionError (tokenVersion révoqué/mot de passe changé, 401) portent
+  // déjà leur propre statusCode via res.status() avant le throw ; on ne fait
+  // que propager leur `code` structuré, même convention que les erreurs
+  // métier ci-dessus.
+  if (['AccountStatusError', 'AuthSessionError'].includes(err.name)) {
+    message = err.message;
+  }
+
   res.status(statusCode).json({
     status: statusCode >= 500 ? 'error' : 'fail',
     message,
@@ -84,6 +93,7 @@ const errorHandler = (err, req, res, next) => {
     ...(err.name === 'BusinessProfileError' && { code: err.code }),
     ...(err.name === 'OrganizationError' && { code: err.code }),
     ...(['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError'].includes(err.name) && { code: err.code }),
+    ...(['AccountStatusError', 'AuthSessionError'].includes(err.name) && { code: err.code }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };

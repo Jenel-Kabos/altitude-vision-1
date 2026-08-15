@@ -21,3 +21,10 @@ export const checkInHotelReservation = async (id, payload = {}) => (await api.pa
 export const checkOutHotelReservation = async (id, payload = {}) => (await api.patch(`/hotel-reservations/${id}/check-out`, payload)).data.data;
 export const getHotelInventory = async (hotelId, params) => (await api.get(`/hotels/${hotelId}/inventory/calendar`, { params })).data.data;
 export const updateHotelInventory = async (hotelId, payload) => (await api.patch(`/hotels/${hotelId}/inventory/range`, payload)).data.data;
+// SYNC-2B — même endpoint certifié E2E-1 (server/controllers/hotelReservationController.js
+// `checkoutFinancialReadiness`), jamais un calcul de solde recalculé côté mobile.
+export const getCheckoutFinancialReadiness = async (id) => (await api.get(`/hotel-reservations/${id}/checkout-financial-readiness`)).data.data.financialReadiness;
+// SYNC-2B — mêmes champs `kpis` que client/lib/pages/dashboard/HotelDetailPage.jsx
+// (client/lib/services/dashboardAnalyticsService.js) : aucun KPI inventé, seuls les
+// champs réellement renvoyés par le backend sont consommés côté écran.
+export const getHotelCockpitAnalytics = async (hotelId) => (await api.get('/dashboard-analytics/hotels', { params: { hotelId } })).data.data;
