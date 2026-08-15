@@ -43,6 +43,12 @@ describe('MyHotelReservationsPage — Sprint C (dashboard propriétaire) — TES
     expect(screen.getAllByText('En attente').length).toBeGreaterThan(0);
   });
 
+  test('conserve le scope établissement fourni par le cockpit', async () => {
+    render(<MyHotelReservationsPage initialHotelId="HOTEL-1" />);
+    await screen.findByText(/RES-2026-000001/);
+    expect(getOwnerHotelReservations).toHaveBeenCalledWith(expect.objectContaining({ hotelId: 'HOTEL-1' }));
+  });
+
   test('confirmer une réservation en attente', async () => {
     confirmHotelReservation.mockResolvedValue({});
     render(<MyHotelReservationsPage />);

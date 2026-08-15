@@ -20,6 +20,7 @@ import { getAllEvents } from "../../services/eventService";
 import { getAlertesPaiements } from "../../services/gestionLocativeService";
 import { getAllUsers } from "../../services/userService";
 import { getRecentActionLogs } from "../../services/actionLogService";
+import RoleDashboardOverview from './RoleDashboardOverview';
 
 const BLUE  = '#2E7BB5';
 const GOLD  = '#C8960C';
@@ -51,7 +52,7 @@ const statusColor = (s) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-const DashboardHome = () => {
+const GlobalDashboardHome = () => {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -774,5 +775,13 @@ const ErrorScreen = ({ error }) => (
     </div>
   </div>
 );
+
+const DashboardHome = () => {
+  const { user } = useAuth();
+  if (['Secretaire', 'GestionnaireImmobilier', 'CommunityManager'].includes(user?.role)) {
+    return <RoleDashboardOverview />;
+  }
+  return <GlobalDashboardHome />;
+};
 
 export default DashboardHome;

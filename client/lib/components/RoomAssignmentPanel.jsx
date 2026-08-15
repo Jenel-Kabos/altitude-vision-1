@@ -50,7 +50,16 @@ const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
   }, [reservation._id]);
 
   useEffect(() => { loadAssignment(); }, [loadAssignment]);
-  const loadReadiness = useCallback(async () => { if (reservation.status !== 'checked_in') return; setLoadingReadiness(true); try { setFinancialReadiness(await getCheckoutFinancialReadiness(reservation._id)); } catch { setFinancialReadiness(null); } finally { setLoadingReadiness(false); } }, [reservation._id, reservation.status]);
+  // Dépend de `reservation` (référence entière, pas seulement `_id`/`status`) :
+  // les actions financières (Finaliser/Émettre/Payer/Allouer) se produisent
+  // dans des panneaux frères (HotelFinancialDocumentPanel/HotelPaymentPanel)
+  // qui ne changent ni l'id ni le statut de la réservation, mais déclenchent
+  // un rechargement de la liste parente (`onChanged`) qui fournit une
+  // nouvelle référence `reservation` — c'est ce changement de référence qui
+  // doit re-déclencher l'évaluation, sinon l'état financier affiché reste
+  // périmé (bug réel constaté : "État financier indisponible" figé après un
+  // encaissement pourtant réussi).
+  const loadReadiness = useCallback(async () => { if (reservation.status !== 'checked_in') return; setLoadingReadiness(true); try { setFinancialReadiness(await getCheckoutFinancialReadiness(reservation._id)); } catch { setFinancialReadiness(null); } finally { setLoadingReadiness(false); } }, [reservation]);
   useEffect(() => { loadReadiness(); }, [loadReadiness]);
 
   const refresh = async () => {
@@ -135,7 +144,7 @@ const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
   };
 
   return (
-    <div className="mt-2 border-t pt-2">
+    <div className="mt-2 border-t pt-2" data-loading-assignment={String(loadingAssignment)}>
       {isMultiRoom && (
         <p className="text-xs text-blue-700 bg-blue-50 rounded px-2 py-1 mb-2">
           Réservation multi-chambres : {assignments.length}/{reservation.roomsCount} affectée(s).
@@ -173,7 +182,7 @@ const RoomAssignmentPanel = ({ reservation, onChanged, isAdmin = false }) => {
           {assignments.length > 1 && <select aria-label="Choisir la chambre à remplacer" value={selectedOldRoomId} onChange={(e) => setSelectedOldRoomId(e.target.value)} className="p-2 border rounded text-sm">
             {assignments.map((item) => <option key={item.id || item._id} value={item.room?._id || item.room?.id}>Remplacer {item.room?.roomNumber}</option>)}
           </select>}
-          <select aria-label="Choisir une chambre disponible" value={selectedRoomId} onChange={(e) => setSelectedRoomId(e.target.value)} className="p-2 border rounded text-sm">
+          <select aria-label="Choisir une chambre disponible" data-rooms-count={rooms.length} data-loading-rooms={String(loadingRooms)} value={selectedRoomId} onChange={(e) => setSelectedRoomId(e.target.value)} className="p-2 border rounded text-sm">
             <option value="">{loadingRooms ? "Chargement..." : "Chambre disponible..."}</option>
             {rooms.map((r) => <option key={r._id} value={r._id}>{r.roomNumber}{r.roomCategory?.name ? ` — ${r.roomCategory.name}` : ""}</option>)}
           </select>

@@ -10,7 +10,7 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const socket = require('../socket');
 const { sendExpoPushNotification } = require('../utils/expoPush');
-const { notify, visitSocketEventFor } = require('../services/notificationService');
+const { notify, visitSocketEventFor, hospitalityLinkFor } = require('../services/notificationService');
 
 describe('notificationService.notify', () => {
   beforeEach(() => {
@@ -30,6 +30,27 @@ describe('notificationService.notify', () => {
     expect(Notification.create).toHaveBeenCalledWith(expect.objectContaining({
       recipient: '507f1f77bcf86cd799439011',
       type: 'visite_status',
+    }));
+  });
+
+  test.each([
+    ['housekeeping_task_created', '/dashboard/housekeeping?hotelId=507f1f77bcf86cd799439099'],
+    ['room_inspection_failed', '/dashboard/housekeeping?hotelId=507f1f77bcf86cd799439099'],
+    ['maintenance_ticket_created', '/dashboard/maintenance?hotelId=507f1f77bcf86cd799439099'],
+    ['hotel_financial_draft_failed', '/dashboard/hotel-finance?hotelId=507f1f77bcf86cd799439099'],
+  ])('contextualise %s pour le staff', (type, link) => {
+    expect(hospitalityLinkFor({ type, audience: 'staff', data: { hotelId: '507f1f77bcf86cd799439099' } })).toBe(link);
+  });
+
+  test('la réservation propriétaire pointe vers le bon hôtel', async () => {
+    await notify({
+      recipient: '507f1f77bcf86cd799439011', type: 'hotel_reservation_pending',
+      title: 'Réservation', body: 'Nouvelle réservation', entityType: 'HotelReservation',
+      entityId: '507f1f77bcf86cd799439012', data: { hotelId: '507f1f77bcf86cd799439099' },
+    });
+    expect(Notification.create).toHaveBeenCalledWith(expect.objectContaining({
+      link: '/mes-hotels/reservations?hotelId=507f1f77bcf86cd799439099',
+      entityType: 'HotelReservation', entityId: '507f1f77bcf86cd799439012',
     }));
   });
 

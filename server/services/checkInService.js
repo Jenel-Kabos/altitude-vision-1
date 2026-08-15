@@ -7,6 +7,7 @@ const { runFinancialOperation } = require('./finance/financialTransactionService
 const FinancialDocument = require('../models/FinancialDocument');
 const { createHotelInvoiceDraftFromReservation } = require('./finance/hotelBillingAdapter');
 const logger = require('../utils/logger');
+const { emitHotelEvent } = require('../socket');
 
 function fail(code, message, statusCode = 409) { const error = new Error(message); error.code = code; error.statusCode = statusCode; throw error; }
 const actorId = (actor) => actor?.id || actor?._id || null;
@@ -102,6 +103,7 @@ async function performCheckIn({ reservation, reservationId, roomId, roomIds, aut
     notifyStaff({ type: 'hotel_financial_draft_failed', title: 'Brouillon financier à reprendre', body: `Le check-in ${result.reservation.reference} est réussi, mais son brouillon financier doit être recréé.`, data: { reservationId: String(id), hotelId: String(result.reservation.hotel) } }).catch(() => {});
     financialDocument = { status: 'creation_failed', retryable: true, code: error.code || 'FINANCIAL_DRAFT_CREATION_FAILED' };
   }
+  await emitHotelEvent(result.reservation.hotel, { eventType: 'reservation.checked_in', entityType: 'HotelReservation', entityId: result.reservation._id, status: result.reservation.status }).catch(() => {});
   return { reservation: result.reservation, rooms: result.rooms, room: result.rooms[0] || null, financialDocument };
 }
 

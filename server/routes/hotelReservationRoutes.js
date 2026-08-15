@@ -11,9 +11,16 @@ const express = require('express');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/hotelReservationController');
 const { ROLES_ALTIMMO } = require('../utils/roles');
+const { attachTenantContext } = require('../middleware/tenantContext');
 
 const router = express.Router();
 router.use(auth.protect);
+// Non bloquant (contrairement à `requireTenantScope`, monté lui sur
+// financialRoutes.js) : ne casse jamais l'accès Owner/Guest existant (ils
+// n'en ont pas besoin, voir assertReservationAccess), résout seulement
+// `req.platformTenant` pour permettre à un Admin/staff plateforme d'accéder
+// aux routes scoping hôtelier (room-assignment, checkout-financial-readiness...).
+router.use(attachTenantContext);
 
 // Client connecté — littéral, avant /:id.
 router.get('/mine', ctrl.mine);

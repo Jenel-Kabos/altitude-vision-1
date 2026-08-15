@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { Calendar } from 'lucide-react';
 import PropertyAssetCockpitDrawer from "../../components/dashboard/propertyAsset/PropertyAssetCockpitDrawer";
 import PropertyPortfolioDashboard from "../../components/dashboard/propertyAsset/PropertyPortfolioDashboard";
+import { projectOwnerPropertyStatus, summarizeOwnerProperties } from '../../utils/ownerPropertyStatus';
 
 const BLUE = '#2E7BB5';
 const GOLD = '#C8960C';
@@ -178,6 +179,7 @@ const PropertyCard = ({ property, rental, onEdit, onDelete, onToggleAvailability
   const availabilityLabel = property.status === 'location'
     ? (property.availability === 'Disponible' ? 'Marquer occupé' : 'Marquer disponible')
     : (property.availability === 'Disponible' ? 'Marquer vendu' : 'Marquer disponible');
+  const businessStatus = projectOwnerPropertyStatus(property, rental);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all group">
@@ -193,7 +195,7 @@ const PropertyCard = ({ property, rental, onEdit, onDelete, onToggleAvailability
         </span>
         <span className="absolute top-3 right-3 text-white text-xs font-semibold px-2.5 py-1 rounded-full"
           style={{ background: property.availability==='Disponible' ? 'linear-gradient(135deg,#15803D,#16A34A)' : 'linear-gradient(135deg,#B45309,#D97706)', fontFamily:"'DM Sans', sans-serif" }}>
-          {property.availability || property.status}
+          {businessStatus.label}
         </span>
         <div className="absolute bottom-3 left-3">
           <span className="text-white text-sm font-bold"
@@ -398,9 +400,7 @@ const OwnerPropertyManagement = () => {
   };
   const handleCancel = () => { setEditingId(null); setView("list"); };
 
-  const availableCount = properties.filter(p => p.availability === 'Disponible').length;
-  const occupiedCount = properties.filter(p => ['Loué', 'Vendu'].includes(p.availability)).length;
-  const pendingCount = properties.filter(p => p.statusAdmin === 'En attente').length;
+  const summary = summarizeOwnerProperties(properties, rentals);
 
   if (authLoading) return (
     <div className="flex items-center justify-center py-20">
@@ -419,7 +419,7 @@ const OwnerPropertyManagement = () => {
             {view === 'list' ? 'Mes Biens Immobiliers' : view === 'add' ? 'Ajouter un bien' : 'Modifier le bien'}
           </h2>
           <p className="text-sm text-gray-400 mt-0.5" style={{ fontFamily:"'DM Sans', sans-serif" }}>
-            {properties.length} bien{properties.length!==1?'s':''} publiés
+            {properties.length} bien{properties.length!==1?'s':''} dans votre portefeuille
           </p>
         </div>
         {view === 'list' && (
@@ -447,8 +447,8 @@ const OwnerPropertyManagement = () => {
                 <Building2 size={19} />
               </div>
               <div>
-                <p className="text-xs text-gray-400">Biens publiés</p>
-                <p className="text-xl font-bold text-gray-900">{properties.length}</p>
+                <p className="text-xs text-gray-400">Total des biens</p>
+                <p className="text-xl font-bold text-gray-900">{summary.total}</p>
               </div>
             </div>
           </div>
@@ -458,8 +458,8 @@ const OwnerPropertyManagement = () => {
                 <CheckCircle2 size={19} />
               </div>
               <div>
-                <p className="text-xs text-gray-400">Disponibles</p>
-                <p className="text-xl font-bold text-gray-900">{availableCount}</p>
+                <p className="text-xs text-gray-400">Publiés / validés</p>
+                <p className="text-xl font-bold text-gray-900">{summary.published} / {summary.validated}</p>
               </div>
             </div>
           </div>
@@ -469,8 +469,8 @@ const OwnerPropertyManagement = () => {
                 <Clock3 size={19} />
               </div>
               <div>
-                <p className="text-xs text-gray-400">Occupés / en attente</p>
-                <p className="text-xl font-bold text-gray-900">{occupiedCount} / {pendingCount}</p>
+                <p className="text-xs text-gray-400">Occupés / en validation</p>
+                <p className="text-xl font-bold text-gray-900">{summary.occupied} / {summary.pending}</p>
               </div>
             </div>
           </div>
@@ -501,7 +501,7 @@ const OwnerPropertyManagement = () => {
                 style={{ background:`${BLUE}12` }}>
                 <Home size={28} style={{ color:BLUE }} />
               </div>
-              <p className="font-bold text-gray-700 mb-1" style={{ fontFamily:"'DM Sans', sans-serif" }}>Aucun bien publié</p>
+              <p className="font-bold text-gray-700 mb-1" style={{ fontFamily:"'DM Sans', sans-serif" }}>Aucun bien immobilier</p>
               <p className="text-sm text-gray-400 mb-5" style={{ fontFamily:"'DM Sans', sans-serif" }}>
                 Commencez par ajouter votre premier bien immobilier.
               </p>

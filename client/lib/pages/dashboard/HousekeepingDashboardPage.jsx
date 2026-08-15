@@ -19,10 +19,10 @@ import {
   DashboardPage, DashboardPageHeader, DashboardCard, DashboardState,
 } from "../../components/dashboard/DashboardUI";
 
-const HousekeepingDashboardPage = () => {
+const HousekeepingDashboardPage = ({ initialHotelId = '' }) => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ hotelId: "", status: "", priority: "" });
+  const [filters, setFilters] = useState({ hotelId: initialHotelId, status: "", priority: "" });
   const [assignInputs, setAssignInputs] = useState({});
   const [inspections, setInspections] = useState({}); // taskId -> inspection
 
@@ -113,7 +113,7 @@ const HousekeepingDashboardPage = () => {
       <DashboardPageHeader icon={Wrench} title="Ménage" description="Tâches de nettoyage en cours et à venir." />
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <input placeholder="ID Hôtel (optionnel)" value={filters.hotelId}
+        <input placeholder="ID Hôtel (optionnel)" value={filters.hotelId} readOnly={Boolean(initialHotelId)}
           onChange={(e) => setFilters((f) => ({ ...f, hotelId: e.target.value }))} className="p-2 border rounded text-sm" />
         <select aria-label="Filtrer par statut" value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} className="p-2 border rounded text-sm">
           <option value="">Tous les statuts</option>

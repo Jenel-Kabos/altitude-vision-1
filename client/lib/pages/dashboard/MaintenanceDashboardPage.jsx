@@ -16,10 +16,10 @@ import { PRIORITY_CLASSES, HOUSEKEEPING_PRIORITIES } from "../../constants/house
 import { Wrench } from "lucide-react";
 import { DashboardPage, DashboardPageHeader, DashboardState, DashboardTableContainer, DashboardToolbar } from "../../components/dashboard/DashboardUI";
 
-const MaintenanceDashboardPage = () => {
+const MaintenanceDashboardPage = ({ initialHotelId = '' }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ hotelId: "", status: "", priority: "", category: "" });
+  const [filters, setFilters] = useState({ hotelId: initialHotelId, status: "", priority: "", category: "" });
   const [assignInputs, setAssignInputs] = useState({});
   const [inspections, setInspections] = useState({}); // ticketId -> inspection
 
@@ -107,7 +107,7 @@ const MaintenanceDashboardPage = () => {
       <DashboardPageHeader icon={Wrench} title="Maintenance" description="Tickets de maintenance ouverts sur les chambres." />
 
       <DashboardToolbar>
-        <input placeholder="ID Hôtel (optionnel)" value={filters.hotelId}
+        <input placeholder="ID Hôtel (optionnel)" value={filters.hotelId} readOnly={Boolean(initialHotelId)}
           onChange={(e) => setFilters((f) => ({ ...f, hotelId: e.target.value }))} className="p-2 border rounded text-sm" />
         <select aria-label="Filtrer par statut" value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} className="p-2 border rounded text-sm">
           <option value="">Tous les statuts</option>

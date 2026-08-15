@@ -18,6 +18,7 @@ const {
 const roomAssignmentService = require('./roomAssignmentService');
 const { notify } = require('./notificationService');
 const { notifyReservationGuest } = require('./hotelReservationNotificationService');
+const { emitHotelEvent } = require('../socket');
 const logger = require('../utils/logger');
 const { isTransactionUnavailable } = require('./finance/financialTransactionService');
 
@@ -249,7 +250,9 @@ async function notifyNewReservation(reservation, hotel) {
     type: 'hotel_reservation_pending',
     title: '🛎️ Nouvelle demande de réservation',
     body: `Une demande (${reservation.reference}) attend votre confirmation pour "${hotel.name}".`,
-    data: { reservationId: String(reservation._id), screen: 'MesReservations' },
+    entityType: 'HotelReservation',
+    entityId: reservation._id,
+    data: { reservationId: String(reservation._id), hotelId: String(hotel._id), screen: 'MesReservations' },
   });
 }
 
@@ -320,6 +323,7 @@ async function transitionStatus(reservation, { to, actingUser, reason = '' }) {
   await reservation.save();
 
   notifyStatusChange(reservation, to).catch(() => {});
+  await emitHotelEvent(reservation.hotel, { eventType: `reservation.${to}`, entityType: 'HotelReservation', entityId: reservation._id, status: to }).catch(() => {});
   return reservation;
 }
 
@@ -408,6 +412,7 @@ async function updateReservation(reservation, changes, actingUser) {
   reservation.updatedBy = actingUser?.id || null;
   await reservation.save();
   notifyReservationGuest({ reservation, eventKey: `modified:${reservation.updatedAt?.toISOString?.() || Date.now()}`, type: 'hotel_reservation_modified', title: 'Réservation modifiée', body: `Votre réservation ${reservation.reference} a été modifiée.` }).catch(() => {});
+  await emitHotelEvent(reservation.hotel, { eventType: 'reservation.modified', entityType: 'HotelReservation', entityId: reservation._id, status: reservation.status }).catch(() => {});
   return reservation;
 }
 

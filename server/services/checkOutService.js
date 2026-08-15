@@ -9,6 +9,7 @@ const { evaluateHotelCheckoutFinancialReadiness } = require('./finance/hotelChec
 const authz = require('./finance/financialAuthorizationService');
 const { appendFinancialLedgerEntry } = require('./finance/financialLedgerService');
 const logger = require('../utils/logger');
+const { emitHotelEvent } = require('../socket');
 
 function fail(code, message, statusCode, extra = {}) { const error = new Error(message); error.code = code; error.statusCode = statusCode; Object.assign(error, extra); throw error; }
 const actorId = (actor) => actor?.id || actor?._id;
@@ -77,9 +78,10 @@ async function performCheckOutCore({ reservationId, reservationSeed, actingUser,
 async function performCheckOut({ reservation, reservationId, actingUser, reason = '', financialOverride, transactionMode = 'fallback', notificationDependencies = {} }) {
   const id = reservationId || reservation?._id;
   const result = await runFinancialOperation({ operationName: 'hotel.checkout.financial', transactionMode }, ({ session }) => performCheckOutCore({ reservationId: id, reservationSeed: reservation, actingUser, reason, financialOverride, session }));
-  if (result.rooms.length) await notifyStaff({ type: 'housekeeping_task_created', title: '🧹 Nouvelles tâches de ménage', body: `${result.rooms.length} tâche(s) de ménage ont été créées.`, data: { roomIds: result.rooms.map((room) => String(room._id)) } }).catch((error) => logger.error('hotel_checkout.post_commit_effect_failed', { reservationId: id, effect: 'housekeeping_notification', errorCode: error.code }));
+  if (result.rooms.length) await notifyStaff({ type: 'housekeeping_task_created', title: '🧹 Nouvelles tâches de ménage', body: `${result.rooms.length} tâche(s) de ménage ont été créées.`, entityType: 'HotelReservation', entityId: result.reservation._id, data: { reservationId: String(result.reservation._id), hotelId: String(result.reservation.hotel), roomIds: result.rooms.map((room) => String(room._id)) } }).catch((error) => logger.error('hotel_checkout.post_commit_effect_failed', { reservationId: id, effect: 'housekeeping_notification', errorCode: error.code }));
   await notifyReservationGuest({ reservation: result.reservation, eventKey: 'checked_out', type: 'hotel_reservation_checked_out', title: '👋 Check-out effectué', body: `Votre séjour ${result.reservation.reference} est terminé. Merci de votre visite !`, ...notificationDependencies }).catch((error) => logger.error('hotel_checkout.post_commit_effect_failed', { reservationId: id, effect: 'guest_notification', errorCode: error.code }));
   logger.info('hotel_checkout.completed', { reservationId: id, hotelId: result.reservation.hotel, actorId: actorId(actingUser), overrideApplied: result.overrideApplied });
+  await emitHotelEvent(result.reservation.hotel, { eventType: 'reservation.checked_out', entityType: 'HotelReservation', entityId: result.reservation._id, status: result.reservation.status }).catch(() => {});
   return { reservation: result.reservation, room: result.room, rooms: result.rooms, financialCheckout: { status: result.overrideApplied ? 'overridden' : result.readiness.status, warnings: result.readiness.warnings, overrideApplied: result.overrideApplied, overrideAuditId: result.overrideAuditId } };
 }
 module.exports = { performCheckOut, validateOverride };

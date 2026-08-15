@@ -30,8 +30,8 @@ function KpiCard({ label, value, hint, tone = 'default' }) {
   );
 }
 
-export default function HotelFinanceDashboardPage() {
-  const [hotelId, setHotelId] = useState('');
+export default function HotelFinanceDashboardPage({ initialHotelId = '' }) {
+  const [hotelId, setHotelId] = useState(initialHotelId);
   const [accessibleHotels, setAccessibleHotels] = useState([]);
   const [globalAccess, setGlobalAccess] = useState(false);
   const [hotelsLoaded, setHotelsLoaded] = useState(false);
@@ -85,11 +85,11 @@ export default function HotelFinanceDashboardPage() {
       setGlobalAccess(result.globalAccess);
       // Un seul hôtel accessible (non-Admin) : présélection automatique côté client, cohérente
       // avec la résolution serveur (§26) — l'utilisateur n'a jamais à saisir un identifiant.
-      if (!result.globalAccess && result.hotels.length === 1) setHotelId(result.hotels[0].id);
+      if (!initialHotelId && !result.globalAccess && result.hotels.length === 1) setHotelId(result.hotels[0].id);
       setHotelsLoaded(true);
     }).catch(() => setHotelsLoaded(true));
     return () => { cancelled = true; };
-  }, []);
+  }, [initialHotelId]);
 
   useEffect(() => { setAlertsPage(1); }, [hotelId, dateFrom, dateTo]);
   useEffect(() => { if (hotelsLoaded) load(alertsPage); }, [load, alertsPage, hotelsLoaded]);

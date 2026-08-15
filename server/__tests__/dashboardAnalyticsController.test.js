@@ -2,7 +2,7 @@ const mockChain = (value = []) => ({ distinct: jest.fn().mockResolvedValue(value
 const mockModel = () => ({ aggregate: jest.fn().mockResolvedValue([]), countDocuments: jest.fn().mockResolvedValue(0), find: jest.fn(() => mockChain()) });
 
 jest.mock('../models/Property', () => mockModel());
-jest.mock('../models/Accommodation', () => mockModel());
+jest.mock('../models/Accommodation', () => ({ ...mockModel(), findById: jest.fn(() => mockChain(null)) }));
 jest.mock('../models/Hotel', () => mockModel());
 jest.mock('../models/Transaction', () => mockModel());
 jest.mock('../models/Visite', () => mockModel());
@@ -23,8 +23,8 @@ jest.mock('../models/FinancialRefund', () => mockModel());
 
 const controller = require('../controllers/dashboardAnalyticsController');
 
-const execute = async (module) => {
-  const req = { params: { module }, user: { role: 'Admin' } };
+const execute = async (module, { user = { role: 'Admin' }, query = {} } = {}) => {
+  const req = { params: { module }, query, user };
   const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
   await controller.getModuleAnalytics(req, res);
   return res.json.mock.calls[0][0];
@@ -52,6 +52,22 @@ describe('dashboardAnalyticsController', () => {
 
   test('les permissions restent propres au domaine', async () => {
     const req = { params: { module: 'sales' }, user: { role: 'Secretaire' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    await controller.getModuleAnalytics(req, res);
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  test('un propriétaire doit sélectionner une maison meublée pour ses analytics', async () => {
+    const req = { params: { module: 'accommodations' }, query: {}, user: { role: 'Proprietaire', id: '64b000000000000000000001' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    await controller.getModuleAnalytics(req, res);
+    expect(res.status).toHaveBeenCalledWith(422);
+  });
+
+  test('un propriétaire ne peut pas agréger la maison meublée d’un autre owner', async () => {
+    const Accommodation = require('../models/Accommodation');
+    Accommodation.findById.mockReturnValueOnce(mockChain({ _id: '64b000000000000000000010', createdBy: '64b000000000000000000003', property: { owner: '64b000000000000000000003' } }));
+    const req = { params: { module: 'accommodations' }, query: { accommodationId: '64b000000000000000000010' }, user: { role: 'Proprietaire', id: '64b000000000000000000001' } };
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
     await controller.getModuleAnalytics(req, res);
     expect(res.status).toHaveBeenCalledWith(403);

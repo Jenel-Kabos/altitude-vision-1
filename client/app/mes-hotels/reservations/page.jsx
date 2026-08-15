@@ -3,6 +3,7 @@ import MyHotelReservationsPage from '@/lib/pages/dashboard/MyHotelReservationsPa
 
 export const metadata = buildMetadata({ title: 'Mes réservations', noIndex: true });
 
-export default function Page() {
-  return <MyHotelReservationsPage />;
+export default async function Page({ searchParams }) {
+  const params = await searchParams;
+  return <MyHotelReservationsPage initialHotelId={params?.hotelId || ''} />;
 }

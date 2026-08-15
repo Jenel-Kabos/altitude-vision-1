@@ -82,6 +82,14 @@ const NOTIFICATION_TYPES = [
   'accommodation_reservation_checked_out', 'accommodation_reservation_no_show',
   'accommodation_arrival_reminder', 'accommodation_checkin_today', 'accommodation_checkout_today',
   'accommodation_payment_received', 'accommodation_payment_due', 'accommodation_payment_completed',
+  // ── Exploitation hôtelière ──
+  'hotel_reservation_created', 'hotel_reservation_pending', 'hotel_reservation_confirmed',
+  'hotel_reservation_rejected', 'hotel_reservation_cancelled', 'hotel_reservation_expired',
+  'hotel_reservation_modified', 'hotel_reservation_checked_in', 'hotel_reservation_checked_out',
+  'hotel_reservation_expired_batch', 'hotel_financial_draft_failed',
+  'housekeeping_task_created', 'housekeeping_task_assigned', 'housekeeping_task_completed',
+  'room_inspection_failed', 'room_returned_to_service',
+  'maintenance_ticket_created', 'maintenance_ticket_assigned', 'maintenance_ticket_resolved',
   // ── Biens immobiliers ──
   'new_property',                 // tous les utilisateurs : nouveau bien validé et publié
   'property_pending_moderation',  // staff : nouveau bien mobile en attente de modération

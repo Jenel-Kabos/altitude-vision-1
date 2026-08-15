@@ -32,6 +32,33 @@ const ids = {
   proprietaireBienPropreMobile: "66e200000000000000000042",
   orgRoot: "66e200000000000000000043",
   platformTenant: "66e200000000000000000044",
+  dash4HotelPropertyA: "66e200000000000000000050",
+  dash4HotelA: "66e200000000000000000051",
+  dash4HotelPropertyB: "66e200000000000000000052",
+  dash4HotelB: "66e200000000000000000053",
+  dash4AccommodationProperty: "66e200000000000000000054",
+  dash4Accommodation: "66e200000000000000000055",
+  // E2E-1 — inventaire physique manquant sur dash4HotelA/B (DASH-4 n'avait
+  // besoin que de la navigation contextuelle, jamais d'un cycle réservation
+  // réel). Additif uniquement : aucune fixture DASH-4 existante modifiée.
+  e2e1RoomCategoryA: "66e200000000000000000060",
+  e2e1RoomA1: "66e200000000000000000061",
+  e2e1RoomCategoryB: "66e200000000000000000062",
+  e2e1RoomB1: "66e200000000000000000063",
+  e2e1RatePlanA: "66e200000000000000000064",
+  e2e1RatePlanB: "66e200000000000000000065",
+  // Salle A2-A8 : plusieurs scénarios E2E-1 indépendants (nominal répété,
+  // checkout bloqué, inspection échouée...) ont chacun besoin de leur PROPRE
+  // chambre physique disponible, sans dépendre qu'un autre test ait déjà
+  // libéré la sienne (mission §6/§37 — isolation stricte, jamais un ordre
+  // implicite entre scénarios).
+  e2e1RoomA2: "66e200000000000000000066",
+  e2e1RoomA3: "66e200000000000000000067",
+  e2e1RoomA4: "66e200000000000000000068",
+  e2e1RoomA5: "66e200000000000000000069",
+  e2e1RoomA6: "66e200000000000000000070",
+  e2e1RoomA7: "66e200000000000000000071",
+  e2e1RoomA8: "66e200000000000000000072",
 };
 let mongo;
 let fakePaymentProvider;
@@ -63,10 +90,12 @@ async function seed(uri) {
   const RatePlan = require("../models/RatePlan");
   const Hotel = require("../models/Hotel");
   const RoomCategory = require("../models/RoomCategory");
+  const Room = require("../models/Room");
   const PaiementTransaction = require("../models/PaiementTransaction");
   const OrgUnit = require("../models/OrgUnit");
   const OrgMembership = require("../models/OrgMembership");
   const PlatformTenant = require("../models/PlatformTenant");
+  const Notification = require("../models/Notification");
   await User.create([
     {
       _id: ids.owner,
@@ -383,6 +412,41 @@ async function seed(uri) {
   await Accommodation.create({ property: ids.mobileHotelProperty, accommodationType: "hotel", hotel: ids.mobileHotel, publicationStatus: "soumis", active: true, createdBy: ids.owner });
   await RoomCategory.create({ _id: ids.mobileRoomCategory, hotel: ids.mobileHotel, name: "Standard Mobile", code: "STDM", unitsAvailable: 13, capacity: { maxAdults: 2, maxChildren: 0 }, createdBy: ids.owner });
   await RatePlan.create({ roomCategory: ids.mobileRoomCategory, rateType: "public", amount: 35000, currency: "XAF", active: true, createdBy: ids.owner });
+  await Property.create([
+    { _id: ids.dash4HotelPropertyA, title: "Hôtel Owner A E2E", description: "Fixture DASH-4 hôtel A.", pole: "Altimmo", type: "Appartement", status: "hebergement", price: 45000, address: { arrondissement: "Centre-ville", city: "Brazzaville" }, latitude: -4.27, longitude: 15.29, images: [E2E_IMAGE], surface: 300, statusAdmin: "Validée", isPublished: true, availability: "Disponible", owner: ids.rentalOnboardingOwner },
+    { _id: ids.dash4HotelPropertyB, title: "Hôtel Owner B E2E", description: "Fixture DASH-4 hôtel B.", pole: "Altimmo", type: "Appartement", status: "hebergement", price: 55000, address: { arrondissement: "Poto-Poto", city: "Brazzaville" }, latitude: -4.26, longitude: 15.28, images: [E2E_IMAGE], surface: 350, statusAdmin: "Validée", isPublished: true, availability: "Disponible", owner: ids.rentalOnboardingOwner },
+    { _id: ids.dash4AccommodationProperty, title: "Maison Owner C E2E", description: "Fixture DASH-4 maison entière sans Room.", pole: "Altimmo", type: "Villa", status: "hebergement", price: 40000, address: { arrondissement: "Bacongo", city: "Brazzaville" }, latitude: -4.28, longitude: 15.27, images: [E2E_IMAGE], surface: 120, bedrooms: 3, bathrooms: 2, statusAdmin: "Validée", isPublished: true, availability: "Disponible", owner: ids.rentalOnboardingOwner },
+  ]);
+  await Hotel.create([
+    { _id: ids.dash4HotelA, tenant: ids.platformTenant, name: "Hôtel Owner A E2E", property: ids.dash4HotelPropertyA, manager: ids.rentalOnboardingOwner, createdBy: ids.rentalOnboardingOwner, publicationStatus: "publie", active: true },
+    { _id: ids.dash4HotelB, tenant: ids.platformTenant, name: "Hôtel Owner B E2E", property: ids.dash4HotelPropertyB, manager: ids.rentalOnboardingOwner, createdBy: ids.rentalOnboardingOwner, publicationStatus: "publie", active: true },
+  ]);
+  await Accommodation.create({ _id: ids.dash4Accommodation, tenant: ids.platformTenant, property: ids.dash4AccommodationProperty, accommodationType: "villa_meublee", publicationStatus: "publie", active: true, capacity: { maxAdults: 6, maxChildren: 2 }, createdBy: ids.rentalOnboardingOwner });
+  await Notification.create({ platformTenant: ids.platformTenant, recipient: ids.rentalOnboardingOwner, type: 'maintenance_ticket_assigned', title: 'Maintenance Hôtel Owner A', body: 'Ouvrir la maintenance de l’établissement concerné.', link: `/mes-hotels/${ids.dash4HotelA}/maintenance`, entityType: 'Hotel', entityId: ids.dash4HotelA, metadata: { hotelId: ids.dash4HotelA, ticketId: '66e200000000000000000056' }, data: { hotelId: ids.dash4HotelA, ticketId: '66e200000000000000000056' } });
+  // E2E-1 — inventaire physique réel pour piloter un cycle réservation
+  // complet (réservation → check-in → check-out → housekeeping →
+  // inspection) sur Hôtel A depuis le navigateur. Hôtel B reçoit le même
+  // inventaire minimal pour rester cohérent avec un hôtel "publié" (aucun
+  // scénario E2E-1 ne l'exploite encore, réservé aux futurs sprints).
+  await RoomCategory.create([
+    { _id: ids.e2e1RoomCategoryA, hotel: ids.dash4HotelA, name: "Standard E2E-1 A", code: "E2E1A", unitsAvailable: 8, capacity: { maxAdults: 2, maxChildren: 0 }, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomCategoryB, hotel: ids.dash4HotelB, name: "Standard E2E-1 B", code: "E2E1B", unitsAvailable: 2, capacity: { maxAdults: 2, maxChildren: 0 }, createdBy: ids.rentalOnboardingOwner },
+  ]);
+  await RatePlan.create([
+    { _id: ids.e2e1RatePlanA, roomCategory: ids.e2e1RoomCategoryA, rateType: "public", amount: 40000, currency: "XAF", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RatePlanB, roomCategory: ids.e2e1RoomCategoryB, rateType: "public", amount: 40000, currency: "XAF", active: true, createdBy: ids.rentalOnboardingOwner },
+  ]);
+  await Room.create([
+    { _id: ids.e2e1RoomA1, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "A1", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomA2, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "A2", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomA3, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "A3", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomA4, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "A4", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomA5, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "A5", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomA6, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "A6", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomA7, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "A7", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomA8, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "A8", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomB1, hotel: ids.dash4HotelB, roomCategory: ids.e2e1RoomCategoryB, roomNumber: "B1", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+  ]);
   await PaiementTransaction.syncIndexes();
   // REG-GL-1.1 / GL-ARCH-1.1 — propriétaire avec un "bien propre"
   // (Proprietaire.biensPropres[], structure embarquée historique sans

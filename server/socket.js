@@ -14,6 +14,17 @@ let _io = null;
 const onlineUsers = new Map();
 
 const STAFF_ROLES = new Set(['Admin', 'Collaborateur']);
+const HOTEL_ROOM_PREFIX = 'hotel:';
+const hotelRoom = (hotelId) => `${HOTEL_ROOM_PREFIX}${String(hotelId)}`;
+
+const canAccessHotel = async (user, hotelId, activeTenantId = null) => {
+  if (!mongoose.isValidObjectId(hotelId)) return false;
+  const actor = user?.toObject ? user.toObject() : { ...user };
+  actor.platformTenant = activeTenantId || actor.platformTenant || null;
+  const { assertOperationalHotelAccess } = require('./services/hotel/hotelAccessScopeService');
+  const access = await assertOperationalHotelAccess({ actor, hotelId });
+  return !access?.error;
+};
 
 const canAccessConversation = async (user, conversationId, activeTenantId = null) => {
   if (!mongoose.isValidObjectId(conversationId)) return false;
@@ -66,6 +77,7 @@ const initSocket = (httpServer, corsOptions) => {
 
       socket.userId = user._id.toString();
       socket.user = user;
+      socket.authTokenVersion = decoded.tokenVersion;
       const requestedTenantId = socket.handshake.auth?.platformTenantId
         || socket.handshake.headers?.['x-platform-tenant-id']
         || socket.handshake.headers?.['x-tenant-id']
@@ -73,6 +85,7 @@ const initSocket = (httpServer, corsOptions) => {
       const tenantContext = await resolveEffectiveTenantContext(user._id, requestedTenantId);
       if (!tenantContext?.tenant) return next(new Error('Contexte tenant requis'));
       socket.platformTenantId = String(tenantContext.tenant._id);
+      socket.user.platformTenant = tenantContext.tenant._id;
       socket.tenantContextSource = tenantContext.source;
       next();
     } catch {
@@ -86,6 +99,46 @@ const initSocket = (httpServer, corsOptions) => {
 
     // Room personnelle = userId (pour push ciblé depuis les controllers)
     socket.join(socket.userId);
+
+    socket.on('establishment:join', async ({ type, id } = {}, acknowledge) => {
+      if (type !== 'hotel' || !mongoose.isValidObjectId(id)) {
+        acknowledge?.({ ok: false, error: 'Établissement invalide' });
+        return;
+      }
+      try {
+        const freshUser = await User.findById(socket.userId).select('-password');
+        const sessionValid = freshUser && freshUser.isActive && !['Suspendu', 'Banni'].includes(freshUser.status)
+          && (socket.authTokenVersion === undefined || socket.authTokenVersion >= freshUser.tokenVersion);
+        if (!sessionValid || !await canAccessHotel(freshUser, id, socket.platformTenantId)) {
+          acknowledge?.({ ok: false, error: 'Accès refusé' });
+          return;
+        }
+        if (socket.data.activeHotelRoom) await socket.leave(socket.data.activeHotelRoom);
+        const room = hotelRoom(id);
+        await socket.join(room);
+        socket.data.activeHotelRoom = room;
+        socket.data.activeHotelId = String(id);
+        logger.info('[Socket] Room hôtel rejointe', { userId: socket.userId, hotelId: String(id) });
+        acknowledge?.({ ok: true, hotelId: String(id) });
+      } catch {
+        acknowledge?.({ ok: false, error: 'Vérification impossible' });
+      }
+    });
+
+    socket.on('establishment:leave', async ({ type, id } = {}, acknowledge) => {
+      if (type !== 'hotel' || !mongoose.isValidObjectId(id)) {
+        acknowledge?.({ ok: false, error: 'Établissement invalide' });
+        return;
+      }
+      const room = hotelRoom(id);
+      await socket.leave(room);
+      if (socket.data.activeHotelRoom === room) {
+        delete socket.data.activeHotelRoom;
+        delete socket.data.activeHotelId;
+      }
+      logger.info('[Socket] Room hôtel quittée', { userId: socket.userId, hotelId: String(id) });
+      acknowledge?.({ ok: true });
+    });
 
     const activeSocketsForUser = _io.sockets.adapter.rooms.get(socket.userId)?.size || 0;
     logger.info('[Socket] Connecté', {
@@ -172,4 +225,34 @@ const getIO = () => {
  */
 const isUserOnline = (userId) => onlineUsers.has(userId.toString());
 
-module.exports = { initSocket, getIO, isUserOnline, canAccessConversation };
+async function emitHotelEvent(hotelId, payload = {}) {
+  if (!_io || !mongoose.isValidObjectId(hotelId)) return { delivered: 0 };
+  const room = hotelRoom(hotelId);
+  const socketIds = [...(_io.sockets.adapter.rooms.get(room) || [])];
+  let delivered = 0;
+  for (const socketId of socketIds) {
+    const socket = _io.sockets.sockets.get(socketId);
+    if (!socket) continue;
+    const freshUser = await User.findById(socket.userId).select('-password');
+    const sessionValid = freshUser && freshUser.isActive && !['Suspendu', 'Banni'].includes(freshUser.status)
+      && (socket.authTokenVersion === undefined || socket.authTokenVersion >= freshUser.tokenVersion);
+    const allowed = sessionValid && await canAccessHotel(freshUser, hotelId, socket.platformTenantId).catch(() => false);
+    if (!allowed) {
+      await socket.leave(room);
+      if (!sessionValid) socket.disconnect(true);
+      continue;
+    }
+    socket.emit('hospitality:updated', {
+      hotelId: String(hotelId),
+      eventType: String(payload.eventType || 'hotel.updated'),
+      entityType: payload.entityType || null,
+      entityId: payload.entityId ? String(payload.entityId) : null,
+      status: payload.status || null,
+      updatedAt: new Date().toISOString(),
+    });
+    delivered += 1;
+  }
+  return { delivered };
+}
+
+module.exports = { initSocket, getIO, isUserOnline, canAccessConversation, canAccessHotel, hotelRoom, emitHotelEvent };

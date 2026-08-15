@@ -19,7 +19,7 @@ import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination,
 
 const STATUS_TABS = [{ value: "", label: "Tous" }, ...RESERVATION_STATUSES];
 
-const MyHotelReservationsPage = () => {
+const MyHotelReservationsPage = ({ initialHotelId = '' }) => {
   const createRequestIdRef = useRef(null);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -29,7 +29,7 @@ const MyHotelReservationsPage = () => {
   const [reasonInputs, setReasonInputs] = useState({});
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({
-    hotelId: "", roomCategoryId: "", ratePlanId: "", checkInDate: "", checkOutDate: "",
+    hotelId: initialHotelId, roomCategoryId: "", ratePlanId: "", checkInDate: "", checkOutDate: "",
     roomsCount: 1, adults: 1, children: 0,
     guest: { firstName: "", lastName: "", email: "", phone: "" },
   });
@@ -38,7 +38,7 @@ const MyHotelReservationsPage = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await getOwnerHotelReservations({ status: status || undefined, search: search || undefined, page, limit });
+      const res = await getOwnerHotelReservations({ hotelId: initialHotelId || undefined, status: status || undefined, search: search || undefined, page, limit });
       setData(res);
     } catch (err) {
       toast.error("Erreur lors du chargement des réservations.");

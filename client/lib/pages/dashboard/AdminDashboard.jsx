@@ -10,6 +10,7 @@ import {
   Clock, PenLine, Calculator, FileText, CreditCard, Palmtree,
   Landmark, KeyRound, Users2, FileSignature, Wrench, Building2, History,
   ContactRound, LayoutDashboard, Network, Gauge,
+  Bell,
 } from "lucide-react";
 import { useAuth } from '../../context/AuthContext';
 import { useDashboardBadges } from '../../hooks/useDashboardBadges';
@@ -114,6 +115,7 @@ const NAV_SECTIONS = [
       // Sprint D — vue globale des chambres (libre/occupée/nettoyage/
       // inspection), tous établissements confondus (mission §18).
       { to: '/dashboard/hotel-rooms',           end: true,  Icon: KeyRound,  label: 'Chambres (vue globale)', accent: GOLD, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/hotel-finance',         end: true,  Icon: CreditCard, label: 'Finance hôtelière', accent: GOLD, roles: ['Admin'] },
       // Sprint E — housekeeping/inspection/maintenance (mission §10-11).
       { to: '/dashboard/housekeeping',          end: true,  Icon: Wrench,    label: 'Ménage',                 accent: GOLD, roles: ROLES_ALTIMMO },
       { to: '/dashboard/maintenance',           end: true,  Icon: Wrench,    label: 'Interventions techniques', accent: GOLD, roles: ROLES_ALTIMMO },
@@ -148,6 +150,7 @@ const NAV_SECTIONS = [
     label: 'Administration',
     links: [
       { to: '/dashboard/users',            end: false, Icon: Users,         label: 'Utilisateurs',       accent: '#0D9488', roles: ['Admin'] },
+      { to: '/dashboard/notifications',    end: false, Icon: Bell,          label: 'Notifications',      accent: BLUE,      roles: ['Admin'] },
       { to: '/dashboard/active-sessions',  end: false, Icon: ShieldCheck,   label: 'Sessions Actives',   accent: '#DC2626', roles: ['Admin'] },
       { to: '/dashboard/historique',       end: false, Icon: ClipboardList, label: 'Historique',         accent: '#7C3AED', roles: ['Admin'] },
       { to: '/dashboard/export-marketing', end: false, Icon: BarChart2,     label: 'Export Marketing',   accent: GOLD,      roles: ['Admin'] },

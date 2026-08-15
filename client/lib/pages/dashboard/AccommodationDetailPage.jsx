@@ -22,7 +22,7 @@ const detailKpis = (data) => [
   { key: "remaining", label: "Solde à encaisser", value: data?.kpis?.remainingAmount, format: "money" }, { key: "refunded", label: "Remboursé", value: data?.kpis?.refundedAmount, format: "money" },
 ];
 
-export default function AccommodationDetailPage({ accommodationId }) {
+export default function AccommodationDetailPage({ accommodationId, ownerMode = false }) {
   const searchParams = useSearchParams(); const requested = searchParams?.get("view");
   const [view, setView] = useState(views.some(([key]) => key === requested) ? requested : "overview");
   const [accommodation, setAccommodation] = useState(null); const [analytics, setAnalytics] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(false); const [editing, setEditing] = useState(false);
@@ -33,8 +33,8 @@ export default function AccommodationDetailPage({ accommodationId }) {
   if (error || !accommodation) return <DashboardPage><DashboardState type="error" title="Hébergement inaccessible" description="Ce bien n’existe pas ou vous n’avez pas accès à sa gestion." action={<Link href="/dashboard/hebergements">Retour aux hébergements</Link>}/></DashboardPage>;
   const property = accommodation.property || {}; const capacity = (accommodation.capacity?.maxAdults || 0) + (accommodation.capacity?.maxChildren || 0);
   return <DashboardPage>
-    <Link href="/dashboard/hebergements" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-700"><ArrowLeft className="h-4 w-4"/> Retour aux hébergements</Link>
-    <DashboardPageHeader icon={Bed} eyebrow="Gestion de l’hébergement" title={property.title || "Hébergement"} description={[property.address?.arrondissement, property.address?.city].filter(Boolean).join(", ")} actions={<button onClick={() => setEditing(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2 font-semibold text-white"><Pencil className="h-4 w-4"/> Modifier</button>}/>
+    <Link href={ownerMode ? "/mes-hotels" : "/dashboard/hebergements"} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-700"><ArrowLeft className="h-4 w-4"/> Retour aux établissements</Link>
+    <DashboardPageHeader icon={Bed} eyebrow="Gestion de l’hébergement" title={property.title || "Hébergement"} description={[property.address?.arrondissement, property.address?.city].filter(Boolean).join(", ")} actions={!ownerMode && <button onClick={() => setEditing(true)} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2 font-semibold text-white"><Pencil className="h-4 w-4"/> Modifier</button>}/>
     <nav className="dashboard-toolbar" aria-label="Gestion de cet hébergement">{views.map(([key, label, Icon]) => <button key={key} type="button" onClick={() => setView(key)} aria-current={view === key ? "page" : undefined} className={`inline-flex items-center gap-2 ${view === key ? "bg-blue-700 text-white" : ""}`}><Icon className="h-4 w-4"/>{label}</button>)}</nav>
     {editing && <DashboardCard className="mb-6"><AccommodationPropertyForm accommodation={accommodation} onSuccess={() => { setEditing(false); load(); }} onCancel={() => setEditing(false)}/></DashboardCard>}
     {view === "overview" && <div className="space-y-6">

@@ -13,6 +13,7 @@ const MaintenanceTicket = require('../models/MaintenanceTicket');
 const { notifyStaff } = require('./notificationService');
 const { syncPhysicalInventoryBlock } = require('./hotelAvailabilityService');
 const { runFinancialOperation } = require('./finance/financialTransactionService');
+const { emitHotelEvent } = require('../socket');
 
 function fail(message, statusCode) {
   const err = new Error(message);
@@ -102,8 +103,11 @@ async function approveInspection({ inspectionId, actingUser, transactionMode = '
     type: 'room_returned_to_service',
     title: '🔓 Chambre remise en service',
     body: 'Une chambre a passé son inspection et est de nouveau disponible.',
-    data: { roomId: String(result.room._id), inspectionId: String(result.inspection._id) },
+    entityType: 'RoomInspection', entityId: result.inspection._id,
+    data: { roomId: String(result.room._id), inspectionId: String(result.inspection._id), hotelId: String(result.room.hotel) },
   }).catch(() => {});
+
+  await emitHotelEvent(result.room.hotel, { eventType: 'inspection.passed', entityType: 'RoomInspection', entityId: result.inspection._id, status: 'passed' }).catch(() => {});
 
   return result;
 }
@@ -136,8 +140,11 @@ async function rejectInspection({ inspectionId, actingUser, notes = '', transact
     type: 'room_inspection_failed',
     title: '❌ Inspection échouée',
     body: 'Une inspection a échoué — la chambre est mise hors service.',
-    data: { roomId: String(result.room._id), inspectionId: String(result.inspection._id) },
+    entityType: 'RoomInspection', entityId: result.inspection._id,
+    data: { roomId: String(result.room._id), inspectionId: String(result.inspection._id), hotelId: String(result.room.hotel) },
   }).catch(() => {});
+
+  await emitHotelEvent(result.room.hotel, { eventType: 'inspection.failed', entityType: 'RoomInspection', entityId: result.inspection._id, status: 'failed' }).catch(() => {});
 
   return result;
 }

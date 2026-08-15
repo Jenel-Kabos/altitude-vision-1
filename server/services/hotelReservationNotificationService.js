@@ -22,7 +22,7 @@ async function notifyReservationGuest({ reservation, eventKey, type, title, body
   if (!event) return { idempotent: true };
   try {
     event.attempts += 1;
-    if (channel === 'internal') await notify({ recipient, type, title, body, data: { reservationId: String(reservation._id), screen: 'MesReservationsHotel' } });
+    if (channel === 'internal') await notify({ recipient, type, title, body, entityType: 'HotelReservation', entityId: reservation._id, data: { reservationId: String(reservation._id), hotelId: String(reservation.hotel), screen: 'MesReservationsHotel' } });
     else await emailSender(process.env.ZOHO_FROM_EMAIL, recipient, title, `<p>${body}</p><p>Référence : <strong>${reservation.reference}</strong></p>`);
     event.status = 'sent'; event.sentAt = new Date(); event.lastError = ''; await event.save();
     return { sent: true, channel };

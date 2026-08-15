@@ -13,7 +13,7 @@ import HotelInvoiceDeliveryPanel from './HotelInvoiceDeliveryPanel';
 const money = (value, currency) => `${Number(value || 0).toLocaleString('fr-FR')} ${currency || 'XAF'}`;
 const errorMessage = (error) => error.response?.data?.message || 'Opération financière impossible.';
 
-export default function HotelFinancialDocumentPanel({ reservation, canManage = false }) {
+export default function HotelFinancialDocumentPanel({ reservation, canManage = false, onChanged }) {
   const [document, setDocument] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -29,7 +29,7 @@ export default function HotelFinancialDocumentPanel({ reservation, canManage = f
   useEffect(() => { load(); }, [reservationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = async (action, success) => {
-    try { const value = await action(); setDocument(value.document || value); setLines((value.document || value).lines || lines); toast.success(success); }
+    try { const value = await action(); setDocument(value.document || value); setLines((value.document || value).lines || lines); toast.success(success); await onChanged?.(); }
     catch (error) { toast.error(errorMessage(error)); }
   };
   const create = () => run(() => createReservationInvoiceDraft(reservationId), 'Brouillon financier prêt.');
@@ -61,7 +61,7 @@ export default function HotelFinancialDocumentPanel({ reservation, canManage = f
       {draft && !finalized && <p className="mt-2 text-amber-700">Finalisez les lignes avant d’émettre la facture.</p>}
     </div>
     <HotelInvoiceDeliveryPanel document={document} canManage={canManage} />
-    <HotelPaymentPanel reservation={reservation} document={document} canManage={canManage} onChanged={load} />
+    <HotelPaymentPanel reservation={reservation} document={document} canManage={canManage} onChanged={async () => { await load(); await onChanged?.(); }} />
     </>
   );
 }

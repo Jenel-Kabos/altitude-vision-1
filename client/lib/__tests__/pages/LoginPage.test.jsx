@@ -80,7 +80,7 @@ describe('LoginPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Se connecter/i }));
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith(expect.objectContaining({ role: 'Client' }), 'jwt-token');
-      expect(mockReplace).toHaveBeenCalledWith('/');
+      expect(mockReplace).toHaveBeenCalledWith('/mon-espace');
     });
   });
 

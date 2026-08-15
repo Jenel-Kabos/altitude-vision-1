@@ -4,6 +4,7 @@ import MyHotelsPage from '../pages/dashboard/MyHotelsPage';
 import {
   getMyHotels, submitHotel, deactivateHotel, reactivateHotel, duplicateHotel, deleteHotel,
 } from '../services/hotelService';
+import { getMyAccommodations } from '../services/accommodationService';
 
 // Sprint B2 — dashboard propriétaire "Mes hôtels" : cycle de vie
 // (soumettre/désactiver/réactiver/dupliquer/supprimer) + score de complétude.
@@ -20,6 +21,7 @@ vi.mock('../services/hotelService', () => ({
   createMyHotel: vi.fn(),
   updateMyHotel: vi.fn(),
 }));
+vi.mock('../services/accommodationService', () => ({ getMyAccommodations: vi.fn() }));
 
 const hotel = (overrides = {}) => ({
   _id: 'HOTEL-1',
@@ -34,6 +36,20 @@ const hotel = (overrides = {}) => ({
 describe('MyHotelsPage — Sprint B2 (dashboard propriétaire) — TEST DATA', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getMyAccommodations.mockResolvedValue([]);
+  });
+
+  test('agrège maisons meublées et hôtels sans appel par établissement', async () => {
+    getMyHotels.mockResolvedValue([hotel()]);
+    getMyAccommodations.mockResolvedValue([{ _id: 'HOUSE-1', accommodationType: 'villa_meublee', publicationStatus: 'publie', property: { title: 'Maison Fleuve', address: { city: 'Brazzaville' } }, completion: { score: 80 } }]);
+    render(<MyHotelsPage />);
+    expect(await screen.findByText('Maison Fleuve')).toBeInTheDocument();
+    expect(screen.getByText('Hôtel Le Panorama')).toBeInTheDocument();
+    expect(getMyHotels).toHaveBeenCalledTimes(1);
+    expect(getMyAccommodations).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('link', { name: /Gérer les hébergements/i })).toHaveAttribute('href', '/mes-hebergements');
+    expect(screen.getByRole('link', { name: /Ouvrir l’exploitation/i })).toHaveAttribute('href', '/mes-hebergements/HOUSE-1');
+    expect(screen.getByRole('link', { name: /Ouvrir le centre opérationnel/i })).toHaveAttribute('href', '/mes-hotels/HOTEL-1');
   });
 
   const openActions = async () => fireEvent.click(await screen.findByRole('button', { name: 'Actions pour Hôtel Le Panorama' }));

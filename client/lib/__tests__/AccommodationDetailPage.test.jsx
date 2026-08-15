@@ -39,4 +39,11 @@ describe('AccommodationDetailPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Modifier' }));
     expect(screen.getByText('FORMULAIRE DÉTAIL')).toBeInTheDocument();
   });
+
+  test('le mode propriétaire conserve les opérations sans exposer le formulaire staff', async () => {
+    render(<AccommodationDetailPage accommodationId="ACC-1" ownerMode/>);
+    expect(await screen.findByRole('heading', { name: 'Villa Test' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Modifier' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Retour aux établissements/i })).toHaveAttribute('href', '/mes-hotels');
+  });
 });

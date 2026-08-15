@@ -8,12 +8,13 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import {
-  getHotelDetail, getHotelPortfolioDetail, submitHotel, deactivateHotel, reactivateHotel, duplicateHotel, deleteHotel, getRooms,
+  getHotelDetail, getHotelPortfolioDetail, submitHotel, deactivateHotel, reactivateHotel, duplicateHotel, deleteHotel,
 } from "../../services/hotelService";
+import { getDashboardAnalytics } from '../../services/dashboardAnalyticsService';
 import { HOTEL_PUBLICATION_STATUSES } from "../../constants/hotel";
-import { ROOM_STATUSES, ROOM_STATUS_CLASSES } from "../../constants/room";
-import { Hotel } from "lucide-react";
+import { AlertTriangle, BedDouble, CalendarCheck, Hotel, LogIn, LogOut, Sparkles, Wrench } from "lucide-react";
 import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
+import useHotelRealtime from '../../hooks/useHotelRealtime';
 
 const STATUS_CLASSES = {
   brouillon: "bg-gray-100 text-gray-700",
@@ -29,9 +30,10 @@ const HotelDetailPage = () => {
   const router = useRouter();
   const hotelId = params?.hotelId;
   const portfolioMode = pathname?.startsWith('/dashboard/etablissements/');
+  const ownerMode = pathname?.startsWith('/mes-hotels/');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [roomCounts, setRoomCounts] = useState(null);
+  const [operations, setOperations] = useState(null);
 
   const load = async () => {
     if (!hotelId) return;
@@ -46,26 +48,38 @@ const HotelDetailPage = () => {
     }
   };
 
-  // Sprint E §12 — compteurs de statut des chambres (disponibles/occupées/
-  // nettoyage/inspection/hors service), calculés côté client à partir du
-  // tableau des chambres existant (pas de nouvel endpoint agrégé).
-  const loadRoomCounts = async () => {
+  const loadOperations = async () => {
     if (!hotelId) return;
     try {
-      const rooms = await getRooms(hotelId);
-      const counts = (rooms || []).reduce((acc, r) => ({ ...acc, [r.status]: (acc[r.status] || 0) + 1 }), {});
-      setRoomCounts(counts);
+      setOperations(await getDashboardAnalytics('hotels', { hotelId }));
     } catch (err) {
-      // silencieux — les compteurs sont un complément, pas un bloquant
+      setOperations({ kpis: {}, unavailable: true });
     }
   };
 
-  useEffect(() => { load(); loadRoomCounts(); }, [hotelId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); loadOperations(); }, [hotelId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useHotelRealtime(hotelId, () => { load(); loadOperations(); });
 
   if (loading) return <DashboardState type="loading" title="Chargement de l’établissement…" />;
   if (!data?.hotel) return <DashboardState title="Établissement introuvable" description="Cet établissement n’est pas disponible ou n’existe plus." />;
 
   const { hotel, completion } = data;
+  const kpis = operations?.kpis || {};
+  const operationPath = (operation) => {
+    if (ownerMode) return `/mes-hotels/${hotelId}/${operation}`;
+    if (operation === 'rooms') return `/dashboard/hotels/${hotelId}/rooms`;
+    return `/dashboard/${operation === 'finance' ? 'hotel-finance' : operation}?hotelId=${hotelId}`;
+  };
+  const reservationsHref = ownerMode ? `/mes-hotels/reservations?hotelId=${hotelId}` : `/dashboard/hotel-reservations?hotelId=${hotelId}`;
+  const todayCards = [
+    { label: 'Occupation', value: `${kpis.occupiedRooms || 0}/${kpis.totalRooms || 0}`, Icon: BedDouble, href: operationPath('rooms') },
+    { label: 'Arrivées aujourd’hui', value: kpis.checkInsToday || 0, detail: `${kpis.pendingCheckIns || 0} check-in en attente`, Icon: LogIn, href: reservationsHref },
+    { label: 'Départs aujourd’hui', value: kpis.checkOutsToday || 0, detail: `${kpis.pendingCheckOuts || 0} check-out en attente`, Icon: LogOut, href: reservationsHref },
+    { label: 'À nettoyer', value: kpis.cleaningRooms || 0, detail: `${kpis.housekeeping || 0} tâche(s) ouverte(s)`, Icon: Sparkles, href: operationPath('housekeeping') },
+    { label: 'À inspecter', value: kpis.inspectionRooms || 0, Icon: CalendarCheck, href: operationPath('housekeeping') },
+    { label: 'Maintenance', value: kpis.maintenance || 0, detail: `${kpis.outOfServiceRooms || 0} chambre(s) hors service`, Icon: Wrench, href: operationPath('maintenance') },
+    { label: 'Alertes financières', value: kpis.remainingAmount ? 1 : 0, detail: kpis.remainingAmount ? 'Solde émis restant' : 'Aucun solde émis', Icon: AlertTriangle, href: operationPath('finance') },
+  ];
 
   const handleSubmit = async () => {
     try {
@@ -123,33 +137,27 @@ const HotelDetailPage = () => {
           {hotel.active === false && <span className="text-xs font-semibold px-2 py-1 rounded bg-gray-200 text-gray-600">Désactivé</span>}
         </div>} />
 
-      {roomCounts && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6">
-          {['available', 'occupied', 'cleaning', 'inspection', 'out_of_service'].map((statusValue) => (
-            <DashboardCard key={statusValue} className={ROOM_STATUS_CLASSES[statusValue]}>
-              <div className="text-2xl font-bold">{roomCounts[statusValue] || 0}</div>
-              <div className="text-xs font-medium">{ROOM_STATUSES.find((s) => s.value === statusValue)?.label}</div>
-            </DashboardCard>
-          ))}
-        </div>
-      )}
+      <section className="mb-6" aria-labelledby="today-board-title">
+        <h2 id="today-board-title" className="mb-3 text-lg font-bold text-slate-900">Aujourd’hui</h2>
+        {operations?.unavailable ? <DashboardState type="error" title="Indicateurs opérationnels indisponibles" description="La fiche de l’établissement reste utilisable." /> : <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{todayCards.map(({ label, value, detail, Icon, href }) => <Link key={label} href={href} className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"><DashboardCard className="h-full transition hover:border-blue-200 hover:shadow-md"><Icon className="mb-2 h-5 w-5 text-blue-700" aria-hidden="true"/><div className="text-2xl font-bold">{value}</div><div className="text-sm font-semibold">{label}</div>{detail && <div className="mt-1 text-xs text-slate-500">{detail}</div>}</DashboardCard></Link>)}</div>}
+      </section>
 
       <DashboardToolbar label={portfolioMode ? "Centre opérationnel" : "Actions de l’établissement"}>
-        <Link href={`/dashboard/hotels/${hotelId}/room-categories`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
+        <Link href={ownerMode ? `/mes-hotels/${hotelId}/room-categories` : `/dashboard/hotels/${hotelId}/room-categories`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
           Catégories de chambres
         </Link>
-        <Link href={`/dashboard/hotels/${hotelId}/rates`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
+        <Link href={ownerMode ? `/mes-hotels/${hotelId}/rates` : `/dashboard/hotels/${hotelId}/rates`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
           Tarifs
         </Link>
-        <Link href={`/dashboard/hotels/${hotelId}/rooms`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
+        <Link href={ownerMode ? `/mes-hotels/${hotelId}/rooms` : `/dashboard/hotels/${hotelId}/rooms`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">
           Chambres
         </Link>
-        <Link href={`/dashboard/hotel-reservations?hotelId=${hotelId}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Réservations</Link>
-        <Link href={`/dashboard/hotels/${hotelId}/inventory`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Calendrier</Link>
-        <Link href={`/dashboard/housekeeping?hotelId=${hotelId}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Housekeeping</Link>
-        <Link href={`/dashboard/maintenance?hotelId=${hotelId}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Maintenance</Link>
-        <Link href={`/dashboard/hotel-finance?hotelId=${hotelId}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Finances</Link>
-        <Link href={`/dashboard/hotels/${hotelId}/staff`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Personnel</Link>
+        <Link href={reservationsHref} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Réservations</Link>
+        <Link href={ownerMode ? `/mes-hotels/${hotelId}/inventory` : `/dashboard/hotels/${hotelId}/inventory`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Calendrier</Link>
+        <Link href={ownerMode ? `/mes-hotels/${hotelId}/housekeeping` : `/dashboard/housekeeping?hotelId=${hotelId}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Housekeeping</Link>
+        <Link href={ownerMode ? `/mes-hotels/${hotelId}/maintenance` : `/dashboard/maintenance?hotelId=${hotelId}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Maintenance</Link>
+        <Link href={ownerMode ? `/mes-hotels/${hotelId}/finance` : `/dashboard/hotel-finance?hotelId=${hotelId}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Finances</Link>
+        {!ownerMode && <Link href={`/dashboard/hotels/${hotelId}/staff`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Personnel</Link>}
         {!portfolioMode && (hotel.publicationStatus === 'brouillon' || hotel.publicationStatus === 'rejete') && (
           <button onClick={handleSubmit} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm">Soumettre pour validation</button>
         )}

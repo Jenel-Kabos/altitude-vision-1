@@ -15,6 +15,7 @@ const Room = require('../models/Room');
 const HousekeepingTask = require('../models/HousekeepingTask');
 const { notify, notifyStaff } = require('./notificationService');
 const { runFinancialOperation } = require('./finance/financialTransactionService');
+const { emitHotelEvent } = require('../socket');
 
 function fail(message, statusCode) {
   const err = new Error(message);
@@ -59,8 +60,11 @@ async function createTask({ roomId, hotelId, reservationId = null, type, priorit
     type: 'housekeeping_task_created',
     title: '🧹 Nouvelle tâche de ménage',
     body: `Une tâche de ménage (${type}) a été créée.`,
-    data: { taskId: String(task._id), roomId: String(roomId) },
+    entityType: 'HousekeepingTask', entityId: task._id,
+    data: { taskId: String(task._id), roomId: String(roomId), hotelId: String(hotelId) },
   }).catch(() => {});
+
+  await emitHotelEvent(hotelId, { eventType: 'housekeeping.created', entityType: 'HousekeepingTask', entityId: task._id, status: task.status }).catch(() => {});
 
   return task;
 }
@@ -86,9 +90,12 @@ async function assignTask({ taskId, assignedToUserId, actingUser }) {
       type: 'housekeeping_task_assigned',
       title: '🧹 Tâche de ménage assignée',
       body: 'Une tâche de ménage vous a été assignée.',
-      data: { taskId: String(task._id) },
+      audience: 'staff', entityType: 'HousekeepingTask', entityId: task._id,
+      data: { taskId: String(task._id), hotelId: String(task.hotel) },
     }).catch(() => {});
   }
+
+  await emitHotelEvent(task.hotel, { eventType: 'housekeeping.assigned', entityType: 'HousekeepingTask', entityId: task._id, status: task.status }).catch(() => {});
 
   return task;
 }
@@ -102,6 +109,7 @@ async function startTask({ taskId, actingUser }) {
   task.startedAt = new Date();
   task.updatedBy = actingUser?.id || null;
   await task.save();
+  await emitHotelEvent(task.hotel, { eventType: 'housekeeping.started', entityType: 'HousekeepingTask', entityId: task._id, status: task.status }).catch(() => {});
   return task;
 }
 
@@ -142,8 +150,11 @@ async function completeTask({ taskId, actingUser, transactionMode = 'fallback' }
     type: 'housekeeping_task_completed',
     title: '✅ Nettoyage terminé',
     body: 'Un nettoyage est terminé et la chambre attend son inspection.',
-    data: { taskId: String(result.task._id), roomId: String(result.task.room) },
+    entityType: 'HousekeepingTask', entityId: result.task._id,
+    data: { taskId: String(result.task._id), roomId: String(result.task.room), hotelId: String(result.task.hotel) },
   }).catch(() => {});
+
+  await emitHotelEvent(result.task.hotel, { eventType: 'housekeeping.completed', entityType: 'HousekeepingTask', entityId: result.task._id, status: result.task.status }).catch(() => {});
 
   return result.task;
 }
@@ -158,6 +169,7 @@ async function cancelTask({ taskId, actingUser, reason = '' }) {
   if (reason) task.notes = task.notes ? `${task.notes} — ${reason}` : reason;
   task.updatedBy = actingUser?.id || null;
   await task.save();
+  await emitHotelEvent(task.hotel, { eventType: 'housekeeping.cancelled', entityType: 'HousekeepingTask', entityId: task._id, status: task.status }).catch(() => {});
   return task;
 }
 

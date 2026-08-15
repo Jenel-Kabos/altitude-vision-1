@@ -187,14 +187,39 @@ function buildReservationReference(sequenceNumber, year = new Date().getUTCFullY
 
 hotelReservationSchema.plugin(AutoIncrement, { inc_field: 'sequenceNumber' });
 
-// Enregistré APRÈS le plugin ci-dessus : Mongoose exécute les hooks
-// pre('save') dans leur ordre d'enregistrement, donc `sequenceNumber` est
-// déjà renseigné par mongoose-sequence quand celui-ci s'exécute.
-hotelReservationSchema.pre('save', function setReference(next) {
-  if (this.isNew && !this.reference && this.sequenceNumber) {
-    this.reference = buildReservationReference(this.sequenceNumber);
-  }
-  next();
+// E2E-1 — bug réel démontré par le scénario PMS navigateur : `reference`
+// restait `undefined` sur TOUTE réservation créée (confirmé par reproduction
+// isolée hors HTTP). Cause exacte : `mongoose-sequence` enregistre son hook
+// `sequenceNumber` avec `pre('save', true, fn)` — le second argument `true`
+// active le mode "parallèle" historique de Mongoose (fonctions `fn(next,
+// done)`), où `next()` est appelé immédiatement pour laisser la CHAÎNE de
+// hooks continuer, `done()` seulement une fois l'incrément terminé. L'ordre
+// d'enregistrement ne garantit donc PAS que `sequenceNumber` soit déjà
+// renseigné quand un hook `pre('save')` SÉRIE suivant s'exécute — seul un
+// hook `post('save')` a la garantie que tous les hooks parallèles (et
+// l'écriture elle-même) sont terminés. Jamais un second appel à `.save()`
+// ici (ré-déclencherait tous les hooks) : une écriture directe et ciblée
+// sur le seul champ `reference`, plus une mise à jour en mémoire pour que
+// l'appelant de `.save()`/`.create()` reçoive immédiatement la valeur.
+hotelReservationSchema.post('save', async function setReferenceAfterSequence(doc) {
+  // `isNew` est déjà retombé à `false` ici (Mongoose le fait avant
+  // d'exécuter les hooks `post('save')`) — jamais un critère fiable à ce
+  // stade. `!doc.reference` seul suffit : `reference` est sparse+unique et
+  // n'est jamais réinitialisé une fois posé, donc son absence ne signale
+  // QUE la toute première sauvegarde réussie (ou un document plus ancien
+  // créé avant ce correctif, qu'un futur `.save()` répare alors au passage).
+  if (doc.reference || !doc.sequenceNumber) return;
+  const reference = buildReservationReference(doc.sequenceNumber);
+  // `createReservation` (hotelReservationService.js) appelle `.create([data],
+  // { session })` dans son chemin transactionnel : ce hook `post('save')`
+  // s'exécute alors AVANT que la transaction n'ait commité. Une écriture
+  // hors session ici entrerait en conflit avec la transaction en cours (ou
+  // serait tout simplement écrasée/ignorée par le commit final) — d'où
+  // `reference` réapparaissant vide sur une lecture fraîche après coup,
+  // malgré une valeur en mémoire correcte sur le document juste créé. Il
+  // faut impérativement rejoindre la même session que le document.
+  await doc.constructor.updateOne({ _id: doc._id, reference: { $exists: false } }, { $set: { reference } }, { session: doc.$session() });
+  doc.reference = reference;
 });
 
 const HotelReservation = mongoose.model('HotelReservation', hotelReservationSchema);

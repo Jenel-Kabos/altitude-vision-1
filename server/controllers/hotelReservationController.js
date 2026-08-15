@@ -89,6 +89,22 @@ async function assertReservationAccess(req, reservation) {
   if (!hotel) return null;
   const isOwner = hotel.manager && String(hotel.manager) === String(req.user?.id);
   if (isOwner) return { role: 'owner', hotel };
+  // `hotelReservationRoutes.js` n'attache pas `requireTenantScope` (contrairement à
+  // financialRoutes.js) : `req.user.platformTenant` n'est jamais peuplé ici. Sans ce
+  // repli sur `req.platformTenant` (résolu par `attachTenantContext`, non bloquant),
+  // `resolveHotelAccessScope` échoue systématiquement pour tout acteur Admin/staff qui
+  // n'est pas legacy `hotel.manager` — bug réel démontré : un Admin plateforme recevait
+  // un 403 permanent sur /room-assignment et /checkout-financial-readiness alors même
+  // que les routes financières équivalentes (qui, elles, montent requireTenantScope)
+  // lui étaient accessibles.
+  // Mutation directe (jamais un spread `{...req.user}` : `req.user` est un
+  // document Mongoose, son spread perd `.role`/`.id`, qui ne sont pas des
+  // propriétés propres énumérables — bug constaté en le faisant une première
+  // fois : `actor.role` devenait `undefined`, faisant tomber la résolution
+  // dans la branche non-Admin de `resolveHotelAccessScope`, qui castait
+  // ensuite l'acteur entier en ObjectId et échouait). Même pattern que
+  // `requireTenantScope` (middleware/tenantContext.js) : `req.user.platformTenant = req.platformTenant`.
+  if (!req.user.platformTenant && req.platformTenant) req.user.platformTenant = req.platformTenant;
   const scope = await resolveHotelAccessScope({ actor: req.user, requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.RESERVATION_VIEW, requestedHotelId: reservation.hotel }).catch(() => null);
   if (scope) return { role: 'staff', hotel };
   return null;

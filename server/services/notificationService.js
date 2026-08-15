@@ -102,6 +102,21 @@ const visitSocketEventFor = (type) => {
   return 'visite:status_changed';
 };
 
+const hospitalityLinkFor = ({ type, audience, data = {} }) => {
+  const hotelId = data.hotelId;
+  if (!hotelId) return null;
+  const encoded = encodeURIComponent(String(hotelId));
+  if (type === 'hotel_reservation_pending') return `/mes-hotels/reservations?hotelId=${encoded}`;
+  if (audience !== 'staff') return null;
+  if (type.startsWith('housekeeping_') || type.startsWith('room_inspection_') || type === 'room_returned_to_service') {
+    return `/dashboard/housekeeping?hotelId=${encoded}`;
+  }
+  if (type.startsWith('maintenance_')) return `/dashboard/maintenance?hotelId=${encoded}`;
+  if (type.startsWith('hotel_financial_')) return `/dashboard/hotel-finance?hotelId=${encoded}`;
+  if (type.startsWith('hotel_reservation_')) return `/dashboard/hotel-reservations?hotelId=${encoded}`;
+  return null;
+};
+
 /**
  * Notifie un utilisateur unique.
  *
@@ -139,7 +154,8 @@ async function notify({
   });
   // NAV-CORE est prioritaire dès qu'une destination canonique existe. Le lien
   // fourni par un ancien producteur ne sert que de repli de compatibilité.
-  const resolvedLink = link ?? navigation.link ?? (audience === 'staff' ? STAFF_LINKS[type] : USER_LINKS[type]) ?? null;
+  const resolvedLink = link ?? hospitalityLinkFor({ type, audience, data: resolvedMetadata })
+    ?? navigation.link ?? (audience === 'staff' ? STAFF_LINKS[type] : USER_LINKS[type]) ?? null;
   const resolvedData = navigation.data || resolvedMetadata;
 
   // 1 — Persistance
@@ -283,6 +299,10 @@ async function notifyStaff(payload) {
     const attribution = await attributionService.resolveResourceTenant({ resourceType, resource }).catch(() => null);
     if (attribution?.status === 'resolved') resolvedTenantId = attribution.tenantId;
   }
+  if (!resolvedTenantId && data.hotelId && (resourceType !== 'Hotel' || String(resource) !== String(data.hotelId))) {
+    const attribution = await attributionService.resolveResourceTenant({ resourceType: 'Hotel', resource: data.hotelId }).catch(() => null);
+    if (attribution?.status === 'resolved') resolvedTenantId = attribution.tenantId;
+  }
   if (!resolvedTenantId) return;
   const scope = await resolveTenantScope(resolvedTenantId).catch(() => ({ scopeUserIds: null }));
   const staffIds = [...(scope.scopeUserIds || [])];
@@ -306,4 +326,4 @@ async function notifyMany(recipientIds, payload) {
   await Promise.allSettled(recipientIds.map((id) => notify({ ...payload, recipient: id })));
 }
 
-module.exports = { notify, notifyStaff, notifyMany, visitSocketEventFor };
+module.exports = { notify, notifyStaff, notifyMany, visitSocketEventFor, hospitalityLinkFor };

@@ -116,7 +116,7 @@ const AdminHotelReservationsPage = () => {
                         {(r.status === "confirmed" || r.status === "checked_in") && (
                           <>
                             <RoomAssignmentPanel reservation={r} onChanged={load} isAdmin />
-                            <HotelFinancialDocumentPanel reservation={r} canManage />
+                            <HotelFinancialDocumentPanel reservation={r} canManage onChanged={load} />
                           </>
                         )}
                       </td>

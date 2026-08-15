@@ -13,6 +13,7 @@ const HotelReservation = require('../models/HotelReservation');
 const { notify, notifyStaff } = require('./notificationService');
 const { syncPhysicalInventoryBlock } = require('./hotelAvailabilityService');
 const { runFinancialOperation } = require('./finance/financialTransactionService');
+const { emitHotelEvent } = require('../socket');
 
 function fail(message, statusCode) {
   const err = new Error(message);
@@ -50,8 +51,11 @@ async function createTicket({ roomId, hotelId, inspectionId = null, category, pr
     type: 'maintenance_ticket_created',
     title: '🔧 Ticket de maintenance créé',
     body: `Un ticket de maintenance (${category}) a été créé.`,
-    data: { ticketId: String(result.ticket._id), roomId: String(roomId), impactedReservations: result.impactedReservations.map(String) },
+    entityType: 'MaintenanceTicket', entityId: result.ticket._id,
+    data: { ticketId: String(result.ticket._id), roomId: String(roomId), hotelId: String(hotelId), impactedReservations: result.impactedReservations.map(String) },
   }).catch(() => {});
+
+  await emitHotelEvent(hotelId, { eventType: 'maintenance.created', entityType: 'MaintenanceTicket', entityId: result.ticket._id, status: result.ticket.status }).catch(() => {});
 
   return result.ticket;
 }
@@ -75,9 +79,12 @@ async function assignTicket({ ticketId, assignedToUserId, actingUser }) {
       type: 'maintenance_ticket_assigned',
       title: '🔧 Ticket de maintenance assigné',
       body: 'Un ticket de maintenance vous a été assigné.',
-      data: { ticketId: String(ticket._id) },
+      audience: 'staff', entityType: 'MaintenanceTicket', entityId: ticket._id,
+      data: { ticketId: String(ticket._id), hotelId: String(ticket.hotel) },
     }).catch(() => {});
   }
+
+  await emitHotelEvent(ticket.hotel, { eventType: 'maintenance.assigned', entityType: 'MaintenanceTicket', entityId: ticket._id, status: ticket.status }).catch(() => {});
 
   return ticket;
 }
@@ -90,6 +97,7 @@ async function startWork({ ticketId, actingUser }) {
   ticket.status = 'in_progress';
   ticket.updatedBy = actingUser?.id || null;
   await ticket.save();
+  await emitHotelEvent(ticket.hotel, { eventType: 'maintenance.started', entityType: 'MaintenanceTicket', entityId: ticket._id, status: ticket.status }).catch(() => {});
   return ticket;
 }
 
@@ -107,8 +115,11 @@ async function resolveTicket({ ticketId, actingUser }) {
     type: 'maintenance_ticket_resolved',
     title: '✅ Maintenance terminée',
     body: 'Un ticket de maintenance a été résolu — la chambre peut être ré-inspectée.',
-    data: { ticketId: String(ticket._id), roomId: String(ticket.room) },
+    entityType: 'MaintenanceTicket', entityId: ticket._id,
+    data: { ticketId: String(ticket._id), roomId: String(ticket.room), hotelId: String(ticket.hotel) },
   }).catch(() => {});
+
+  await emitHotelEvent(ticket.hotel, { eventType: 'maintenance.resolved', entityType: 'MaintenanceTicket', entityId: ticket._id, status: ticket.status }).catch(() => {});
 
   return ticket;
 }
@@ -121,6 +132,7 @@ async function closeTicket({ ticketId, actingUser }) {
   ticket.status = 'closed';
   ticket.updatedBy = actingUser?.id || null;
   await ticket.save();
+  await emitHotelEvent(ticket.hotel, { eventType: 'maintenance.closed', entityType: 'MaintenanceTicket', entityId: ticket._id, status: ticket.status }).catch(() => {});
   return ticket;
 }
 
