@@ -91,3 +91,59 @@ describe.each([
     expect(leaveConversation).toHaveBeenCalledWith('conv-1');
   });
 });
+
+// POST-E2E-2 — un deep link générique (`altimmo://messages/:id`, hors tap de
+// notification) ne fournit à cet écran qu'un identifiant brut (`route.params.id`,
+// jamais l'objet `conversation` complet) : sans repli, TOUT deep link générique
+// affichait "Conversation introuvable", même pour une conversation possédée par
+// l'utilisateur — bug réel reproduit sur device durant ce sprint et corrigé par
+// un chargement autonome via `GET /conversations/:id` (même endpoint authentifié
+// que `loadChatParams`, cf. notificationsService.js).
+describe('ChatScreen — repli deep link générique (route.params.id sans conversation)', () => {
+  beforeEach(() => {
+    mockActiveTheme = colors;
+    jest.clearAllMocks();
+  });
+
+  test('charge la conversation via GET /conversations/:id quand seul un id brut est fourni', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/conversations/conv-99') {
+        return Promise.resolve({
+          data: { data: { conversation: { _id: 'conv-99', participants: [{ _id: 'contact-1', name: 'Ada Lovelace' }, { _id: 'user-me' }] } } },
+        });
+      }
+      if (url === '/messages/conv-99') {
+        return Promise.resolve({ data: { data: { messages: [] } } });
+      }
+      return Promise.resolve({ data: { data: {} } });
+    });
+
+    render(<ChatScreen route={{ params: { id: 'conv-99' } }} navigation={navigation} />);
+
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/conversations/conv-99'));
+    await waitFor(() => expect(joinConversation).toHaveBeenCalledWith('conv-99'));
+  });
+
+  test('affiche "Conversation introuvable" (jamais de crash ni de fuite) si l’API refuse ou ne trouve rien', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/conversations/conv-foreign') {
+        return Promise.reject({ response: { status: 403, data: { message: 'Accès refusé' } } });
+      }
+      return Promise.resolve({ data: { data: {} } });
+    });
+
+    render(<ChatScreen route={{ params: { id: 'conv-foreign' } }} navigation={navigation} />);
+
+    expect(await screen.findByText('Conversation introuvable')).toBeTruthy();
+    expect(joinConversation).not.toHaveBeenCalled();
+  });
+
+  test('un `conversation` déjà fourni dans route.params (chemin notification) court-circuite le repli par id', async () => {
+    api.get.mockResolvedValue({ data: { data: { messages: [] } } });
+
+    render(<ChatScreen route={{ params: { conversation, contact, id: 'conv-1' } }} navigation={navigation} />);
+
+    await waitFor(() => expect(joinConversation).toHaveBeenCalledWith('conv-1'));
+    expect(api.get).not.toHaveBeenCalledWith('/conversations/conv-1');
+  });
+});

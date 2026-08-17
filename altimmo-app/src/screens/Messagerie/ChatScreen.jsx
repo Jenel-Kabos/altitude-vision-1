@@ -5,7 +5,7 @@ import React, {
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
   StyleSheet, KeyboardAvoidingView, Platform, Animated,
-  Modal, Pressable, ScrollView, Linking,
+  Modal, Pressable, ScrollView, Linking, ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
@@ -105,10 +105,51 @@ const AudioPlayer = memo(function AudioPlayer({ url, nom, styles }) {
 // ─── ChatScreen ───────────────────────────────────────────────────────────────
 
 export default function ChatScreen({ route, navigation }) {
-  const { conversation, contact } = route?.params ?? {};
+  const { conversation: routeConversation, contact: routeContact } = route?.params ?? {};
+  // POST-E2E-2 — un deep link générique (`altimmo://messages/:id`, hors tap
+  // de notification) passe par le `linking.config` de React Navigation
+  // (navigationSdk.js), qui ne fournit qu'un identifiant brut (`id`), jamais
+  // l'objet `conversation` complet que cet écran exige — contrairement au
+  // chemin notification qui l'enrichit via `loadChatParams` (notificationsService.js).
+  // Sans ce repli, TOUT deep link générique vers une conversation affichait
+  // "Conversation introuvable", même pour une conversation possédée par
+  // l'utilisateur (bug réel reproduit et corrigé ici). Réutilise le même
+  // endpoint authentifié `GET /conversations/:id` : un accès refusé (403) ou
+  // une conversation inexistante aboutit au même état sûr "introuvable" —
+  // ni fuite de données ni distinction observable entre les deux cas.
+  const bareId = route?.params?.id || route?.params?.conversationId;
   const { user }           = useAuth();
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
+
+  const [resolvedConversation, setResolvedConversation] = useState(null);
+  const [resolvedContact,      setResolvedContact]      = useState(null);
+  const [resolving, setResolving] = useState(Boolean(bareId && !routeConversation));
+
+  useEffect(() => {
+    if (routeConversation || !bareId) return undefined;
+    let active = true;
+    (async () => {
+      try {
+        const res = await api.get(`/conversations/${bareId}`);
+        const conv = res.data?.data?.conversation;
+        if (!active || !conv) return;
+        const found = conv.participants?.find(
+          (p) => p._id?.toString() !== user?._id?.toString()
+        );
+        setResolvedConversation(conv);
+        setResolvedContact(found || { name: 'Équipe Altitude Vision' });
+      } catch {
+        // conversation introuvable ou accès refusé — repli silencieux vers l'état "introuvable"
+      } finally {
+        if (active) setResolving(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [bareId, routeConversation, user?._id]);
+
+  const conversation = routeConversation || resolvedConversation;
+  const contact = routeContact || resolvedContact;
 
   const [messages, setMessages] = useState([]);
   const [text,     setText]     = useState('');
@@ -380,6 +421,15 @@ export default function ChatScreen({ route, navigation }) {
       </View>
     );
   }, [isMe, messages, styles, c, renderAttachment]);
+
+  if (!conversation && resolving) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center',
+        alignItems: 'center', backgroundColor: c.bg }}>
+        <ActivityIndicator size="large" color={c.gold} />
+      </SafeAreaView>
+    );
+  }
 
   if (!conversation) {
     return (
