@@ -6,6 +6,7 @@ import Button from '../Button';
 import Card from '../Card';
 import Checkbox from '../Checkbox';
 import FormSwitch from '../FormSwitch';
+import Chip from '../Chip';
 import { colors } from '../../theme/colors';
 import { colorsDark } from '../../theme/colorsDark';
 
@@ -98,6 +99,38 @@ describe.each([
     expect(toggle.props.trackColor).toEqual({ false: theme.inputBorder, true: theme.gold });
     expect(toggle.props.thumbColor).toBe(theme.onAccent);
     expect(toggle.props.accessibilityState).toEqual({ checked: true, disabled: true });
+  });
+
+  // UI-MOB-1 — Chip.jsx importait auparavant le token 'colors' (clair) en dur,
+  // au lieu de useTheme() : en mode sombre les chips restaient rendus avec
+  // les couleurs claires, invisibles/incohérentes sur fond sombre.
+  test('Chip suit le thème actif (clair/sombre), jamais figé sur les couleurs claires', () => {
+    const screen = render(
+      <>
+        <Chip label="Appartement meublé" active onPress={jest.fn()} />
+        <Chip label="Studio" onPress={jest.fn()} />
+      </>,
+    );
+
+    const active = screen.getByRole('button', { name: 'Appartement meublé' });
+    const inactive = screen.getByRole('button', { name: 'Studio' });
+
+    expect(flattenedStyle(active)).toMatchObject({
+      borderColor: theme.borderGoldFull,
+      backgroundColor: theme.goldMuted,
+    });
+    expect(flattenedStyle(inactive)).toMatchObject({
+      borderColor: theme.inputBorder,
+      backgroundColor: theme.bgCardAlt,
+    });
+    expect(flattenedStyle(screen.getByText('Appartement meublé')).color).toBe(theme.gold);
+    expect(flattenedStyle(screen.getByText('Studio')).color).toBe(theme.text);
+    expect(active.props.accessibilityState).toEqual({ selected: true, disabled: false });
+  });
+
+  test('le label du bouton reste sur une seule ligne (bug "Précédent" coupé)', () => {
+    const screen = render(<Button label="Précédent" variant="outline" onPress={jest.fn()} />);
+    expect(screen.getByText('Précédent').props.numberOfLines).toBe(1);
   });
 });
 

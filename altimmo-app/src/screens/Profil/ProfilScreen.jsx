@@ -452,7 +452,7 @@ const makeStyles = (c) => StyleSheet.create({
   // ─── Hero ───
   hero: {
     paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     gap: spacing.sm,
@@ -504,18 +504,19 @@ const makeStyles = (c) => StyleSheet.create({
   heroEmail: {
     fontFamily: fonts.body,
     fontSize: fontSize.sm,
-    color: 'rgba(240,237,232,0.5)',
+    color: 'rgba(240,237,232,0.75)',
     textAlign: 'center',
   },
   roleBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 3,
     borderRadius: 100,
     marginTop: spacing.xs,
+    opacity: 0.9,
   },
   roleBadgeText: {
     fontFamily: fonts.bodyBold,
-    fontSize: fontSize.xs,
+    fontSize: 10,
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },

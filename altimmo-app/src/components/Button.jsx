@@ -66,7 +66,7 @@ export default function Button({
         ? <ActivityIndicator color={spinnerColor} />
         : <View style={styles.content}>
           {icon ? <Ionicons name={icon} size={18} color={StyleSheet.flatten(textStyle).color} /> : null}
-          <Text style={textStyle}>{label}</Text>
+          <Text style={textStyle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{label}</Text>
         </View>}
     </TouchableOpacity>
   );
@@ -79,7 +79,8 @@ const makeStyles = (c) => StyleSheet.create({
     paddingVertical: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
+    minHeight: 48,
+    minWidth: 88,
   },
   primary: {
     backgroundColor: c.gold,

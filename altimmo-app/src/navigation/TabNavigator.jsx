@@ -5,7 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../context/AuthContext';
-import { colors } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 import CustomTabBar from './CustomTabBar';
 
 import ListeAnnoncesScreen  from '../screens/Annonces/ListeAnnoncesScreen';
@@ -21,11 +21,12 @@ const Tab   = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
 function AnnoncesStack() {
+  const { themeColors: c } = useTheme();
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        cardStyle: { backgroundColor: colors.bg },
+        cardStyle: { backgroundColor: c.bg },
       }}
     >
       <Stack.Screen name="ListeAnnonces" component={ListeAnnoncesScreen} />

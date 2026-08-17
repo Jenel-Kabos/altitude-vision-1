@@ -457,7 +457,7 @@ const makeStyles = (c) => StyleSheet.create({
   headerBadgeText: {
     fontFamily: fonts.bodyBold,
     fontSize: 11,
-    color: '#0A0A0A',
+    color: c.onAccent,
   },
   headerActions: {
     width: 60,
@@ -513,7 +513,7 @@ const makeStyles = (c) => StyleSheet.create({
   filterBadgeText: {
     fontFamily: fonts.bodyBold,
     fontSize: 9,
-    color: '#0A0A0A',
+    color: c.onAccent,
   },
 
   // ─── Liste ───

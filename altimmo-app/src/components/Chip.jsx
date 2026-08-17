@@ -1,46 +1,61 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { colors, radius, fonts, fontSize, spacing } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { radius, fonts, fontSize, spacing } from '../theme';
 
-export default function Chip({ label, active = false, onPress, small = false }) {
+export default function Chip({ label, active = false, onPress, small = false, disabled = false }) {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+
   return (
     <TouchableOpacity
       onPress={onPress}
+      disabled={disabled}
       activeOpacity={0.8}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ selected: active }}
+      accessibilityState={{ selected: active, disabled }}
       style={[
         styles.chip,
         small && styles.chipSmall,
-        {
-          borderColor: active ? colors.borderGoldFull : colors.border,
-          backgroundColor: active ? colors.goldMuted : 'transparent',
-        },
+        active && styles.chipActive,
+        disabled && styles.chipDisabled,
       ]}
     >
-      <Text
-        style={{
-          fontFamily: active ? fonts.bodyBold : fonts.body,
-          fontSize: fontSize.sm,
-          color: active ? colors.gold : colors.textMuted,
-        }}
-      >
+      <Text style={[styles.label, active && styles.labelActive]}>
         {label}
       </Text>
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   chip: {
     borderRadius: radius.xs,
-    borderWidth: 1,
+    borderWidth: 1.5,
+    borderColor: c.inputBorder,
+    backgroundColor: c.bgCardAlt,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
   chipSmall: {
     paddingHorizontal: spacing.xs,
     paddingVertical: 4,
+  },
+  chipActive: {
+    borderColor: c.borderGoldFull,
+    backgroundColor: c.goldMuted,
+  },
+  chipDisabled: {
+    opacity: 0.5,
+  },
+  label: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: c.text,
+  },
+  labelActive: {
+    fontFamily: fonts.bodyBold,
+    color: c.gold,
   },
 });

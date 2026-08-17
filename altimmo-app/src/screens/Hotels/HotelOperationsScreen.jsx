@@ -139,5 +139,5 @@ const makeStyles = (c) => StyleSheet.create({
   reference: { color: c.text, fontFamily: fonts.bodyBold }, text: { color: c.textSub, fontFamily: fonts.body },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, inventoryLine: { borderTopWidth: 1, borderTopColor: c.border, paddingTop: spacing.sm, gap: spacing.xs },
   readiness: { borderTopWidth: 1, borderTopColor: c.border, paddingTop: spacing.sm, gap: spacing.xs },
-  readinessLabel: { color: c.text, fontFamily: fonts.bodyBold }, readinessBlocker: { color: c.danger || '#B91C1C', fontFamily: fonts.body, fontSize: fontSize.sm },
+  readinessLabel: { color: c.text, fontFamily: fonts.bodyBold }, readinessBlocker: { color: c.error, fontFamily: fonts.body, fontSize: fontSize.sm },
 });

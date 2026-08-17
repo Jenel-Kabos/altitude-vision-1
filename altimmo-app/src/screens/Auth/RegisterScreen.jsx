@@ -668,7 +668,7 @@ const makeStyles = (c) => StyleSheet.create({
   heroSub: {
     fontFamily: 'DMSans-Regular',
     fontSize: 13,
-    color: 'rgba(240,237,232,0.5)',
+    color: 'rgba(240,237,232,0.72)',
     letterSpacing: 0.3,
   },
 

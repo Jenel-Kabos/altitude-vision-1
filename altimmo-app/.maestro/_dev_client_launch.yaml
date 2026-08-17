@@ -1,0 +1,36 @@
+appId: com.altitudevision.altimmo
+---
+# MOB-E2E-2 — lancement déterministe, à réutiliser via `runFlow` par tous les
+# autres flows au lieu de `launchApp`.
+#
+# Cause racine diagnostiquée par `adb shell dumpsys activity activities` :
+# `launchApp` (et le lanceur Android par défaut) ouvre
+# `expo.modules.devlauncher.launcher.DevLauncherActivity` — l'écran natif de
+# sélection de serveur de développement d'Expo Dev Client — PAS l'activité
+# de l'app (`.MainActivity`). C'est un préalable natif systématique, pas un
+# overlay ponctuel : `topResumedActivity` le confirme littéralement.
+#
+# Fix : `openLink` vers le deep-link explicite du Dev Client
+# (`exp+altimmo-app://expo-development-client/?url=...`, format confirmé par
+# les logs réels de `expo run:android`), qui ouvre directement
+# `.MainActivity` connectée au bundle Metro (port 8081, déjà forwardé par
+# `adb reverse` vers l'hôte). Vérifié par `dumpsys` : topResumedActivity
+# devient `.MainActivity` immédiatement après cet appel.
+#
+# Second artefact distinct, découvert ensuite : un tooltip natif "developer
+# menu" (overlay hors de l'arbre d'accessibilité, confirmé par dump de
+# hiérarchie) réapparaît de façon fiable à CHAQUE démarrage à froid du
+# process (pas seulement à la première connexion), quel que soit le chemin
+# de lancement. Pas de sleep arbitraire : on attend une condition RÉELLE
+# (texte rendu par le JS, donc présent dans l'arbre) qui garantit que le
+# bundle est chargé, donc que le tooltip natif a déjà eu l'occasion de
+# s'afficher — puis un unique tap de point (dernier recours documenté,
+# mandat §15 : aucun sélecteur d'accessibilité n'existe pour cet overlay
+# natif), sans effet néfaste quand le tooltip est absent.
+- openLink: "exp+altimmo-app://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+- extendedWaitUntil:
+    visible: "DÉCOUVRIR"
+    timeout: 20000
+- tapOn:
+    point: "50%,56%"
+    optional: true

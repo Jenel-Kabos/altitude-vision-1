@@ -68,6 +68,17 @@ export const linking = {
               MyDocuments: pathFor('MY_DOCUMENTS'),
               PersonalDocumentDetail: pathFor('MY_DOCUMENT_DETAILS'),
               TenantPortal: { path: 'espace-locataire/:section?' },
+              // POST-E2E-1 — ces 4 écrans hôteliers sont déclarés avec un
+              // `deepLink` réel dans shared/navigation/registry.json
+              // (HOTEL_OPERATIONS/HOTEL_COCKPIT/HOUSEKEEPING/HOTEL_MAINTENANCE)
+              // mais n'étaient jamais câblés ici : un deep-link vers un hôtel
+              // était donc silencieusement ignoré par React Navigation (aucun
+              // écran ne matchait le chemin), reproduit et confirmé 2/2 lors
+              // de ce sprint (POST_E2E1_REPORT.md).
+              HotelOperations: pathFor('HOTEL_OPERATIONS'),
+              HotelCockpit: pathFor('HOTEL_COCKPIT'),
+              HotelHousekeeping: pathFor('HOUSEKEEPING'),
+              HotelMaintenance: pathFor('HOTEL_MAINTENANCE'),
             },
           },
         },

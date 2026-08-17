@@ -150,7 +150,7 @@ exports.createFull = async (req, res) => {
       action: 'Annonce location créée (admin)',
       description: `"${result.property.title}" créé depuis le dashboard admin`,
       module: 'Altimmo',
-      typeAction: 'CREATION',
+      typeAction: 'CRÉATION',
       auteur: buildAuteur(req.user),
       cible: { id: String(result.property._id), type: 'Property', nom: result.property.title },
       req,

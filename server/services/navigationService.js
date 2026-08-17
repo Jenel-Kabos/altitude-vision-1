@@ -4,7 +4,14 @@ const navigation = require('../../shared/navigation');
 
 const USER_DESTINATIONS = {
   new_property: 'PROPERTY_LIST', bien_valide: 'PROPERTY_LIST', bien_rejete: 'PROFILE',
-  new_message: 'MESSAGES', new_staff_message: 'MESSAGES', message_staff: 'MESSAGES',
+  // POST-E2E-2 — ces 3 types portent toujours un `conversationId` réel dans
+  // `data` (voir conversationController.js/messageController.js, jamais
+  // modifiés par ce correctif) : router vers `MESSAGES` (liste générique)
+  // perdait cette information et ouvrait toujours la liste au lieu de LA
+  // conversation concernée — bug réel reproduit et corrigé ici. `CONVERSATION`
+  // interpole `:id` depuis `data.conversationId` (buildNotificationNavigation,
+  // même fichier, inchangé) exactement comme prévu par le registre partagé.
+  new_message: 'CONVERSATION', new_staff_message: 'CONVERSATION', message_staff: 'CONVERSATION',
   visite_status: 'VISITS', visite_cancelled: 'VISITS', visite_auto_cancelled: 'VISITS',
   visite_confirmee: 'VISITS', visite_demandee: 'VISITS', visite_a_confirmer: 'VISITS',
   visite_reprogrammee: 'VISITS', visite_rappel: 'VISITS', visite_en_cours: 'VISITS',

@@ -94,7 +94,7 @@ exports.create = async (req, res) => {
 
     logAction({
       action: 'Ticket de maintenance créé', description: `Ticket ${category} créé pour la chambre ${room.roomNumber}`, module: 'Altimmo',
-      typeAction: 'CREATION', auteur: buildAuteur(req.user),
+      typeAction: 'CRÉATION', auteur: buildAuteur(req.user),
       cible: { id: String(ticket._id), type: 'MaintenanceTicket', nom: room.roomNumber }, req,
     });
 

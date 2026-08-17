@@ -59,6 +59,17 @@ const errorHandler = (err, req, res, next) => {
     message = err.message;
   }
 
+  // POST-E2E-2 — même convention que HotelAccessError ci-dessus : erreurs
+  // levées par des helpers sans accès à `res` (assertConversationAccess,
+  // conversationController.js), qui ne peuvent donc pas appeler
+  // `res.status()` avant de lancer l'exception comme le fait le reste du
+  // contrôleur. Sans ce nom reconnu, le défaut (500) masquait un vrai 403/404
+  // fonctionnel — bug réel reproduit (POST_E2E1_REPORT.md §36).
+  if (err.name === 'ConversationAccessError') {
+    statusCode = err.statusCode || 403;
+    message = err.message;
+  }
+
   // USER-ARCH-1 — même convention que FinancialError/HotelAccessError.
   if (err.name === 'BusinessProfileError') {
     statusCode = err.statusCode || 400;

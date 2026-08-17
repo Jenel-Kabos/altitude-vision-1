@@ -80,3 +80,39 @@ describe('errorHandler middleware', () => {
     expect(jsonCall.message).toContain('type est invalide');
   });
 });
+
+// POST-E2E-2 — teste le VRAI module (pas la réimplémentation ci-dessus) :
+// une erreur portant `.statusCode` mais sans `.name` reconnu tombait sur 500
+// (bug réel démontré, voir conversationController.js:assertConversationAccess,
+// POST_E2E2_ETAT_INITIAL.md §5). `ConversationAccessError` est le nom
+// désormais reconnu (même convention que HotelAccessError).
+const { errorHandler: realErrorHandler } = require('../middleware/errorMiddleware');
+
+describe('errorHandler middleware (module réel) — ConversationAccessError', () => {
+  test('honore .statusCode=403 pour une ConversationAccessError nommée', () => {
+    const err = new Error('Accès refusé');
+    err.name = 'ConversationAccessError';
+    err.statusCode = 403;
+    const res = makeRes();
+    realErrorHandler(err, {}, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: 'fail', message: 'Accès refusé' }));
+  });
+
+  test('honore .statusCode=404 pour une ConversationAccessError nommée', () => {
+    const err = new Error('Conversation introuvable');
+    err.name = 'ConversationAccessError';
+    err.statusCode = 404;
+    const res = makeRes();
+    realErrorHandler(err, {}, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('une erreur inattendue SANS nom reconnu reste bien une 500 (non transformée globalement)', () => {
+    const err = new Error('Boom inattendu');
+    const res = makeRes();
+    realErrorHandler(err, {}, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', message: 'Boom inattendu' }));
+  });
+});

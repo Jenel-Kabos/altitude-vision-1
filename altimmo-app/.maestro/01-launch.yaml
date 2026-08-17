@@ -1,6 +1,11 @@
 appId: com.altitudevision.altimmo
 ---
-- launchApp:
-    clearState: true
+# MOB-E2E-2 — ce flow suppose que `.maestro/mob-e2e-prelaunch.sh` a déjà été
+# exécuté juste avant (force-stop + lancement par deep-link direct vers
+# MainActivity + dissolution déterministe du tooltip natif "developer menu",
+# voir ce script pour le diagnostic complet). Ne PAS appeler `launchApp` ici
+# : cela redéclencherait le lanceur par défaut d'Android, donc
+# `DevLauncherActivity` (l'écran de sélection de serveur de développement),
+# recréant exactement le problème résolu par le script.
 - assertVisible:
-    text: "Altimmo"
+    text: "DÉCOUVRIR"

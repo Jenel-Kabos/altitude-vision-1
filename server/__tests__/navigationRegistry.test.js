@@ -120,4 +120,19 @@ describe('registre de navigation NAV-CORE-1', () => {
     expect(result.destination).toBeNull();
     expect(result.data.screen).toBeUndefined();
   });
+
+  // POST-E2E-2 — bug réel démontré (POST_E2E1_REPORT.md §23,
+  // POST_E2E2_ETAT_INITIAL.md §3) : ces 3 types pointaient vers `MESSAGES`
+  // (liste générique) au lieu de `CONVERSATION` (chat précis), perdant le
+  // `conversationId` et empêchant systématiquement l'ouverture de LA
+  // conversation concernée depuis une notification. `CONVERSATION` doit
+  // interpoler `:id` depuis `data.conversationId`.
+  test('new_message/new_staff_message/message_staff ouvrent la conversation précise, jamais la liste générique', () => {
+    ['new_message', 'new_staff_message', 'message_staff'].forEach((type) => {
+      const result = buildNotificationNavigation({ type, data: { conversationId: 'conv-1' } });
+      expect(result.destination).toBe('CONVERSATION');
+      expect(result.data.params).toEqual({ screen: 'Chat', params: { conversationId: 'conv-1' } });
+      expect(result.data.deepLink).toBe('altimmo://messages/conv-1');
+    });
+  });
 });

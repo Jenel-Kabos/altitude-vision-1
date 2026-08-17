@@ -1,15 +1,18 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { colors, spacing } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing } from '../../theme';
 
 export default function Divider({ style }) {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return <View style={[styles.divider, style]} />;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   divider: {
     height: 1,
-    backgroundColor: colors.border,
+    backgroundColor: c.border,
     marginVertical: spacing.md,
   },
 });

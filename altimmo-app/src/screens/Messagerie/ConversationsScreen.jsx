@@ -35,9 +35,9 @@ const STAFF_ROLES = ['Admin', 'Collaborateur'];
 // Badge rôle — uniquement pertinent côté staff (item.isStaffInbox === true) ;
 // un client ne voit jamais ce badge dans ses propres conversations 1-à-1.
 const ROLE_COLORS = (c) => ({
-  'Proprietaire': { bg: c.goldMuted, text: c.goldDark, label: 'Propriétaire' },
-  'Client':       { bg: c.blueMuted, text: c.blue,     label: 'Client' },
-  'Prestataire':  { bg: '#EDE9FE',   text: '#6D28D9',  label: 'Prestataire' },
+  'Proprietaire': { bg: c.goldMuted,   text: c.goldDark, label: 'Propriétaire' },
+  'Client':       { bg: c.blueMuted,   text: c.blue,     label: 'Client' },
+  'Prestataire':  { bg: c.purpleMuted, text: c.purple,   label: 'Prestataire' },
 });
 
 // ─── Item de conversation ─────────────────────────────────────────────────────
@@ -178,11 +178,36 @@ export default function ConversationsScreen({ navigation }) {
   const [search,        setSearch]        = useState('');
 
   // ─── Chargement ───
+  // POST-E2E-2 — un client ordinaire peut légitimement avoir DEUX types de
+  // conversations : sa boîte partagée avec le staff (`isStaffInbox: true`,
+  // exposée par /conversations/my-inbox, jamais par /conversations qui
+  // l'exclut explicitement côté backend) et, plus rarement, une conversation
+  // 1-à-1 classique si le staff l'a lui-même initiée (/conversations). Avant
+  // ce correctif, seule la seconde était interrogée : une conversation
+  // client↔staff pourtant fonctionnelle (créable, lisible, répondable)
+  // n'apparaissait jamais dans la liste au retour sur cet écran — bug réel
+  // reproduit et documenté dans POST_E2E1_REPORT.md §17, corrigé ici en
+  // interrogeant les deux endpoints et en fusionnant, jamais en élargissant
+  // le filtre serveur (chaque endpoint garde exactement son autorisation
+  // actuelle).
   const chargerConversations = useCallback(async () => {
     try {
-      const endpoint = isStaff ? '/conversations/staff-inbox' : '/conversations';
-      const res = await api.get(endpoint);
-      setConversations(res.data?.data?.conversations || []);
+      if (isStaff) {
+        const res = await api.get('/conversations/staff-inbox');
+        setConversations(res.data?.data?.conversations || []);
+        return;
+      }
+      const [directRes, inboxRes] = await Promise.all([
+        api.get('/conversations'),
+        api.get('/conversations/my-inbox'),
+      ]);
+      const direct = directRes.data?.data?.conversations || [];
+      const inbox = inboxRes.data?.data?.conversations || [];
+      const byId = new Map([...direct, ...inbox].map((conv) => [conv._id, conv]));
+      const merged = Array.from(byId.values()).sort(
+        (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)
+      );
+      setConversations(merged);
     } catch {
       // silencieux — l'utilisateur peut refresh manuellement
     } finally {

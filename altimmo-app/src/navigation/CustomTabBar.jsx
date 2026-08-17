@@ -81,7 +81,7 @@ function TabItem({ route, isFocused, tabWidth, onPress, onLongPress, options, c 
         accessibilityState={{ selected: isFocused }}
       >
         <View style={[styles.raisedBtn, { backgroundColor: c.gold, borderColor: c.bgCard }]}>
-          <Ionicons name="add" size={26} color="#FFFFFF" />
+          <Ionicons name="add" size={26} color={c.onAccent} />
         </View>
       </TouchableOpacity>
     );

@@ -13,6 +13,7 @@ jest.mock('../models/User');
 jest.mock('../services/housekeepingService');
 jest.mock('../services/inspectionService');
 jest.mock('../services/maintenanceService');
+jest.mock('../services/actionLogService');
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
@@ -61,6 +62,8 @@ const User = require('../models/User');
 const housekeepingService = require('../services/housekeepingService');
 const inspectionService = require('../services/inspectionService');
 const maintenanceService = require('../services/maintenanceService');
+const { logAction } = require('../services/actionLogService');
+const ActionLog = require('../models/ActionLog');
 
 HousekeepingTask.HOUSEKEEPING_TYPES = ['checkout_cleaning', 'refresh', 'deep_cleaning'];
 MaintenanceTicket.MAINTENANCE_CATEGORIES = ['plumbing', 'electricity', 'furniture', 'cleanliness', 'security', 'other'];
@@ -229,6 +232,13 @@ describe('POST /api/inspections + PATCH approve/reject (Sprint E)', () => {
     const res = await request(app).post('/api/inspections').set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
       .send({ roomId: ROOM_ID, housekeepingTaskId: TASK_ID });
     expect(res.statusCode).toBe(201);
+    // POST-E2E-1 — non-régression bug ActionLog : le contrôleur doit passer
+    // une valeur RÉELLEMENT valide pour l'enum `typeAction` (auparavant
+    // 'CREATION' non accentué, rejeté silencieusement par la validation
+    // Mongoose puisque l'enum n'accepte que 'CRÉATION').
+    expect(logAction).toHaveBeenCalledWith(expect.objectContaining({ typeAction: 'CRÉATION' }));
+    const typeActionEnum = ActionLog.schema.path('typeAction').enumValues;
+    expect(typeActionEnum).toContain(logAction.mock.calls[0][0].typeAction);
   });
 
   test('403 — un propriétaire tiers ne peut pas créer d\'inspection sur une chambre qui n\'est pas la sienne', async () => {

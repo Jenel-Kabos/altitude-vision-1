@@ -105,7 +105,7 @@ exports.create = async (req, res) => {
 
     logAction({
       action: 'Chambre créée', description: `Chambre ${room.roomNumber} créée`, module: 'Altimmo',
-      typeAction: 'CREATION', auteur: buildAuteur(req.user),
+      typeAction: 'CRÉATION', auteur: buildAuteur(req.user),
       cible: { id: String(room._id), type: 'Room', nom: room.roomNumber }, req,
     });
 

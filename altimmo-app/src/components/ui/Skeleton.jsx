@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -7,9 +7,12 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { colors, radius } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { radius } from '../../theme';
 
 export default function Skeleton({ width, height, style, borderRadius }) {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const opacity = useSharedValue(1);
 
   useEffect(() => {
@@ -34,8 +37,8 @@ export default function Skeleton({ width, height, style, borderRadius }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   base: {
-    backgroundColor: colors.bgCardAlt,
+    backgroundColor: c.bgCardAlt,
   },
 });

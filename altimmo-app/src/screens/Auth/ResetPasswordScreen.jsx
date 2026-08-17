@@ -349,7 +349,7 @@ const makeStyles = (c) => StyleSheet.create({
   heroSub: {
     fontFamily: fonts.body,
     fontSize: fontSize.sm,
-    color: 'rgba(240,237,232,0.5)',
+    color: 'rgba(240,237,232,0.72)',
     letterSpacing: 0.3,
   },
 

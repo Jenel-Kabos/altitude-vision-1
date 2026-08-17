@@ -1153,19 +1153,19 @@ export default function PublierBienScreen({ navigation, route }) {
             accessibilityState={{ disabled: submitting }}
           >
             {submitting ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={isLastStep ? c.bg : c.onAccent} />
             ) : (
               <>
-                <Text style={styles.btnNextText}>
+                <Text style={[styles.btnNextText, { color: isLastStep ? c.bg : c.onAccent }]}>
                   {isLastStep
                     ? (isEditing ? 'Enregistrer' : 'Publier')
                     : 'Suivant'}
                 </Text>
                 {!isLastStep && (
-                  <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+                  <Ionicons name="chevron-forward" size={18} color={c.onAccent} />
                 )}
                 {isLastStep && (
-                  <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                  <Ionicons name="checkmark" size={18} color={c.bg} />
                 )}
               </>
             )}
@@ -1728,6 +1728,5 @@ const makeStyles = (c) => StyleSheet.create({
   btnNextText: {
     fontFamily: fonts.bodyBold,
     fontSize: 14,
-    color: '#FFFFFF',
   },
 });

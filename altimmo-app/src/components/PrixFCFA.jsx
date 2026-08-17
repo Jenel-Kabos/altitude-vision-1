@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text } from 'react-native';
-import { colors, fonts, fontSize } from '../theme';
+import { useTheme } from '../context/ThemeContext';
+import { fonts, fontSize } from '../theme';
 
 // Signature visuelle Altimmo
 // Usage : <PrixFCFA montant={185000000} />
@@ -12,9 +13,12 @@ export default function PrixFCFA({
   compact = false,
   variant = 'default',
 }) {
+  const { themeColors: c } = useTheme();
   const isOnImage = variant === 'onImage';
-  const mainColor   = isOnImage ? colors.white : colors.gold;
-  const suffixColor = isOnImage ? colors.white : colors.textSub;
+  // 'onImage' reste blanc fixe dans les deux thèmes : le texte est posé sur
+  // une photo, pas sur le fond de l'app — cohérent avec mandat UI-MOB-3 §23.
+  const mainColor   = isOnImage ? '#FFFFFF' : c.gold;
+  const suffixColor = isOnImage ? '#FFFFFF' : c.textSub;
 
   return (
     <Text style={style} numberOfLines={compact ? 1 : undefined}>

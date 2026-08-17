@@ -596,9 +596,17 @@ async function main() {
   // laissant npm/Next/Express orphelins et privant Playwright de verdict.
   await new Promise(() => setInterval(() => {}, 1000));
 }
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
-main().catch(async (error) => {
-  console.error(error);
-  await shutdown();
-});
+// MOB-E2E — exporté pour permettre à server/scripts/start-mobile-e2e.js de
+// réutiliser exactement les mêmes fixtures (ids, seed) sans les dupliquer.
+// N'affecte pas l'exécution directe existante (Playwright web), toujours
+// déclenchée uniquement quand ce fichier est le point d'entrée du process.
+module.exports = { ids, seed };
+
+if (require.main === module) {
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+  main().catch(async (error) => {
+    console.error(error);
+    await shutdown();
+  });
+}

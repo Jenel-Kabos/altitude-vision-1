@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
-import { colors, radius, spacing } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
+import { radius, spacing } from '../../theme';
 import Skeleton from './Skeleton';
 
 export default function SkeletonPropertyCard() {
+  const { themeColors: c } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={styles.shadow}>
       <View style={styles.card}>
@@ -38,10 +41,10 @@ export default function SkeletonPropertyCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c) => StyleSheet.create({
   shadow: {
     borderRadius: radius.md,
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -53,7 +56,7 @@ const styles = StyleSheet.create({
     }),
   },
   card: {
-    backgroundColor: colors.bgCard,
+    backgroundColor: c.bgCard,
     borderRadius: radius.md,
     overflow: 'hidden',
   },

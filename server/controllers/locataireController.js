@@ -337,7 +337,7 @@ exports.invite = async (req, res) => {
 
     logAction({
       action: 'Invitation locataire envoyée', description: `Invitation envoyée à ${locataire.prenom || ''} ${locataire.nom || ''}`, module: 'GestionLocative',
-      typeAction: 'CREATION', auteur: buildAuteur(req.user),
+      typeAction: 'CRÉATION', auteur: buildAuteur(req.user),
       cible: { id: String(locataire._id), type: 'Locataire', nom: `${locataire.prenom || ''} ${locataire.nom || ''}`.trim() }, req,
     });
 

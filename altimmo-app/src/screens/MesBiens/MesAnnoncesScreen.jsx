@@ -49,16 +49,8 @@ const BienCard = React.memo(function BienCard({
   const rental     = item._rental;
 
   const toneColor = { success: c.success, error: c.error, warning: c.warning }[modInfo.tone];
-  const toneBg    = {
-    success: 'rgba(56,161,105,0.14)',
-    error:   'rgba(229,62,62,0.14)',
-    warning: 'rgba(221,107,32,0.14)',
-  }[modInfo.tone];
-  const toneBorder = {
-    success: 'rgba(56,161,105,0.3)',
-    error:   'rgba(229,62,62,0.3)',
-    warning: 'rgba(221,107,32,0.3)',
-  }[modInfo.tone];
+  const toneBg    = { success: c.successMuted, error: c.dangerMuted, warning: c.warningMuted }[modInfo.tone];
+  const toneBorder = toneColor;
 
   return (
     <View style={styles.card}>
@@ -137,8 +129,8 @@ const BienCard = React.memo(function BienCard({
             <Text style={[styles.actionText, { color: c.blue }]}>Modifier</Text>
           </TouchableOpacity>}
 
-          {rental?.allowedActions?.includes('request_publish') && <TouchableOpacity style={[styles.actionBtn, styles.actionDisp]} onPress={()=>onRentalRequest(rental,'request-publish')}><Text style={[styles.actionText,{color:'#0A0A0A'}]}>Demander publication</Text></TouchableOpacity>}
-          {rental?.allowedActions?.includes('request_suspension') && <TouchableOpacity style={[styles.actionBtn, styles.actionDisp]} onPress={()=>onRentalRequest(rental,'request-suspension')}><Text style={[styles.actionText,{color:'#0A0A0A'}]}>Demander suspension</Text></TouchableOpacity>}
+          {rental?.allowedActions?.includes('request_publish') && <TouchableOpacity style={[styles.actionBtn, styles.actionDisp]} onPress={()=>onRentalRequest(rental,'request-publish')}><Text style={[styles.actionText,{color:c.gold}]}>Demander publication</Text></TouchableOpacity>}
+          {rental?.allowedActions?.includes('request_suspension') && <TouchableOpacity style={[styles.actionBtn, styles.actionDisp]} onPress={()=>onRentalRequest(rental,'request-suspension')}><Text style={[styles.actionText,{color:c.gold}]}>Demander suspension</Text></TouchableOpacity>}
           {rental?.allowedActions?.includes('report_maintenance') && <TouchableOpacity style={[styles.actionBtn, styles.actionDelete]} onPress={()=>onRentalRequest(rental,'report-maintenance')}><Text style={[styles.actionText,{color:c.error}]}>Maintenance</Text></TouchableOpacity>}
 
           {!rental && <TouchableOpacity
@@ -153,9 +145,9 @@ const BienCard = React.memo(function BienCard({
             <Ionicons
               name={disponible ? (isHebergement ? 'close-circle' : isLocation ? 'home' : 'bag-check') : 'checkmark-circle-outline'}
               size={15}
-              color="#0A0A0A"
+              color={c.gold}
             />
-            <Text style={[styles.actionText, { color: '#0A0A0A' }]}>
+            <Text style={[styles.actionText, { color: c.gold }]}>
               {disponible ? (isHebergement ? 'Indisponible' : isLocation ? 'Loué' : 'Vendu') : 'Libre'}
             </Text>
           </TouchableOpacity>}
@@ -384,7 +376,7 @@ export default function MesAnnoncesScreen({ navigation }) {
         accessibilityRole="button"
         accessibilityLabel="Publier une annonce"
       >
-        <Ionicons name="add-circle" size={20} color="#0A0A0A" />
+        <Ionicons name="add-circle" size={20} color={c.onAccent} />
         <Text style={styles.addBtnText}>Ajouter un bien</Text>
       </TouchableOpacity>
 
@@ -411,7 +403,7 @@ export default function MesAnnoncesScreen({ navigation }) {
         accessibilityRole="button"
         accessibilityLabel="Publier une annonce"
       >
-        <Ionicons name="add" size={22} color="#0A0A0A" />
+        <Ionicons name="add" size={22} color={c.onAccent} />
       </TouchableOpacity>
     </View>
   );
@@ -695,7 +687,7 @@ const makeStyles = (c) => StyleSheet.create({
   addBtnText: {
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.md,
-    color: '#0A0A0A',
+    color: c.onAccent,
   },
   listTitle: {
     fontFamily: fonts.bodyBold,

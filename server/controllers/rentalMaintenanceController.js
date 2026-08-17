@@ -105,7 +105,7 @@ exports.create = async (req, res) => {
 
     logAction({
       action: 'Ticket de maintenance locative créé', description: `Ticket ${category} créé pour ${property.title}`, module: 'GestionLocative',
-      typeAction: 'CREATION', auteur: buildAuteur(req.user),
+      typeAction: 'CRÉATION', auteur: buildAuteur(req.user),
       cible: { id: String(ticket._id), type: 'RentalMaintenanceTicket', nom: property.title }, req,
     });
 

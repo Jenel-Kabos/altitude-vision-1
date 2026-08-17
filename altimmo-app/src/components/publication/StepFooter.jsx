@@ -36,6 +36,6 @@ const makeStyles = () => StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.md,
   },
-  backBtn: { flex: 1 },
-  nextBtn: { flex: 2 },
+  backBtn: { flex: 0.85 },
+  nextBtn: { flex: 1.6 },
 });

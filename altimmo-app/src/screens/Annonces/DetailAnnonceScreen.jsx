@@ -1005,7 +1005,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                   <Ionicons
                     name="send"
                     size={18}
-                    color={envoi || !commentaire.trim() ? c.textMuted : '#FFFFFF'}
+                    color={envoi || !commentaire.trim() ? c.textMuted : c.onAccent}
                   />
                 </TouchableOpacity>
               </View>
@@ -1081,7 +1081,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                 accessibilityRole="button"
                 accessibilityLabel="Réserver cet hébergement"
               >
-                <Ionicons name="bed-outline" size={18} color="#FFFFFF" />
+                <Ionicons name="bed-outline" size={18} color={c.onAccent} />
                 <Text style={styles.ctaBtnPrimaryText}>Réserver</Text>
               </TouchableOpacity>
             )}
@@ -1091,7 +1091,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                 onPress={() => navigation.navigate('Profil', { screen: 'SubmitRealEstateApplication', params: { propertyId: annonce._id || annonce.id, propertyTitle: title, kind: isLocation ? 'rental_application' : 'purchase_offer' } })}
                 accessibilityLabel={isLocation ? 'Déposer une candidature locative' : 'Faire une offre d’achat'}
               >
-                <Ionicons name="document-text-outline" size={18} color="#FFFFFF" />
+                <Ionicons name="document-text-outline" size={18} color={c.onAccent} />
                 <Text style={styles.ctaBtnPrimaryText}>{isLocation ? 'Candidater' : 'Faire une offre'}</Text>
               </TouchableOpacity>
             )}
@@ -1119,7 +1119,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                 onPress={demanderVisite}
                 activeOpacity={0.85}
               >
-                <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
+                <Ionicons name="calendar-outline" size={18} color={c.onAccent} />
                 <Text style={styles.ctaBtnPrimaryText}>Planifier une visite</Text>
               </TouchableOpacity>
             ) : permissions.canContact && permissions.reason ? (
@@ -2072,7 +2072,7 @@ const makeStyles = (c) => {
     ctaBtnPrimaryText: {
       fontFamily: fonts.bodyBold,
       fontSize: 14,
-      color: '#FFFFFF',
+      color: c.onAccent,
     },
     ctaBtnFull: { flex: 1 },
     ctaReasonWrap: {
@@ -2388,7 +2388,7 @@ const makeStyles = (c) => {
     rdvSlotChipSelected: { backgroundColor: c.gold, borderColor: c.gold },
     rdvSlotChipDisabled: { opacity: 0.4 },
     rdvSlotChipText: { fontFamily: fonts.bodyBold, fontSize: 13, color: c.text },
-    rdvSlotChipTextSelected: { color: '#FFFFFF' },
+    rdvSlotChipTextSelected: { color: c.onAccent },
     rdvSlotChipTextDisabled: { color: c.textMuted, textDecorationLine: 'line-through' },
     rdvSubmitBtn: {
       flexDirection: 'row',
@@ -2400,7 +2400,7 @@ const makeStyles = (c) => {
       padding: 16,
       marginTop: 16,
     },
-    rdvSubmitText: { fontFamily: fonts.bodyBold, fontSize: 15, color: '#fff' },
+    rdvSubmitText: { fontFamily: fonts.bodyBold, fontSize: 15, color: c.onAccent },
     rdvSuccessView: { alignItems: 'center', padding: 20 },
     rdvSuccessIcon: { marginBottom: 16 },
     rdvSuccessTitle: { fontFamily: fonts.display, fontSize: 24, color: c.text, marginBottom: 8 },

@@ -8,26 +8,59 @@ const { ALL_STAFF } = require('../utils/roles');
 const { assertResourceTenant, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
 
 const activeTenantId = (req) => req.platformTenant?._id;
-const tenantConversationFilter = (req) => ({
-  $or: [
-    { tenant: activeTenantId(req) },
-    { tenant: null, participants: { $in: req.tenantScopeUserIds || [] } },
-  ],
-});
+// POST-E2E-1 — un client sans tenant propre voit UNIQUEMENT ses propres
+// conversations (toujours combiné à `participants: req.user.id` par les
+// appelants ci-dessous) : ce filtre tenant n'a de sens que pour le STAFF
+// (qui a toujours un tenant réel), jamais pour un client, pour qui il
+// excluait à tort sa propre conversation (bug réel démontré :
+// `{tenant: undefined}` ne se comporte PAS comme « tout accepter » ici —
+// vérifié par reproduction, la conversation existait bien en base mais
+// n'apparaissait dans aucune liste côté client).
+const tenantConversationFilter = (req) => (activeTenantId(req)
+  ? { $or: [
+      { tenant: activeTenantId(req) },
+      { tenant: null, participants: { $in: req.tenantScopeUserIds || [] } },
+    ] }
+  : {});
 
+// POST-E2E-1 — un client ordinaire (rôle non-staff) n'a structurellement
+// AUCUN PlatformTenant propre (OrgMembership réservée au staff/exploitants,
+// jamais attribuée à l'inscription normale) : `activeTenantId(req)` vaut
+// alors `undefined` en permanence pour cet acteur. La frontière tenant
+// (`assertResourceTenant`) n'a de sens QUE pour départager plusieurs tenants
+// entre eux (staff d'un tenant A ne doit pas lire les conversations du
+// tenant B) — elle n'ajoute AUCUNE protection pour un client, dont l'accès
+// est déjà strictement borné par la vérification participant/staff
+// ci-dessous (jamais retirée, jamais affaiblie). Sans ce garde, TOUT client
+// sans tenant recevait un 404/403 sur sa propre conversation — bug réel
+// démontré (POST_E2E1_REPORT.md), pas une hypothèse.
 async function assertConversationAccess(req, conversation) {
-  await assertResourceTenant({ resourceType: 'Conversation', resource: conversation, tenantId: activeTenantId(req) });
+  if (activeTenantId(req)) {
+    await assertResourceTenant({ resourceType: 'Conversation', resource: conversation, tenantId: activeTenantId(req) });
+  }
   const isStaff = ALL_STAFF.includes(req.user.role);
   const isParticipant = (conversation.participants || []).some((participant) =>
     String(participant?._id || participant) === String(req.user.id));
   if (!isStaff && !isParticipant) {
+    // POST-E2E-2 — cette erreur portait déjà `.statusCode = 403` mais jamais
+    // de `.name` reconnu par errorMiddleware.js, qui ne lit `.statusCode`
+    // que pour des classes nommées explicitement (même convention que
+    // HotelAccessError/FinancialError, voir errorMiddleware.js) — sans nom,
+    // le middleware retombait sur son défaut 500. Bug réel reproduit
+    // (POST_E2E1_REPORT.md §36), corrigé en alignant sur la convention
+    // existante plutôt qu'en généralisant `.statusCode` pour toute erreur.
     const error = new Error('Accès refusé');
+    error.name = 'ConversationAccessError';
     error.statusCode = 403;
     throw error;
   }
 }
 
 async function keepAttributedConversations(req, conversations) {
+  // Même raisonnement que `assertConversationAccess` ci-dessus : sans tenant
+  // propre, rien à filtrer ici — les requêtes appelantes restreignent déjà
+  // par `participants: req.user.id` (jamais un accès élargi).
+  if (!activeTenantId(req)) return conversations;
   const allowed = [];
   for (const conversation of conversations) {
     try {
@@ -122,7 +155,11 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
       otherUserId = otherParticipant.toString();
     }
   } else {
+    // POST-E2E-2 — même correctif que ci-dessus : nommer l'erreur pour que
+    // errorMiddleware.js honore son `.statusCode` réel (404) au lieu de
+    // retomber sur 500.
     const error = new Error('Conversation introuvable');
+    error.name = 'ConversationAccessError';
     error.statusCode = 404;
     throw error;
   }
@@ -346,7 +383,9 @@ exports.getUnreadCount = asyncHandler(async (req, res) => {
   let unreadCount = await Message.countDocuments({
     receiver: req.user.id,
     isRead: false,
-    tenant: activeTenantId(req),
+    // POST-E2E-1 — même raisonnement que tenantConversationFilter : déjà
+    // borné par `receiver: req.user.id`, jamais élargi pour un client.
+    ...(activeTenantId(req) ? { tenant: activeTenantId(req) } : {}),
   });
 
   // Staff : ajoute les conversations de la boîte partagée où un message
@@ -380,10 +419,27 @@ exports.getUnreadCount = asyncHandler(async (req, res) => {
  * REMPLACE `createOrGetConversation` (POST /) pour les nouveaux flux.
  * L'ancienne route est conservée pour compatibilité avec le mobile existant.
  */
+// POST-E2E-1 — un client (jamais membre d'une organisation) n'a pas de
+// tenant propre : le tenant de la conversation doit être déduit de la
+// RESSOURCE métier contactée (le bien), jamais de l'appartenance du client
+// lui-même (`resolveResourceTenant`, déjà utilisé ailleurs pour exactement
+// ce cas — voir tenantResourceAttributionService.js). Le staff garde son
+// propre tenant sélectionné (`activeTenantId`), comportement inchangé. Sans
+// bien fourni (aucune ressource à attribuer), la conversation reste sans
+// tenant (`null`, déjà une valeur valide du schéma) — inchangé, non traité
+// ce sprint (hors du chemin mobile réel testé, cf. POST_E2E1_REPORT.md).
+async function resolveConversationTenantId(req, propertyId) {
+  if (ALL_STAFF.includes(req.user.role)) return activeTenantId(req);
+  if (!propertyId) return null;
+  const attribution = await resolveResourceTenant({ resourceType: 'Property', resource: propertyId });
+  return attribution.status === 'resolved' ? attribution.tenantId : null;
+}
+
 exports.startConversation = async (req, res) => {
   try {
     const { recipientId, propertyId, message } = req.body;
     const isSenderStaff = ALL_STAFF.includes(req.user.role);
+    const conversationTenantId = await resolveConversationTenantId(req, propertyId);
 
     // ── Blocage client → client ──────────────────────────────────
     if (!isSenderStaff && recipientId) {
@@ -416,7 +472,7 @@ exports.startConversation = async (req, res) => {
           participants: [req.user.id, recipientId],
           relatedProperty: propertyId || null,
           isStaffInbox: false,
-          tenant: activeTenantId(req),
+          tenant: conversationTenantId,
         });
       } else if (propertyId && !conversation.relatedProperty) {
         conversation.relatedProperty = propertyId;
@@ -437,7 +493,7 @@ exports.startConversation = async (req, res) => {
           participants: [req.user.id],
           relatedProperty: propertyId || null,
           isStaffInbox: true,
-          tenant: activeTenantId(req),
+          tenant: conversationTenantId,
         });
       }
     }
@@ -452,7 +508,7 @@ exports.startConversation = async (req, res) => {
         receiver: isSenderStaff ? recipientId : null,
         conversation: conversation._id,
         content: message.trim(),
-        tenant: activeTenantId(req),
+        tenant: conversationTenantId,
       });
 
       conversation.lastMessage = message.trim();

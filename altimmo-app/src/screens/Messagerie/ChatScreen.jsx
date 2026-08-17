@@ -491,7 +491,7 @@ export default function ChatScreen({ route, navigation }) {
             accessibilityRole="button"
             accessibilityLabel="Envoyer le message"
           >
-            <Ionicons name="send" size={18} color="#FFFFFF" />
+            <Ionicons name="send" size={18} color={c.onAccent} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -619,7 +619,7 @@ const makeStyles = (c) => StyleSheet.create({
   bubbleTextMe: {
     fontFamily: fonts.body,
     fontSize: fontSize.md,
-    color: '#0A0A0A',
+    color: c.onAccent,
   },
   bubbleTextThem: {
     fontFamily: fonts.body,

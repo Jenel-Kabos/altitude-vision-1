@@ -92,7 +92,7 @@ exports.create = async (req, res) => {
 
     logAction({
       action: 'Tâche de ménage créée', description: `Tâche ${task.type} créée pour la chambre ${room.roomNumber}`, module: 'Altimmo',
-      typeAction: 'CREATION', auteur: buildAuteur(req.user),
+      typeAction: 'CRÉATION', auteur: buildAuteur(req.user),
       cible: { id: String(task._id), type: 'HousekeepingTask', nom: room.roomNumber }, req,
     });
 

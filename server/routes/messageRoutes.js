@@ -6,7 +6,7 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 const { upload } = require('../config/cloudinary');
-const { requireTenantScope } = require('../middleware/tenantContext');
+const { attachTenantContext } = require('../middleware/tenantContext');
 
 const uploadAttachments = upload.array('attachments', 5);
 
@@ -19,7 +19,9 @@ const {
     downloadAttachment,
 } = require('../controllers/messageController');
 
-router.use(protect, requireTenantScope);
+// POST-E2E-1 — même correction que conversationRoutes.js : voir ce fichier
+// pour le raisonnement complet (bug réel démontré, pas une hypothèse).
+router.use(protect, attachTenantContext);
 
 // ==========================================================
 // --- 📌 Routes spécifiques (Statiques) ---

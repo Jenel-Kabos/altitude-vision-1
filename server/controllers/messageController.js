@@ -95,7 +95,15 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             res.status(404);
             throw new Error('Conversation non trouvée.');
         }
-        await assertResourceTenant({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
+        // POST-E2E-1 — un client sans tenant propre (cas normal, jamais
+        // membre d'une organisation) ne doit pas être bloqué par cette
+        // frontière tenant, qui ne sert qu'à isoler plusieurs tenants entre
+        // eux (jamais une protection pour un client). Ce garde ne retire
+        // AUCUNE vérification existante — voir conversationController.js
+        // pour le même raisonnement.
+        if (req.platformTenant) {
+            await assertResourceTenant({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
+        }
 
         if (convDoc.isStaffInbox) {
             // CAS 2 : boîte partagée staff
@@ -131,10 +139,23 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             res.status(404);
             throw new Error('Destinataire non trouvé.');
         }
-        const receiverTenant = await resolveResourceTenant({ resourceType: 'User', resource: receiver });
-        if (receiverTenant.status !== 'resolved' || String(receiverTenant.tenantId) !== String(req.platformTenant._id)) {
-            res.status(404);
-            throw new Error('Destinataire non trouvé.');
+        // POST-E2E-1 — deux cas légitimes où cette frontière tenant ne doit
+        // PAS s'appliquer : (a) `targetUserId` vient de `convDoc.participants`
+        // (cas conversationId) — déjà légitimé par l'appartenance à la
+        // conversation, jamais un choix arbitraire de destinataire ; (b) le
+        // destinataire est un client ordinaire sans tenant propre (cas
+        // normal, jamais membre d'une organisation) — lui exiger un tenant
+        // resterait le même bug que côté expéditeur (bloquait déjà tout
+        // staff → client réel, reproduit lors de ce sprint). Reste appliqué
+        // pour un nouveau destinataire arbitraire (`receiverId` direct, sans
+        // conversation préexistante) entre deux acteurs ayant chacun un
+        // tenant réel — comportement inchangé dans ce cas précis.
+        if (req.platformTenant && !convDoc) {
+            const receiverTenant = await resolveResourceTenant({ resourceType: 'User', resource: receiver });
+            if (receiverTenant.status === 'resolved' && String(receiverTenant.tenantId) !== String(req.platformTenant._id)) {
+                res.status(404);
+                throw new Error('Destinataire non trouvé.');
+            }
         }
     }
 
@@ -145,7 +166,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         conversation: convDoc?._id || null,
         content,
         attachments: attachmentsData,
-        tenant: req.platformTenant._id,
+        tenant: req.platformTenant?._id ?? convDoc?.tenant ?? null,
     });
 
     await message.populate('sender', 'name email avatar');
@@ -161,7 +182,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         if (!convDoc) {
             convDoc = await Conversation.create({
                 participants: [req.user.id, targetUserId],
-                tenant: req.platformTenant._id,
+                tenant: req.platformTenant?._id ?? null,
             });
         }
     }
@@ -231,12 +252,17 @@ exports.downloadAttachment = asyncHandler(async (req, res) => {
     const message = await Message.findById(req.params.messageId)
         .select('+attachments.asset.publicId +attachments.asset.resourceType +attachments.asset.deliveryType +attachments.asset.version +attachments.asset.format');
     if (!message) { res.status(404); throw new Error('Message non trouvé.'); }
-    await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+    // POST-E2E-1 — même garde que sendMessage/getMessages : un client sans
+    // tenant propre reste protégé par la vérification `participant`
+    // ci-dessous, jamais par cette frontière tenant qui ne le concerne pas.
+    if (req.platformTenant) {
+        await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+    }
     const conversation = message.conversation ? await Conversation.findById(message.conversation) : null;
     const userId = String(req.user.id);
     const participant = conversation?.participants?.some((id) => String(id) === userId)
         || String(message.sender) === userId || String(message.receiver || '') === userId;
-    const staffAllowed = ALL_STAFF.includes(req.user.role) && conversation?.tenant
+    const staffAllowed = ALL_STAFF.includes(req.user.role) && conversation?.tenant && req.platformTenant
         && String(conversation.tenant) === String(req.platformTenant._id);
     if (!participant && !staffAllowed) { res.status(403); throw new Error('Accès refusé à cette pièce jointe.'); }
     const attachment = message.attachments.id(req.params.attachmentId);
@@ -274,7 +300,11 @@ exports.getMessages = asyncHandler(async (req, res) => {
   let otherUserId = conversationId;
   const convDoc = await Conversation.findById(conversationId);
   if (convDoc) {
-    await assertResourceTenant({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
+    // POST-E2E-1 — voir sendMessage plus haut : un client sans tenant propre
+    // ne doit pas être bloqué par cette frontière tenant.
+    if (req.platformTenant) {
+      await assertResourceTenant({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
+    }
     const otherParticipant = convDoc.participants.find(
       (p) => p.toString() !== req.user.id.toString()
     );
@@ -350,7 +380,11 @@ exports.markAsRead = asyncHandler(async (req, res) => {
     throw new Error('Message non trouvé.');
   }
 
-  await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+  // POST-E2E-1 — voir sendMessage plus haut : la vérification receiver
+  // ci-dessous reste l'autorisation réelle, jamais retirée.
+  if (req.platformTenant) {
+    await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+  }
 
   if (message.receiver.toString() !== req.user.id) {
     res.status(403);
@@ -384,7 +418,11 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
     throw new Error('Message non trouvé.');
   }
 
-  await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+  // POST-E2E-1 — voir sendMessage plus haut : la vérification sender/receiver
+  // ci-dessous reste l'autorisation réelle, jamais retirée.
+  if (req.platformTenant) {
+    await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+  }
 
   if (
     message.sender.toString() !== req.user.id &&
@@ -412,10 +450,14 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
 exports.getConversations = asyncHandler(async (req, res) => {
   logger.info(`💬 [getConversations] User: ${req.user.id}`);
 
+  // POST-E2E-1 — un client sans tenant propre voit toutes SES conversations
+  // (déjà borné par sender/receiver === req.user.id ci-dessus) ; le filtre
+  // tenant ci-dessous n'a de sens que pour le staff, qui a toujours un
+  // tenant réel.
   const candidates = await Message.find({
     $and: [
       { $or: [{ sender: req.user.id }, { receiver: req.user.id }] },
-      { $or: [{ tenant: req.platformTenant._id }, { tenant: null }] },
+      ...(req.platformTenant ? [{ $or: [{ tenant: req.platformTenant._id }, { tenant: null }] }] : []),
     ],
   })
     .populate('sender', 'name email avatar')
@@ -424,7 +466,9 @@ exports.getConversations = asyncHandler(async (req, res) => {
   const messages = [];
   for (const message of candidates) {
     try {
-      await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+      if (req.platformTenant) {
+        await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+      }
       messages.push(message);
     } catch {}
   }

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import HotelOperationsScreen from '../HotelOperationsScreen';
+import { colors } from '../../../theme/colors';
 import {
   assignHotelRoom, checkOutHotelReservation, getAccessibleHotels, getCheckoutFinancialReadiness,
   getHotelRooms, getOwnerHotelReservations, getReservationAssignments,
@@ -46,7 +47,12 @@ describe('HotelOperationsScreen — exploitation Mobile C/D.1.2', () => {
     getCheckoutFinancialReadiness.mockResolvedValue({ status: 'blocked', blockers: [{ code: 'FINANCIAL_BALANCE_REMAINING' }] });
     render(<HotelOperationsScreen />);
     await waitFor(() => expect(screen.getByText('Check-out bloqué')).toBeTruthy());
-    expect(screen.getByText('FINANCIAL_BALANCE_REMAINING')).toBeTruthy();
+    const blocker = screen.getByText('FINANCIAL_BALANCE_REMAINING');
+    expect(blocker).toBeTruthy();
+    // UI-MOB-2 — utilisait `c.danger || '#B91C1C'` alors que le token
+    // s'appelle `error` (pas `danger`) : le fallback était donc TOUJOURS
+    // actif, ignorant silencieusement le thème. Corrigé vers `c.error`.
+    expect(StyleSheet.flatten(blocker.props.style).color).toBe(colors.error);
     expect(screen.getByLabelText('Check-out / départ anticipé').props.accessibilityState.disabled).toBe(true);
   });
 

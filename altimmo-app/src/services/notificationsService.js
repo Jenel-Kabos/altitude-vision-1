@@ -158,11 +158,41 @@ const TYPE_TO_SCREEN = {
   rental_property_available: ()  => ['Profil', { screen: 'MesAnnonces' }],
 };
 
+// POST-E2E-2 — le registre partagé (`shared/navigation/registry.json`) ne
+// connaît qu'un `conversationId` interpolé (contrat générique, valable pour
+// TOUTE destination, y compris web) ; `ChatScreen.jsx` exige l'objet
+// `conversation` complet (participants, isStaffInbox…), jamais un ID seul,
+// et affiche « Conversation introuvable » sinon — bug réel reproduit lors de
+// ce sprint après correction du mapping de destination (POST_E2E2_REPORT.md).
+// Résolu ici, au point d'entrée unique, plutôt qu'en élargissant le contrat
+// générique du registre pour ce seul écran.
+async function loadChatParams(conversationId) {
+  try {
+    const res = await api.get(`/conversations/${conversationId}`);
+    const conversation = res.data?.data?.conversation;
+    if (!conversation) return null;
+    const currentUserId = await getCurrentUserId();
+    const contact = conversation.participants?.find(
+      (p) => p._id?.toString() !== currentUserId
+    ) || { name: 'Équipe Altitude Vision' };
+    return { conversation, contact };
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveNavigation(data = {}) {
   const { type, screen, params } = data;
 
   const registeredTarget = resolveNotificationMobileTarget(data);
-  if (registeredTarget) return [registeredTarget.screen, registeredTarget.params];
+  if (registeredTarget) {
+    if (registeredTarget.screen === 'Messages' && registeredTarget.params?.screen === 'Chat') {
+      const conversationId = registeredTarget.params?.params?.conversationId;
+      const chatParams = conversationId ? await loadChatParams(conversationId) : null;
+      return ['Messages', { screen: 'Chat', params: chatParams || {} }];
+    }
+    return [registeredTarget.screen, registeredTarget.params];
+  }
 
   // Le resolver dédié au type est prioritaire — il peut enrichir les params
   // (ex: charger la conversation complète) avant de determiner l'écran.

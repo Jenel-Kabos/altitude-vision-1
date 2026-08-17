@@ -4,7 +4,7 @@ const { ALL_STAFF } = require('../utils/roles');
 const router = express.Router();
 
 const authController = require('../controllers/authController');
-const { requireTenantScope } = require('../middleware/tenantContext');
+const { attachTenantContext } = require('../middleware/tenantContext');
 const { restrictTo } = require('../middleware/authMiddleware');
 const {
   getConversationById,
@@ -19,8 +19,18 @@ const {
   getMyInbox,                // ✅  NOUVEAU — ma propre conversation staff-inbox (client)
 } = require('../controllers/conversationController');
 
-// 🔒 Toutes les routes nécessitent un token valide
-router.use(authController.protect, requireTenantScope);
+// 🔒 Toutes les routes nécessitent un token valide.
+// POST-E2E-1 — `requireTenantScope` bloquait ICI, avant même d'atteindre le
+// contrôleur, tout client ordinaire (jamais de PlatformTenant propre par
+// design — voir tenantContextService.js) : bug réel démontré, Messaging
+// totalement inaccessible pour cet acteur. `attachTenantContext` résout
+// `req.platformTenant` sans jamais bloquer ; la frontière tenant reste
+// appliquée dans chaque contrôleur UNIQUEMENT quand `req.platformTenant`
+// existe (staff), jamais retirée pour cet acteur — voir
+// conversationController.js/messageController.js pour le détail. `GET
+// /staff-inbox` reste gardée séparément par `restrictTo(...ALL_STAFF)`
+// ci-dessous, inchangé.
+router.use(authController.protect, attachTenantContext);
 
 // ── Routes statiques (AVANT /:conversationId pour éviter les conflits) ──────
 

@@ -3,17 +3,26 @@ env:
   TEST_EMAIL: ${TEST_EMAIL}
   TEST_PASSWORD: ${TEST_PASSWORD}
 ---
-- launchApp
+# MOB-E2E-2 — suppose `.maestro/mob-e2e-prelaunch.sh` déjà exécuté juste
+# avant (voir ce script pour le diagnostic complet du menu développeur Expo
+# Dev Client). Ne PAS appeler `launchApp` ici. L'écran de connexion utilise
+# des accessibilityLabel réels ("Adresse email"/"Mot de passe"), jamais
+# "Email" seul (absent du code). Les identifiants viennent exclusivement de
+# variables d'environnement passées via `-e` (jamais en dur ici).
 - tapOn:
-    text: "Se connecter|Connexion"
+    text: "Passer"
     optional: true
 - tapOn:
-    text: "Email"
+    text: "Se connecter"
+    optional: true
+- tapOn:
+    text: "Adresse email"
 - inputText: ${TEST_EMAIL}
 - tapOn:
     text: "Mot de passe"
 - inputText: ${TEST_PASSWORD}
+- hideKeyboard
 - tapOn:
-    text: "Se connecter"
+    text: "^Se connecter$"
 - assertVisible:
     text: "Annonces"
