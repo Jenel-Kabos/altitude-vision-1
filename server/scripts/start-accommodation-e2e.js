@@ -568,6 +568,12 @@ async function main() {
   await startFakePaymentProvider();
   mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
   const uri = mongo.getUri("altitude_e2e");
+  // UX-OWNER-4 — journalisé pour permettre à un script de fixture ponctuel
+  // (ex : ajout d'un compte de test après coup) de se connecter à cette
+  // même instance Mongo éphémère sans dupliquer le harnais. Aucun secret
+  // réel (instance en mémoire, port aléatoire, détruite à l'arrêt du
+  // processus) — même esprit de transparence que `E2E_READY` ci-dessous.
+  console.log(`E2E_MONGO_URI=${uri}`);
   await seed(uri);
   start(process.execPath, ["server.js"], serverDir, {
     MONGO_URI: uri,
