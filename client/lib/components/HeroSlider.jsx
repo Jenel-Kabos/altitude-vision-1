@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, Building2, Calendar, Briefcase } from 'lucid
 
 const slides = [
   {
-    title:    "200 familles logées\nau Congo Brazzaville",
+    title:    "Plus de 200 familles logées\nau Congo Brazzaville",
     subtitle: "Biens vérifiés, prix transparents — achetez, louez ou investissez avec des experts qui connaissent chaque quartier.",
     image:    "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1600&q=80",
     imgWidth: 1600,
