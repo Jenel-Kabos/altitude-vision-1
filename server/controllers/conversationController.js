@@ -5,7 +5,7 @@ const { serializeMessage } = require('./messageController');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const { ALL_STAFF } = require('../utils/roles');
-const { assertResourceTenant, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
 
 const activeTenantId = (req) => req.platformTenant?._id;
 // POST-E2E-1 — un client sans tenant propre voit UNIQUEMENT ses propres
@@ -16,10 +16,29 @@ const activeTenantId = (req) => req.platformTenant?._id;
 // `{tenant: undefined}` ne se comporte PAS comme « tout accepter » ici —
 // vérifié par reproduction, la conversation existait bien en base mais
 // n'apparaissait dans aucune liste côté client).
+//
+// HOTFIX-MSG-STAFF-INBOX-1 — `tenant: null` ci-dessous n'admettait
+// auparavant une conversation que si un participant figurait dans
+// `req.tenantScopeUserIds` (dérivé exclusivement d'`OrgMembership`, voir
+// organizationService.js:getScopeUserIds). Un client ordinaire n'a
+// STRUCTURELLEMENT jamais d'`OrgMembership` (réservée au staff/exploitants,
+// déjà établi POST_E2E1_REPORT.md §9/§12) : toute conversation créée sans
+// `propertyId` (chemin « Contacter l'agence » générique, resolveConversationTenantId
+// retourne `null` faute de ressource à attribuer) devenait donc invisible
+// dans TOUTE staff-inbox, quel que soit le staff — bug réel reproduit
+// (HOTFIX_MSG_STAFF_INBOX1_ETAT_INITIAL.md §7). `tenant: null` signifie ici
+// « ressource non attribuable à un tenant », même sémantique que
+// `assertResourceTenantOrUnattributed` (tenantResourceAttributionService.js) :
+// aucune attribution possible = aucune frontière tenant à faire respecter,
+// jamais un filtre supprimé globalement. Les conversations réellement
+// attribuées (`tenant` non-null, bien fourni) restent strictement isolées
+// par tenant, inchangé. `getConversations`/`getMyInbox` restent bornés par
+// `participants: req.user.id` dans la même requête — cette relaxation ne
+// peut jamais exposer la conversation d'un tiers.
 const tenantConversationFilter = (req) => (activeTenantId(req)
   ? { $or: [
       { tenant: activeTenantId(req) },
-      { tenant: null, participants: { $in: req.tenantScopeUserIds || [] } },
+      { tenant: null },
     ] }
   : {});
 
@@ -34,9 +53,21 @@ const tenantConversationFilter = (req) => (activeTenantId(req)
 // ci-dessous (jamais retirée, jamais affaiblie). Sans ce garde, TOUT client
 // sans tenant recevait un 404/403 sur sa propre conversation — bug réel
 // démontré (POST_E2E1_REPORT.md), pas une hypothèse.
+//
+// HOTFIX-MSG-STAFF-INBOX-1 — `assertResourceTenant` (strict) exigeait une
+// attribution `resolved` exacte, ce qui rejetait aussi bien une conversation
+// d'un AUTRE tenant (correct) qu'une conversation NON ATTRIBUABLE du tout
+// (`tenant: null`, aucun `propertyId` fourni à la création — cas générique
+// « Contacter l'agence », voir HOTFIX_MSG_STAFF_INBOX1_ETAT_INITIAL.md §7) —
+// bloquant tout staff qui tentait d'OUVRIR une telle conversation, même
+// après correction du listing. `assertResourceTenantOrUnattributed` distingue
+// les deux : une ressource `unresolved` n'a aucune frontière tenant à faire
+// respecter (rien ne la rattache à un tenant, donc aucune fuite possible) et
+// passe sans lever d'erreur ; une ressource `resolved` vers un AUTRE tenant
+// continue de lever (isolation cross-tenant inchangée, jamais affaiblie).
 async function assertConversationAccess(req, conversation) {
   if (activeTenantId(req)) {
-    await assertResourceTenant({ resourceType: 'Conversation', resource: conversation, tenantId: activeTenantId(req) });
+    await assertResourceTenantOrUnattributed({ resourceType: 'Conversation', resource: conversation, tenantId: activeTenantId(req) });
   }
   const isStaff = ALL_STAFF.includes(req.user.role);
   const isParticipant = (conversation.participants || []).some((participant) =>
@@ -60,11 +91,15 @@ async function keepAttributedConversations(req, conversations) {
   // Même raisonnement que `assertConversationAccess` ci-dessus : sans tenant
   // propre, rien à filtrer ici — les requêtes appelantes restreignent déjà
   // par `participants: req.user.id` (jamais un accès élargi).
+  // HOTFIX-MSG-STAFF-INBOX-1 — `assertResourceTenantOrUnattributed` (pas la
+  // variante stricte) : une conversation `tenant: null` non attribuable
+  // (§7 de l'état initial) doit rester dans le résultat pour le staff,
+  // jamais une ressource réellement attribuée à un AUTRE tenant.
   if (!activeTenantId(req)) return conversations;
   const allowed = [];
   for (const conversation of conversations) {
     try {
-      await assertResourceTenant({ resourceType: 'Conversation', resource: conversation, tenantId: activeTenantId(req) });
+      await assertResourceTenantOrUnattributed({ resourceType: 'Conversation', resource: conversation, tenantId: activeTenantId(req) });
       allowed.push(conversation);
     } catch {}
   }

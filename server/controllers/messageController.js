@@ -11,7 +11,7 @@ const { getIO } = require('../socket');
 const { notify, notifyStaff } = require('../services/notificationService');
 const { ALL_STAFF } = require('../utils/roles');
 const logger = require('../utils/logger');
-const { assertResourceTenant, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
 const { streamRemoteDocument } = require('./rentalDocumentController');
 
 const serializeMessage = (value) => {
@@ -101,8 +101,16 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         // eux (jamais une protection pour un client). Ce garde ne retire
         // AUCUNE vérification existante — voir conversationController.js
         // pour le même raisonnement.
+        // HOTFIX-MSG-STAFF-INBOX-1 — `assertResourceTenantOrUnattributed`
+        // (pas la variante stricte) : une conversation `tenant: null` (créée
+        // sans `propertyId`, cas générique « Contacter l'agence ») n'a aucune
+        // attribution tenant possible — la bloquer ici empêchait le STAFF de
+        // répondre à une conversation pourtant visible dans son inbox après
+        // correction du filtre de listing (conversationController.js). Une
+        // conversation réellement attribuée à un AUTRE tenant continue d'être
+        // rejetée, isolation inchangée.
         if (req.platformTenant) {
-            await assertResourceTenant({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
+            await assertResourceTenantOrUnattributed({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
         }
 
         if (convDoc.isStaffInbox) {
@@ -256,7 +264,7 @@ exports.downloadAttachment = asyncHandler(async (req, res) => {
     // tenant propre reste protégé par la vérification `participant`
     // ci-dessous, jamais par cette frontière tenant qui ne le concerne pas.
     if (req.platformTenant) {
-        await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+        await assertResourceTenantOrUnattributed({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
     }
     const conversation = message.conversation ? await Conversation.findById(message.conversation) : null;
     const userId = String(req.user.id);
@@ -303,7 +311,7 @@ exports.getMessages = asyncHandler(async (req, res) => {
     // POST-E2E-1 — voir sendMessage plus haut : un client sans tenant propre
     // ne doit pas être bloqué par cette frontière tenant.
     if (req.platformTenant) {
-      await assertResourceTenant({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
+      await assertResourceTenantOrUnattributed({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
     }
     const otherParticipant = convDoc.participants.find(
       (p) => p.toString() !== req.user.id.toString()
@@ -383,7 +391,7 @@ exports.markAsRead = asyncHandler(async (req, res) => {
   // POST-E2E-1 — voir sendMessage plus haut : la vérification receiver
   // ci-dessous reste l'autorisation réelle, jamais retirée.
   if (req.platformTenant) {
-    await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+    await assertResourceTenantOrUnattributed({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
   }
 
   if (message.receiver.toString() !== req.user.id) {
@@ -421,7 +429,7 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
   // POST-E2E-1 — voir sendMessage plus haut : la vérification sender/receiver
   // ci-dessous reste l'autorisation réelle, jamais retirée.
   if (req.platformTenant) {
-    await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+    await assertResourceTenantOrUnattributed({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
   }
 
   if (
@@ -467,7 +475,7 @@ exports.getConversations = asyncHandler(async (req, res) => {
   for (const message of candidates) {
     try {
       if (req.platformTenant) {
-        await assertResourceTenant({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
+        await assertResourceTenantOrUnattributed({ resourceType: 'Message', resource: message, tenantId: req.platformTenant._id });
       }
       messages.push(message);
     } catch {}
