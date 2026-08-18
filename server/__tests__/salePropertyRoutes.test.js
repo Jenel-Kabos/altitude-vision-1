@@ -2,6 +2,7 @@
 
 jest.mock('../models/Property');
 jest.mock('../models/SaleManagement');
+jest.mock('../models/RentalManagement');
 jest.mock('../models/User');
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
@@ -24,6 +25,7 @@ const jwt = require('jsonwebtoken');
 const { app } = require('../server');
 const Property = require('../models/Property');
 const SaleManagement = require('../models/SaleManagement');
+const RentalManagement = require('../models/RentalManagement');
 const User = require('../models/User');
 
 const OWNER_ID = '507f1f77bcf86cd799439011';
@@ -73,14 +75,36 @@ describe('POST /api/sale-properties — création complète (dashboard admin)', 
     expect(res.statusCode).toBe(401);
   });
 
-  test("403 — un utilisateur non-staff (Proprietaire) est refusé", async () => {
-    mockUserAuth(OWNER_ID, 'Proprietaire');
+  test("403 — un rôle sans lien avec l'immobilier (Client) est refusé", async () => {
+    mockUserAuth(OWNER_ID, 'Client');
     const res = await request(app)
       .post('/api/sale-properties')
       .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
       .send(validBody());
     expect(res.statusCode).toBe(403);
     expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  // UX-OWNER-2 — `Proprietaire` est désormais autorisé sur cette route
+  // (server/routes/salePropertyRoutes.js), avec ses propres frontières
+  // appliquées côté contrôleur (jamais un accès Admin élargi) :
+  // - `owner` toujours forcé sur l'acteur, jamais un body arbitraire ;
+  // - `agencyCommission` (Admin-only, commission interne) silencieusement
+  //   ignoré, jamais une 422, jamais persisté.
+  test('201 — un Proprietaire crée sa propre annonce de vente, owner forcé, agencyCommission ignoré', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const { sale } = mockCreatedDocs();
+
+    const res = await request(app)
+      .post('/api/sale-properties')
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
+      .send({ ...validBody(), owner: ADMIN_ID }); // tentative d'injection d'un owner arbitraire
+
+    expect(res.statusCode).toBe(201);
+    expect(Property.create).toHaveBeenCalledWith(expect.objectContaining({ status: 'vente', owner: OWNER_ID }));
+    const saleCreatedWith = SaleManagement.create.mock.calls[0][0];
+    expect(saleCreatedWith).not.toHaveProperty('agencyCommission');
+    expect(res.body.data.sale._id).toBe(sale._id);
   });
 
   test('201 — un admin crée une annonce de vente complète (Property + SaleManagement)', async () => {
@@ -177,6 +201,26 @@ describe('POST /api/sale-properties — création complète (dashboard admin)', 
     expect(Property.create).not.toHaveBeenCalled();
   });
 
+  // UX-OWNER-2 — mass assignment : un Proprietaire ne doit jamais pouvoir
+  // forcer un statut administratif, une publication ou un rôle de commission
+  // via le body, même en les nommant explicitement.
+  test("mass assignment — un Proprietaire injectant statusAdmin/isPublished/recommande/agent ne les voit jamais appliqués", async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    mockCreatedDocs();
+
+    await request(app)
+      .post('/api/sale-properties')
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
+      .send({ ...validBody(), statusAdmin: 'Validée', isPublished: 'true', recommande: 'true', agent: ADMIN_ID });
+
+    const createdWith = Property.create.mock.calls[0][0];
+    expect(createdWith.statusAdmin).toBe('En attente');
+    expect(createdWith).not.toHaveProperty('isPublished');
+    expect(createdWith).not.toHaveProperty('recommande');
+    expect(createdWith).not.toHaveProperty('agent');
+    expect(createdWith.owner).toBe(OWNER_ID);
+  });
+
   test('aucun Property orphelin ne subsiste si SaleManagement échoue (compensation)', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
     const property = {
@@ -210,13 +254,46 @@ describe('PUT /api/sale-properties/:propertyId — édition complète (dashboard
     expect(res.statusCode).toBe(401);
   });
 
-  test('403 — un non-staff est refusé', async () => {
-    mockUserAuth(OWNER_ID, 'Proprietaire');
+  test("403 — un rôle sans lien avec l'immobilier (Client) est refusé", async () => {
+    mockUserAuth(OWNER_ID, 'Client');
     const res = await request(app)
       .put(`/api/sale-properties/${PROPERTY_ID}`)
       .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
       .send({ title: 'x' });
     expect(res.statusCode).toBe(403);
+  });
+
+  // UX-OWNER-2 — un Proprietaire peut désormais atteindre ce contrôleur,
+  // mais seulement pour SES PROPRES biens (jamais de vérification
+  // d'ownership auparavant, cette route était réservée au staff).
+  test('403 — un Proprietaire ne peut pas modifier le bien vente d\'un autre propriétaire', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    Property.findById = jest.fn().mockResolvedValue(existingProperty({ owner: ADMIN_ID }));
+    const res = await request(app)
+      .put(`/api/sale-properties/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
+      .send({ title: 'x' });
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('200 — un Proprietaire modifie SON PROPRE bien vente, agencyCommission ignoré, repasse en modération', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const property = existingProperty({ owner: OWNER_ID });
+    Property.findById = jest.fn().mockResolvedValue(property);
+    const existingSale = { _id: 'sale1', property: PROPERTY_ID, save: jest.fn().mockResolvedValue() };
+    SaleManagement.findOne = jest.fn().mockResolvedValue(existingSale);
+    RentalManagement.findOne = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
+
+    const res = await request(app)
+      .put(`/api/sale-properties/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
+      .send({ title: 'Villa mise à jour par le propriétaire', agencyCommission: '9' });
+
+    expect(res.statusCode).toBe(200);
+    expect(property.title).toBe('Villa mise à jour par le propriétaire');
+    expect(property.statusAdmin).toBe('En attente');
+    const saleUpdate = existingSale;
+    expect(saleUpdate).not.toHaveProperty('agencyCommission');
   });
 
   test('404 — bien introuvable', async () => {

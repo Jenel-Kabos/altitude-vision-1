@@ -53,6 +53,14 @@ const SalePropertyForm = ({
   existingImages: initialExistingImages = [],
   onSuccess,
   onCancel,
+  // UX-OWNER-2 — 'owner' masque uniquement `agencyCommission` (commission
+  // interne agence↔vendeur, Admin-only — server/controllers/salePropertyController.js
+  // l'ignore silencieusement pour un acteur Proprietaire de toute façon ;
+  // masqué ici pour ne jamais laisser croire qu'une valeur saisie sera
+  // enregistrée). Le reste du formulaire, la validation et l'appel API
+  // (`salePropertyService`, désormais autorisé pour Proprietaire sur ses
+  // propres biens) restent strictement identiques aux deux modes.
+  mode = 'admin',
 }) => {
   const [formData, setFormData] = useState(() => emptyForm({ ...initialProperty, ...initialSale }));
   const [existingImages, setExistingImages] = useState(initialExistingImages);
@@ -94,7 +102,7 @@ const SalePropertyForm = ({
     if (!(Number(formData.price) > 0)) e.price = "Le prix de vente doit être positif.";
     if (!formData.surface) e.surface = "La surface est requise.";
     if (!formData.address.arrondissement) e.arrondissement = "L'arrondissement est requis.";
-    if (formData.agencyCommission !== "" && (Number(formData.agencyCommission) < 0 || Number(formData.agencyCommission) > 100)) {
+    if (mode !== 'owner' && formData.agencyCommission !== "" && (Number(formData.agencyCommission) < 0 || Number(formData.agencyCommission) > 100)) {
       e.agencyCommission = "La commission doit être comprise entre 0 et 100.";
     }
     return e;
@@ -140,7 +148,7 @@ const SalePropertyForm = ({
       data.append("ownershipDocumentAvailable", ownershipDocumentAvailable ? "true" : "false");
       data.append("legalStatus", legalStatus);
       data.append("financingAccepted", financingAccepted ? "true" : "false");
-      if (agencyCommission !== "") data.append("agencyCommission", agencyCommission);
+      if (mode !== 'owner' && agencyCommission !== "") data.append("agencyCommission", agencyCommission);
       if (sellerConditions) data.append("sellerConditions", sellerConditions);
 
       if (propertyId) {
@@ -190,7 +198,7 @@ const SalePropertyForm = ({
       {/* Localisation */}
       <div className="border-t pt-4 mt-2">
         <h3 className="text-lg font-semibold mb-3">Localisation</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Ville *</label>
             <select value={formData.address.city} onChange={handleCityChange} aria-label="Ville" className={inputClass}>
@@ -215,7 +223,7 @@ const SalePropertyForm = ({
       {/* Caractéristiques physiques */}
       <div className="border-t pt-4 mt-2">
         <h3 className="text-lg font-semibold mb-3">Caractéristiques physiques</h3>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
             <select name="type" value={formData.type} onChange={handleChange} aria-label="Type de bien" className={inputClass}>
@@ -228,7 +236,7 @@ const SalePropertyForm = ({
             {errors.surface && <p className="text-xs text-red-600 mt-1">{errors.surface}</p>}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Chambres</label>
             <input type="number" name="bedrooms" value={formData.bedrooms} onChange={handleChange} aria-label="Chambres" className={inputClass} />
@@ -247,7 +255,7 @@ const SalePropertyForm = ({
       {/* Situation juridique */}
       <div className="border-t pt-4 mt-2">
         <h3 className="text-lg font-semibold mb-3">Situation juridique</h3>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Statut juridique</label>
             <select name="legalStatus" value={formData.legalStatus} onChange={handleChange} aria-label="Statut juridique" className={inputClass}>
@@ -272,17 +280,19 @@ const SalePropertyForm = ({
       {/* Prix et négociation */}
       <div className="border-t pt-4 mt-2">
         <h3 className="text-lg font-semibold mb-3">Prix et négociation</h3>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className={mode === 'owner' ? 'grid grid-cols-1 gap-3 mb-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3'}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Prix de vente (FCFA) *</label>
             <input type="number" name="price" value={formData.price} onChange={handleChange} aria-label="Prix de vente" className={inputClass} />
             {errors.price && <p className="text-xs text-red-600 mt-1">{errors.price}</p>}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Commission d'agence (%)</label>
-            <input type="number" name="agencyCommission" value={formData.agencyCommission} onChange={handleChange} aria-label="Commission d'agence" className={inputClass} />
-            {errors.agencyCommission && <p className="text-xs text-red-600 mt-1">{errors.agencyCommission}</p>}
-          </div>
+          {mode !== 'owner' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Commission d'agence (%)</label>
+              <input type="number" name="agencyCommission" value={formData.agencyCommission} onChange={handleChange} aria-label="Commission d'agence" className={inputClass} />
+              {errors.agencyCommission && <p className="text-xs text-red-600 mt-1">{errors.agencyCommission}</p>}
+            </div>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-700 mb-3">
           <input type="checkbox" name="negotiable" checked={formData.negotiable} onChange={handleChange} aria-label="Prix négociable" />
@@ -314,7 +324,7 @@ const SalePropertyForm = ({
             ))}
           </div>
         )}
-        <input type="file" multiple accept="image/*" onChange={handleImageChange} aria-label="Ajouter des images" />
+        <input type="file" multiple accept="image/*" onChange={handleImageChange} aria-label="Ajouter des images" className="block w-full max-w-full text-sm text-gray-500" />
         <p className="text-xs text-gray-500 mt-1">
           {formData.images.length === 0 ? "Aucune nouvelle image" : `${formData.images.length} nouvelle(s) image(s) sélectionnée(s)`}
         </p>

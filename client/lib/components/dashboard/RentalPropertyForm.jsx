@@ -58,6 +58,15 @@ const RentalPropertyForm = ({
   existingImages: initialExistingImages = [],
   onSuccess,
   onCancel,
+  // UX-OWNER-2 — `managementFee` (frais de gestion interne agence↔propriétaire,
+  // Admin-only, server/controllers/rentalPropertyController.js l'ignore déjà
+  // silencieusement pour un acteur Proprietaire) n'a jamais eu de champ
+  // affiché dans ce formulaire (aucun `<input name="managementFee">` — dette
+  // pré-existante, non introduite ici) ; `mode` ne fait donc qu'éviter de
+  // l'envoyer par défense en profondeur. Même appel API
+  // (`rentalPropertyService`, désormais autorisé Proprietaire sur ses
+  // propres biens) dans les deux modes.
+  mode = 'admin',
 }) => {
   const [formData, setFormData] = useState(() => emptyForm({ ...initialProperty, ...initialRental }));
   const [existingImages, setExistingImages] = useState(initialExistingImages);
@@ -165,7 +174,7 @@ const RentalPropertyForm = ({
       data.append("furnished", furnished ? "true" : "false");
       if (depositAmount !== "") data.append("depositAmount", depositAmount);
       if (cautionMultiplicateur !== "") data.append("cautionMultiplicateur", cautionMultiplicateur);
-      if (managementFee !== "") data.append("managementFee", managementFee);
+      if (mode !== 'owner' && managementFee !== "") data.append("managementFee", managementFee);
       if (minimumLeaseMonths !== "") data.append("minimumLeaseMonths", minimumLeaseMonths);
       if (availableFrom) data.append("availableFrom", availableFrom);
       data.append("petsAllowed", petsAllowed ? "true" : "false");
@@ -220,7 +229,7 @@ const RentalPropertyForm = ({
       {/* Localisation */}
       <div className="border-t pt-4 mt-2">
         <h3 className="text-lg font-semibold mb-3">Localisation</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Ville *</label>
             <select value={formData.address.city} onChange={handleCityChange} aria-label="Ville" className={inputClass}>
@@ -241,7 +250,7 @@ const RentalPropertyForm = ({
       {/* Caractéristiques */}
       <div className="border-t pt-4 mt-2">
         <h3 className="text-lg font-semibold mb-3">Caractéristiques</h3>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
             <select name="type" value={formData.type} onChange={handleChange} aria-label="Type de bien" className={inputClass}>
@@ -263,7 +272,7 @@ const RentalPropertyForm = ({
       {/* Loyer et charges */}
       <div className="border-t pt-4 mt-2">
         <h3 className="text-lg font-semibold mb-3">Loyer et charges</h3>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Loyer mensuel (FCFA) *</label>
             <input type="number" name="price" value={formData.price} onChange={handleChange} aria-label="Loyer mensuel" className={inputClass} />
@@ -283,7 +292,7 @@ const RentalPropertyForm = ({
       {/* Caution et avance */}
       <div className="border-t pt-4 mt-2">
         <h3 className="text-lg font-semibold mb-3">Caution et avance</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Caution (× loyer mensuel)</label>
             <input type="number" name="cautionMultiplicateur" min="0" max="6" value={formData.cautionMultiplicateur} onChange={handleChange} aria-label="Multiplicateur de caution" className={inputClass} />
@@ -302,7 +311,7 @@ const RentalPropertyForm = ({
         <h3 className="text-lg font-semibold mb-3">Conditions du bail</h3>
         <div className="mb-3">
           <p className="block text-sm font-medium text-gray-700 mb-2">Profils de locataires recherchés</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {TENANT_PROFILES.map((p) => (
               <label key={p} className="flex items-center gap-2 text-sm text-gray-700">
                 <input type="checkbox" checked={formData.profilsLocataireRecherches.includes(p)} onChange={() => handleCheckboxArrayChange("profilsLocataireRecherches", p)} />
@@ -313,7 +322,7 @@ const RentalPropertyForm = ({
         </div>
         <div className="mb-3">
           <p className="block text-sm font-medium text-gray-700 mb-2">Documents requis</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {REQUIRED_DOCUMENTS.map((d) => (
               <label key={d} className="flex items-center gap-2 text-sm text-gray-700">
                 <input type="checkbox" checked={formData.documentsRequis.includes(d)} onChange={() => handleCheckboxArrayChange("documentsRequis", d)} />
@@ -359,7 +368,7 @@ const RentalPropertyForm = ({
             ))}
           </div>
         )}
-        <input type="file" multiple accept="image/*" onChange={handleImageChange} aria-label="Ajouter des images" />
+        <input type="file" multiple accept="image/*" onChange={handleImageChange} aria-label="Ajouter des images" className="block w-full max-w-full text-sm text-gray-500" />
         <p className="text-xs text-gray-500 mt-1">
           {formData.images.length === 0 ? "Aucune nouvelle image" : `${formData.images.length} nouvelle(s) image(s) sélectionnée(s)`}
         </p>

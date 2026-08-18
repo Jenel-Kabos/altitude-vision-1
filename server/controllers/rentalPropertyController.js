@@ -9,6 +9,7 @@
 
 const mongoose = require('mongoose');
 const Property = require('../models/Property');
+const RentalManagement = require('../models/RentalManagement');
 const { createFullRentalProperty, updateFullRentalProperty } = require('../services/rentalPropertyService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const {
@@ -30,8 +31,15 @@ const REQUIRED_DOCUMENTS = [
   'Caution bancaire', 'Attestation de travail', 'Quittance de loyer précédente',
 ];
 
-/** Construit le payload RentalManagement (fiche d'annonce) à partir du body admin. */
-function buildRentalData(req) {
+// UX-OWNER-2 — `managementFee` est le frais de GESTION interne qu'Altitude
+// Vision facture au propriétaire (terme commercial agence↔propriétaire),
+// jamais une caractéristique de l'offre locative elle-même — même nature que
+// `agencyCommission` côté Vente (salePropertyController.js), seul champ
+// RentalManagement classé Admin-only par UX_OWNER2_ETAT_INITIAL.md §9. Tous
+// les autres champs (loyer, charges, caution, meublé, conditions...) décrivent
+// réellement le bien/l'offre et restent Owner-authorized.
+/** Construit le payload RentalManagement (fiche d'annonce) à partir du body. */
+function buildRentalData(req, { isOwnerActor = false } = {}) {
   const {
     monthlyRent, charges, depositAmount, managementFee,
     chargesIncluded, furnished, minimumLeaseMonths, availableFrom,
@@ -46,8 +54,10 @@ function buildRentalData(req) {
   if (parsedCharges !== undefined) data.charges = parsedCharges;
   const parsedDeposit = parseNumericField(depositAmount, 'La caution');
   if (parsedDeposit !== undefined) data.depositAmount = parsedDeposit;
-  const parsedFee = parseNumericField(managementFee, 'Les frais de gestion');
-  if (parsedFee !== undefined) data.managementFee = parsedFee;
+  if (!isOwnerActor) {
+    const parsedFee = parseNumericField(managementFee, 'Les frais de gestion');
+    if (parsedFee !== undefined) data.managementFee = parsedFee;
+  }
 
   if (chargesIncluded !== undefined) data.chargesIncluded = chargesIncluded === 'true' || chargesIncluded === true;
   if (furnished !== undefined) data.furnished = furnished === 'true' || furnished === true;
@@ -114,8 +124,12 @@ function buildRentalData(req) {
 // ─────────────────────────────────────────────
 exports.createFull = async (req, res) => {
   try {
+    // UX-OWNER-2 — même garde que salePropertyController.createFull : un
+    // propriétaire ne peut jamais s'attribuer un `owner` arbitraire, toujours
+    // forcé sur `req.user.id`.
+    const isOwnerActor = req.user.role === 'Proprietaire';
     const { owner } = req.body;
-    const ownerId = mongoose.isValidObjectId(owner) ? owner : req.user.id;
+    const ownerId = isOwnerActor ? req.user.id : (mongoose.isValidObjectId(owner) ? owner : req.user.id);
 
     let propertyData;
     try {
@@ -133,7 +147,7 @@ exports.createFull = async (req, res) => {
 
     let rentalData;
     try {
-      rentalData = buildRentalData(req);
+      rentalData = buildRentalData(req, { isOwnerActor });
     } catch (error) {
       await cleanupUploadedImages(propertyData.images);
       return fail(res, error.statusCode || 422, error.message);
@@ -174,9 +188,15 @@ exports.updateFull = async (req, res) => {
       return fail(res, 422, "Ce bien n'est pas une annonce de location.");
     }
 
+    // UX-OWNER-2 — même garde que salePropertyController.updateFull.
+    const isOwnerActor = req.user.role === 'Proprietaire';
+    if (isOwnerActor && (!property.owner || property.owner.toString() !== req.user.id.toString())) {
+      return fail(res, 403, 'Vous ne pouvez modifier que vos propres biens.');
+    }
+
     let rentalData;
     try {
-      rentalData = buildRentalData(req);
+      rentalData = buildRentalData(req, { isOwnerActor });
     } catch (error) {
       return fail(res, error.statusCode || 422, error.message);
     }
@@ -197,7 +217,15 @@ exports.updateFull = async (req, res) => {
       }
       property.price = parsedPrice;
     }
-    if (availability) property.availability = availability;
+    // UX-OWNER-2 — même restriction que salePropertyController.updateFull /
+    // propertyController.updateProperty (route legacy).
+    if (availability && isOwnerActor) {
+      const managedRental = await RentalManagement.findOne({ property: property._id, managementActivated: true }).select('_id');
+      const ALLOWED_OWNER_AVAILABILITY = ['Disponible', 'Loué', 'Retiré', 'Vendu'];
+      if (!managedRental && ALLOWED_OWNER_AVAILABILITY.includes(availability)) property.availability = availability;
+    } else if (availability) {
+      property.availability = availability;
+    }
     if (type) property.type = type;
     if (surface !== undefined && surface !== '') property.surface = parseFloat(surface);
     if (bedrooms !== undefined && bedrooms !== '') property.bedrooms = parseInt(bedrooms);
@@ -228,6 +256,11 @@ exports.updateFull = async (req, res) => {
     } else if (existingImages !== undefined) {
       property.images = parseStringArray(existingImages);
     }
+
+    // UX-OWNER-2 — même règle que salePropertyController.updateFull /
+    // propertyController.updateProperty (route legacy) : repasse en
+    // modération après une modification propriétaire.
+    if (isOwnerActor) property.statusAdmin = 'En attente';
 
     await property.save();
 

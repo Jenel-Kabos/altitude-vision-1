@@ -218,6 +218,11 @@ describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA'
     expect(screen.getByText('Situation juridique')).toBeInTheDocument();
     expect(screen.getByText('Prix et négociation')).toBeInTheDocument();
     expect(screen.getByLabelText('Prix de vente')).toBeInTheDocument();
+    // UX-OWNER-2 — non-régression : le champ Commission d'agence (Admin-only)
+    // reste visible en mode Admin (défaut, `mode` non transmis par
+    // ManagePropertiesPage) — seul le mode `owner` (OwnerPropertyManagement.jsx)
+    // le masque.
+    expect(screen.getByLabelText("Commission d'agence")).toBeInTheDocument();
     // Aucun champ de loyer, de tarif par nuit, ni statut technique.
     expect(screen.queryByLabelText('Statut')).not.toBeInTheDocument();
     expect(screen.queryByText('Loyer et charges')).not.toBeInTheDocument();

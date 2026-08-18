@@ -232,6 +232,15 @@ const PropertyForm = ({
       </div>
 
       {/* ------------------ SECTION INFOS DE BASE ------------------ */}
+      {/* UX-OWNER-1 — `required` retiré des champs ci-dessous (titre, description,
+          prix, quartier, arrondissement) : la validation HTML5 native intercepte
+          la soumission AVANT que React `onSubmit`/`errors` ne s'exécute jamais —
+          un champ vide affichait une bulle native du navigateur, jamais le message
+          `errors.X` stylé prévu pour ce champ (bug réel reproduit). Même choix que
+          SalePropertyForm.jsx/RentalPropertyForm.jsx (Admin), qui n'utilisent
+          d'ailleurs aucun `required` natif, uniquement leur `validate()` JS — la
+          présence obligatoire de ces champs reste vérifiée, seulement par
+          `validate()`/`validateHebergement` désormais, pour un affichage cohérent. */}
       <h3 className="text-lg font-semibold border-b pb-2">Informations générales</h3>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Titre *</label>
@@ -242,8 +251,8 @@ const PropertyForm = ({
           placeholder="Ex: Appartement moderne à Moungali"
           aria-label="Titre du bien"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-          required
         />
+        {errors.title && <p className="text-xs text-red-600 mt-1">{errors.title}</p>}
       </div>
 
       <div>
@@ -256,8 +265,8 @@ const PropertyForm = ({
           aria-label="Description du bien"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
           rows={5}
-          required
         />
+        {errors.description && <p className="text-xs text-red-600 mt-1">{errors.description}</p>}
       </div>
 
       <div>
@@ -270,9 +279,9 @@ const PropertyForm = ({
           placeholder="Ex: 150000"
           aria-label="Prix en FCFA"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-          required
         />
         <p className="text-xs text-gray-500 mt-1">{transactionProfile.priceHelp}</p>
+        {errors.price && <p className="text-xs text-red-600 mt-1">{errors.price}</p>}
       </div>
 
       <div>
@@ -407,8 +416,8 @@ const PropertyForm = ({
               placeholder="Ex: Plateau des 15 ans"
               aria-label="Quartier"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
-              required
             />
+            {errors.neighborhood && <p className="text-xs text-red-600 mt-1">{errors.neighborhood}</p>}
           </div>
 
           <div>
@@ -420,13 +429,13 @@ const PropertyForm = ({
               disabled={!formData.address.city}
               aria-label="Arrondissement"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
-              required
             >
               <option value="">Sélectionner...</option>
               {getArrondissementsFor(formData.address.city).map((a) => (
                 <option key={a} value={a}>{a}</option>
               ))}
             </select>
+            {errors.arrondissement && <p className="text-xs text-red-600 mt-1">{errors.arrondissement}</p>}
           </div>
 
           <div>
@@ -460,6 +469,7 @@ const PropertyForm = ({
               aria-label="Surface en m²"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
             />
+            {errors.surface && <p className="text-xs text-red-600 mt-1">{errors.surface}</p>}
           </div>
 
           <div>

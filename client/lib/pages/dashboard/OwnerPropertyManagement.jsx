@@ -6,12 +6,15 @@ import { useAuth } from '../../context/AuthContext';
 import {
   Building2, Plus, Edit2, Trash2, MapPin, Maximize2, Bed, Bath,
   Loader2, AlertCircle, Home, X, CheckCircle2, Clock3, FileText,
+  Landmark, KeyRound,
 } from "lucide-react";
 import {
   getMyProperties, createProperty, updateProperty,
   deleteProperty, getPropertyById,
 } from "../../services/propertyService";
 import PropertyForm from "../../components/dashboard/PropertyForm";
+import SalePropertyForm from "../../components/dashboard/SalePropertyForm";
+import RentalPropertyForm from "../../components/dashboard/RentalPropertyForm";
 import { getMyRentalManagement, requestRentalAction } from '../../services/gestionLocativeService';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -56,9 +59,25 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
   const [formData, setFormData]             = useState(emptyForm());
   const [existingImages, setExistingImages] = useState([]);
   const [loading, setLoading]               = useState(false);
+  const [errors, setErrors]                 = useState({});
+
+  // UX-OWNER-1 — mêmes règles que SalePropertyForm.jsx/RentalPropertyForm.jsx
+  // (Admin) : jusqu'ici aucune erreur de validation ne remontait au champ
+  // fautif côté Owner (seul un toast générique s'affichait) — bug réel
+  // corrigé en alignant sur le même pattern que les formulaires Admin.
+  const validate = () => {
+    const e = {};
+    if (!formData.title) e.title = "Le titre est requis.";
+    if (!formData.description) e.description = "La description est requise.";
+    if (!(Number(formData.price) > 0)) e.price = "Le prix doit être positif.";
+    if (!formData.surface) e.surface = "La surface est requise.";
+    if (!formData.address.neighborhood) e.neighborhood = "Le quartier est requis.";
+    if (!formData.address.arrondissement) e.arrondissement = "L'arrondissement est requis.";
+    return e;
+  };
 
   useEffect(() => {
-    if (!isEditing) { setFormData(emptyForm()); setExistingImages([]); return; }
+    if (!isEditing) { setFormData(emptyForm()); setExistingImages([]); setErrors({}); return; }
     const load = async () => {
       setLoading(true);
       try {
@@ -91,6 +110,13 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      toast.error("Veuillez corriger les champs indiqués.");
+      return;
+    }
+    setErrors({});
     setLoading(true);
     try {
       const fd = new FormData();
@@ -158,6 +184,7 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
         onSubmit={handleSubmit}
         loading={loading}
         isEditing={isEditing}
+        errors={errors}
       />
     </div>
   );
@@ -334,6 +361,19 @@ const OwnerPropertyManagement = () => {
   const [editingId, setEditingId]     = useState(null);
   const [confirm, setConfirm]         = useState(null);     // { id, message }
   const [cockpitProperty, setCockpitProperty] = useState(null); // GL-ASSET-UX-1
+  // UX-OWNER-2 — convergence avec Admin : Vente/Location réutilisent
+  // désormais SalePropertyForm.jsx/RentalPropertyForm.jsx (mode="owner"),
+  // même composants qu'Admin, mêmes sections, même validation, même appel
+  // API (salePropertyService/rentalPropertyService, désormais autorisés pour
+  // Proprietaire sur ses propres biens — voir server/controllers/
+  // salePropertyController.js et rentalPropertyController.js). Hébergement
+  // reste sur PropertyManagementForm/PropertyForm legacy (Owner n'a jamais
+  // pu en créer — `enableHebergement` non transmis — mais peut en éditer un
+  // préexistant), même précédent que ManagePropertiesPage.jsx (Admin).
+  const [addChoice, setAddChoice]         = useState(null); // null | 'vente' | 'location'
+  const [editingProperty, setEditingProperty] = useState(null); // pour connaître `status` en édition
+  const [editFullData, setEditFullData]       = useState(null); // { property, sale?, rental? }
+  const [editLoading, setEditLoading]         = useState(false);
 
   const fetchProperties = useCallback(async () => {
     if (!user) return;
@@ -391,14 +431,48 @@ const OwnerPropertyManagement = () => {
     } catch (error) { toast.error(error.response?.data?.message || 'Demande impossible.'); }
   };
 
-  const handleEdit   = (property) => { setEditingId(property._id); setView("edit"); };
+  // UX-OWNER-2 — pour Vente/Location, SalePropertyForm.jsx/RentalPropertyForm.jsx
+  // (mode="owner") ont besoin de connaître `status` avant même le premier
+  // rendu (branchement du composant) et des données `sale`/`rental`
+  // existantes en édition — même chargement que ManagePropertiesPage.jsx
+  // (Admin) via `getPropertyById`, qui embarque déjà ces deux satellites.
+  const handleEdit = async (property) => {
+    setEditingId(property._id);
+    setEditingProperty(property);
+    setView("edit");
+    if (property.status === 'hebergement') return; // PropertyManagementForm charge lui-même
+    setEditLoading(true);
+    try {
+      const full = await getPropertyById(property._id);
+      setEditFullData(full);
+    } catch {
+      toast.error("Erreur lors du chargement du bien.");
+      setEditFullData({ property });
+    } finally {
+      setEditLoading(false);
+    }
+  };
   const handleSave   = (saved, isUpdate) => {
     setProperties(prev =>
       isUpdate ? prev.map(p => p._id === saved._id ? saved : p) : [saved, ...prev]
     );
-    setEditingId(null); setView("list");
+    setEditingId(null); setEditingProperty(null); setEditFullData(null); setView("list");
   };
-  const handleCancel = () => { setEditingId(null); setView("list"); };
+  const handleCancel = () => {
+    setEditingId(null); setEditingProperty(null); setEditFullData(null); setAddChoice(null); setView("list");
+  };
+
+  // SalePropertyForm/RentalPropertyForm gèrent leur propre appel API et
+  // leurs propres erreurs (même convention qu'Admin) ; ce composant n'a
+  // qu'à rafraîchir la liste et revenir à la vue portefeuille.
+  const handleSaleRentalCreateSuccess = () => {
+    setAddChoice(null);
+    setView("list"); // déclenche le rechargement via l'effet existant (view === 'list')
+  };
+  const handleSaleRentalUpdateSuccess = (result) => {
+    setProperties(prev => prev.map(p => p._id === editingId ? result.property : p));
+    handleCancel();
+  };
 
   const summary = summarizeOwnerProperties(properties, rentals);
 
@@ -478,11 +552,93 @@ const OwnerPropertyManagement = () => {
       )}
 
       {/* ── Formulaire ── */}
-      {(view === 'add' || view === 'edit') && (
+      {view === 'add' && !addChoice && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="font-bold text-gray-900 text-lg" style={{ fontFamily:"'DM Sans', sans-serif" }}>
+              Que souhaitez-vous ajouter ?
+            </h3>
+            <button onClick={handleCancel}
+              className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button onClick={() => setAddChoice('vente')}
+              className="flex flex-col items-start gap-3 p-5 rounded-2xl border-2 border-gray-100 hover:border-blue-300 hover:bg-blue-50/40 transition-all text-left">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background:`${BLUE}12`, color:BLUE }}>
+                <Landmark size={22} />
+              </div>
+              <div>
+                <p className="font-bold text-gray-900" style={{ fontFamily:"'DM Sans', sans-serif" }}>Vente</p>
+                <p className="text-sm text-gray-400 mt-0.5">Mettre un bien en vente.</p>
+              </div>
+            </button>
+            <button onClick={() => setAddChoice('location')}
+              className="flex flex-col items-start gap-3 p-5 rounded-2xl border-2 border-gray-100 hover:border-amber-300 hover:bg-amber-50/40 transition-all text-left">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-amber-50" style={{ color:GOLD }}>
+                <KeyRound size={22} />
+              </div>
+              <div>
+                <p className="font-bold text-gray-900" style={{ fontFamily:"'DM Sans', sans-serif" }}>Location</p>
+                <p className="text-sm text-gray-400 mt-0.5">Mettre un bien en location.</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {view === 'add' && addChoice === 'vente' && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+          <SalePropertyForm mode="owner" onSuccess={handleSaleRentalCreateSuccess} onCancel={() => setAddChoice(null)} />
+        </div>
+      )}
+      {view === 'add' && addChoice === 'location' && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+          <RentalPropertyForm mode="owner" onSuccess={handleSaleRentalCreateSuccess} onCancel={() => setAddChoice(null)} />
+        </div>
+      )}
+
+      {/* Édition — Vente/Location convergent avec Admin ; Hébergement reste
+          sur le formulaire legacy (Owner ne peut jamais en CRÉER un nouveau,
+          `enableHebergement` non transmis, mais peut éditer un bien
+          hébergement préexistant — même précédent que ManagePropertiesPage.jsx). */}
+      {view === 'edit' && editingProperty?.status === 'hebergement' && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
           <PropertyManagementForm
             propertyId={editingId}
             onSave={handleSave}
+            onCancel={handleCancel}
+          />
+        </div>
+      )}
+      {view === 'edit' && editingProperty && editingProperty.status !== 'hebergement' && editLoading && (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: BLUE }} />
+        </div>
+      )}
+      {view === 'edit' && editingProperty?.status === 'vente' && !editLoading && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+          <SalePropertyForm
+            mode="owner"
+            propertyId={editingId}
+            initialProperty={editFullData}
+            initialSale={editFullData?.sale}
+            existingImages={editFullData?.images || []}
+            onSuccess={handleSaleRentalUpdateSuccess}
+            onCancel={handleCancel}
+          />
+        </div>
+      )}
+      {view === 'edit' && editingProperty?.status === 'location' && !editLoading && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+          <RentalPropertyForm
+            mode="owner"
+            propertyId={editingId}
+            initialProperty={editFullData}
+            initialRental={editFullData?.rental}
+            existingImages={editFullData?.images || []}
+            onSuccess={handleSaleRentalUpdateSuccess}
             onCancel={handleCancel}
           />
         </div>

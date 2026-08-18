@@ -125,6 +125,12 @@ Voir §10. Réserve mineure : pas de test d'intégration dédié à `messageCont
 
 `npm run test:unit` : **117/117 suites, 1342/1342 tests** (1337 hérités POST-E2E-2 + 5 nouveaux ce hotfix), 100% vert. `npm run lint` (serveur) : **0 erreur**, 106 warnings pré-existants (compte identique à la baseline POST-E2E-2 documentée). Aucun fichier `client/`, aucun fichier `altimmo-app/` modifié par ce hotfix — non-régression mobile/web garantie par construction (aucun code partagé touché).
 
+`npm run test:mongo` (suite complète Mongo/replica, 82 suites, 863 tests) exécutée en gate finale : **2 échecs** relevés, **tous deux vérifiés pré-existants et sans rapport avec ce hotfix** — vérification rigoureuse effectuée en rejouant la suite dans un `git worktree` isolé au commit de départ `c9f68cc` (avant toute modification de cette session), les deux mêmes échecs s'y reproduisent à l'identique :
+1. `platformAdmin1.adversarial.mongo.integration.test.js` — « opérateur SANS tenant sélectionné → Conversations unread 403 signal distinct » attend un `403`/`PLATFORM_OPERATOR_TENANT_SELECTION_REQUIRED` sur `GET /conversations/count/unread`, reçoit `200`. Cause : cette route n'est montée qu'avec `attachTenantContext` (non-bloquant) dans `conversationRoutes.js`, jamais `requireTenantScope` — **fichier non touché par ce hotfix**, `getUnreadCount` non modifié (`git diff` le confirme), écart de test déjà présent avant cette session.
+2. `tenantAttributionLegacyExtension.mongo.integration.test.js` — `E11000 duplicate key` sur l'index `litiges.reference_1` (valeur `null` dupliquée). Sans rapport avec `Conversation`/`Message`/tenant-attribution des conversations — aucun fichier lié à `Litige`/`Contrat` touché par ce hotfix.
+
+Aucun de ces deux échecs pré-existants n'est corrigé par ce hotfix (hors périmètre, mandat §19 — pas de refactoring massif au-delà du bug ciblé) ; documentés ici pour transparence plutôt que masqués, conformément au mandat §20 (« aucun échec masqué »).
+
 ## 23. Fichiers modifiés
 
 - `server/controllers/conversationController.js` — `tenantConversationFilter`, `assertConversationAccess`, `keepAttributedConversations`.

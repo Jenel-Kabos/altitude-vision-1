@@ -10,6 +10,7 @@
 const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const SaleManagement = require('../models/SaleManagement');
+const RentalManagement = require('../models/RentalManagement');
 const { createFullSaleProperty, updateFullSaleProperty } = require('../services/salePropertyService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const {
@@ -27,8 +28,18 @@ const cleanupUploadedImages = (images = []) =>
 
 const LEGAL_STATUSES = ['regularise', 'en_cours_regularisation', 'litigieux', 'non_renseigne'];
 
-/** Construit le payload SaleManagement (champs ALLOWED) à partir du body admin. */
-function buildSaleData(req) {
+// UX-OWNER-2 — `agencyCommission` est le taux de commission INTERNE négocié
+// entre Altitude Vision et le vendeur, jamais une caractéristique du bien
+// lui-même (déjà exclu de la sérialisation publique, voir
+// PROPERTY_TRANSACTION_ARCHITECTURE.md « Exposition publique ») — seul champ
+// SaleManagement classé Admin-only par UX_OWNER2_ETAT_INITIAL.md §9. Un
+// propriétaire qui l'inclut dans son body le voit silencieusement ignoré
+// (jamais une erreur 422 — ce champ n'existe simplement pas dans son
+// formulaire, pas une saisie fautive), jamais persisté, jamais lisible dans
+// sa propre réponse (`SaleManagement` reste néanmoins toujours géré côté
+// staff via ce même satellite pour ce bien).
+/** Construit le payload SaleManagement (champs ALLOWED) à partir du body. */
+function buildSaleData(req, { isOwnerActor = false } = {}) {
   const {
     negotiable, ownershipDocumentType, ownershipDocumentAvailable,
     legalStatus, financingAccepted, agencyCommission, sellerConditions,
@@ -49,14 +60,16 @@ function buildSaleData(req) {
     data.legalStatus = legalStatus;
   }
   if (financingAccepted !== undefined) data.financingAccepted = financingAccepted === 'true' || financingAccepted === true;
-  const parsedCommission = parseNumericField(agencyCommission, "La commission d'agence");
-  if (parsedCommission !== undefined) {
-    if (parsedCommission < 0 || parsedCommission > 100) {
-      const err = new Error("La commission d'agence doit être comprise entre 0 et 100.");
-      err.statusCode = 422;
-      throw err;
+  if (!isOwnerActor) {
+    const parsedCommission = parseNumericField(agencyCommission, "La commission d'agence");
+    if (parsedCommission !== undefined) {
+      if (parsedCommission < 0 || parsedCommission > 100) {
+        const err = new Error("La commission d'agence doit être comprise entre 0 et 100.");
+        err.statusCode = 422;
+        throw err;
+      }
+      data.agencyCommission = parsedCommission;
     }
-    data.agencyCommission = parsedCommission;
   }
   if (sellerConditions !== undefined) data.sellerConditions = sellerConditions;
   return data;
@@ -67,8 +80,15 @@ function buildSaleData(req) {
 // ─────────────────────────────────────────────
 exports.createFull = async (req, res) => {
   try {
+    // UX-OWNER-2 — un propriétaire ne peut JAMAIS s'attribuer un `owner`
+    // arbitraire depuis le body (contrairement au staff, qui peut créer une
+    // annonce « pour le compte de » un propriétaire existant) : la création
+    // reste toujours forcée sur `req.user.id`, même convention que
+    // `propertyController.createProperty` (route legacy déjà autorisée
+    // Proprietaire) — jamais retirée, seulement répliquée ici.
+    const isOwnerActor = req.user.role === 'Proprietaire';
     const { owner } = req.body;
-    const ownerId = mongoose.isValidObjectId(owner) ? owner : req.user.id;
+    const ownerId = isOwnerActor ? req.user.id : (mongoose.isValidObjectId(owner) ? owner : req.user.id);
 
     let propertyData;
     try {
@@ -86,7 +106,7 @@ exports.createFull = async (req, res) => {
 
     let saleData;
     try {
-      saleData = buildSaleData(req);
+      saleData = buildSaleData(req, { isOwnerActor });
     } catch (error) {
       await cleanupUploadedImages(propertyData.images);
       return fail(res, error.statusCode || 422, error.message);
@@ -127,11 +147,21 @@ exports.updateFull = async (req, res) => {
       return fail(res, 422, "Ce bien n'est pas une annonce de vente.");
     }
 
+    // UX-OWNER-2 — même garde que `propertyController.updateProperty`
+    // (route legacy) : un propriétaire ne peut modifier que SES PROPRES
+    // biens, jamais ceux d'un tiers — cette route n'avait jusqu'ici aucune
+    // vérification d'ownership car réservée au staff (`ROLES_ALTIMMO`, qui
+    // peut légitimement éditer n'importe quelle annonce).
+    const isOwnerActor = req.user.role === 'Proprietaire';
+    if (isOwnerActor && (!property.owner || property.owner.toString() !== req.user.id.toString())) {
+      return fail(res, 403, 'Vous ne pouvez modifier que vos propres biens.');
+    }
+
     // Validé AVANT toute mutation de `property`, même convention que
     // accommodationController.updateFull (Sprint Hébergement).
     let saleData;
     try {
-      saleData = buildSaleData(req);
+      saleData = buildSaleData(req, { isOwnerActor });
     } catch (error) {
       return fail(res, error.statusCode || 422, error.message);
     }
@@ -152,7 +182,19 @@ exports.updateFull = async (req, res) => {
       }
       property.price = parsedPrice;
     }
-    if (availability) property.availability = availability;
+    // UX-OWNER-2 — même restriction que `propertyController.updateProperty`
+    // (route legacy) : un propriétaire ne peut signaler que
+    // Disponible/Loué/Retiré/Vendu sur son propre bien, jamais un statut plus
+    // large ; il perd même ce droit dès que le bien est en gestion locative
+    // active (`RentalManagement.managementActivated`), qui suit alors
+    // exclusivement les règles de l'agence — jamais retiré, seulement répliqué.
+    if (availability && isOwnerActor) {
+      const managedRental = await RentalManagement.findOne({ property: property._id, managementActivated: true }).select('_id');
+      const ALLOWED_OWNER_AVAILABILITY = ['Disponible', 'Loué', 'Retiré', 'Vendu'];
+      if (!managedRental && ALLOWED_OWNER_AVAILABILITY.includes(availability)) property.availability = availability;
+    } else if (availability) {
+      property.availability = availability;
+    }
     if (type) property.type = type;
     if (surface !== undefined && surface !== '') property.surface = parseFloat(surface);
     if (bedrooms !== undefined && bedrooms !== '') property.bedrooms = parseInt(bedrooms);
@@ -183,6 +225,12 @@ exports.updateFull = async (req, res) => {
     } else if (existingImages !== undefined) {
       property.images = parseStringArray(existingImages);
     }
+
+    // UX-OWNER-2 — même règle que `propertyController.updateProperty` (route
+    // legacy) : un propriétaire qui modifie son bien repasse en modération,
+    // jamais publié tel quel sans nouvelle revue — jamais retiré, seulement
+    // répliqué pour ce nouveau chemin owner-authorized.
+    if (isOwnerActor) property.statusAdmin = 'En attente';
 
     await property.save();
 

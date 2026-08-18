@@ -285,6 +285,16 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
   // caution locative, profils locataires, documents requis).
   const validateHebergement = (data) => {
     const e = {};
+    // UX-OWNER-1 — ces 5 champs portaient uniquement un `required` HTML natif
+    // (jamais vérifiés ici), qui interceptait la soumission avant que React ne
+    // s'exécute — aucun message stylé cohérent avec le reste du formulaire ne
+    // s'affichait jamais. `required` retiré de PropertyForm.jsx pour ces
+    // champs ; vérifiés ici désormais pour ne rien perdre côté Admin/hébergement.
+    if (!data.title) e.title = "Le titre est requis.";
+    if (!data.description) e.description = "La description est requise.";
+    if (!(Number(data.price) > 0)) e.price = "Le prix doit être positif.";
+    if (!data.address?.neighborhood) e.neighborhood = "Le quartier est requis.";
+    if (!data.address?.arrondissement) e.arrondissement = "L'arrondissement est requis.";
     if (!data.accommodationType) e.accommodationType = "Le type d'hébergement est requis.";
     if (!(Number(data.maxAdults) > 0)) e.maxAdults = "La capacité (adultes) doit être supérieure à 0.";
     if (!data.checkInTime) e.checkInTime = "L'heure de check-in est requise.";

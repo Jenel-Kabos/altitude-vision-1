@@ -73,14 +73,35 @@ describe('POST /api/rental-properties — création complète (dashboard admin)'
     expect(res.statusCode).toBe(401);
   });
 
-  test("403 — un utilisateur non-staff (Proprietaire) est refusé", async () => {
-    mockUserAuth(OWNER_ID, 'Proprietaire');
+  test("403 — un rôle sans lien avec l'immobilier (Client) est refusé", async () => {
+    mockUserAuth(OWNER_ID, 'Client');
     const res = await request(app)
       .post('/api/rental-properties')
       .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
       .send(validBody());
     expect(res.statusCode).toBe(403);
     expect(Property.create).not.toHaveBeenCalled();
+  });
+
+  // UX-OWNER-2 — `Proprietaire` désormais autorisé sur cette route, ses
+  // propres frontières appliquées côté contrôleur (voir
+  // salePropertyRoutes.test.js pour le même principe côté Vente) :
+  // `owner` toujours forcé, `managementFee` (Admin-only, frais interne
+  // agence↔propriétaire) silencieusement ignoré.
+  test('201 — un Proprietaire crée sa propre annonce de location, owner forcé, managementFee ignoré', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const { rental } = mockCreatedDocs();
+
+    const res = await request(app)
+      .post('/api/rental-properties')
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
+      .send({ ...validBody(), owner: ADMIN_ID, managementFee: '20000' });
+
+    expect(res.statusCode).toBe(201);
+    expect(Property.create).toHaveBeenCalledWith(expect.objectContaining({ status: 'location', owner: OWNER_ID }));
+    const rentalCreatedWith = RentalManagement.create.mock.calls[0][0];
+    expect(rentalCreatedWith).not.toHaveProperty('managementFee');
+    expect(res.body.data.rental._id).toBe(rental._id);
   });
 
   test('201 — un admin crée une annonce de location complète (Property + RentalManagement)', async () => {
@@ -206,13 +227,50 @@ describe('PUT /api/rental-properties/:propertyId — édition complète (dashboa
     expect(res.statusCode).toBe(401);
   });
 
-  test('403 — un non-staff est refusé', async () => {
-    mockUserAuth(OWNER_ID, 'Proprietaire');
+  test("403 — un rôle sans lien avec l'immobilier (Client) est refusé", async () => {
+    mockUserAuth(OWNER_ID, 'Client');
     const res = await request(app)
       .put(`/api/rental-properties/${PROPERTY_ID}`)
       .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
       .send({ title: 'x' });
     expect(res.statusCode).toBe(403);
+  });
+
+  test('403 — un Proprietaire ne peut pas modifier le bien location d\'un autre propriétaire', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    Property.findById = jest.fn().mockResolvedValue(existingProperty({ owner: ADMIN_ID }));
+    const res = await request(app)
+      .put(`/api/rental-properties/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
+      .send({ title: 'x' });
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('200 — un Proprietaire modifie SON PROPRE bien location, managementFee ignoré, repasse en modération', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    const property = existingProperty({ owner: OWNER_ID });
+    Property.findById = jest.fn().mockResolvedValue(property);
+    const existingRental = { _id: 'rental1', property: PROPERTY_ID, save: jest.fn().mockResolvedValue() };
+    // Deux formes d'appel distinctes sur le même mock : le garde-fou
+    // `availability` de ce contrôleur (`.select('_id')` chaîné) et la
+    // recherche du satellite lui-même par `updateFullPropertyTransaction`
+    // (awaité directement, sans `.select`).
+    RentalManagement.findOne = jest.fn((query) => (
+      query.managementActivated
+        ? { select: jest.fn().mockResolvedValue(null) }
+        : Promise.resolve(existingRental)
+    ));
+
+    const res = await request(app)
+      .put(`/api/rental-properties/${PROPERTY_ID}`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
+      .send({ title: 'Appartement mis à jour par le propriétaire', managementFee: '30000', availability: 'Loué' });
+
+    expect(res.statusCode).toBe(200);
+    expect(property.title).toBe('Appartement mis à jour par le propriétaire');
+    expect(property.availability).toBe('Loué');
+    expect(property.statusAdmin).toBe('En attente');
+    expect(existingRental).not.toHaveProperty('managementFee');
   });
 
   test('404 — bien introuvable', async () => {

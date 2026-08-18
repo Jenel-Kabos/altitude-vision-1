@@ -250,7 +250,14 @@ const OwnerDashboard = ({ children }) => {
       </aside>
 
       {/* ── Contenu principal ────────────────────────────────── */}
-      <main className="flex-1 flex flex-col min-h-screen">
+      {/* UX-OWNER-2 — `min-w-0` : sans lui, un enfant flex garde par défaut
+          `min-width: auto` et ne peut jamais rétrécir sous le contenu le
+          plus large qu'il contient (grilles à colonnes fixes des formulaires
+          Vente/Location, non responsives) — le shell entier débordait
+          horizontalement à 390px (bug réel reproduit dans le navigateur),
+          jamais le formulaire seul. Correctif structurel au niveau du shell,
+          bénéficie à tout contenu futur, pas seulement à ce formulaire. */}
+      <main className="flex-1 flex flex-col min-h-screen min-w-0">
 
         {/* Topbar mobile */}
         <div className="md:hidden grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2 bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
