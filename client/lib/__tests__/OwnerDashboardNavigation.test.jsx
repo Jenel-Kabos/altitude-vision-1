@@ -95,12 +95,37 @@ describe('Navigation propriétaire', () => {
     expect(screen.getByRole('link', { name: 'Mon profil' })).toBeInTheDocument();
   });
 
-  test('tant que businessProfiles est null (chargement), tous les liens restent visibles (pas de flash de menu amputé)', async () => {
+  // UX-OWNER-3 — bug réel mesuré au navigateur (~800ms) : afficher `NAV_LINKS`
+  // intégral pendant `businessProfiles === null` faisait apparaître TOUTES
+  // les sections (y compris celles d'un profil que l'utilisateur n'a
+  // finalement pas) puis les retirait brutalement dès la résolution — un
+  // flash de menu, pas une protection contre un flash. Cette même assertion
+  // encodait à tort l'ancien comportement comme le comportement désiré ;
+  // corrigée pour verrouiller le nouveau comportement (voir
+  // UX_OWNER3_DASHBOARD_STATE_REPORT.md).
+  test('tant que businessProfiles est null (chargement), seuls les liens sans profil requis sont visibles (jamais de section qui pourrait disparaître ensuite)', async () => {
     mockAuth = { ...mockAuth, businessProfiles: null, isProprietaireImmobilier: false, isExploitantEtablissement: false };
     getOwnerVisitesUnreadCount.mockResolvedValue(0);
     render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
 
+    expect(screen.queryByRole('link', { name: 'Vue du patrimoine' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Mes établissements' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Mes messages' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Mon profil' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sécurité' })).toBeInTheDocument();
+  });
+
+  test('la résolution de businessProfiles fait CROÎTRE le menu (jamais rétrécir) — de null vers un profil réel', async () => {
+    mockAuth = { ...mockAuth, businessProfiles: null, isProprietaireImmobilier: false, isExploitantEtablissement: false };
+    getOwnerVisitesUnreadCount.mockResolvedValue(0);
+    const { rerender } = render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
+    const countWhileLoading = screen.getAllByRole('link').length;
+
+    mockAuth = { ...mockAuth, businessProfiles: ['proprietaire_immobilier'], isProprietaireImmobilier: true, isExploitantEtablissement: false };
+    rerender(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
+    const countAfterResolution = screen.getAllByRole('link').length;
+
+    expect(countAfterResolution).toBeGreaterThan(countWhileLoading);
     expect(screen.getByRole('link', { name: 'Vue du patrimoine' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Mes établissements' })).toBeInTheDocument();
   });
 });

@@ -47,9 +47,6 @@ const OwnerDashboard = ({ children }) => {
   const pathname = usePathname();
   const isActive = (to, end = false) => end ? pathname === to : pathname.startsWith(to);
   const { logout, user, businessProfiles, isProprietaireImmobilier, isExploitantEtablissement } = useAuth();
-  // Tant que les profils métiers ne sont pas encore chargés (`null`), on
-  // affiche tout — un utilisateur légitime ne doit jamais voir son menu
-  // amputé pendant le chargement réseau.
   const profileOptions = businessProfiles === null ? [] : [
     isProprietaireImmobilier && { value: 'patrimoine', label: 'Patrimoine immobilier' },
     isExploitantEtablissement && { value: 'etablissement', label: "Exploitation d’établissement" },
@@ -60,8 +57,23 @@ const OwnerDashboard = ({ children }) => {
     : businessProfiles !== null && isProprietaireImmobilier && !isExploitantEtablissement
       ? 'patrimoine'
       : pathContext;
-  const visibleNavLinks = businessProfiles === null ? NAV_LINKS : NAV_LINKS.filter(({ profile }) => {
+  // UX-OWNER-3 — bug réel mesuré au navigateur : afficher `NAV_LINKS` intégral
+  // pendant `businessProfiles === null` (ancien commentaire : « un utilisateur
+  // légitime ne doit jamais voir son menu amputé pendant le chargement ») créait
+  // l'effet inverse et pire — un flash d'environ 800ms où TOUTES les sections
+  // (Vente, Location, Établissements, Hébergements, Réservations…) s'affichent
+  // avant de se réduire brutalement dès que `businessProfiles` résout, y compris
+  // pour un propriétaire n'ayant réellement qu'UN SEUL des deux profils (voir
+  // UX_OWNER3_DASHBOARD_STATE_REPORT.md §11, mesuré avec un compte réel).
+  // Les liens sans `profile` (Messages/Profil/Sécurité) ne dépendent d'aucune
+  // donnée et restent toujours visibles, chargement ou non — seules les
+  // sections liées à un profil métier non encore confirmé sont retenues tant
+  // que la résolution n'a pas eu lieu ; le menu peut ensuite CROÎTRE une fois
+  // résolu (jamais RÉTRÉCIR), un pattern bien moins perturbateur qu'un retrait
+  // de section après affichage.
+  const visibleNavLinks = NAV_LINKS.filter(({ profile }) => {
     if (!profile) return true;
+    if (businessProfiles === null) return false;
     if (profile === 'proprietaire_immobilier') return isProprietaireImmobilier && activeContext === 'patrimoine';
     return isExploitantEtablissement && activeContext === 'etablissement';
   });
