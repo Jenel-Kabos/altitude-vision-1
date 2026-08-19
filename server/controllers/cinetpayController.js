@@ -1,73 +1,40 @@
-const axios = require('axios');
-const Paiement = require('../models/Paiement');
-const { notify } = require('../services/notificationService');
-
+// PAY-2 — CinetPay est déprécié par décision produit (Congo-Brazzaville :
+// MTN/Airtel directs, manuel, Yabetoo selon corridors, futur PSP carte —
+// jamais CinetPay). PAY-1 avait démontré que le webhook ci-dessous
+// (`notify_url` de `initierPaiement`) n'appliquait aucune vérification de
+// signature ni idempotence, permettant à quiconque devinant une référence de
+// paiement de la faire marquer `payé` par un simple POST non authentifié
+// (voir `server/docs/PAY1_ARCHITECTURE_REPORT.md` §9 — le comportement
+// vulnérable exact reste consultable dans l'historique git de
+// `server/__tests__/cinetpayWebhookCharacterization.test.js`, désormais
+// réécrit pour prouver la fermeture du P0 plutôt que la vulnérabilité).
+//
+// Plutôt que de porter la vérification HMAC déjà existante ailleurs
+// (`paiementTransactionController.verifyCinetPayWebhook`) sur ce flux, la
+// décision produit est de ne plus développer CinetPay du tout : aucune
+// nouvelle initiation n'est permise (§7 du mandat PAY-2), et le webhook ne
+// peut plus muter aucune donnée (§8) — sans pour autant renvoyer une erreur
+// serveur à CinetPay pour d'éventuels événements résiduels sur des paiements
+// initiés avant cette dépréciation (ceux-ci, s'ils existent, doivent être
+// complétés manuellement par le staff via `POST /api/paiements/:id/marquer-paye`,
+// déjà existant — aucune perte de capacité, juste plus de confirmation
+// automatique non vérifiable).
 exports.initierPaiement = async (req, res) => {
-  try {
-    const { montant, description, transactionId, channels = 'ALL', currency = 'XAF' } = req.body;
-
-    if (!montant || !description || !transactionId) {
-      return res.status(400).json({ status: 'fail', message: 'montant, description et transactionId requis.' });
-    }
-
-    const response = await axios.post('https://api-checkout.cinetpay.com/v2/payment', {
-      apikey:         process.env.CINETPAY_API_KEY,
-      site_id:        process.env.CINETPAY_SITE_ID,
-      transaction_id: transactionId,
-      amount:         montant,
-      currency,
-      description,
-      return_url:     'altimmo://paiement/success',
-      cancel_url:     'altimmo://paiement/cancel',
-      notify_url:     `${process.env.BACKEND_URL}/api/paiements/webhook-cinetpay`,
-      channels,
-      lang:           'fr',
-      metadata:       JSON.stringify({ userId: req.user?._id }),
-    });
-
-    res.status(200).json({
-      status:        'success',
-      paymentUrl:    response.data?.data?.payment_url,
-      transactionId,
-    });
-  } catch (error) {
-    console.error('❌ [CinetPay] initierPaiement:', error.response?.data || error.message);
-    res.status(500).json({ status: 'error', message: 'Erreur lors de l\'initiation du paiement.' });
-  }
+  res.status(410).json({
+    status: 'fail',
+    code: 'PAYMENT_PROVIDER_DEPRECATED',
+    provider: 'cinetpay',
+    message: 'CinetPay n\'est plus disponible pour de nouveaux paiements. Utilisez un moyen de paiement actif (Mobile Money, virement, espèces, chèque).',
+  });
 };
 
 exports.webhookCinetpay = async (req, res) => {
-  try {
-    const { transaction_id, status, amount, metadata } = req.body;
-
-    console.log(`📩 [CinetPay] Webhook reçu — TX: ${transaction_id} — Status: ${status}`);
-
-    if (status === 'ACCEPTED') {
-      let userId = null;
-      try { userId = JSON.parse(metadata || '{}').userId; } catch {}
-
-      // Mettre à jour le paiement en DB si référence trouvée
-      await Paiement.findOneAndUpdate(
-        { reference: transaction_id },
-        { statut: 'payé', datePaiement: new Date(), montantRecu: amount },
-      ).catch(() => {});
-
-      if (userId) {
-        const montantFmt = Number(amount).toLocaleString('fr-FR');
-        notify({
-          recipient: userId,
-          type:      'payment_success',
-          title:     'Paiement confirmé ✅',
-          body:      `Votre paiement de ${montantFmt} FCFA a bien été reçu.`,
-          data:      { screen: 'Transactions', params: { transactionId: transaction_id } },
-        }).catch(() => {});
-      }
-      console.log(`✅ [CinetPay] Paiement accepté — ${amount} XAF — user: ${userId}`);
-    }
-
-    res.status(200).json({ received: true });
-  } catch (error) {
-    console.error('❌ [CinetPay] webhook:', error.message);
-    res.status(200).json({ received: true });
-  }
+  const { transaction_id: transactionId, status } = req.body || {};
+  console.log(`📩 [CinetPay] Webhook reçu sur un provider déprécié — TX: ${transactionId} — Status: ${status} — ignoré, aucune mutation.`);
+  res.status(410).json({
+    status: 'fail',
+    code: 'PAYMENT_PROVIDER_DEPRECATED',
+    provider: 'cinetpay',
+    message: 'CinetPay est déprécié. Ce webhook n\'effectue plus aucune mutation. Complétez manuellement le paiement concerné si nécessaire.',
+  });
 };

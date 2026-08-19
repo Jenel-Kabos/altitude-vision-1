@@ -21,7 +21,11 @@ const adminOnly = [auth.protect, auth.restrictTo('Admin')];
 // locataire (qui n'atteignent de toute façon aucune route /paiements).
 const cancelReceipt = [auth.protect, requireCapability('payments.reverse')];
 
-// CinetPay
+// CinetPay — PAY-2 : déprécié par décision produit, les deux handlers
+// renvoient désormais 410 PAYMENT_PROVIDER_DEPRECATED sans aucune mutation
+// (voir server/docs/PAY2_CINETPAY_DEPRECATION_REPORT.md). Routes conservées
+// (non retirées) pour répondre proprement à `notify_url` déjà enregistrée
+// chez CinetPay plutôt que de renvoyer un 404 muet.
 router.post('/initier',           auth.protect, cinetpay.initierPaiement);
 router.post('/webhook-cinetpay',               cinetpay.webhookCinetpay);
 

@@ -1,17 +1,17 @@
-// PAY-1 — Test de caractérisation (aucun changement métier). Documente par la
-// preuve le comportement RÉEL actuel du webhook CinetPay live
-// (`POST /api/paiements/webhook-cinetpay`, cinetpayController.webhookCinetpay),
-// notify_url effectif configuré dans initierPaiement — par opposition au flux
-// signé/idempotent mais explicitement commenté "legacy — non utilisé" dans
-// paiementTransactionController.webhookCinetpay.
+// PAY-1 avait ajouté ce fichier comme test de caractérisation prouvant, sans
+// rien corriger, que `cinetpayController.webhookCinetpay` acceptait un
+// payload non authentifié et mutait `Paiement.statut` en `payé` (preuve
+// exécutable conservée dans l'historique git de ce fichier au commit
+// f1bb85c, et citée intégralement dans
+// server/docs/PAY1_ARCHITECTURE_REPORT.md §9).
 //
-// Ce test ne corrige rien : il prouve, avec assertions, qu'aucune vérification
-// de signature n'est appliquée avant l'écriture `Paiement.statut = 'payé'`, et
-// qu'aucun garde-fou d'idempotence n'empêche une notification répétée. Il doit
-// continuer à échouer (donc signaler une régression de compréhension) si un
-// futur correctif ajoute une vérification — c'est le but : ce test devra être
-// mis à jour explicitement le jour où la vulnérabilité est corrigée, jamais
-// contourné silencieusement.
+// PAY-2 ferme ce P0 par dépréciation du provider (voir cinetpayController.js
+// et server/docs/PAY2_CINETPAY_DEPRECATION_REPORT.md). Ce fichier devient
+// désormais le test d'attaque / garde de non-régression : il rejoue
+// exactement les mêmes payloads forgés qu'auparavant et prouve qu'ils ne
+// produisent plus aucune mutation ni aucune notification — c'est le test qui
+// doit échouer si quelqu'un réintroduit un jour une écriture dans ce handler
+// sans vérification de signature.
 
 jest.mock('../models/Paiement');
 jest.mock('../services/notificationService', () => ({ notify: jest.fn().mockResolvedValue() }));
@@ -27,29 +27,28 @@ const response = () => {
   return res;
 };
 
-describe('cinetpayController.webhookCinetpay — comportement réel actuel (PAY-1, non corrigé)', () => {
+describe('cinetpayController.webhookCinetpay — fermeture du P0 (PAY-2, provider déprécié)', () => {
   afterEach(() => jest.clearAllMocks());
 
-  test('accepte une requête sans aucun en-tête de signature et marque le paiement payé', async () => {
-    Paiement.findOneAndUpdate.mockReturnValue({ catch: jest.fn().mockResolvedValue(undefined) });
+  test('un payload forgé (transaction_id deviné + status ACCEPTED, sans aucun en-tête de signature) ne mute plus aucun paiement', async () => {
     const req = {
-      headers: {}, // aucune signature, aucun x-token — contrairement à paiementTransactionController.webhookCinetpay
+      headers: {},
       body: { transaction_id: 'REF-DEVINEE-PAR-UN-TIERS', status: 'ACCEPTED', amount: 999999, metadata: '{}' },
     };
     const res = response();
 
     await controller.webhookCinetpay(req, res);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual({ received: true });
-    expect(Paiement.findOneAndUpdate).toHaveBeenCalledWith(
-      { reference: 'REF-DEVINEE-PAR-UN-TIERS' },
-      expect.objectContaining({ statut: 'payé', montantRecu: 999999 }),
-    );
+    expect(Paiement.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(410);
+    expect(res.body).toEqual(expect.objectContaining({
+      status: 'fail',
+      code: 'PAYMENT_PROVIDER_DEPRECATED',
+      provider: 'cinetpay',
+    }));
   });
 
-  test('déclenche une notification "payment_success" à partir d’un userId fourni dans le metadata du corps de la requête, non authentifié', async () => {
-    Paiement.findOneAndUpdate.mockReturnValue({ catch: jest.fn().mockResolvedValue(undefined) });
+  test('un userId fourni dans le metadata du corps de la requête ne déclenche plus aucune notification', async () => {
     const req = {
       headers: {},
       body: {
@@ -59,18 +58,13 @@ describe('cinetpayController.webhookCinetpay — comportement réel actuel (PAY-
         metadata: JSON.stringify({ userId: 'attacker-supplied-user-id' }),
       },
     };
-    const res = response();
 
-    await controller.webhookCinetpay(req, res);
+    await controller.webhookCinetpay(req, response());
 
-    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
-      recipient: 'attacker-supplied-user-id',
-      type: 'payment_success',
-    }));
+    expect(notify).not.toHaveBeenCalled();
   });
 
-  test('un second appel identique (rejeu) répète intégralement l’écriture et la notification — aucune protection anti-doublon', async () => {
-    Paiement.findOneAndUpdate.mockReturnValue({ catch: jest.fn().mockResolvedValue(undefined) });
+  test('un rejeu identique du même payload reste sans effet à chaque appel (rien à protéger par idempotence, car rien ne mute)', async () => {
     const req = {
       headers: {},
       body: { transaction_id: 'REF-REJOUEE', status: 'ACCEPTED', amount: 1000, metadata: '{}' },
@@ -79,6 +73,6 @@ describe('cinetpayController.webhookCinetpay — comportement réel actuel (PAY-
     await controller.webhookCinetpay(req, response());
     await controller.webhookCinetpay(req, response());
 
-    expect(Paiement.findOneAndUpdate).toHaveBeenCalledTimes(2);
+    expect(Paiement.findOneAndUpdate).not.toHaveBeenCalled();
   });
 });
