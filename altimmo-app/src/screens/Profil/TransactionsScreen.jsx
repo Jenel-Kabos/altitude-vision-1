@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import PageHeader from '../../components/PageHeader';
 import { useTheme } from '../../context/ThemeContext';
 import { colors, fonts, fontSize, spacing, radius } from '../../theme';
 import { getMyTransactions } from '../../services/transactionService';
@@ -225,16 +226,12 @@ export default function TransactionsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} accessibilityLabel="Retour">
-          <Ionicons name="arrow-back" size={22} color={c.text || colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mes transactions</Text>
-        <TouchableOpacity onPress={() => load(false)} style={styles.refreshBtn} accessibilityLabel="Rafraîchir">
-          <Ionicons name="refresh-outline" size={20} color={colors.gold} />
-        </TouchableOpacity>
-      </View>
+      <PageHeader
+        title="Mes transactions"
+        onBack={() => navigation.goBack()}
+        rightIcon="refresh-outline"
+        onRightPress={() => load(false)}
+      />
 
       {loading ? (
         <View style={styles.loadWrap}>
@@ -302,12 +299,6 @@ function makeStyles(c) {
 
   return StyleSheet.create({
     root:  { flex: 1, backgroundColor: bg },
-
-    // Header
-    header:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: border, backgroundColor: card },
-    backBtn:     { padding: 4, marginRight: 8 },
-    refreshBtn:  { padding: 4, marginLeft: 'auto' },
-    headerTitle: { fontFamily: fonts.display, fontSize: fontSize.lg, fontWeight: '700', color: text, flex: 1 },
 
     // Loading / error
     loadWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },

@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { MapPin, Mail, Phone, Clock, ArrowUpRight, Users, Handshake, Zap, Mountain } from 'lucide-react';
+import { MapPin, Mail, Phone, Clock, ArrowUpRight, Users, Handshake, Zap } from 'lucide-react';
 import { FaFacebook, FaInstagram, FaWhatsapp } from 'react-icons/fa';
 
 const currentYear = new Date().getFullYear();
@@ -159,33 +160,27 @@ const Footer = () => (
 
       {/* ── Marque ── */}
       <div className="av-footer-brand">
-        {/* UI-WEB-FOOTER-1 — le logo raster (`/images/Logo_Altitude1.png`)
-            n'est pas conçu pour un fond sombre (vérifié visuellement — se
-            fond dans `#0A0C0F`). Le projet a déjà une variante dédiée aux
-            surfaces sombres : le badge dégradé or + icône `Mountain`
-            (identique à OwnerDashboard.jsx, sidebar `#0D1117`) — reprise ici
-            à l'identique plutôt qu'une nouvelle variante inventée. */}
-        <Link href="/" style={{ textDecoration: 'none', display: 'block', marginBottom: '16px' }} aria-label="Accueil Altitude-Vision">
-          <span style={{
-            width: '40px', height: '40px', borderRadius: '10px', marginBottom: '14px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: `linear-gradient(135deg, #A06820, ${GOLD})`,
-          }}>
-            <Mountain size={18} color="#fff" strokeWidth={2.2} aria-hidden="true" />
-          </span>
-          <span style={{
-            display: 'block', fontFamily: "'Cinzel', 'Cormorant Garamond', Georgia, serif",
-            fontSize: '1.3rem', fontWeight: 700, color: PAPER, letterSpacing: '0.1em',
-            textTransform: 'uppercase', lineHeight: 1,
-          }}>
-            Altitude<span style={{ color: GOLD }}>·</span>Vision
-          </span>
-          <span style={{
-            display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.62rem',
-            letterSpacing: '0.35em', color: MUTED, textTransform: 'uppercase', marginTop: '6px',
-          }}>
-            Agence Immobilière
-          </span>
+        {/* HOTFIX-WEB-FOOTER-LOGO-1 — logo officiel fourni par l'utilisateur
+            (`/images/Logo_Altitude_Vision.png`), utilisé tel quel (non
+            redessiné, couleurs/proportions inchangées). Fond réellement
+            transparent (alpha vérifié pixel par pixel — pas un carré blanc/
+            noir), donc aucun badge/fond artificiel n'est nécessaire pour le
+            faire ressortir sur le footer sombre : l'ancien traitement
+            (badge dégradé or + icône Mountain, ajouté en UI-WEB-FOOTER-1
+            uniquement pour pallier l'absence de logo exploitable) est
+            supprimé. Le fichier contenant déjà "ALTITUDE VISION" +
+            "AGENCE DE COMMUNICATION & COURTAGE" en tant qu'image, le
+            wordmark texte séparé qui répétait la même information juste en
+            dessous est retiré pour éviter une répétition visuelle ; le nom
+            reste accessible via `alt`/`aria-label`. */}
+        <Link href="/" style={{ textDecoration: 'none', display: 'block', marginBottom: '20px' }} aria-label="Accueil Altitude-Vision">
+          <Image
+            src="/images/Logo_Altitude_Vision.png"
+            alt="Altitude Vision — Agence de Communication & Courtage"
+            width={220}
+            height={220}
+            style={{ height: 'clamp(64px, 7vw, 84px)', width: 'auto', objectFit: 'contain', display: 'block' }}
+          />
         </Link>
 
         <p style={{

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -131,10 +131,20 @@ export default function CustomTabBar({ state, descriptors, navigation }) {
     transform: [{ translateX: pillX.value }],
   }));
 
-  const bottomPad = Platform.OS === 'ios' ? insets.bottom : 8;
+  // UI-MOB-5 — sur un Android à navigation 3 boutons (device réel testé : Samsung
+  // Galaxy, `insets.bottom` ≈ 135px), l'ancien `bottomPad` fixe (8px) laissait la
+  // moitié basse de la tab bar dessinée SOUS la barre de navigation système : les
+  // icônes/labels restaient visibles à l'écran mais les taps dans cette zone
+  // étaient interceptés par la fenêtre système (toujours au-dessus), pas par
+  // l'app — confirmé en reproduisant des taps qui n'atteignaient jamais l'onglet
+  // visé alors que les bounds d'accessibilité étaient corrects. `insets.bottom`
+  // vaut déjà 0 sur les Android à navigation gestuelle (pas de régression visuelle
+  // là où l'ancien code fonctionnait), donc l'utiliser aussi sur Android aligne
+  // simplement le comportement sur iOS et sur la vraie zone sûre de l'appareil.
+  const bottomPad = Math.max(insets.bottom, 8);
 
   return (
-    <View style={[styles.bar, { paddingBottom: bottomPad, backgroundColor: c.bgCard, borderTopColor: c.border }]}>
+    <View testID="custom-tab-bar" style={[styles.bar, { paddingBottom: bottomPad, backgroundColor: c.bgCard, borderTopColor: c.border }]}>
       {/* Pill glissant derrière les icônes */}
       <Animated.View
         pointerEvents="none"

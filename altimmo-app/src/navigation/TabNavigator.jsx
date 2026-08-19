@@ -40,7 +40,19 @@ export default function TabNavigator() {
   const { canAdd } = useAuth();
   const insets     = useSafeAreaInsets();
 
-  const tabBarHeight = 65 + (Platform.OS === 'ios' ? insets.bottom : 0);
+  // UI-MOB-5 — doit rester en phase avec `bottomPad` dans CustomTabBar.jsx : cette
+  // hauteur est ce que React Navigation réserve comme espace pour le contenu des
+  // écrans au-dessus de la tab bar custom. Elle ignorait `insets.bottom` sur
+  // Android (toujours `65 + 0`) ; une fois CustomTabBar corrigé pour respecter la
+  // vraie zone sûre (navigation 3 boutons, `insets.bottom` ≈ 135px sur le device
+  // testé), la barre réellement rendue devenait plus haute que l'espace réservé
+  // ici — elle recouvrait alors le bas du contenu de chaque écran (confirmé :
+  // l'état vide de la Home se retrouvait rogné, magnifying glass et titre
+  // masqués sous la tab bar). Même formule que `bottomPad` dans CustomTabBar.jsx
+  // pour qu'ils correspondent exactement.
+  const tabBarHeight = Platform.OS === 'ios'
+    ? 65 + insets.bottom
+    : 65 - 8 + Math.max(insets.bottom, 8);
 
   return (
     <Tab.Navigator

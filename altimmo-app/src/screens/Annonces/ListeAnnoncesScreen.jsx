@@ -626,6 +626,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
               illustration={IllustrationNoAnnonces}
               title="Aucune annonce trouvée"
               subtitle="Essayez d'élargir vos critères de recherche."
+              compact
             />
           }
           refreshControl={
@@ -655,6 +656,16 @@ const makeStyles = (c) => StyleSheet.create({
     height: 230,
     justifyContent: 'space-between',
     overflow: 'hidden',
+    // UI-MOB-5 — base solide sous le LinearGradient décoratif : sur device réel
+    // (Android, dev client), le gradient (`#0A0A0A → #2D1E04`) ne se peint pas
+    // (confirmé par capture d'écran + échantillonnage pixel : le fond mesuré
+    // était uniformément `#FAFAF8`, le token `bg` clair de l'écran, jamais le
+    // dégradé). Sans base, le titre quasi blanc (`#F0EDE8`) atterrit directement
+    // sur ce fond clair — texte quasiment invisible. Ce fond de secours
+    // reprend la teinte du premier stop du gradient : rend le hero lisible
+    // même si le gradient ne se peint pas, et reste invisible/redondant si le
+    // gradient fonctionne (même teinte).
+    backgroundColor: '#0A0A0A',
   },
   heroLogo: {
     position: 'absolute',
@@ -662,7 +673,7 @@ const makeStyles = (c) => StyleSheet.create({
     top: -10,
     width: 160,
     height: 160,
-    opacity: 0.12,
+    opacity: 0.16,
   },
   heroTextWrap: {
     flex: 1,

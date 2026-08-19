@@ -457,6 +457,15 @@ const makeStyles = (c) => StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     overflow: 'hidden',
+    // UI-MOB-6 — même cause que le hero Home (UI-MOB-5) : ce hero repose
+    // uniquement sur le LinearGradient décoratif ci-dessous comme source de
+    // fond sombre. Sur ce device réel (Android, dev client), le gradient ne
+    // se peint pas — confirmé par capture d'écran réelle : le fond mesuré
+    // était le token clair `c.bg` de l'écran, jamais le dégradé. Sans base,
+    // `heroName`/`heroEmail` (quasi blancs, conçus pour un fond sombre)
+    // atterrissaient directement sur ce fond clair — texte quasi invisible.
+    // Fond de secours reprenant la teinte du premier stop du dégradé.
+    backgroundColor: '#0A0A0A',
   },
 
   // ─── Avatar ───
