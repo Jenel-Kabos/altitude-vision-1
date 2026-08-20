@@ -388,6 +388,7 @@ const maintenanceRoutes      = require('./routes/maintenanceRoutes');
 const salePropertyRoutes     = require('./routes/salePropertyRoutes');
 const rentalPropertyRoutes   = require('./routes/rentalPropertyRoutes');
 const financialRoutes        = require('./routes/financialRoutes');
+const paymentProviderRoutes  = require('./routes/paymentProviderRoutes');
 const dashboardAnalyticsRoutes = require('./routes/dashboardAnalyticsRoutes');
 const accommodationReservationRoutes = require('./routes/accommodationReservationRoutes');
 // DOC-EVO-1 — moteur générique de dossier métier (Centre documentaire).
@@ -450,6 +451,7 @@ app.use('/api/altimmo', altimmoSearchRoutes);
 app.use('/api/hotel-reservations', hotelReservationRoutes);
 // 💰 Noyau financier F1 — routes staff protégées, sans fournisseur réel.
 app.use('/api/financial', financialRoutes);
+app.use('/api/payments/providers', paymentProviderRoutes);
 app.use('/api/dashboard-analytics', dashboardAnalyticsRoutes);
 app.use('/api/accommodation-reservations', accommodationReservationRoutes);
 // 🧹 Housekeeping / Inspection / Maintenance (Sprint E)

@@ -2,6 +2,7 @@ const express = require('express');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/financialController');
 const dashboardCtrl = require('../controllers/hotelFinancialDashboardController');
+const mtnCtrl = require('../controllers/mtnMomoPaymentController');
 const { STAFF_IMMO } = require('../utils/roles');
 const router = express.Router();
 const { requireTenantScope } = require('../middleware/tenantContext');
@@ -29,6 +30,12 @@ router.post('/documents/:documentId/email', ctrl.sendOfficialInvoiceEmail);
 router.get('/documents/:documentId/deliveries', ctrl.listDocumentDeliveries);
 router.post('/payments/manual', ctrl.createManualPayment);
 router.post('/hotel/payments', ctrl.createHotelPayment);
+// PAY-4 — MTN MoMo Direct : client (sa propre réservation) ou staff autorisé
+// (au comptoir). Authentifiées comme le reste du routeur (auth.protect déjà
+// appliqué ci-dessus) — jamais publiques, contrairement au callback MTN
+// (server/routes/paymentProviderRoutes.js, monté séparément, sans JWT).
+router.post('/hotel/payments/mtn/initiate', mtnCtrl.initiate);
+router.post('/hotel/payments/:paymentId/mtn/check-status', mtnCtrl.checkStatus);
 router.get('/hotel/:hotelId/payments', ctrl.listHotelPayments);
 router.get('/hotel/reservations/:reservationId/payments', ctrl.listReservationPayments);
 router.get('/documents/:documentId/payments', ctrl.listDocumentPayments);

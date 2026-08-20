@@ -44,7 +44,14 @@ async function createHotelPaymentCore({ data, actor, businessOperationKey, sessi
   if (amountMinor <= 0) fail('FINANCIAL_INVALID_AMOUNT', 'Le montant doit être strictement positif.');
   if (data.currency !== 'XAF') fail('FINANCIAL_CURRENCY_UNSUPPORTED', 'Les encaissements hôteliers F2.2 sont limités au XAF.');
   assertCurrency(data.currency);
-  const payloadHash = hashPayload({ documentId: String(data.documentId), reservationId: String(data.reservationId), amountMinor, method: data.method, reference: data.reference || '', notes: data.notes || '' });
+  // PAY-4 — `provider`/`providerPaymentId` optionnels, additifs : un appel
+  // existant qui ne les fournit pas obtient exactement le comportement F2.2
+  // d'origine (`provider: 'manual'`, pas de manualValidation pour un
+  // provider automatique). Jamais lus depuis une source non serveur — voir
+  // mtnHotelPaymentBridge.js, seul appelant qui les fournit aujourd'hui.
+  const provider = data.provider || 'manual';
+  const isManual = provider === 'manual';
+  const payloadHash = hashPayload({ documentId: String(data.documentId), reservationId: String(data.reservationId), amountMinor, method: data.method, reference: data.reference || '', notes: data.notes || '', provider });
   const existing = await inSession(FinancialPayment.findOne({ domain: 'hotel', establishmentId: data.establishmentId, businessOperationKey }).select('+payloadHash'), session);
   if (existing) {
     if (existing.payloadHash !== payloadHash) fail('FINANCIAL_IDEMPOTENCY_CONFLICT', 'Cette clé d’idempotence a déjà été utilisée avec des données différentes.', 409);
@@ -53,7 +60,7 @@ async function createHotelPaymentCore({ data, actor, businessOperationKey, sessi
   const paymentReference = data.reference || `PAY-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
   let payment;
   try {
-    [payment] = await FinancialPayment.create([{ tenant: actor.platformTenant?._id || actor.platformTenant || null, domain: 'hotel', establishmentType: 'Hotel', establishmentId: data.establishmentId, paymentReference, status: 'pending', method: data.method, provider: 'manual', currency: 'XAF', amountMinor, availableAmountMinor: amountMinor, payer: data.payer, subjectType: 'HotelReservation', subjectId: data.reservationId, receivedAt: new Date(), manualValidation: { status: 'pending', submittedBy: actorId }, metadata: { financialDocumentId: data.documentId, notes: data.notes, source: 'hotel_manual_f2_2' }, businessOperationKey, payloadHash, createdBy: actorId }], { session });
+    [payment] = await FinancialPayment.create([{ tenant: actor.platformTenant?._id || actor.platformTenant || null, domain: 'hotel', establishmentType: 'Hotel', establishmentId: data.establishmentId, paymentReference, status: 'pending', method: data.method, provider, providerPaymentId: data.providerPaymentId || undefined, currency: 'XAF', amountMinor, availableAmountMinor: amountMinor, payer: data.payer, subjectType: 'HotelReservation', subjectId: data.reservationId, receivedAt: new Date(), manualValidation: isManual ? { status: 'pending', submittedBy: actorId } : undefined, metadata: { financialDocumentId: data.documentId, notes: data.notes, source: isManual ? 'hotel_manual_f2_2' : 'hotel_provider_pay4' }, businessOperationKey, payloadHash, createdBy: actorId }], { session });
   } catch (error) {
     if (error.code !== 11000) throw error;
     const duplicate = await inSession(FinancialPayment.findOne({ domain: 'hotel', establishmentId: data.establishmentId, businessOperationKey }).select('+payloadHash'), session);
@@ -84,4 +91,31 @@ async function confirmHotelPaymentCore({ paymentId, actor, businessOperationKey,
 }
 
 async function confirmHotelPayment(args) { return runFinancialOperation({ operationName: 'payment.hotel.confirm', transactionMode: args.transactionMode || 'auto' }, ({ session }) => confirmHotelPaymentCore({ ...args, session })); }
-module.exports = { createManualPayment, createHotelPayment, confirmHotelPayment };
+
+// PAY-4 — transition manquante avant ce sprint : aucun paiement manuel
+// n'échoue de façon asynchrone (le staff choisit simplement de ne jamais le
+// confirmer). Un provider automatique (mtn_direct) peut réellement échouer
+// après avoir été `pending` — cette fonction miroir de
+// `confirmHotelPaymentCore` couvre ce cas, jamais appelée par le flux
+// manuel F2.2.
+async function failHotelPaymentCore({ paymentId, actor, reason, businessOperationKey, session }) {
+  const actorId = actor.id || actor._id;
+  let payment = await inSession(FinancialPayment.findById(paymentId), session);
+  if (!payment) fail('FINANCIAL_PAYMENT_NOT_AVAILABLE', 'Paiement introuvable.', 404);
+  if (payment.status === 'failed') return { payment, failed: false };
+  // PAY-4 §24 — jamais de régression depuis un état terminal réussi : un
+  // FAILED tardif après un SUCCESSFUL déjà traité ne rétrograde rien.
+  if (payment.status !== 'pending') fail('FINANCIAL_PAYMENT_INVALID_TRANSITION', `Le paiement ${payment.status} ne peut pas être marqué échoué.`, 409);
+  payment = await FinancialPayment.findOneAndUpdate({ _id: paymentId, status: 'pending' }, { status: 'failed', failedAt: new Date() }, { new: true, session });
+  if (!payment) {
+    payment = await inSession(FinancialPayment.findById(paymentId), session);
+    if (payment?.status === 'failed') return { payment, failed: false };
+    if (payment?.status === 'succeeded') return { payment, failed: false }; // course gagnée par une confirmation entre-temps — jamais écrasée
+    fail('FINANCIAL_PAYMENT_INVALID_TRANSITION', 'Le paiement a changé pendant son échec.', 409);
+  }
+  await appendFinancialLedgerEntry({ eventType: 'payment.failed', domain: payment.domain, establishmentType: payment.establishmentType, establishmentId: payment.establishmentId, entityType: 'FinancialPayment', entityId: payment._id, relatedEntities: [{ entityType: 'FinancialDocument', entityId: payment.metadata?.financialDocumentId }, { entityType: 'HotelReservation', entityId: payment.subjectId }].filter((item) => item.entityId), actorType: 'system', actorId, amountMinor: payment.amountMinor, currency: payment.currency, businessOperationKey, previousState: { status: 'pending' }, newState: { status: 'failed' }, metadata: { method: payment.method, provider: payment.provider, reason: String(reason || '').slice(0, 200) } }, { session });
+  return { payment, failed: true };
+}
+async function failHotelPayment(args) { return runFinancialOperation({ operationName: 'payment.hotel.fail', transactionMode: args.transactionMode || 'auto' }, ({ session }) => failHotelPaymentCore({ ...args, session })); }
+
+module.exports = { createManualPayment, createHotelPayment, confirmHotelPayment, failHotelPayment };

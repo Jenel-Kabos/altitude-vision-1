@@ -8,6 +8,49 @@ const userKpiService = require('../services/userKpiService'); // USER-KPI-1
 const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
 const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
 const { getOperatorByUserId } = require('../services/platformOperator/platformOperatorService');
+const PlatformTenant = require('../models/PlatformTenant');
+const OrgMembership = require('../models/OrgMembership');
+const PlatformOperator = require('../models/PlatformOperator');
+
+// HOTFIX-USERS-COUNT-1 — `req.tenantScopeUserIds` (posé par
+// `requireTenantScope`) ne contient que les membres `OrgMembership` du
+// tenant, alimentés UNIQUEMENT par le flux d'invitation staff.
+// `authController.signup` (inscription publique : Client, Proprietaire,
+// User…) n'en crée jamais aucun (audit exhaustif, zéro occurrence) — ces
+// comptes restaient donc invisibles ici bien qu'appartenant sans ambiguïté
+// au tenant unique existant.
+//
+// Intentionnellement LOCAL à ce contrôleur (jamais dans
+// `resolveTenantScope`, la couche partagée par le catalogue public de
+// biens/hôtels et le reporting) : une tentative précédente d'appliquer
+// cette même extension au niveau partagé a fait fuiter des propriétaires
+// non affiliés dans le catalogue public tenant-scopé
+// (`tenantCore.mongo.integration.test.js`, 6 régressions constatées) —
+// l'extension n'est sûre que pour la liste d'utilisateurs elle-même, jamais
+// pour des ressources métier tierces qu'un compte non affilié pourrait
+// posséder.
+//
+// Strictement bornée au cas sans ambiguïté (`tenantCount === 1`) : dès
+// qu'un second `PlatformTenant` existe, aucune supposition n'est jamais
+// faite (retour au scope `OrgMembership` strict).
+async function expandScopeWithUnaffiliatedUsersIfSoleTenant(scopeUserIds) {
+    const ids = new Set((scopeUserIds || []).map(String));
+    const tenantCount = await PlatformTenant.countDocuments({ status: { $in: ['trial', 'active'] } });
+    if (tenantCount !== 1) return [...ids];
+    const [membershipUserIds, operatorUserIds] = await Promise.all([
+        OrgMembership.distinct('user'),
+        PlatformOperator.distinct('user'),
+    ]);
+    const excluded = new Set([...membershipUserIds, ...operatorUserIds].map(String));
+    const unaffiliated = await User.find({
+        isTechnical: { $ne: true },
+        isActive: { $ne: false },
+        status: { $nin: ['Suspendu', 'Banni', 'Supprimé'] },
+        _id: { $nin: [...excluded] },
+    }).select('_id').lean();
+    unaffiliated.forEach((u) => ids.add(String(u._id)));
+    return [...ids];
+}
 
 exports.downloadContractDocument = async (req, res) => {
     try {
@@ -125,7 +168,8 @@ exports.getAllUsers = async (req, res) => {
         // utilisateurs réellement membres du tenant actif. Un PlatformOperator
         // sans capacité tenant sélectionnée n'atteint jamais ce contrôleur
         // (403 en amont) — jamais de `User.find()` global implicite.
-        const users = await User.find({ _id: { $in: req.tenantScopeUserIds || [] } }).select('-password');
+        const scopeUserIds = await expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || []).catch(() => req.tenantScopeUserIds || []);
+        const users = await User.find({ _id: { $in: scopeUserIds } }).select('-password');
         res.status(200).json({ status: 'success', results: users.length, data: { users } });
     } catch (error) {
         console.error('Erreur getAllUsers:', error);
@@ -143,8 +187,10 @@ exports.getAllOwners = async (req, res) => {
         // d'union propriétaire immobilier + exploitant d'établissement).
         const ownerIds = await userKpiService.getProprietaireUserIds();
         // PLATFORM-ADMIN-CERT-1 (V1) — intersection avec le scope tenant actif,
-        // même principe que getAllUsers ci-dessus.
-        const scopeSet = new Set((req.tenantScopeUserIds || []).map(String));
+        // même principe que getAllUsers ci-dessus (HOTFIX-USERS-COUNT-1 :
+        // scope étendu localement, voir expandScopeWithUnaffiliatedUsersIfSoleTenant).
+        const expandedScope = await expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || []).catch(() => req.tenantScopeUserIds || []);
+        const scopeSet = new Set(expandedScope.map(String));
         const scopedOwnerIds = ownerIds.filter((id) => scopeSet.has(String(id)));
         const owners = await User.find({ _id: { $in: scopedOwnerIds } }).select('-password');
         res.status(200).json({ status: 'success', results: owners.length, data: { owners } });
