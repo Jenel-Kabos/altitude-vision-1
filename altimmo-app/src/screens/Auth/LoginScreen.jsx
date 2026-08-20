@@ -14,6 +14,7 @@ import { fonts, fontSize, spacing, radius } from '../../theme';
 import {
   configureGoogleSignIn,
   getGoogleIdToken,
+  getGoogleSignInDiagnostic,
   getGoogleSignInErrorMessage,
 } from '../../services/googleSignIn';
 
@@ -47,7 +48,7 @@ export default function LoginScreen({ navigation }) {
     } catch (error) {
       const message = getGoogleSignInErrorMessage(error);
       if (!message) return;
-      if (__DEV__) console.warn('Google Sign-In failed', { code: error?.code, message: error?.message });
+      if (__DEV__) console.warn('Google Sign-In failed', getGoogleSignInDiagnostic(error));
       Alert.alert('Erreur', message);
     }
   };

@@ -19,6 +19,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import {
   configureGoogleSignIn,
   getGoogleIdToken,
+  getGoogleSignInDiagnostic,
   getGoogleSignInErrorMessage,
 } from '../googleSignIn';
 
@@ -51,5 +52,18 @@ describe('googleSignIn', () => {
   it.each(['10', 'DEVELOPER_ERROR'])('hides technical developer error %s', (code) => {
     expect(getGoogleSignInErrorMessage({ code }))
       .toBe('Connexion Google indisponible. Veuillez réessayer.');
+  });
+
+  it('exposes only safe diagnostic fields and property names', () => {
+    const diagnostic = getGoogleSignInDiagnostic({
+      name: 'Error', code: '10', message: 'DEVELOPER_ERROR', idToken: 'never-log-me',
+    });
+    expect(diagnostic).toEqual({
+      name: 'Error',
+      code: '10',
+      message: 'DEVELOPER_ERROR',
+      propertyNames: ['code', 'message', 'name'],
+    });
+    expect(diagnostic).not.toHaveProperty('idToken');
   });
 });

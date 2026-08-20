@@ -37,3 +37,15 @@ export function getGoogleSignInErrorMessage(error) {
   }
   return 'Impossible de vous connecter avec Google. Veuillez réessayer.';
 }
+
+export function getGoogleSignInDiagnostic(error) {
+  const sensitiveProperty = /token|credential|cookie|authorization|jwt|codeVerifier/i;
+  return {
+    name: error?.name,
+    code: error?.code,
+    message: error?.message,
+    propertyNames: error && typeof error === 'object'
+      ? Object.keys(error).filter((key) => !sensitiveProperty.test(key)).sort()
+      : [],
+  };
+}
