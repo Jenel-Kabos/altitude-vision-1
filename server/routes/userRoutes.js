@@ -57,9 +57,20 @@ router.use(restrictTo('Admin'), requireTenantScope);
 
 // `router.param('id', …)` s'exécute AVANT chaque route `:id` ci-dessous —
 // même patron que paiementRoutes.js/contratRoutes.js/platformTenantRoutes.js.
-router.param('id', (req, res, next, userId) => {
+// HOTFIX-OWNER-CONTRACT-RESEND-1 — utilisait `req.tenantScopeUserIds` brut
+// (scope `OrgMembership` strict, posé par `requireTenantScope`), alors que
+// `getAllUsers`/`getAllOwners` (HOTFIX-USERS-COUNT-1) l'étendent localement
+// aux comptes non affiliés sur tenant unique : un compte visible dans la
+// liste restait donc 404 sur CHAQUE action individuelle (renvoyer-contrat,
+// contract-document, verify, suspend, activate, role, GET/PUT/DELETE) —
+// deux chemins résolvant une identité différente pour la même ressource.
+// Réutilise la même fonction canonique (jamais réimplémentée).
+router.param('id', async (req, res, next, userId) => {
   if (!mongoose.isValidObjectId(userId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
-  const inScope = (req.tenantScopeUserIds || []).some((id) => String(id) === String(userId));
+  const scopeUserIds = await userController
+    .expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || [])
+    .catch(() => req.tenantScopeUserIds || []);
+  const inScope = scopeUserIds.some((id) => String(id) === String(userId));
   if (!inScope) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
   next();
 });

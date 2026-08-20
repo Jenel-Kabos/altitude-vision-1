@@ -24,6 +24,13 @@ jest.mock('../services/platformTenant/tenantContextService', () => ({
 }));
 jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
   assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+  // TENANT-SCOPE-AUDIT-2A — propertyController.js utilise désormais
+  // `assertResourceTenantOrUnattributed` (variante fail-open déjà certifiée
+  // ailleurs) au lieu de `assertResourceTenant` pour les actions staff
+  // individuelles sur une Property. Même résolution que ci-dessus : ce
+  // fichier ne teste jamais le cas `unresolved` lui-même (couvert par
+  // tenantScopeAudit2aAttribution.mongo.integration.test.js sur Mongo réel).
+  assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
   resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
 }));
 jest.mock('../config/db', () => jest.fn());

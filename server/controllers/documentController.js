@@ -2,7 +2,38 @@ const mongoose = require('mongoose');
 const Document = require('../models/Document');
 const Transaction = require('../models/Transaction');
 const Property = require('../models/Property');
-const { assertResourceTenant, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+
+// TENANT-SCOPE-AUDIT-2A — `assertResourceTenant` (STRICTE) traite une
+// attribution `unresolved` comme un échec (404). Pour un `Document` lié à
+// un compte public-signup (Client/Proprietaire) sans `OrgMembership`, et
+// sans `relatedProperty` résoluble, `resolveResourceTenant` renvoie
+// TOUJOURS `unresolved` — pas parce que le document appartient à un autre
+// tenant, mais parce qu'aucune frontière tenant n'est traçable pour lui
+// (compte historique/non affilié). C'est exactement la distinction déjà
+// encodée par `assertResourceTenantOrUnattributed`, utilisée par 13 autres
+// consommateurs de ce même service (Accommodation, Conversation, Message,
+// Contrat, Proprietaire, Locataire, Paiement, RentalManagement…) : un
+// résultat `unresolved` est laissé passer (rien à refuser), tandis qu'un
+// résultat `resolved` vers un AUTRE tenant, ou `ambiguous`, reste refusé
+// (404) exactement comme avant. Voir TENANT_SCOPE_AUDIT2A_REPORT.md pour la
+// caractérisation complète justifiant ce choix (Option D — jamais une
+// modification de `fromUser` lui-même, qui resterait strict pour tous ses
+// autres appelants).
+const assertResourceTenant = assertResourceTenantOrUnattributed;
+
+// TENANT-SCOPE-AUDIT-2A — même distinction que ci-dessus, appliquée à la
+// vérification de COHÉRENCE des relations d'un document en cours de
+// création/mise à jour (`createDocument`/`updateDocument`) : un `client`/
+// `createdBy`/`relatedProperty` non affilié à AUCUN tenant (`unresolved`)
+// n'est pas une preuve de conflit — seule une résolution vers un AUTRE
+// tenant (`resolved` différent) ou une ambiguïté réelle (`ambiguous`,
+// plusieurs tenants distincts prouvés) doit bloquer. Le `tenant` assigné
+// au document reste toujours dérivé du serveur (`tenantId(req)`), jamais
+// du body client — cette fonction ne fait que vérifier l'ABSENCE de
+// contradiction, jamais une source de vérité sur le tenant lui-même.
+const relationsConsistentWithTenant = (attribution, expectedTenantId) => attribution.status === 'unresolved'
+  || (attribution.status === 'resolved' && String(attribution.tenantId) === String(expectedTenantId));
 
 const safeDocument = (value) => {
   const data = value?.toObject ? value.toObject() : { ...value };
@@ -131,7 +162,7 @@ exports.createDocument = async (req, res) => {
     const docData = { ...req.body, tenant: tenantId(req), createdBy: req.user.id };
     delete docData.privateAsset;
     const attribution = await resolveResourceTenant({ resourceType: 'Document', resource: docData });
-    if (attribution.status !== 'resolved' || String(attribution.tenantId) !== String(tenantId(req))) {
+    if (!relationsConsistentWithTenant(attribution, tenantId(req))) {
       return res.status(422).json({ status: 'fail', code: 'TENANT_RELATION_MISMATCH', message: 'Les relations du document ne correspondent pas au tenant actif.' });
     }
 
@@ -195,7 +226,7 @@ exports.updateDocument = async (req, res) => {
     delete docData.privateAsset;
     const merged = { ...existing.toObject(), ...docData, tenant: existing.tenant || tenantId(req) };
     const attribution = await resolveResourceTenant({ resourceType: 'Document', resource: merged });
-    if (attribution.status !== 'resolved' || String(attribution.tenantId) !== String(tenantId(req))) {
+    if (!relationsConsistentWithTenant(attribution, tenantId(req))) {
       return res.status(422).json({ status: 'fail', code: 'TENANT_RELATION_MISMATCH', message: 'Les relations du document ne correspondent pas au tenant actif.' });
     }
     docData.tenant = existing.tenant || tenantId(req);

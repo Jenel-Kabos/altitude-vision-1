@@ -10,7 +10,7 @@ const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
 const rentalMaintenanceService = require('../services/rentalMaintenanceService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { ROLES_GL } = require('../utils/roles');
-const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { readPrivateAsset } = require('../services/storage/secureStorageService');
 const { streamRemoteDocument } = require('./rentalDocumentController');
 
@@ -23,7 +23,11 @@ async function assertPropertyAccess(req, propertyId) {
   const isOwner = property.owner && String(property.owner) === String(req.user.id);
   if (!isOwner && !ROLES_GL.includes(req.user.role)) return { error: 403 };
   if (ROLES_GL.includes(req.user.role)) {
-    try { await assertResourceTenant({ resourceType: 'Property', resource: property, tenantId: req.platformTenant?._id }); }
+    // TENANT-SCOPE-AUDIT-2A — même correction que propertyController.js :
+    // un `Property.owner` sans OrgMembership n'est pas une preuve
+    // d'appartenance à un AUTRE tenant, juste une absence de frontière
+    // traçable. Réutilise la primitive fail-open déjà certifiée.
+    try { await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: req.platformTenant?._id }); }
     catch { return { error: 403 }; }
   }
   return { property };

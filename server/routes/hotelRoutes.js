@@ -11,7 +11,7 @@ const { requireHotelCapability } = require('../middleware/hotelAccessMiddleware'
 const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
 const { ROLES_ALTIMMO, ROLES_MODERATION } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
-const { requireTenantScope } = require('../middleware/tenantContext');
+const { attachTenantScopeIfResolvable } = require('../middleware/tenantContext');
 
 const router = express.Router();
 
@@ -26,7 +26,23 @@ router.get('/public/:id', ctrl.getPublic);
 router.get('/:hotelId/availability', auth.optionalAuth, reservationCtrl.getPublicAvailability);
 router.post('/:hotelId/reservations', auth.optionalAuth, reservationCtrl.createPublicReservation);
 
-router.use(auth.protect, requireTenantScope);
+// TENANT-SCOPE-HOTFIX-3 — `requireTenantScope` bloquait ICI, avant même
+// d'atteindre le contrôleur, tout exploitant/Proprietaire public-signup
+// sans OrgMembership sur ses propres routes self-service (`/mine`,
+// room-categories, rooms, inventory, room-assignments…) : bug réel
+// démontré (voir server/docs/TENANT_SCOPE_AUDIT2B_REPORT.md), alors que
+// `hotelAccessScopeService.assertOperationalHotelAccess` contient déjà le
+// contournement ownership nécessaire pour ce cas exact. `attachTenantScopeIfResolvable`
+// résout `req.platformTenant`/`req.tenantScopeUserIds` (et enrichit
+// `req.user` À L'IDENTIQUE de `requireTenantScope`) quand un tenant EXISTE
+// — aucun changement pour le staff — mais ne bloque plus quand aucun
+// tenant ne se résout, laissant `assertOperationalHotelAccess` (jamais
+// modifié) appliquer la vraie vérification d'ownership. Chaque route
+// strictement staff-only de ce routeur reste protégée indépendamment par
+// `auth.restrictTo(...)`/capacité (jamais par la seule présence d'un
+// tenant) — voir TENANT_SCOPE_HOTFIX3_ROUTE_MATRIX.md pour la preuve
+// route par route.
+router.use(auth.protect, attachTenantScopeIfResolvable);
 
 // F2.6 — hôtels accessibles à l'utilisateur courant (Admin, manager legacy ou rattachement actif).
 // Placée avant '/:id' générique pour ne jamais être capturée par le paramètre.

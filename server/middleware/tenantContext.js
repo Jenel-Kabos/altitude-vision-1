@@ -1,10 +1,32 @@
 // TENANT-CORE-1 (Phase 4) — Middleware d'isolation, opt-in par route
 // (jamais monté globalement — voir tenantContextService.js pour la
-// justification). Deux niveaux :
-//   attachTenantContext  — résout req.platformTenant si possible, ne bloque
-//                           jamais (utile aux routes qui personnalisent sans
-//                           exiger un tenant, ex. branding public).
-//   requireTenantScope   — exige un tenant résolu, 403 sinon.
+// justification). Trois niveaux :
+//   attachTenantContext        — résout req.platformTenant si possible, ne
+//                                 bloque jamais, N'ENRICHIT PAS req.user
+//                                 (utile aux routes qui personnalisent sans
+//                                 exiger un tenant, ex. branding public —
+//                                 aucun service en aval ne lit
+//                                 req.user.platformTenant sur ces routes).
+//   requireTenantScope         — exige un tenant résolu, 403 sinon.
+//   attachTenantScopeIfResolvable — TENANT-SCOPE-HOTFIX-3 : même résolution
+//                                 et même enrichissement de `req.user` que
+//                                 `requireTenantScope` QUAND un tenant se
+//                                 résout (aucun changement pour le staff),
+//                                 mais ne bloque JAMAIS quand aucun tenant
+//                                 ne se résout — laisse la requête atteindre
+//                                 le contrôleur/service d'autorisation
+//                                 métier (hotelAccessScopeService,
+//                                 financialAuthorizationService…) qui
+//                                 applique la vraie vérification
+//                                 d'ownership. Ne décide jamais lui-même de
+//                                 l'autorisation — voir §12 du mandat
+//                                 HOTFIX-3 : « laisser passer la requête
+//                                 jusqu'au bon garde, jamais supprimer le
+//                                 garde ». Réservé aux routeurs dont TOUTES
+//                                 les routes staff-only restent protégées
+//                                 indépendamment par rôle/capacité (jamais
+//                                 par la seule présence d'un tenant) — voir
+//                                 TENANT_SCOPE_HOTFIX3_ROUTE_MATRIX.md.
 const { resolveEffectiveTenantContext, resolveAvailableTenantsForUser } = require('../services/platformTenant/tenantContextService');
 
 const requestedTenant = (req) => req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
@@ -20,6 +42,47 @@ const attachTenantContext = async (req, res, next) => {
   next();
 };
 
+// Résolution + enrichissement partagés par `requireTenantScope` et
+// `attachTenantScopeIfResolvable` — extrait une seule fois pour qu'aucune
+// des deux variantes ne puisse diverger accidentellement dans SA façon de
+// peupler `req.platformTenant`/`req.tenantScopeUserIds`/`req.user.*`. Ne
+// décide JAMAIS du blocage : chaque appelant applique sa propre politique
+// (bloquant ou non) sur le résultat retourné.
+async function resolveAndAttachTenantScope(req, { allowAnyStatus = false } = {}) {
+  const userId = req.user?._id || req.user?.id;
+  const explicitTenantId = requestedTenant(req);
+  const available = userId ? await resolveAvailableTenantsForUser(userId).catch(() => []) : [];
+  const context = userId ? await resolveEffectiveTenantContext(userId, explicitTenantId).catch(() => null) : null;
+  req.platformTenant = context?.tenant || null;
+  req.tenantContextSource = context?.source || null;
+
+  const isPlatformOperator = typeof req.tenantContextSource === 'string' && req.tenantContextSource.startsWith('platform_operator');
+  req.isPlatformOperatorContext = isPlatformOperator;
+  req.platformOperatorCapabilities = isPlatformOperator ? (context.operator?.capabilities || []) : [];
+
+  if (!req.platformTenant) {
+    return { resolved: false, isPlatformOperator, available, explicitTenantId, context };
+  }
+
+  const scope = await require('../services/platformTenant/tenantContextService').resolveTenantScope(
+    req.platformTenant._id,
+    { allowAnyStatus: allowAnyStatus || isPlatformOperator },
+  );
+  req.tenantScopeUserIds = Array.from(scope.scopeUserIds || []);
+  if (context.source === 'legacy_fallback' && !req.tenantScopeUserIds.some((id) => String(id) === String(userId))) {
+    req.tenantScopeUserIds.push(userId);
+  }
+  // Les services métier centraux reçoivent déjà `req.user`; enrichir cet
+  // acteur évite de disperser tenantId dans chaque signature sans jamais
+  // faire confiance à une valeur issue du body/query client.
+  req.user.platformTenant = req.platformTenant;
+  req.user.tenantScopeUserIds = req.tenantScopeUserIds;
+  req.user.tenantContextSource = req.tenantContextSource;
+  req.user.isPlatformOperatorContext = req.isPlatformOperatorContext;
+  req.user.platformOperatorCapabilities = req.platformOperatorCapabilities;
+  return { resolved: true, isPlatformOperator, available, explicitTenantId, context };
+}
+
 // PLATFORM-ADMIN-1 — factory, pas une fonction unique : `allowPlatformWide`
 // distingue les DEUX routes/domaines qui supportent nativement un mode
 // plateforme sans tenant sélectionné (reporting exécutif — voir
@@ -31,24 +94,11 @@ const attachTenantContext = async (req, res, next) => {
 // opérateur non scopé au-delà du message d'erreur (voir plus bas) — il
 // bloque toujours, exactement comme le fail-closed historique.
 const createRequireTenantScope = ({ allowPlatformWide = false } = {}) => async (req, res, next) => {
-  const userId = req.user?._id || req.user?.id;
-  const explicitTenantId = requestedTenant(req);
-  const available = userId ? await resolveAvailableTenantsForUser(userId).catch(() => []) : [];
-  const context = userId ? await resolveEffectiveTenantContext(userId, explicitTenantId).catch(() => null) : null;
-  req.platformTenant = context?.tenant || null;
-  req.tenantContextSource = context?.source || null;
-
-  // PLATFORM-ADMIN-1 — un opérateur actif est reconnu par `source` même
-  // quand `tenant` reste `null` (mode plateforme non scopé) : ne jamais
-  // déduire ce flag de l'absence de tenant seule (mission §15 — un
-  // `tenantId` absent ne doit JAMAIS, à lui seul, signifier un accès global).
-  const isPlatformOperator = typeof req.tenantContextSource === 'string' && req.tenantContextSource.startsWith('platform_operator');
-  req.isPlatformOperatorContext = isPlatformOperator;
-  req.platformOperatorCapabilities = isPlatformOperator ? (context.operator?.capabilities || []) : [];
+  const { resolved, isPlatformOperator, available, explicitTenantId } = await resolveAndAttachTenantScope(req);
 
   const unscopedOperatorAllowed = allowPlatformWide && isPlatformOperator && req.tenantContextSource === 'platform_operator_unscoped';
 
-  if (!req.platformTenant && !unscopedOperatorAllowed) {
+  if (!resolved && !unscopedOperatorAllowed) {
     res.status(403);
     let message;
     if (isPlatformOperator && req.tenantContextSource === 'platform_operator_tenant_not_found') {
@@ -72,7 +122,7 @@ const createRequireTenantScope = ({ allowPlatformWide = false } = {}) => async (
     return next(error);
   }
 
-  if (!req.platformTenant) {
+  if (!resolved) {
     // Opérateur en mode plateforme, sur une route qui l'autorise
     // explicitement : aucun scope à résoudre, `scopeParams` (reportingController)
     // sait lire `req.isPlatformOperatorContext` pour laisser `tenantId`
@@ -80,29 +130,27 @@ const createRequireTenantScope = ({ allowPlatformWide = false } = {}) => async (
     req.tenantScopeUserIds = null;
     req.user.isPlatformOperatorContext = req.isPlatformOperatorContext;
     req.user.platformOperatorCapabilities = req.platformOperatorCapabilities;
-    return next();
   }
-
-  const scope = await require('../services/platformTenant/tenantContextService').resolveTenantScope(
-    req.platformTenant._id,
-    { allowAnyStatus: isPlatformOperator },
-  );
-  req.tenantScopeUserIds = Array.from(scope.scopeUserIds || []);
-  if (context.source === 'legacy_fallback' && !req.tenantScopeUserIds.some((id) => String(id) === String(userId))) {
-    req.tenantScopeUserIds.push(userId);
-  }
-  // Les services métier centraux reçoivent déjà `req.user`; enrichir cet
-  // acteur évite de disperser tenantId dans chaque signature sans jamais
-  // faire confiance à une valeur issue du body/query client.
-  req.user.platformTenant = req.platformTenant;
-  req.user.tenantScopeUserIds = req.tenantScopeUserIds;
-  req.user.tenantContextSource = req.tenantContextSource;
-  req.user.isPlatformOperatorContext = req.isPlatformOperatorContext;
-  req.user.platformOperatorCapabilities = req.platformOperatorCapabilities;
   return next();
 };
 
 const requireTenantScope = createRequireTenantScope({ allowPlatformWide: false });
 const requireTenantScopeAllowPlatformWide = createRequireTenantScope({ allowPlatformWide: true });
 
-module.exports = { attachTenantContext, requireTenantScope, requireTenantScopeAllowPlatformWide };
+// TENANT-SCOPE-HOTFIX-3 — voir bandeau d'en-tête. `allowAnyStatus` n'a de
+// sens que pour un PlatformOperator (mêmes garanties que
+// `requireTenantScope`) ; sans objet pour le cas self-service visé ici,
+// exposé uniquement par cohérence avec `resolveAndAttachTenantScope`.
+const attachTenantScopeIfResolvable = async (req, res, next) => {
+  try {
+    await resolveAndAttachTenantScope(req);
+  } catch {
+    req.platformTenant = null;
+    req.tenantScopeUserIds = null;
+  }
+  return next();
+};
+
+module.exports = {
+  attachTenantContext, requireTenantScope, requireTenantScopeAllowPlatformWide, attachTenantScopeIfResolvable,
+};

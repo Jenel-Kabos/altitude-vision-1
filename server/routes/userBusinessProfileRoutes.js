@@ -7,12 +7,23 @@ const auth = require('../middleware/authMiddleware');
 const { ROLES_DOCS } = require('../utils/roles');
 const ctrl = require('../controllers/userBusinessProfileController');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
-const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const User = require('../models/User');
 
 const router = express.Router();
 router.use(auth.protect);
 
+// TENANT-SCOPE-AUDIT-2B (Phase C) — `assertResourceTenant` (STRICTE) traitait
+// une cible sans OrgMembership (Proprietaire/exploitant public-signup, cas
+// typique de ce module) comme un échec, bloquant le staff légitime du
+// tenant unique alors même que l'auto-lecture (`isSelf`, ci-dessous) ne
+// dépend déjà d'AUCUNE frontière tenant pour ce même utilisateur — les
+// profils métier sont dérivés par pur ownership (Property.owner,
+// Hotel.manager…), jamais par OrgMembership (voir
+// userBusinessProfileService.deriveProfilesFromExistingData). Réutilise la
+// même primitive fail-open déjà certifiée ailleurs (documentController.js,
+// userController.downloadContractDocument, propertyController.js…) : un
+// résultat `resolved` vers un AUTRE tenant reste refusé à l'identique.
 async function assertTargetInActorTenant(req) {
   const tenant = await resolveTenantForUser(req.user._id || req.user.id, req.headers['x-platform-tenant-id']);
   if (!tenant) {
@@ -26,7 +37,7 @@ async function assertTargetInActorTenant(req) {
     error.statusCode = 404;
     throw error;
   }
-  await assertResourceTenant({ resourceType: 'User', resource: target, tenantId: tenant._id });
+  await assertResourceTenantOrUnattributed({ resourceType: 'User', resource: target, tenantId: tenant._id });
 }
 
 function tenantBoundaryResponse(res, error) {

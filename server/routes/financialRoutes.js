@@ -5,8 +5,23 @@ const dashboardCtrl = require('../controllers/hotelFinancialDashboardController'
 const mtnCtrl = require('../controllers/mtnMomoPaymentController');
 const { STAFF_IMMO } = require('../utils/roles');
 const router = express.Router();
-const { requireTenantScope } = require('../middleware/tenantContext');
-router.use(auth.protect, requireTenantScope);
+const { attachTenantScopeIfResolvable } = require('../middleware/tenantContext');
+// TENANT-SCOPE-HOTFIX-3 — même correctif que hotelRoutes.js : `requireTenantScope`
+// bloquait, avant même d'atteindre `financialAuthorizationService.assertFinancialScope`,
+// tout exploitant/Proprietaire public-signup sans OrgMembership sur des
+// routes en lecture seule pourtant explicitement ouvertes à `ownerCapabilities`
+// (DOCUMENT_VIEW, PAYMENT_VIEW, LEDGER_VIEW, DASHBOARD_VIEW…) — voir
+// server/docs/TENANT_SCOPE_AUDIT2B_REPORT.md. `assertFinancialScope` contient
+// déjà le contournement ownership nécessaire (`!user.platformTenant &&
+// hotel.manager===user`). `attachTenantScopeIfResolvable` enrichit
+// `req.user` À L'IDENTIQUE de `requireTenantScope` quand un tenant EXISTE
+// (aucun changement pour le staff finance), mais ne bloque plus quand aucun
+// tenant ne se résout. Chaque route strictement staff-only (émission,
+// confirmation, allocation, reverse…) reste protégée indépendamment par
+// `assertFinancialCapability` (RBAC par rôle/capacité, jamais par la seule
+// présence d'un tenant — `Proprietaire` n'a jamais ces capacités dans
+// `FINANCIAL_CAPABILITIES`) — voir TENANT_SCOPE_HOTFIX3_ROUTE_MATRIX.md.
+router.use(auth.protect, attachTenantScopeIfResolvable);
 // DOC-ARCH-2 — lecture seule, gardée au niveau route (pas d'établissement
 // précis à vérifier ici, contrairement aux routes /hotel/:hotelId/*).
 router.get('/accommodations/documents', auth.restrictTo(...STAFF_IMMO), ctrl.listAccommodationDocuments);

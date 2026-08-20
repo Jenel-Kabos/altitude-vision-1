@@ -32,8 +32,19 @@ const { STAFF_IMMO } = require('../utils/roles');
 // `property.owner === req.user.id`, qui ne nécessite aucune vérification
 // supplémentaire — seul le contournement par rôle Admin manquait de preuve
 // tenant.
-const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser, resolveTenantScope } = require('../services/platformTenant/tenantContextService');
+
+// TENANT-SCOPE-AUDIT-2A — `assertResourceTenant` (STRICTE) traitait un
+// `Property.owner` sans OrgMembership (Proprietaire public-signup, cas
+// fréquent) comme un échec, bloquant à tort le staff légitime du tenant
+// unique sur ses propres actions de modération/mise à jour — reproduit par
+// test (voir __tests__/tenantScopeAudit2aAttribution.mongo.integration.test.js).
+// Réutilise la même primitive fail-open déjà certifiée ailleurs (Accommodation,
+// Contrat, RentalManagement…) : `unresolved` (aucune frontière traçable) est
+// laissé passer, `resolved` vers un AUTRE tenant reste refusé à l'identique.
+// Le catalogue PUBLIC (publicPropertyService.js) n'est jamais concerné par
+// cette fonction — code path staff-only, strictement séparé.
 
 // Pure prédicat, ne touche jamais `res` — utilisé par getProperty pour
 // calculer `isAdmin` sans risquer de laisser un `res.statusCode` erroné
@@ -44,7 +55,7 @@ async function isPropertyInActorTenant(req, property) {
   const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
   const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
   if (!tenant) return false;
-  return assertResourceTenant({ resourceType: 'Property', resource: property, tenantId: tenant._id })
+  return assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: tenant._id })
     .then(() => true).catch(() => false);
 }
 
@@ -60,7 +71,7 @@ async function assertPropertyTenantAccess(req, res, property) {
     throw new Error('Contexte tenant requis ou ambigu pour cette action.');
   }
   try {
-    await assertResourceTenant({ resourceType: 'Property', resource: property, tenantId: tenant._id });
+    await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: tenant._id });
     return tenant;
   } catch (error) {
     res.status(error.statusCode || 403);

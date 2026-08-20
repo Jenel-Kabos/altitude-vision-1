@@ -6,7 +6,7 @@ const { logAction, buildAuteur } = require('../services/actionLogService');
 const { COLLAB_ROLES, ROLE_LABELS } = require('../utils/roles');
 const userKpiService = require('../services/userKpiService'); // USER-KPI-1
 const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
-const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { getOperatorByUserId } = require('../services/platformOperator/platformOperatorService');
 const PlatformTenant = require('../models/PlatformTenant');
 const OrgMembership = require('../models/OrgMembership');
@@ -52,6 +52,15 @@ async function expandScopeWithUnaffiliatedUsersIfSoleTenant(scopeUserIds) {
     return [...ids];
 }
 
+// HOTFIX-OWNER-CONTRACT-RESEND-1 — exportée pour que
+// `router.param('id', …)` (userRoutes.js) résolve la même identité
+// canonique que `getAllUsers`/`getAllOwners` : sans cet export, un compte
+// visible dans la liste (scope étendu) restait 404 sur CHAQUE action
+// individuelle (`renvoyer-contrat`, `contract-document`, `verify`,
+// `suspend`, `activate`, `role`, `GET/PUT/DELETE /:id`), qui ne lisaient
+// que le scope brut `OrgMembership` posé par `requireTenantScope`.
+exports.expandScopeWithUnaffiliatedUsersIfSoleTenant = expandScopeWithUnaffiliatedUsersIfSoleTenant;
+
 exports.downloadContractDocument = async (req, res) => {
     try {
         const requestedId = req.params.id || req.user.id;
@@ -60,7 +69,15 @@ exports.downloadContractDocument = async (req, res) => {
         }
         const user = await User.findById(requestedId).select('+contratPdfAsset');
         if (!user) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
-        if (String(requestedId) !== String(req.user.id)) await assertResourceTenant({ resourceType: 'User', resource: user, tenantId: req.platformTenant?._id });
+        // TENANT-SCOPE-AUDIT-2A — `assertResourceTenant` (STRICTE) traitait
+        // une cible sans OrgMembership (Proprietaire public-signup, cas
+        // typique de ce téléchargement de contrat) comme un échec, alors
+        // qu'aucune frontière tenant n'est traçable pour elle (pas une
+        // preuve d'appartenance à un AUTRE tenant). Réutilise la même
+        // primitive fail-open déjà certifiée ailleurs (documentController.js,
+        // rentalManagementRoutes.js…) — un résultat `resolved` vers un autre
+        // tenant reste refusé exactement comme avant.
+        if (String(requestedId) !== String(req.user.id)) await assertResourceTenantOrUnattributed({ resourceType: 'User', resource: user, tenantId: req.platformTenant?._id });
         if (!user.contratPdfAsset) return res.status(409).json({ status: 'fail', code: 'LEGACY_ASSET_MIGRATION_REQUIRED', message: 'Ce contrat historique doit être migré.' });
         const buffer = await readPrivateAsset(user.contratPdfAsset.toObject());
         res.setHeader('Content-Type', 'application/pdf');

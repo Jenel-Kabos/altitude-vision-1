@@ -12,6 +12,18 @@ jest.mock('../models/RentalManagement');
 jest.mock('../models/Contrat');
 jest.mock('../models/Paiement');
 jest.mock('../models/User');
+// TENANT-SCOPE-AUDIT-1 — `rentalManagementController.list`/`.stats`
+// appellent désormais `expandScopeWithUnaffiliatedUsersIfSoleTenant`
+// (userController.js), qui interroge directement `PlatformTenant`/
+// `OrgMembership`/`PlatformOperator`. Sans mock, ces modèles réels tentent
+// une vraie requête Mongoose sans connexion (ce fichier ne démarre aucun
+// Mongo, voir convention `test:unit`) et restent en attente jusqu'au
+// timeout — auto-mock suffit : `PlatformTenant.countDocuments()` renvoie
+// alors `undefined` (`!== 1`), et la fonction retourne immédiatement le
+// scope inchangé sans jamais toucher les autres modèles.
+jest.mock('../models/PlatformTenant');
+jest.mock('../models/OrgMembership');
+jest.mock('../models/PlatformOperator');
 jest.mock('../services/platformTenant/tenantContextService', () => ({
   resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439002' }),
   resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439002' }, source: 'single_membership' }),

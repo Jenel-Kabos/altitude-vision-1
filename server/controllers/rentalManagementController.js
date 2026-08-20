@@ -7,6 +7,20 @@ const sync = require('../services/rentalListingSyncService');
 const { notifyStaff } = require('../services/notificationService');
 const { contractAlertWindowDays } = require('../services/rentalFinancialAutomationService');
 const onboarding = require('../services/rentalAssetOnboardingService');
+const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('./userController');
+
+// TENANT-SCOPE-AUDIT-1 — `req.tenantScopeUserIds` reste le scope brut
+// `OrgMembership`-only. `list`/`stats` comparent `RentalManagement.owner`/
+// `Property.owner` directement à ce scope : un dossier activé pour un
+// Proprietaire créé par inscription publique, sans `OrgMembership`, sur
+// tenant unique, restait invisible du module Gestion Locative pour le staff
+// légitime — alors que le garde `router.param('id', …)` de ce même routeur
+// documente déjà explicitement que ce cas ne doit "jamais [être] bloqué par
+// l'absence de contexte tenant" (voir rentalManagementRoutes.js). Réutilise
+// la même fonction canonique que Property Portfolio/HOTFIX-USERS-COUNT-1,
+// jamais dans `resolveTenantScope`.
+const resolveScope = (req) => expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || [])
+  .catch(() => req.tenantScopeUserIds || []);
 
 const fail = (res, error) => res.status(error.statusCode || 500).json({
   status: (error.statusCode || 500) >= 500 ? 'error' : 'fail',
@@ -82,7 +96,7 @@ exports.list = async (req, res) => {
     // doit pas apparaître dans le module Gestion Locative tant qu'elle n'a
     // pas été explicitement activée. `?managementActivated=false` permet de
     // consulter les annonces en attente d'activation si un écran futur en a besoin.
-    const filter = { managementActivated: true, owner: { $in: req.tenantScopeUserIds || [] } };
+    const filter = { managementActivated: true, owner: { $in: await resolveScope(req) } };
     ['occupancyStatus', 'availabilityStatus', 'publicationStatus', 'active', 'managementActivated'].forEach((key) => {
       if (req.query[key] !== undefined) {
         filter[key] = key === 'managementActivated' || key === 'active' ? req.query[key] === 'true' : req.query[key];
@@ -114,7 +128,7 @@ exports.stats = async (req, res) => {
   try {
     const windowDays = contractAlertWindowDays();
     const soon = new Date(Date.now() + windowDays * 24 * 60 * 60 * 1000);
-    const propertyIds = await Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+    const propertyIds = await Property.find({ owner: { $in: await resolveScope(req) } }).distinct('_id');
     const contractIds = await Contrat.find({ bien: { $in: propertyIds }, type: 'location' }).distinct('_id');
     const [grouped, overduePayments, partialPayments, expiringContracts, expiredContracts, biensInscrits] = await Promise.all([
       // Sprint A : n'agrège que les dossiers réellement activés — une

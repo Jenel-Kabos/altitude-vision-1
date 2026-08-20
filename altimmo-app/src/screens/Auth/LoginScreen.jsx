@@ -6,14 +6,17 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import ImmobilierHero from '../../components/illustrations/ImmobilierHero';
 import { AntDesign, Ionicons } from '@expo/vector-icons';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Button } from '../../components';
 import { fonts, fontSize, spacing, radius } from '../../theme';
+import {
+  configureGoogleSignIn,
+  getGoogleIdToken,
+  getGoogleSignInErrorMessage,
+} from '../../services/googleSignIn';
 
-const WEB_CLIENT = '3869205293-ej9uld9a25m8i01o41e37pliaac4eumo.apps.googleusercontent.com';
 const EMAIL_RE   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen({ navigation }) {
@@ -31,10 +34,7 @@ export default function LoginScreen({ navigation }) {
   const { login, loginWithGoogle } = useAuth();
 
   useEffect(() => {
-    GoogleSignin.configure({
-      webClientId: WEB_CLIENT,
-      offlineAccess: false,
-    });
+    configureGoogleSignIn();
   }, []);
 
   // Rôle par défaut 'Client' — CompleterProfilScreen permet de choisir
@@ -42,22 +42,13 @@ export default function LoginScreen({ navigation }) {
   // AppNavigator y bascule automatiquement via needsProfileCompletion.
   const handleGoogleSignIn = async () => {
     try {
-      await GoogleSignin.hasPlayServices();
-      const userInfo = await GoogleSignin.signIn();
-      const idToken = userInfo.data?.idToken || userInfo.idToken;
-      if (!idToken) throw new Error('Pas de idToken reçu');
+      const idToken = await getGoogleIdToken();
       await loginWithGoogle({ idToken, role: 'Client' });
     } catch (error) {
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) return;
-      if (error.code === statusCodes.IN_PROGRESS) return;
-      if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        Alert.alert('Erreur', 'Google Play Services requis.');
-        return;
-      }
-      console.log('Google Sign-In error code:', error.code);
-      console.log('Google Sign-In error message:', error.message);
-      console.log('Google Sign-In error full:', JSON.stringify(error));
-      Alert.alert('Erreur', `Code: ${error.code}\n${error.message}`);
+      const message = getGoogleSignInErrorMessage(error);
+      if (!message) return;
+      if (__DEV__) console.warn('Google Sign-In failed', { code: error?.code, message: error?.message });
+      Alert.alert('Erreur', message);
     }
   };
 
