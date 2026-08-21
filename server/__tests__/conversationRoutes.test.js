@@ -34,6 +34,7 @@ const jwt          = require('jsonwebtoken');
 const { app }      = require('../server');
 const User         = require('../models/User');
 const Conversation = require('../models/Conversation');
+const Message      = require('../models/Message');
 
 const makeToken = (role = 'Client') =>
   jwt.sign({ id: '507f1f77bcf86cd799439011', tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' });
@@ -63,6 +64,24 @@ describe('GET /api/conversations', () => {
       .get('/api/conversations')
       .set('Authorization', 'Bearer token.invalide.xyz');
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('GET /api/conversations/count/unread — ordre et clients sans tenant', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('la route statique atteint le compteur et conserve le client ordinaire', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue({ ...fakeUser('Client'), id: '507f1f77bcf86cd799439011' }) });
+    User.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
+    Message.countDocuments = jest.fn().mockResolvedValue(2);
+    const res = await request(app).get('/api/conversations/count/unread').set('Authorization', `Bearer ${makeToken('Client')}`);
+    expect(res.statusCode).toBe(200); expect(res.body.data.unreadCount).toBe(2);
+    expect(Message.countDocuments).toHaveBeenCalledWith(expect.objectContaining({ receiver: '507f1f77bcf86cd799439011', isRead: false }));
+    expect(Conversation.findById).not.toHaveBeenCalled();
+  });
+
+  test('401 sans authentification', async () => {
+    expect((await request(app).get('/api/conversations/count/unread')).statusCode).toBe(401);
   });
 });
 

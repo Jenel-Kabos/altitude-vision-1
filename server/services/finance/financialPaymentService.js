@@ -92,6 +92,30 @@ async function confirmHotelPaymentCore({ paymentId, actor, businessOperationKey,
 
 async function confirmHotelPayment(args) { return runFinancialOperation({ operationName: 'payment.hotel.confirm', transactionMode: args.transactionMode || 'auto' }, ({ session }) => confirmHotelPaymentCore({ ...args, session })); }
 
+function normalizeRejectionReason(value) {
+  const reason = [...String(value || '')].map((character) => { const code = character.charCodeAt(0); return code < 32 || code === 127 ? ' ' : character; }).join('').replace(/\s+/g, ' ').trim();
+  if (reason.length < 3 || reason.length > 500) fail('FINANCIAL_REJECTION_REASON_REQUIRED', 'Un motif de rejet de 3 à 500 caractères est obligatoire.');
+  return reason;
+}
+async function rejectManualHotelPaymentCore({ paymentId, actor, reason, businessOperationKey, session }) {
+  const actorId = actor.id || actor._id; const rejectionReason = normalizeRejectionReason(reason);
+  let payment = await inSession(FinancialPayment.findById(paymentId), session);
+  if (!payment) fail('FINANCIAL_PAYMENT_NOT_AVAILABLE', 'Paiement introuvable.', 404);
+  if (payment.domain !== 'hotel' || payment.provider !== 'manual') fail('FINANCIAL_PAYMENT_INVALID_TRANSITION', 'Seul un paiement manuel hôtelier peut être rejeté.', 409);
+  if (payment.status === 'failed' && payment.manualValidation?.status === 'rejected') return { payment, rejected: false };
+  if (payment.status !== 'pending') fail('FINANCIAL_PAYMENT_INVALID_TRANSITION', `Le paiement ${payment.status} ne peut pas être rejeté.`, 409);
+  const rejectedAt = new Date();
+  payment = await FinancialPayment.findOneAndUpdate({ _id: paymentId, status: 'pending', provider: 'manual' }, { status: 'failed', failedAt: rejectedAt, 'manualValidation.status': 'rejected', 'manualValidation.rejectedBy': actorId, 'manualValidation.rejectedAt': rejectedAt, 'manualValidation.reason': rejectionReason }, { new: true, session });
+  if (!payment) {
+    payment = await inSession(FinancialPayment.findById(paymentId), session);
+    if (payment?.status === 'failed' && payment.manualValidation?.status === 'rejected') return { payment, rejected: false };
+    fail('FINANCIAL_PAYMENT_INVALID_TRANSITION', 'Le paiement a changé pendant son rejet.', 409);
+  }
+  await appendFinancialLedgerEntry({ eventType: 'payment.rejected', domain: payment.domain, establishmentType: payment.establishmentType, establishmentId: payment.establishmentId, entityType: 'FinancialPayment', entityId: payment._id, relatedEntities: [{ entityType: 'FinancialDocument', entityId: payment.metadata?.financialDocumentId }, { entityType: 'HotelReservation', entityId: payment.subjectId }].filter((item) => item.entityId), actorType: 'user', actorId, amountMinor: payment.amountMinor, currency: payment.currency, businessOperationKey, previousState: { status: 'pending' }, newState: { status: 'failed', manualValidation: 'rejected' }, metadata: { method: payment.method, reference: payment.paymentReference, reason: rejectionReason } }, { session });
+  return { payment, rejected: true };
+}
+async function rejectManualHotelPayment(args) { return runFinancialOperation({ operationName: 'payment.hotel.reject', transactionMode: args.transactionMode || 'auto' }, ({ session }) => rejectManualHotelPaymentCore({ ...args, session })); }
+
 // PAY-4 — transition manquante avant ce sprint : aucun paiement manuel
 // n'échoue de façon asynchrone (le staff choisit simplement de ne jamais le
 // confirmer). Un provider automatique (mtn_direct) peut réellement échouer
@@ -118,4 +142,4 @@ async function failHotelPaymentCore({ paymentId, actor, reason, businessOperatio
 }
 async function failHotelPayment(args) { return runFinancialOperation({ operationName: 'payment.hotel.fail', transactionMode: args.transactionMode || 'auto' }, ({ session }) => failHotelPaymentCore({ ...args, session })); }
 
-module.exports = { createManualPayment, createHotelPayment, confirmHotelPayment, failHotelPayment };
+module.exports = { createManualPayment, createHotelPayment, confirmHotelPayment, rejectManualHotelPayment, failHotelPayment };

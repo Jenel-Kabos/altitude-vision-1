@@ -8,6 +8,7 @@ const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financial
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
 const User = require('../models/User');
 const PlatformOperator = require('../models/PlatformOperator');
+const Message = require('../models/Message');
 const platformTenantRoutes = require('../routes/platformTenantRoutes');
 const platformOperatorRoutes = require('../routes/platformOperatorRoutes');
 const propertyRoutes = require('../routes/propertyRoutes');
@@ -42,6 +43,8 @@ let grantingAdmin;
 let suspendedOperatorUser;
 let revokedOperatorUser;
 let plainAdminNoTenant;
+let ordinaryClient;
+let proprietor;
 
 beforeAll(async () => {
   await startFinancialMongo();
@@ -65,6 +68,8 @@ beforeAll(async () => {
   suspendedOperatorUser = await mkStandaloneAdmin('SuspendedOperator');
   revokedOperatorUser = await mkStandaloneAdmin('RevokedOperator');
   plainAdminNoTenant = await mkStandaloneAdmin('PlainAdminNoTenant');
+  ordinaryClient = await User.create({ name: 'Ordinary Client', email: `ordinary-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
+  proprietor = await User.create({ name: 'Isolated Owner', email: `owner-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
 
   await grantOperator({
     userId: operatorUser._id, actor: grantingAdmin, reason: 'Test PLATFORM-ADMIN-1',
@@ -103,8 +108,34 @@ describe('RCA — les 403 rapportés sont résolus pour un opérateur, inchangé
   });
 
   test('opérateur AVEC tenant A sélectionné → Conversations unread 200', async () => {
+    await Message.create([
+      { tenant: tenantA._id, sender: adminA._id, receiver: operatorUser._id, content: 'Tenant A', isRead: false },
+      { tenant: tenantB._id, sender: adminB._id, receiver: operatorUser._id, content: 'Tenant B', isRead: false },
+    ]);
     const res = await request(app).get('/api/conversations/count/unread').set(bearer(operatorUser, tenantA));
     expect(res.status).toBe(200);
+    expect(res.body.data.unreadCount).toBe(1);
+  });
+
+  test('staff mono-tenant A ne compte jamais le message du tenant B', async () => {
+    await Message.create([
+      { tenant: tenantA._id, sender: adminA._id, receiver: staffA._id, content: 'A', isRead: false },
+      { tenant: tenantB._id, sender: adminB._id, receiver: staffA._id, content: 'B', isRead: false },
+    ]);
+    const res = await request(app).get('/api/conversations/count/unread').set(bearer(staffA));
+    expect(res.status).toBe(200); expect(res.body.data.unreadCount).toBe(1);
+  });
+
+  test('client ordinaire sans tenant compte son message personnel unattributed', async () => {
+    await Message.create({ tenant: null, sender: adminA._id, receiver: ordinaryClient._id, content: 'Personnel', isRead: false });
+    const res = await request(app).get('/api/conversations/count/unread').set(bearer(ordinaryClient));
+    expect(res.status).toBe(200); expect(res.body.data.unreadCount).toBe(1);
+  });
+
+  test('Proprietaire sans tenant reste borné à son identité et ne gagne aucun count', async () => {
+    await Message.create({ tenant: null, sender: adminA._id, receiver: ordinaryClient._id, content: 'Autre personne', isRead: false });
+    const res = await request(app).get('/api/conversations/count/unread').set(bearer(proprietor));
+    expect(res.status).toBe(200); expect(res.body.data.unreadCount).toBe(0);
   });
 
   test('Admin SANS tenant et SANS capacité opérateur → 403 message historique inchangé (mission §41)', async () => {

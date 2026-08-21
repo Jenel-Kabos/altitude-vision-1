@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import BackButton from '../components/navigation/BackButton';
 import StaffInboxPage from '../pages/dashboard/StaffInboxPage';
 import InternalMessagingPage from '../pages/dashboard/InternalMessagingPage';
@@ -110,9 +110,16 @@ describe('Navigation responsive du dashboard', () => {
     countUnread.mockResolvedValue(0);
 
     render(<InternalMessagingPage />);
-    expect(screen.getByRole('button', { name: /Boîte de réception/i })).toBeInTheDocument();
+    // INBOX-PRO-2 — le rail de navigation desktop (icônes seules,
+    // toujours dans le DOM, masqué en CSS sous lg:) coexiste désormais
+    // avec l'écran mobile "dossiers" (rendu conditionnellement) : les deux
+    // exposent un contrôle accessible "Boîte de réception". On scope donc
+    // explicitement sur le landmark mobile ("Choisir un dossier") pour
+    // tester la navigation mono-écran mobile, qui est l'objet réel de ce test.
+    const mobileFolders = () => within(screen.getByRole('navigation', { name: 'Choisir un dossier' }));
+    expect(mobileFolders().getByRole('button', { name: /Boîte de réception/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Boîte de réception/i }));
+    fireEvent.click(mobileFolders().getByRole('button', { name: /Boîte de réception/i }));
     expect(await screen.findByText('SUJET TEST')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retour aux dossiers' })).toBeInTheDocument();
 
@@ -121,7 +128,7 @@ describe('Navigation responsive du dashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retour aux messages' }));
     expect(screen.getByRole('button', { name: 'Retour aux dossiers' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retour aux dossiers' }));
-    expect(screen.getByRole('button', { name: /Boîte de réception/i })).toBeInTheDocument();
+    expect(mobileFolders().getByRole('button', { name: /Boîte de réception/i })).toBeInTheDocument();
   });
 
   test('le menu mobile expose son état et se ferme avec Échap en restaurant le focus', async () => {

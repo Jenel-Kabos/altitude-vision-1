@@ -50,8 +50,13 @@ const processFetchedMessage = async (message, context) => {
     const fromName = parsed.from?.value?.[0]?.name || fromAddress;
     const toAddress = (parsed.to?.value?.[0]?.address || process.env.ZOHO_FROM_EMAIL).toLowerCase().trim();
     const subject = parsed.subject || '(Sans objet)';
-    const textContent = parsed.text || '';
-    const htmlContent = parsed.html || '';
+    // INBOX-PRO-1 — tronquer défensivement AVANT persistance : un email
+    // dépassant `maxlength` (content: 10000, html: 200000) ferait échouer
+    // toute la validation Mongoose, donc rejeter l'import entier d'un
+    // email par ailleurs légitime — un email tronqué reste consultable,
+    // un email jamais importé ne l'est pas.
+    const textContent = (parsed.text || '').slice(0, 10000);
+    const htmlContent = (parsed.html || '').slice(0, 200000);
     const messageId = parsed.messageId || `imap-uid-${message.uid}-${Date.now()}`;
 
     const duplicateCheckStartedAt = Date.now();
@@ -103,6 +108,14 @@ const processFetchedMessage = async (message, context) => {
         return { markSeen: true, status: 'permanent_rejection' };
     }
 
+    // INBOX-PRO-1 — `simpleParser` génère quasi systématiquement un
+    // `textContent` auto-dérivé même pour un email HTML pur : préférer
+    // `textContent` ici privait `content` de toute correspondance HTML
+    // réelle (facture/newsletter/tableaux/images), le HTML original
+    // n'étant jamais persisté nulle part. `html` conserve désormais le
+    // corps HTML original tel que reçu (rendu par le frontend via un
+    // viewer sandboxé) ; `content` reste le texte (fallback, recherche,
+    // notifications) — jamais supprimé.
     await runEmailStep(context, 'persist', () => InternalMail.create({
         sender: undefined,
         senderName: fromName,
@@ -110,7 +123,8 @@ const processFetchedMessage = async (message, context) => {
         receiverEmail: toAddress,
         receiver: recipientUser._id,
         subject,
-        content: textContent || htmlContent || '(Contenu vide)',
+        content: (textContent || htmlContent || '(Contenu vide)').slice(0, 10000),
+        html: htmlContent || null,
         priority: 'Normale',
         isRead: false,
         isDraft: false,

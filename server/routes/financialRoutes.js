@@ -6,6 +6,7 @@ const mtnCtrl = require('../controllers/mtnMomoPaymentController');
 const { STAFF_IMMO } = require('../utils/roles');
 const router = express.Router();
 const { attachTenantScopeIfResolvable } = require('../middleware/tenantContext');
+const manualPaymentProofUpload = require('../middleware/manualPaymentProofUpload');
 // TENANT-SCOPE-HOTFIX-3 — même correctif que hotelRoutes.js : `requireTenantScope`
 // bloquait, avant même d'atteindre `financialAuthorizationService.assertFinancialScope`,
 // tout exploitant/Proprietaire public-signup sans OrgMembership sur des
@@ -56,6 +57,11 @@ router.get('/hotel/reservations/:reservationId/payments', ctrl.listReservationPa
 router.get('/documents/:documentId/payments', ctrl.listDocumentPayments);
 router.get('/payments/:paymentId', ctrl.getPayment);
 router.post('/payments/:paymentId/confirm', ctrl.confirmPayment);
+router.post('/payments/:paymentId/reject', ctrl.rejectPayment);
+router.post('/payments/:paymentId/proof', manualPaymentProofUpload, ctrl.uploadPaymentProof);
+router.get('/payments/:paymentId/proof', ctrl.downloadPaymentProof);
+router.post('/payments/:paymentId/receipt', ctrl.generatePaymentReceipt);
+router.get('/payments/:paymentId/receipt', ctrl.downloadPaymentReceipt);
 router.post('/payments/:paymentId/allocations', ctrl.allocateHotelPayment);
 router.post('/allocations', ctrl.allocate);
 router.post('/allocations/:allocationId/reverse', ctrl.reverseAllocation);

@@ -43,6 +43,18 @@ const internalMailSchema = new mongoose.Schema({
     maxlength: 10000,
   },
 
+  // INBOX-PRO-1 — corps HTML original (facture/newsletter/signature…), quand
+  // disponible. `content` reste le texte brut (fallback, recherche,
+  // notifications) — jamais supprimé ni renommé pour rester rétrocompatible
+  // avec tout code existant qui ne lit que `content`. Plafond nettement plus
+  // élevé que `content` : un email HTML professionnel réel dépasse
+  // couramment 10 000 caractères de markup.
+  html: {
+    type: String,
+    default: null,
+    maxlength: 200000,
+  },
+
   priority: {
     type:    String,
     enum:    ['Basse', 'Normale', 'Haute', 'Urgente'],

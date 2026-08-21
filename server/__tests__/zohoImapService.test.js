@@ -186,6 +186,61 @@ describe('pollZohoInbox', () => {
         expect(logger.warn).toHaveBeenCalledWith('[IMAP] Polling ignoré : cycle déjà en cours');
     });
 
+    test('INBOX-PRO-1 — conserve le HTML original en plus du texte (ne préfère plus systématiquement le texte)', async () => {
+        const client = createClient();
+        client.search.mockResolvedValue([1]);
+        client.fetchAll.mockResolvedValue([message(1)]);
+        simpleParser.mockResolvedValue({
+            from: { value: [{ address: 'sender@example.test', name: 'Sender' }] },
+            to: { value: [{ address: 'inbox@altitudevision.test' }] },
+            subject: 'Facture HTML',
+            text: 'Facture — version texte auto-générée',
+            html: '<table><tr><td>Ligne</td><td>100 FCFA</td></tr></table>',
+            messageId: 'message-html-1',
+            attachments: [],
+        });
+        User.findOne.mockResolvedValue({ _id: 'recipient-id', email: 'inbox@altitudevision.test' });
+        InternalMail.findOne.mockResolvedValue(null);
+        InternalMail.create.mockResolvedValue({ _id: 'created' });
+        ImapFlow.mockImplementation(() => client);
+
+        await expect(pollZohoInbox()).resolves.toEqual({ imported: 1, skipped: 0, errors: 0 });
+
+        expect(InternalMail.create).toHaveBeenCalledWith(expect.objectContaining({
+            content: 'Facture — version texte auto-générée',
+            html: '<table><tr><td>Ligne</td><td>100 FCFA</td></tr></table>',
+        }));
+    });
+
+    test('INBOX-PRO-1 — un email HTML sans partie texte stocke quand même le HTML, jamais tronqué de façon à casser content', async () => {
+        const client = createClient();
+        client.search.mockResolvedValue([1]);
+        client.fetchAll.mockResolvedValue([message(1)]);
+        const longHtml = `<div>${'x'.repeat(250000)}</div>`;
+        simpleParser.mockResolvedValue({
+            from: { value: [{ address: 'sender@example.test', name: 'Sender' }] },
+            to: { value: [{ address: 'inbox@altitudevision.test' }] },
+            subject: 'Newsletter volumineuse',
+            text: '',
+            html: longHtml,
+            messageId: 'message-html-2',
+            attachments: [],
+        });
+        User.findOne.mockResolvedValue({ _id: 'recipient-id', email: 'inbox@altitudevision.test' });
+        InternalMail.findOne.mockResolvedValue(null);
+        InternalMail.create.mockResolvedValue({ _id: 'created' });
+        ImapFlow.mockImplementation(() => client);
+
+        await expect(pollZohoInbox()).resolves.toEqual({ imported: 1, skipped: 0, errors: 0 });
+
+        const payload = InternalMail.create.mock.calls[0][0];
+        // Ne doit jamais dépasser les plafonds du schéma (content: 10000,
+        // html: 200000) — une validation Mongoose échouée rejetterait
+        // l'import entier d'un email par ailleurs légitime.
+        expect(payload.content.length).toBeLessThanOrEqual(10000);
+        expect(payload.html.length).toBeLessThanOrEqual(200000);
+    });
+
     test('un logout qui ne répond pas est borné puis la connexion est fermée localement', async () => {
         jest.useFakeTimers();
         const client = createClient({ logout: jest.fn().mockReturnValue(new Promise(() => {})) });

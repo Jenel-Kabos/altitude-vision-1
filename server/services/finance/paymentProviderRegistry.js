@@ -48,7 +48,10 @@ const STATUS_MAPS = Object.freeze({
   [PAYMENT_PROVIDERS.MANUAL]: Object.freeze({ submitted: 'pending', approved: 'succeeded', rejected: 'failed' }),
   // PAY-4 — source de vérité unique : mtnMoMoProvider.MTN_STATUS_MAP.
   [PAYMENT_PROVIDERS.MTN_DIRECT]: mtnMoMoProvider.MTN_STATUS_MAP,
-  [PAYMENT_PROVIDERS.AIRTEL_DIRECT]: Object.freeze({ pending: 'pending', success: 'succeeded', failed: 'failed', cancelled: 'cancelled' }),
+  // PAY-5 — aucun vocabulaire de statut Airtel n'est publiquement exposé
+  // dans la documentation officielle accessible sans compte développeur.
+  // Une table vide échoue fermée au lieu d'inventer des statuts distants.
+  [PAYMENT_PROVIDERS.AIRTEL_DIRECT]: Object.freeze({}),
   [PAYMENT_PROVIDERS.YABETOO]: Object.freeze({ pending: 'pending', succeeded: 'succeeded', failed: 'failed', cancelled: 'cancelled' }),
   [PAYMENT_PROVIDERS.CARD_PSP]: Object.freeze({ pending: 'pending', authorized: 'processing', captured: 'succeeded', declined: 'failed', voided: 'cancelled' }),
 });
@@ -112,7 +115,9 @@ const REGISTRY = Object.freeze({
     scope: PAYMENT_PROVIDER_SCOPE[PAYMENT_PROVIDERS.AIRTEL_DIRECT],
     methods: PAYMENT_PROVIDER_METHODS[PAYMENT_PROVIDERS.AIRTEL_DIRECT],
     integratedWithFinancialCore: false,
-    capabilities: Object.freeze({ initiate: true, statusQuery: true, webhook: true, refund: false, reconcile: true, requiresManualValidation: false }),
+    // PAY-5 — toutes les opérations réseau restent volontairement fermées
+    // tant que le contrat officiel Congo et un sandbox ne sont pas fournis.
+    capabilities: Object.freeze({ initiate: false, statusQuery: false, webhook: false, refund: false, reconcile: false, requiresManualValidation: false }),
     normalizeStatus: (raw) => normalizeStatus(PAYMENT_PROVIDERS.AIRTEL_DIRECT, raw),
     initiatePayment: notImplemented(PAYMENT_PROVIDERS.AIRTEL_DIRECT, 'initiatePayment'),
     getStatus: notImplemented(PAYMENT_PROVIDERS.AIRTEL_DIRECT, 'getStatus'),

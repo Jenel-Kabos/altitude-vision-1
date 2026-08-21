@@ -174,12 +174,16 @@ exports.receiveExternalMail = asyncHandler(async (req, res) => {
     return res.status(200).json({ status: 'ignored', message: 'Destinataire inconnu.' });
   }
 
+  // INBOX-PRO-1 — même correction que zohoImapService.js : conserver le
+  // HTML original (tronqué défensivement pour ne jamais faire échouer la
+  // validation Mongoose) plutôt que de ne garder que le texte auto-dérivé.
   const mail = await InternalMail.create({
     senderName:     fromName    || fromAddress,
     senderEmail:    fromAddress,
     receiver:       recipientUser._id,
     subject:        subject     || 'Sans objet',
-    content:        textContent || htmlContent || '',
+    content:        (textContent || htmlContent || '').slice(0, 10000),
+    html:           htmlContent ? String(htmlContent).slice(0, 200000) : null,
     priority:       'Normale',
     isRead:         false,
     isDraft:        false,

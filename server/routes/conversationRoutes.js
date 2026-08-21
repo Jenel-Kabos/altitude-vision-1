@@ -4,7 +4,7 @@ const { ALL_STAFF } = require('../utils/roles');
 const router = express.Router();
 
 const authController = require('../controllers/authController');
-const { attachTenantContext } = require('../middleware/tenantContext');
+const { attachTenantContext, requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/tenantContext');
 const { restrictTo } = require('../middleware/authMiddleware');
 const {
   getConversationById,
@@ -35,7 +35,7 @@ router.use(authController.protect, attachTenantContext);
 // ── Routes statiques (AVANT /:conversationId pour éviter les conflits) ──────
 
 // Compteur global de non-lus
-router.get('/count/unread', getUnreadCount);
+router.get('/count/unread', requireTenantScopeForStaffOrPlatformOperator, getUnreadCount);
 
 // Boîte partagée staff (Admin + tous sous-rôles collaborateurs)
 router.get('/staff-inbox', restrictTo(...ALL_STAFF), getStaffInbox);

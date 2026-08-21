@@ -1,4 +1,5 @@
 const mongoose = require('mongoose'); const C = require('../constants/financialConstants'); const ObjectId = mongoose.Schema.Types.ObjectId;
+const privateAssetSchema = require('./schemas/privateAssetSchema');
 const schema = new mongoose.Schema({
   tenant: { type: ObjectId, ref: 'PlatformTenant', default: null, index: true },
   domain: { type: String, enum: C.FINANCIAL_DOMAINS, required: true }, establishmentType: { type: String, enum: C.FINANCIAL_ESTABLISHMENT_TYPES, required: true }, establishmentId: { type: ObjectId, required: true }, paymentReference: { type: String, required: true }, status: { type: String, enum: C.FINANCIAL_PAYMENT_STATUSES, default: 'pending' }, method: { type: String, enum: C.FINANCIAL_PAYMENT_METHODS, required: true }, provider: { type: String, default: 'manual' },
@@ -6,6 +7,7 @@ const schema = new mongoose.Schema({
   payer: { name: String, email: String, phone: String, userId: { type: ObjectId, ref: 'User' } }, subjectType: { type: String, enum: C.FINANCIAL_SUBJECT_TYPES }, subjectId: ObjectId,
   providerPaymentId: { type: String, trim: true, minlength: 1, set(value) { if (value == null) return undefined; if (typeof value !== 'string') throw new mongoose.Error.CastError('String', value, 'providerPaymentId'); return value; } }, providerIntentId: String, providerMetadata: { type: mongoose.Schema.Types.Mixed, default: {}, select: false }, receivedAt: Date, confirmedAt: Date, failedAt: Date, cancelledAt: Date,
   manualValidation: { status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }, submittedBy: { type: ObjectId, ref: 'User' }, approvedBy: { type: ObjectId, ref: 'User' }, approvedAt: Date, rejectedBy: { type: ObjectId, ref: 'User' }, rejectedAt: Date, reason: String },
+  proof: { asset: { type: privateAssetSchema, select: false }, uploadedBy: { type: ObjectId, ref: 'User' }, uploadedAt: Date },
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} }, createdBy: { type: ObjectId, ref: 'User', required: true }, confirmedBy: { type: ObjectId, ref: 'User' },
   businessOperationKey: { type: String, trim: true, maxlength: 200 }, payloadHash: { type: String, select: false },
 }, { timestamps: true });

@@ -53,10 +53,28 @@ describe('paymentProviderRegistry — providers automatiques non implémentés (
 describe('paymentProviderRegistry — normalisation de statut (PAY-3 §16)', () => {
   test('chaque statut normalisé appartient bien à FINANCIAL_PAYMENT_STATUSES (jamais un nouvel enum créé)', () => {
     expect(normalizeStatus('mtn_direct', 'SUCCESSFUL')).toBe('succeeded');
-    expect(normalizeStatus('airtel_direct', 'success')).toBe('succeeded');
+    expect(() => normalizeStatus('airtel_direct', 'success')).toThrow(
+      expect.objectContaining({ code: 'FINANCIAL_PROVIDER_STATUS_UNKNOWN' }),
+    );
     expect(normalizeStatus('yabetoo', 'pending')).toBe('pending');
     expect(normalizeStatus('card_psp', 'authorized')).toBe('processing');
     expect(FINANCIAL_PAYMENT_STATUSES).toContain(normalizeStatus('mtn_direct', 'FAILED'));
+  });
+
+  test('airtel_direct reste fail-closed tant que le contrat officiel PAY-5 est indisponible', () => {
+    const airtel = getProvider(PAYMENT_PROVIDERS.AIRTEL_DIRECT);
+    expect(airtel.integratedWithFinancialCore).toBe(false);
+    expect(airtel.capabilities).toEqual({
+      initiate: false,
+      statusQuery: false,
+      webhook: false,
+      refund: false,
+      reconcile: false,
+      requiresManualValidation: false,
+    });
+    expect(() => airtel.normalizeStatus('SUCCESS')).toThrow(
+      expect.objectContaining({ code: 'FINANCIAL_PROVIDER_STATUS_UNKNOWN' }),
+    );
   });
 
   test('statut distant non reconnu → FINANCIAL_PROVIDER_STATUS_UNKNOWN, jamais une supposition silencieuse', () => {

@@ -11,7 +11,7 @@ const proofSchema = new mongoose.Schema({
 }, { _id: true });
 
 const litigeSchema = new mongoose.Schema({
-  reference: { type: String, unique: true },
+  reference: { type: String },
 
   type: {
     type: String,
@@ -73,6 +73,14 @@ const litigeSchema = new mongoose.Schema({
   dateOuverture:   { type: Date, default: Date.now },
   dateDerniereMaj: Date,
 }, { timestamps: true });
+
+// Les créations API reçoivent une référence métier, mais les ressources
+// historiques/legacy peuvent légitimement ne pas en avoir. L'unicité porte
+// donc uniquement sur les vraies valeurs textuelles, jamais sur null/absent.
+litigeSchema.index(
+  { reference: 1 },
+  { unique: true, name: 'reference_1', partialFilterExpression: { reference: { $type: 'string' } } },
+);
 
 litigeSchema.set('toJSON', { transform: (_doc, ret) => {
   ret.preuves = (ret.preuves || []).map(({ url, asset, ...metadata }, index) => ({ ...metadata,

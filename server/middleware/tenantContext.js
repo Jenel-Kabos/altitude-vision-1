@@ -93,8 +93,14 @@ async function resolveAndAttachTenantScope(req, { allowAnyStatus = false } = {})
 // utilisé PARTOUT ailleurs et n'a AUCUN changement de comportement pour un
 // opérateur non scopé au-delà du message d'erreur (voir plus bas) — il
 // bloque toujours, exactement comme le fail-closed historique.
-const createRequireTenantScope = ({ allowPlatformWide = false } = {}) => async (req, res, next) => {
+const createRequireTenantScope = ({ allowPlatformWide = false, requireWhen = () => true } = {}) => async (req, res, next) => {
   const { resolved, isPlatformOperator, available, explicitTenantId } = await resolveAndAttachTenantScope(req);
+
+  // Certaines routes restent légitimement accessibles aux clients sans
+  // OrgMembership, tout en étant tenant-scoped pour le staff et les
+  // Platform Operators. Le prédicat permet de réutiliser exactement le
+  // garde canonique et ses codes sans imposer un tenant aux clients.
+  if (!requireWhen({ req, resolved, isPlatformOperator })) return next();
 
   const unscopedOperatorAllowed = allowPlatformWide && isPlatformOperator && req.tenantContextSource === 'platform_operator_unscoped';
 
@@ -136,6 +142,10 @@ const createRequireTenantScope = ({ allowPlatformWide = false } = {}) => async (
 
 const requireTenantScope = createRequireTenantScope({ allowPlatformWide: false });
 const requireTenantScopeAllowPlatformWide = createRequireTenantScope({ allowPlatformWide: true });
+const requireTenantScopeForStaffOrPlatformOperator = createRequireTenantScope({
+  allowPlatformWide: false,
+  requireWhen: ({ req, isPlatformOperator }) => isPlatformOperator || require('../utils/roles').ALL_STAFF.includes(req.user?.role),
+});
 
 // TENANT-SCOPE-HOTFIX-3 — voir bandeau d'en-tête. `allowAnyStatus` n'a de
 // sens que pour un PlatformOperator (mêmes garanties que
@@ -152,5 +162,6 @@ const attachTenantScopeIfResolvable = async (req, res, next) => {
 };
 
 module.exports = {
-  attachTenantContext, requireTenantScope, requireTenantScopeAllowPlatformWide, attachTenantScopeIfResolvable,
+  attachTenantContext, requireTenantScope, requireTenantScopeAllowPlatformWide,
+  requireTenantScopeForStaffOrPlatformOperator, attachTenantScopeIfResolvable,
 };
