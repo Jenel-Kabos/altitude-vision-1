@@ -3,10 +3,28 @@
 // src/pages/dashboard/PropertyModerationPage.jsx
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
-import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag } from 'lucide-react';
+import { Filter, CheckCircle2, XCircle, Eye, MapPin, Tag, Mail, Phone, MessageCircle } from 'lucide-react';
 import toast from '@/lib/utils/toast';
 import Image from 'next/image';
 import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState, DashboardToolbar } from '../../components/dashboard/DashboardUI';
+import { buildWhatsAppLink } from '../../utils/whatsapp';
+
+// HOTFIX-MODERATION-PROPERTY-SUBMITTER-CONTACT-1 — labels humains pour le
+// rôle du soumissionnaire dans le bloc "Soumis par". Volontairement local à
+// cette page (pas de helper partagé existant côté web pour l'enum complet de
+// `User.role` — voir ProfilePage.jsx qui a son propre mapping partiel).
+const ROLE_LABELS = {
+  Admin: 'Administrateur',
+  Client: 'Client',
+  Proprietaire: 'Propriétaire',
+  Collaborateur: 'Collaborateur',
+  Secretaire: 'Secrétaire',
+  GestionnaireImmobilier: 'Gestionnaire immobilier',
+  CommunityManager: 'Community manager',
+  Communicant: 'Communicant',
+  Prestataire: 'Prestataire',
+  User: 'Membre',
+};
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api';
 const getImageUrl = (url) => {
@@ -233,26 +251,66 @@ const PropertyModerationPage = () => {
               </div>
             </div>
 
-            {/* Propriétaire */}
-            {selectedProperty.owner && (
-              <div className="mb-6 p-4 rounded-xl bg-gray-50 border border-gray-100">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Propriétaire</p>
-                <div className="flex items-center gap-3">
-                  {selectedProperty.owner.photo ? (
-                    <Image src={selectedProperty.owner.photo} alt={selectedProperty.owner.name}
-                      width={40} height={40} unoptimized className="rounded-full object-cover" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
-                      {selectedProperty.owner.name?.charAt(0).toUpperCase()}
+            {/* Soumis par — backoffice uniquement, jamais exposé sur la fiche publique */}
+            {selectedProperty.owner && (() => {
+              const submitter = selectedProperty.owner;
+              const roleLabel = ROLE_LABELS[submitter.role] || submitter.role;
+              const whatsappLink = buildWhatsAppLink(
+                submitter.phone,
+                `Bonjour, je vous contacte depuis Altitude Vision concernant votre annonce « ${selectedProperty.title} » actuellement en cours de validation.`,
+              );
+              const submittedAt = selectedProperty.createdAt
+                ? new Date(selectedProperty.createdAt).toLocaleString('fr-FR', {
+                    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                  })
+                : null;
+
+              return (
+                <div className="mb-6 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Soumis par</p>
+                  <div className="flex items-start gap-3 mb-3">
+                    {submitter.photo ? (
+                      <Image src={submitter.photo} alt={submitter.name}
+                        width={44} height={44} unoptimized className="rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm flex-shrink-0">
+                        {submitter.name?.charAt(0).toUpperCase() || '?'}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm">{submitter.name || 'Nom non renseigné'}</p>
+                      {roleLabel && <p className="text-gray-500 text-xs">{roleLabel}</p>}
+                      {submittedAt && <p className="text-gray-400 text-xs mt-0.5">Soumis le {submittedAt}</p>}
                     </div>
-                  )}
-                  <div>
-                    <p className="font-semibold text-gray-900 text-sm">{selectedProperty.owner.name}</p>
-                    <p className="text-gray-500 text-xs">{selectedProperty.owner.email}</p>
                   </div>
+
+                  <div className="space-y-1.5 mb-3 text-sm">
+                    <p className="flex items-center gap-2 text-gray-700">
+                      <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      {submitter.email || <span className="text-gray-400 italic">Email non renseigné</span>}
+                    </p>
+                    <p className="flex items-center gap-2 text-gray-700">
+                      <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      {submitter.phone || <span className="text-gray-400 italic">Numéro non renseigné</span>}
+                    </p>
+                  </div>
+
+                  {whatsappLink ? (
+                    <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+                      aria-label={`Contacter ${submitter.name || 'le soumissionnaire'} sur WhatsApp`}
+                      className="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-2">
+                      <MessageCircle size={16} /> Contacter sur WhatsApp
+                    </a>
+                  ) : (
+                    <button type="button" disabled
+                      aria-label="Contacter sur WhatsApp — numéro indisponible"
+                      className="inline-flex items-center gap-2 bg-gray-200 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold cursor-not-allowed">
+                      <MessageCircle size={16} /> Contacter sur WhatsApp
+                    </button>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Images */}
             <div className="mb-6">

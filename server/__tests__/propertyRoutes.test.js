@@ -202,6 +202,75 @@ describe('PATCH /api/properties/admin/:id/:action', () => {
   });
 });
 
+// ─── GET /api/properties/status/pending (modération, backoffice uniquement) ──
+// HOTFIX-MODERATION-PROPERTY-SUBMITTER-CONTACT-1 : le bloc "Soumis par" du
+// dashboard modération réutilise `owner` déjà peuplé par cette route — ce
+// test prouve que le peuplement existant (name/email/photo/role/phone) est
+// bien celui reçu par le frontend et qu'il reste borné au staff Admin.
+
+describe('GET /api/properties/status/pending', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('401 — sans token', async () => {
+    const res = await request(app).get('/api/properties/status/pending');
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('403 — rôle non-Admin refusé (endpoint backoffice uniquement)', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
+    const res = await request(app)
+      .get('/api/properties/status/pending')
+      .set('Authorization', `Bearer ${makeToken('Client')}`);
+    expect(res.statusCode).toBe(403);
+  });
+
+  test("200 (Admin) — renvoie le vrai soumissionnaire (owner) avec name/email/phone/role, jamais mot de passe ni tokens", async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
+    const submitter = {
+      _id: '507f1f77bcf86cd799439012', name: 'TEST DATA SUBMITTER', email: 'submitter@example.test',
+      photo: '', role: 'Proprietaire', phone: '+242060000010',
+    };
+    const pendingProperty = {
+      _id: '507f191e810c19729de860ea', title: 'TEST DATA PENDING', statusAdmin: 'En attente',
+      status: 'vente', owner: submitter, createdAt: new Date('2026-08-21T15:42:00.000Z'),
+    };
+    const chain = makeMongoChain([pendingProperty]);
+    Property.find = jest.fn().mockReturnValue(chain);
+
+    const res = await request(app)
+      .get('/api/properties/status/pending')
+      .set('Authorization', `Bearer ${makeToken('Admin')}`);
+
+    expect(res.statusCode).toBe(200);
+    // Le champ de sélection du populate() est la seule protection structurelle
+    // empêchant password/tokenVersion/tokens de sortir de Mongoose — vérifié
+    // explicitement ici plutôt que de faire confiance à un simple mock.
+    expect(chain.populate).toHaveBeenCalledWith('owner', 'name email photo role phone');
+    const returned = res.body.data.properties[0].owner;
+    expect(returned).toMatchObject({
+      name: 'TEST DATA SUBMITTER', email: 'submitter@example.test', role: 'Proprietaire', phone: '+242060000010',
+    });
+    expect(returned.password).toBeUndefined();
+    expect(returned.tokenVersion).toBeUndefined();
+  });
+
+  test('200 (Admin) — un bien en attente sans owner résolu ne fait pas planter la route', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
+    const pendingProperty = {
+      _id: '507f191e810c19729de860ea', title: 'TEST DATA ORPHAN', statusAdmin: 'En attente',
+      status: 'vente', owner: null,
+    };
+    Property.find = jest.fn().mockReturnValue(makeMongoChain([pendingProperty]));
+
+    const res = await request(app)
+      .get('/api/properties/status/pending')
+      .set('Authorization', `Bearer ${makeToken('Admin')}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.data.properties[0].owner).toBeNull();
+  });
+});
+
 // ─── GET /api/properties/recommended ────────────────────────────────────────
 
 describe('GET /api/properties/recommended', () => {
