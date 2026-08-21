@@ -154,6 +154,21 @@ export const AuthProvider = ({ children }) => {
         errorMessage: error?.message,
       });
       const code = error?.code || error?.message || '';
+      const businessCode = error?.response?.data?.code;
+      if (businessCode === 'ACCOUNT_NOT_FOUND') {
+        Alert.alert(
+          'Compte introuvable',
+          "Aucun compte n'est associé à cette adresse Google. Créez d'abord votre compte."
+        );
+        return { errorCode: businessCode };
+      }
+      if (businessCode === 'ACCOUNT_ALREADY_EXISTS') {
+        Alert.alert(
+          'Compte existant',
+          'Un compte existe déjà avec cette adresse. Connectez-vous.'
+        );
+        return { errorCode: businessCode };
+      }
       if (
         code.includes('SIGN_IN_CANCELLED') ||
         code === 'ERR_CANCELED' ||

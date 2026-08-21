@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Text, View } from 'react-native';
+import { Alert, Button, Text, View } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 // La totalité du mock est construite À L'INTÉRIEUR de la factory (jamais une
@@ -57,6 +57,8 @@ function Harness() {
       <Text testID="account-status">{auth.accountStatusMessage || ''}</Text>
       <Button title="logout" onPress={auth.logout} />
       <Button title="login" onPress={() => auth.login('user@example.test', 'secret')} />
+      <Button title="google-login" onPress={() => auth.loginWithGoogle({ idToken: 'opaque', intent: 'login' })} />
+      <Button title="google-signup" onPress={() => auth.loginWithGoogle({ idToken: 'opaque', intent: 'signup' })} />
     </View>
   );
 }
@@ -67,7 +69,10 @@ describe('AuthProvider', () => {
     mockDeleteToken.mockResolvedValue();
     mockRegisterPush.mockResolvedValue();
     mockUnregisterPush.mockResolvedValue();
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
+
+  afterEach(() => Alert.alert.mockRestore());
 
   test('termine anonyme si aucun token ne doit être restauré', async () => {
     mockGetToken.mockResolvedValue(null);
@@ -156,5 +161,41 @@ describe('AuthProvider', () => {
     await act(async () => fireEvent.press(screen.getByText('login')));
     expect(screen.getByTestId('state').props.children).toBe('user-b');
     expect(screen.getByTestId('account-status').props.children).toBe('');
+  });
+
+  test('ACCOUNT_NOT_FOUND reste sans session et affiche le message Login dédié', async () => {
+    mockGetToken.mockResolvedValue(null);
+    mockApi.post.mockRejectedValue({
+      response: { status: 404, data: { code: 'ACCOUNT_NOT_FOUND' } },
+    });
+    const screen = render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('state').props.children).toBe('anonymous'));
+
+    await act(async () => fireEvent.press(screen.getByText('google-login')));
+
+    expect(mockApi.post).toHaveBeenCalledWith('/auth/google', expect.objectContaining({ intent: 'login' }));
+    expect(screen.getByTestId('state').props.children).toBe('anonymous');
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Compte introuvable',
+      "Aucun compte n'est associé à cette adresse Google. Créez d'abord votre compte."
+    );
+  });
+
+  test('ACCOUNT_ALREADY_EXISTS reste sans session et affiche le message Signup dédié', async () => {
+    mockGetToken.mockResolvedValue(null);
+    mockApi.post.mockRejectedValue({
+      response: { status: 409, data: { code: 'ACCOUNT_ALREADY_EXISTS' } },
+    });
+    const screen = render(<AuthProvider><Harness /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('state').props.children).toBe('anonymous'));
+
+    await act(async () => fireEvent.press(screen.getByText('google-signup')));
+
+    expect(mockApi.post).toHaveBeenCalledWith('/auth/google', expect.objectContaining({ intent: 'signup' }));
+    expect(screen.getByTestId('state').props.children).toBe('anonymous');
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Compte existant',
+      'Un compte existe déjà avec cette adresse. Connectez-vous.'
+    );
   });
 });

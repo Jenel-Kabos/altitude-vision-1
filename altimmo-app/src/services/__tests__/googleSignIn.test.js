@@ -102,7 +102,22 @@ describe('googleSignIn', () => {
 
     await signInWithGoogle(authenticate, 'Login');
     expect(authenticate).toHaveBeenCalledTimes(1);
-    expect(authenticate).toHaveBeenCalledWith({ idToken: 'test-id-token', role: 'Client' });
+    expect(authenticate).toHaveBeenCalledWith({
+      idToken: 'test-id-token', intent: 'login', role: 'Client',
+    });
+  });
+
+  it('sends the signup intent from the Signup surface', async () => {
+    const authenticate = jest.fn().mockResolvedValue({ user: { id: 'app-user' } });
+    GoogleSignin.signIn.mockResolvedValue({
+      type: 'success', data: { idToken: 'test-id-token', user: {} },
+    });
+
+    await signInWithGoogle(authenticate, 'Signup');
+
+    expect(authenticate).toHaveBeenCalledWith({
+      idToken: 'test-id-token', intent: 'signup', role: 'Client',
+    });
   });
 
   it('does not call backend authentication after cancellation', async () => {

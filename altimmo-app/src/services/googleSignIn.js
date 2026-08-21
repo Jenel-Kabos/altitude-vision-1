@@ -65,10 +65,13 @@ export async function getGoogleIdToken() {
 }
 
 export async function signInWithGoogle(authenticate, source) {
+  const intentBySource = { Login: 'login', Signup: 'signup' };
+  const intent = intentBySource[source];
+  if (!intent) throw new Error('Unsupported Google authentication source');
   logGoogleSignInStep(`STEP 1 ${source} button pressed`);
   const idToken = await getGoogleIdToken();
   logGoogleSignInStep('STEP 7 backend auth call attempted', { source });
-  const result = await authenticate({ idToken, role: 'Client' });
+  const result = await authenticate({ idToken, intent, role: 'Client' });
   logGoogleSignInStep(`STEP 9 ${source} session result`, {
     hasSessionUser: Boolean(result?.user),
   });

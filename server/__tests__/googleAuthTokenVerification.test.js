@@ -51,7 +51,7 @@ describe('POST /api/auth/google verification contract', () => {
         });
     });
 
-    test('accepts a Google ticket verified for the configured Web client audience', async () => {
+    test('keeps the missing-intent legacy Web contract and verifies the configured audience', async () => {
         verifyIdToken.mockResolvedValue({ getPayload: () => verifiedPayload });
         const res = response();
 
@@ -63,6 +63,123 @@ describe('POST /api/auth/google verification contract', () => {
         });
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: 'success' }));
+    });
+
+    test('login + existing account creates a session without creating a user', async () => {
+        verifyIdToken.mockResolvedValue({ getPayload: () => verifiedPayload });
+        const res = response();
+
+        await authController.googleToken({
+            body: { idToken: 'opaque-valid-token', intent: 'login' },
+        }, res);
+
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            status: 'success', token: expect.any(String), isNewUser: false,
+        }));
+        expect(User.create).not.toHaveBeenCalled();
+    });
+
+    test('login + absent account returns ACCOUNT_NOT_FOUND without creation or session', async () => {
+        verifyIdToken.mockResolvedValue({ getPayload: () => verifiedPayload });
+        User.findOne.mockResolvedValue(null);
+        const res = response();
+
+        await authController.googleToken({
+            body: { idToken: 'opaque-valid-token', intent: 'login' },
+        }, res);
+
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'ACCOUNT_NOT_FOUND' }));
+        expect(res.json.mock.calls[0][0]).not.toHaveProperty('token');
+        expect(User.create).not.toHaveBeenCalled();
+        expect(PendingRegistration.findOne).not.toHaveBeenCalled();
+    });
+
+    test('signup + absent account creates one Client account and a session', async () => {
+        verifyIdToken.mockResolvedValue({ getPayload: () => verifiedPayload });
+        User.findOne.mockResolvedValue(null);
+        const createdUser = {
+            _id: 'created-user-id', tokenVersion: 0, role: 'Client',
+            name: verifiedPayload.name, email: verifiedPayload.email,
+            isEmailVerified: true, save: jest.fn().mockResolvedValue(undefined),
+        };
+        User.create.mockResolvedValue(createdUser);
+        const res = response();
+
+        await authController.googleToken({
+            body: { idToken: 'opaque-valid-token', intent: 'signup', role: 'Admin' },
+        }, res);
+
+        expect(User.create).toHaveBeenCalledTimes(1);
+        expect(User.create).toHaveBeenCalledWith(expect.objectContaining({
+            email: verifiedPayload.email,
+            googleId: verifiedPayload.sub,
+            role: 'Client',
+            authProvider: 'google',
+        }));
+        expect(res.status).toHaveBeenCalledWith(201);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            token: expect.any(String), isNewUser: true,
+        }));
+    });
+
+    test('signup + existing account returns conflict without linking, creation, or session', async () => {
+        verifyIdToken.mockResolvedValue({ getPayload: () => verifiedPayload });
+        const existingUser = await User.findOne();
+        existingUser.googleId = undefined;
+        User.findOne.mockResolvedValue(existingUser);
+        const res = response();
+
+        await authController.googleToken({
+            body: { idToken: 'opaque-valid-token', intent: 'signup' },
+        }, res);
+
+        expect(res.status).toHaveBeenCalledWith(409);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            code: 'ACCOUNT_ALREADY_EXISTS',
+        }));
+        expect(res.json.mock.calls[0][0]).not.toHaveProperty('token');
+        expect(existingUser.googleId).toBeUndefined();
+        expect(existingUser.save).not.toHaveBeenCalled();
+        expect(User.create).not.toHaveBeenCalled();
+    });
+
+    test('a repeated signup sees the existing account and cannot create a duplicate', async () => {
+        verifyIdToken.mockResolvedValue({ getPayload: () => verifiedPayload });
+        const createdUser = {
+            _id: 'created-user-id', tokenVersion: 0, role: 'Client',
+            name: verifiedPayload.name, email: verifiedPayload.email,
+            isEmailVerified: true, save: jest.fn().mockResolvedValue(undefined),
+        };
+        User.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(createdUser);
+        User.create.mockResolvedValue(createdUser);
+
+        await authController.googleToken({
+            body: { idToken: 'opaque-valid-token', intent: 'signup' },
+        }, response());
+        const replayResponse = response();
+        await authController.googleToken({
+            body: { idToken: 'opaque-valid-token', intent: 'signup' },
+        }, replayResponse);
+
+        expect(User.create).toHaveBeenCalledTimes(1);
+        expect(replayResponse.status).toHaveBeenCalledWith(409);
+        expect(replayResponse.json.mock.calls[0][0]).not.toHaveProperty('token');
+    });
+
+    test('rejects an invalid explicit intent before verifying the token', async () => {
+        const res = response();
+
+        await authController.googleToken({
+            body: { idToken: 'opaque-token', intent: 'register-or-login' },
+        }, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            code: 'INVALID_AUTH_INTENT',
+        }));
+        expect(verifyIdToken).not.toHaveBeenCalled();
     });
 
     test.each([

@@ -659,9 +659,19 @@ const sendGoogleAuthResponse = (user, statusCode, isNewUser, res) => {
 
 exports.googleToken = async (req, res) => {
     try {
-        const { idToken, role, phone } = req.body;
+        const { idToken, intent, role, phone } = req.body;
         if (!idToken) {
             return res.status(400).json({ status: 'fail', message: 'idToken requis.' });
+        }
+        // `intent` absent conserve temporairement le contrat Web NextAuth
+        // historique (login-or-create). Tout client qui l'envoie est soumis à
+        // l'une des deux intentions fermées ci-dessous.
+        if (intent !== undefined && !['login', 'signup'].includes(intent)) {
+            return res.status(400).json({
+                status: 'fail',
+                code: 'INVALID_AUTH_INTENT',
+                message: "L'intention Google doit être 'login' ou 'signup'.",
+            });
         }
 
         let payload;
@@ -676,14 +686,31 @@ exports.googleToken = async (req, res) => {
             return res.status(401).json({ status: 'fail', message: 'Email Google non vérifié.' });
         }
 
-        // L'email est authentifié par Google — un éventuel inscription en attente
-        // (PendingRegistration) pour ce même email est obsolète, on la nettoie.
+        const existingUser = await User.findOne({ email: payload.email });
+
+        if (intent === 'login' && !existingUser) {
+            return res.status(404).json({
+                status: 'fail',
+                code: 'ACCOUNT_NOT_FOUND',
+                message: "Aucun compte n'est associé à cette adresse Google.",
+            });
+        }
+
+        if (intent === 'signup' && existingUser) {
+            return res.status(409).json({
+                status: 'fail',
+                code: 'ACCOUNT_ALREADY_EXISTS',
+                message: 'Un compte existe déjà avec cette adresse. Connectez-vous.',
+            });
+        }
+
+        // Une inscription email en attente ne devient obsolète que lorsqu'une
+        // authentification va réellement aboutir. Un `login` sans compte doit
+        // rester sans effet sur cette inscription en cours.
         const pending = await PendingRegistration.findOne({ email: payload.email });
         if (pending) {
             await PendingRegistration.deleteOne({ email: payload.email });
         }
-
-        const existingUser = await User.findOne({ email: payload.email });
 
         if (existingUser) {
             if (rejectDisabledAccount(existingUser, res)) return;
