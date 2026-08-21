@@ -82,16 +82,12 @@ exports.initierPaiement = async (req, res) => {
     if (tx.status === 'Annulée') return res.status(400).json({ status: 'fail', message: 'Transaction annulée.' });
     if (tx.status === 'Réussie') return res.status(400).json({ status: 'fail', message: 'Transaction déjà finalisée.' });
 
-    const existing = await PaiementTransaction.findOne({
-      transaction: tx._id,
-      statut:      'En attente',
-      methode:     'yabetoo_momo',
-    });
+    const businessKey = `yabetoo:transaction:${tx._id}:payer:${req.user._id}:v1`;
+    const existing = await PaiementTransaction.findOne({ yabetooBusinessKey: businessKey }).select('+yabetooBusinessKey');
     if (existing) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Un paiement YabetooPay est déjà en attente pour ce dossier.',
-        data:    { intentId: existing.yabetooIntentId },
+      return res.status(202).json({
+        status: 'pending', code: existing.yabetooReconciliationRequired ? 'PAYMENT_RECONCILIATION_REQUIRED' : 'PAYMENT_ALREADY_INITIATED',
+        data: { intentId: existing.yabetooIntentId || null, statut: existing.statut },
       });
     }
 
@@ -104,16 +100,14 @@ exports.initierPaiement = async (req, res) => {
       operateur:   operator,
       telephone:   phone,
       statut:      'En attente',
+      yabetooBusinessKey: businessKey,
+      yabetooState: 'creating',
     });
 
     const description = `${tx.transactionType === 'vente' ? 'Achat' : 'Location'} — ${tx.property?.title}`;
 
     const intent = await yabetooService.createIntent({
       amount:   tx.finalAmount,
-      phone,
-      operator,
-      firstName,
-      lastName,
       description,
       metadata: {
         transactionId:         tx._id.toString(),
@@ -122,13 +116,19 @@ exports.initierPaiement = async (req, res) => {
       },
     });
 
-    const intentId = intent?.id || intent?.data?.id;
-    if (!intentId) throw new Error("YabetooPay n'a pas retourné d'identifiant d'intention.");
+    const created = yabetooService.extractIntent(intent);
+    if (!created.id || !created.clientSecret) {
+      await PaiementTransaction.findByIdAndUpdate(paiement._id, { yabetooState: 'create_unknown', yabetooReconciliationRequired: true });
+      const invalid = new Error("YabetooPay n'a pas retourné id et clientSecret."); invalid.code = 'provider_invalid_response'; throw invalid;
+    }
+    const intentId = created.id;
+    await PaiementTransaction.findByIdAndUpdate(paiement._id, { yabetooIntentId: intentId, yabetooState: 'confirming' });
 
     // Déclenche la notification push MoMo sur le téléphone du client
-    await yabetooService.confirmIntent(intentId);
+    const confirmation = await yabetooService.confirmIntent(intentId, { clientSecret: created.clientSecret, phone, operator, firstName, lastName, receiptEmail: req.user.email });
+    const confirmed = yabetooService.extractIntent(confirmation);
 
-    await PaiementTransaction.findByIdAndUpdate(paiement._id, { yabetooIntentId: intentId });
+    await PaiementTransaction.findByIdAndUpdate(paiement._id, { yabetooState: 'pending', yabetooProviderStatus: confirmed.status || undefined, yabetooReconciliationRequired: true });
     await Transaction.findByIdAndUpdate(tx._id, {
       paymentStatus: 'en_attente',
       paymentMethod: 'yabetoo_momo',
@@ -140,8 +140,13 @@ exports.initierPaiement = async (req, res) => {
     if (err?.code === 11000) {
       return res.status(409).json({ status: 'fail', code: 'PAYMENT_ALREADY_PENDING', message: 'Un paiement est déjà en attente pour ce dossier.' });
     }
-    console.error('❌ [PaiementTx] initierPaiement (Yabetoo):', err.response?.data || err.message);
-    res.status(500).json({ status: 'error', message: "Erreur lors de l'initiation du paiement." });
+    if (err.code === 'provider_timeout_unknown') {
+      const query = { transaction: req.params.id, methode: 'yabetoo_momo', statut: 'En attente' };
+      const payment = await PaiementTransaction.findOne(query);
+      if (payment) await PaiementTransaction.findByIdAndUpdate(payment._id, { yabetooState: payment.yabetooIntentId ? 'confirm_unknown' : 'create_unknown', yabetooReconciliationRequired: true });
+    }
+    console.error('❌ [PaiementTx] Yabetoo:', err.code || 'provider_error');
+    res.status(err.statusCode || 502).json({ status: 'error', code: err.code || 'provider_invalid_response', message: "L'état du paiement doit être vérifié avant toute nouvelle tentative." });
   }
 };
 
@@ -162,7 +167,7 @@ exports.verifierPaiement = async (req, res) => {
 
     let statut = paiement.statut;
     if (yStatus === 'succeeded') statut = 'Payé';
-    else if (yStatus === 'failed') statut = 'Échoué';
+    else if (yStatus === 'failed' || yStatus === 'expired') statut = 'Échoué';
 
     if (statut !== paiement.statut) {
       paiement.statut = statut;
@@ -174,14 +179,19 @@ exports.verifierPaiement = async (req, res) => {
         ...(statut === 'Payé' && { status: 'Paiement en attente' }),
       });
     }
+    await PaiementTransaction.findByIdAndUpdate(paiement._id, {
+      yabetooProviderStatus: yStatus || 'unknown',
+      yabetooState: statut === 'Payé' ? 'succeeded' : statut === 'Échoué' ? 'failed' : 'pending',
+      yabetooReconciliationRequired: !['Payé', 'Échoué'].includes(statut),
+    });
 
     res.json({
       status: 'success',
       data: { statut, montant: paiement.montant, telephone: paiement.telephone, operateur: paiement.operateur },
     });
   } catch (err) {
-    console.error('❌ [PaiementTx] verifierPaiement:', err.response?.data || err.message);
-    res.status(500).json({ status: 'error', message: 'Erreur lors de la vérification du paiement.' });
+    console.error('❌ [PaiementTx] verifierPaiement:', err.code || 'provider_error');
+    res.status(err.statusCode || 502).json({ status: 'error', code: err.code || 'provider_status_unknown', message: 'Statut provider non confirmé.' });
   }
 };
 
@@ -214,7 +224,13 @@ exports.webhookYabetoo = async (req, res) => {
       : { $nin: ['Payé', 'Échoué'] };
     const paiement = await PaiementTransaction.findOneAndUpdate(
       { yabetooIntentId: intentId, statut: allowedCurrentStatuses },
-      { statut, ...(statut === 'Payé' && { confirméAt: new Date() }) },
+      {
+        statut,
+        yabetooState: statut === 'Payé' ? 'succeeded' : 'failed',
+        yabetooProviderStatus: statut === 'Payé' ? 'succeeded' : 'failed',
+        yabetooReconciliationRequired: false,
+        ...(statut === 'Payé' && { confirméAt: new Date() }),
+      },
       { new: true },
     );
     // Livraison répétée : l'état a déjà été appliqué. Ne pas renvoyer les

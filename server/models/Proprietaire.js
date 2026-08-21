@@ -11,7 +11,7 @@ const bienSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ['Appartement', 'Appartement meublé', 'Maison', 'Villa',
-           'Terrain', 'Bureau', 'Commerce', 'Studio', 'Entrepôt'],
+           'Terrain', 'Parcelle', 'Bureau', 'Commerce', 'Studio', 'Entrepôt'],
     default: 'Appartement',
   },
   adresse:        { type: String, required: [true, "L'adresse est requise"], trim: true },

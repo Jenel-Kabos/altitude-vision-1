@@ -93,6 +93,10 @@ const visiteSchema = new mongoose.Schema({
     default: 'non_requis',
   },
   paiementRef: { type: String, default: null },  // référence YabetooPay intent ID
+  yabetooBusinessKey: { type: String, default: null, index: true, select: false },
+  yabetooState: { type: String, enum: ['creating', 'create_unknown', 'created', 'confirming', 'confirm_unknown', 'pending', 'succeeded', 'failed'], default: null },
+  yabetooProviderStatus: { type: String, default: null, maxlength: 80 },
+  yabetooReconciliationRequired: { type: Boolean, default: false },
   traitePar: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

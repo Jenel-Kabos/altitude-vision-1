@@ -1,3 +1,4 @@
+import axios from 'axios';
 import api from './api';
 import { cache } from './cacheService';
 
@@ -18,26 +19,51 @@ function getUploadMeta(uri) {
   return { name: `upload_${Date.now()}.jpg`, type: 'image/jpeg' };
 }
 
+// DEV-only, jamais de contenu binaire : trace la forme de chaque partie du
+// FormData pour diagnostiquer un rejet natif (ex. "Unsupported FormDataPart
+// implementation") sans jamais logger le contenu du fichier lui-même.
+function logFormDataPartDev(fieldName, value) {
+  if (!__DEV__) return;
+  if (value && typeof value === 'object' && 'uri' in value) {
+    const scheme = typeof value.uri === 'string' ? value.uri.split(':')[0] : typeof value.uri;
+    console.log('[FormData part]', {
+      fieldName, kind: 'file', hasUri: Boolean(value.uri), uriScheme: scheme,
+      type: value.type, name: value.name,
+    });
+  } else {
+    console.log('[FormData part]', {
+      fieldName, kind: 'primitive', jsType: typeof value, isString: typeof value === 'string',
+    });
+  }
+}
+
+// IMPORTANT : ne jamais utiliser fetch() global ici. Depuis Expo SDK 57,
+// expo/fetch remplace fetch() par défaut (voir AGENTS.md) et son
+// implémentation WinterCG ne reconnaît pas la forme classique RN
+// `{uri, name, type}` pour un fichier — elle lève
+// "Unsupported FormDataPart implementation". axios (utilisé partout ailleurs
+// dans l'app pour l'upload de fichiers, ex. ProfilScreen.jsx) passe par
+// XMLHttpRequest côté RN et supporte cette forme correctement.
 export async function uploadToCloudinary(uri) {
   const { name, type } = getUploadMeta(uri);
+  const filePart = { uri, name, type };
   const fd = new FormData();
-  fd.append('file', { uri, name, type });
+  logFormDataPartDev('file', filePart);
+  fd.append('file', filePart);
+  logFormDataPartDev('upload_preset', CLOUDINARY_UPLOAD_PRESET);
   fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,
-    {
-      method: 'POST',
-      body: fd,
-    },
-  );
-
-  if (!res.ok) {
+  try {
+    const res = await axios.post(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,
+      fd,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return res.data.secure_url;
+  } catch (err) {
+    if (__DEV__) console.log('[Cloudinary upload error]', err.response?.data || err.message);
     throw new Error('Cloudinary upload failed');
   }
-
-  const data = await res.json();
-  return data.secure_url;
 }
 
 export async function getRecommendedProperties() {

@@ -4,6 +4,7 @@ export const PROPERTY_TYPES = [
   { value: 'Maison',             label: 'Maison',              icon: 'home-outline' },
   { value: 'Villa',              label: 'Villa',               icon: 'home-outline' },
   { value: 'Terrain',            label: 'Terrain',             icon: 'map-outline' },
+  { value: 'Parcelle',           label: 'Parcelle',            icon: 'map-outline' },
   { value: 'Bureau',             label: 'Bureau',              icon: 'briefcase-outline' },
   { value: 'Commerce',           label: 'Commerce',            icon: 'storefront-outline' },
   { value: 'Studio',             label: 'Studio',              icon: 'bed-outline' },

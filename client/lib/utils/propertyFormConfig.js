@@ -2,7 +2,7 @@ import { BedDouble, Building2, Home, KeyRound, Map, ShoppingBag, Tag } from 'luc
 import { HOTEL_ACCOMMODATION_TYPES } from '../constants/accommodation';
 
 export function getPropertyFormConfig({ transactionType = 'vente', propertyType = 'Bien immobilier', accommodationType = '', mode = 'create' } = {}) {
-  const isLand = propertyType === 'Terrain';
+  const isLand = propertyType === 'Terrain' || propertyType === 'Parcelle';
   const isCommercial = ['Commerce', 'Bureau', 'Entrepôt'].includes(propertyType);
   const isHotel = transactionType === 'hebergement' && HOTEL_ACCOMMODATION_TYPES.includes(accommodationType);
   const TypeIcon = isLand ? Map : isCommercial ? ShoppingBag : Home;

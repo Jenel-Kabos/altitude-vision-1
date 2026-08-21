@@ -39,7 +39,7 @@ const LEGACY_QUERY_PARAM_ALIASES = {
 const OFFER_TYPES = ['vente', 'location', 'hebergement'];
 const PROPERTY_TYPES = [
   'Appartement', 'Appartement meublé', 'Maison', 'Villa',
-  'Terrain', 'Bureau', 'Commerce', 'Studio', 'Entrepôt',
+  'Terrain', 'Parcelle', 'Bureau', 'Commerce', 'Studio', 'Entrepôt',
 ];
 
 // Miroir de l'enum réel de server/models/Accommodation.js (ACCOMMODATION_TYPES) — utilisé

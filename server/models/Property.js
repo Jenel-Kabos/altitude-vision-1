@@ -29,9 +29,9 @@ const propertySchema = new mongoose.Schema(
       enum: {
         values: [
           'Appartement', 'Appartement meublé', 'Maison', 'Villa',
-          'Terrain', 'Bureau', 'Commerce', 'Studio', 'Entrepôt',
+          'Terrain', 'Parcelle', 'Bureau', 'Commerce', 'Studio', 'Entrepôt',
         ],
-        message: 'Type de propriété invalide : {VALUE}. Valeurs acceptées : Appartement, Appartement meublé, Maison, Villa, Terrain, Bureau, Commerce, Studio, Entrepôt.',
+        message: 'Type de propriété invalide : {VALUE}. Valeurs acceptées : Appartement, Appartement meublé, Maison, Villa, Terrain, Parcelle, Bureau, Commerce, Studio, Entrepôt.',
       },
       required: [true, 'Veuillez spécifier le type de propriété'],
     },

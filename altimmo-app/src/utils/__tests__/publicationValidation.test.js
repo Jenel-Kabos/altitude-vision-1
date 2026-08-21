@@ -12,6 +12,10 @@ describe('getPropertyVisibleFields', () => {
     expect(getPropertyVisibleFields('Entrepôt')).toEqual({ bedrooms: false, bathrooms: true });
   });
 
+  test('Parcelle masque chambres ET salles de bain, comme Terrain', () => {
+    expect(getPropertyVisibleFields('Parcelle')).toEqual({ bedrooms: false, bathrooms: false });
+  });
+
   test('Appartement affiche chambres et salles de bain', () => {
     expect(getPropertyVisibleFields('Appartement')).toEqual({ bedrooms: true, bathrooms: true });
   });
@@ -34,6 +38,12 @@ describe('sanitizePropertyFieldsForType', () => {
     const next = sanitizePropertyFieldsForType(form, 'Entrepôt');
     expect(next.bedrooms).toBe(0);
     expect(next.bathrooms).toBe(2);
+  });
+
+  test('passer à Parcelle remet chambres et salles de bain à 0, comme Terrain', () => {
+    const form = { bedrooms: 3, bathrooms: 2, surface: 500 };
+    const next = sanitizePropertyFieldsForType(form, 'Parcelle');
+    expect(next).toEqual({ bedrooms: 0, bathrooms: 0, surface: 500, type: 'Parcelle' });
   });
 
   test('passer à Appartement conserve les valeurs existantes', () => {
@@ -64,6 +74,10 @@ describe('salePropertySchema.validateStep', () => {
   test('étape photos : au moins une photo requise', () => {
     expect(salePropertySchema.validateStep('photos', { form: baseForm, photos: [] }).photos).toBeDefined();
     expect(salePropertySchema.validateStep('photos', { form: baseForm, photos: [{ uri: 'x' }] })).toEqual({});
+  });
+
+  test('type "Parcelle" est accepté à l\'étape info (nouveau type, ne bloque pas la publication)', () => {
+    expect(salePropertySchema.validateStep('info', { form: { ...baseForm, type: 'Parcelle' }, photos: [] })).toEqual({});
   });
 });
 

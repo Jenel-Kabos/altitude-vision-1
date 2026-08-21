@@ -7,6 +7,7 @@ export const PROPERTY_TYPES = [
   { value: 'Maison',             label: 'Maison'             },
   { value: 'Villa',              label: 'Villa'              },
   { value: 'Terrain',            label: 'Terrain'            },
+  { value: 'Parcelle',           label: 'Parcelle'           },
   { value: 'Bureau',             label: 'Bureau'             },
   { value: 'Commerce',           label: 'Commerce'           },
   { value: 'Studio',             label: 'Studio'             },

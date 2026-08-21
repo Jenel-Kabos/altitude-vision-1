@@ -709,28 +709,46 @@ exports.initierPaiementVisite = asyncHandler(async (req, res) => {
     throw new Error('Aucun montant à payer.');
   }
 
-  const intent = await yabetooService.createIntent({
-    amount:   montant,
-    phone,
-    operator,
-    firstName: req.user.name?.split(' ')[0] || '',
-    lastName:  req.user.name?.split(' ').slice(1).join(' ') || '',
-    description: `Honoraires visite — ${prop?.title || 'bien'}`,
-    metadata: { visiteId: visite._id.toString() },
-  });
-
-  const intentId = intent?.id || intent?.data?.id;
-  if (!intentId) {
-    res.status(500);
-    throw new Error("YabetooPay n'a pas retourné d'identifiant d'intention.");
+  const businessKey = `yabetoo:visite:${visite._id}:payer:${req.user.id}:v1`;
+  const claimed = await Visite.findOneAndUpdate(
+    { _id: visite._id, client: req.user.id, yabetooBusinessKey: null, paiementStatus: { $ne: 'payé' } },
+    { $set: { yabetooBusinessKey: businessKey, yabetooState: 'creating', yabetooReconciliationRequired: false } },
+    { new: true },
+  ).select('+yabetooBusinessKey');
+  if (!claimed) {
+    const current = await Visite.findById(visite._id).select('+yabetooBusinessKey');
+    return res.status(202).json({ status: 'pending', code: current?.yabetooReconciliationRequired ? 'PAYMENT_RECONCILIATION_REQUIRED' : 'PAYMENT_ALREADY_INITIATED', data: { intentId: current?.paiementRef || null, montant } });
   }
 
-  // Déclenche la notification push MoMo sur le téléphone du client
-  await yabetooService.confirmIntent(intentId);
+  let intent;
+  try {
+    intent = await yabetooService.createIntent({ amount: montant, description: `Honoraires visite — ${prop?.title || 'bien'}`, metadata: { visiteId: visite._id.toString(), businessKey } });
+  } catch (error) {
+    await Visite.findByIdAndUpdate(visite._id, { yabetooState: error.code === 'provider_timeout_unknown' ? 'create_unknown' : 'failed', yabetooReconciliationRequired: error.code === 'provider_timeout_unknown' });
+    throw error;
+  }
 
-  visite.paiementStatus = 'en_attente';
-  visite.paiementRef = intentId;
-  await visite.save();
+  const created = yabetooService.extractIntent(intent);
+  if (!created.id || !created.clientSecret) {
+    await Visite.findByIdAndUpdate(visite._id, { yabetooState: 'create_unknown', yabetooReconciliationRequired: true });
+    res.status(502);
+    const error = new Error("Réponse Yabetoo incomplète ; reconciliation requise."); error.code = 'provider_invalid_response'; throw error;
+  }
+  const intentId = created.id;
+  await Visite.findByIdAndUpdate(visite._id, { paiementRef: intentId, paiementStatus: 'en_attente', yabetooState: 'confirming', yabetooReconciliationRequired: true });
+
+  // Déclenche la notification push MoMo sur le téléphone du client
+  try {
+    const confirmation = await yabetooService.confirmIntent(intentId, {
+      clientSecret: created.clientSecret, phone, operator,
+      firstName: req.user.name?.split(' ')[0] || '', lastName: req.user.name?.split(' ').slice(1).join(' ') || '', receiptEmail: req.user.email,
+    });
+    const confirmed = yabetooService.extractIntent(confirmation);
+    await Visite.findByIdAndUpdate(visite._id, { yabetooState: 'pending', yabetooProviderStatus: confirmed.status || undefined, yabetooReconciliationRequired: true });
+  } catch (error) {
+    await Visite.findByIdAndUpdate(visite._id, { yabetooState: error.code === 'provider_timeout_unknown' ? 'confirm_unknown' : 'pending', yabetooReconciliationRequired: true });
+    throw error;
+  }
 
   res.status(200).json({
     status: 'success',
@@ -759,7 +777,7 @@ exports.verifierPaiementVisite = asyncHandler(async (req, res) => {
 
   let statut = 'en_attente';
   if (yStatus === 'succeeded') statut = 'payé';
-  else if (yStatus === 'failed') statut = 'échoué';
+  else if (yStatus === 'failed' || yStatus === 'expired') statut = 'échoué';
 
   if (statut === 'payé' && visite.paiementStatus !== 'payé') {
     visite.paiementStatus = 'payé';
@@ -786,6 +804,12 @@ exports.verifierPaiementVisite = asyncHandler(async (req, res) => {
       data:  { screen: 'Visites' },
     }).catch(() => {});
   }
+
+  await Visite.findByIdAndUpdate(visite._id, {
+    yabetooProviderStatus: yStatus || 'unknown',
+    yabetooState: statut === 'payé' ? 'succeeded' : statut === 'échoué' ? 'failed' : 'pending',
+    yabetooReconciliationRequired: statut === 'en_attente',
+  });
 
   res.status(200).json({
     status: 'success',

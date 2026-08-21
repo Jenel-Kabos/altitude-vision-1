@@ -31,7 +31,11 @@ const paiementTransactionSchema = new Schema(
     cinetpayRaw:           { type: Schema.Types.Mixed },
 
     // YabetooPay
-    yabetooIntentId: { type: String, sparse: true, index: true },
+    yabetooIntentId: { type: String },
+    yabetooBusinessKey: { type: String, sparse: true, unique: true, index: true, select: false },
+    yabetooState: { type: String, enum: ['creating', 'create_unknown', 'created', 'confirming', 'confirm_unknown', 'pending', 'succeeded', 'failed'] },
+    yabetooProviderStatus: { type: String, maxlength: 80 },
+    yabetooReconciliationRequired: { type: Boolean, default: false },
     operateur:       { type: String, enum: ['AIRTEL', 'MTN'] },
     telephone:       { type: String },
 
@@ -48,6 +52,7 @@ const paiementTransactionSchema = new Schema(
   },
   { timestamps: true }
 );
+paiementTransactionSchema.index({ yabetooIntentId: 1 }, { unique: true, sparse: true, name: 'unique_yabetoo_intent' });
 
 // `statut` mélange deux vocabulaires (voir commentaire plus haut) : le
 // filtre doit couvrir les deux, sinon l'index ne protège en pratique que

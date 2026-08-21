@@ -5,8 +5,8 @@
 
 // Types de bien pour lesquels chambres/salles de bain n'ont pas de sens métier
 // (Vente et Location uniquement — l'Hébergement ne connaît pas ces types, voir §6 mission).
-const NO_BEDROOMS_TYPES  = ['Terrain', 'Entrepôt', 'Bureau', 'Commerce'];
-const NO_BATHROOMS_TYPES = ['Terrain'];
+const NO_BEDROOMS_TYPES  = ['Terrain', 'Parcelle', 'Entrepôt', 'Bureau', 'Commerce'];
+const NO_BATHROOMS_TYPES = ['Terrain', 'Parcelle'];
 
 export function getPropertyVisibleFields(type) {
   return {
