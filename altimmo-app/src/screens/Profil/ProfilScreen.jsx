@@ -74,7 +74,16 @@ export default function ProfilScreen({ navigation }) {
   // indifféremment : tant que les profils métiers ne sont pas encore chargés
   // (businessProfiles === null), on retombe sur l'ancien comportement basé
   // sur le rôle pour ne jamais faire disparaître une section légitime.
-  const showImmoSection = businessProfiles === null ? isProprietaire : isProprietaireImmobilier;
+  // HOTFIX-MOB-PROFILE-MY-PROPERTIES-LINK-1 — `isProprietaireImmobilier` est
+  // dérivé côté serveur de l'existence d'au moins un bien déjà publié
+  // (Property.exists({owner, status: vente|location})) : un compte
+  // `role === 'Proprietaire'` fraîchement créé, sans bien encore publié,
+  // n'obtenait jamais ce profil dérivé et perdait tout accès à "Mes biens" —
+  // y compris une fois businessProfiles chargé. Le rôle canonique reste
+  // désormais un critère suffisant à lui seul, en plus du profil dérivé.
+  const showImmoSection = businessProfiles === null
+    ? isProprietaire
+    : (isProprietaire || isProprietaireImmobilier);
   const showEtablissementSection = businessProfiles === null ? isProprietaire : isExploitantEtablissement;
   const canSeeMyBiens  = showImmoSection || showEtablissementSection || isAdmin;
   const roleColor      = ROLE_COLOR[role] || colors.info;
