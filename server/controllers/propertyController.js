@@ -950,9 +950,17 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
   // assertPropertyTenantAccess en tête de fichier.
   const tenant = await assertPropertyTenantAccess(req, res, target);
 
+  // Pour les annonces Property classiques (vente/location), la file de
+  // modération est l'unique transition staff disponible : valider publie et
+  // rejeter retire. Les hébergements gardent leur cycle spécialisé
+  // Accommodation/Hotel et ne sont jamais publiés par ce raccourci.
+  const classicListing = ['vente', 'location'].includes(target.status);
+  const publicationUpdate = classicListing
+    ? { isPublished: newStatusAdmin === 'Validée' }
+    : {};
   const updatedProperty = await Property.findByIdAndUpdate(
     id,
-    { statusAdmin: newStatusAdmin, reviewedAt: Date.now() },
+    { statusAdmin: newStatusAdmin, reviewedAt: Date.now(), ...publicationUpdate },
     { new: true }
   );
 
@@ -975,7 +983,7 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
         title: '✅ Bien validé',
         body: updatedProperty.isPublished === true
           ? `"${updatedProperty.title}" est maintenant visible sur la plateforme.`
-          : `"${updatedProperty.title}" a été validé. Sa publication reste à activer.`,
+          : `"${updatedProperty.title}" a été validé dans son workflow spécialisé.`,
         data:  { propertyId: updatedProperty._id.toString(), screen: 'Annonces' },
       }).catch(() => {});
     } else if (newStatusAdmin === 'Rejetée') {

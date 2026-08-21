@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
-const { getAllProperties, getRecommendedProperties } = require('../controllers/propertyController');
+const { getAllProperties, getLatestProperties, getRecommendedProperties } = require('../controllers/propertyController');
 
 jest.setTimeout(120000);
 
@@ -156,6 +156,23 @@ describe('Audit filtrage Altimmo — getAllProperties (nomenclature canonique + 
     const { data } = await callGetAllProperties({});
     expect(data.properties).toHaveLength(1);
     expect(data.properties[0].title).toBe('Visible');
+  });
+
+  test('catalogue et Home/latest partagent la visibilité publique et acceptent Parcelle', async () => {
+    await Property.create(baseProperty({ type: 'Parcelle', title: 'Parcelle publiée', createdAt: new Date('2026-08-21T12:00:00Z') }));
+    await Property.create(baseProperty({ type: 'Parcelle', title: 'Parcelle validée non publiée', isPublished: false }));
+    await Property.create(baseProperty({ type: 'Terrain', title: 'Terrain rejeté', statusAdmin: 'Rejetée', isPublished: false }));
+
+    const catalog = await callGetAllProperties({ offerType: 'vente' });
+    expect(catalog.data.properties.map((item) => item.title)).toEqual(['Parcelle publiée']);
+
+    const req = { query: { pole: 'Altimmo', limit: '99' } };
+    let latest;
+    const res = { status: () => res, json: (body) => { latest = body; return res; } };
+    await new Promise((resolve) => getLatestProperties(req, res, resolve));
+    await getAllProperties(req, res);
+    expect(req.query).toMatchObject({ limit: '5', sort: '-createdAt' });
+    expect(latest.data.properties.map((item) => item.title)).toEqual(['Parcelle publiée']);
   });
 
   test('un client ne peut pas outrepasser statusAdmin/availability/pole via la query string', async () => {

@@ -7,6 +7,7 @@ const RentalManagement = require('../models/RentalManagement');
 const { getPropertyPortfolio } = require('../services/propertyPortfolioService');
 const { listValidatedHotelPortfolio } = require('../services/hotelService');
 const { listAccommodationsForAdmin } = require('../services/accommodationService');
+const { sales } = require('../controllers/dashboardAnalyticsController');
 
 jest.setTimeout(120000);
 const actor = () => new mongoose.Types.ObjectId();
@@ -43,6 +44,27 @@ test('vente et location publiées apparaissent, les brouillons et retraits dispa
   const result = await getPropertyPortfolio();
   expect(result.items.map((item) => item.title).sort()).toEqual(['Location publiée', 'Vente publiée']);
   expect(result.stats).toMatchObject({ total: 2, bySource: { vente: 1, location: 1 } });
+});
+
+test('Parcelle et Terrain publiés restent visibles et les compteurs dérivent de la liste', async () => {
+  await property({ status: 'vente', type: 'Parcelle', title: 'Parcelle publiée', price: 80000000 });
+  await property({ status: 'vente', type: 'Terrain', title: 'Terrain publié', price: 20000000 });
+  const result = await getPropertyPortfolio();
+  expect(result.items.map((item) => item.type).sort()).toEqual(['Parcelle', 'Terrain']);
+  expect(result.stats).toMatchObject({ total: 2, totalValue: 100000000, bySource: { vente: 2 } });
+  expect(result.stats.total).toBe(result.items.length);
+});
+
+test('le KPI Sales « published » applique le même prédicat que la liste publique', async () => {
+  await property({ status: 'vente', type: 'Parcelle', title: 'Parcelle réellement publiée' });
+  await property({ status: 'vente', type: 'Maison', title: 'Maison seulement validée', isPublished: false });
+  await property({ status: 'vente', type: 'Villa', title: 'Villa rejetée', statusAdmin: 'Rejetée', isPublished: false });
+  await property({ status: 'location', type: 'Terrain', title: 'Terrain location publié' });
+  const [analytics, portfolio] = await Promise.all([sales(), getPropertyPortfolio()]);
+  const saleItems = portfolio.items.filter((item) => item.status === 'vente');
+  expect(analytics.kpis).toMatchObject({ total: 3, published: 1, drafts: 2 });
+  expect(analytics.kpis.published).toBe(saleItems.length);
+  expect(saleItems.map((item) => item.title)).toEqual(['Parcelle réellement publiée']);
 });
 
 test('hébergement suit exactement publication, activation et validation de sa source spécialisée', async () => {

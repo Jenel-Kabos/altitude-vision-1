@@ -89,6 +89,7 @@ describe('TENANT-SCOPE-AUDIT-2A — propertyController (assertPropertyTenantAcce
 
     expect(res.status).toBe(200);
     expect(res.body.data.property.statusAdmin).toBe('Validée');
+    expect(res.body.data.property.isPublished).toBe(true);
   });
 
   test('cross-tenant reste refusé : AdminA ne peut pas modérer un bien affilié au Tenant B', async () => {

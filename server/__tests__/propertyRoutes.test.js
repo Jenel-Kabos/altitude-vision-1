@@ -179,12 +179,12 @@ describe('PATCH /api/properties/admin/:id/:action', () => {
     );
   });
 
-  test('ne diffuse pas un bien seulement validé et indique que sa publication reste à activer', async () => {
+  test('une annonce classique validée est publiée dans la même transition canonique', async () => {
     User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
     User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
-    Property.findById = jest.fn().mockResolvedValue({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012' });
+    Property.findById = jest.fn().mockResolvedValue({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012', status: 'vente' });
     Property.findByIdAndUpdate = jest.fn().mockResolvedValue({
-      ...fakeProp, owner: '507f1f77bcf86cd799439012', isPublished: false,
+      ...fakeProp, owner: '507f1f77bcf86cd799439012', isPublished: true,
     });
     User.find = jest.fn();
 
@@ -193,12 +193,12 @@ describe('PATCH /api/properties/admin/:id/:action', () => {
       .set('Authorization', `Bearer ${makeToken('Admin')}`);
 
     expect(res.statusCode).toBe(200);
-    expect(mockNotify).toHaveBeenCalledWith(expect.objectContaining({
-      recipient: '507f1f77bcf86cd799439012',
-      body: expect.stringContaining('publication reste à activer'),
-    }));
-    expect(User.find).not.toHaveBeenCalled();
-    expect(mockNotifyMany).not.toHaveBeenCalled();
+    expect(Property.findByIdAndUpdate).toHaveBeenCalledWith(
+      fakeProp._id,
+      expect.objectContaining({ statusAdmin: 'Validée', isPublished: true }),
+      { new: true },
+    );
+    expect(mockNotify).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining('visible sur la plateforme') }));
   });
 });
 
