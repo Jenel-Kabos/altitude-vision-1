@@ -1,7 +1,13 @@
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import {
+  GoogleSignin, isCancelledResponse, isSuccessResponse, statusCodes,
+} from '@react-native-google-signin/google-signin';
 import { environment } from '../config/environment';
 
 const DEVELOPER_ERROR_CODES = new Set(['10', 'DEVELOPER_ERROR']);
+
+export function logGoogleSignInStep(step, details = {}) {
+  if (__DEV__) console.info(`[Google Sign-In] ${step}`, details);
+}
 
 export function configureGoogleSignIn() {
   if (!environment.googleWebClientId) {
@@ -16,11 +22,57 @@ export function configureGoogleSignIn() {
 
 export async function getGoogleIdToken() {
   await GoogleSignin.hasPlayServices();
-  const userInfo = await GoogleSignin.signIn();
-  const idToken = userInfo.data?.idToken || userInfo.idToken;
+  logGoogleSignInStep('STEP 2 checkPlayServices completed');
+  logGoogleSignInStep('STEP 3 signIn called');
+
+  let response;
+  try {
+    response = await GoogleSignin.signIn();
+  } catch (error) {
+    logGoogleSignInStep('STEP 4 signIn threw', getGoogleSignInDiagnostic(error));
+    throw error;
+  }
+
+  const data = response?.data;
+  const idToken = data?.idToken;
+  logGoogleSignInStep('STEP 4 signIn returned', {
+    jsType: typeof response,
+    resultKeys: response && typeof response === 'object' ? Object.keys(response).sort() : [],
+    resultType: response?.type,
+    hasData: Boolean(data),
+    dataKeys: data && typeof data === 'object' ? Object.keys(data).sort() : [],
+    hasUser: Boolean(data?.user),
+    hasIdToken: Boolean(idToken),
+    idTokenLength: typeof idToken === 'string' ? idToken.length : 0,
+    hasServerAuthCode: Boolean(data?.serverAuthCode),
+  });
+
+  if (isCancelledResponse(response)) {
+    logGoogleSignInStep('STEP 5 result classified', { classification: 'cancelled' });
+    const error = new Error('Google Sign-In cancelled');
+    error.code = statusCodes.SIGN_IN_CANCELLED;
+    throw error;
+  }
+  if (!isSuccessResponse(response)) {
+    logGoogleSignInStep('STEP 5 result classified', { classification: 'unknown' });
+    throw new Error('Google Sign-In returned an unsupported response');
+  }
+  logGoogleSignInStep('STEP 5 result classified', { classification: 'success' });
 
   if (!idToken) throw new Error('Google Sign-In did not return an ID token');
+  logGoogleSignInStep('STEP 6 idToken extracted', { idTokenLength: idToken.length });
   return idToken;
+}
+
+export async function signInWithGoogle(authenticate, source) {
+  logGoogleSignInStep(`STEP 1 ${source} button pressed`);
+  const idToken = await getGoogleIdToken();
+  logGoogleSignInStep('STEP 7 backend auth call attempted', { source });
+  const result = await authenticate({ idToken, role: 'Client' });
+  logGoogleSignInStep(`STEP 9 ${source} session result`, {
+    hasSessionUser: Boolean(result?.user),
+  });
+  return result;
 }
 
 export function getGoogleSignInErrorMessage(error) {

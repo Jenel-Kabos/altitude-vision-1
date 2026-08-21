@@ -9,6 +9,8 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
     IN_PROGRESS: 'IN_PROGRESS',
     PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
   },
+  isCancelledResponse: (response) => response?.type === 'cancelled',
+  isSuccessResponse: (response) => response?.type === 'success',
 }));
 
 jest.mock('../../config/environment', () => ({
@@ -16,15 +18,22 @@ jest.mock('../../config/environment', () => ({
 }));
 
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { environment } from '../../config/environment';
 import {
   configureGoogleSignIn,
   getGoogleIdToken,
   getGoogleSignInDiagnostic,
   getGoogleSignInErrorMessage,
+  signInWithGoogle,
 } from '../googleSignIn';
 
 describe('googleSignIn', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, 'info').mockImplementation(() => {});
+  });
+
+  afterEach(() => console.info.mockRestore());
 
   it('configures the original API with the WEB client ID and no offline access', () => {
     configureGoogleSignIn();
@@ -34,10 +43,83 @@ describe('googleSignIn', () => {
     });
   });
 
+  it('fails explicitly when the WEB client ID is absent', () => {
+    const configuredClientId = environment.googleWebClientId;
+    environment.googleWebClientId = '';
+
+    expect(() => configureGoogleSignIn())
+      .toThrow('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is required');
+    expect(GoogleSignin.configure).not.toHaveBeenCalled();
+
+    environment.googleWebClientId = configuredClientId;
+  });
+
   it('returns the ID token after checking Play Services', async () => {
-    GoogleSignin.signIn.mockResolvedValue({ data: { idToken: 'test-id-token' } });
+    GoogleSignin.signIn.mockResolvedValue({
+      type: 'success',
+      data: { idToken: 'test-id-token', user: { id: 'google-user' } },
+    });
     await expect(getGoogleIdToken()).resolves.toBe('test-id-token');
     expect(GoogleSignin.hasPlayServices).toHaveBeenCalledTimes(1);
+  });
+
+  it('classifies the modern cancelled response without treating it as a token failure', async () => {
+    GoogleSignin.signIn.mockResolvedValue({ type: 'cancelled', data: null });
+
+    await expect(getGoogleIdToken()).rejects.toMatchObject({ code: 'SIGN_IN_CANCELLED' });
+  });
+
+  it('rejects a modern success response without an ID token', async () => {
+    GoogleSignin.signIn.mockResolvedValue({
+      type: 'success', data: { idToken: null, user: { id: 'google-user' } },
+    });
+
+    await expect(getGoogleIdToken())
+      .rejects.toThrow('Google Sign-In did not return an ID token');
+  });
+
+  it('explicitly rejects the legacy root response shape', async () => {
+    GoogleSignin.signIn.mockResolvedValue({ idToken: 'legacy-token' });
+
+    await expect(getGoogleIdToken())
+      .rejects.toThrow('Google Sign-In returned an unsupported response');
+  });
+
+  it('does not log token values', async () => {
+    GoogleSignin.signIn.mockResolvedValue({
+      type: 'success', data: { idToken: 'never-log-this-token', user: {} },
+    });
+    await getGoogleIdToken();
+
+    expect(JSON.stringify(console.info.mock.calls)).not.toContain('never-log-this-token');
+  });
+
+  it('calls backend authentication exactly once after a modern success', async () => {
+    const authenticate = jest.fn().mockResolvedValue({ user: { id: 'app-user' } });
+    GoogleSignin.signIn.mockResolvedValue({
+      type: 'success', data: { idToken: 'test-id-token', user: {} },
+    });
+
+    await signInWithGoogle(authenticate, 'Login');
+    expect(authenticate).toHaveBeenCalledTimes(1);
+    expect(authenticate).toHaveBeenCalledWith({ idToken: 'test-id-token', role: 'Client' });
+  });
+
+  it('does not call backend authentication after cancellation', async () => {
+    const authenticate = jest.fn();
+    GoogleSignin.signIn.mockResolvedValue({ type: 'cancelled', data: null });
+
+    await expect(signInWithGoogle(authenticate, 'Login'))
+      .rejects.toMatchObject({ code: 'SIGN_IN_CANCELLED' });
+    expect(authenticate).not.toHaveBeenCalled();
+  });
+
+  it('does not call backend authentication after a native error', async () => {
+    const authenticate = jest.fn();
+    GoogleSignin.signIn.mockRejectedValue(Object.assign(new Error('native failure'), { code: 'NATIVE' }));
+
+    await expect(signInWithGoogle(authenticate, 'Login')).rejects.toMatchObject({ code: 'NATIVE' });
+    expect(authenticate).not.toHaveBeenCalled();
   });
 
   it.each(['SIGN_IN_CANCELLED', 'IN_PROGRESS'])('silently ignores %s', (code) => {

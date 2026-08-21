@@ -17,7 +17,7 @@
         "EXPO_PUBLIC_APP_ENV": "development",
         "EXPO_PUBLIC_API_URL": "https://altitude-vision.onrender.com/api",
         "EXPO_PUBLIC_SOCKET_URL": "https://altitude-vision.onrender.com",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "3869205293-ej9uld9a25m8i01o41e37pliaac4eumo.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "872164120879-fnllca3lavaintq499hr7rbjjvcrgj3k.apps.googleusercontent.com",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
@@ -32,7 +32,7 @@
         "EXPO_PUBLIC_APP_ENV": "preview",
         "EXPO_PUBLIC_API_URL": "https://altitude-vision-staging.onrender.com/api",
         "EXPO_PUBLIC_SOCKET_URL": "https://altitude-vision-staging.onrender.com",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "3869205293-ej9uld9a25m8i01o41e37pliaac4eumo.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "872164120879-fnllca3lavaintq499hr7rbjjvcrgj3k.apps.googleusercontent.com",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
@@ -47,7 +47,7 @@
         "EXPO_PUBLIC_APP_ENV": "preview",
         "EXPO_PUBLIC_API_URL": "https://altitude-vision.onrender.com/api",
         "EXPO_PUBLIC_SOCKET_URL": "https://altitude-vision.onrender.com",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "3869205293-ej9uld9a25m8i01o41e37pliaac4eumo.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "872164120879-fnllca3lavaintq499hr7rbjjvcrgj3k.apps.googleusercontent.com",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
@@ -62,7 +62,7 @@
         "EXPO_PUBLIC_APP_ENV": "production",
         "EXPO_PUBLIC_API_URL": "https://altitude-vision.onrender.com/api",
         "EXPO_PUBLIC_SOCKET_URL": "https://altitude-vision.onrender.com",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "3869205293-ej9uld9a25m8i01o41e37pliaac4eumo.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "872164120879-fnllca3lavaintq499hr7rbjjvcrgj3k.apps.googleusercontent.com",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }

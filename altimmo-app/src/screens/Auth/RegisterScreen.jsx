@@ -14,9 +14,9 @@ import { Button, Card, Checkbox } from '../../components';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 import {
   configureGoogleSignIn,
-  getGoogleIdToken,
   getGoogleSignInDiagnostic,
   getGoogleSignInErrorMessage,
+  signInWithGoogle,
 } from '../../services/googleSignIn';
 
 const EMAIL_RE   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -194,8 +194,7 @@ export default function RegisterScreen({ navigation }) {
   // AppNavigator y bascule automatiquement via needsProfileCompletion.
   const handleGoogleSignIn = async () => {
     try {
-      const idToken = await getGoogleIdToken();
-      await loginWithGoogle({ idToken, role: 'Client' });
+      await signInWithGoogle(loginWithGoogle, 'Signup');
     } catch (error) {
       const message = getGoogleSignInErrorMessage(error);
       if (!message) return;

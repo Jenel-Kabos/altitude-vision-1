@@ -8,6 +8,10 @@ import { cache } from '../services/cacheService';
 
 const AuthContext = createContext({});
 
+const logGoogleAuthStep = (step, details = {}) => {
+  if (__DEV__) console.info(`[Google Sign-In] ${step}`, details);
+};
+
 export async function restoreStoredSession({
   getStoredToken = getToken,
   removeStoredToken = deleteToken,
@@ -123,6 +127,7 @@ export const AuthProvider = ({ children }) => {
 
   const loginWithGoogle = async (googlePayload) => {
     try {
+      logGoogleAuthStep('STEP 8 backend request started', { endpoint: '/auth/google' });
       const response = await api.post('/auth/google', {
         ...googlePayload, // contient idToken
         role:  googlePayload.role || 'Client',
@@ -131,15 +136,23 @@ export const AuthProvider = ({ children }) => {
       const token     = response.data.token;
       const user      = response.data.data?.user || response.data.user;
       const isNewUser = response.data?.isNewUser ?? false;
+      logGoogleAuthStep('STEP 8 backend response received', { status: response.status });
       if (!token) throw new Error('Token manquant dans la réponse /auth/google');
       cache.clear();
       await saveToken(token);
       setToken(token);
       setUser(user);
+      logGoogleAuthStep('STEP 9 session created', { hasUser: Boolean(user) });
       if (isNewUser) setNeedsProfileCompletion(true);
       enregistrerNotifications(user?._id).catch(() => {});
       return { user, isNewUser };
     } catch (error) {
+      logGoogleAuthStep('STEP 8 backend request failed', {
+        status: error?.response?.status,
+        errorName: error?.name,
+        errorCode: error?.code,
+        errorMessage: error?.message,
+      });
       const code = error?.code || error?.message || '';
       if (
         code.includes('SIGN_IN_CANCELLED') ||
