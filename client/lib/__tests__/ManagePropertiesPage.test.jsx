@@ -122,6 +122,36 @@ describe('Dashboard annonces — séparation des responsabilités', () => {
     expect(await screen.findByText('Ajouter — Vente')).toBeInTheDocument();
     expect(screen.queryByText('Quel type d’annonce souhaitez-vous publier ?')).not.toBeInTheDocument();
   });
+
+  // HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1 — le widget Patrimoine
+  // (PropertyPortfolioDashboard) était monté à l'identique sur Sales et
+  // Rentals sans jamais transmettre l'univers métier de la page, ce qui
+  // affichait les mêmes Valeur totale/Total biens/Valeur par type des deux
+  // côtés pour un même bien "vente". Vérifie que la page transmet
+  // désormais le bon `status` au service sous-jacent.
+  test('la page Sales interroge le dashboard patrimoine avec status=vente', async () => {
+    const propertyAssetService = await import('../services/propertyAssetService');
+    getAllProperties.mockResolvedValue([]);
+    render(<ManagePropertiesPage section="vente" />);
+    await waitFor(() => expect(propertyAssetService.getPortfolioDashboard).toHaveBeenCalledWith('vente'));
+    expect(propertyAssetService.getPortfolioDashboard).not.toHaveBeenCalledWith('location');
+  });
+
+  test('la page Rentals interroge le dashboard patrimoine avec status=location', async () => {
+    const propertyAssetService = await import('../services/propertyAssetService');
+    getAllProperties.mockResolvedValue([]);
+    render(<ManagePropertiesPage section="location" />);
+    await waitFor(() => expect(propertyAssetService.getPortfolioDashboard).toHaveBeenCalledWith('location'));
+    expect(propertyAssetService.getPortfolioDashboard).not.toHaveBeenCalledWith('vente');
+  });
+
+  test('la page "Tous les biens" (readOnly, aucune rubrique) ne monte pas le widget Patrimoine (comportement inchangé)', async () => {
+    const propertyAssetService = await import('../services/propertyAssetService');
+    getAllProperties.mockResolvedValue([]);
+    render(<ManagePropertiesPage readOnly />);
+    await screen.findByText('Aucun bien trouvé');
+    expect(propertyAssetService.getPortfolioDashboard).not.toHaveBeenCalled();
+  });
 });
 
 describe('ManagePropertiesPage — Hébergement (dashboard admin) — TEST DATA', () => {

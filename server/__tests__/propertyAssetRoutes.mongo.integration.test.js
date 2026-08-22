@@ -216,6 +216,104 @@ describe('GET /portfolio/dashboard — agrégation portefeuille (Phase 8)', () =
   });
 });
 
+// HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1 — le bien réel "PARCELLE A VENDRE"
+// (status=vente) était compté à l'identique dans le widget Patrimoine monté
+// sur /dashboard/sales ET /dashboard/rentals, car getPortfolioDashboard()
+// n'appliquait jamais aucun filtre vente/location. Caractérise le bug via
+// des fixtures réalistes (Parcelle vente 80M + Maison location 20M) et
+// prouve la séparation stricte après correctif.
+describe('GET /portfolio/dashboard?status=vente|location — séparation stricte Vente/Location (HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1)', () => {
+  async function seedSaleAndRental() {
+    const admin = await makeUser({ role: 'Admin' });
+    const { property: saleProperty } = await buildManagedProperty({
+      title: 'PARCELLE A VENDRE', type: 'Parcelle', status: 'vente', price: 80000000,
+    });
+    const { property: rentalProperty } = await buildManagedProperty({
+      title: 'Maison à louer', type: 'Maison', status: 'location', price: 20000000,
+    });
+    return { admin, saleProperty, rentalProperty };
+  }
+
+  test('sans ?status : comportement historique inchangé — les deux univers restent mélangés (patrimoine global)', async () => {
+    const { admin } = await seedSaleAndRental();
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.dashboard.totalBiens).toBe(2);
+    expect(res.body.data.dashboard.valeurTotale).toBe(100000000);
+  });
+
+  test('?status=vente : la vente Parcelle 80M est incluse, la location Maison 20M est exclue (jamais 100M)', async () => {
+    const { admin } = await seedSaleAndRental();
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.dashboard.totalBiens).toBe(1);
+    expect(res.body.data.dashboard.valeurTotale).toBe(80000000);
+    expect(res.body.data.dashboard.valeurParType).toEqual({ Parcelle: 80000000 });
+  });
+
+  test('?status=location : la location Maison 20M est incluse, la vente Parcelle 80M est exclue (jamais 100M)', async () => {
+    const { admin } = await seedSaleAndRental();
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.dashboard.totalBiens).toBe(1);
+    expect(res.body.data.dashboard.valeurTotale).toBe(20000000);
+    expect(res.body.data.dashboard.valeurParType).toEqual({ Maison: 20000000 });
+  });
+
+  test('type physique ignoré pour la séparation : une Parcelle en location est bien exclue de ?status=vente', async () => {
+    const admin = await makeUser({ role: 'Admin' });
+    await buildManagedProperty({ title: 'Parcelle en location', type: 'Parcelle', status: 'location', price: 15000000 });
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.dashboard.totalBiens).toBe(0);
+    expect(res.body.data.dashboard.valeurTotale).toBe(0);
+  });
+
+  test('paramètre status forgé (valeur hors liste blanche) est ignoré — retombe sur le patrimoine global, jamais un filtre arbitraire', async () => {
+    const { admin } = await seedSaleAndRental();
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=hebergement_forge').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.dashboard.totalBiens).toBe(2);
+  });
+
+  test('brouillon (statusAdmin non Validée) vente reste dans ?status=vente, jamais côté location', async () => {
+    const admin = await makeUser({ role: 'Admin' });
+    await buildManagedProperty({ status: 'vente', statusAdmin: 'En attente', price: 5000000 });
+    const resVente = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const resLocation = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    expect(resVente.body.data.dashboard.totalBiens).toBe(1);
+    expect(resLocation.body.data.dashboard.totalBiens).toBe(0);
+  });
+
+  test('rejeté (statusAdmin=Rejetée) vente reste dans ?status=vente, jamais côté location', async () => {
+    const admin = await makeUser({ role: 'Admin' });
+    await buildManagedProperty({ status: 'vente', statusAdmin: 'Rejetée', price: 5000000 });
+    const resVente = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const resLocation = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    expect(resVente.body.data.dashboard.totalBiens).toBe(1);
+    expect(resLocation.body.data.dashboard.totalBiens).toBe(0);
+  });
+
+  test('publié (isPublished=true) location reste dans ?status=location, jamais côté vente', async () => {
+    const admin = await makeUser({ role: 'Admin' });
+    await buildManagedProperty({ status: 'location', isPublished: true, price: 7000000 });
+    const resVente = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const resLocation = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    expect(resVente.body.data.dashboard.totalBiens).toBe(0);
+    expect(resLocation.body.data.dashboard.totalBiens).toBe(1);
+  });
+
+  test('propriétaire scope + status combinés : ne voit que ses propres biens du bon univers métier', async () => {
+    const { owner: saleOwner, property: saleProperty } = await buildManagedProperty({ status: 'vente', price: 80000000 });
+    await buildManagedProperty({ status: 'vente', price: 999999 }); // autre propriétaire, ne doit jamais apparaître
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(saleOwner._id)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.dashboard.totalBiens).toBe(1);
+    expect(res.body.data.dashboard.valeurTotale).toBe(80000000);
+    void saleProperty;
+  });
+});
+
 // GL-ASSET-UX-1 — Phase 9 : la notification de transition de cycle de vie
 // (type partagé 'contrat_updated') doit porter un lien explicite vers la
 // fiche du bien, jamais hériter du lien générique du bail — aucune

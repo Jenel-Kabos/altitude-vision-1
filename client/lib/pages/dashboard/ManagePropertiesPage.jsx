@@ -626,7 +626,13 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
           </div>
         </div>
 
-        {isStaffDocs(user) && !readOnly && <PropertyPortfolioDashboard />}
+        {/* HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1 — restreint le patrimoine
+            affiché à l'univers métier de la page (Sales → vente uniquement,
+            Rentals → location uniquement) ; jamais le patrimoine global
+            mélangé sur ces deux pages spécialisées. */}
+        {isStaffDocs(user) && !readOnly && (
+          <PropertyPortfolioDashboard status={section === 'vente' || section === 'location' ? section : undefined} />
+        )}
         {readOnly && <DashboardKpis items={portfolioKpis} loading={false} note="Ces indicateurs utilisent exactement la projection affichée, après déduplication." />}
 
         {section === 'vente' && <DashboardKpis items={[

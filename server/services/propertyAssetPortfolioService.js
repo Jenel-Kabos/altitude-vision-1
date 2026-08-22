@@ -14,8 +14,16 @@ const CYCLE_LABELS = {
   inspection: 'Inspection', travaux: 'Travaux', vendu: 'Vendu', archive: 'Archivé',
 };
 
-async function getPortfolioDashboard({ ownerId } = {}) {
-  const filter = ownerId ? { owner: ownerId } : {};
+// HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1 — `status` optionnel restreint le
+// portefeuille agrégé à un seul univers métier ('vente' ou 'location').
+// Sans lui (comportement historique inchangé, ex. patrimoineReport.js),
+// l'agrégation reste globale (tout le patrimoine, tous statuts confondus) —
+// jamais un comportement par défaut différent pour les appelants existants.
+async function getPortfolioDashboard({ ownerId, status } = {}) {
+  const filter = {
+    ...(ownerId ? { owner: ownerId } : {}),
+    ...(status ? { status } : {}),
+  };
   const properties = await Property.find(filter)
     .select('title type price availability assetCycle assetCycleHistory owner createdAt')
     .lean();

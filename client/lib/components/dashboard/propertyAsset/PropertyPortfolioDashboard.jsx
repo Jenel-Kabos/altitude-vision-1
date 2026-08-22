@@ -14,22 +14,28 @@ import { DashboardCard, DashboardState } from "../DashboardUI";
 const fmtFcfa = (n) => `${Number(n || 0).toLocaleString("fr-FR")} FCFA`;
 const fmtPct = (n) => (n === null || n === undefined ? "—" : `${Number(n).toFixed(1)}%`);
 
-const PropertyPortfolioDashboard = () => {
+// HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1 — `status` ('vente'|'location',
+// optionnel) restreint l'agrégation à un seul univers métier. Sans lui
+// (comportement historique inchangé), le patrimoine global reste affiché tel
+// quel — seuls les montages sur /dashboard/sales et /dashboard/rentals
+// passent désormais une valeur, pour ne jamais mélanger les deux domaines.
+const PropertyPortfolioDashboard = ({ status } = {}) => {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     (async () => {
       try {
-        const data = await getPortfolioDashboard();
+        const data = await getPortfolioDashboard(status);
         if (!cancelled) setDashboard(data);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [status]);
 
   if (loading) return <DashboardState type="loading" title="Chargement du dashboard patrimoine…" />;
   if (!dashboard) return null;

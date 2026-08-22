@@ -87,4 +87,35 @@ describe('PropertyPortfolioDashboard', () => {
     expect(screen.getByText('5.2%')).toBeInTheDocument();
     expect(screen.getByText('Villa Test')).toBeInTheDocument();
   });
+
+  // HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1 — sans `status`, le composant ne
+  // doit rien changer à son appel historique (patrimoine global) ; avec
+  // `status`, il doit le relayer tel quel au service, sans jamais le
+  // recalculer ou le transformer côté composant.
+  test('sans prop status : appelle le service sans argument (comportement historique inchangé)', async () => {
+    propertyAssetService.getPortfolioDashboard.mockResolvedValue({ totalBiens: 0, valeurTotale: 0, valeurParType: {} });
+    render(<PropertyPortfolioDashboard />);
+    await waitFor(() => expect(propertyAssetService.getPortfolioDashboard).toHaveBeenCalledWith(undefined));
+  });
+
+  test('prop status="vente" : relayée telle quelle au service', async () => {
+    propertyAssetService.getPortfolioDashboard.mockResolvedValue({
+      totalBiens: 1, valeurTotale: 80000000, valeurParType: { Parcelle: 80000000 },
+    });
+    render(<PropertyPortfolioDashboard status="vente" />);
+    await waitFor(() => expect(propertyAssetService.getPortfolioDashboard).toHaveBeenCalledWith('vente'));
+    // "80 000 000 FCFA" apparaît deux fois (valeur totale + valeur par type,
+    // un seul type dans ce jeu de test) — même remarque que le test ci-dessus.
+    expect((await screen.findAllByText('80 000 000 FCFA')).length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('prop status="location" : relayée telle quelle au service, jamais mélangée avec "vente"', async () => {
+    propertyAssetService.getPortfolioDashboard.mockResolvedValue({
+      totalBiens: 1, valeurTotale: 20000000, valeurParType: { Maison: 20000000 },
+    });
+    render(<PropertyPortfolioDashboard status="location" />);
+    await waitFor(() => expect(propertyAssetService.getPortfolioDashboard).toHaveBeenCalledWith('location'));
+    expect((await screen.findAllByText('20 000 000 FCFA')).length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText('80 000 000 FCFA')).not.toBeInTheDocument();
+  });
 });

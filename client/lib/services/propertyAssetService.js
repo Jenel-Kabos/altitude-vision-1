@@ -39,7 +39,10 @@ export const getPropertyAlerts = async (propertyId) => {
 // les mêmes services par-bien déjà exposés ci-dessus, agrégés côté serveur
 // (server/services/propertyAssetPortfolioService.js) — aucune logique de
 // calcul supplémentaire côté client.
-export const getPortfolioDashboard = async () => {
-  const res = await api.get('/property-asset/portfolio/dashboard');
+// HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1 — `status` ('vente'|'location')
+// restreint l'agrégation à un seul univers métier, utilisé par les pages
+// Sales/Rentals pour ne jamais afficher le patrimoine global mélangé.
+export const getPortfolioDashboard = async (status) => {
+  const res = await api.get('/property-asset/portfolio/dashboard', { params: status ? { status } : {} });
   return res.data.data.dashboard;
 };
