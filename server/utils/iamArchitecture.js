@@ -34,4 +34,62 @@ function hasDefaultCapability(role, capability) {
   const capabilities = DEFAULT_CAPABILITIES[role] || [];
   return capabilities.includes('*') || capabilities.includes('legacy.full') || capabilities.includes(capability);
 }
-module.exports = { ACCOUNT_FAMILIES, STAFF_FUNCTIONS, DEFAULT_CAPABILITIES, ROLE_PROJECTION, projectLegacyRole, hasDefaultCapability };
+
+// RBAC-2 — capacités qui existent et sont réellement exigées par une route
+// (`requireCapability(...)`) mais qu'AUCUN rôle staff nommé ne détient dans
+// DEFAULT_CAPABILITIES — accessibles uniquement via les jokers `*` (Admin) et
+// `legacy.full` (Collaborateur). Toujours réservées ainsi de façon
+// délibérée, jamais un oubli : `payments.reverse` (annulation d'un
+// encaissement, `paiementRoutes.js` → `POST /:id/receipts/:receiptId/cancel`)
+// en est la preuve directe — le test `__tests__/rentalPaymentReceiptsAndCancellation
+// .mongo.integration.test.js` ("IAM-3 : GestionnaireImmobilier ne peut pas
+// annuler un encaissement") prouve que ce rôle doit rester exclu malgré le
+// commentaire plus ancien et désormais inexact de `paiementController.js`
+// (`CANCEL_ROLES`, code mort pour GestionnaireImmobilier — jamais atteint
+// depuis que le guard de route existe). Cette liste sert uniquement à faire
+// reconnaître la capacité par `assertKnownCapability` sans l'accorder à
+// aucun rôle nommé — jamais à décider d'un accès.
+const ADMIN_ONLY_CAPABILITIES = ['payments.reverse'];
+
+// RBAC-2 — registre canonique des capacités réellement déclarées (union de
+// toutes les valeurs de DEFAULT_CAPABILITIES + ADMIN_ONLY_CAPABILITIES, hors
+// les deux jokers `*`/`legacy.full` qui ne sont pas des capacités nommées).
+// Sert uniquement à valider qu'une capacité demandée à `requireCapability(...)`
+// existe bien quelque part dans la table — jamais à décider d'un accès.
+const ALL_CAPABILITIES = Object.freeze([
+  ...new Set([
+    ...Object.values(DEFAULT_CAPABILITIES).flat().filter((cap) => cap !== '*' && cap !== 'legacy.full'),
+    ...ADMIN_ONLY_CAPABILITIES,
+  ]),
+]);
+
+// RBAC-2 — lève une erreur de configuration claire (jamais un 403 silencieux)
+// si une route référence une capacité qui n'existe dans aucune liste de
+// DEFAULT_CAPABILITIES — typiquement une faute de frappe au moment d'écrire
+// `requireCapability('propertie.read')`. Volontairement appelée au moment de
+// la déclaration de la route (synchrone, au chargement du module), pas à
+// chaque requête : une faute de frappe doit faire échouer le démarrage du
+// serveur / les tests, jamais produire un 403 muet en production.
+function assertKnownCapability(capability) {
+  if (!ALL_CAPABILITIES.includes(capability)) {
+    throw new Error(`[iamArchitecture] Capacité inconnue : "${capability}". Vérifier server/utils/iamArchitecture.js (DEFAULT_CAPABILITIES) — faute de frappe probable.`);
+  }
+}
+
+// RBAC-2 — capacités effectives d'un rôle, forme préparatoire pour un futur
+// payload /me (RBAC-3+). Pure fonction du rôle uniquement : ne résout ni
+// HotelStaffAssignment, ni businessProfiles, ni tenant, ni ownership — ce
+// sont des dimensions distinctes, jamais mélangées ici (voir RBAC2_REPORT.md
+// §Principe architectural). Non exposée par aucune route dans ce sprint.
+function getEffectiveCapabilities(role) {
+  const capabilities = DEFAULT_CAPABILITIES[role] || [];
+  if (capabilities.includes('*')) return [...ALL_CAPABILITIES];
+  if (capabilities.includes('legacy.full')) return [...ALL_CAPABILITIES];
+  return [...capabilities];
+}
+
+module.exports = {
+  ACCOUNT_FAMILIES, STAFF_FUNCTIONS, DEFAULT_CAPABILITIES, ROLE_PROJECTION,
+  projectLegacyRole, hasDefaultCapability,
+  ALL_CAPABILITIES, ADMIN_ONLY_CAPABILITIES, assertKnownCapability, getEffectiveCapabilities,
+};

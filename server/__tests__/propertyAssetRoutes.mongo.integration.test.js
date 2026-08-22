@@ -111,6 +111,78 @@ test('POST /transition est refusé pour un rôle hors STAFF_IMMO', async () => {
   expect(res.status).toBe(403);
 });
 
+// RBAC-2 — caractérisation complète AVANT migration de POST /transition de
+// `restrictTo(...STAFF_IMMO)` vers `requireCapability('properties.update')`.
+// Matrice de rôles exhaustive (mandat §28-30) : ce test doit rester vert à
+// l'identique après la migration (parité stricte, RBAC2_MIGRATION_MATRIX.md).
+describe('POST /transition — matrice de rôles complète (RBAC-2, caractérisation avant/après requireCapability)', () => {
+  test.each([
+    ['Admin', 200], ['GestionnaireImmobilier', 200], ['Collaborateur', 200],
+    ['Secretaire', 403], ['CommunityManager', 403], ['Communicant', 403],
+    ['Client', 403], ['Proprietaire', 403], ['User', 403], ['Prestataire', 403],
+  ])('%s → %i', async (role, expectedStatus) => {
+    const actor = await makeUser({ role });
+    const { property } = await buildManagedProperty({ availability: 'Disponible' });
+    const res = await request(app)
+      .post(`/api/property-asset/${property._id}/transition`)
+      .set('Authorization', `Bearer ${signToken(actor._id)}`)
+      .send({ target: 'reserve' });
+    expect(res.status).toBe(expectedStatus);
+  });
+
+  test('rôle inconnu (jamais dans l\'enum User.role) — fail closed, jamais un accès', async () => {
+    // `role` n'a pas d'enum de validation ici : on passe directement une
+    // valeur hors-enum pour prouver le comportement fail-closed du guard
+    // lui-même (hasDefaultCapability), indépendamment de la validation Mongoose.
+    const actor = await makeUser({ role: 'Admin' });
+    actor.role = 'RoleInexistant';
+    await actor.save({ validateBeforeSave: false });
+    const { property } = await buildManagedProperty({ availability: 'Disponible' });
+    const res = await request(app)
+      .post(`/api/property-asset/${property._id}/transition`)
+      .set('Authorization', `Bearer ${signToken(actor._id)}`)
+      .send({ target: 'reserve' });
+    expect(res.status).toBe(403);
+  });
+});
+
+// RBAC-3 — mandat §46/47 : prouve que `requireCapability` dérive le rôle
+// exclusivement de `req.user` (posé par `protect` à partir du JWT vérifié en
+// base), jamais d'un champ envoyé par le client dans le corps de la requête.
+// Le payload `capabilities` exposé au frontend (RBAC-3) est une pure
+// projection UX — le backend ne le lit jamais pour autoriser une action.
+describe('POST /transition — le backend ignore un role/capabilities forgé dans le corps de la requête', () => {
+  test('un Client qui usurpe role:"Admin" dans le body reste refusé (403)', async () => {
+    const client = await makeUser({ role: 'Client' });
+    const { property } = await buildManagedProperty({ availability: 'Disponible' });
+    const res = await request(app)
+      .post(`/api/property-asset/${property._id}/transition`)
+      .set('Authorization', `Bearer ${signToken(client._id)}`)
+      .send({ target: 'reserve', role: 'Admin' });
+    expect(res.status).toBe(403);
+  });
+
+  test('un Client qui injecte capabilities:["properties.update"] dans le body reste refusé (403)', async () => {
+    const client = await makeUser({ role: 'Client' });
+    const { property } = await buildManagedProperty({ availability: 'Disponible' });
+    const res = await request(app)
+      .post(`/api/property-asset/${property._id}/transition`)
+      .set('Authorization', `Bearer ${signToken(client._id)}`)
+      .send({ target: 'reserve', capabilities: ['properties.update'], user: { role: 'Admin', capabilities: ['*'] } });
+    expect(res.status).toBe(403);
+  });
+
+  test('un GestionnaireImmobilier réel réussit sans jamais avoir besoin d\'envoyer role/capabilities', async () => {
+    const gestionnaire = await makeUser({ role: 'GestionnaireImmobilier' });
+    const { property } = await buildManagedProperty({ availability: 'Disponible' });
+    const res = await request(app)
+      .post(`/api/property-asset/${property._id}/transition`)
+      .set('Authorization', `Bearer ${signToken(gestionnaire._id)}`)
+      .send({ target: 'reserve' });
+    expect(res.status).toBe(200);
+  });
+});
+
 describe('historique / carnet d\'entretien / valorisation / alertes — agrégation réelle', () => {
   async function seedFullHistory() {
     const { owner, property } = await buildManagedProperty({ availability: 'Loué' });

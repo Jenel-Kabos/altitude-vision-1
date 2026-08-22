@@ -91,7 +91,7 @@ function InfoPill({ icon, label, color }) {
   );
 }
 
-function TransactionModal({ tx, onClose, onRefresh, isAdmin }) {
+function TransactionModal({ tx, onClose, onRefresh, canManageTransactions, isAdmin }) {
   const [paiements,        setPaiements]        = useState([]);
   const [loadingPaiements, setLoadingPaiements] = useState(false);
   const [action,           setAction]           = useState(null);
@@ -131,8 +131,13 @@ function TransactionModal({ tx, onClose, onRefresh, isAdmin }) {
 
   const status    = STATUS_MAP[tx.status] || STATUS_MAP["En cours"];
   const payStatus = PAYMENT_STATUS_MAP[tx.paymentStatus] || PAYMENT_STATUS_MAP['non_initié'];
-  const canFinalize = isAdmin && tx.status === 'Paiement en attente';
-  const canCancel   = isAdmin && !['Réussie', 'Annulée'].includes(tx.status);
+  // HOTFIX-RBAC-TRANSACTIONS-ACCESS-1 — finaliser/annuler suivent le contrat
+  // backend réel de POST /:id/finalize et PATCH /:id/cancel
+  // (staffOnly = restrictTo(...STAFF_DOC) = {Admin, Secretaire, Collaborateur}),
+  // distinct de la validation de virement (adminOnly, voir plus bas). Voir
+  // server/docs/HOTFIX_RBAC_TRANSACTIONS_ACCESS1_CONTRACT.md.
+  const canFinalize = canManageTransactions && tx.status === 'Paiement en attente';
+  const canCancel   = canManageTransactions && !['Réussie', 'Annulée'].includes(tx.status);
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }} onClick={onClose}>
@@ -213,6 +218,9 @@ function TransactionModal({ tx, onClose, onRefresh, isAdmin }) {
                     {p.paymentProof?.canPreview && <button type="button" onClick={() => previewTransactionPaymentProof(tx._id, p._id)} style={{ fontFamily: FONT, fontSize: 11, color: BLUE, border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }}>Voir justificatif sécurisé</button>}
                   </div>
                   <span style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600, color: ps.color, background: `${ps.color}15`, padding: "3px 10px", borderRadius: 20, flexShrink: 0 }}>{ps.label}</span>
+                  {/* HOTFIX-RBAC-TRANSACTIONS-ACCESS-1 — valider/rejeter un virement suit
+                      le contrat backend réel de PATCH /:txId/paiements/:pId/valider
+                      (adminOnly = restrictTo('Admin'), Collaborateur exclu). */}
                   {isAdmin && p.methode === 'virement' && p.statut === 'en_attente' && (
                     <div style={{ display: "flex", gap: 6 }}>
                       <button onClick={() => handleValiderVirement(p._id, 'valider')} disabled={validating} style={{ background: GREEN, color: "#fff", border: "none", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontSize: 11, fontFamily: FONT, display: "flex", alignItems: "center", gap: 4 }}>
@@ -228,7 +236,7 @@ function TransactionModal({ tx, onClose, onRefresh, isAdmin }) {
             })}
           </div>
 
-          {isAdmin && (
+          {canManageTransactions && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
               {action === 'finalize' && (
                 <div style={{ background: "#F0FDF4", borderRadius: 10, padding: 14 }}>
@@ -328,7 +336,15 @@ const FILTERS = [
 
 export default function TransactionsPage() {
   const { user } = useAuth();
-  const isAdmin  = ['Admin', 'Collaborateur'].includes(user?.role);
+  // HOTFIX-RBAC-TRANSACTIONS-ACCESS-1 — deux contrats backend distincts
+  // (voir server/docs/HOTFIX_RBAC_TRANSACTIONS_ACCESS1_CONTRACT.md) :
+  // `canManageTransactions` reflète staffOnly = restrictTo(...STAFF_DOC)
+  // (Admin, Secretaire, Collaborateur — lecture liste/stats, finaliser,
+  // annuler) ; `isAdmin` reflète adminOnly = restrictTo('Admin') (validation
+  // de virement uniquement). Un seul flag ne peut pas représenter les deux
+  // sans exclure Secretaire à tort ou inclure Collaborateur à tort.
+  const canManageTransactions = ['Admin', 'Secretaire', 'Collaborateur'].includes(user?.role);
+  const isAdmin = user?.role === 'Admin';
 
   const [transactions, setTransactions] = useState([]);
   const [stats,        setStats]        = useState(null);
@@ -341,8 +357,8 @@ export default function TransactionsPage() {
     setLoading(true); setError(null);
     try {
       const [txRes, statsRes] = await Promise.allSettled([
-        isAdmin ? getAllTransactions() : getMyTransactions(),
-        isAdmin ? getStats() : Promise.resolve(null),
+        canManageTransactions ? getAllTransactions() : getMyTransactions(),
+        canManageTransactions ? getStats() : Promise.resolve(null),
       ]);
       if (txRes.status === 'fulfilled') {
         const data = txRes.value;
@@ -352,7 +368,7 @@ export default function TransactionsPage() {
     } catch {
       setError("Impossible de charger les transactions.");
     } finally { setLoading(false); }
-  }, [isAdmin]);
+  }, [canManageTransactions]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -366,7 +382,7 @@ export default function TransactionsPage() {
           <Link href="/dashboard" style={{ color: "#94A3B8" }}><ArrowLeft size={18} /></Link>
           <div>
             <h1 style={{ fontFamily: FONT, fontSize: 20, fontWeight: 700, color: "#1E293B", margin: 0 }}>
-              {isAdmin ? "Gestion des transactions" : "Mes transactions"}
+              {canManageTransactions ? "Gestion des transactions" : "Mes transactions"}
             </h1>
             <p style={{ fontFamily: FONT, fontSize: 12, color: "#94A3B8", margin: "2px 0 0" }}>
               Suivi des dossiers immobiliers et paiements
@@ -377,7 +393,7 @@ export default function TransactionsPage() {
           </button>
         </div>
 
-        {isAdmin && stats && (
+        {canManageTransactions && stats && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", margin: "20px 0" }}>
             <KpiCard label="En cours"           value={stats.byStatus?.['En cours'] || 0}            color={BLUE}  />
             <KpiCard label="Paiement reçu"      value={stats.byStatus?.['Paiement en attente'] || 0} color={GOLD}  />
@@ -421,6 +437,7 @@ export default function TransactionsPage() {
           tx={selected}
           onClose={() => setSelected(null)}
           onRefresh={load}
+          canManageTransactions={canManageTransactions}
           isAdmin={isAdmin}
         />
       )}

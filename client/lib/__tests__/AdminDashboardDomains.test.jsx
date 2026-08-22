@@ -12,11 +12,24 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('../hooks/useDashboardBadges', () => ({ useDashboardBadges: () => ({ badges: {} }) }));
 
+// RBAC-3 — mêmes capacités que server/utils/iamArchitecture.js
+// (DEFAULT_CAPABILITIES), parité prouvée en RBAC-2/RBAC-3.
+const CAPABILITIES_BY_ROLE = {
+  Admin: ['*'],
+  Collaborateur: ['legacy.full'],
+  Secretaire: ['documents.read', 'documents.manage', 'payments.read', 'payments.manage', 'clients.read', 'owners.read', 'tenants.read', 'leases.read', 'properties.read'],
+  GestionnaireImmobilier: ['properties.read', 'properties.create', 'properties.update', 'owners.read', 'tenants.read', 'tenants.manage', 'visits.read', 'visits.manage', 'rental.read', 'rental.manage', 'leases.read', 'leases.manage', 'maintenance.read', 'maintenance.manage', 'notice.read', 'notice.manage', 'occupancy.read', 'occupancy.manage', 'payment.status'],
+  CommunityManager: ['altcom.read', 'altcom.manage', 'events.read', 'events.manage', 'media.read', 'media.manage'],
+  Communicant: ['messages.read', 'messages.manage', 'visits.read'],
+};
+
 const renderAsRole = (role) => {
+  const capabilities = CAPABILITIES_BY_ROLE[role] || [];
+  const can = (capability) => capabilities.includes('*') || capabilities.includes('legacy.full') || capabilities.includes(capability);
   vi.doMock('../context/AuthContext', () => ({
     useAuth: () => ({
-      user: { _id: 'TEST-USER', role, name: 'TEST USER' },
-      logout: vi.fn(), isCollaborateur: false, activeWrites: {}, timeLeft: () => 0,
+      user: { _id: 'TEST-USER', role, name: 'TEST USER', capabilities },
+      logout: vi.fn(), isCollaborateur: false, activeWrites: {}, timeLeft: () => 0, can,
     }),
   }));
 };

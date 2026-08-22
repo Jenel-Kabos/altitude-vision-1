@@ -11,6 +11,7 @@ const { getOperatorByUserId } = require('../services/platformOperator/platformOp
 const PlatformTenant = require('../models/PlatformTenant');
 const OrgMembership = require('../models/OrgMembership');
 const PlatformOperator = require('../models/PlatformOperator');
+const { getEffectiveCapabilities } = require('../utils/iamArchitecture'); // RBAC-3 — refresh identité /me
 
 // HOTFIX-USERS-COUNT-1 — `req.tenantScopeUserIds` (posé par
 // `requireTenantScope`) ne contient que les membres `OrgMembership` du
@@ -236,6 +237,11 @@ exports.getUser = async (req, res) => {
         const requesterId = String(req.user?._id || req.user?.id || '');
         if (requesterId && requesterId === String(user._id)) {
             payload.platformOperator = await getOperatorByUserId(user._id).catch(() => null);
+            // RBAC-3 — projection UX des capacités effectives (RBAC-2,
+            // getEffectiveCapabilities) ; réservé à /me pour ne jamais
+            // exposer les permissions d'un autre utilisateur via cette route
+            // générique (même garde que platformOperator ci-dessus).
+            payload.capabilities = getEffectiveCapabilities(user.role);
         }
         res.status(200).json({ status: 'success', data: payload });
     } catch (error) {

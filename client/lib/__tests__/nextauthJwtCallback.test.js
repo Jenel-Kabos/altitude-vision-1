@@ -20,6 +20,7 @@ vi.mock('next-auth/providers/google', () => ({
 await import('../../app/api/auth/[...nextauth]/route.js');
 
 const jwtCallback = capturedConfigRef.current.callbacks.jwt;
+const sessionCallback = capturedConfigRef.current.callbacks.session;
 
 const FIVE_MINUTES = 5 * 60;
 
@@ -32,7 +33,7 @@ describe('NextAuth callback jwt', () => {
     const account = {
       provider:     'google',
       backendToken: 'jwt-du-backend',
-      backendUser:  { _id: 'user-1', role: 'Admin' },
+      backendUser:  { _id: 'user-1', role: 'Admin', capabilities: ['*'] },
       isNewUser:    false,
     };
     const token = { email: 'admin@test.com' };
@@ -43,12 +44,13 @@ describe('NextAuth callback jwt', () => {
     expect(result.accessToken).toBe('jwt-du-backend');
     expect(result.userId).toBe('user-1');
     expect(result.role).toBe('Admin');
+    expect(result.capabilities).toEqual(['*']);
     expect(result.roleCheckedAt).toEqual(expect.any(Number));
   });
 
   test('connexion initiale (pas de backendToken) — fallback fetch /auth/google-token', async () => {
     fetch.mockResolvedValue({
-      json: async () => ({ token: 'jwt-fallback', userId: 'user-2', role: 'Client' }),
+      json: async () => ({ token: 'jwt-fallback', userId: 'user-2', role: 'Client', capabilities: ['client.self'] }),
     });
 
     const account = { provider: 'google' };
@@ -61,22 +63,24 @@ describe('NextAuth callback jwt', () => {
     expect(result.accessToken).toBe('jwt-fallback');
     expect(result.userId).toBe('user-2');
     expect(result.role).toBe('Client');
+    expect(result.capabilities).toEqual(['client.self']);
     expect(result.roleCheckedAt).toEqual(expect.any(Number));
   });
 
   test('refresh (account absent) sans roleCheckedAt — recharge le rôle', async () => {
     fetch.mockResolvedValue({
       ok:   true,
-      json: async () => ({ role: 'Collaborateur', userId: 'user-3' }),
+      json: async () => ({ role: 'Collaborateur', userId: 'user-3', capabilities: ['legacy.full'] }),
     });
 
-    const token = { email: 'staff@test.com', accessToken: 'ancien-token', role: 'Client' };
+    const token = { email: 'staff@test.com', accessToken: 'ancien-token', role: 'Client', capabilities: ['client.self'] };
 
     const result = await jwtCallback({ token, account: null });
 
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(result.role).toBe('Collaborateur');
     expect(result.userId).toBe('user-3');
+    expect(result.capabilities).toEqual(['legacy.full']);
     expect(result.roleCheckedAt).toEqual(expect.any(Number));
   });
 
@@ -86,6 +90,7 @@ describe('NextAuth callback jwt', () => {
       email:         'staff@test.com',
       accessToken:   'token-existant',
       role:          'Collaborateur',
+      capabilities:  ['legacy.full'],
       roleCheckedAt: recentCheck,
     };
 
@@ -93,6 +98,7 @@ describe('NextAuth callback jwt', () => {
 
     expect(fetch).not.toHaveBeenCalled();
     expect(result.role).toBe('Collaborateur');
+    expect(result.capabilities).toEqual(['legacy.full']);
     expect(result.roleCheckedAt).toBe(recentCheck);
   });
 
@@ -100,13 +106,14 @@ describe('NextAuth callback jwt', () => {
     const staleCheck = Math.floor(Date.now() / 1000) - (FIVE_MINUTES + 30);
     fetch.mockResolvedValue({
       ok:   true,
-      json: async () => ({ role: 'Admin', userId: 'user-4' }),
+      json: async () => ({ role: 'Admin', userId: 'user-4', capabilities: ['*'] }),
     });
 
     const token = {
       email:         'admin2@test.com',
       accessToken:   'token-existant',
       role:          'Client',
+      capabilities:  ['client.self'],
       roleCheckedAt: staleCheck,
     };
 
@@ -114,6 +121,7 @@ describe('NextAuth callback jwt', () => {
 
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(result.role).toBe('Admin');
+    expect(result.capabilities).toEqual(['*']);
     expect(result.roleCheckedAt).not.toBe(staleCheck);
   });
 
@@ -129,11 +137,32 @@ describe('NextAuth callback jwt', () => {
   test('refresh — échec réseau silencieux, le token existant est conservé', async () => {
     fetch.mockRejectedValue(new Error('network down'));
 
-    const token = { email: 'staff@test.com', accessToken: 'token-existant', role: 'Collaborateur' };
+    const token = { email: 'staff@test.com', accessToken: 'token-existant', role: 'Collaborateur', capabilities: ['legacy.full'] };
 
     const result = await jwtCallback({ token, account: null });
 
     expect(result.role).toBe('Collaborateur');
+    expect(result.capabilities).toEqual(['legacy.full']);
     expect(result.roleCheckedAt).toBeUndefined();
+  });
+});
+
+describe('NextAuth callback session', () => {
+  test('projette token.capabilities sur session.user.capabilities', async () => {
+    const session = { user: {} };
+    const token = { userId: 'user-1', role: 'Admin', capabilities: ['*'], accessToken: 'jwt', isNewUser: false };
+
+    const result = await sessionCallback({ session, token });
+
+    expect(result.user.capabilities).toEqual(['*']);
+  });
+
+  test('token.capabilities absent (ancienne session) — projette un tableau vide, jamais un fallback basé sur le rôle', async () => {
+    const session = { user: {} };
+    const token = { userId: 'user-2', role: 'Admin', accessToken: 'jwt', isNewUser: false };
+
+    const result = await sessionCallback({ session, token });
+
+    expect(result.user.capabilities).toEqual([]);
   });
 });

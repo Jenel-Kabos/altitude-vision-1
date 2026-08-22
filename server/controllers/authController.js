@@ -14,6 +14,11 @@ const { uploadPrivateAsset } = require('../services/storage/secureStorageService
 // réexportés ici pour les ~20 routes qui importent encore auth.protect/auth.restrictTo
 // depuis ce contrôleur, sans avoir à modifier chaque fichier de routes.
 const { protect: mwProtect, optionalAuth: mwOptionalAuth, restrictTo: mwRestrictTo } = require('../middleware/authMiddleware');
+// RBAC-3 — capacités effectives (RBAC-2, pure fonction du rôle) exposées au
+// Web comme projection UX ; le backend continue TOUJOURS de recalculer et
+// d'appliquer ses propres autorisations indépendamment de ce que le client
+// affirme détenir (voir server/docs/RBAC3_SECURITY_MATRIX.md).
+const { getEffectiveCapabilities } = require('../utils/iamArchitecture');
 
 const PUBLIC_SIGNUP_ROLES = new Set(['Client', 'Proprietaire']);
 const isAccountEnabled = (user) => Boolean(user?.isActive && (user.status === undefined || user.status === 'Actif'));
@@ -68,6 +73,10 @@ const createSendToken = (user, statusCode, res) => {
                 phone:           user.phone  || null,
                 photo:           user.photo  || null,
                 isEmailVerified: user.isEmailVerified,
+                // RBAC-3 — projection UX des capacités effectives (RBAC-2) ;
+                // jamais une source d'autorisation, seulement une aide à
+                // l'affichage côté client.
+                capabilities:    getEffectiveCapabilities(user.role),
             },
         },
     });
@@ -652,6 +661,10 @@ const sendGoogleAuthResponse = (user, statusCode, isNewUser, res) => {
                 phone:           user.phone  || null,
                 photo:           user.photo  || null,
                 isEmailVerified: user.isEmailVerified,
+                // RBAC-3 — projection UX des capacités effectives (RBAC-2) ;
+                // jamais une source d'autorisation, seulement une aide à
+                // l'affichage côté client.
+                capabilities:    getEffectiveCapabilities(user.role),
             },
         },
     });
@@ -791,6 +804,10 @@ exports.googleGetToken = async (req, res) => {
             token,
             userId: user._id,
             role:   user.role,
+            // RBAC-3 — recalculées à chaque pont NextAuth→backend (refresh de
+            // rôle périodique) pour que les capacités restent alignées si le
+            // rôle change en base entre deux connexions.
+            capabilities: getEffectiveCapabilities(user.role),
         });
     } catch (error) {
         logger.error('❌ [Auth] Erreur googleGetToken:', error);

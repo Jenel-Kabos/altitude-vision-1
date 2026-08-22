@@ -4,6 +4,17 @@ import Google from 'next-auth/providers/google';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://altitude-vision.onrender.com/api';
 
 const { handlers } = NextAuth({
+  // HOTFIX-WEB-GOOGLE-AUTH-1 — Auth.js v5 exige `trustHost` pour faire
+  // confiance à l'en-tête Host de la requête entrante ; sans lui, il défaut à
+  // `false` dès que ni AUTH_URL/AUTH_TRUST_HOST/VERCEL/CF_PAGES n'est présent
+  // ET NODE_ENV==='production' (voir @auth/core/lib/utils/env.js) — ce qui
+  // est exactement le cas sur Netlify avec seulement NEXTAUTH_URL défini.
+  // Résultat en production : assertConfig() renvoie UntrustedHost pour
+  // CHAQUE requête /api/auth/* (signin, callback, session…), avant même de
+  // rediriger vers Google — jamais reproductible en local où NODE_ENV vaut
+  // 'development' (trustHost y défaut à true). Le mobile n'est pas concerné
+  // (Google Sign-In natif, aucun passage par NextAuth).
+  trustHost: true,
   providers: [
     Google({
       clientId:     process.env.GOOGLE_CLIENT_ID,
@@ -46,6 +57,9 @@ const { handlers } = NextAuth({
           token.userId      = account.backendUser?._id;
           token.role        = account.backendUser?.role || 'Client';
           token.isNewUser   = account.isNewUser ?? false;
+          // RBAC-3 — capacités effectives renvoyées par le backend
+          // (getEffectiveCapabilities, RBAC-2) ; jamais recalculées ici.
+          token.capabilities = account.backendUser?.capabilities || [];
           token.roleCheckedAt = now;
         } else {
           try {
@@ -61,6 +75,7 @@ const { handlers } = NextAuth({
             token.accessToken = data.token;
             token.userId      = data.userId;
             token.role        = data.role || 'Client';
+            token.capabilities = data.capabilities || [];
             token.roleCheckedAt = now;
           } catch (e) {
             console.error('❌ [NextAuth] google-token error:', e);
@@ -73,6 +88,9 @@ const { handlers } = NextAuth({
       // après un changement de rôle côté admin. Plafonné à un appel / 5 min
       // (token.roleCheckedAt, posé aussi lors de la connexion initiale
       // ci-dessus pour éviter un refetch immédiat juste après le login).
+      // RBAC-3 — les capacités sont recalculées dans la même fenêtre que le
+      // rôle (getEffectiveCapabilities dépend uniquement du rôle côté
+      // backend), jamais sur un cycle séparé.
       if (!account && token.accessToken) {
         const lastCheck = token.roleCheckedAt || 0;
         const FIVE_MINUTES = 5 * 60;
@@ -91,6 +109,7 @@ const { handlers } = NextAuth({
               const data = await res.json();
               token.role          = data.role   || token.role;
               token.userId        = data.userId || token.userId;
+              token.capabilities  = data.capabilities || [];
               token.roleCheckedAt = now;
             }
           } catch {}
@@ -105,6 +124,10 @@ const { handlers } = NextAuth({
       session.user.id         = token.userId;
       session.user.role       = token.role || 'Client';
       session.user.isNewUser  = token.isNewUser ?? false;
+      // RBAC-3 — projection UX uniquement ; le backend réévalue toujours ses
+      // propres autorisations indépendamment de ce champ (voir
+      // server/docs/RBAC3_SECURITY_MATRIX.md).
+      session.user.capabilities = token.capabilities || [];
       return session;
     },
   },

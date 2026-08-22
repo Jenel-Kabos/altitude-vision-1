@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { useSession, signOut } from 'next-auth/react';
 import { useWriteWindow } from '../hooks/useWriteWindow';
 import { getEffectiveProfiles } from '../services/userBusinessProfileService';
+import { getMe } from '../services/userService';
 
 const DEFAULT_AUTH = {
     user: null,
@@ -19,6 +20,7 @@ const DEFAULT_AUTH = {
     canEdit:         false,
     canDelete:       false,
     canValidate:     false,
+    can:             () => false,
     // Fenêtre d'écriture collaborateur (10 min)
     registerWrite:   () => {},
     canModify:       () => true,
@@ -163,6 +165,9 @@ export const AuthProvider = ({ children }) => {
                 role:            session.user?.role || 'Client',
                 photo:           session.user?.image || null,
                 isEmailVerified: true,
+                // RBAC-3 — projection UX du backend (getEffectiveCapabilities,
+                // RBAC-2) ; ne remplace jamais l'autorisation backend.
+                capabilities:    session.user?.capabilities || [],
             };
             localStorage.setItem('token', session.accessToken);
             localStorage.setItem('user',  JSON.stringify(googleUser));
@@ -185,9 +190,45 @@ export const AuthProvider = ({ children }) => {
         return () => { cancelled = true; };
     }, [user?._id, user?.id]);
 
+    // ── RBAC-3 : auto-guérison des sessions antérieures au champ capabilities ──
+    // Une session localStorage créée avant ce sprint n'a pas `user.capabilities`
+    // (champ absent, à distinguer de `[]` = chargé, aucune capacité). Plutôt que
+    // de recréer un mapping rôle→capacités côté client (interdit par le mandat
+    // RBAC-3 §21-22), on rafraîchit une seule fois l'identité depuis /me — seul
+    // point d'exposition qui projette réellement getEffectiveCapabilities.
+    // Transitoire : à supprimer une fois toutes les sessions pré-RBAC-3 expirées
+    // (durée de vie du JWT — voir server/docs/RBAC3_SECURITY_MATRIX.md).
+    useEffect(() => {
+        if (!user || Array.isArray(user.capabilities)) return;
+        let cancelled = false;
+        getMe()
+            .then((fresh) => {
+                if (cancelled || !fresh || !Array.isArray(fresh.capabilities)) return;
+                setUser(prev => {
+                    if (!prev || Array.isArray(prev.capabilities)) return prev;
+                    const merged = { ...prev, capabilities: fresh.capabilities };
+                    localStorage.setItem('user', JSON.stringify(merged));
+                    return merged;
+                });
+            })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [user]);
+
     const hasBusinessProfile = useCallback(
         (profileType) => Boolean(businessProfiles?.includes(profileType)),
         [businessProfiles]
+    );
+
+    // ── RBAC-3 : helper canonique unique de consultation des capacités ──
+    // Projection UX du backend (getEffectiveCapabilities, RBAC-2) — ne
+    // sécurise RIEN : le backend réévalue toujours indépendamment via
+    // protect/requireCapability/restrictTo/tenant/ownership (voir
+    // server/docs/RBAC3_SECURITY_MATRIX.md). Capacité inconnue ou absente
+    // → false (fail closed), jamais true.
+    const can = useCallback(
+        (capability) => Boolean(user?.capabilities?.includes(capability)),
+        [user]
     );
 
     // Prevents hydration mismatch: Next.js RSC renders the layout in the HTML,
@@ -210,6 +251,7 @@ export const AuthProvider = ({ children }) => {
         canEdit:         user?.role === 'Admin',
         canDelete:       user?.role === 'Admin',
         canValidate:     user?.role === 'Admin',
+        can,
         // Fenêtre d'écriture : 10 min après une création/modification
         registerWrite,
         canModify,
@@ -221,7 +263,7 @@ export const AuthProvider = ({ children }) => {
         isProprietaireImmobilier:  hasBusinessProfile('proprietaire_immobilier'),
         isExploitantEtablissement: hasBusinessProfile('exploitant_etablissement'),
         isLocataireProfile:        hasBusinessProfile('locataire'),
-    }), [user, loading, isInitialized, login, logout, updateUser, registerWrite, canModify, timeLeft, activeWrites, businessProfiles, hasBusinessProfile]);
+    }), [user, loading, isInitialized, login, logout, updateUser, can, registerWrite, canModify, timeLeft, activeWrites, businessProfiles, hasBusinessProfile]);
 
     return (
         <AuthContext.Provider value={value}>

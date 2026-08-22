@@ -4,15 +4,7 @@ import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-
-const COLLAB_ROLES = ['Collaborateur','Secretaire','GestionnaireImmobilier','CommunityManager','Communicant'];
-
-const getTargetPath = (role) => {
-  if (role === 'Admin' || COLLAB_ROLES.includes(role)) return '/dashboard';
-  if (role === 'Proprietaire') return '/mes-biens';
-  // Client, User, undefined → accueil connecté
-  return '/altimmo/annonces';
-};
+import { getPostAuthDestination } from '../../../lib/navigation/postAuthDestination';
 
 export default function GoogleRedirectPage() {
   const { data: session, status } = useSession();
@@ -34,8 +26,13 @@ export default function GoogleRedirectPage() {
       return;
     }
 
-    const role = session?.user?.role;
-    const target = getTargetPath(role);
+    // HOTFIX-AUTH-POSTLOGIN-ROUTING-1 — réutilise l'unique résolveur canonique
+    // (déjà consommé par LoginPage/RegisterPage/VerifyEmailPage) au lieu d'une
+    // logique locale dupliquée qui envoyait Proprietaire directement vers
+    // /mes-biens (court-circuitant resolveOwnerDestination/le chooser
+    // multi-profil) et Client/legacy vers /altimmo/annonces au lieu de
+    // /mon-espace ou /. Voir server/docs/HOTFIX_AUTH_POSTLOGIN_ROUTING1_ROUTE_MATRIX.md.
+    const target = getPostAuthDestination(session?.user);
     router.replace(target);
   }, [status, session, router]);
 

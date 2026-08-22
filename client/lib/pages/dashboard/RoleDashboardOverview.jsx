@@ -3,14 +3,16 @@
 import Link from 'next/link';
 import { ArrowRight, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { hasStaffCapability } from '../../utils/staffCapabilities';
 import { getProfileDashboard, getVisibleProfileModules } from '../../navigation/dashboardProfiles';
 import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState } from '../../components/dashboard/DashboardUI';
 
 export default function RoleDashboardOverview() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const dashboard = getProfileDashboard(user?.role);
-  const modules = getVisibleProfileModules(user?.role, capability => hasStaffCapability(user, capability));
+  // RBAC-3 — `can()` lit les capacités effectives calculées côté backend
+  // (getEffectiveCapabilities, RBAC-2), parité prouvée avec l'ancien
+  // hasStaffCapability/CAPABILITIES_BY_ROLE (voir server/docs/RBAC3_WEB_MIGRATION_MATRIX.md).
+  const modules = getVisibleProfileModules(user?.role, can);
 
   if (!dashboard) {
     return <DashboardState title="Dashboard indisponible" description="Aucune vue métier n’est configurée pour ce profil." />;

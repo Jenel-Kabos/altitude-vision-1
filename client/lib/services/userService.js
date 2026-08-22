@@ -15,6 +15,18 @@ export const getAllUsers = async () => {
 };
 
 /**
+ * 🔹 RBAC-3 — Récupère l'utilisateur connecté (dont ses capacités effectives,
+ *    projetées uniquement sur /me côté backend). Utilisé pour rafraîchir une
+ *    session locale antérieure à l'ajout du champ `capabilities`.
+ */
+export const getMe = async () => {
+  const response = await api.get("/users/me");
+  return response.data?.data?.user
+    ? { ...response.data.data.user, capabilities: response.data.data.capabilities }
+    : null;
+};
+
+/**
  * 🔹 Met à jour les informations de profil (nom, email, téléphone, photo)
  *
  * ⚠️  IMPORTANT — Ne jamais forcer "Content-Type: multipart/form-data" manuellement.

@@ -1,0 +1,27 @@
+# HOTFIX-RBAC-GESTION-LOCATIVE-ACCESS-1 — MATRICE DES ENDPOINTS
+
+Endpoints réellement consommés par `client/lib/pages/dashboard/GestionLocativePage.jsx` (vérifiés ligne par ligne dans les fichiers de routes, pas seulement rapportés).
+
+| Endpoint | UI consumer (fichier:ligne) | Auth middleware | Capability/rôles | Tenant | Ownership | Verdict |
+|---|---|---|---|---|---|---|
+| `POST /rental-management/onboarding`, `GET /rental-management/onboarding/options` | "Ajouter un bien à la gestion locative" (2189, 2194) via `AddManagedPropertyModal`/`onboardRentalProperty` | `protect`, `requireTenantScope` | `restrictTo('Admin','GestionnaireImmobilier')` | Oui (`requireTenantScope` global au routeur) | N/A (création) | Frontend `canManage` correspond exactement |
+| `POST /rental-management/:id/deactivate` | "Retirer de la gestion locative" (2218) via `handleDeactivateRental`/`deactivateRentalManagement` | `protect`, `requireTenantScope`, `router.param('id')` (tenant/ownership du dossier) | `restrictTo('Admin','GestionnaireImmobilier')` | Oui | Oui (`assertResourceTenantOrUnattributed` sur `RentalManagement`) | Frontend `canManage` correspond exactement |
+| `rental.allowedActions` (publish/suspend/maintenance/complete-maintenance/validate-exit) | Boutons conditionnels (2213-2217) | N/A côté UI — le backend calcule déjà `allowedActions` par dossier et l'UI se contente de l'afficher | `requireCapability('rental.manage'\|'occupancy.manage'\|'maintenance.manage')` selon l'action, côté `runRentalAction` | Oui | Oui | Déjà correct — pattern backend-driven, non concerné par `canManage` |
+| `POST /contrats`, `PUT /contrats/:id` | "Nouveau Contrat" (2247), édition (2280 `showEdit`) via `createContrat`/`updateContrat` | `protect` | `requireCapability('leases.manage')` → résout à `{Admin, GestionnaireImmobilier, Collaborateur}` | Non explicite sur create ; `router.param('id')` + `assertResourceTenantOrUnattributed` sur update | Oui (update) | **DIVERGENCE — frontend `canManage` exclut `Collaborateur` à tort** |
+| `DELETE /contrats/:id` | Suppression contrat (2281 `showDelete`) via `deleteContrat` | `protect`, `router.param('id')` (tenant) | **`restrictTo('Admin')` — Admin uniquement** | Oui | Oui | **DIVERGENCE OPPOSÉE — frontend `canManage` inclut à tort `GestionnaireImmobilier`, qui verrait le bouton mais recevrait un 403** |
+| `POST /proprietaires`, `PUT /proprietaires/:id`, `DELETE /proprietaires/:id`, `POST/PUT/DELETE /proprietaires/:id/biens*` | Création/édition/suppression Propriétaire + biens (2329, 2367-2368, 2372) | `protect` | `restrictTo(...STAFF_IMMO)` = `{Admin, GestionnaireImmobilier, Collaborateur}` | Non explicite sur create ; `assertProprietaireInScope` sur update/delete/biens | Oui (update/delete/biens) | **DIVERGENCE — frontend `canManage` exclut `Collaborateur` à tort** |
+| `POST /locataires`, `PUT /locataires/:id`, `DELETE /locataires/:id` | Création/édition/suppression Locataire (2396, 2428-2429) | `protect` | `requireCapability('tenants.manage')` → résout à `{Admin, GestionnaireImmobilier, Collaborateur}` | Non explicite sur create ; `assertLocataireInScope` sur update/delete | Oui (update/delete) | **DIVERGENCE — frontend `canManage` exclut `Collaborateur` à tort** |
+| `GET /proprietaires`, `GET /locataires`, `GET /contrats`, `GET /rental-management`, `GET /rental-management/stats` | Lecture des listes (chargement de la page) | `protect` | `restrictTo(...STAFF_IMMO,'Secretaire')` (proprietaires) / `requireCapability('tenants.read'\|'leases.read'\|'rental.read')` | Selon route | N/A (lecture liste) | Cohérent avec le menu (capability-based), aucune action requise |
+| `GET/PATCH/POST /paiements*` | Paiements locatifs (onglet Paiements) | `protect` | `requireCapability('payments.read'\|'payments.manage')` | Non explicite | Non explicite | Hors périmètre de `canManage`/`canDoc` — déjà géré par `canDoc` séparément, non modifié |
+| `GET/POST /gestion-docs/*`, `GET /documents` | Documents (onglet Documents) | `protect` | `requireCapability('documents.read'\|'documents.manage')` | Non explicite | Non explicite | Hors périmètre de `canManage`, déjà géré par `canDoc`, non modifié |
+| `GET /rental-maintenance` | Maintenance locative (onglet) | `protect` | `requireCapabilityForStaff('maintenance.read')` | Non explicite | Non explicite | Lecture seule consommée par cette page, aucune action de mutation ici |
+| `GET /properties/portfolio` (onboarding options) | Sélection de bien à ajouter en gestion | `protect`, `requireTenantScope` | `restrictTo(...STAFF_IMMO)` | Oui | N/A | Cohérent avec `canManage` (même population que l'onboarding) |
+
+## Constat central
+
+`canManage` (une seule variable booléenne, `isAdmin || user?.role === 'GestionnaireImmobilier'`) est utilisée pour gater **trois contrats backend différents** :
+1. Onboarding + désactivation de mandat → `{Admin, GestionnaireImmobilier}` — **correspond exactement** à `canManage`.
+2. Création/édition Contrat, CRUD Propriétaire+biens, CRUD Locataire → `{Admin, GestionnaireImmobilier, Collaborateur}` — **`canManage` exclut `Collaborateur` à tort**.
+3. Suppression Contrat → `{Admin}` seul — **`canManage` inclut `GestionnaireImmobilier` à tort** (bouton visible, 403 backend garanti).
+
+Ce n'est donc pas une simple question "faut-il ajouter Collaborateur à `canManage` ?" — une réponse binaire casserait le contrat n°1 (onboarding/désactivation) en accordant à tort ces actions à `Collaborateur`, et laisserait intact le bug n°3 (suppression Contrat visible à tort pour `GestionnaireImmobilier`).

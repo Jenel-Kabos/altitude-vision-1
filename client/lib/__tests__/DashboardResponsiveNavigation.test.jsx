@@ -18,7 +18,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
     user: { _id: 'TEST-STAFF', id: 'TEST-STAFF', role: 'Admin', name: 'STAFF TEST' },
-    logout: vi.fn(), isCollaborateur: false, activeWrites: {}, timeLeft: () => 0,
+    logout: vi.fn(), isCollaborateur: false, activeWrites: {}, timeLeft: () => 0, can: () => true,
   }),
 }));
 

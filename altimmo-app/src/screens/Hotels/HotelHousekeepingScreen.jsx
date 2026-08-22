@@ -26,8 +26,8 @@ export default function HotelHousekeepingScreen({ route }) {
   const [loading, setLoading] = useState(false);
   const [inspections, setInspections] = useState({}); // taskId -> inspection en attente de décision
   // Les capacités hôtel (hotel.housekeeping.manage, etc.) sont un espace de
-  // permissions PAR HÔTEL via `HotelStaffAssignment` — distinct de la
-  // projection IAM-3 (`staffCapabilities.js`, rôles globaux). Aucun garde
+  // permissions PAR HÔTEL via `HotelStaffAssignment` — distinct des capacités
+  // globales exposées par `can()` (AuthContext, RBAC-4). Aucun garde
   // client ne peut reproduire ce scope sans le requêter séparément ; comme
   // `HotelOperationsScreen.jsx` existant, les actions restent visibles et le
   // backend (`assertOperationalHotelAccess`) reste la seule sécurité réelle,

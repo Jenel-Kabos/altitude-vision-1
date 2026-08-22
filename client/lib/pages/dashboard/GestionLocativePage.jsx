@@ -1734,7 +1734,21 @@ const AddManagedPropertyModal = ({ onClose, onSuccess, toast }) => {
 const GestionLocativePage = () => {
   const { toasts, push: toast } = useToast();
   const { canAdd, isAdmin, user } = useAuth();
+  // HOTFIX-RBAC-GESTION-LOCATIVE-ACCESS-1 — `canManage` reste réservé aux
+  // deux actions backend strictement {Admin, GestionnaireImmobilier}
+  // (onboarding d'un bien en gestion locative, désactivation de mandat —
+  // `restrictTo('Admin','GestionnaireImmobilier')` sur rentalManagementRoutes.js).
+  // `canManageStaffImmo` couvre le contrat backend réel du reste du domaine
+  // (CRUD Propriétaire+biens via STAFF_IMMO, CRUD Locataire via
+  // requireCapability('tenants.manage'), création/édition Contrat via
+  // requireCapability('leases.manage')) — les trois résolvent exactement à
+  // {Admin, GestionnaireImmobilier, Collaborateur}, Collaborateur y
+  // atteignant ces capacités via son joker `legacy.full`. Voir
+  // server/docs/HOTFIX_RBAC_GESTION_LOCATIVE_ACCESS1_CONTRACT.md pour la
+  // preuve complète — aucune permission backend n'a changé, seul le
+  // frontend excluait Collaborateur à tort de ce second contrat.
   const canManage = isAdmin || user?.role === 'GestionnaireImmobilier';
+  const canManageStaffImmo = isAdmin || ['GestionnaireImmobilier', 'Collaborateur'].includes(user?.role);
   const canDoc    = isAdmin || ['Secretaire', 'Collaborateur'].includes(user?.role);
 
   const checkPermission = (action) => {
@@ -2243,7 +2257,7 @@ const GestionLocativePage = () => {
                     <option value="expiré">Expiré</option>
                   </Select>
                 </div>
-                {canManage && (
+                {canManageStaffImmo && (
                   <Btn onClick={() => { setEditContrat(null); setContratModal(true); }}><Plus size={15}/> Nouveau Contrat</Btn>
                 )}
               </div>
@@ -2277,8 +2291,8 @@ const GestionLocativePage = () => {
                             <TD><StatutBadge statut={c.statut}/></TD>
                             <TD>{c.dateEntree?new Date(c.dateEntree).toLocaleDateString('fr-FR'):c.dateSignatureCompromis?new Date(c.dateSignatureCompromis).toLocaleDateString('fr-FR'):'—'}</TD>
                             <Actions
-                              showEdit={canManage}
-                              showDelete={canManage}
+                              showEdit={canManageStaffImmo}
+                              showDelete={isAdmin}
                               onView={() => setViewContrat(c)}
                               onEdit={() => {
                                 const init = {
@@ -2325,7 +2339,7 @@ const GestionLocativePage = () => {
                   placeholder="Rechercher un propriétaire…"
                   style={{maxWidth:280}}
                 />
-                {canManage && (
+                {canManageStaffImmo && (
                   <Btn onClick={() => { setEditProp(null); setAddBienForProp(false); setPropModal(true); }}><Plus size={15}/> Nouveau Propriétaire</Btn>
                 )}
               </div>
@@ -2364,12 +2378,12 @@ const GestionLocativePage = () => {
                               </TD>
                               <TD>{p.ville||'—'}</TD>
                               <Actions
-                                showEdit={canManage}
-                                showDelete={canManage}
+                                showEdit={canManageStaffImmo}
+                                showDelete={canManageStaffImmo}
                                 onView={() => setViewProp(p)}
                                 onEdit={() => { setEditProp(p); setAddBienForProp(false); setPropModal(true); }}
                                 onDelete={() => setDeleteTarget({id:p._id, label:`${p.prenom} ${p.nom}`, type:'proprietaire'})}
-                                onAddBien={canManage ? () => { setEditProp(p); setAddBienForProp(true); setPropModal(true); } : undefined}
+                                onAddBien={canManageStaffImmo ? () => { setEditProp(p); setAddBienForProp(true); setPropModal(true); } : undefined}
                               />
                             </TRow>
                           );
@@ -2392,7 +2406,7 @@ const GestionLocativePage = () => {
                   placeholder="Rechercher un locataire…"
                   style={{maxWidth:280}}
                 />
-                {canManage && (
+                {canManageStaffImmo && (
                   <Btn onClick={() => { setEditLoc(null); setLocModal(true); }}><Plus size={15}/> Nouveau Locataire</Btn>
                 )}
               </div>
@@ -2425,8 +2439,8 @@ const GestionLocativePage = () => {
                                 ? <span className="text-xs font-semibold" style={{color:GREEN}}>✓ {contrat.adresseBien||'Actif'}</span>
                                 : <span className="text-xs text-gray-400">—</span>}</TD>
                               <Actions
-                                showEdit={canManage}
-                                showDelete={canManage}
+                                showEdit={canManageStaffImmo}
+                                showDelete={canManageStaffImmo}
                                 onEdit={() => { setEditLoc(l); setLocModal(true); }}
                                 onDelete={() => setDeleteTarget({id:l._id, label:`${l.prenom} ${l.nom}`, type:'locataire'})}
                               />

@@ -228,12 +228,23 @@ export const AuthProvider = ({ children }) => {
   const role = useMemo(() => user?.role?.toLowerCase(), [user?.role]);
   const hasBusinessProfile = (profileType) => Boolean(businessProfiles?.includes(profileType));
 
+  // RBAC-4 — helper canonique unique de consultation des capacités
+  // effectives calculées côté backend (getEffectiveCapabilities, RBAC-2),
+  // déjà présentes dans `user` (login, /auth/google, /users/me — RBAC-3 a
+  // enrichi ces mêmes payloads côté backend, réutilisés tels quels ici).
+  // Projection UX uniquement — ne sécurise rien, le backend réévalue
+  // toujours indépendamment (voir server/docs/RBAC4_SECURITY_MATRIX.md).
+  // Capacité inconnue ou absente → false (fail closed, jamais un mapping
+  // rôle→capacités recalculé localement).
+  const can = (capability) => Boolean(user?.capabilities?.includes(capability));
+
   return (
     <AuthContext.Provider value={{
       user, token, loading, needsProfileCompletion,
       login, loginWithGoogle, register, logout, updateUser, refreshSession, markProfileCompleted,
       accountStatusMessage,
       clearAccountStatusMessage: () => setAccountStatusMessage(null),
+      can,
       isAdmin:         role === 'admin',
       isCollaborateur: role === 'collaborateur',
       isProprietaire:  role === 'proprietaire',

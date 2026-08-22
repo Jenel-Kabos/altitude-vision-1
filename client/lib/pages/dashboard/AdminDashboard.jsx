@@ -18,7 +18,6 @@ import DashboardBadge from '../../components/dashboard/DashboardBadge';
 import { resolveWebDestination } from '../../navigation/navigationSdk';
 import PlatformOperatorContextSwitcher from '../../components/dashboard/PlatformOperatorContextSwitcher';
 import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeContext';
-import { hasStaffCapability } from '../../utils/staffCapabilities';
 
 const GOLD = '#C8960C';
 const BLUE = '#2E7BB5';
@@ -187,7 +186,7 @@ const AdminDashboard = ({ children }) => {
   const router = useRouter();
   const pathname = usePathname();
   const isActive = (to, end = false) => end ? pathname === to : pathname.startsWith(to);
-  const { logout, user, isCollaborateur, activeWrites, timeLeft } = useAuth();
+  const { logout, user, isCollaborateur, activeWrites, timeLeft, can } = useAuth();
   const { tenantReady, tenantRequired, selectedTenantId } = usePlatformTenantRuntime();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
@@ -374,7 +373,11 @@ const AdminDashboard = ({ children }) => {
             style={{ maxHeight: 'calc(100dvh - 220px)' }}>
             {NAV_SECTIONS.map((section, si) => {
               const visibleLinks = section.links.filter(link => (
-                link.capability ? hasStaffCapability(user, link.capability) : (!link.roles || link.roles.includes(user?.role))
+                // RBAC-3 — `can()` lit les capacités effectives calculées côté
+                // backend (getEffectiveCapabilities, RBAC-2), parité prouvée
+                // avec l'ancien hasStaffCapability/CAPABILITIES_BY_ROLE (voir
+                // server/docs/RBAC3_WEB_MIGRATION_MATRIX.md).
+                link.capability ? can(link.capability) : (!link.roles || link.roles.includes(user?.role))
               ));
               // Une section dont aucun lien n'est visible pour le rôle
               // courant ne doit jamais afficher un en-tête "orphelin" sans

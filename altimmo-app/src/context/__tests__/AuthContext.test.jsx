@@ -49,12 +49,13 @@ const mockDeleteToken = mockApi.deleteToken;
 const mockGetToken = mockApi.getToken;
 const getCapturedSessionInvalidatedHandler = () => require('../../services/api').__getCapturedSessionInvalidatedHandler();
 
-function Harness() {
+function Harness({ probeCapability } = {}) {
   const auth = useAuth();
   return (
     <View>
       <Text testID="state">{auth.loading ? 'loading' : auth.user?._id || 'anonymous'}</Text>
       <Text testID="account-status">{auth.accountStatusMessage || ''}</Text>
+      {probeCapability && <Text testID="can">{String(auth.can(probeCapability))}</Text>}
       <Button title="logout" onPress={auth.logout} />
       <Button title="login" onPress={() => auth.login('user@example.test', 'secret')} />
       <Button title="google-login" onPress={() => auth.loginWithGoogle({ idToken: 'opaque', intent: 'login' })} />
@@ -197,5 +198,137 @@ describe('AuthProvider', () => {
       'Compte existant',
       'Un compte existe déjà avec cette adresse. Connectez-vous.'
     );
+  });
+});
+
+// RBAC-4 — le mobile réutilise les mêmes payloads d'identité que RBAC-3
+// (login, /auth/google, /users/me), déjà enrichis de `capabilities` côté
+// backend. `can()` doit lire ce champ tel quel, jamais recalculer un
+// mapping rôle→capacités localement (voir server/docs/RBAC4_SECURITY_MATRIX.md).
+describe('AuthProvider.can()', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockDeleteToken.mockResolvedValue();
+    mockRegisterPush.mockResolvedValue();
+    mockUnregisterPush.mockResolvedValue();
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+
+  afterEach(() => Alert.alert.mockRestore());
+
+  test('login email — capacité présente dans user.capabilities → true', async () => {
+    mockGetToken.mockResolvedValue(null);
+    mockApi.post.mockResolvedValue({
+      data: { token: 'fresh-token', data: { user: { _id: 'user-c', role: 'GestionnaireImmobilier', capabilities: ['properties.update'] } } },
+    });
+    const screen = render(<AuthProvider><Harness probeCapability="properties.update" /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('state').props.children).toBe('anonymous'));
+
+    await act(async () => fireEvent.press(screen.getByText('login')));
+
+    expect(screen.getByTestId('state').props.children).toBe('user-c');
+    expect(screen.getByTestId('can').props.children).toBe('true');
+  });
+
+  test('login email — capacité absente de user.capabilities → false (fail closed)', async () => {
+    mockGetToken.mockResolvedValue(null);
+    mockApi.post.mockResolvedValue({
+      data: { token: 'fresh-token', data: { user: { _id: 'user-d', role: 'GestionnaireImmobilier', capabilities: ['properties.update'] } } },
+    });
+    const screen = render(<AuthProvider><Harness probeCapability="payments.reverse" /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('state').props.children).toBe('anonymous'));
+
+    await act(async () => fireEvent.press(screen.getByText('login')));
+
+    expect(screen.getByTestId('can').props.children).toBe('false');
+  });
+
+  test('login Google — capacités projetées depuis la réponse /auth/google', async () => {
+    mockGetToken.mockResolvedValue(null);
+    mockApi.post.mockResolvedValue({
+      data: { token: 'jwt-google', data: { user: { _id: 'user-e', role: 'Admin', capabilities: ['properties.update', 'payments.reverse'] } }, isNewUser: false },
+    });
+    const screen = render(<AuthProvider><Harness probeCapability="payments.reverse" /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('state').props.children).toBe('anonymous'));
+
+    await act(async () => fireEvent.press(screen.getByText('google-login')));
+
+    expect(screen.getByTestId('state').props.children).toBe('user-e');
+    expect(screen.getByTestId('can').props.children).toBe('true');
+  });
+
+  test('restauration de session (cold start via /users/me) — capacités disponibles immédiatement, jamais de fallback rôle', async () => {
+    mockGetToken.mockResolvedValue('stored-token');
+    mockApi.get.mockResolvedValue({
+      data: { data: { user: { _id: 'user-f', role: 'Secretaire', capabilities: ['documents.read'] } } },
+    });
+    const screen = render(<AuthProvider><Harness probeCapability="documents.read" /></AuthProvider>);
+
+    await waitFor(() => expect(screen.getByTestId('state').props.children).toBe('user-f'));
+    expect(screen.getByTestId('can').props.children).toBe('true');
+  });
+
+  test('session ancienne restaurée sans capabilities (backend non déployé/ancien cache) → fail closed, jamais un mapping local', async () => {
+    mockGetToken.mockResolvedValue('stored-token');
+    mockApi.get.mockResolvedValue({
+      data: { data: { user: { _id: 'user-g', role: 'Admin' } } },
+    });
+    const screen = render(<AuthProvider><Harness probeCapability="properties.update" /></AuthProvider>);
+
+    await waitFor(() => expect(screen.getByTestId('state').props.children).toBe('user-g'));
+    expect(screen.getByTestId('can').props.children).toBe('false');
+  });
+
+  test('capacité inconnue jamais enregistrée backend → false', async () => {
+    mockGetToken.mockResolvedValue('stored-token');
+    mockApi.get.mockResolvedValue({
+      data: { data: { user: { _id: 'user-h', role: 'Admin', capabilities: ['properties.update'] } } },
+    });
+    const screen = render(<AuthProvider><Harness probeCapability="not.registered" /></AuthProvider>);
+
+    await waitFor(() => expect(screen.getByTestId('state').props.children).toBe('user-h'));
+    expect(screen.getByTestId('can').props.children).toBe('false');
+  });
+
+  test('aucun utilisateur connecté → false', async () => {
+    mockGetToken.mockResolvedValue(null);
+    const screen = render(<AuthProvider><Harness probeCapability="properties.update" /></AuthProvider>);
+
+    await waitFor(() => expect(screen.getByTestId('state').props.children).toBe('anonymous'));
+    expect(screen.getByTestId('can').props.children).toBe('false');
+  });
+
+  test('logout efface les capacités — plus aucune capacité accessible après déconnexion', async () => {
+    mockGetToken.mockResolvedValue('stored-token');
+    mockApi.get.mockResolvedValue({
+      data: { data: { user: { _id: 'user-i', role: 'Admin', capabilities: ['properties.update'] } } },
+    });
+    const screen = render(<AuthProvider><Harness probeCapability="properties.update" /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('can').props.children).toBe('true'));
+
+    await act(async () => fireEvent.press(screen.getByText('logout')));
+
+    expect(screen.getByTestId('state').props.children).toBe('anonymous');
+    expect(screen.getByTestId('can').props.children).toBe('false');
+  });
+
+  test('changement d\'utilisateur (Admin déconnecté → Client reconnecté) ne laisse aucune capacité résiduelle', async () => {
+    mockGetToken.mockResolvedValue('stored-token');
+    mockApi.get.mockResolvedValue({
+      data: { data: { user: { _id: 'user-admin', role: 'Admin', capabilities: ['properties.update', 'payments.reverse'] } } },
+    });
+    const screen = render(<AuthProvider><Harness probeCapability="payments.reverse" /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('can').props.children).toBe('true'));
+
+    await act(async () => fireEvent.press(screen.getByText('logout')));
+    expect(screen.getByTestId('can').props.children).toBe('false');
+
+    mockApi.post.mockResolvedValue({
+      data: { token: 'jwt-client', data: { user: { _id: 'user-client', role: 'Client', capabilities: ['client.self'] } } },
+    });
+    await act(async () => fireEvent.press(screen.getByText('login')));
+
+    expect(screen.getByTestId('state').props.children).toBe('user-client');
+    expect(screen.getByTestId('can').props.children).toBe('false');
   });
 });
