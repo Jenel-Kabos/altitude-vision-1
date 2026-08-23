@@ -89,7 +89,7 @@ export default function AddSalePropertyScreen({ navigation }) {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const uploaded = await Promise.all(photos.map((p) => uploadToCloudinary(p.uri)));
+      const uploaded = await Promise.all(photos.map((p, index) => uploadToCloudinary(p.uri, { index, total: photos.length })));
       const payload = buildSalePropertyPayload(form, uploaded);
       await creerAnnonce(payload);
       await clearDraft();

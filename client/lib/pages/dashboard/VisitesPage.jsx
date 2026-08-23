@@ -134,11 +134,11 @@ const VisitesPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 sm:p-8 font-sans">
       <style>{`
         .vp-client-request, .vp-owner-section, .vp-address-section {
-          margin-top: 14px; padding: 14px; background: #FAFAF8;
-          border-radius: 12px; border: 1px solid #F0F0EE;
+          margin-top: 14px; padding: 14px; background: var(--db-surface-soft);
+          border-radius: 12px; border: 1px solid var(--db-border);
         }
         .vp-section-label {
-          font-size: 12px; font-weight: 700; color: #666;
+          font-size: 12px; font-weight: 700; color: var(--db-muted);
           letter-spacing: 0.08em; text-transform: uppercase;
           display: flex; align-items: center; gap: 6px;
           margin-bottom: 10px;
@@ -146,9 +146,9 @@ const VisitesPage = () => {
         .vp-info-grid { display: flex; flex-direction: column; gap: 8px; }
         .vp-info-row {
           display: flex; align-items: center; gap: 8px;
-          font-size: 13px; color: #1A1A1A;
+          font-size: 13px; color: var(--db-text);
         }
-        .vp-info-row span { color: #666; }
+        .vp-info-row span { color: var(--db-muted); }
         .vp-tel-link { color: #C8960C; font-weight: 600; text-decoration: none; }
         .vp-tel-link:hover { text-decoration: underline; }
         .vp-maps-btn {
@@ -160,8 +160,8 @@ const VisitesPage = () => {
         }
         .vp-maps-btn:hover { background: #185FA5; color: #fff; }
         .vp-message {
-          background: #F5F5F2; border-radius: 8px;
-          padding: 8px 10px; font-style: italic; color: #666 !important;
+          background: var(--db-surface-soft); border-radius: 8px;
+          padding: 8px 10px; font-style: italic; color: var(--db-muted) !important;
         }
         .vp-payment-banner {
           margin: 0 20px 16px; padding: 16px;
@@ -171,8 +171,8 @@ const VisitesPage = () => {
         }
         .vp-payment-banner > svg { color: #C8960C; flex-shrink: 0; margin-top: 2px; }
         .vp-payment-content { flex: 1; }
-        .vp-payment-title { font-weight: 700; font-size: 14px; color: #1A1A1A; margin-bottom: 4px; }
-        .vp-payment-desc { font-size: 13px; color: #666; margin-bottom: 12px; }
+        .vp-payment-title { font-weight: 700; font-size: 14px; color: var(--db-text); margin-bottom: 4px; }
+        .vp-payment-desc { font-size: 13px; color: var(--db-muted); margin-bottom: 12px; }
         .vp-payment-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .vp-pay-btn {
           display: inline-flex; align-items: center; gap: 6px;
@@ -184,8 +184,8 @@ const VisitesPage = () => {
         .vp-agent-btn {
           display: inline-flex; align-items: center; gap: 6px;
           padding: 9px 16px; border-radius: 10px;
-          background: #fff; border: 1.5px solid #F0F0EE;
-          color: #666; font-size: 13px; font-weight: 600;
+          background: var(--db-surface-solid); border: 1.5px solid var(--db-border);
+          color: var(--db-muted); font-size: 13px; font-weight: 600;
           text-decoration: none;
         }
         .vp-agent-btn:hover { border-color: #C8960C; color: #C8960C; }

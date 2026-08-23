@@ -44,7 +44,15 @@ function logFormDataPartDev(fieldName, value) {
 // "Unsupported FormDataPart implementation". axios (utilisé partout ailleurs
 // dans l'app pour l'upload de fichiers, ex. ProfilScreen.jsx) passe par
 // XMLHttpRequest côté RN et supporte cette forme correctement.
-export async function uploadToCloudinary(uri) {
+//
+// HOTFIX-MOB-PROPERTY-PUBLISH-FAILURE-2 — `{ index, total }` est une
+// instrumentation DEV optionnelle (jamais de contenu binaire/JWT/secret
+// loggé) permettant de distinguer, pour un lot de plusieurs photos, laquelle
+// échoue réellement et à quelle étape (avant le fix, "Erreur lors de la
+// publication" masquait entièrement si l'échec venait de Cloudinary ou du
+// backend Property). Optionnel et rétrocompatible : les appelants qui ne le
+// passent pas se contentent de logs sans index/total.
+export async function uploadToCloudinary(uri, { index, total } = {}) {
   const { name, type } = getUploadMeta(uri);
   const filePart = { uri, name, type };
   const fd = new FormData();
@@ -53,15 +61,34 @@ export async function uploadToCloudinary(uri) {
   logFormDataPartDev('upload_preset', CLOUDINARY_UPLOAD_PRESET);
   fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
+  const uriScheme = typeof uri === 'string' ? uri.split(':')[0] : typeof uri;
+  if (__DEV__) console.log('[Cloudinary upload start]', { index, total, uriScheme, mime: type, hasName: Boolean(name) });
+
   try {
     const res = await axios.post(
       `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,
       fd,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     );
+    if (__DEV__) console.log('[Cloudinary upload success]', {
+      index, httpStatus: res.status,
+      hasSecureUrl: Boolean(res.data?.secure_url),
+      hasPublicId: Boolean(res.data?.public_id),
+    });
     return res.data.secure_url;
   } catch (err) {
-    if (__DEV__) console.log('[Cloudinary upload error]', err.response?.data || err.message);
+    if (__DEV__) console.log('[Cloudinary upload failure]', {
+      index,
+      errorName: err.name,
+      errorCode: err.code,
+      axiosStatus: err.response?.status,
+      // Cloudinary renvoie {error: {message}} en cas de rejet (preset/format/
+      // signature) — jamais de secret dans ce champ, seulement un message
+      // métier. Tronqué par prudence, jamais loggé en entier ni en prod.
+      responseDataSafe: typeof err.response?.data?.error?.message === 'string'
+        ? err.response.data.error.message.slice(0, 300)
+        : undefined,
+    });
     throw new Error('Cloudinary upload failed');
   }
 }
@@ -78,19 +105,50 @@ export async function getRecommendedProperties() {
 }
 
 export async function creerAnnonce(payload) {
+  const body = {
+    ...payload,
+    latitude: payload.latitude ?? -4.2661,
+    longitude: payload.longitude ?? 15.2832,
+  };
+  // HOTFIX-MOB-PROPERTY-PUBLISH-FAILURE-2 — instrumentation DEV expurgée :
+  // aucune valeur métier sensible (adresse complète, téléphone) ni JWT n'est
+  // loggée, uniquement des présences booléennes et le type/catégorie déjà
+  // affichés dans le récapitulatif de l'écran. `categorie` (vente/location/
+  // hebergement) est un champ distinct de `type` (nature physique du bien) —
+  // jamais dérivé l'un de l'autre dans ce payload (voir buildBasePropertyPayload).
+  if (__DEV__) console.log('[Property publish request]', {
+    type: body.type,
+    statusOrListingType: body.categorie,
+    imageCount: Array.isArray(body.photos) ? body.photos.length : 0,
+    titlePresent: Boolean(body.titre),
+    cityPresent: Boolean(body.ville),
+    areaPresent: body.superficie !== undefined,
+    pricePresent: body.prix !== undefined,
+    bedroomsPresent: body.chambres !== undefined,
+    bathroomsPresent: body.bathrooms !== undefined,
+    payloadKeys: Object.keys(body),
+  });
   try {
-    const res = await api.post('/properties/mobile', {
-      ...payload,
-      latitude: payload.latitude ?? -4.2661,
-      longitude: payload.longitude ?? 15.2832,
+    const res = await api.post('/properties/mobile', body);
+    const property = res.data?.data?.property || res.data?.property;
+    if (__DEV__) console.log('[Property publish response]', {
+      httpStatus: res.status,
+      success: res.data?.status === 'success' || Boolean(property),
+      propertyIdPresent: Boolean(property?._id || property?.id),
     });
-    return res.data?.data?.property || res.data?.property;
+    return property;
   } catch (err) {
-    throw new Error(
-      err.response?.data?.message ||
-      err.response?.data?.error ||
-      'Erreur lors de la publication'
-    );
+    const backendMessageSafe = typeof (err.response?.data?.message || err.response?.data?.error) === 'string'
+      ? (err.response.data.message || err.response.data.error).slice(0, 300)
+      : undefined;
+    if (__DEV__) console.log('[Property publish failure]', {
+      errorName: err.name,
+      errorCode: err.code,
+      axiosStatus: err.response?.status,
+      backendCode: err.response?.data?.code,
+      backendMessageSafe,
+    });
+    throw new Error(backendMessageSafe || 'Erreur lors de la publication');
   }
 }
 

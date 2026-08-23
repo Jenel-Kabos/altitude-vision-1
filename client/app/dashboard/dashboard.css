@@ -3,8 +3,12 @@
   --db-surface: rgba(255, 255, 255, 0.92);
   --db-surface-solid: #fff;
   --db-surface-soft: #f8fafc;
+  --db-surface-raised: #ffffff;
+  --db-surface-input: #ffffff;
   --db-text: #111827;
   --db-muted: #64748b;
+  --db-faint: #94a3b8;
+  --db-focus: #2563eb;
   --db-border: rgba(15, 23, 42, 0.09);
   --db-shadow: 0 10px 30px rgba(15, 23, 42, 0.07);
   --db-shadow-hover: 0 18px 42px rgba(15, 23, 42, 0.12);
@@ -85,10 +89,17 @@
 /* Harmonisation progressive des pages historiques, limitée au dashboard. */
 .dashboard-content-inner > * { max-width: 80rem; margin-inline: auto; color: var(--db-text); }
 .dashboard-content-inner :where(.bg-white, .bg-white\/70, .bg-white\/80, .bg-white\/90, .bg-white\/95) { background-color: var(--db-surface) !important; }
-.dashboard-content-inner :where(.bg-gray-50, .bg-gray-100) { background-color: var(--db-surface-soft) !important; }
-.dashboard-content-inner :where(.text-gray-900, .text-gray-800, .text-gray-700) { color: var(--db-text) !important; }
-.dashboard-content-inner :where(.text-gray-600, .text-gray-500, .text-gray-400) { color: var(--db-muted) !important; }
+.dashboard-content-inner :where(.bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100) { background-color: var(--db-surface-soft) !important; }
+.dashboard-content-inner :where(.text-gray-900, .text-gray-800, .text-gray-700, .text-slate-900, .text-slate-800, .text-slate-700) { color: var(--db-text) !important; }
+.dashboard-content-inner :where(.text-gray-600, .text-gray-500, .text-gray-400, .text-slate-600, .text-slate-500, .text-slate-400) { color: var(--db-muted) !important; }
+.dashboard-content-inner :where(.text-gray-300, .text-slate-300) { color: var(--db-faint) !important; }
+.dashboard-content-inner :where(.border-gray-100, .border-gray-200, .border-gray-300, .border-slate-100, .border-slate-200, .border-slate-300) { border-color: var(--db-border) !important; }
+.dashboard-content-inner :where(.from-slate-50, .from-gray-50) { --tw-gradient-from: var(--db-bg) var(--tw-gradient-from-position) !important; --tw-gradient-to: rgb(241 245 249 / 0) var(--tw-gradient-to-position) !important; }
+.dashboard-content-inner :where(.to-blue-50, .to-slate-50, .to-gray-50) { --tw-gradient-to: var(--db-bg) var(--tw-gradient-to-position) !important; }
 .dashboard-content-inner :where(input, textarea, select) { min-height: 2.75rem; border-color: var(--db-border); border-radius: .75rem; color: var(--db-text); background: var(--db-surface-solid); }
+.dashboard-content-inner :where(input, textarea)::placeholder { color: var(--db-faint); opacity: 1; }
+.dashboard-content-inner :where(input, textarea, select):focus-visible { outline: 2px solid var(--db-focus); outline-offset: 1px; }
+.dashboard-content-inner :where(input, textarea, select, button):disabled { cursor: not-allowed; opacity: .5; }
 .dashboard-content-inner :where(table) { width: 100%; color: var(--db-text); }
 .dashboard-content-inner :where(thead) { color: var(--db-muted); background: var(--db-surface-soft); }
 .dashboard-content-inner :where(th) { font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; }
@@ -103,15 +114,51 @@
     --db-surface: rgba(17, 24, 39, 0.94);
     --db-surface-solid: #111827;
     --db-surface-soft: #182130;
+    --db-surface-raised: #151e2c;
+    --db-surface-input: #0f172a;
     --db-text: #f1f5f9;
-    --db-muted: #94a3b8;
+    --db-muted: #b1bdcd;
+    --db-faint: #8291a6;
+    --db-focus: #60a5fa;
     --db-border: rgba(148, 163, 184, 0.16);
     --db-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
     --db-shadow-hover: 0 18px 42px rgba(0, 0, 0, 0.38);
   }
   .dashboard-content-inner :where(.from-blue-50, .via-cyan-50, .to-indigo-50) { --tw-gradient-from: var(--db-bg) !important; --tw-gradient-to: var(--db-bg) !important; --tw-gradient-stops: var(--db-bg), var(--db-bg) !important; }
+  .dashboard-content-inner :where(.bg-slate-800, .bg-slate-900, .bg-gray-800, .bg-gray-900) { background-color: var(--db-surface-raised) !important; }
+  .dashboard-content-inner :where(.bg-blue-50) { color: #bfdbfe !important; background-color: rgba(37,99,235,.18) !important; }
+  .dashboard-content-inner :where(.bg-amber-50, .bg-yellow-50, .bg-orange-50) { color: #fde68a !important; background-color: rgba(217,119,6,.16) !important; }
+  .dashboard-content-inner :where(.bg-red-50) { color: #fecaca !important; background-color: rgba(220,38,38,.16) !important; }
+  .dashboard-content-inner :where(.bg-green-50, .bg-emerald-50) { color: #bbf7d0 !important; background-color: rgba(22,163,74,.16) !important; }
+  .dashboard-skeleton { background-image: linear-gradient(100deg, #182130 20%, #243044 45%, #182130 70%); }
   .dashboard-mobile-topbar { color: var(--db-text); border-color: var(--db-border) !important; background: var(--db-surface-solid) !important; }
 }
+
+/* Compatible avec une future bascule applicative par classe, sans imposer
+   de nouveau ThemeProvider ni concurrencer la préférence système actuelle. */
+.dark .dashboard-shell {
+  --db-bg: #090d14;
+  --db-surface: rgba(17, 24, 39, 0.94);
+  --db-surface-solid: #111827;
+  --db-surface-soft: #182130;
+  --db-surface-raised: #151e2c;
+  --db-surface-input: #0f172a;
+  --db-text: #f1f5f9;
+  --db-muted: #b1bdcd;
+  --db-faint: #8291a6;
+  --db-focus: #60a5fa;
+  --db-border: rgba(148, 163, 184, 0.16);
+  --db-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  --db-shadow-hover: 0 18px 42px rgba(0, 0, 0, 0.38);
+}
+.dark .dashboard-content-inner :where(.from-blue-50, .via-cyan-50, .to-indigo-50) { --tw-gradient-from: var(--db-bg) !important; --tw-gradient-to: var(--db-bg) !important; --tw-gradient-stops: var(--db-bg), var(--db-bg) !important; }
+.dark .dashboard-content-inner :where(.bg-slate-800, .bg-slate-900, .bg-gray-800, .bg-gray-900) { background-color: var(--db-surface-raised) !important; }
+.dark .dashboard-content-inner :where(.bg-blue-50) { color: #bfdbfe !important; background-color: rgba(37,99,235,.18) !important; }
+.dark .dashboard-content-inner :where(.bg-amber-50, .bg-yellow-50, .bg-orange-50) { color: #fde68a !important; background-color: rgba(217,119,6,.16) !important; }
+.dark .dashboard-content-inner :where(.bg-red-50) { color: #fecaca !important; background-color: rgba(220,38,38,.16) !important; }
+.dark .dashboard-content-inner :where(.bg-green-50, .bg-emerald-50) { color: #bbf7d0 !important; background-color: rgba(22,163,74,.16) !important; }
+.dark .dashboard-skeleton { background-image: linear-gradient(100deg, #182130 20%, #243044 45%, #182130 70%); }
+.dark .dashboard-mobile-topbar { color: var(--db-text); border-color: var(--db-border) !important; background: var(--db-surface-solid) !important; }
 
 @media (max-width: 767px) {
   .dashboard-page-header { align-items: flex-start; flex-direction: column; }

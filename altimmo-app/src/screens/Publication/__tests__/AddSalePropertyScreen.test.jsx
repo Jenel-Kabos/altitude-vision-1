@@ -111,7 +111,10 @@ describe('AddSalePropertyScreen', () => {
     fireEvent.press(screen.getByText('Publier')); // summary -> publication
 
     await waitFor(() => expect(creerAnnonce).toHaveBeenCalled());
-    expect(uploadToCloudinary).toHaveBeenCalledWith('file://photo1.jpg');
+    // HOTFIX-MOB-PROPERTY-PUBLISH-FAILURE-2 — index/total sont une
+    // instrumentation DEV optionnelle ajoutée pour distinguer, sur un lot de
+    // plusieurs photos, laquelle échoue réellement.
+    expect(uploadToCloudinary).toHaveBeenCalledWith('file://photo1.jpg', { index: 0, total: 1 });
     expect(creerAnnonce.mock.calls[0][0]).toMatchObject({ categorie: 'vente', titre: 'Belle maison' });
   });
 
