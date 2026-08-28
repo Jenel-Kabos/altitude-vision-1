@@ -67,8 +67,15 @@ exports.list = async (req, res) => {
       if (error === 404) return fail(res, 404, 'Bien introuvable.');
       if (error === 403) return fail(res, 403, 'Vous ne pouvez consulter que vos propres biens.');
       query.property = propertyId;
-    } else if (!isStaff) {
-      const properties = await Property.find({ owner: req.user.id }).select('_id');
+    } else {
+      // HOTFIX-RENTAL-MANAGEMENT-DASHBOARD-SEMANTICS-1 — la vue d'ensemble
+      // staff appelle cette liste sans propertyId. `requireTenantScope` a
+      // déjà résolu l'autorité canonique dans `req.tenantScopeUserIds` : la
+      // liste doit donc dériver ses Property de ce scope, exactement comme
+      // les autres lectures Gestion locative, jamais retomber sur `{}`.
+      // Un scope staff vide reste volontairement fail-closed (`$in: []`).
+      const ownerIds = isStaff ? (req.tenantScopeUserIds || []) : [req.user.id];
+      const properties = await Property.find({ owner: { $in: ownerIds } }).select('_id');
       query.property = { $in: properties.map((p) => p._id) };
     }
     if (status) query.status = status;

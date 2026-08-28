@@ -8,10 +8,13 @@ import { RefreshCw } from "lucide-react";
 
 const RentalStats = ({ rentalStats, contratsActifs, loyersMensuel, onRefresh, colors }) => {
   const { BLUE, GREEN, GOLD, RED } = colors;
+  const eligibleRentalLabel = rentalStats.biensInscrits === 1
+    ? 'Bien locatif éligible'
+    : 'Biens locatifs éligibles';
   return (
     <div className="flex items-center gap-4 flex-wrap">
       {[
-        ['Biens inscrits',  rentalStats.biensInscrits || 0, '#64748B'],
+        [eligibleRentalLabel, rentalStats.biensInscrits || 0, '#64748B'],
         ['Biens gérés',     rentalStats.total || 0,       BLUE],
         ['Vacants',         rentalStats.vacant || 0,      GREEN],
         ['Publiés',         rentalStats.published || 0,   '#7C3AED'],

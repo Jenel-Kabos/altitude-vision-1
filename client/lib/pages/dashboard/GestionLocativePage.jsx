@@ -2133,7 +2133,7 @@ const GestionLocativePage = () => {
     </div>
   );
 
-  const contratsActifs    = contrats.filter(c => c.statut==='actif').length;
+  const contratsActifs    = contrats.filter(c => c.type==='location' && c.statut==='actif').length;
   const contratsEnAttente = contrats.filter(c => c.statut==='en_attente').length;
   const loyersMensuel     = contrats.filter(c => c.statut==='actif' && c.type==='location').reduce((s,c) => s+(c.montantLoyer||0), 0);
   const totalAttendu   = paiements.reduce((s,p) => s+(p.montantTotal||p.montant||0), 0);

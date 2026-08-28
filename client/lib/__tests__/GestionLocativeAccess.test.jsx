@@ -24,7 +24,11 @@ vi.mock('../context/AuthContext', () => ({
   }),
 }));
 
-const contratFixture = { _id: 'c1', type: 'location', adresseBien: 'Bien Test', statut: 'actif', montantLoyer: 100000 };
+const contratFixtures = [
+  { _id: 'c1', type: 'location', adresseBien: 'Bail actif', statut: 'actif', montantLoyer: 100000 },
+  { _id: 'c2', type: 'vente', adresseBien: 'Vente active', statut: 'actif', prixVente: 20000000 },
+  { _id: 'c3', type: 'location', adresseBien: 'Bail expiré', statut: 'expiré', montantLoyer: 80000 },
+];
 const proprietaireFixture = { _id: 'p1', nom: 'Nkounkou', prenom: 'Alice', telephone: '+242060000001', biensPropres: [] };
 const locataireFixture = { _id: 'l1', nom: 'Moke', prenom: 'Paul', telephone: '+242060000002' };
 
@@ -37,7 +41,7 @@ vi.mock('../services/gestionLocativeService', () => ({
   createLocataire: vi.fn(),
   updateLocataire: vi.fn(),
   deleteLocataire: vi.fn(),
-  getContrats: vi.fn().mockResolvedValue([contratFixture]),
+  getContrats: vi.fn().mockResolvedValue(contratFixtures),
   createContrat: vi.fn(),
   updateContrat: vi.fn(),
   deleteContrat: vi.fn(),
@@ -46,8 +50,8 @@ vi.mock('../services/gestionLocativeService', () => ({
   marquerPaiementPaye: vi.fn(),
   calculerPenalites: vi.fn(),
   addBienPhotos: vi.fn(),
-  getRentalManagement: vi.fn().mockResolvedValue({ rentals: [] }),
-  getRentalManagementStats: vi.fn().mockResolvedValue({ total: 0, vacant: 0, occupied: 0, published: 0, maintenance: 0, readyToRepublish: 0 }),
+  getRentalManagement: vi.fn().mockResolvedValue({ rentals: [{ _id: 'rm1', property: { _id: 'property-managed', title: 'Bien géré' } }] }),
+  getRentalManagementStats: vi.fn().mockResolvedValue({ biensInscrits: 1, total: 1, vacant: 0, occupied: 0, published: 0, maintenance: 0, readyToRepublish: 0 }),
   getRentalManagementDetail: vi.fn(),
   runRentalAction: vi.fn(),
   deactivateRentalManagement: vi.fn(),
@@ -71,7 +75,7 @@ vi.mock('../services/documentService', () => ({
 }));
 
 vi.mock('../services/rentalMaintenanceService', () => ({
-  getRentalMaintenanceTickets: vi.fn().mockResolvedValue([]),
+  getRentalMaintenanceTickets: vi.fn().mockResolvedValue([{ _id: 'maintenance-a', status: 'ouvert', priority: 'normale' }]),
 }));
 
 vi.mock('../services/propertyService', () => ({
@@ -93,6 +97,25 @@ const renderAsRole = async (role) => {
 describe('GestionLocativePage — parité du contrat Contrat/Propriétaire/Locataire (Admin, GestionnaireImmobilier, Collaborateur)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  test('Contrats actifs compte uniquement le bail location actif', async () => {
+    await renderAsRole('Admin');
+    const label = screen.getByText('Contrats actifs');
+    expect(label.previousElementSibling).toHaveTextContent('1');
+  });
+
+  test('dashboard consolidé : éligible, géré, bail actif et maintenance ouverte gardent leurs sémantiques distinctes', async () => {
+    await renderAsRole('Admin');
+
+    const eligibleLabel = screen.getByText('Bien locatif éligible');
+    expect(eligibleLabel.previousElementSibling).toHaveTextContent('1');
+    const managedLabel = screen.getAllByText('Biens gérés').find((element) => element.tagName === 'P');
+    expect(managedLabel.previousElementSibling).toHaveTextContent('1');
+    const activeContractsLabel = screen.getByText('Contrats actifs');
+    expect(activeContractsLabel.previousElementSibling).toHaveTextContent('1');
+    const maintenanceLabel = screen.getByText('Maintenances ouvertes');
+    expect(maintenanceLabel.previousElementSibling).toHaveTextContent('1');
   });
 
   test.each(['Admin', 'GestionnaireImmobilier', 'Collaborateur'])(
@@ -131,7 +154,7 @@ describe('GestionLocativePage — suppression de Contrat (contrat backend adminO
 
   test('Admin voit le bouton de suppression du contrat', async () => {
     await renderAsRole('Admin');
-    expect(screen.getByTitle('Supprimer')).toBeInTheDocument();
+    expect(screen.getAllByTitle('Supprimer')).toHaveLength(contratFixtures.length);
   });
 
   test.each(['GestionnaireImmobilier', 'Collaborateur'])(

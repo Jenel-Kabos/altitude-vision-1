@@ -14,6 +14,15 @@ import DocumentOverview from '../components/dashboard/DocumentOverview';
 const COLORS = { BLUE: '#2E7BB5', GREEN: '#16A34A', GOLD: '#C8960C', RED: '#D42B2B' };
 
 describe('RentalStats — TEST DATA', () => {
+  test.each([
+    [1, 'Bien locatif éligible'],
+    [2, 'Biens locatifs éligibles'],
+  ])('décrit précisément le catalogue locatif éligible (%s)', (count, label) => {
+    render(<RentalStats rentalStats={{ biensInscrits: count }} contratsActifs={0} loyersMensuel={0} onRefresh={() => {}} colors={COLORS} />);
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.queryByText(/Bien(?:s)? inscrit/i)).not.toBeInTheDocument();
+  });
+
   test('affiche les compteurs et le loyer mensuel, déclenche le rafraîchissement', () => {
     const onRefresh = vi.fn();
     render(<RentalStats
