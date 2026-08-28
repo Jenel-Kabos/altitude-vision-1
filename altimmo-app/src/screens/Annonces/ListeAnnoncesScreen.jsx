@@ -357,6 +357,17 @@ export default function ListeAnnoncesScreen({ navigation }) {
 
   const onRefresh = useCallback(() => {
     cache.invalidate('properties:');
+    // HOTFIX-MOB-RECOMMENDED-PROPERTIES-1 — la section "Biens recommandés"
+    // n'était chargée qu'une seule fois au montage (useEffect ci-dessus,
+    // deps []), jamais rechargée par le pull-to-refresh : un changement
+    // admin (nouveau bien recommandé, image corrigée) restait invisible
+    // jusqu'au redémarrage de l'app ou l'expiration du cache 10 min de
+    // `getRecommendedProperties` (aucun mécanisme ne la déclenchait non
+    // plus). Le backend a été vérifié correct (voir
+    // HOTFIX_MOB_RECOMMENDED_PROPERTIES1_REPORT.md) — seul le refetch
+    // manquait.
+    cache.invalidate('recommended:');
+    getRecommendedProperties().then(setRecommended).catch(() => {});
     setRefreshing(true);
     setPage(1);
     setHasMore(true);
