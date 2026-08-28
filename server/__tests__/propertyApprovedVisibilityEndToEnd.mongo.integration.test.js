@@ -21,7 +21,7 @@ const Property = require('../models/Property');
 const propertyRoutes = require('../routes/propertyRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { getPropertyPortfolio } = require('../services/propertyPortfolioService');
-const { sales } = require('../controllers/dashboardAnalyticsController');
+const { getImmobilierReportData } = require('../services/reporting/immobilierReportQueryService');
 
 jest.setTimeout(120000);
 
@@ -63,7 +63,7 @@ describe('Reproduction — bien historique déjà approuvé mais isPublished=fal
     await Property.create(propertyPayload(owner, { statusAdmin: 'Validée', isPublished: false }));
 
     const portfolio = await getPropertyPortfolio();
-    const analytics = await sales();
+    const analytics = await getImmobilierReportData();
 
     // Matrice attendu/actuel du mandat, AVANT réparation :
     expect(portfolio.items.some((i) => i.title === 'PARCELLE A VENDRE')).toBe(false); // Sales list : NON
@@ -103,7 +103,7 @@ describe('Réparation idempotente — re-validation via le vrai workflow (PATCH 
     expect(portfolio.items.map((i) => i.title)).toContain('PARCELLE A VENDRE');
     const homeVisible = await Property.exists({ _id: pending._id, statusAdmin: 'Validée', isPublished: true, availability: 'Disponible', pole: 'Altimmo' });
     expect(homeVisible).not.toBeNull();
-    const analytics = await sales();
+    const analytics = await getImmobilierReportData();
     expect(analytics.kpis).toMatchObject({ total: 1, published: 1, drafts: 0 });
   });
 

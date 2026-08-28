@@ -7,6 +7,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "lint": "eslint . --ext .js,.mjs",
+    "architecture:check": "node scripts/check-architecture.js",
     "format": "prettier --write \"**/*.{js,json,css,md}\"",
     "test": "jest",
     "test:unit": "jest --testPathIgnorePatterns='\\.(mongo|replica)\\.integration\\.test\\.js$'",
@@ -19,8 +20,8 @@
     "test:finance:resilience": "jest --runInBand --detectOpenHandles --testPathPatterns='financialCore.resilience.replica.integration.test.js'",
     "finance:reconcile": "node scripts/reconcile-finance.js",
     "rental:reconcile": "node scripts/reconcile-rental-management.js",
-    "verify": "npm run lint",
-    "ci": "npm run lint && npm run test:unit && npm run test:mongo"
+    "verify": "npm run architecture:check && npm run lint",
+    "ci": "npm run architecture:check && npm run lint && npm run test:unit && npm run test:mongo"
   },
   "keywords": [
     "express",

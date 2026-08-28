@@ -1,11 +1,12 @@
 // server/controllers/conversationController.js
 const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
-const { serializeMessage } = require('./messageController');
+const { serializeMessage } = require('../services/messageSerializer');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const { ALL_STAFF } = require('../utils/roles');
 const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertConversationAccess } = require('../services/messagingAuthorizationService');
 
 const activeTenantId = (req) => req.platformTenant?._id;
 // POST-E2E-1 — un client sans tenant propre voit UNIQUEMENT ses propres
@@ -65,27 +66,13 @@ const tenantConversationFilter = (req) => (activeTenantId(req)
 // respecter (rien ne la rattache à un tenant, donc aucune fuite possible) et
 // passe sans lever d'erreur ; une ressource `resolved` vers un AUTRE tenant
 // continue de lever (isolation cross-tenant inchangée, jamais affaiblie).
-async function assertConversationAccess(req, conversation) {
-  if (activeTenantId(req)) {
-    await assertResourceTenantOrUnattributed({ resourceType: 'Conversation', resource: conversation, tenantId: activeTenantId(req) });
-  }
-  const isStaff = ALL_STAFF.includes(req.user.role);
-  const isParticipant = (conversation.participants || []).some((participant) =>
-    String(participant?._id || participant) === String(req.user.id));
-  if (!isStaff && !isParticipant) {
-    // POST-E2E-2 — cette erreur portait déjà `.statusCode = 403` mais jamais
-    // de `.name` reconnu par errorMiddleware.js, qui ne lit `.statusCode`
-    // que pour des classes nommées explicitement (même convention que
-    // HotelAccessError/FinancialError, voir errorMiddleware.js) — sans nom,
-    // le middleware retombait sur son défaut 500. Bug réel reproduit
-    // (POST_E2E1_REPORT.md §36), corrigé en alignant sur la convention
-    // existante plutôt qu'en généralisant `.statusCode` pour toute erreur.
-    const error = new Error('Accès refusé');
-    error.name = 'ConversationAccessError';
-    error.statusCode = 403;
-    throw error;
-  }
-}
+//
+// HOTFIX-MESSAGING-MESSAGE-READ-AUTHORITY-1 — `assertConversationAccess`
+// vit désormais dans `services/messagingAuthorizationService.js` (import
+// ci-dessus), pour être réutilisée telle quelle par
+// `messageController.js::getMessages` sans edge controller→controller.
+// Comportement strictement inchangé pour les 4 appelants ci-dessous —
+// seule sa localisation a changé.
 
 async function keepAttributedConversations(req, conversations) {
   // Même raisonnement que `assertConversationAccess` ci-dessus : sans tenant

@@ -12,7 +12,7 @@ const { destroyFromCloudinary } = require('../config/cloudinary');
 const { uploadPrivateAsset, deletePrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
 const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
 const Locataire = require('../models/Locataire');
-const { streamRemoteDocument } = require('./rentalDocumentController');
+const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });

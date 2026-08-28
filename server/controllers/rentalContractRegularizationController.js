@@ -1,5 +1,5 @@
 const service = require('../services/rentalContractRegularizationService');
-const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('./userController');
+const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
 
 const fail = (res, error) => res.status(error.statusCode || 500).json({
   status: (error.statusCode || 500) >= 500 ? 'error' : 'fail',

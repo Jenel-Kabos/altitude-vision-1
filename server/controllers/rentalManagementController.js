@@ -7,7 +7,7 @@ const sync = require('../services/rentalListingSyncService');
 const { notifyStaff } = require('../services/notificationService');
 const { contractAlertWindowDays } = require('../services/rentalFinancialAutomationService');
 const onboarding = require('../services/rentalAssetOnboardingService');
-const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('./userController');
+const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
 
 // TENANT-SCOPE-AUDIT-1 — `req.tenantScopeUserIds` reste le scope brut
 // `OrgMembership`-only. `list`/`stats` comparent `RentalManagement.owner`/

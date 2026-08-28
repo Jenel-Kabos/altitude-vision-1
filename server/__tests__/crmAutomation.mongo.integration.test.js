@@ -16,7 +16,7 @@ const OrgUnit = require('../models/OrgUnit');
 const OrgMembership = require('../models/OrgMembership');
 const PlatformTenant = require('../models/PlatformTenant');
 const { notify } = require('../services/notificationService');
-const { handleEvent: handleTenantEvent } = require('../services/crmAutomationEngine');
+const { handleEvent: handleTenantEvent, initializeCrmAutomation } = require('../services/crmAutomationEngine');
 const { computeCustomerScore } = require('../services/crmScoreService');
 const { getCockpit } = require('../services/crmCockpitService');
 const { createOpportunity, moveOpportunity, setOpportunityOutcome } = require('../services/crmService');
@@ -49,14 +49,21 @@ const makeCustomerForUser = (user, relations = ['prospect']) => CrmCustomer.crea
   relations, sourceRefs: [{ entityType: 'User', entityId: user._id, source: 'auth' }],
 });
 
-beforeAll(startFinancialMongo);
+let stopObservingNotifications;
+beforeAll(async () => {
+  stopObservingNotifications = initializeCrmAutomation();
+  await startFinancialMongo();
+});
 beforeEach(async () => {
   const root = await OrgUnit.create({ name: `CRM Automation ${Date.now()} ${counter}`, type: 'organization', status: 'active' });
   currentTenant = await PlatformTenant.create({ name: root.name, slug: `crm-auto-${Date.now()}-${counter++}`, rootOrgUnit: root._id, status: 'active' });
   CrmAutomationRule.schema.path('tenant').default(() => currentTenant._id);
 });
 afterEach(clearFinancialMongo);
-afterAll(stopFinancialMongo);
+afterAll(async () => {
+  stopObservingNotifications();
+  await stopFinancialMongo();
+});
 
 describe('crmAutomationEngine — moteur générique', () => {
   test('une règle désactivée ne produit aucune action', async () => {

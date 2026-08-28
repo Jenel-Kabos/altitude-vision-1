@@ -1,6 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const { getPropertyPortfolio } = require('../services/propertyPortfolioService');
-const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('./userController');
+const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
 
 // TENANT-SCOPE-AUDIT-1 — `req.tenantScopeUserIds` reste le scope brut
 // `OrgMembership`-only : un bien appartenant à un Proprietaire créé par

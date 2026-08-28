@@ -1,7 +1,7 @@
 jest.mock('../services/accommodation/mobileAccommodationPublicationService', () => ({
   createFullMobileAccommodation: jest.fn(),
 }));
-jest.mock('../controllers/propertyController', () => ({
+jest.mock('../services/propertyPublicationInputService', () => ({
   uploadFilesToCloudinary: jest.fn().mockResolvedValue(['https://cdn.test/hotel.jpg']),
   parseAmenities: jest.fn(), parseStringArray: jest.fn(), parseNonNegativeAmount: jest.fn(),
   parseAddress: jest.fn(), parseGeoLocation: jest.fn(), buildBasePropertyData: jest.fn(),

@@ -7,7 +7,7 @@ const RentalManagement = require('../models/RentalManagement');
 const { getPropertyPortfolio } = require('../services/propertyPortfolioService');
 const { listValidatedHotelPortfolio } = require('../services/hotelService');
 const { listAccommodationsForAdmin } = require('../services/accommodationService');
-const { sales } = require('../controllers/dashboardAnalyticsController');
+const { getImmobilierReportData } = require('../services/reporting/immobilierReportQueryService');
 
 jest.setTimeout(120000);
 const actor = () => new mongoose.Types.ObjectId();
@@ -60,7 +60,7 @@ test('le KPI Sales « published » applique le même prédicat que la liste publ
   await property({ status: 'vente', type: 'Maison', title: 'Maison seulement validée', isPublished: false });
   await property({ status: 'vente', type: 'Villa', title: 'Villa rejetée', statusAdmin: 'Rejetée', isPublished: false });
   await property({ status: 'location', type: 'Terrain', title: 'Terrain location publié' });
-  const [analytics, portfolio] = await Promise.all([sales(), getPropertyPortfolio()]);
+  const [analytics, portfolio] = await Promise.all([getImmobilierReportData(), getPropertyPortfolio()]);
   const saleItems = portfolio.items.filter((item) => item.status === 'vente');
   expect(analytics.kpis).toMatchObject({ total: 3, published: 1, drafts: 2 });
   expect(analytics.kpis.published).toBe(saleItems.length);

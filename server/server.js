@@ -22,9 +22,11 @@ const path = require("path");
 const fs = require("fs");
 const mongoose = require("mongoose");
 const connectDB = require("./config/db");
+const { initializeCrmAutomation } = require('./services/crmAutomationEngine');
 
 // --- Connexion MongoDB ---
 connectDB();
+initializeCrmAutomation();
 
 // ============================================================
 // ⏰ CRON JOB - Synchronisation Facebook automatique

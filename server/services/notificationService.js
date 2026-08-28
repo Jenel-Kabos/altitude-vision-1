@@ -17,6 +17,7 @@ const { getIO, isUserOnline }         = require('../socket');
 const { sendExpoPushNotification }    = require('../utils/expoPush');
 const { ALL_STAFF }                   = require('../utils/roles');
 const { buildNotificationNavigation } = require('./navigationService');
+const { publishNotificationObserved } = require('./notificationObservationPort');
 
 const USER_LINKS = {
   visite_status: '/mes-visites', visite_cancelled: '/mes-visites', visite_auto_cancelled: '/mes-visites',
@@ -183,18 +184,13 @@ async function notify({
     return Notification.findOne({ recipient: id, dedupeKey });
   }
 
-  // CRM-AUTOMATION-1 — point d'observation unique du moteur d'automatisation
-  // CRM : notify() est le choke point déjà emprunté par tous les domaines
-  // métier (voir audit). Fire-and-forget, require() différé pour éviter tout
-  // cycle de dépendance au chargement des modules ; une erreur ici ne doit
-  // JAMAIS empêcher l'émission de la notification elle-même (déjà persistée
-  // ci-dessus).
-  Promise.resolve()
-    .then(() => require('./crmAutomationEngine').handleEvent({
-      type, recipient: id, sender, entityType: navigation.entityType, entityId: navigation.entityId,
-      metadata: resolvedMetadata, audience, dedupeKey, notificationId: notif._id, platformTenantId,
-    }))
-    .catch(() => {});
+  // Point d'observation unique des automatisations applicatives. Le port
+  // préserve le contrat historique fire-and-forget/best-effort sans faire
+  // dépendre l'infrastructure Notification du moteur CRM.
+  publishNotificationObserved({
+    type, recipient: id, sender, entityType: navigation.entityType, entityId: navigation.entityId,
+    metadata: resolvedMetadata, audience, dedupeKey, notificationId: notif._id, platformTenantId,
+  });
 
   // API-PUBLIC-1 — même choke point, même convention (fire-and-forget,
   // require() différé) : la diffusion webhook (Phase 8) consomme le même

@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "generatedFrom": "a04055f62952c782b92aeef2f100824a17a5f645",
+  "policy": "Baseline exacte et temporaire : aucune nouvelle entrée sans décision architecturale explicite.",
+  "violations": [
+    {
+      "rule": "ARCH-LAYER-002",
+      "from": "controllers/altimmoSearchController.js",
+      "to": "controllers/propertyController.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/contratRoutes.js",
+      "to": "models/Contrat.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/estimationRoutes.js",
+      "to": "models/Estimation.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/gestionDocumentRoutes.js",
+      "to": "models/Contrat.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/gestionDocumentRoutes.js",
+      "to": "models/Paiement.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/locataireRoutes.js",
+      "to": "models/Locataire.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/paiementRoutes.js",
+      "to": "models/Paiement.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/platformTenantRoutes.js",
+      "to": "models/PlatformTenantDomain.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/proprietaireRoutes.js",
+      "to": "models/Proprietaire.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/projetsRoutes.js",
+      "to": "models/Projet.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; cible absente du tree actuel, suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/realisationsRoutes.js",
+      "to": "models/Realisation.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/rentalManagementRoutes.js",
+      "to": "models/RentalManagement.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/userBusinessProfileRoutes.js",
+      "to": "models/User.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-001",
+      "from": "services/reporting/domains/accommodationReport.js",
+      "to": "controllers/dashboardAnalyticsController.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-001",
+      "from": "services/reporting/domains/hotelReport.js",
+      "to": "controllers/dashboardAnalyticsController.js",
+      "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
+      "category": "legacy-layer-debt"
+    }
+  ],
+  "cycles": [],
+  "snapshot": {
+    "filesAnalyzed": 467,
+    "internalEdgesDetectedByGuardrail": 1522,
+    "controllerToModelEdges": 199,
+    "note": "ARCH-2D2 a replacé buildMobilePropertyData dans propertyPublicationInputService et supprimé l'arête mobileAccommodationPublicationService vers propertyMobileController. Le garde-fou normalise et déduplique 1 522 arêtes statiques."
+  }
+}

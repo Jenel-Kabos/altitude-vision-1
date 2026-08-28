@@ -2,9 +2,13 @@
 const express    = require('express');
 const router     = express.Router();
 const sendEmail  = require('../utils/email');
-const Devis      = require('../models/Devis');
 const auth       = require('../controllers/authController');
 const { notifyStaff } = require('../services/notificationService');
+const {
+    createDevis,
+    listDevis,
+    updateDevis,
+} = require('../services/devisApplicationService');
 const { ROLES_ESTIMATION } = require('../utils/roles');
 
 const staffOnly = [auth.protect, auth.restrictTo(...ROLES_ESTIMATION)];
@@ -93,7 +97,7 @@ router.post('/', async (req, res) => {
     }
 
     try {
-        const devis = await Devis.create({
+        const devis = await createDevis({
             nom, email, telephone, adresseBien, typeBien, surface, loyerSouhaite, nbBiens, message,
         });
 
@@ -137,9 +141,7 @@ router.post('/', async (req, res) => {
 // ── GET /api/devis — liste toutes les demandes (Admin/Collaborateur) ────────
 router.get('/', staffOnly, async (req, res) => {
     try {
-        const devis = await Devis.find()
-            .populate('traitePar', 'name')
-            .sort('-createdAt');
+        const devis = await listDevis();
 
         res.status(200).json({
             status:  'success',
@@ -156,18 +158,16 @@ router.get('/', staffOnly, async (req, res) => {
 router.patch('/:id', staffOnly, async (req, res) => {
     try {
         const { statut, noteInterne } = req.body;
-        const devis = await Devis.findById(req.params.id);
+        const devis = await updateDevis({
+            devisId: req.params.id,
+            statut,
+            noteInterne,
+            traitePar: req.user.id,
+        });
 
         if (!devis) {
             return res.status(404).json({ status: 'fail', message: 'Demande de devis introuvable.' });
         }
-
-        if (statut !== undefined)      devis.statut = statut;
-        if (noteInterne !== undefined) devis.noteInterne = noteInterne;
-        devis.traitePar = req.user.id;
-
-        await devis.save();
-        await devis.populate('traitePar', 'name');
 
         res.status(200).json({
             status: 'success',

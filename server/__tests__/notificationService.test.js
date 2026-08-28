@@ -5,11 +5,13 @@ jest.mock('../socket', () => ({
   isUserOnline: jest.fn(() => true),
 }));
 jest.mock('../utils/expoPush', () => ({ sendExpoPushNotification: jest.fn() }));
+jest.mock('../services/notificationObservationPort', () => ({ publishNotificationObserved: jest.fn().mockResolvedValue([]) }));
 
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const socket = require('../socket');
 const { sendExpoPushNotification } = require('../utils/expoPush');
+const { publishNotificationObserved } = require('../services/notificationObservationPort');
 const { notify, visitSocketEventFor, hospitalityLinkFor } = require('../services/notificationService');
 
 describe('notificationService.notify', () => {
@@ -31,6 +33,26 @@ describe('notificationService.notify', () => {
       recipient: '507f1f77bcf86cd799439011',
       type: 'visite_status',
     }));
+  });
+
+  test('publie une seule observation avec le payload CRM historique et le tenant intacts', async () => {
+    await notify({
+      recipient: '507f1f77bcf86cd799439011', sender: '507f1f77bcf86cd799439010',
+      type: 'rental_notice_started', title: 'Préavis', body: 'Démarré',
+      entityType: 'RentalManagement', entityId: '507f1f77bcf86cd799439013',
+      data: { source: 'lease' }, audience: 'staff', dedupeKey: 'notice:1',
+      platformTenantId: '507f1f77bcf86cd799439099',
+    });
+
+    expect(publishNotificationObserved).toHaveBeenCalledTimes(1);
+    expect(publishNotificationObserved).toHaveBeenCalledWith({
+      type: 'rental_notice_started', recipient: '507f1f77bcf86cd799439011',
+      sender: '507f1f77bcf86cd799439010', entityType: 'RentalManagement',
+      entityId: '507f1f77bcf86cd799439013', metadata: { source: 'lease' },
+      audience: 'staff', dedupeKey: 'notice:1',
+      notificationId: '507f1f77bcf86cd799439012',
+      platformTenantId: '507f1f77bcf86cd799439099',
+    });
   });
 
   test.each([

@@ -20,6 +20,7 @@
 const CrmAutomationRule = require('../models/CrmAutomationRule');
 const CrmAutomationRun = require('../models/CrmAutomationRun');
 const { ACTION_HANDLERS } = require('./crmAutomationActions');
+const { registerNotificationObserver } = require('./notificationObservationPort');
 
 function getPath(obj, path) {
   return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
@@ -94,4 +95,8 @@ async function handleEvent(event, { simulate = false } = {}) {
   return results;
 }
 
-module.exports = { handleEvent, matchesConditions, evaluateCondition };
+function initializeCrmAutomation() {
+  return registerNotificationObserver(handleEvent);
+}
+
+module.exports = { handleEvent, initializeCrmAutomation, matchesConditions, evaluateCondition };

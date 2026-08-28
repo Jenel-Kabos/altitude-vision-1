@@ -13,41 +13,17 @@
 // sont jamais renvoyés au client.
 
 const mongoose = require('mongoose');
-const http = require('http');
-const https = require('https');
 const Contrat = require('../models/Contrat');
 const logger = require('../utils/logger');
 const { ROLES_DOCS } = require('../utils/roles');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { readPrivateAsset } = require('../services/storage/secureStorageService');
+const { safeFilename, streamRemoteDocument } = require('../services/storage/documentStreamingService');
 
 const isStaffDoc = (role) => ROLES_DOCS.includes(role);
 
 const fail = (res, status, message) => res.status(status).json({ status: status >= 500 ? 'error' : 'fail', message });
-
-const safeFilename = (name) => String(name || 'document').replace(/[^\w.\- ]/g, '_').slice(0, 120);
-
-const streamRemoteDocument = ({ url, name, res, context = {} }) => {
-  if (!/^https?:\/\//i.test(url || '')) return fail(res, 422, 'Document indisponible.');
-  const client = url.startsWith('https:') ? https : http;
-  const upstream = client.get(url, (upstreamRes) => {
-    if (upstreamRes.statusCode >= 400) {
-      logger.error('rental_document.upstream_error', { ...context, statusCode: upstreamRes.statusCode });
-      upstreamRes.resume();
-      return fail(res, 502, 'Impossible de récupérer le document.');
-    }
-    res.setHeader('Content-Type', upstreamRes.headers['content-type'] || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${safeFilename(name)}"`);
-    res.setHeader('Cache-Control', 'private, no-store');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    upstreamRes.pipe(res);
-  });
-  upstream.on('error', (error) => {
-    logger.error('rental_document.stream_failed', { ...context, error: error.message });
-    if (!res.headersSent) fail(res, 502, 'Impossible de récupérer le document.');
-  });
-};
 
 // GET /api/rental-documents/:documentId/download
 exports.download = async (req, res) => {
@@ -114,5 +90,3 @@ exports.download = async (req, res) => {
   }
   return streamRemoteDocument({ url: doc.url, name: `${doc.nom}.pdf`, res, context: { documentId } });
 };
-
-exports.streamRemoteDocument = streamRemoteDocument;

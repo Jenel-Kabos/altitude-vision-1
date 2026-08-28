@@ -4,7 +4,7 @@ const InternalMail = require('../models/InternalMail');
 const User = require('../models/User');
 const { sendEmailViaZoho } = require('../services/emailService');
 const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
-const { streamRemoteDocument } = require('./rentalDocumentController');
+const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
 
 const storeAttachments = (files, ownerId) => Promise.all(files.map(async (file) => ({
   filename: file.originalname,

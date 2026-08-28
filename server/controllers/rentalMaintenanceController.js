@@ -12,7 +12,7 @@ const { logAction, buildAuteur } = require('../services/actionLogService');
 const { ROLES_GL } = require('../utils/roles');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { readPrivateAsset } = require('../services/storage/secureStorageService');
-const { streamRemoteDocument } = require('./rentalDocumentController');
+const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });

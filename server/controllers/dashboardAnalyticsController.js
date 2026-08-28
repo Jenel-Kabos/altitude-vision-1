@@ -1,13 +1,6 @@
 const mongoose = require('mongoose');
-const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
 const Hotel = require('../models/Hotel');
-const Transaction = require('../models/Transaction');
-const Visite = require('../models/Visite');
-const RentalManagement = require('../models/RentalManagement');
-const Contrat = require('../models/Contrat');
-const Paiement = require('../models/Paiement');
-const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
 const HotelReservation = require('../models/HotelReservation');
 const Room = require('../models/Room');
 const HousekeepingTask = require('../models/HousekeepingTask');
@@ -19,41 +12,11 @@ const PaymentAllocation = require('../models/PaymentAllocation');
 const FinancialRefund = require('../models/FinancialRefund');
 const { ROLES_ALTIMMO, ROLES_GL } = require('../utils/roles');
 const { listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
+const { getImmobilierReportData } = require('../services/reporting/immobilierReportQueryService');
+const { getRentalReportData } = require('../services/reporting/rentalReportQueryService');
 
 const dayBounds = () => { const start = new Date(); start.setHours(0, 0, 0, 0); const end = new Date(start); end.setDate(end.getDate() + 1); return { start, end }; };
 const periodStarts = () => { const { start: today, end: tomorrow } = dayBounds(); const month = new Date(today.getFullYear(), today.getMonth(), 1); const year = new Date(today.getFullYear(), 0, 1); return { today, tomorrow, month, year }; };
-
-async function sales({ scopeUserIds = null } = {}) {
-  const now = new Date();
-  if (scopeUserIds instanceof Set) scopeUserIds = [...scopeUserIds];
-  if (scopeUserIds) scopeUserIds = scopeUserIds.map((id) => new mongoose.Types.ObjectId(String(id)));
-  const propertyFilter = { status: 'vente', ...(scopeUserIds ? { owner: { $in: scopeUserIds } } : {}) };
-  const ids = await Property.find(propertyFilter).distinct('_id');
-  const [properties, visits, transactions, recent] = await Promise.all([
-    Property.aggregate([{ $match: propertyFilter }, { $group: { _id: null, total: { $sum: 1 }, published: { $sum: { $cond: [{ $and: [{ $eq: ['$statusAdmin', 'Validée'] }, { $eq: ['$isPublished', true] }, { $eq: ['$availability', 'Disponible'] }, { $eq: ['$pole', 'Altimmo'] }] }, 1, 0] } }, drafts: { $sum: { $cond: [{ $or: [{ $ne: ['$statusAdmin', 'Validée'] }, { $ne: ['$isPublished', true] }] }, 1, 0] } }, sold: { $sum: { $cond: [{ $eq: ['$availability', 'Vendu'] }, 1, 0] } }, active: { $sum: { $cond: [{ $eq: ['$availability', 'Disponible'] }, 1, 0] } } } }]),
-    Visite.countDocuments({ property: { $in: ids }, scheduledStartAt: { $gte: now }, statut: { $nin: ['Terminée', 'Annulée'] } }),
-    Transaction.aggregate([{ $match: { transactionType: 'vente', property: { $in: ids } } }, { $group: { _id: null, pendingOffers: { $sum: { $cond: [{ $in: ['$status', ['En cours', 'Paiement en attente']] }, 1, 0] } }, salesAmount: { $sum: { $cond: [{ $eq: ['$status', 'Réussie'] }, '$finalAmount', 0] } }, commissions: { $sum: { $cond: [{ $eq: ['$status', 'Réussie'] }, '$commission.agencyNet', 0] } } } }]),
-    Transaction.find({ transactionType: 'vente', status: 'Réussie', property: { $in: ids } }).sort({ transactionDate: -1 }).limit(5).select('property finalAmount commission.agencyNet transactionDate').populate('property', 'title').lean(),
-  ]);
-  return { kpis: { ...(properties[0] || { total: 0, published: 0, drafts: 0, sold: 0, active: 0 }), scheduledVisits: visits, ...(transactions[0] || { pendingOffers: 0, salesAmount: 0, commissions: 0 }) }, recent };
-}
-
-async function rentals({ scopeUserIds = null } = {}) {
-  const now = new Date(); const soon = new Date(now.getTime() + 30 * 86400000);
-  if (scopeUserIds instanceof Set) scopeUserIds = [...scopeUserIds];
-  if (scopeUserIds) scopeUserIds = scopeUserIds.map((id) => new mongoose.Types.ObjectId(String(id)));
-  const properties = scopeUserIds ? await Property.find({ owner: { $in: scopeUserIds } }).distinct('_id') : null;
-  const rentalFilter = properties ? { property: { $in: properties } } : {};
-  const contractFilter = properties ? { bien: { $in: properties } } : {};
-  const contractsInScope = properties ? await Contrat.find(contractFilter).distinct('_id') : null;
-  const [management, contracts, payments, maintenance] = await Promise.all([
-    RentalManagement.aggregate([{ $match: { managementActivated: true, ...rentalFilter } }, { $group: { _id: null, available: { $sum: { $cond: [{ $eq: ['$availabilityStatus', 'disponible'] }, 1, 0] } }, occupied: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'occupe'] }, 1, 0] } }, notices: { $sum: { $cond: [{ $eq: ['$occupancyStatus', 'preavis'] }, 1, 0] } } } }]),
-    Contrat.aggregate([{ $match: { type: 'location', ...contractFilter } }, { $group: { _id: null, activeContracts: { $sum: { $cond: [{ $eq: ['$statut', 'actif'] }, 1, 0] } }, expiringContracts: { $sum: { $cond: [{ $and: [{ $eq: ['$statut', 'actif'] }, { $gte: ['$dateFinBail', now] }, { $lte: ['$dateFinBail', soon] }] }, 1, 0] } } } }]),
-    Paiement.aggregate([{ $match: contractsInScope ? { contrat: { $in: contractsInScope } } : {} }, { $group: { _id: null, rentCollected: { $sum: { $ifNull: ['$montantRecu', 0] } }, unpaidRent: { $sum: { $cond: [{ $in: ['$statut', ['impayé', 'en_retard', 'partiel']] }, { $max: [{ $subtract: [{ $ifNull: ['$montantTotal', '$montant'] }, { $ifNull: ['$montantRecu', 0] }] }, 0] }, 0] } }, penalties: { $sum: { $cond: ['$penaliteAppliquee', '$penaliteMontant', 0] } } } }]),
-    RentalMaintenanceTicket.countDocuments({ status: { $in: RentalMaintenanceTicket.OPEN_RENTAL_MAINTENANCE_STATUSES }, ...(properties ? { property: { $in: properties } } : {}) }),
-  ]);
-  return { kpis: { ...(management[0] || { available: 0, occupied: 0, notices: 0 }), ...(contracts[0] || { activeContracts: 0, expiringContracts: 0 }), ...(payments[0] || { rentCollected: 0, unpaidRent: 0, penalties: 0 }), maintenance } };
-}
 
 async function accommodations(accommodationId = null, { tenantId = null } = {}) {
   const { today, tomorrow, month, year } = periodStarts(); const week = new Date(today.getTime() + 7 * 86400000); const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
@@ -128,25 +91,22 @@ async function hotels(actor, requestedHotelId = null) {
   return { kpis: { activeHotels: hotelIds.length, temporarilyClosedHotels: eligibleHotels.length - hotelIds.length, ...roomStats, occupancyRate: roomStats.totalRooms ? Math.round((roomStats.occupiedRooms / roomStats.totalRooms) * 10000) / 100 : 0, ...(reservations[0] || { reservations: 0, reservationsToday: 0, checkInsToday: 0, checkOutsToday: 0 }), housekeeping, maintenance, grossAmountCollected: gross, refundedAmount: refunded, netAmountCollected: Math.max(0, gross - refunded), remainingAmount: balances[0]?.remainingAmount || 0 }, revenueBasis: 'Encaissements hôteliers confirmés, remboursements terminés et soldes de factures émis ; hôtels validés et actifs uniquement.' };
 }
 
-// REPORTING-1 — exportées additivement (elles existaient déjà comme
-// fonctions pures internes, jamais exposées) pour être réutilisées telles
-// quelles par server/services/reporting/domains/*.js — aucune requête
-// dupliquée, aucun changement de comportement pour getModuleAnalytics
-// ci-dessous, qui continue à les utiliser exactement comme avant.
-exports.sales = sales;
-exports.rentals = rentals;
+// REPORTING-1 — ces trois fonctions restent temporairement exportées pour
+// leurs DomainReports. La query ventes est désormais détenue par
+// immobilierReportQueryService et partagée sans dépendance vers ce controller.
 exports.accommodations = accommodations;
 exports.hotels = hotels;
 
 exports.getModuleAnalytics = async (req, res) => {
   try {
-    const handlers = { sales, rentals, accommodations, hotels };
+    const handlers = { sales: getImmobilierReportData, rentals: getRentalReportData, accommodations, hotels };
     if (!handlers[req.params.module]) return res.status(404).json({ status: 'fail', message: 'Module analytics inconnu.' });
     const allowedRoles = req.params.module === 'rentals' ? ROLES_GL : (['hotels', 'accommodations'].includes(req.params.module) ? [...ROLES_ALTIMMO, 'Proprietaire'] : ROLES_ALTIMMO);
     if (!allowedRoles.includes(req.user?.role)) return res.status(403).json({ status: 'fail', message: 'Accès refusé à ce module.' });
     const requestedAccommodationId = req.query?.accommodationId;
     const accommodationId = req.params.module === 'accommodations' && mongoose.isValidObjectId(requestedAccommodationId) ? new mongoose.Types.ObjectId(requestedAccommodationId) : null;
     const requestedHotelId = req.params.module === 'hotels' && mongoose.isValidObjectId(req.query?.hotelId) ? new mongoose.Types.ObjectId(req.query.hotelId) : null;
+    const scopeUserIds = req.user?.platformTenant ? (req.tenantScopeUserIds || []) : null;
     let data;
     if (req.params.module === 'hotels') data = await handlers.hotels(req.user, requestedHotelId);
     else if (req.params.module === 'accommodations') {
@@ -161,7 +121,7 @@ exports.getModuleAnalytics = async (req, res) => {
       }
       data = await handlers.accommodations(accommodationId, { tenantId: req.user.role === 'Proprietaire' ? null : (req.user.platformTenant?._id || req.user.platformTenant || null) });
     }
-    else data = await handlers[req.params.module]();
+    else data = await handlers[req.params.module]({ scopeUserIds });
     res.json({ status: 'success', data });
   } catch (error) { res.status(error.statusCode || 500).json({ status: 'error', message: error.message }); }
 };

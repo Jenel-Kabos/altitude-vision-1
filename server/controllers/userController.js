@@ -8,9 +8,7 @@ const userKpiService = require('../services/userKpiService'); // USER-KPI-1
 const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { getOperatorByUserId } = require('../services/platformOperator/platformOperatorService');
-const PlatformTenant = require('../models/PlatformTenant');
-const OrgMembership = require('../models/OrgMembership');
-const PlatformOperator = require('../models/PlatformOperator');
+const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
 const { getEffectiveCapabilities } = require('../utils/iamArchitecture'); // RBAC-3 — refresh identité /me
 
 // HOTFIX-USERS-COUNT-1 — `req.tenantScopeUserIds` (posé par
@@ -34,34 +32,13 @@ const { getEffectiveCapabilities } = require('../utils/iamArchitecture'); // RBA
 // Strictement bornée au cas sans ambiguïté (`tenantCount === 1`) : dès
 // qu'un second `PlatformTenant` existe, aucune supposition n'est jamais
 // faite (retour au scope `OrgMembership` strict).
-async function expandScopeWithUnaffiliatedUsersIfSoleTenant(scopeUserIds) {
-    const ids = new Set((scopeUserIds || []).map(String));
-    const tenantCount = await PlatformTenant.countDocuments({ status: { $in: ['trial', 'active'] } });
-    if (tenantCount !== 1) return [...ids];
-    const [membershipUserIds, operatorUserIds] = await Promise.all([
-        OrgMembership.distinct('user'),
-        PlatformOperator.distinct('user'),
-    ]);
-    const excluded = new Set([...membershipUserIds, ...operatorUserIds].map(String));
-    const unaffiliated = await User.find({
-        isTechnical: { $ne: true },
-        isActive: { $ne: false },
-        status: { $nin: ['Suspendu', 'Banni', 'Supprimé'] },
-        _id: { $nin: [...excluded] },
-    }).select('_id').lean();
-    unaffiliated.forEach((u) => ids.add(String(u._id)));
-    return [...ids];
-}
-
-// HOTFIX-OWNER-CONTRACT-RESEND-1 — exportée pour que
+// HOTFIX-OWNER-CONTRACT-RESEND-1 — extraite dans un service partagé pour que
 // `router.param('id', …)` (userRoutes.js) résolve la même identité
 // canonique que `getAllUsers`/`getAllOwners` : sans cet export, un compte
 // visible dans la liste (scope étendu) restait 404 sur CHAQUE action
 // individuelle (`renvoyer-contrat`, `contract-document`, `verify`,
 // `suspend`, `activate`, `role`, `GET/PUT/DELETE /:id`), qui ne lisaient
 // que le scope brut `OrgMembership` posé par `requireTenantScope`.
-exports.expandScopeWithUnaffiliatedUsersIfSoleTenant = expandScopeWithUnaffiliatedUsersIfSoleTenant;
-
 exports.downloadContractDocument = async (req, res) => {
     try {
         const requestedId = req.params.id || req.user.id;

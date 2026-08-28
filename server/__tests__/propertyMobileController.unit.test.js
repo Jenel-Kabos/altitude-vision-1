@@ -1,4 +1,4 @@
-const { buildMobilePropertyData } = require('../controllers/propertyMobileController');
+const { buildMobilePropertyData } = require('../services/propertyPublicationInputService');
 
 const validPayload = {
   titre: 'Villa test', description: 'Description', prix: 100000,

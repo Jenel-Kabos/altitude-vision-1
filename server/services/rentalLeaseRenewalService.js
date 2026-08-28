@@ -12,7 +12,7 @@ const Paiement = require('../models/Paiement');
 const { LifecycleError, transition } = require('./rentalLeaseLifecycleService');
 const { addAvenant, buildChampsModifies } = require('./rentalLeaseAmendmentService');
 const { syncLeaseOccupation } = require('./rentalManagementLeaseSyncService');
-const { generatePaiements } = require('../controllers/contratController');
+const { generatePaiements } = require('./rentalPaymentScheduleService');
 const { notifyStaff } = require('./notificationService');
 const { notifyContractTenant } = require('./rentalTenantNotificationService');
 

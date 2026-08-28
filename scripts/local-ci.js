@@ -50,6 +50,7 @@ const runTests = mode !== 'verify';
 const runBuildAndExport = mode !== 'verify';
 
 // ── SERVER ─────────────────────────────────────────────────────────────
+check('SERVER', 'Architecture', WORKSPACES.server, ['run', 'architecture:check']);
 check('SERVER', 'Lint', WORKSPACES.server, ['run', 'lint']);
 // Les suites MongoDB Replica Set (mongodb-memory-server + wiredTiger) sont coûteuses en
 // CPU/mémoire à démarrer simultanément ; elles tournent dans une étape dédiée en --runInBand

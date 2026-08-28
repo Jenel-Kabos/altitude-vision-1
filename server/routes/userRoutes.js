@@ -6,6 +6,7 @@ const userController = require('../controllers/userController');
 const { upload } = require('../config/cloudinary');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 const { requireTenantScope } = require('../middleware/tenantContext');
+const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
 
 const router = express.Router();
 
@@ -67,8 +68,7 @@ router.use(restrictTo('Admin'), requireTenantScope);
 // Réutilise la même fonction canonique (jamais réimplémentée).
 router.param('id', async (req, res, next, userId) => {
   if (!mongoose.isValidObjectId(userId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
-  const scopeUserIds = await userController
-    .expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || [])
+  const scopeUserIds = await expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || [])
     .catch(() => req.tenantScopeUserIds || []);
   const inScope = scopeUserIds.some((id) => String(id) === String(userId));
   if (!inScope) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
