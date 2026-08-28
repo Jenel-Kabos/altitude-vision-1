@@ -107,6 +107,29 @@ describe('InternalMessagingPage — UX (INBOX-PRO-2)', () => {
     expect(frame.getAttribute('sandbox')).not.toMatch(/allow-scripts/);
   });
 
+  test('pleine hauteur : liste et lecteur ont chacun un seul scroll logique, avec header hors du scroll du message', async () => {
+    getReceivedMessages.mockResolvedValue([unreadMail]);
+    render(<InternalMessagingPage />);
+    fireEvent.click(await screen.findByText('Facture à régler'));
+    await screen.findByRole('heading', { name: 'Facture à régler' });
+
+    const listScroll = screen.getByTestId('inbox-message-list-scroll');
+    const viewer = screen.getByTestId('inbox-message-viewer');
+    const bodyScroll = screen.getByTestId('inbox-message-body-scroll');
+    const header = screen.getByRole('heading', { name: 'Facture à régler' }).closest('.flex-shrink-0');
+
+    expect(listScroll).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
+    expect(viewer).toHaveClass('min-h-0', 'flex-1', 'flex', 'flex-col', 'overflow-hidden');
+    expect(viewer).not.toHaveClass('overflow-y-auto');
+    expect(bodyScroll).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto', 'overflow-x-hidden');
+    expect(header).not.toBeNull();
+    expect(bodyScroll).not.toContainElement(header);
+
+    const frame = screen.getByTestId('email-html-frame');
+    expect(frame).toHaveStyle({ width: '100%', display: 'block' });
+    expect(frame.getAttribute('sandbox')).toBe('allow-popups allow-popups-to-escape-sandbox');
+  });
+
   test('recherche : filtre la liste déjà chargée par objet/expéditeur/contenu', async () => {
     getReceivedMessages.mockResolvedValue([unreadMail, readMail]);
     render(<InternalMessagingPage />);
