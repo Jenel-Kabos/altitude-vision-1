@@ -18,6 +18,12 @@ const defaults = {
   includedServices: { menage: false, petitDejeuner: false, blanchisserie: false, transfert: false, cuisine: false },
 };
 
+export const accommodationSaveMessage = ({ isEditing, publicationStatus }) => {
+  if (isEditing) return "Hébergement modifié.";
+  if (publicationStatus === 'soumis') return "Hébergement créé et envoyé en modération.";
+  return "Brouillon d’hébergement enregistré. Complétez-le avant de l’envoyer en modération.";
+};
+
 const initialData = (accommodation) => {
   if (!accommodation) return defaults;
   const property = accommodation.property || {};
@@ -75,10 +81,13 @@ export default function AccommodationPropertyForm({ accommodation = null, onSucc
       data.append('accommodationAmenities', JSON.stringify(formData.accommodationAmenities));
       data.append('rules', JSON.stringify(formData.rules)); data.append('includedServices', JSON.stringify(formData.includedServices));
 
-      if (accommodation) await updateFullAccommodation(accommodation.property?._id || accommodation.property, data);
-      else await createFullAccommodation(data);
-      toast.success(accommodation ? "Hébergement modifié." : "Hébergement créé.");
-      onSuccess?.();
+      const result = accommodation
+        ? await updateFullAccommodation(accommodation.property?._id || accommodation.property, data)
+        : await createFullAccommodation(data);
+      const publicationStatus = result?.lifecycle?.publicationStatus || result?.accommodation?.publicationStatus;
+      const message = accommodationSaveMessage({ isEditing: Boolean(accommodation), publicationStatus });
+      toast.success(message);
+      onSuccess?.(result);
     } catch (error) {
       toast.error(error.response?.data?.message || "Impossible d'enregistrer l'hébergement.");
     } finally { setLoading(false); }

@@ -252,6 +252,8 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
       _id: PROPERTY_ID, title: 'Villa Test', owner: OWNER_ID,
       description: 'Une belle villa', bedrooms: 3, bathrooms: 2,
       images: ['a.jpg', 'b.jpg', 'c.jpg'],
+      statusAdmin: 'En attente', isPublished: false,
+      save: jest.fn().mockResolvedValue(),
     },
     save: jest.fn().mockResolvedValue(),
     ...overrides,
@@ -278,6 +280,8 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
     expect(res.statusCode).toBe(200);
     expect(acc.publicationStatus).toBe('publie');
     expect(acc.publishedAt).not.toBeNull();
+    expect(acc.property).toMatchObject({ statusAdmin: 'Validée', isPublished: true });
+    expect(acc.property.save).toHaveBeenCalled();
   });
 
   test('422 — un hébergement incomplet (aucun tarif, aucun équipement) ne peut pas être validé', async () => {
@@ -356,6 +360,7 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
     expect(res.statusCode).toBe(200);
     expect(acc.publicationStatus).toBe('rejete');
     expect(acc.rejectionReason).toBe('Photos manquantes');
+    expect(acc.property).toMatchObject({ statusAdmin: 'Rejetée', isPublished: false });
   });
 
   test('409 — impossible de valider un hébergement pas encore soumis (toujours brouillon)', async () => {

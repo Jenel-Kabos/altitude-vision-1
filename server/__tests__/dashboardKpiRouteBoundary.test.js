@@ -1,21 +1,24 @@
 const express = require('express');
 const request = require('supertest');
 
-jest.mock('../models/Property', () => ({ countDocuments: jest.fn() }));
 jest.mock('../models/Event', () => ({ countDocuments: jest.fn() }));
 jest.mock('../models/User', () => ({ countDocuments: jest.fn() }));
 jest.mock('../models/portfolioItemModel', () => ({ countDocuments: jest.fn() }));
 jest.mock('../services/userKpiService', () => ({ getUserKpiSummary: jest.fn() }));
+jest.mock('../services/propertyPortfolioService', () => ({ getPropertyPortfolioForTenantScope: jest.fn() }));
 jest.mock('../controllers/authController', () => ({
   protect: (req, res, next) => next(),
   restrictTo: jest.fn(() => (req, res, next) => next()),
 }));
+jest.mock('../middleware/tenantContext', () => ({
+  requireTenantScope: (req, res, next) => { req.tenantScopeUserIds = ['staff-1']; next(); },
+}));
 
-const Property = require('../models/Property');
 const Event = require('../models/Event');
 const User = require('../models/User');
 const PortfolioItem = require('../models/portfolioItemModel');
 const userKpiService = require('../services/userKpiService');
+const { getPropertyPortfolioForTenantScope } = require('../services/propertyPortfolioService');
 const authController = require('../controllers/authController');
 const { STAFF_ALL } = require('../utils/roles');
 const dashboardRoutes = require('../routes/dashboardRoutes');
@@ -27,7 +30,7 @@ const app = express();
 app.use('/api/dashboard', dashboardRoutes);
 
 function mockDashboardReads({ properties, events, users, owners, portfolio }) {
-  Property.countDocuments.mockResolvedValue(properties);
+  getPropertyPortfolioForTenantScope.mockResolvedValue({ stats: { total: properties } });
   Event.countDocuments.mockResolvedValue(events);
   User.countDocuments.mockResolvedValue(users);
   userKpiService.getUserKpiSummary.mockResolvedValue({ proprietaires: owners });
@@ -61,7 +64,7 @@ describe('GET /api/dashboard/stats — contrat de caractérisation ARCH-2F', () 
         },
       },
     });
-    expect(Property.countDocuments).toHaveBeenCalledWith();
+    expect(getPropertyPortfolioForTenantScope).toHaveBeenCalledWith({ scopeUserIds: ['staff-1'] });
     expect(Event.countDocuments).toHaveBeenCalledWith();
     expect(User.countDocuments).toHaveBeenCalledWith();
     expect(userKpiService.getUserKpiSummary).toHaveBeenCalledWith();

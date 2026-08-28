@@ -1,12 +1,12 @@
-const Property = require('../models/Property');
 const Event = require('../models/Event');
 const User = require('../models/User');
 const PortfolioItem = require('../models/portfolioItemModel');
 const userKpiService = require('./userKpiService');
+const { getPropertyPortfolioForTenantScope } = require('./propertyPortfolioService');
 
-async function getDashboardKpis() {
-  const [propertyCount, eventCount, usersCount, kpis, portfolioCount] = await Promise.all([
-    Property.countDocuments(),
+async function getDashboardKpis({ scopeUserIds = [] } = {}) {
+  const [propertyPortfolio, eventCount, usersCount, kpis, portfolioCount] = await Promise.all([
+    getPropertyPortfolioForTenantScope({ scopeUserIds }),
     Event.countDocuments(),
     User.countDocuments(),
     userKpiService.getUserKpiSummary(),
@@ -14,7 +14,7 @@ async function getDashboardKpis() {
   ]);
 
   return {
-    Altimmo: propertyCount,
+    Altimmo: propertyPortfolio.stats.total,
     MilaEvents: eventCount,
     Altcom: portfolioCount,
     Users: usersCount,

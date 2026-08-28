@@ -3,7 +3,7 @@ const auth = require('../controllers/authController');
 const ctrl = require('../controllers/accommodationController');
 const { ROLES_ALTIMMO, STAFF_CM } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
-const { requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
+const { requireTenantScope, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
 
 const router = express.Router();
 const reservationCtrl = require('../controllers/accommodationReservationController');
@@ -17,7 +17,7 @@ router.use(auth.protect);
 // Staff (dashboard admin) — création/édition complète Property+Accommodation+
 // RatePlan. Placées AVANT '/:id' pour que '/admin' ne soit jamais capturé par
 // le paramètre générique ':id'.
-router.post('/admin', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.createFull);
+router.post('/admin', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScope, upload.array('images', 10), ctrl.createFull);
 router.put('/admin/:propertyId', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.updateFull);
 router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, ctrl.listAdmin);
 router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, ctrl.pending);

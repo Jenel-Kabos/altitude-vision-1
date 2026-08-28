@@ -1,6 +1,5 @@
 const asyncHandler = require('express-async-handler');
-const { getPropertyPortfolio } = require('../services/propertyPortfolioService');
-const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
+const { getPropertyPortfolioForTenantScope } = require('../services/propertyPortfolioService');
 
 // TENANT-SCOPE-AUDIT-1 — `req.tenantScopeUserIds` reste le scope brut
 // `OrgMembership`-only : un bien appartenant à un Proprietaire créé par
@@ -13,8 +12,6 @@ const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/un
 // élargissement global de cette nature avait provoqué une fuite réelle
 // démontrée par test sur ce catalogue, voir HOTFIX_USERS_COUNT1_REPORT.md).
 exports.list = asyncHandler(async (req, res) => {
-  const scopeUserIds = await expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || [])
-    .catch(() => req.tenantScopeUserIds || []);
-  const portfolio = await getPropertyPortfolio({ scopeUserIds });
+  const portfolio = await getPropertyPortfolioForTenantScope({ scopeUserIds: req.tenantScopeUserIds || [] });
   res.status(200).json({ status: 'success', results: portfolio.items.length, data: portfolio });
 });

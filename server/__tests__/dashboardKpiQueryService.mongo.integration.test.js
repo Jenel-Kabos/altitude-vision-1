@@ -50,6 +50,7 @@ describe('dashboardKpiQueryService — Mongo réel', () => {
       images: ['https://placehold.co/1200x800/png?text=Dashboard'],
       surface: 90,
       statusAdmin: 'Validée',
+      isPublished: true,
       availability: 'Disponible',
       owner: owner._id,
     });
@@ -76,7 +77,7 @@ describe('dashboardKpiQueryService — Mongo réel', () => {
       },
     ]);
 
-    await expect(getDashboardKpis()).resolves.toEqual({
+    await expect(getDashboardKpis({ scopeUserIds: [owner._id] })).resolves.toEqual({
       Altimmo: 1,
       MilaEvents: 1,
       Altcom: 1,

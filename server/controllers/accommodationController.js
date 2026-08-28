@@ -581,7 +581,10 @@ exports.reviewDecision = async (req, res) => {
       return fail(res, 400, 'Action invalide (validate, reject, suspend ou unsuspend attendu).');
     }
 
-    const accommodation = await Accommodation.findById(id).populate('property', 'title owner images bedrooms bathrooms');
+    const accommodation = await Accommodation.findById(id).populate(
+      'property',
+      'title description owner images bedrooms bathrooms status statusAdmin isPublished availability tenant',
+    );
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
     // TENANT-CERT-3-PRE — route staff-only (aucun propriétaire self-service
     // ici, déjà restreinte à ROLES_ALTIMMO par la route) : n'avait jusqu'ici
@@ -615,6 +618,7 @@ exports.reviewDecision = async (req, res) => {
       }
     }
 
+    const previousStatus = accommodation.publicationStatus;
     const newStatus = { validate: 'publie', reject: 'rejete', suspend: 'suspendu', unsuspend: 'publie' }[action];
     accommodation.publicationStatus = newStatus;
     accommodation.reviewedBy = req.user.id;
@@ -623,6 +627,24 @@ exports.reviewDecision = async (req, res) => {
     if (action === 'validate') accommodation.publishedAt = new Date();
     if (action === 'suspend') accommodation.suspendedAt = new Date();
     await accommodation.save();
+
+    if (accommodation.property && ['validate', 'reject'].includes(action)) {
+      const previousPropertyState = {
+        statusAdmin: accommodation.property.statusAdmin,
+        isPublished: accommodation.property.isPublished,
+      };
+      accommodation.property.statusAdmin = action === 'validate' ? 'Validée' : 'Rejetée';
+      accommodation.property.isPublished = action === 'validate';
+      try {
+        await accommodation.property.save();
+      } catch (error) {
+        accommodation.publicationStatus = previousStatus;
+        await accommodation.save().catch(() => null);
+        accommodation.property.statusAdmin = previousPropertyState.statusAdmin;
+        accommodation.property.isPublished = previousPropertyState.isPublished;
+        throw error;
+      }
+    }
 
     if (accommodation.property?.owner && ['validate', 'reject', 'suspend'].includes(action)) {
       const notifType = { validate: 'bien_valide', reject: 'bien_rejete', suspend: 'bien_rejete' }[action];
@@ -944,6 +966,10 @@ exports.createFull = async (req, res) => {
         accommodation: serializeAccommodation(result.accommodation, result.rate ? [result.rate] : []),
         rate: result.rate,
         hotel: result.hotel,
+        lifecycle: {
+          publicationStatus: result.accommodation.publicationStatus,
+          visibility: result.accommodation.publicationStatus === 'soumis' ? 'pending_moderation' : 'draft',
+        },
       },
     });
   } catch (error) {

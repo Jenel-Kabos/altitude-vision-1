@@ -9,9 +9,10 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, Edit3, Eye, Landmark,
-  LayoutDashboard, Loader2, Palmtree, PlusCircle, Search, SlidersHorizontal, Sparkles, Trash2, X,
+  LayoutDashboard, Palmtree, PlusCircle, Search, SlidersHorizontal, Sparkles, Trash2, X,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { deactivateAccommodation, getAccommodationsAdmin } from "../../services/accommodationService";
@@ -44,6 +45,7 @@ const compactFieldClass = "flex-1 min-w-[9rem] px-3 py-2.5 border-2 border-gray-
 const DEFAULT_FILTERS = { type: "tous", city: "", availability: "tous", sort: "recent", search: "" };
 
 export default function ManageAccommodationsPage() {
+  const router = useRouter();
   const { user, canEdit } = useAuth();
   const canCreate = ["Admin", "CommunityManager", "Collaborateur"].includes(user?.role);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -118,7 +120,6 @@ export default function ManageAccommodationsPage() {
   };
 
   const totalPages = Math.max(1, Math.ceil((data.total || 0) / PAGE_SIZE));
-  const isFirstLoad = loading && data.accommodations.length === 0 && !error;
 
   // ── ConfirmDialog (archivage) — même structure que ManagePropertiesPage ──
   const ConfirmDialog = () => {
@@ -145,17 +146,6 @@ export default function ManageAccommodationsPage() {
       </div>
     );
   };
-
-  if (isFirstLoad) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-indigo-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-xl font-bold text-gray-700">Chargement des hébergements…</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-indigo-50 p-4 sm:p-10 font-sans">
@@ -282,7 +272,7 @@ export default function ManageAccommodationsPage() {
             ))}
           </div>
         ) : error ? (
-          <div className="text-center py-20 bg-white rounded-2xl shadow-xl border-2 border-dashed border-red-200 animate-slideUp">
+          <div role="alert" className="text-center py-20 bg-white rounded-2xl shadow-xl border-2 border-dashed border-red-200 animate-slideUp">
             <div className="flex justify-center mb-4">
               <div className="p-4 bg-red-100 rounded-full text-red-600"><AlertTriangle className="w-12 h-12" /></div>
             </div>
@@ -404,7 +394,14 @@ export default function ManageAccommodationsPage() {
               <div className="p-3 sm:p-6 overflow-y-auto flex-grow">
                 <AccommodationPropertyForm
                   accommodation={editing}
-                  onSuccess={() => { closeForm(); load(); loadAnalytics(); }}
+                  onSuccess={(result) => {
+                    closeForm();
+                    load();
+                    loadAnalytics();
+                    if (!editing && result?.lifecycle?.visibility === 'pending_moderation') {
+                      router.push('/dashboard/moderation/hebergement');
+                    }
+                  }}
                   onCancel={closeForm}
                 />
               </div>

@@ -5,6 +5,7 @@ const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
 const { isPubliclyVisible } = require('./accommodationService');
 const { listEligibleHotels } = require('./hotelService');
+const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('./unaffiliatedUserScopeService');
 
 const PROPERTY_PUBLICATION_FILTER = Object.freeze({
   pole: 'Altimmo',
@@ -96,4 +97,10 @@ async function getPropertyPortfolio({ scopeUserIds } = {}) {
   return { items, stats };
 }
 
-module.exports = { getPropertyPortfolio, PROPERTY_PUBLICATION_FILTER };
+async function getPropertyPortfolioForTenantScope({ scopeUserIds = [] } = {}) {
+  const expandedScopeUserIds = await expandScopeWithUnaffiliatedUsersIfSoleTenant(scopeUserIds)
+    .catch(() => scopeUserIds);
+  return getPropertyPortfolio({ scopeUserIds: expandedScopeUserIds });
+}
+
+module.exports = { getPropertyPortfolio, getPropertyPortfolioForTenantScope, PROPERTY_PUBLICATION_FILTER };

@@ -1,10 +1,11 @@
 // server/routes/dashboardRoutes.js
 const express = require('express');
-const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
+const { STAFF_ALL } = require('../utils/roles');
 const router  = express.Router();
 
 const authController = require('../controllers/authController');
 const { getDashboardKpis } = require('../services/dashboardKpiQueryService');
+const { requireTenantScope } = require('../middleware/tenantContext');
 
 router.use(authController.protect);
 router.use(authController.restrictTo(...STAFF_ALL));
@@ -13,9 +14,9 @@ router.use(authController.restrictTo(...STAFF_ALL));
  * @DESC   Obtenir les statistiques du Dashboard
  * @ROUTE  GET /api/dashboard/stats
  */
-router.get('/stats', async (req, res) => {
+router.get('/stats', requireTenantScope, async (req, res) => {
   try {
-    const statsData = await getDashboardKpis();
+    const statsData = await getDashboardKpis({ scopeUserIds: req.tenantScopeUserIds || [] });
 
     res.status(200).json({
       status: 'success',

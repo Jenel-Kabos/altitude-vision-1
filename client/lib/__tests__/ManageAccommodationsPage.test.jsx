@@ -2,11 +2,15 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import ManageAccommodationsPage from '../pages/dashboard/ManageAccommodationsPage';
 import { deactivateAccommodation, getAccommodationsAdmin } from '../services/accommodationService';
 
+const push = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { role: 'Admin' }, canEdit: true }) }));
-vi.mock('next/link', () => ({ default: ({ children, href }) => <a href={href}>{children}</a> }));
+vi.mock('next/link', () => ({ default: ({ children, href, ...props }) => <a href={href} {...props}>{children}</a> }));
 vi.mock('../services/accommodationService', () => ({ getAccommodationsAdmin: vi.fn(), deactivateAccommodation: vi.fn(), createFullAccommodation: vi.fn(), updateFullAccommodation: vi.fn() }));
-vi.mock('../components/dashboard/AccommodationPropertyForm', () => ({ default: () => <div>FORMULAIRE HÉBERGEMENT TEST DATA</div> }));
+vi.mock('../components/dashboard/AccommodationPropertyForm', () => ({
+  default: ({ onSuccess }) => <button onClick={() => onSuccess?.({ lifecycle: { visibility: 'pending_moderation' } })}>FORMULAIRE HÉBERGEMENT TEST DATA</button>,
+}));
 vi.mock('../services/dashboardAnalyticsService', () => ({ getDashboardAnalytics: vi.fn().mockResolvedValue({ kpis: {} }) }));
 vi.mock('../components/dashboard/AccommodationReservationsPanel', () => ({ default: ({ initialTab, initialAccommodationId }) => <div>OPÉRATIONS {initialTab} {initialAccommodationId}</div> }));
 
@@ -27,6 +31,14 @@ describe('ManageAccommodationsPage — gestion des hébergements validés', () =
     expect(screen.getByTestId('accommodation-grid')).toHaveClass('grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-4');
     expect(screen.getByText(/35.000 XAF \/ nuit/)).toBeInTheDocument();
     expect(screen.getByText('Publié')).toBeInTheDocument();
+  });
+
+  test('après création soumise, ouvre la file de modération où la ressource est visible', async () => {
+    render(<ManageAccommodationsPage />);
+    await screen.findByText('Villa Test');
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter un hébergement/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'FORMULAIRE HÉBERGEMENT TEST DATA' }));
+    expect(push).toHaveBeenCalledWith('/dashboard/moderation/hebergement');
   });
 
   test('expose la recherche et les filtres métier sans filtre de modération', async () => {

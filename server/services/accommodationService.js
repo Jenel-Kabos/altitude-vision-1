@@ -228,7 +228,8 @@ async function compensateHotel(hotelId, hotelWasCreated) {
  * @returns {Promise<{property, accommodation, rate, hotel: ObjectId|null}>}
  */
 async function createFullAccommodation({ propertyData, accommodationData, rateData, hotelInput, actingUser }) {
-  const property = await Property.create(propertyData);
+  const tenantId = actingUser.platformTenant?._id || actingUser.platformTenant || null;
+  const property = await Property.create({ ...propertyData, tenant: tenantId });
 
   let hotelId = null;
   let hotelWasCreated = false;
@@ -247,7 +248,7 @@ async function createFullAccommodation({ propertyData, accommodationData, rateDa
       hotel: hotelId,
       property: property._id,
       createdBy: actingUser.id,
-      tenant: actingUser.platformTenant?._id || actingUser.platformTenant || null,
+      tenant: tenantId,
     });
   } catch (error) {
     await compensateHotel(hotelId, hotelWasCreated);
