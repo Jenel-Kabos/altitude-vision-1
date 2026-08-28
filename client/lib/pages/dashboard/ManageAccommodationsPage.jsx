@@ -7,11 +7,11 @@
 // d'action colorés avec hover dégradé + scale, pagination numérotée avec
 // flèches. Aucune logique métier modifiée (filtres, chargement, archivage).
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, Edit3, Eye, Landmark,
-  LayoutDashboard, Loader2, Palmtree, PlusCircle, Search, Sparkles, Trash2, X,
+  LayoutDashboard, Loader2, Palmtree, PlusCircle, Search, SlidersHorizontal, Sparkles, Trash2, X,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { deactivateAccommodation, getAccommodationsAdmin } from "../../services/accommodationService";
@@ -37,11 +37,17 @@ const kpis = (analytics) => [
 ];
 
 const inputClass = "w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm";
+// UX-ACCOMMODATION-SEARCH-BAR-1 — panneau "Filtres" replié par défaut : champs
+// compacts (py-2.5 au lieu de py-3) qui se répartissent en flex-wrap plutôt
+// que de s'empiler pleine largeur (voir _UX_DECISION.md).
+const compactFieldClass = "flex-1 min-w-[9rem] px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm";
+const DEFAULT_FILTERS = { type: "tous", city: "", availability: "tous", sort: "recent", search: "" };
 
 export default function ManageAccommodationsPage() {
   const { user, canEdit } = useAuth();
   const canCreate = ["Admin", "CommunityManager", "Collaborateur"].includes(user?.role);
-  const [filters, setFilters] = useState({ type: "tous", city: "", availability: "tous", sort: "recent", search: "" });
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ accommodations: [], total: 0 });
   const [loading, setLoading] = useState(true);
@@ -79,6 +85,22 @@ export default function ManageAccommodationsPage() {
   }, [filters.search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setFilter = (key, value) => { setFilters((current) => ({ ...current, [key]: value })); setPage(1); };
+  // UX-ACCOMMODATION-SEARCH-BAR-1 — chips de filtres actifs : dérivés
+  // directement de `filters`, jamais dupliqués dans un état séparé. Le tri
+  // n'exclut aucun résultat (contrairement à type/ville/disponibilité) : il
+  // n'apparaît jamais en chip individuel, mais compte dans `isFiltered` pour
+  // l'affichage du bouton "Réinitialiser" (voir _UX_DECISION.md).
+  const activeFilterEntries = useMemo(() => [
+    filters.type !== "tous" && { key: "type", label: ACCOMMODATION_TYPES.find((item) => item.value === filters.type)?.label || filters.type },
+    filters.city && { key: "city", label: filters.city },
+    filters.availability !== "tous" && { key: "availability", label: filters.availability },
+  ].filter(Boolean), [filters.type, filters.city, filters.availability]);
+  const isFiltered = activeFilterEntries.length > 0 || filters.sort !== DEFAULT_FILTERS.sort;
+  const removeFilterChip = (key) => setFilter(key, key === "city" ? "" : "tous");
+  const resetFilters = () => {
+    setFilters((current) => ({ ...current, type: DEFAULT_FILTERS.type, city: DEFAULT_FILTERS.city, availability: DEFAULT_FILTERS.availability, sort: DEFAULT_FILTERS.sort }));
+    setPage(1);
+  };
 
   const closeForm = () => { setCreating(false); setEditing(null); };
 
@@ -165,10 +187,12 @@ export default function ManageAccommodationsPage() {
           <DashboardKpis items={kpis(analytics)} loading={!analytics} note={analytics?.occupancyFormula} />
         </div>
 
-        {/* Barre d'outils */}
+        {/* Barre d'outils — UX-ACCOMMODATION-SEARCH-BAR-1 : toolbar compacte
+            harmonisée avec Sales/Rentals (recherche + Filtres + Ajouter sur
+            une ligne dès `sm`, filtres avancés repliés par défaut). */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-100 mb-6">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div className="relative flex-1 w-full lg:max-w-xs">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="relative flex-1 w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text" value={filters.search} onChange={(event) => setFilter("search", event.target.value)}
@@ -177,37 +201,70 @@ export default function ManageAccommodationsPage() {
               />
             </div>
 
-            <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-              <select value={filters.type} onChange={(event) => setFilter("type", event.target.value)} aria-label="Type d’hébergement" className={inputClass}>
+            <div className="flex gap-3 w-full sm:w-auto">
+              <button
+                type="button" onClick={() => setFiltersOpen((open) => !open)}
+                aria-expanded={filtersOpen} aria-controls="accommodations-filters-panel"
+                className="flex flex-1 sm:flex-none min-h-11 items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 rounded-xl bg-white text-sm font-semibold text-gray-700 hover:border-blue-500 hover:text-blue-600 transition-all"
+              >
+                <SlidersHorizontal className="w-5 h-5" />
+                {activeFilterEntries.length > 0 ? `Filtres (${activeFilterEntries.length})` : "Filtres"}
+              </button>
+
+              {canCreate && (
+                <button
+                  type="button" onClick={() => setCreating(true)}
+                  className="flex flex-1 sm:flex-none min-h-11 items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all hover:scale-105"
+                >
+                  <PlusCircle className="w-5 h-5" /> <span className="hidden sm:inline">Ajouter un hébergement</span><span className="sm:hidden">Ajouter</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {isFiltered && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {activeFilterEntries.map((chip) => (
+                <span key={chip.key} className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700">
+                  {chip.label}
+                  <button
+                    type="button" onClick={() => removeFilterChip(chip.key)}
+                    aria-label={`Retirer le filtre ${chip.label}`}
+                    className="text-gray-400 hover:text-gray-700"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              ))}
+              <button type="button" onClick={resetFilters} className="text-xs font-semibold text-blue-600 hover:text-blue-800 underline underline-offset-2">
+                Réinitialiser
+              </button>
+            </div>
+          )}
+
+          {filtersOpen && (
+            <div id="accommodations-filters-panel" className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-3">
+              <select value={filters.type} onChange={(event) => setFilter("type", event.target.value)} aria-label="Type d’hébergement" className={compactFieldClass}>
                 <option value="tous">Tous les types</option>
                 {ACCOMMODATION_TYPES.filter((item) => item.value !== "hotel").map((item) => (
                   <option key={item.value} value={item.value}>{item.label}</option>
                 ))}
               </select>
-              <input value={filters.city} onChange={(event) => setFilter("city", event.target.value)} placeholder="Ville" aria-label="Ville" className={inputClass} />
-              <select value={filters.availability} onChange={(event) => setFilter("availability", event.target.value)} aria-label="Disponibilité" className={inputClass}>
+              <input value={filters.city} onChange={(event) => setFilter("city", event.target.value)} placeholder="Ville" aria-label="Ville" className={compactFieldClass} />
+              <select value={filters.availability} onChange={(event) => setFilter("availability", event.target.value)} aria-label="Disponibilité" className={compactFieldClass}>
                 <option value="tous">Toutes disponibilités</option>
                 <option value="Disponible">Disponible</option>
                 <option value="Indisponible">Indisponible</option>
                 <option value="Maintenance">Maintenance</option>
               </select>
-              <select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} aria-label="Trier par" className={inputClass}>
+              <select value={filters.sort} onChange={(event) => setFilter("sort", event.target.value)} aria-label="Trier par" className={compactFieldClass}>
                 <option value="recent">Plus récent</option>
                 <option value="ancien">Plus ancien</option>
                 <option value="prix_asc">Prix croissant</option>
                 <option value="prix_desc">Prix décroissant</option>
               </select>
             </div>
-
-            {canCreate && (
-              <button
-                type="button" onClick={() => setCreating(true)}
-                className="flex min-h-11 w-full lg:w-auto items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all hover:scale-105"
-              >
-                <PlusCircle className="w-5 h-5" /> Ajouter un hébergement
-              </button>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Contenu */}

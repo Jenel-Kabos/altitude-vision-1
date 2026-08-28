@@ -285,6 +285,33 @@ async function createFullAccommodation({ propertyData, accommodationData, rateDa
     }
   }
 
+  // HOTFIX-ACCOMMODATION-CREATED-NOT-VISIBLE-1 — un hébergement créé depuis ce
+  // point d'entrée admin restait bloqué en `publicationStatus: 'brouillon'`
+  // (valeur par défaut du schéma), invisible à la fois de "Hébergements"
+  // (`publie` uniquement) et de "Modération Hébergements" (`soumis`
+  // uniquement) : aucune UI accessible au staff ne permet de le soumettre
+  // (seul /mes-hebergements le permet — page propriétaire, jamais liée dans
+  // la sidebar staff). Le flux mobile équivalent
+  // (mobileAccommodationPublicationService.js) soumet déjà automatiquement à
+  // la création, avec la même garde `evaluateReadiness` (jamais dupliquée,
+  // réutilisée ici à l'identique). Contrairement au flux mobile (transaction
+  // Mongo tout-ou-rien), cette étape reste "best effort" et non bloquante :
+  // Property/Accommodation/RatePlan sont déjà validés et committés
+  // ci-dessus ; un hébergement non prêt (ex. bathrooms manquant) reste
+  // simplement en 'brouillon' — comportement inchangé pour ce cas, jamais de
+  // nouvelle règle de validation introduite.
+  if (evaluateReadiness(accommodation, property).ready) {
+    try {
+      accommodation.publicationStatus = 'soumis';
+      accommodation.submittedAt = new Date();
+      await accommodation.save();
+    } catch (error) {
+      logger.error(`Soumission automatique de Accommodation(${accommodation._id}) échouée — reste en brouillon`, error);
+      accommodation.publicationStatus = 'brouillon';
+      accommodation.submittedAt = null;
+    }
+  }
+
   return { property, accommodation, rate, hotel: hotelId };
 }
 
@@ -461,8 +488,8 @@ async function deleteAccommodation({ accommodation, property }) {
  * Hébergement) car les statuts filtrés ici (brouillon/soumis/publié/
  * suspendu/rejeté) sont propres à Accommodation, pas à Property.statusAdmin.
  */
-async function listAccommodationsForAdmin({ status, type, city, availability, search, sort, page = 1, limit = 20, independentOnly = false, validatedOnly = false, activeOnly = false }) {
-  const query = {};
+async function listAccommodationsForAdmin({ status, type, city, availability, search, sort, page = 1, limit = 20, tenantId = null, independentOnly = false, validatedOnly = false, activeOnly = false }) {
+  const query = tenantId ? { tenant: tenantId } : {};
   if (status && status !== 'tous') query.publicationStatus = status;
   if (type && type !== 'tous') query.accommodationType = type;
   if (independentOnly) {

@@ -4,6 +4,7 @@ jest.mock('imapflow', () => ({ ImapFlow: jest.fn() }));
 jest.mock('mailparser', () => ({ simpleParser: jest.fn() }));
 jest.mock('../models/InternalMail', () => ({ findOne: jest.fn(), create: jest.fn() }));
 jest.mock('../models/User', () => ({ findOne: jest.fn() }));
+jest.mock('../models/ImapSyncCheckpoint', () => ({ findOne: jest.fn(), findOneAndUpdate: jest.fn() }));
 jest.mock('../config/cloudinary', () => ({ uploadToCloudinary: jest.fn() }));
 jest.mock('../utils/logger', () => ({
     info: jest.fn(), success: jest.fn(), warn: jest.fn(), error: jest.fn(),
@@ -13,8 +14,9 @@ const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const InternalMail = require('../models/InternalMail');
 const User = require('../models/User');
+const ImapSyncCheckpoint = require('../models/ImapSyncCheckpoint');
 const logger = require('../utils/logger');
-const { pollZohoInbox } = require('../services/zohoImapService');
+const { pollZohoInbox, resolveSyncOrigin } = require('../services/zohoImapService');
 
 const message = (uid) => ({ uid, source: Buffer.from(`message-${uid}`) });
 const parsedMessage = (uid) => ({
@@ -30,6 +32,7 @@ const createClient = (overrides = {}) => {
     const client = new EventEmitter();
     Object.assign(client, {
         usable: true,
+        mailbox: { uidValidity: '1000' },
         connect: jest.fn().mockResolvedValue(),
         getMailboxLock: jest.fn().mockResolvedValue({ release: jest.fn() }),
         search: jest.fn().mockResolvedValue([]),
@@ -56,6 +59,12 @@ describe('pollZohoInbox', () => {
         jest.clearAllMocks();
         process.env.ZOHO_FROM_EMAIL = 'inbox@altitudevision.test';
         process.env.ZOHO_IMAP_PASSWORD = 'test-password';
+        // Checkpoint existant par défaut (même UIDVALIDITY que `createClient`,
+        // lastProcessedUid=0) — la plupart des tests existants portent sur le
+        // traitement des messages, pas sur le bootstrap/reset lui-même
+        // (couverts séparément, voir tests "checkpoint").
+        ImapSyncCheckpoint.findOne.mockResolvedValue({ uidValidity: '1000', lastProcessedUid: 0 });
+        ImapSyncCheckpoint.findOneAndUpdate.mockResolvedValue({});
     });
 
     afterAll(() => {
@@ -71,7 +80,10 @@ describe('pollZohoInbox', () => {
 
         expect(client.connect).toHaveBeenCalledTimes(1);
         expect(client.getMailboxLock).toHaveBeenCalledWith('INBOX');
-        expect(client.search).toHaveBeenCalledWith({ seen: false });
+        // HOTFIX-ZOHO-IMAP-SEEN-CHECKPOINT-1 — `\Seen` n'est plus jamais le
+        // critère de recherche : avec un checkpoint existant (lastProcessedUid:0,
+        // même UIDVALIDITY), la recherche porte sur UID > 0, jamais sur le flag.
+        expect(client.search).toHaveBeenCalledWith({ uid: '1:*' });
         expect(lock.release).toHaveBeenCalledTimes(1);
         expect(client.logout).toHaveBeenCalledTimes(1);
     });
@@ -253,5 +265,220 @@ describe('pollZohoInbox', () => {
         expect(client.logout).toHaveBeenCalledTimes(1);
         expect(client.close).toHaveBeenCalledTimes(1);
         jest.useRealTimers();
+    });
+});
+
+// HOTFIX-ZOHO-IMAP-SEEN-CHECKPOINT-1 — `resolveSyncOrigin` (fonction pure)
+describe('resolveSyncOrigin', () => {
+    test('aucun checkpoint → réexamen complet (bootstrap), jamais de perte au premier démarrage', () => {
+        expect(resolveSyncOrigin(null, '1000')).toEqual({
+            searchCriteria: { all: true }, baseUid: 0, isReset: true, resetReason: 'no_checkpoint',
+        });
+    });
+
+    test('UIDVALIDITY inchangée → recherche incrémentale stricte UID > lastProcessedUid', () => {
+        expect(resolveSyncOrigin({ uidValidity: '1000', lastProcessedUid: 112 }, '1000')).toEqual({
+            searchCriteria: { uid: '113:*' }, baseUid: 112, isReset: false, resetReason: null,
+        });
+    });
+
+    test('UIDVALIDITY changée → reset contrôlé (jamais un silent-skip-all avec un ancien UID devenu invalide)', () => {
+        expect(resolveSyncOrigin({ uidValidity: '1000', lastProcessedUid: 112 }, '2000')).toEqual({
+            searchCriteria: { all: true }, baseUid: 0, isReset: true, resetReason: 'uidvalidity_changed',
+        });
+    });
+
+    test('lastProcessedUid=0 (jamais aucun message traité mais checkpoint déjà écrit) → UID > 0', () => {
+        expect(resolveSyncOrigin({ uidValidity: '1000', lastProcessedUid: 0 }, '1000')).toEqual({
+            searchCriteria: { uid: '1:*' }, baseUid: 0, isReset: false, resetReason: null,
+        });
+    });
+});
+
+// HOTFIX-ZOHO-IMAP-SEEN-CHECKPOINT-1 — comportement de bout en bout du poller
+describe('pollZohoInbox — checkpoint UID (remplace `\\Seen` comme source de vérité)', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        process.env.ZOHO_FROM_EMAIL = 'inbox@altitudevision.test';
+        process.env.ZOHO_IMAP_PASSWORD = 'test-password';
+        ImapSyncCheckpoint.findOneAndUpdate.mockResolvedValue({});
+    });
+
+    test('RÉGRESSION FERMÉE — un message déjà marqué \\Seen (UID > checkpoint) est tout de même ingéré', async () => {
+        // Caractérise exactement le cas prouvé par ZOHO_INBOX_HEALTHCHECK1 :
+        // UID 113 déjà \Seen, checkpoint à 112 — avant ce hotfix,
+        // `search({seen:false})` ne l'aurait JAMAIS trouvé. Le mock
+        // `client.search` ci-dessous ignore volontairement le flag Seen
+        // (comme le ferait un serveur IMAP réel pour une recherche par UID)
+        // pour prouver que le NOUVEAU critère (`uid: '113:*'`) est bien ce
+        // qui est utilisé, indépendamment de tout état de lecture.
+        ImapSyncCheckpoint.findOne.mockResolvedValue({ uidValidity: '1000', lastProcessedUid: 112 });
+        const client = createClient();
+        client.search.mockImplementation(async (criteria) => (criteria.uid === '113:*' ? [113] : []));
+        client.fetchAll.mockResolvedValue([message(113)]);
+        simpleParser.mockResolvedValue(parsedMessage(113));
+        User.findOne.mockResolvedValue({ _id: 'admin-fallback', role: 'Admin', isActive: true });
+        InternalMail.findOne.mockResolvedValue(null);
+        InternalMail.create.mockResolvedValue({ _id: 'created-113' });
+        ImapFlow.mockImplementation(() => client);
+
+        await expect(pollZohoInbox()).resolves.toEqual({ imported: 1, skipped: 0, errors: 0 });
+
+        expect(client.search).toHaveBeenCalledWith({ uid: '113:*' });
+        expect(InternalMail.create).toHaveBeenCalledTimes(1);
+        expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
+            { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
+            { uidValidity: '1000', lastProcessedUid: 113 },
+            { upsert: true },
+        );
+    });
+
+    test('un message non lu (Unseen) au-dessus du checkpoint est ingéré normalement (non-régression)', async () => {
+        ImapSyncCheckpoint.findOne.mockResolvedValue({ uidValidity: '1000', lastProcessedUid: 112 });
+        const client = createClient();
+        prepareTwoMessages(client, [message(113)]);
+        InternalMail.findOne.mockResolvedValue(null);
+        InternalMail.create.mockResolvedValue({ _id: 'created' });
+        ImapFlow.mockImplementation(() => client);
+
+        await expect(pollZohoInbox()).resolves.toEqual({ imported: 1, skipped: 0, errors: 0 });
+        expect(client.search).toHaveBeenCalledWith({ uid: '113:*' });
+    });
+
+    test('bootstrap (aucun checkpoint) : réexamen complet, la déduplication empêche tout doublon pour les messages déjà ingérés', async () => {
+        ImapSyncCheckpoint.findOne.mockResolvedValue(null);
+        const client = createClient();
+        client.search.mockResolvedValue([111, 112, 113]);
+        client.fetchAll.mockResolvedValue([message(111), message(112), message(113)]);
+        simpleParser.mockImplementation(async (source) => parsedMessage(Number(source.toString().replace('message-', ''))));
+        User.findOne.mockResolvedValue({ _id: 'recipient-id', email: 'inbox@altitudevision.test' });
+        // 111 et 112 déjà en base (déjà ingérés lors de cycles précédents,
+        // avant l'introduction du checkpoint) ; 113 est nouveau.
+        InternalMail.findOne
+            .mockResolvedValueOnce({ _id: 'existing-111' })
+            .mockResolvedValueOnce({ _id: 'existing-112' })
+            .mockResolvedValueOnce(null);
+        InternalMail.create.mockResolvedValue({ _id: 'created-113' });
+        ImapFlow.mockImplementation(() => client);
+
+        await expect(pollZohoInbox()).resolves.toEqual({ imported: 1, skipped: 2, errors: 0 });
+
+        expect(client.search).toHaveBeenCalledWith({ all: true });
+        expect(InternalMail.create).toHaveBeenCalledTimes(1); // jamais de doublon pour 111/112
+        expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
+            { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
+            { uidValidity: '1000', lastProcessedUid: 113 },
+            { upsert: true },
+        );
+    });
+
+    test('UIDVALIDITY changée : reset contrôlé, réexamen complet sous la nouvelle valeur', async () => {
+        ImapSyncCheckpoint.findOne.mockResolvedValue({ uidValidity: '1000', lastProcessedUid: 112 });
+        const client = createClient({ mailbox: { uidValidity: '2000' } });
+        client.search.mockResolvedValue([1]);
+        client.fetchAll.mockResolvedValue([message(1)]);
+        simpleParser.mockResolvedValue(parsedMessage(1));
+        User.findOne.mockResolvedValue({ _id: 'recipient-id', email: 'inbox@altitudevision.test' });
+        InternalMail.findOne.mockResolvedValue(null);
+        InternalMail.create.mockResolvedValue({ _id: 'created' });
+        ImapFlow.mockImplementation(() => client);
+
+        await expect(pollZohoInbox()).resolves.toEqual({ imported: 1, skipped: 0, errors: 0 });
+
+        expect(client.search).toHaveBeenCalledWith({ all: true });
+        expect(logger.warn).toHaveBeenCalledWith('[IMAP] Réinitialisation du checkpoint de synchronisation', expect.objectContaining({
+            reason: 'uidvalidity_changed',
+        }));
+        expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
+            { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
+            { uidValidity: '2000', lastProcessedUid: 1 },
+            { upsert: true },
+        );
+    });
+
+    test("échec métier sur un UID intermédiaire : le checkpoint n'avance pas au-delà, même si un UID suivant réussit (jamais de perte définitive)", async () => {
+        ImapSyncCheckpoint.findOne.mockResolvedValue({ uidValidity: '1000', lastProcessedUid: 112 });
+        const client = createClient();
+        client.search.mockResolvedValue([113, 114, 115]);
+        client.fetchAll.mockResolvedValue([message(113), message(114), message(115)]);
+        simpleParser.mockImplementation(async (source) => parsedMessage(Number(source.toString().replace('message-', ''))));
+        User.findOne.mockResolvedValue({ _id: 'recipient-id', email: 'inbox@altitudevision.test' });
+        InternalMail.findOne.mockResolvedValue(null);
+        // 113 réussit, 114 échoue (ex. incident Mongo transitoire), 115 réussit quand même (résilience déjà existante préservée).
+        InternalMail.create
+            .mockResolvedValueOnce({ _id: 'created-113' })
+            .mockRejectedValueOnce(new Error('Mongo temporary failure'))
+            .mockResolvedValueOnce({ _id: 'created-115' });
+        ImapFlow.mockImplementation(() => client);
+
+        await expect(pollZohoInbox()).resolves.toEqual({ imported: 2, skipped: 0, errors: 1 });
+
+        // Le checkpoint reste bloqué à 113 (dernier succès contigu) : 114 ET
+        // 115 seront réexaminés au prochain cycle. 115 sera alors détecté
+        // comme doublon par `zohoMessageId` (déjà importé), jamais recréé.
+        expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
+            { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
+            { uidValidity: '1000', lastProcessedUid: 113 },
+            { upsert: true },
+        );
+    });
+
+    test('UID avec un trou (gap) entre le checkpoint et le prochain message réel : fonctionne normalement', async () => {
+        ImapSyncCheckpoint.findOne.mockResolvedValue({ uidValidity: '1000', lastProcessedUid: 100 });
+        const client = createClient();
+        client.search.mockImplementation(async (criteria) => (criteria.uid === '101:*' ? [105] : []));
+        client.fetchAll.mockResolvedValue([message(105)]);
+        simpleParser.mockResolvedValue(parsedMessage(105));
+        User.findOne.mockResolvedValue({ _id: 'recipient-id', email: 'inbox@altitudevision.test' });
+        InternalMail.findOne.mockResolvedValue(null);
+        InternalMail.create.mockResolvedValue({ _id: 'created-105' });
+        ImapFlow.mockImplementation(() => client);
+
+        await expect(pollZohoInbox()).resolves.toEqual({ imported: 1, skipped: 0, errors: 0 });
+
+        expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
+            { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
+            { uidValidity: '1000', lastProcessedUid: 105 },
+            { upsert: true },
+        );
+    });
+
+    test('aucun nouveau message : le checkpoint existant reste inchangé (aucune écriture Mongo inutile)', async () => {
+        ImapSyncCheckpoint.findOne.mockResolvedValue({ uidValidity: '1000', lastProcessedUid: 112 });
+        const client = createClient();
+        client.search.mockResolvedValue([]);
+        ImapFlow.mockImplementation(() => client);
+
+        await expect(pollZohoInbox()).resolves.toEqual({ imported: 0, skipped: 0, errors: 0 });
+
+        expect(ImapSyncCheckpoint.findOneAndUpdate).not.toHaveBeenCalled();
+    });
+
+    test('mailbox vide au bootstrap : établit quand même un checkpoint de référence (jamais un rescan infini)', async () => {
+        ImapSyncCheckpoint.findOne.mockResolvedValue(null);
+        const client = createClient();
+        client.search.mockResolvedValue([]);
+        ImapFlow.mockImplementation(() => client);
+
+        await expect(pollZohoInbox()).resolves.toEqual({ imported: 0, skipped: 0, errors: 0 });
+
+        expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
+            { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
+            { uidValidity: '1000', lastProcessedUid: 0 },
+            { upsert: true },
+        );
+    });
+
+    test('échec de persistance du checkpoint : compté en erreur, ne bloque pas la fin du cycle (le prochain cycle réexaminera la même plage)', async () => {
+        ImapSyncCheckpoint.findOne.mockResolvedValue({ uidValidity: '1000', lastProcessedUid: 112 });
+        ImapSyncCheckpoint.findOneAndUpdate.mockRejectedValue(new Error('Mongo unavailable'));
+        const client = createClient();
+        prepareTwoMessages(client, [message(113)]);
+        InternalMail.findOne.mockResolvedValue(null);
+        InternalMail.create.mockResolvedValue({ _id: 'created' });
+        ImapFlow.mockImplementation(() => client);
+
+        await expect(pollZohoInbox()).resolves.toEqual({ imported: 1, skipped: 0, errors: 1 });
+        expect(client.logout).toHaveBeenCalledTimes(1); // le cycle se termine proprement malgré l'échec de checkpoint
     });
 });

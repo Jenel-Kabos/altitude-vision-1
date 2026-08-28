@@ -32,11 +32,68 @@ describe('ManageAccommodationsPage — gestion des hébergements validés', () =
   test('expose la recherche et les filtres métier sans filtre de modération', async () => {
     render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
     fireEvent.change(screen.getByPlaceholderText('Rechercher un hébergement…'), { target: { value: 'Villa' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
     fireEvent.change(screen.getByLabelText('Ville'), { target: { value: 'Pointe-Noire' } });
     fireEvent.change(screen.getByLabelText('Disponibilité'), { target: { value: 'Maintenance' } });
     fireEvent.change(screen.getByLabelText('Trier par'), { target: { value: 'prix_desc' } });
     await waitFor(() => expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ search: 'Villa', city: 'Pointe-Noire', availability: 'Maintenance', sort: 'prix_desc' })));
     expect(screen.queryByLabelText(/modération/i)).not.toBeInTheDocument();
+  });
+
+  // UX-ACCOMMODATION-SEARCH-BAR-1 — toolbar compacte : le panneau de filtres
+  // avancés est replié par défaut, s'ouvre/se ferme via le bouton "Filtres",
+  // affiche un compteur, des chips de filtres actifs, et un reset global.
+  describe('UX-ACCOMMODATION-SEARCH-BAR-1 — toolbar compacte', () => {
+    test('les filtres avancés sont repliés par défaut et le bouton "Filtres" les ouvre/ferme', async () => {
+      render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
+      expect(screen.queryByLabelText('Ville')).not.toBeInTheDocument();
+      const toggle = screen.getByRole('button', { name: 'Filtres' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+      fireEvent.click(toggle);
+      expect(screen.getByLabelText('Ville')).toBeInTheDocument();
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(toggle).toHaveAttribute('aria-controls', 'accommodations-filters-panel');
+      expect(document.getElementById('accommodations-filters-panel')).toContainElement(screen.getByLabelText('Ville'));
+
+      fireEvent.click(toggle);
+      expect(screen.queryByLabelText('Ville')).not.toBeInTheDocument();
+    });
+
+    test('le bouton "Filtres" affiche le nombre de filtres actifs (hors recherche et tri)', async () => {
+      render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
+      fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+      fireEvent.change(screen.getByLabelText('Ville'), { target: { value: 'Pointe-Noire' } });
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Filtres (1)' })).toBeInTheDocument());
+      fireEvent.change(screen.getByLabelText('Disponibilité'), { target: { value: 'Maintenance' } });
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Filtres (2)' })).toBeInTheDocument());
+    });
+
+    test('affiche un chip par filtre actif et permet de le retirer individuellement', async () => {
+      render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
+      fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+      fireEvent.change(screen.getByLabelText('Ville'), { target: { value: 'Pointe-Noire' } });
+      expect(await screen.findByText('Pointe-Noire')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Retirer le filtre Pointe-Noire' }));
+      await waitFor(() => expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ city: undefined })));
+      expect(screen.queryByText('Pointe-Noire')).not.toBeInTheDocument();
+    });
+
+    test('"Réinitialiser" n\'apparaît que si un filtre non par défaut est actif, et remet tout aux valeurs par défaut sans effacer la recherche', async () => {
+      render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
+      expect(screen.queryByRole('button', { name: 'Réinitialiser' })).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByPlaceholderText('Rechercher un hébergement…'), { target: { value: 'Villa' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Filtres' }));
+      fireEvent.change(screen.getByLabelText('Trier par'), { target: { value: 'prix_desc' } });
+
+      const resetButton = await screen.findByRole('button', { name: 'Réinitialiser' });
+      fireEvent.click(resetButton);
+      await waitFor(() => expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ sort: 'recent', search: 'Villa' })));
+      expect(screen.getByPlaceholderText('Rechercher un hébergement…')).toHaveValue('Villa');
+      expect(screen.queryByRole('button', { name: 'Réinitialiser' })).not.toBeInTheDocument();
+    });
   });
 
   test('affiche un skeleton structuré pendant le chargement', () => {
