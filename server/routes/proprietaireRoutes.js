@@ -6,7 +6,7 @@ const auth       = require('../controllers/authController');
 const ctrl       = require('../controllers/proprietaireController');
 const { upload } = require('../config/cloudinary');
 const { STAFF_IMMO } = require('../utils/roles');
-const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireTenantScope, requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/tenantContext');
 // PLATFORM-ADMIN-CERT-1 — vulnérabilité V2 corrigée, même patron que
 // locataireRoutes.js (voir son commentaire pour le détail complet).
 const Proprietaire = require('../models/Proprietaire');
@@ -52,7 +52,9 @@ const single = multer({
 }).single('pieceIdentite');
 
 // ── CRUD Proprietaire ─────────────────────────────────────────
-router.get('/',       readAll,   ctrl.getAll);
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-J, finding RA-15) — `GET /` n'appliquait
+// aucune frontière tenant, contrairement aux routes `:id` de ce fichier.
+router.get('/',       readAll,   requireTenantScopeForStaffOrPlatformOperator, ctrl.getAll);
 router.get('/:id/identity-document', auth.protect, requireTenantScope, auth.restrictTo(...STAFF_IMMO, 'Secretaire'), ctrl.downloadIdentityDocument);
 router.get('/:id',    readAll,   assertProprietaireInScope, ctrl.getOne);
 router.post('/',      protect,   single, ctrl.create);

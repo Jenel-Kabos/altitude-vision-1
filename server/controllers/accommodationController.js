@@ -15,7 +15,7 @@ const {
   uploadFilesToCloudinary, parseAmenities, parseStringArray,
   parseNonNegativeAmount, parseAddress, parseGeoLocation, buildBasePropertyData,
   parseNumericField,
-} = require('./propertyController');
+} = require('../services/propertyPublicationInputService');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
@@ -517,7 +517,11 @@ exports.submit = async (req, res) => {
 exports.pending = async (req, res) => {
   try {
     const { accommodationModerationFilter } = require('../services/moderationClassificationService');
-    const accommodations = await Accommodation.find(accommodationModerationFilter({ publicationStatus: 'soumis' }))
+    const tenantId = req.platformTenant?._id || req.platformTenant || null;
+    const accommodations = await Accommodation.find(accommodationModerationFilter({
+      publicationStatus: 'soumis',
+      ...(tenantId ? { tenant: tenantId } : {}),
+    }))
       .populate('property', 'title images address owner bedrooms bathrooms')
       .sort({ submittedAt: 1 });
     const withScore = await Promise.all(accommodations.map(async (a) => {
@@ -542,6 +546,7 @@ exports.listAdmin = async (req, res) => {
     const { status, type, city, availability, search, sort, page, limit } = req.query;
     const result = await listAccommodationsForAdmin({
       status, type, city, availability, search, sort, page, limit,
+      tenantId: req.platformTenant?._id || req.platformTenant || null,
       independentOnly: req.query.independentOnly === 'true',
       validatedOnly: req.query.validatedOnly === 'true',
       activeOnly: req.query.activeOnly === 'true',
@@ -968,6 +973,18 @@ exports.updateFull = async (req, res) => {
     // celui envoyé dans la requête, sinon celui déjà en base (édition
     // partielle — l'admin ne renvoie pas forcément accommodationType).
     const existingAccommodationForType = await Accommodation.findOne({ property: property._id });
+    // SECURITY-CLOSURE-P1-WAVE-1 (P1-E, finding RA-10) — seul handler de ce
+    // fichier à muter une Accommodation existante sans jamais appeler
+    // `assertAccommodationAccessible`, contrairement à
+    // `update/submit/reviewDecision/deactivate/reactivate/duplicate/remove`.
+    // Même garde canonique, appliquée AVANT toute mutation de `property`.
+    if (existingAccommodationForType) {
+      try {
+        await assertAccommodationAccessible(req, existingAccommodationForType, ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager']);
+      } catch (error) {
+        return fail(res, error.statusCode || 403, error.message);
+      }
+    }
     const effectiveType = accommodationType || existingAccommodationForType?.accommodationType;
 
     // Validé AVANT toute mutation de `property` : si les champs Accommodation/

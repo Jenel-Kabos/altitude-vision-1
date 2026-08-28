@@ -70,6 +70,7 @@ const HOTEL_ID = '707f1f77bcf86cd799439055';
 const OWNER_ID = '507f1f77bcf86cd799439011';
 const OTHER_OWNER_ID = '507f1f77bcf86cd799439099';
 const ADMIN_ID = '507f1f77bcf86cd799439012';
+const TENANT_ID = '607f1f77bcf86cd799439001';
 const PROPERTY_ID = '507f191e810c19729de860ea';
 const ACCOMMODATION_ID = '607f191e810c19729de860eb';
 
@@ -401,6 +402,7 @@ describe('GET /api/accommodations/status/pending — file de modération staff',
     expect(res.body.data.accommodations[0].completion).toBeDefined();
     expect(Accommodation.find).toHaveBeenCalledWith({
       publicationStatus: 'soumis',
+      tenant: TENANT_ID,
       $and: [{ $or: [{ hotel: null }, { hotel: { $exists: false } }] }],
     });
   });

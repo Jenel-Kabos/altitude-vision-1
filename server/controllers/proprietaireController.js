@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const Proprietaire = require('../models/Proprietaire');
+const Contrat = require('../models/Contrat');
+const Property = require('../models/Property');
 const Document     = require('../models/Document');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 const { uploadPrivateAsset, deletePrivateAsset, readPrivateAsset, safePrivateDescriptor } = require('../services/storage/secureStorageService');
@@ -7,7 +9,25 @@ const { logAction, buildAuteur } = require('../services/actionLogService');
 const logger = require('../utils/logger');
 const { importBienPropreVersGestion, ImportError } = require('../services/proprietaireGestionImportService');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
-const { streamRemoteDocument } = require('./rentalDocumentController');
+const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
+
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-J, finding RA-15) — `Proprietaire` n'a
+// aucun champ tenant/property direct ; sa frontière tenant canonique
+// (déjà utilisée par `tenantResourceAttributionService.resolveResourceTenant`
+// pour les routes `:id`) est dérivée soit de `proprietaire.user` (compte lié,
+// appartenance directe), soit des `Contrat` qui le référencent -> leur
+// `Property` -> son `owner`. Réutilisé ici pour la liste plutôt qu'un champ
+// tenant inventé.
+async function scopedProprietaireIdsForTenant(req) {
+  if (!req.platformTenant) return null;
+  const scopeUserIds = req.tenantScopeUserIds || [];
+  const propertyIds = await Property.find({ owner: { $in: scopeUserIds } }).distinct('_id');
+  const [viaUser, viaContrat] = await Promise.all([
+    Proprietaire.find({ user: { $in: scopeUserIds } }).distinct('_id'),
+    propertyIds.length === 0 ? [] : Contrat.find({ bien: { $in: propertyIds } }).distinct('proprietaire'),
+  ]);
+  return [...new Set([...viaUser, ...viaContrat].map(String))];
+}
 
 const rollbackUploads = async (urls, tag) => {
   const list = (Array.isArray(urls) ? urls : [urls]).filter(Boolean);
@@ -129,7 +149,8 @@ const parseBiens = (raw) => {
 
 exports.getAll = async (req, res) => {
   try {
-    const proprietaires = await Proprietaire.find().sort({ createdAt: -1 });
+    const scopedIds = await scopedProprietaireIdsForTenant(req);
+    const proprietaires = await Proprietaire.find(scopedIds ? { _id: { $in: scopedIds } } : {}).sort({ createdAt: -1 });
     res.json({ status: 'success', data: { proprietaires: proprietaires.map(serializeProprietaire) } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });

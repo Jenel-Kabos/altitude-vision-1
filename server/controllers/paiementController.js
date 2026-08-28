@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Paiement = require('../models/Paiement');
 const Contrat  = require('../models/Contrat');
+const Property = require('../models/Property');
 const RentalPaymentReceipt = require('../models/RentalPaymentReceipt');
 const { verifierPaiementsEnRetard } = require('../services/alerteService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
@@ -8,7 +9,29 @@ const { notifyContractTenant } = require('../services/rentalTenantNotificationSe
 const { uploadPrivateAsset, deletePrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
 const { runFinancialOperation } = require('../services/finance/financialTransactionService');
 const logger = require('../utils/logger');
-const { streamRemoteDocument } = require('./rentalDocumentController');
+const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+
+// SECURITY-CLOSURE-P0-WAVE-1 (P0-B, finding RA-02) — `Paiement` n'a aucun
+// champ `tenant` direct. IMPORTANT : la frontière tenant canonique déjà
+// utilisée par `tenantResourceAttributionService.resolveResourceTenant`
+// (appelée par `assertResourceTenantOrUnattributed`, elle-même utilisée par
+// le `router.param('id', …)` de ce même fichier) résout le tenant d'un
+// Contrat via `Contrat.bien.owner` **et l'appartenance (OrgMembership) de ce
+// propriétaire**, PAS via un éventuel champ `Property.tenant` — ce serait
+// une frontière parallèle et potentiellement divergente si réinventée ici.
+// Réutilise donc exactement la même primitive de scope que
+// `rentalManagementController.js` (`resolveScope`/`req.tenantScopeUserIds`,
+// peuplé par `requireTenantScopeForStaffOrPlatformOperator`) : l'ensemble
+// des utilisateurs membres du tenant résolu, puis les Property dont
+// `owner` appartient à cet ensemble.
+async function scopedContratIdsForTenant(req) {
+  if (!req.platformTenant) return null; // pas de restriction — tenant non résolu (mode plateforme) ou route non tenant-scopée.
+  const propertyIds = await Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+  if (propertyIds.length === 0) return [];
+  return Contrat.find({ bien: { $in: propertyIds } }).distinct('_id');
+}
 
 const safePaiement = (value) => {
   const data = value?.toObject ? value.toObject() : { ...value };
@@ -23,7 +46,16 @@ const safeReceipt = (value) => { const data = value?.toObject ? value.toObject()
 exports.getAll = async (req, res) => {
   try {
     const filter = {};
-    if (req.query.contrat) filter.contrat = req.query.contrat;
+    const scopedContratIds = await scopedContratIdsForTenant(req);
+    if (scopedContratIds) filter.contrat = { $in: scopedContratIds };
+    if (req.query.contrat) {
+      // Une valeur explicite reste appliquée, mais seulement si elle est
+      // déjà dans le périmètre tenant résolu ci-dessus — jamais un moyen de
+      // le contourner via un paramètre de requête.
+      filter.contrat = scopedContratIds && !scopedContratIds.some((id) => String(id) === String(req.query.contrat))
+        ? { $in: [] }
+        : req.query.contrat;
+    }
     if (req.query.statut)  filter.statut  = req.query.statut;
     if (req.query.annee)   filter.annee   = parseInt(req.query.annee, 10);
 
@@ -67,6 +99,8 @@ exports.getStats = async (req, res) => {
   try {
     const { annee } = req.query;
     const filter = {};
+    const scopedContratIds = await scopedContratIdsForTenant(req);
+    if (scopedContratIds) filter.contrat = { $in: scopedContratIds };
     if (annee) filter.annee = parseInt(annee, 10);
 
     const [grouped] = await Paiement.aggregate([
@@ -295,6 +329,33 @@ exports.encaisserMultiple = async (req, res) => {
     if (!contrat || !mongoose.isValidObjectId(contrat)) {
       return res.status(422).json({ status: 'fail', message: 'Identifiant de contrat invalide.' });
     }
+    // SECURITY-CLOSURE-P0-WAVE-1 (P0-C, finding RA-03) — `contrat` vient du
+    // corps de la requête et contournait jusqu'ici le `router.param('id', …)`
+    // (TENANT-CERT-2) qui protège les autres routes de ce fichier. Même
+    // garde canonique, ici appliqué directement dans le contrôleur avec la
+    // même tolérance « non attribué » que ce `router.param` (résolution du
+    // tenant de l'ACTEUR via `resolveTenantForUser`, qui peut rester
+    // `undefined` sans bloquer — seul un Contrat RÉELLEMENT résolu vers un
+    // AUTRE tenant est refusé ; un Contrat legacy sans Property liée
+    // (`adresseBien` en texte libre, cf.
+    // rentalPaymentMultiEcheanceAllocation.mongo.integration.test.js) reste
+    // accessible, exactement comme pour `GET/PUT/DELETE /api/paiements/:id`).
+    // Appliqué AVANT toute mutation de `Paiement`/création de
+    // `RentalPaymentReceipt` — aucun paiement hors autorité ne doit être
+    // encaissé, y compris partiellement.
+    const contratDoc = await Contrat.findById(contrat);
+    if (!contratDoc) {
+      return res.status(404).json({ status: 'fail', message: 'Contrat introuvable.' });
+    }
+    {
+      const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+      const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
+      try {
+        await assertResourceTenantOrUnattributed({ resourceType: 'Contrat', resource: contratDoc, tenantId: tenant?._id });
+      } catch (error) {
+        return res.status(error.statusCode || 404).json({ status: 'fail', message: 'Contrat introuvable.' });
+      }
+    }
     const parsedAllocations = typeof allocations === 'string' ? JSON.parse(allocations) : allocations;
     if (!Array.isArray(parsedAllocations) || parsedAllocations.length === 0) {
       return res.status(422).json({ status: 'fail', message: 'Au moins une allocation échéance/montant est requise.' });
@@ -514,9 +575,11 @@ exports.calculerPenalites = async (req, res) => {
 exports.getAlertes = async (req, res) => {
   try {
     const maintenant = new Date();
+    const scopedContratIds = await scopedContratIdsForTenant(req);
 
     const paiementsRetard = await Paiement.find({
       statut: { $in: ['impayé', 'en_retard'] },
+      ...(scopedContratIds ? { contrat: { $in: scopedContratIds } } : {}),
     }).select('retardJours penaliteAppliquee penaliteMontant');
 
     const nbImpayes     = paiementsRetard.filter(p => (p.retardJours || 0) >= 5).length;
@@ -530,6 +593,7 @@ exports.getAlertes = async (req, res) => {
       statut: 'actif',
       type: 'location',
       dateFinBail: { $gte: maintenant, $lte: dans30j },
+      ...(scopedContratIds ? { _id: { $in: scopedContratIds } } : {}),
     });
 
     res.json({ status: 'success', data: { nbImpayes, nbPenalites, totalPenalites, bailsExpiration } });

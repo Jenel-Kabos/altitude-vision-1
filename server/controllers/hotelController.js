@@ -30,7 +30,7 @@ const { notify } = require('../services/notificationService');
 const {
   uploadFilesToCloudinary, parseAmenities, parseStringArray,
   parseNonNegativeAmount, parseAddress, parseGeoLocation, buildBasePropertyData,
-} = require('./propertyController');
+} = require('../services/propertyPublicationInputService');
 const { assertOperationalHotelAccess, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 const { buildExactCiRegexFilter } = require('../services/propertyFilterService');
@@ -230,6 +230,7 @@ exports.mine = async (req, res) => {
 exports.listAdmin = async (req, res) => {
   try {
     const { status, search, sort, page, limit } = req.query;
+    const tenantId = req.user.role === 'Admin' ? (req.platformTenant?._id || req.platformTenant || null) : null;
     // F2.6.2 : un non-Admin ne voit que ses hôtels réellement rattachés (jamais {} pour tout
     // le staff Altimmo) — le total (pagination) utilise exactement le même scope que la liste.
     let hotelIds;
@@ -238,7 +239,7 @@ exports.listAdmin = async (req, res) => {
       hotelIds = accessibleHotels.map((h) => h._id);
       if (hotelIds.length === 0) return res.json({ status: 'success', data: { hotels: [], total: 0, page: Number(page) || 1, limit: Number(limit) || 20 } });
     }
-    const result = await listHotelsForAdmin({ status, search, sort, page, limit, hotelIds });
+    const result = await listHotelsForAdmin({ status, search, sort, page, limit, hotelIds, tenantId });
     const { completionByHotel } = await batchCategoriesAndCompletion(result.hotels);
     const hotels = result.hotels.map((h) => ({ ...h.toObject(), completion: completionByHotel.get(String(h._id)) }));
     res.json({ status: 'success', data: { hotels, total: result.total, page: result.page, limit: result.limit } });
@@ -252,13 +253,14 @@ exports.listAdmin = async (req, res) => {
 exports.portfolio = async (req, res) => {
   try {
     const { search, city, district, starRating, sort, page, limit } = req.query;
+    const tenantId = req.user.role === 'Admin' ? (req.platformTenant?._id || req.platformTenant || null) : null;
     let hotelIds;
     if (req.user.role !== 'Admin') {
       const { hotels } = await listAccessibleHotels(req.user);
       hotelIds = hotels.map((hotel) => hotel._id);
       if (!hotelIds.length) return res.json({ status: 'success', data: { hotels: [], total: 0, page: Number(page) || 1, limit: Number(limit) || 20 } });
     }
-    const result = await listValidatedHotelPortfolio({ search, city, district, starRating, sort, page, limit, hotelIds });
+    const result = await listValidatedHotelPortfolio({ search, city, district, starRating, sort, page, limit, hotelIds, tenantId });
     const ids = result.hotels.map((hotel) => hotel._id);
     const roomRows = ids.length ? await Room.aggregate([
       { $match: { hotel: { $in: ids }, active: true } },
@@ -603,6 +605,8 @@ exports.submit = async (req, res) => {
 exports.pending = async (req, res) => {
   try {
     const query = { $or: [{ publicationStatus: 'soumis' }, { 'proposedVersion.status': 'pending' }] };
+    const tenantId = req.user.role === 'Admin' ? (req.platformTenant?._id || req.platformTenant || null) : null;
+    if (tenantId) query.tenant = tenantId;
     if (req.user.role !== 'Admin') {
       const { hotels: accessibleHotels } = await listAccessibleHotels(req.user);
       query._id = { $in: accessibleHotels.map((h) => h._id) };

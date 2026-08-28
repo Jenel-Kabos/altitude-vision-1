@@ -12,7 +12,7 @@ const { upload } = require('../config/cloudinary');
 // ✅ IMPORT 3 : Le contrôleur Property
 const propertyController = require('../controllers/propertyController');
 const propertyPortfolioController = require('../controllers/propertyPortfolioController');
-const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireTenantScope, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
 
 // ✅ IMPORT 4 : Contrôleur mobile (JSON pur, photos déjà uploadées)
 const { createPropertyMobile } = require('../controllers/propertyMobileController');
@@ -44,12 +44,14 @@ router.get(
     '/status/pending', 
     authController.protect, 
     authController.restrictTo('Admin'), 
+    requireTenantScopeForStaffAllowPlatformWide,
     propertyController.getPendingProperties
 );
 router.get(
     '/status/pending-count',
     authController.protect,
     authController.restrictTo('Admin', 'Collaborateur'),
+    requireTenantScopeForStaffAllowPlatformWide,
     propertyController.getPendingPropertiesCount
 );
 
@@ -79,7 +81,8 @@ router.get(
  */
 router.get(
     '/', 
-    authController.optionalAuth, 
+    authController.optionalAuth,
+    requireTenantScopeForStaffAllowPlatformWide,
     propertyController.getAllProperties
 );
 

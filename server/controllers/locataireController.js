@@ -11,8 +11,21 @@ const { logAction, buildAuteur } = require('../services/actionLogService');
 const tenantLinkService = require('../services/tenantLinkService');
 const tenantPortalEmailService = require('../services/tenantPortalEmailService');
 const User = require('../models/User');
+const Property = require('../models/Property');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
-const { streamRemoteDocument } = require('./rentalDocumentController');
+const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
+
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-J, finding RA-15) — `Locataire` n'a aucun
+// champ tenant/property direct ; sa frontière tenant canonique (déjà
+// utilisée par `assertLocataireInScope`, routes/locataireRoutes.js) est
+// dérivée des `Contrat` qui le référencent -> leur `Property` -> son
+// `owner`. Réutilisé ici pour les listes plutôt qu'un champ tenant inventé.
+async function scopedLocataireIdsForTenant(req) {
+  if (!req.platformTenant) return null;
+  const propertyIds = await Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+  if (propertyIds.length === 0) return [];
+  return Contrat.find({ bien: { $in: propertyIds } }).distinct('locataire');
+}
 
 const uploadPiece = async (file) => {
   if (!file) return undefined;
@@ -93,7 +106,8 @@ exports.downloadIdentityDocument = async (req, res) => {
 
 exports.getAll = async (req, res) => {
   try {
-    const locataires = await Locataire.find().sort({ createdAt: -1 });
+    const scopedIds = await scopedLocataireIdsForTenant(req);
+    const locataires = await Locataire.find(scopedIds ? { _id: { $in: scopedIds } } : {}).sort({ createdAt: -1 });
     res.json({ status: 'success', data: { locataires: locataires.map(serializeLocataire) } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
@@ -185,7 +199,8 @@ exports.listDossiers = async (req, res) => {
     const pageNum = Math.max(1, Number(page) || 1);
     const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));
 
-    const filter = {};
+    const scopedIds = await scopedLocataireIdsForTenant(req);
+    const filter = scopedIds ? { _id: { $in: scopedIds } } : {};
     if (search) {
       const re = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       filter.$or = [{ nom: re }, { prenom: re }, { email: re }, { telephone: re }];

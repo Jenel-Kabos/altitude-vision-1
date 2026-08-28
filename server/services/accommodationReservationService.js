@@ -80,8 +80,8 @@ async function acquireLocks(reservation) {
   });
 }
 
-async function transition({ id, to, user, reason }) {
-  const reservation = await Reservation.findById(id); if (!reservation) throw fail('Réservation introuvable.', 404);
+async function transition({ id, to, user, reason, authorizedReservation = null }) {
+  const reservation = authorizedReservation || await Reservation.findById(id); if (!reservation) throw fail('Réservation introuvable.', 404);
   const userId = user.id || user._id; const isGuest = String(reservation.guest) === String(userId);
   if (to === 'cancelled' ? !(isGuest || canManage(user, reservation)) : !canManage(user, reservation)) throw fail('Accès refusé.', 403, 'FORBIDDEN');
   if (!TRANSITIONS[reservation.status]?.includes(to)) throw fail(`Transition ${reservation.status} → ${to} interdite.`, 409, 'INVALID_TRANSITION');
@@ -100,8 +100,8 @@ async function transition({ id, to, user, reason }) {
   return reservation;
 }
 
-async function createBlock({ accommodationId, input, user }) {
-  const accommodation = await accommodationWithProperty(accommodationId); if (!accommodation) throw fail('Hébergement introuvable.', 404);
+async function createBlock({ accommodationId, input, user, authorizedAccommodation = null }) {
+  const accommodation = authorizedAccommodation || await accommodationWithProperty(accommodationId); if (!accommodation) throw fail('Hébergement introuvable.', 404);
   if (!(['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'].includes(user.role) || String(accommodation.property.owner) === String(user.id))) throw fail('Accès refusé.', 403);
   const start = parseDate(input.startDate); const end = parseDate(input.endDate); nightsBetween(start, end);
   return withCalendarMutex(accommodation._id, async () => {

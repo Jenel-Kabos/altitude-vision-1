@@ -146,6 +146,14 @@ const requireTenantScopeForStaffOrPlatformOperator = createRequireTenantScope({
   allowPlatformWide: false,
   requireWhen: ({ req, isPlatformOperator }) => isPlatformOperator || require('../utils/roles').ALL_STAFF.includes(req.user?.role),
 });
+const requireTenantScopeForAnalytics = createRequireTenantScope({
+  allowPlatformWide: true,
+  requireWhen: ({ req, isPlatformOperator }) => isPlatformOperator || require('../utils/roles').ALL_STAFF.includes(req.user?.role),
+});
+const requireTenantScopeForStaffAllowPlatformWide = createRequireTenantScope({
+  allowPlatformWide: true,
+  requireWhen: ({ req, isPlatformOperator }) => isPlatformOperator || require('../utils/roles').ALL_STAFF.includes(req.user?.role),
+});
 
 // TENANT-SCOPE-HOTFIX-3 — voir bandeau d'en-tête. `allowAnyStatus` n'a de
 // sens que pour un PlatformOperator (mêmes garanties que
@@ -163,5 +171,7 @@ const attachTenantScopeIfResolvable = async (req, res, next) => {
 
 module.exports = {
   attachTenantContext, requireTenantScope, requireTenantScopeAllowPlatformWide,
-  requireTenantScopeForStaffOrPlatformOperator, attachTenantScopeIfResolvable,
+  requireTenantScopeForStaffOrPlatformOperator, requireTenantScopeForAnalytics,
+  requireTenantScopeForStaffAllowPlatformWide,
+  attachTenantScopeIfResolvable,
 };

@@ -1,8 +1,29 @@
 const asyncHandler = require('express-async-handler');
 const Signalement  = require('../models/Signalement');
+const Property     = require('../models/Property');
 const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
-const { streamRemoteDocument } = require('./rentalDocumentController');
+const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
 const { notifyStaff } = require('../services/notificationService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-C, finding RA-07) — même relation
+// canonique que litigeController.js : `Signalement.property` -> Property ->
+// owner -> OrgMembership. `tenantResourceAttributionService` supporte déjà
+// nativement `resourceType: 'Signalement'`.
+async function scopedPropertyIdsForTenant(req) {
+  if (!req.platformTenant) return null;
+  return Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+}
+
+async function assertSignalementTenantAccess(req, res, signalement) {
+  if (!req.platformTenant) return;
+  try {
+    await assertResourceTenantOrUnattributed({ resourceType: 'Signalement', resource: signalement, tenantId: req.platformTenant._id });
+  } catch (error) {
+    res.status(error.statusCode || 404);
+    throw new Error('Signalement non trouvé.');
+  }
+}
 
 exports.creerSignalement = asyncHandler(async (req, res) => {
   const { propertyId, raison, details } = req.body;
@@ -56,9 +77,18 @@ exports.getAllSignalements = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 20;
   const skip  = (page - 1) * limit;
 
+  const scopedPropertyIds = await scopedPropertyIdsForTenant(req);
   const filter = {};
-  if (req.query.statut)     filter.statut   = req.query.statut;
-  if (req.query.propertyId) filter.property = req.query.propertyId;
+  if (req.query.statut) filter.statut = req.query.statut;
+  if (req.query.propertyId) {
+    // Une valeur explicite reste appliquée, mais seulement si elle est déjà
+    // dans le périmètre tenant résolu — jamais un moyen de le contourner.
+    filter.property = scopedPropertyIds && !scopedPropertyIds.some((id) => String(id) === String(req.query.propertyId))
+      ? { $in: [] }
+      : req.query.propertyId;
+  } else if (scopedPropertyIds) {
+    filter.property = { $in: scopedPropertyIds };
+  }
 
   const [signalements, total] = await Promise.all([
     Signalement.find(filter)
@@ -89,16 +119,18 @@ exports.traiterSignalement = asyncHandler(async (req, res) => {
     throw new Error('statut doit être "traite" ou "rejete".');
   }
 
+  const existing = await Signalement.findById(req.params.id);
+  if (!existing) {
+    res.status(404);
+    throw new Error('Signalement non trouvé.');
+  }
+  await assertSignalementTenantAccess(req, res, existing);
+
   const signalement = await Signalement.findByIdAndUpdate(
     req.params.id,
     { statut, traitePar: req.user._id, traiteAt: new Date() },
     { new: true }
   );
-
-  if (!signalement) {
-    res.status(404);
-    throw new Error('Signalement non trouvé.');
-  }
 
   res.json({ status: 'success', data: signalement });
 });
@@ -110,6 +142,7 @@ exports.downloadProof = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Signalement non trouvé.');
   }
+  await assertSignalementTenantAccess(req, res, signalement);
   const proof = signalement.preuves?.[Number(req.params.proofIndex)];
   if (!proof) {
     res.status(404);

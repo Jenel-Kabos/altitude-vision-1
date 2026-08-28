@@ -17,6 +17,15 @@ const { resolveTenantForUser } = require('../services/platformTenant/tenantConte
 
 const respondError = (res, error) => res.status(error.status || 500).json({ status: 'fail', code: error.code, message: error.message });
 const isStaff = (user) => ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'].includes(user?.role);
+const isPlatformWide = (user) => Boolean(user?.isPlatformOperatorContext && !user?.platformTenant);
+
+async function authorizedCalendarAccommodation(req) {
+  const query = { _id: req.params.id };
+  if (isStaff(req.user) && !isPlatformWide(req.user)) query.tenant = req.user.platformTenant?._id || req.user.platformTenant;
+  const accommodation = await Accommodation.findOne(query).populate('property');
+  if (!accommodation || accommodation.hotel) throw service.fail('Hébergement indépendant introuvable.', 404, 'NOT_FOUND');
+  return accommodation;
+}
 
 // TENANT-CERT-3-PRE — `isStaff(req.user)` autorisait jusqu'ici un accès
 // portée globale (toute réservation, tout tenant) à `list`/`getOne`, le même
@@ -85,7 +94,15 @@ exports.getOne = async (req, res) => {
 
 exports.transition = (to) => async (req, res) => {
   try {
-    const reservation = await service.transition({ id: req.params.id, to, user: req.user, reason: req.body.reason });
+    let authorizedReservation = null;
+    if (isStaff(req.user)) {
+      const platformWide = req.user.isPlatformOperatorContext && !req.user.platformTenant;
+      const query = { _id: req.params.id };
+      if (!platformWide) query.tenant = req.user.platformTenant?._id || req.user.platformTenant;
+      authorizedReservation = await Reservation.findOne(query);
+      if (!authorizedReservation) throw service.fail('Réservation introuvable.', 404, 'NOT_FOUND');
+    }
+    const reservation = await service.transition({ id: req.params.id, to, user: req.user, reason: req.body.reason, authorizedReservation });
     if (to === 'confirmed') await billing.ensureAccommodationInvoice({ reservationId: reservation._id, actor: req.user });
     const actorIsGuest = String(reservation.guest) === String(req.user.id);
     const recipient = to === 'cancelled' && actorIsGuest ? reservation.owner : reservation.guest;
@@ -166,13 +183,14 @@ exports.availability = async (req, res) => {
 };
 
 exports.createBlock = async (req, res) => {
-  try { const block = await service.createBlock({ accommodationId: req.params.id, input: req.body, user: req.user }); logAction({ action: 'Calendrier hébergement bloqué', description: `Blocage ${block._id} créé`, module: 'Altimmo', typeAction: 'CRÉATION', auteur: buildAuteur(req.user), cible: { id: String(block._id), type: 'AccommodationAvailabilityBlock' }, req }); res.status(201).json({ status: 'success', data: { block } }); }
+  try { const authorizedAccommodation = await authorizedCalendarAccommodation(req); const block = await service.createBlock({ accommodationId: req.params.id, input: req.body, user: req.user, authorizedAccommodation }); logAction({ action: 'Calendrier hébergement bloqué', description: `Blocage ${block._id} créé`, module: 'Altimmo', typeAction: 'CRÉATION', auteur: buildAuteur(req.user), cible: { id: String(block._id), type: 'AccommodationAvailabilityBlock' }, req }); res.status(201).json({ status: 'success', data: { block } }); }
   catch (error) { respondError(res, error); }
 };
 
 exports.deleteBlock = async (req, res) => {
   try {
-    const block = await Block.findOne({ _id: req.params.blockId, accommodation: req.params.id }).populate({ path: 'accommodation', populate: { path: 'property' } });
+    const authorizedAccommodation = await authorizedCalendarAccommodation(req);
+    const block = await Block.findOne({ _id: req.params.blockId, accommodation: authorizedAccommodation._id }).populate({ path: 'accommodation', populate: { path: 'property' } });
     if (!block) return res.status(404).json({ status: 'fail', message: 'Blocage introuvable.' });
     if (!(isStaff(req.user) || String(block.accommodation.property.owner) === String(req.user.id))) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
     await Promise.all([NightLock.deleteMany({ sourceType: 'block', sourceId: block._id }), block.deleteOne()]);
@@ -181,15 +199,31 @@ exports.deleteBlock = async (req, res) => {
   } catch (error) { respondError(res, error); }
 };
 
+// RBAC-ACCOMMODATION-AVAILABILITY-BLOCKS-1 (RBAC-FINAL-01) — cette lecture
+// n'exigeait jusqu'ici que `auth.protect` (tout utilisateur authentifié),
+// contrairement à ses trois routes sœurs sur la même ressource (`calendar`,
+// `createBlock`, `deleteBlock` ci-dessus), qui exigent toutes
+// `isStaff(user) || owner===user.id` — contrat déjà en production, prouvé
+// par HOTFIX_ACCOMMODATION_CALENDAR_TENANT_SCOPE1_RBAC_CONTRACT.md. Même
+// garde réutilisée ici à l'identique (jamais une nouvelle politique) : les
+// blocages exposent des données internes (motif libre, créateur) qu'un
+// Client ou un Proprietaire non-owner n'a aucune raison de lire. La
+// frontière tenant (HZ-02, `authorizedCalendarAccommodation` ci-dessus)
+// reste strictement inchangée.
 exports.listBlocks = async (req, res) => {
-  try { const blocks = await Block.find({ accommodation: req.params.id }).sort({ startDate: 1 }).lean(); res.json({ status: 'success', data: { blocks } }); }
-  catch (error) { respondError(res, error); }
+  try {
+    const accommodation = await authorizedCalendarAccommodation(req);
+    if (!(isStaff(req.user) || String(accommodation.property?.owner) === String(req.user.id))) {
+      return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+    }
+    const blocks = await Block.find({ accommodation: accommodation._id }).sort({ startDate: 1 }).lean();
+    res.json({ status: 'success', data: { blocks } });
+  } catch (error) { respondError(res, error); }
 };
 
 exports.calendar = async (req, res) => {
   try {
-    const accommodation = await Accommodation.findById(req.params.id).populate('property', 'owner title');
-    if (!accommodation || accommodation.hotel) throw service.fail('Hébergement indépendant introuvable.', 404);
+    const accommodation = await authorizedCalendarAccommodation(req);
     if (!(isStaff(req.user) || String(accommodation.property?.owner) === String(req.user.id))) throw service.fail('Accès refusé.', 403, 'FORBIDDEN');
     const from = service.parseDate(req.query.from); const to = service.parseDate(req.query.to);
     if (service.nightsBetween(from, to) > 62) throw service.fail('La période du calendrier est limitée à 62 jours.', 422);

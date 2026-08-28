@@ -6,10 +6,30 @@ const { notify } = require('../services/notificationService');
 const workflow = require('../services/realEstateApplicationService');
 const mongoose = require('mongoose');
 const storage = require('../services/storage/realEstateApplicationStorageService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 
 const isStaff = (user) => STAFF_IMMO.includes(user?.role);
 const fail = (res, error) => res.status(error.statusCode || 500).json({ status: 'fail', code: error.code, message: error.message });
 const canManage = (user, application) => isStaff(user) || String(application.owner) === String(user._id);
+
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-D, finding RA-08) — `canManage` accordait
+// l'accès à TOUT staff, de n'importe quel tenant, sans jamais vérifier que
+// l'application appartienne au même tenant que l'acteur — malgré le support
+// déjà déclaré de `resourceType: 'RealEstateApplication'` dans
+// `tenantResourceAttributionService` (jamais utilisé jusqu'ici). Vérifie la
+// frontière tenant UNIQUEMENT quand l'accès est accordé via le statut staff
+// (jamais pour le propriétaire/candidat, déjà légitimés par leur propre
+// identité).
+async function assertApplicationTenantAccessIfStaff(req, res, application, isStaffGranted) {
+  if (!isStaffGranted || !req.platformTenant) return true;
+  try {
+    await assertResourceTenantOrUnattributed({ resourceType: 'RealEstateApplication', resource: application, tenantId: req.platformTenant._id });
+    return true;
+  } catch (error) {
+    res.status(error.statusCode || 404).json({ status: 'fail', message: 'Dossier introuvable.' });
+    return false;
+  }
+}
 
 exports.create = async (req, res) => {
   try {
@@ -48,7 +68,12 @@ exports.create = async (req, res) => {
 };
 
 exports.list = async (req, res) => {
-  const filter = isStaff(req.user) ? {} : { $or: [{ applicant: req.user._id }, { owner: req.user._id }] };
+  let filter;
+  if (isStaff(req.user)) {
+    filter = req.platformTenant ? { owner: { $in: req.tenantScopeUserIds || [] } } : {};
+  } else {
+    filter = { $or: [{ applicant: req.user._id }, { owner: req.user._id }] };
+  }
   if (req.query.kind) filter.kind = req.query.kind;
   if (req.query.status) filter.status = req.query.status;
   if (req.query.propertyId) filter.property = req.query.propertyId;
@@ -71,6 +96,7 @@ exports.getOne = async (req, res) => {
   const application = await Application.findById(req.params.id).select('+attachments +attachments.storageKey +rentalApplication.monthlyIncome').populate('property', 'title images status availability owner').populate('applicant', 'name firstName lastName email phone').populate('decidedBy', 'name firstName lastName');
   if (!application) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
   if (!canManage(req.user, application) && String(application.applicant) !== String(req.user._id)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+  if (!(await assertApplicationTenantAccessIfStaff(req, res, application, isStaff(req.user)))) return;
   const safe = application.toObject();
   safe.attachments = (safe.attachments || []).map(({ storageKey: _storageKey, ...attachment }) => attachment);
   res.json({ status: 'success', data: { application: safe } });
@@ -80,6 +106,7 @@ exports.review = async (req, res) => {
   const application = await Application.findById(req.params.id);
   if (!application) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
   if (!canManage(req.user, application)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+  if (!(await assertApplicationTenantAccessIfStaff(req, res, application, isStaff(req.user)))) return;
   if (application.status !== 'submitted') return res.status(409).json({ status: 'fail', code: 'INVALID_TRANSITION', message: 'Transition impossible.' });
   application.status = 'under_review';
   application.history.push({ from: 'submitted', to: 'under_review', action: 'review_started', actor: req.user._id });
@@ -93,6 +120,7 @@ exports.accept = async (req, res) => {
     const application = await Application.findById(req.params.id);
     if (!application) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
     if (!canManage(req.user, application)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+    if (!(await assertApplicationTenantAccessIfStaff(req, res, application, isStaff(req.user)))) return;
     const result = await workflow.acceptApplication({ applicationId: application._id, actorId: req.user._id, idempotencyKey: req.get('Idempotency-Key') });
     if (!result.idempotent) await notify({ recipient: result.application.applicant, type: 'real_estate_application_accepted', title: 'Dossier accepté', body: 'Votre dossier est accepté et le bien est temporairement réservé.', entityType: 'RealEstateReservation', entityId: result.reservation._id, dedupeKey: `reservation:${result.reservation._id}:created` });
     res.status(result.idempotent ? 200 : 201).json({ status: 'success', data: result });
@@ -103,6 +131,7 @@ exports.reject = async (req, res) => {
   const application = await Application.findById(req.params.id);
   if (!application) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
   if (!canManage(req.user, application)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+  if (!(await assertApplicationTenantAccessIfStaff(req, res, application, isStaff(req.user)))) return;
   if (!['submitted', 'under_review'].includes(application.status)) return res.status(409).json({ status: 'fail', code: 'INVALID_TRANSITION', message: 'Transition impossible.' });
   const reason = String(req.body.reason || '').trim();
   if (!reason) return res.status(400).json({ status: 'fail', code: 'REJECTION_REASON_REQUIRED', message: 'Le motif de rejet est requis.' });
@@ -123,19 +152,30 @@ exports.withdraw = async (req, res) => {
   res.json({ status: 'success', data: { application } });
 };
 
+// SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-02) — `getReservation`/
+// `cancelReservation` accordaient l'accès à TOUT staff, de n'importe quel
+// tenant, sans jamais appeler `assertApplicationTenantAccessIfStaff` —
+// contrairement à tous les endpoints sœurs `Application` de ce même
+// fichier. Même frontière canonique, appliquée UNIQUEMENT quand l'accès est
+// accordé via le statut staff (jamais pour le client/propriétaire, déjà
+// légitimés par leur propre identité).
 exports.getReservation = async (req, res) => {
   const reservation = await Reservation.findById(req.params.id).populate('property', 'title images status availability owner').populate('application');
   if (!reservation) return res.status(404).json({ status: 'fail', message: 'Réservation introuvable.' });
   const owner = reservation.property?.owner;
-  if (!isStaff(req.user) && String(reservation.client) !== String(req.user._id) && String(owner) !== String(req.user._id)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+  const isClientOrOwner = String(reservation.client) === String(req.user._id) || String(owner) === String(req.user._id);
+  if (!isStaff(req.user) && !isClientOrOwner) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+  if (!(await assertApplicationTenantAccessIfStaff(req, res, reservation.application, isStaff(req.user) && !isClientOrOwner))) return;
   res.json({ status: 'success', data: { reservation } });
 };
 
 exports.cancelReservation = async (req, res) => {
-  const reservation = await Reservation.findById(req.params.id).populate('property', 'owner');
+  const reservation = await Reservation.findById(req.params.id).populate('property', 'owner').populate('application');
   if (!reservation) return res.status(404).json({ status: 'fail', message: 'Réservation introuvable.' });
-  const allowed = isStaff(req.user) || String(reservation.client) === String(req.user._id) || String(reservation.property?.owner) === String(req.user._id);
+  const isClientOrOwner = String(reservation.client) === String(req.user._id) || String(reservation.property?.owner) === String(req.user._id);
+  const allowed = isStaff(req.user) || isClientOrOwner;
   if (!allowed) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+  if (!(await assertApplicationTenantAccessIfStaff(req, res, reservation.application, isStaff(req.user) && !isClientOrOwner))) return;
   if (isStaff(req.user) && !String(req.body.reason || '').trim()) return res.status(400).json({ status: 'fail', code: 'CANCELLATION_REASON_REQUIRED', message: 'Le motif est requis.' });
   const changed = await workflow.releaseReservation(reservation, { status: 'cancelled', actorId: req.user._id, reason: req.body.reason });
   if (changed) {
@@ -177,6 +217,7 @@ exports.downloadAttachment = async (req, res) => {
     const application = await loadApplicationWithPrivateFields(req.params.id);
     if (!application) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
     if (!canReadPrivate(req.user, application)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+    if (!(await assertApplicationTenantAccessIfStaff(req, res, application, isStaff(req.user)))) return;
     const attachment = application.attachments.id(req.params.attachmentId);
     if (!attachment) return res.status(404).json({ status: 'fail', message: 'Pièce introuvable.' });
     const buffer = await storage.readPrivateAttachment(attachment.storageKey);

@@ -1,10 +1,38 @@
 // server/controllers/litigeController.js
 const Litige   = require('../models/Litige');
 const User     = require('../models/User');
+const Property = require('../models/Property');
 const sendEmail = require('../utils/email');
 const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
-const { streamRemoteDocument } = require('./rentalDocumentController');
+const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
 const { ROLES_LITIGES } = require('../utils/roles');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-C, finding RA-07) — `Litige` n'a aucun
+// champ tenant direct ; `tenantResourceAttributionService` supporte déjà
+// nativement `resourceType: 'Litige'` via `bienConcerné` (Property). Jamais
+// utilisé jusqu'ici dans ce contrôleur (ni pour les listes, ni même pour les
+// accès unitaires `getLitige`/`downloadProof`).
+async function scopedPropertyIdsForTenant(req) {
+  if (!req.platformTenant) return null;
+  return Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+}
+
+// Ce fichier n'utilise pas `asyncHandler` (chaque handler a son propre
+// try/catch qui répond `500` sur toute exception) — cette fonction répond
+// donc elle-même et retourne `false` plutôt que de lever une erreur, pour
+// ne jamais laisser le catch générique du handler appelant écraser le 403/404
+// voulu par un 500.
+async function assertLitigeTenantAccess(req, res, litige) {
+  if (!req.platformTenant) return true;
+  try {
+    await assertResourceTenantOrUnattributed({ resourceType: 'Litige', resource: litige, tenantId: req.platformTenant._id });
+    return true;
+  } catch (error) {
+    res.status(error.statusCode || 404).json({ status: 'fail', message: 'Litige introuvable.' });
+    return false;
+  }
+}
 
 const ADMIN_EMAIL = process.env.ZOHO_FROM_EMAIL || 'contact@altitudevision.agency';
 
@@ -132,6 +160,9 @@ exports.getLitiges = async (req, res) => {
         { 'plaignant.userId': req.user._id },
         { 'accusé.userId':    req.user._id },
       ];
+    } else {
+      const scopedPropertyIds = await scopedPropertyIdsForTenant(req);
+      if (scopedPropertyIds) filter.bienConcerné = { $in: scopedPropertyIds };
     }
     if (statut)   filter.statut   = statut;
     if (priorité) filter.priorité = priorité;
@@ -156,10 +187,12 @@ exports.getLitiges = async (req, res) => {
 // ======================================================
 exports.getStats = async (req, res) => {
   try {
+    const scopedPropertyIds = await scopedPropertyIdsForTenant(req);
+    const matchStage = scopedPropertyIds ? [{ $match: { bienConcerné: { $in: scopedPropertyIds } } }] : [];
     const [byStatut, byType, byPriorité] = await Promise.all([
-      Litige.aggregate([{ $group: { _id: '$statut',   count: { $sum: 1 } } }]),
-      Litige.aggregate([{ $group: { _id: '$type',     count: { $sum: 1 } } }]),
-      Litige.aggregate([{ $group: { _id: '$priorité', count: { $sum: 1 } } }]),
+      Litige.aggregate([...matchStage, { $group: { _id: '$statut',   count: { $sum: 1 } } }]),
+      Litige.aggregate([...matchStage, { $group: { _id: '$type',     count: { $sum: 1 } } }]),
+      Litige.aggregate([...matchStage, { $group: { _id: '$priorité', count: { $sum: 1 } } }]),
     ]);
     const toMap = arr => arr.reduce((acc, v) => { acc[v._id] = v.count; return acc; }, {});
     res.json({ status: 'success', data: { byStatut: toMap(byStatut), byType: toMap(byType), byPriorité: toMap(byPriorité) } });
@@ -172,7 +205,11 @@ exports.getStats = async (req, res) => {
 // 4. COMPTEUR DES LITIGES NON CONSULTÉS PAR LE STAFF
 // ======================================================
 exports.getUnreadCount = async (req, res) => {
-  const unreadCount = await Litige.countDocuments({ staffViewedAt: null });
+  const scopedPropertyIds = await scopedPropertyIdsForTenant(req);
+  const unreadCount = await Litige.countDocuments({
+    staffViewedAt: null,
+    ...(scopedPropertyIds ? { bienConcerné: { $in: scopedPropertyIds } } : {}),
+  });
   res.json({ status: 'success', data: { unreadCount } });
 };
 
@@ -191,6 +228,7 @@ exports.getLitige = async (req, res) => {
     const isStaff = ROLES_LITIGES.includes(req.user?.role);
     const isPart  = litige.plaignant?.userId?.equals(req.user._id) || litige.accusé?.userId?.equals(req.user._id);
     if (!isStaff && !isPart) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+    if (isStaff && !(await assertLitigeTenantAccess(req, res, litige))) return;
 
     if (isStaff && !litige.staffViewedAt) {
       litige.staffViewedAt = new Date();
@@ -212,6 +250,7 @@ exports.downloadProof = async (req, res) => {
     const isStaff = ROLES_LITIGES.includes(req.user?.role);
     const isPart = litige.plaignant?.userId?.equals(req.user._id) || litige.accusé?.userId?.equals(req.user._id);
     if (!isStaff && !isPart) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+    if (isStaff && !(await assertLitigeTenantAccess(req, res, litige))) return;
 
     const proof = litige.preuves?.[Number(req.params.proofIndex)];
     if (!proof) return res.status(404).json({ status: 'fail', message: 'Preuve introuvable.' });
@@ -240,6 +279,10 @@ exports.updateStatut = async (req, res) => {
   try {
     const { statut, note } = req.body;
     if (!statut) return res.status(400).json({ status: 'fail', message: 'Statut requis.' });
+
+    const existing = await Litige.findById(req.params.id);
+    if (!existing) return res.status(404).json({ status: 'fail', message: 'Litige introuvable.' });
+    if (!(await assertLitigeTenantAccess(req, res, existing))) return;
 
     const litige = await Litige.findByIdAndUpdate(
       req.params.id,
@@ -283,6 +326,7 @@ exports.addMessage = async (req, res) => {
     const isAdmin = req.user?.role === 'Admin';
     const isPart  = litige.plaignant?.userId?.equals(req.user._id) || litige.accusé?.userId?.equals(req.user._id);
     if (!isAdmin && !isPart) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+    if (isAdmin && !(await assertLitigeTenantAccess(req, res, litige))) return;
 
     litige.timeline.push({ action: 'Message ajouté', auteur: req.user.name, role: req.user.role, note });
     litige.dateDerniereMaj = new Date();
@@ -301,6 +345,10 @@ exports.resolverLitige = async (req, res) => {
   try {
     const { decision } = req.body;
     if (!decision) return res.status(400).json({ status: 'fail', message: 'Décision requise.' });
+
+    const existingLitige = await Litige.findById(req.params.id);
+    if (!existingLitige) return res.status(404).json({ status: 'fail', message: 'Litige introuvable.' });
+    if (!(await assertLitigeTenantAccess(req, res, existingLitige))) return;
 
     const litige = await Litige.findByIdAndUpdate(
       req.params.id,

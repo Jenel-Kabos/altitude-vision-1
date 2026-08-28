@@ -418,7 +418,7 @@ const createProperty = asyncHandler(async (req, res, next) => {
  *
  * @returns {Promise<{properties: object[], total: number}>}
  */
-async function runPropertySearch({ query, isAdmin }) {
+async function runPropertySearch({ query, isAdmin, tenantId = null }) {
   const workingQuery = { ...query };
 
   // ── 1. Filtre de base passé directement à Property.find() ───────────────
@@ -430,7 +430,7 @@ async function runPropertySearch({ query, isAdmin }) {
   // déjà gérés ET tous les biens pouvant être pris en gestion, publiés ou
   // non, disponibles ou non. Seul le public (non-staff) reste restreint aux
   // annonces validées/disponibles/Altimmo.
-  const baseFilter = {};
+  const baseFilter = tenantId ? { tenant: tenantId } : {};
   if (!isAdmin) {
     baseFilter.availability = 'Disponible';
     baseFilter.statusAdmin  = 'Validée';
@@ -447,6 +447,8 @@ async function runPropertySearch({ query, isAdmin }) {
   delete workingQuery.isPublished;
   delete workingQuery.availability;
   delete workingQuery.pole;
+  // Le tenant est une frontière serveur, jamais un filtre contrôlé par la query HTTP.
+  delete workingQuery.tenant;
   // `accommodationType` n'a aucun sens sur Property (catégorie propre à Accommodation) —
   // silencieusement ignoré ici si un client le fournit avec offerType=vente/location/tous.
   delete workingQuery.accommodationType;
@@ -519,7 +521,8 @@ const getAllProperties = asyncHandler(async (req, res) => {
   const includeDashboardClassification = req.query.dashboardClassification === '1';
   const query = { ...req.query };
   delete query.dashboardClassification;
-  let { properties, total } = await runPropertySearch({ query, isAdmin });
+  const tenantId = isAdmin ? (req.platformTenant?._id || req.platformTenant || null) : null;
+  let { properties, total } = await runPropertySearch({ query, isAdmin, tenantId });
 
   if (includeDashboardClassification && properties.length) {
     const { classifyDashboardListing } = require('../services/moderationClassificationService');
@@ -559,7 +562,11 @@ const getPendingProperties = asyncHandler(async (req, res) => {
   logger.info('📡 [Admin] Récupération des annonces en attente...');
 
   const { classicPropertyModerationFilter } = require('../services/moderationClassificationService');
-  const properties = await Property.find(classicPropertyModerationFilter({ statusAdmin: 'En attente' }))
+  const tenantId = req.platformTenant?._id || req.platformTenant || null;
+  const properties = await Property.find(classicPropertyModerationFilter({
+    statusAdmin: 'En attente',
+    ...(tenantId ? { tenant: tenantId } : {}),
+  }))
     .populate('owner', 'name email photo role phone')
     .sort('-createdAt');
 
@@ -572,9 +579,13 @@ const getPendingProperties = asyncHandler(async (req, res) => {
   });
 });
 
-const getPendingPropertiesCount = asyncHandler(async (_req, res) => {
+const getPendingPropertiesCount = asyncHandler(async (req, res) => {
   const { classicPropertyModerationFilter } = require('../services/moderationClassificationService');
-  const unreadCount = await Property.countDocuments(classicPropertyModerationFilter({ statusAdmin: 'En attente' }));
+  const tenantId = req.platformTenant?._id || req.platformTenant || null;
+  const unreadCount = await Property.countDocuments(classicPropertyModerationFilter({
+    statusAdmin: 'En attente',
+    ...(tenantId ? { tenant: tenantId } : {}),
+  }));
   res.status(200).json({ status: 'success', data: { unreadCount } });
 });
 
@@ -1194,16 +1205,6 @@ module.exports = {
   toggleLike,
   incrementShare,
   addPropertyReview,
-  // Helpers réutilisés par accommodationController (création admin complète
-  // d'un hébergement) — évite de dupliquer la logique d'upload/parsing.
-  uploadFilesToCloudinary,
-  parseAmenities,
-  parseStringArray,
-  parseNonNegativeAmount,
-  parseAddress,
-  parseGeoLocation,
-  buildBasePropertyData,
-  parseNumericField,
   serializeSalePublic,
   serializeRentalPublic,
 };

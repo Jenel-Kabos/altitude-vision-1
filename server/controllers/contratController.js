@@ -14,35 +14,33 @@ const { ensureRentalManagementActive, syncLeaseOccupation } = require('../servic
 // changement de `statut` sur un bail (comportement inchangé pour les
 // contrats de vente, hors périmètre du cycle de vie locatif).
 const leaseLifecycle = require('../services/rentalLeaseLifecycleService');
+const { generatePaiements } = require('../services/rentalPaymentScheduleService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 
-// Génère les paiements mensuels pour un bail location
-const generatePaiements = async (contratId, dateEntree, dateFinBail, montantLoyer) => {
-  if (!dateEntree || !dateFinBail || !montantLoyer) return;
+// SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — même frontière
+// canonique que `router.param('id', …)` de contratRoutes.js (TENANT-CERT-2) :
+// `POST /` créait un Contrat sur `req.body.bien` sans jamais vérifier que
+// cette Property appartienne au tenant de l'acteur.
+async function assertPropertyTenantAccess(req, property) {
+  const explicitTenantId = req.get?.('X-Platform-Tenant-Id') || req.get?.('X-Tenant-Id') || null;
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
+  await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: tenant?._id });
+}
 
-  const start = new Date(dateEntree);
-  const end   = new Date(dateFinBail);
-  const rows  = [];
-
-  let cur = new Date(start.getFullYear(), start.getMonth(), 1);
-  const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
-
-  while (cur <= endMonth) {
-    rows.push({
-      contrat:  contratId,
-      mois:     cur.getMonth() + 1,
-      annee:    cur.getFullYear(),
-      montant:  montantLoyer,
-      statut:   'impayé',
-    });
-    cur.setMonth(cur.getMonth() + 1);
-  }
-
-  if (rows.length > 0) await Paiement.insertMany(rows);
-};
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-A, finding RA-04) — même relation
+// canonique que `paiementController.scopedContratIdsForTenant`
+// (SECURITY-CLOSURE-P0-WAVE-1) : `Contrat.bien.owner → OrgMembership`, pas
+// un champ `tenant` dénormalisé sur `Property`.
+async function scopedContratFilterForTenant(req) {
+  if (!req.platformTenant) return {};
+  const propertyIds = await Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+  return { bien: { $in: propertyIds } };
+}
 
 exports.getAll = async (req, res) => {
   try {
-    const filter = {};
+    const filter = await scopedContratFilterForTenant(req);
     if (req.query.statut) filter.statut = req.query.statut;
     if (req.query.type)   filter.type   = req.query.type;
 
@@ -78,6 +76,11 @@ exports.create = async (req, res) => {
     }
     const property = await Property.findById(req.body.bien).select('status statusAdmin availability owner price reservationLock');
     if (!property) return res.status(404).json({ status: 'fail', code: 'PROPERTY_NOT_FOUND', message: 'Bien introuvable.' });
+    try {
+      await assertPropertyTenantAccess(req, property);
+    } catch (error) {
+      return res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Bien introuvable.' });
+    }
     if (property.status !== req.body.type) {
       return res.status(409).json({ status: 'fail', code: 'CONTRACT_TYPE_MISMATCH', message: 'Le type de contrat ne correspond pas au bien.' });
     }
@@ -302,8 +305,3 @@ exports.createPaiement = async (req, res) => {
     res.status(400).json({ status: 'error', message: err.message });
   }
 };
-
-// GL-LIFE-1 — réutilisé par rentalLeaseRenewalService.js pour générer les
-// échéances futures d'un renouvellement (prolongation ou nouveau contrat
-// lié) sans dupliquer cette logique de calendrier.
-exports.generatePaiements = generatePaiements;

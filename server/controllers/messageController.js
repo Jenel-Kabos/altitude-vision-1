@@ -6,28 +6,15 @@ const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
-const { uploadPrivateAsset, readPrivateAsset, safePrivateDescriptor } = require('../services/storage/secureStorageService');
+const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
 const { getIO } = require('../socket');
 const { notify, notifyStaff } = require('../services/notificationService');
 const { ALL_STAFF } = require('../utils/roles');
 const logger = require('../utils/logger');
 const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
-const { streamRemoteDocument } = require('./rentalDocumentController');
-
-const serializeMessage = (value) => {
-    const data = value?.toObject ? value.toObject() : { ...value };
-    data.attachments = (data.attachments || []).map((attachment) => {
-        const { asset, url: legacyUrl, ...metadata } = attachment;
-        if (asset) return { ...metadata, ...safePrivateDescriptor(asset, {
-            previewEndpoint: `/api/messages/${data._id}/attachments/${attachment._id}`,
-            downloadEndpoint: `/api/messages/${data._id}/attachments/${attachment._id}?download=1`,
-        }) };
-        return { ...metadata, legacy: true, previewEndpoint: `/api/messages/${data._id}/attachments/${attachment._id}`,
-            downloadEndpoint: `/api/messages/${data._id}/attachments/${attachment._id}?download=1`, canPreview: Boolean(legacyUrl), canDownload: Boolean(legacyUrl) };
-    });
-    return data;
-};
-exports.serializeMessage = serializeMessage;
+const { assertConversationAccess } = require('../services/messagingAuthorizationService');
+const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
+const { serializeMessage } = require('../services/messageSerializer');
 
 /**
  * @description Envoyer un message dans une conversation
@@ -95,23 +82,15 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             res.status(404);
             throw new Error('Conversation non trouvée.');
         }
-        // POST-E2E-1 — un client sans tenant propre (cas normal, jamais
-        // membre d'une organisation) ne doit pas être bloqué par cette
-        // frontière tenant, qui ne sert qu'à isoler plusieurs tenants entre
-        // eux (jamais une protection pour un client). Ce garde ne retire
-        // AUCUNE vérification existante — voir conversationController.js
-        // pour le même raisonnement.
-        // HOTFIX-MSG-STAFF-INBOX-1 — `assertResourceTenantOrUnattributed`
-        // (pas la variante stricte) : une conversation `tenant: null` (créée
-        // sans `propertyId`, cas générique « Contacter l'agence ») n'a aucune
-        // attribution tenant possible — la bloquer ici empêchait le STAFF de
-        // répondre à une conversation pourtant visible dans son inbox après
-        // correction du filtre de listing (conversationController.js). Une
-        // conversation réellement attribuée à un AUTRE tenant continue d'être
-        // rejetée, isolation inchangée.
-        if (req.platformTenant) {
-            await assertResourceTenantOrUnattributed({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
-        }
+        // SECURITY-CLOSURE-P0-WAVE-1 (P0-A, finding RA-01) — l'ancienne
+        // vérification tenant-seule (POST-E2E-1/HOTFIX-MSG-STAFF-INBOX-1,
+        // conservée en commentaire pour l'historique) n'avait aucun effet
+        // pour un Client/Proprietaire (jamais de `req.platformTenant`) et ne
+        // vérifiait jamais que l'appelant soit réellement participant ou
+        // staff de CETTE conversation — même autorité canonique que
+        // `getMessages` (HOTFIX-MESSAGING-MESSAGE-READ-AUTHORITY-1),
+        // réutilisée ici verbatim, jamais une nouvelle politique.
+        await assertConversationAccess(req, convDoc);
 
         if (convDoc.isStaffInbox) {
             // CAS 2 : boîte partagée staff
@@ -308,11 +287,16 @@ exports.getMessages = asyncHandler(async (req, res) => {
   let otherUserId = conversationId;
   const convDoc = await Conversation.findById(conversationId);
   if (convDoc) {
-    // POST-E2E-1 — voir sendMessage plus haut : un client sans tenant propre
-    // ne doit pas être bloqué par cette frontière tenant.
-    if (req.platformTenant) {
-      await assertResourceTenantOrUnattributed({ resourceType: 'Conversation', resource: convDoc, tenantId: req.platformTenant._id });
-    }
+    // HOTFIX-MESSAGING-MESSAGE-READ-AUTHORITY-1 — remplace l'ancienne
+    // vérification tenant-seule (`if (req.platformTenant) { assertResourceTenantOrUnattributed }`)
+    // par l'autorité Messaging canonique déjà utilisée par 4 fonctions de
+    // `conversationController.js` (tenant inchangé + isStaff OU participant
+    // réel) — voir HOTFIX_MESSAGING_MESSAGE_READ_AUTHORITY1_EXISTING_CONTRACT.md.
+    // Sans cette vérification, n'importe quel utilisateur authentifié
+    // connaissant un `conversationId` pouvait lire l'intégralité d'une
+    // conversation étrangère (P0 confirmé, voir
+    // MESSAGING_MESSAGE_READ_AUTHORITY_ASSESSMENT1_REPRODUCTION.md).
+    await assertConversationAccess(req, convDoc);
     const otherParticipant = convDoc.participants.find(
       (p) => p.toString() !== req.user.id.toString()
     );

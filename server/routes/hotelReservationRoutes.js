@@ -11,7 +11,7 @@ const express = require('express');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/hotelReservationController');
 const { ROLES_ALTIMMO } = require('../utils/roles');
-const { attachTenantContext } = require('../middleware/tenantContext');
+const { attachTenantContext, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
 
 const router = express.Router();
 router.use(auth.protect);
@@ -31,8 +31,8 @@ router.get('/owner', ctrl.ownerList);
 router.post('/owner', ctrl.ownerCreate);
 
 // Administration — littéral, avant /:id.
-router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), ctrl.listAdmin);
-router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), ctrl.pending);
+router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, ctrl.listAdmin);
+router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, ctrl.pending);
 
 // Actions nommées à 2 segments — avant le fallback générique /:id.
 router.patch('/:id/cancel', ctrl.cancel);

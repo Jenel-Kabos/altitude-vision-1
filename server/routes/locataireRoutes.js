@@ -4,7 +4,7 @@ const router     = express.Router();
 const auth       = require('../controllers/authController');
 const ctrl       = require('../controllers/locataireController');
 const { upload } = require('../config/cloudinary');
-const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireTenantScope, requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/tenantContext');
 // PLATFORM-ADMIN-CERT-1 — vulnérabilité V2 corrigée : seule la route
 // `identity-document` vérifiait le tenant. `GET /`, `GET/PUT/DELETE /:id`
 // n'avaient AUCUNE frontière — un Admin/staff d'un tenant pouvait consulter/
@@ -49,17 +49,23 @@ async function assertLocataireInScope(req, res, next) {
   }
 }
 
-router.get('/', readTenants, ctrl.getAll);
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-J, finding RA-15) — `GET /` et
+// `GET /dossiers` n'appliquaient aucune frontière tenant, contrairement aux
+// routes `:id` protégées par `assertLocataireInScope`.
+router.get('/', readTenants, requireTenantScopeForStaffOrPlatformOperator, ctrl.getAll);
 // Sprint GL-B2 — littéraux/2-segments AVANT le fallback générique /:id
 // (convention de routage déjà établie dans ce projet, voir hotelRoutes.js).
-router.get('/dossiers', readTenants, ctrl.listDossiers);
+router.get('/dossiers', readTenants, requireTenantScopeForStaffOrPlatformOperator, ctrl.listDossiers);
 // Dette technique GL-B2 — liaison User ↔ Locataire (Missions 1 & 3),
 // littéraux avant /:id également.
 router.get('/link-requests', readTenants, ctrl.listLinkRequests);
 router.patch('/link-requests/:requestId/review', manageTenants, ctrl.reviewLinkRequest);
 router.patch('/invitations/:requestId/cancel', manageTenants, ctrl.cancelInvitation);
 router.post('/invitations/:requestId/resend', manageTenants, ctrl.resendInvitation);
-router.get('/:id/dossier', readTenants, ctrl.getDossier);
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-J, finding RA-15) — cette route n'était pas
+// enveloppée par `assertLocataireInScope`, contrairement à ses routes
+// sœurs `:id` (GET/PUT/DELETE) ci-dessous.
+router.get('/:id/dossier', readTenants, assertLocataireInScope, ctrl.getDossier);
 router.get('/:id/identity-document', requireTenantScope, requireCapability('tenants.read'), ctrl.downloadIdentityDocument);
 router.post('/:id/invite', manageTenants, ctrl.invite);
 router.get('/:id', readTenants, assertLocataireInScope, ctrl.getOne);

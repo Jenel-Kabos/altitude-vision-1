@@ -2,6 +2,8 @@
 
 const express = require('express');
 const router = express.Router();
+const auth = require('../controllers/authController');
+const { ROLES_DOCS } = require('../utils/roles');
 const {
   getAllEmails,
   getActiveEmails,
@@ -18,6 +20,16 @@ const {
   sendEmailViaZoho,
   syncWithZoho
 } = require('../controllers/emailController');
+
+// HOTFIX-INBOX-SECURITY-1 — ce routeur ne portait aucune authentification
+// (aucun `protect` ici, aucune protection globale dans server.js — chaque
+// routeur applique la sienne dans ce projet, jamais une couche commune).
+// Politique dérivée de la preuve existante, pas inventée : le seul
+// consommateur (`client/lib/services/emailService.js`, `ManageEmailsPage.jsx`
+// sur /dashboard/emails) est déjà gaté côté menu par `ROLES_DOCS`
+// (`AdminDashboard.jsx`, NAV_SECTIONS) — voir
+// server/docs/HOTFIX_INBOX_SECURITY1_ETAT_INITIAL.md.
+router.use(auth.protect, auth.restrictTo(...ROLES_DOCS));
 
 // ⚠️ IMPORTANT : Les routes spécifiques DOIVENT être déclarées
 // AVANT les routes avec paramètres dynamiques (/:id)

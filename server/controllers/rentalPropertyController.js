@@ -15,8 +15,18 @@ const { logAction, buildAuteur } = require('../services/actionLogService');
 const {
   uploadFilesToCloudinary, parseAmenities, parseAddress, parseGeoLocation, parseStringArray,
   parseNonNegativeAmount, buildBasePropertyData, parseNumericField,
-} = require('./propertyController');
+} = require('../services/propertyPublicationInputService');
 const { destroyFromCloudinary } = require('../config/cloudinary');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-F, finding RA-11) — même correctif que
+// salePropertyController.updateFull (racine identique, même Sprint A).
+async function assertStaffPropertyTenantAccess(req, property) {
+  const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
+  await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: tenant?._id });
+}
 
 const fail = (res, statusCode, message, extra = {}) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...extra });
@@ -192,6 +202,13 @@ exports.updateFull = async (req, res) => {
     const isOwnerActor = req.user.role === 'Proprietaire';
     if (isOwnerActor && (!property.owner || property.owner.toString() !== req.user.id.toString())) {
       return fail(res, 403, 'Vous ne pouvez modifier que vos propres biens.');
+    }
+    if (!isOwnerActor) {
+      try {
+        await assertStaffPropertyTenantAccess(req, property);
+      } catch (error) {
+        return fail(res, error.statusCode || 403, error.message);
+      }
     }
 
     let rentalData;

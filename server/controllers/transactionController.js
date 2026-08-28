@@ -7,6 +7,44 @@ const { ALL_STAFF } = require('../utils/roles');
 const { finalizeRealEstateTransaction } = require('../services/finance/realEstateTransactionFinalizationService');
 const RealEstateReservation = require('../models/RealEstateReservation');
 const { releaseReservation } = require('../services/realEstateApplicationService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-I, finding RA-14) — `Transaction` n'a
+// aucun champ tenant direct ; `tenantResourceAttributionService` supporte
+// déjà nativement `resourceType: 'Transaction'` via `property` (jamais
+// utilisé jusqu'ici). Réutilisé pour les listes (via `Property.owner` en
+// scope, fail-closed via `requireTenantScopeForStaffOrPlatformOperator`
+// route-level) et pour les accès/mutations unitaires (staff uniquement —
+// jamais pour le client propriétaire de sa propre transaction).
+//
+// IMPORTANT (leçon P0-C/encaisserMultiple) — les accès/mutations UNITAIRES
+// résolvent le tenant EUX-MÊMES via `resolveTenantForUser` (tolérant : un
+// acteur sans AUCUN tenant reste autorisé sur une Transaction dont la
+// Property est elle-même non attribuée/legacy, exactement comme
+// `assertResourceTenantOrUnattributed` le permet déjà pour les routes `:id`
+// de paiementRoutes.js/contratRoutes.js) plutôt que de dépendre d'un garde
+// de route fail-closed (`requireTenantScopeForStaffOrPlatformOperator`),
+// qui bloquerait à tort un staff sans tenant agissant sur une ressource
+// legacy non attribuée — reproduit par
+// `transactionCancellationReleasesReservation.mongo.integration.test.js`.
+async function scopedPropertyIdsForTenant(req) {
+  if (!req.platformTenant) return null;
+  return Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+}
+
+async function assertTransactionTenantAccessIfStaff(req, res, tx, isStaffGranted) {
+  if (!isStaffGranted) return true;
+  const explicitTenantId = req.get?.('X-Platform-Tenant-Id') || req.get?.('X-Tenant-Id') || null;
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
+  try {
+    await assertResourceTenantOrUnattributed({ resourceType: 'Transaction', resource: tx, tenantId: tenant?._id });
+    return true;
+  } catch (error) {
+    res.status(error.statusCode || 404).json({ status: 'fail', message: 'Transaction introuvable.' });
+    return false;
+  }
+}
 
 const calcCommission = (finalAmount, tauxPercent = 10, hasSpecial = false) => {
   const total       = Math.round(finalAmount * (tauxPercent / 100));
@@ -96,7 +134,8 @@ exports.getAllTransactions = async (req, res) => {
     const { status, transactionType } = req.query;
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
-    const filter = {};
+    const scopedPropertyIds = await scopedPropertyIdsForTenant(req);
+    const filter = scopedPropertyIds ? { property: { $in: scopedPropertyIds } } : {};
     if (status)          filter.status          = status;
     if (transactionType) filter.transactionType = transactionType;
 
@@ -151,6 +190,7 @@ exports.getTransaction = async (req, res) => {
     const isOwner = tx.client._id.toString() === req.user._id.toString();
     const isStaff = ALL_STAFF.includes(req.user.role);
     if (!isOwner && !isStaff) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+    if (!(await assertTransactionTenantAccessIfStaff(req, res, tx, isStaff && !isOwner))) return;
 
     res.json({ status: 'success', data: { transaction: tx } });
   } catch (err) {
@@ -161,6 +201,9 @@ exports.getTransaction = async (req, res) => {
 // POST /api/transactions/:id/finalize
 exports.finalizeTransaction = async (req, res) => {
   try {
+    const existingTx = await Transaction.findById(req.params.id);
+    if (!existingTx) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
+    if (!(await assertTransactionTenantAccessIfStaff(req, res, existingTx, true))) return;
     const result = await finalizeRealEstateTransaction({ transactionId: req.params.id, actorId: req.user.id || req.user._id, tauxCommission: req.body.tauxCommission, transactionMode: 'auto' });
     const tx = await Transaction.findById(result.transaction._id).populate('property');
 
@@ -185,6 +228,7 @@ exports.cancelTransaction = async (req, res) => {
     const { raison } = req.body;
     const tx = await Transaction.findById(req.params.id).populate('property', 'title');
     if (!tx) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
+    if (!(await assertTransactionTenantAccessIfStaff(req, res, tx, true))) return;
     if (tx.status === 'Réussie') return res.status(400).json({ status: 'fail', message: "Impossible d'annuler une transaction finalisée." });
     if (tx.status === 'Annulée') return res.status(400).json({ status: 'fail', message: 'Déjà annulée.' });
 
@@ -219,8 +263,10 @@ exports.cancelTransaction = async (req, res) => {
 // PATCH /api/transactions/:id/notes
 exports.updateNotes = async (req, res) => {
   try {
+    const existingTx = await Transaction.findById(req.params.id);
+    if (!existingTx) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
+    if (!(await assertTransactionTenantAccessIfStaff(req, res, existingTx, true))) return;
     const tx = await Transaction.findByIdAndUpdate(req.params.id, { notes: req.body.notes }, { new: true });
-    if (!tx) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
     res.json({ status: 'success', data: { transaction: tx } });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
@@ -230,10 +276,13 @@ exports.updateNotes = async (req, res) => {
 // GET /api/transactions/stats
 exports.getStats = async (req, res) => {
   try {
+    const scopedPropertyIds = await scopedPropertyIdsForTenant(req);
+    const scopeMatch = scopedPropertyIds ? [{ $match: { property: { $in: scopedPropertyIds } } }] : [];
     const [byStatus, byType, totaux] = await Promise.all([
-      Transaction.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-      Transaction.aggregate([{ $group: { _id: '$transactionType', count: { $sum: 1 } } }]),
+      Transaction.aggregate([...scopeMatch, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Transaction.aggregate([...scopeMatch, { $group: { _id: '$transactionType', count: { $sum: 1 } } }]),
       Transaction.aggregate([
+        ...scopeMatch,
         { $match: { status: 'Réussie' } },
         { $group: {
           _id: null,

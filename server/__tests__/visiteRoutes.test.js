@@ -14,6 +14,16 @@ jest.mock('../services/notificationService', () => ({
   notify: jest.fn().mockResolvedValue(),
   notifyStaff: jest.fn().mockResolvedValue(),
 }));
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-B) — `requireTenantScopeForStaffOrPlatformOperator`
+// est désormais sur ces routes ; sans ce mock, la résolution tenant réelle
+// (OrgMembership/PlatformTenant, non mockés dans ce test unitaire) attend
+// indéfiniment une connexion Mongo absente ici (timeout Jest), même
+// convention que rentalDossiersRoutes.test.js.
+jest.mock('../services/platformTenant/tenantContextService', () => ({
+  resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),
+  resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' }),
+  resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set(['507f1f77bcf86cd799439011']) }),
+}));
 
 const request  = require('supertest');
 const jwt      = require('jsonwebtoken');
@@ -21,6 +31,8 @@ const { app }  = require('../server');
 const Visite   = require('../models/Visite');
 const Property = require('../models/Property');
 const User     = require('../models/User');
+
+Property.find = jest.fn().mockReturnValue({ distinct: jest.fn().mockResolvedValue([]) });
 
 const OWNER_ID  = '507f1f77bcf86cd799439011';
 const CLIENT_ID = '507f1f77bcf86cd799439012';
@@ -252,7 +264,14 @@ describe('GET /api/visites — visibilité dashboard', () => {
       .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
 
     expect(res.statusCode).toBe(200);
-    expect(Visite.find).toHaveBeenCalledWith();
+    // SECURITY-CLOSURE-P1-WAVE-1 (P1-B) — `Visite.find` reçoit désormais un
+    // filtre de scope tenant (légitime, RA-06) ; l'intention historique de
+    // ce test (documentée par son titre) est seulement l'ABSENCE d'un
+    // filtre par source mobile/web, jamais l'absence de tout argument.
+    expect(Visite.find).toHaveBeenCalled();
+    const calledWithFilter = Visite.find.mock.calls[0][0] || {};
+    expect(calledWithFilter).not.toHaveProperty('source');
+    expect(calledWithFilter).not.toHaveProperty('platform');
   });
 });
 

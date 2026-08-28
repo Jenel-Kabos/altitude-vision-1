@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Visite   = require('../models/Visite');
 const User     = require('../models/User');
 const Property = require('../models/Property');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { notify, notifyStaff } = require('../services/notificationService');
 const yabetooService = require('../services/yabetooService');
 const mongoose = require('mongoose');
@@ -27,6 +28,32 @@ const assertObjectId = (id, res) => {
     throw new Error('Identifiant de rendez-vous invalide.');
   }
 };
+
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-B, finding RA-06) — `Visite.tenant` existe
+// dans le schéma mais n'est JAMAIS peuplé nulle part dans ce contrôleur
+// (vérifié par recherche exhaustive) : l'utiliser tel quel filtrerait TOUTES
+// les visites au lieu de les scoper correctement. La frontière canonique
+// réelle est dérivée via `Visite.property` (Property) -> `owner` ->
+// OrgMembership, même relation que Locataire/Proprietaire/Contrat —
+// `tenantResourceAttributionService` supporte déjà nativement
+// `resourceType: 'Visite'`.
+async function scopedPropertyIdsForTenant(req) {
+  if (!req.platformTenant) return null;
+  return Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+}
+
+// `res` positionné AVANT le throw (même convention qu'`assertObjectId`
+// ci-dessus) : errorMiddleware.js dérive son statusCode de `res.statusCode`,
+// jamais de `err.statusCode`.
+async function assertVisitePropertyInScope(req, res, visite) {
+  if (!req.platformTenant) return;
+  try {
+    await assertResourceTenantOrUnattributed({ resourceType: 'Visite', resource: visite, tenantId: req.platformTenant._id });
+  } catch (error) {
+    res.status(error.statusCode || 404);
+    throw new Error('Visite non trouvée.');
+  }
+}
 const buildRequestedStart = (body) => {
   if (body.requestedDate) return new Date(body.requestedDate);
   if (!body.datePreferee) return null;
@@ -307,8 +334,10 @@ exports.getMyVisites = asyncHandler(async (req, res) => {
 exports.getAllVisites = asyncHandler(async (req, res) => {
   // La liste staff est la vue détaillée disponible dans ce module : la
   // consultation est distincte du statut « En attente » du rendez-vous.
-  await Visite.updateMany({ staffViewedAt: null }, { $set: { staffViewedAt: new Date() } });
-  const visites = await Visite.find()
+  const scopedPropertyIds = await scopedPropertyIdsForTenant(req);
+  const scopeFilter = scopedPropertyIds ? { property: { $in: scopedPropertyIds } } : {};
+  await Visite.updateMany({ ...scopeFilter, staffViewedAt: null }, { $set: { staffViewedAt: new Date() } });
+  const visites = await Visite.find(scopeFilter)
     .populate({
       path: 'property',
       select: 'title images address availability honoraires fraisVisite price status owner latitude longitude',
@@ -329,8 +358,12 @@ exports.getAllVisites = asyncHandler(async (req, res) => {
   });
 });
 
-exports.getUnreadCount = asyncHandler(async (_req, res) => {
-  const unreadCount = await Visite.countDocuments({ staffViewedAt: null });
+exports.getUnreadCount = asyncHandler(async (req, res) => {
+  const scopedPropertyIds = await scopedPropertyIdsForTenant(req);
+  const unreadCount = await Visite.countDocuments({
+    staffViewedAt: null,
+    ...(scopedPropertyIds ? { property: { $in: scopedPropertyIds } } : {}),
+  });
   res.status(200).json({ status: 'success', data: { unreadCount } });
 });
 
@@ -345,6 +378,7 @@ exports.updateVisite = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Visite non trouvée.');
   }
+  await assertVisitePropertyInScope(req, res, visite);
 
   const { dateProposee, dateConfirmee, statut, status, notes, scheduledStartAt,
     scheduledEndAt, meetingAddressSnapshot, coordinatesSnapshot, assignedAgent,
@@ -600,16 +634,18 @@ exports.ownerAction = asyncHandler(async (req, res) => {
 exports.updatePaiementVisite = asyncHandler(async (req, res) => {
   const { paiementStatus, paiementRef } = req.body;
 
+  const existing = await Visite.findById(req.params.id);
+  if (!existing) {
+    res.status(404);
+    throw new Error('Visite non trouvée.');
+  }
+  await assertVisitePropertyInScope(req, res, existing);
+
   const visite = await Visite.findByIdAndUpdate(
     req.params.id,
     { paiementStatus, paiementRef },
     { new: true, runValidators: true },
   );
-
-  if (!visite) {
-    res.status(404);
-    throw new Error('Visite non trouvée.');
-  }
 
   // Notifie le client si paiement confirmé
   if (paiementStatus === 'payé') {
@@ -631,7 +667,11 @@ exports.updatePaiementVisite = asyncHandler(async (req, res) => {
 // GET /api/visites/all-payments — staff : toutes les visites avec paiement requis
 // ─────────────────────────────────────────────
 exports.getAllPayments = asyncHandler(async (req, res) => {
-  const visites = await Visite.find({ paiementStatus: { $ne: 'non_requis' } })
+  const scopedPropertyIds = await scopedPropertyIdsForTenant(req);
+  const visites = await Visite.find({
+    paiementStatus: { $ne: 'non_requis' },
+    ...(scopedPropertyIds ? { property: { $in: scopedPropertyIds } } : {}),
+  })
     .populate('client', 'name email phone')
     .populate({
       path: 'property',

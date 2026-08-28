@@ -6,6 +6,16 @@ jest.mock('../models/RealEstateReservation');
 jest.mock('../services/notificationService', () => ({ notify: jest.fn(), notifyStaff: jest.fn() }));
 jest.mock('../services/actionLogService', () => ({ logAction: jest.fn(), buildAuteur: jest.fn() }));
 jest.mock('../services/finance/realEstateTransactionFinalizationService', () => ({ finalizeRealEstateTransaction: jest.fn() }));
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-I) — `finalizeTransaction`/`cancelTransaction`/
+// `updateNotes` résolvent désormais le tenant de l'acteur (staff) avant de
+// déléguer ; sans ce mock, la résolution réelle (non mockée ici) attend
+// indéfiniment une connexion Mongo absente dans ce test unitaire.
+jest.mock('../services/platformTenant/tenantContextService', () => ({
+  resolveTenantForUser: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
+  assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'unresolved' }),
+}));
 
 const Property = require('../models/Property');
 const Transaction = require('../models/Transaction');
@@ -27,6 +37,10 @@ describe('transactionController — garde de finalisation', () => {
 
   test('refuse de finaliser tant que le paiement n’est pas confirmé', async () => {
     const tx = { _id: '507f1f77bcf86cd799439011', status: 'Paiement en attente', paymentStatus: 'en_attente' };
+    // SECURITY-CLOSURE-P1-WAVE-1 (P1-I) — `finalizeTransaction` charge
+    // désormais la Transaction avant de déléguer au service, pour vérifier
+    // l'autorité tenant (staff uniquement) AVANT toute finalisation.
+    Transaction.findById.mockResolvedValue(tx);
     finalizeRealEstateTransaction.mockRejectedValue(Object.assign(new Error('Le paiement doit être confirmé avant la finalisation.'), { code: 'PAYMENT_NOT_CONFIRMED', statusCode: 409 }));
     const res = response();
 

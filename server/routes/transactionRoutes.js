@@ -5,6 +5,13 @@ const ctrl    = require('../controllers/transactionController');
 const pCtrl   = require('../controllers/paiementTransactionController');
 const { upload } = require('../config/cloudinary');
 const { STAFF_DOC } = require('../utils/roles');
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-I, finding RA-14) — utilisé UNIQUEMENT sur
+// les listes (`/`, `/stats`), où le fail-closed est correct (pas de notion
+// « ressource non attribuée » possible sur une liste). Les routes `:id`
+// résolvent le tenant elles-mêmes dans le contrôleur, avec la tolérance
+// « non attribué » déjà appliquée ailleurs (voir bandeau de
+// transactionController.js — leçon P0-C/encaisserMultiple).
+const { requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/tenantContext');
 
 const protect   = auth.protect;
 const staffOnly = [auth.protect, auth.restrictTo(...STAFF_DOC)];
@@ -15,13 +22,13 @@ router.post('/webhook/cinetpay', pCtrl.webhookCinetpay); // legacy — conservé
 router.post('/paiements/webhook', pCtrl.webhookYabetoo);
 
 // Stats (staff)
-router.get('/stats', staffOnly, ctrl.getStats);
+router.get('/stats', staffOnly, requireTenantScopeForStaffOrPlatformOperator, ctrl.getStats);
 
 // Client : ses transactions
 router.get('/my', protect, ctrl.getMyTransactions);
 
 // Staff : toutes les transactions
-router.get('/',    staffOnly, ctrl.getAllTransactions);
+router.get('/',    staffOnly, requireTenantScopeForStaffOrPlatformOperator, ctrl.getAllTransactions);
 router.post('/',   staffOnly, ctrl.createTransaction);
 
 // Transaction unique

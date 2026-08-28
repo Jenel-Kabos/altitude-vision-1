@@ -1,16 +1,17 @@
 const router = require('express').Router();
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/accommodationReservationController');
+const { requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
 
 router.use(auth.protect);
 router.post('/', ctrl.create);
-router.get('/', ctrl.list);
+router.get('/', requireTenantScopeForStaffAllowPlatformWide, ctrl.list);
 router.get('/:id', ctrl.getOne);
-router.post('/:id/confirm', ctrl.transition('confirmed'));
-router.post('/:id/cancel', ctrl.transition('cancelled'));
-router.post('/:id/check-in', ctrl.transition('checked_in'));
-router.post('/:id/check-out', ctrl.transition('checked_out'));
-router.post('/:id/no-show', ctrl.transition('no_show'));
+router.post('/:id/confirm', requireTenantScopeForStaffAllowPlatformWide, ctrl.transition('confirmed'));
+router.post('/:id/cancel', requireTenantScopeForStaffAllowPlatformWide, ctrl.transition('cancelled'));
+router.post('/:id/check-in', requireTenantScopeForStaffAllowPlatformWide, ctrl.transition('checked_in'));
+router.post('/:id/check-out', requireTenantScopeForStaffAllowPlatformWide, ctrl.transition('checked_out'));
+router.post('/:id/no-show', requireTenantScopeForStaffAllowPlatformWide, ctrl.transition('no_show'));
 router.get('/:id/financial-summary', ctrl.financialSummary);
 router.post('/:id/payments', ctrl.createPayment);
 router.post('/payments/:paymentId/confirm', ctrl.confirmPayment);

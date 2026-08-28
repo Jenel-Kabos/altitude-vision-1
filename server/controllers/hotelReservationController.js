@@ -529,7 +529,8 @@ exports.checkoutFinancialReadiness = async (req, res) => {
 exports.listAdmin = async (req, res) => {
   try {
     const { hotelId, status, search, page = 1, limit = 20 } = req.query;
-    const query = {};
+    const tenantId = req.platformTenant?._id || req.platformTenant || null;
+    const query = tenantId ? { tenant: tenantId } : {};
     if (hotelId) query.hotel = hotelId;
     if (status) query.status = status;
     if (search) query.reference = new RegExp(search, 'i');
@@ -550,7 +551,11 @@ exports.listAdmin = async (req, res) => {
 
 exports.pending = async (req, res) => {
   try {
-    const reservations = await HotelReservation.find({ status: 'pending' })
+    const tenantId = req.platformTenant?._id || req.platformTenant || null;
+    const reservations = await HotelReservation.find({
+      status: 'pending',
+      ...(tenantId ? { tenant: tenantId } : {}),
+    })
       .populate('hotel', 'name manager')
       .populate('roomCategory', 'name')
       .sort({ createdAt: 1 });

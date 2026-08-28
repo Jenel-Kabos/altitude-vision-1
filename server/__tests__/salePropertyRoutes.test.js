@@ -19,6 +19,16 @@ jest.mock('../config/cloudinary', () => ({
   ...jest.requireActual('../config/cloudinary'),
   destroyFromCloudinary: jest.fn().mockResolvedValue(),
 }));
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-F) — `updateFull` (staff) appelle
+// désormais `assertStaffPropertyTenantAccess` ; sans ce mock, la résolution
+// tenant réelle (non mockée dans ce test unitaire) attend indéfiniment une
+// connexion Mongo absente ici (timeout Jest).
+jest.mock('../services/platformTenant/tenantContextService', () => ({
+  resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001' }),
+}));
+jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
+  assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
+}));
 
 const request = require('supertest');
 const jwt = require('jsonwebtoken');

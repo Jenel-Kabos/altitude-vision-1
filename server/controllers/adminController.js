@@ -8,6 +8,26 @@ const Property = require('../models/Property');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const userKpiService = require('../services/userKpiService'); // USER-KPI-1
+// SECURITY-CLOSURE-P0-WAVE-1 (P0-E, finding RA-09) — ce fichier duplique un
+// flux de modération Property jamais aligné sur TENANT-CERT-2
+// (propertyController.js) : `getAllProperties`/`getPendingProperties`
+// n'appliquaient aucun filtre tenant, et `approveProperty`/`rejectProperty`/
+// `deleteProperty` ne vérifiaient aucune frontière avant de muter/supprimer
+// un Property par ObjectId arbitraire. Réutilise directement les mêmes
+// primitives déjà canoniques (assertResourceTenantOrUnattributed +
+// resolveTenantForUser), sans importer propertyController.js (éviterait un
+// nouvel edge controller→controller suivi par architecture:check).
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+
+async function assertAdminPropertyTenantAccess(req, res, property) {
+  if (!req.platformTenant) return; // PlatformOperator en mode plateforme (allowPlatformWide) — aucun scope à imposer.
+  try {
+    await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: req.platformTenant._id });
+  } catch (error) {
+    res.status(error.statusCode || 403);
+    throw error;
+  }
+}
 
 /* ============================================================
    📊 DASHBOARD ADMIN – STATISTIQUES GLOBALES
@@ -208,7 +228,7 @@ exports.deleteUser = catchAsync(async (req, res, next) => {
 
 // 🔹 Récupérer toutes les propriétés
 exports.getAllProperties = catchAsync(async (req, res) => {
-    const properties = await Property.find()
+    const properties = await Property.find(req.platformTenant ? { tenant: req.platformTenant._id } : {})
         .populate('owner', 'name email photo phone')
         .sort('-createdAt');
 
@@ -221,7 +241,10 @@ exports.getAllProperties = catchAsync(async (req, res) => {
 
 // 🔹 Récupérer les propriétés en attente
 exports.getPendingProperties = catchAsync(async (req, res) => {
-    const properties = await Property.find({ adminStatus: 'pending' })
+    const properties = await Property.find({
+        adminStatus: 'pending',
+        ...(req.platformTenant ? { tenant: req.platformTenant._id } : {}),
+    })
         .populate('owner', 'name email photo phone')
         .sort('-createdAt');
 
@@ -236,6 +259,7 @@ exports.getPendingProperties = catchAsync(async (req, res) => {
 exports.approveProperty = catchAsync(async (req, res, next) => {
     const property = await Property.findById(req.params.id);
     if (!property) return next(new AppError('Propriété non trouvée.', 404));
+    await assertAdminPropertyTenantAccess(req, res, property);
 
     property.adminStatus = 'approved';
     await property.save({ validateBeforeSave: false });
@@ -251,6 +275,7 @@ exports.approveProperty = catchAsync(async (req, res, next) => {
 exports.rejectProperty = catchAsync(async (req, res, next) => {
     const property = await Property.findById(req.params.id);
     if (!property) return next(new AppError('Propriété non trouvée.', 404));
+    await assertAdminPropertyTenantAccess(req, res, property);
 
     property.adminStatus = 'rejected';
     await property.save({ validateBeforeSave: false });
@@ -264,8 +289,11 @@ exports.rejectProperty = catchAsync(async (req, res, next) => {
 
 // 🔹 Supprimer une propriété
 exports.deleteProperty = catchAsync(async (req, res, next) => {
-    const property = await Property.findByIdAndDelete(req.params.id);
+    const property = await Property.findById(req.params.id);
     if (!property) return next(new AppError('Propriété non trouvée.', 404));
+    await assertAdminPropertyTenantAccess(req, res, property);
+
+    await Property.findByIdAndDelete(req.params.id);
 
     res.status(204).json({
         status: 'success',

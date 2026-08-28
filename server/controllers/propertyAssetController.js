@@ -14,6 +14,8 @@ const { getMaintenanceLogbook } = require('../services/propertyMaintenanceLogboo
 const { computeValuation } = require('../services/propertyAssetValuationService');
 const { computeAlerts } = require('../services/propertyAlertsService');
 const { getPortfolioDashboard } = require('../services/propertyAssetPortfolioService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 
 const fail = (res, error) => res.status(error.statusCode || 500).json({ status: (error.statusCode || 500) >= 500 ? 'error' : 'fail', message: error.message });
 
@@ -26,6 +28,26 @@ async function assertReadAccess(req, propertyId) {
   if (!isStaff && !isOwner) { const e = new Error('Accès refusé.'); e.statusCode = 403; throw e; }
 }
 
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-G, finding RA-12) — la route
+// `POST /:id/transition` exige déjà `requireCapability('properties.update')`
+// = `STAFF_IMMO` : un simple `isStaff` répliquant `assertReadAccess` serait
+// donc TOUJOURS vrai pour quiconque atteint ce contrôleur (la dimension
+// RBAC est déjà couverte par la route) et ne fermerait rien de réel. Le
+// vrai manque est la dimension tenant, absente ici alors qu'elle protège
+// déjà `Property` ailleurs (TENANT-CERT-2, `propertyController.js`) : un
+// staff de N'IMPORTE QUEL tenant pouvait transitionner N'IMPORTE QUEL bien.
+// Même primitive canonique que P1-F, réutilisée directement.
+async function assertTransitionAccess(req, propertyId) {
+  if (!mongoose.isValidObjectId(propertyId)) { const e = new Error('Identifiant invalide.'); e.statusCode = 400; throw e; }
+  const property = await Property.findById(propertyId).select('owner');
+  if (!property) { const e = new Error('Bien introuvable.'); e.statusCode = 404; throw e; }
+  const isOwner = String(property.owner) === String(req.user._id || req.user.id);
+  if (isOwner) return;
+  const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
+  await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: tenant?._id });
+}
+
 exports.getLifecycle = async (req, res) => {
   try {
     await assertReadAccess(req, req.params.id);
@@ -36,6 +58,12 @@ exports.getLifecycle = async (req, res) => {
 
 exports.transition = async (req, res) => {
   try {
+    // SECURITY-CLOSURE-P1-WAVE-1 (P1-G, finding RA-12) — seul handler de ce
+    // fichier sans aucune vérification d'accès, contrairement à ses 5
+    // handlers GET sœurs — alors que c'est le seul qui MUTE réellement
+    // l'état du bien. Voir `assertTransitionAccess` ci-dessus pour la
+    // raison de ne pas réutiliser `assertReadAccess` tel quel.
+    await assertTransitionAccess(req, req.params.id);
     const property = await lifecycle.transition(req.params.id, req.body.target, { actor: req.user.id, comment: req.body.comment });
     res.status(200).json({ status: 'success', data: { property } });
   } catch (error) { fail(res, error); }

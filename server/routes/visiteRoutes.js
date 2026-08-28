@@ -3,6 +3,10 @@ const router = express.Router();
 
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 const { requireCapability } = require('../middleware/capabilityMiddleware');
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-B, finding RA-06) — routes staff sans
+// aucune frontière tenant, contrairement au reste de la campagne. Même
+// garde canonique que HF-FINAL-01/P0-B.
+const { requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/tenantContext');
 const {
   createVisite,
   getMyVisites,
@@ -37,7 +41,7 @@ router.get('/owner', restrictTo('Proprietaire', 'Admin'), getOwnerVisites);
 router.get('/owner/unread-count', restrictTo('Proprietaire', 'Admin'), getOwnerUnreadCount);
 
 // Staff : voir toutes les visites avec paiement requis
-router.get('/all-payments', requireCapability('visits.read'), getAllPayments);
+router.get('/all-payments', requireCapability('visits.read'), requireTenantScopeForStaffOrPlatformOperator, getAllPayments);
 
 // Client : voir ses propres visites avec paiement requis
 router.get('/my-payments', getMyPayments);
@@ -46,8 +50,8 @@ router.get('/my-payments', getMyPayments);
 router.get('/paiement/verifier/:intentId', verifierPaiementVisite);
 
 // Staff : voir toutes les visites
-router.get('/unread-count', requireCapability('visits.read'), getUnreadCount);
-router.get('/', requireCapability('visits.read'), getAllVisites);
+router.get('/unread-count', requireCapability('visits.read'), requireTenantScopeForStaffOrPlatformOperator, getUnreadCount);
+router.get('/', requireCapability('visits.read'), requireTenantScopeForStaffOrPlatformOperator, getAllVisites);
 
 // Client : créer une demande de visite
 router.post('/', createVisite);
@@ -58,10 +62,10 @@ router.post('/', createVisite);
 router.post('/:id/paiement/initier', initierPaiementVisite);
 
 // Staff : mettre à jour (dateProposee, dateConfirmee, statut, notes)
-router.patch('/:id', requireCapability('visits.manage'), updateVisite);
+router.patch('/:id', requireCapability('visits.manage'), requireTenantScopeForStaffOrPlatformOperator, updateVisite);
 
 // Staff : mettre à jour le paiement (paiementStatus, paiementRef)
-router.patch('/:id/paiement', requireCapability('visits.manage'), updatePaiementVisite);
+router.patch('/:id/paiement', requireCapability('visits.manage'), requireTenantScopeForStaffOrPlatformOperator, updatePaiementVisite);
 
 // Client : annuler sa propre visite
 router.patch('/:id/cancel', cancelVisite);

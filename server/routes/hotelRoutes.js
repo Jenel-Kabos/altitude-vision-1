@@ -11,7 +11,7 @@ const { requireHotelCapability } = require('../middleware/hotelAccessMiddleware'
 const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
 const { ROLES_ALTIMMO, ROLES_MODERATION } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
-const { attachTenantScopeIfResolvable } = require('../middleware/tenantContext');
+const { attachTenantScopeIfResolvable, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
 
 const router = express.Router();
 
@@ -48,7 +48,7 @@ router.use(auth.protect, attachTenantScopeIfResolvable);
 // Placée avant '/:id' générique pour ne jamais être capturée par le paramètre.
 router.get('/accessible', staffCtrl.accessibleHotels);
 // Portefeuille validé : filtre de publication non paramétrable côté serveur.
-router.get('/portfolio', ctrl.portfolio);
+router.get('/portfolio', requireTenantScopeForStaffAllowPlatformWide, ctrl.portfolio);
 router.get('/portfolio/:id', ctrl.portfolioOne);
 
 // F2.6 — gouvernance des accès hôteliers (gestion du personnel rattaché).
@@ -66,8 +66,8 @@ router.post('/:hotelId/staff-assignments/:assignmentId/revoke', staffManage, sta
 // capturées par le paramètre générique.
 router.post('/admin', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.createFull);
 router.put('/admin/:hotelId', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.updateFull);
-router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), ctrl.listAdmin);
-router.get('/status/pending', auth.restrictTo(...ROLES_MODERATION), ctrl.pending);
+router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, ctrl.listAdmin);
+router.get('/status/pending', auth.restrictTo(...ROLES_MODERATION), requireTenantScopeForStaffAllowPlatformWide, ctrl.pending);
 // Contrôle final (audit Sprint B2) — réconciliation manuelle en cas de
 // désynchronisation Hotel↔Accommodation constatée (voir hotelService.
 // resyncLinkedAccommodations). Réservé au staff : action de récupération

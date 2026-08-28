@@ -2,6 +2,10 @@
 // services dédiés (rentalLeaseLifecycleService/RenewalService/
 // AmendmentService/CautionService/DashboardService) — aucune logique
 // métier ici, même convention que dossierController.js (DOC-EVO-1).
+const mongoose = require('mongoose');
+const Contrat = require('../models/Contrat');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const lifecycle = require('../services/rentalLeaseLifecycleService');
 const { renewLease, previewRenewal } = require('../services/rentalLeaseRenewalService');
 const { addAvenant } = require('../services/rentalLeaseAmendmentService');
@@ -9,6 +13,26 @@ const caution = require('../services/rentalLeaseCautionService');
 const { getLeaseLifecycleDashboard } = require('../services/rentalLeaseDashboardService');
 
 const fail = (res, error) => res.status(error.statusCode || 500).json({ status: (error.statusCode || 500) >= 500 ? 'error' : 'fail', message: error.message });
+
+// SECURITY-CLOSURE-P0-WAVE-1 (P0-D, finding RA-05) — garde `router.param('id', …)`
+// identique à celui de contratRoutes.js/paiementRoutes.js (TENANT-CERT-2),
+// réutilisé verbatim sur ce même modèle `Contrat`. Vit dans le contrôleur
+// (et non dans le fichier de routes) pour rester un edge controller→model,
+// jamais un edge route→model (catégorie de dette suivie par
+// architecture:check).
+exports.assertContratTenantAccessParam = async (req, res, next, contratId) => {
+  try {
+    if (!mongoose.isValidObjectId(contratId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
+    const contrat = await Contrat.findById(contratId);
+    if (!contrat) return res.status(404).json({ status: 'fail', message: 'Contrat introuvable.' });
+    const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+    const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
+    await assertResourceTenantOrUnattributed({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
+    next();
+  } catch (error) {
+    res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Contrat introuvable.' });
+  }
+};
 
 // GL-UX-1 — permet au frontend de savoir quelles transitions sont
 // actuellement légales pour CE contrat, sans jamais dupliquer la table de

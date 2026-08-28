@@ -7,6 +7,28 @@ const { notify, notifyStaff } = require('../services/notificationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { ALL_STAFF } = require('../utils/roles');
 const { registerProviderEvent, claimProviderEvent, completeProviderEvent, failProviderEvent } = require('../services/finance/financialIdempotencyService');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-I, finding RA-14) — mêmes mutations
+// financières que transactionController.js (`finalize`/`cancel`), sur le
+// même modèle `Transaction`. Réutilise la même primitive canonique
+// (staff uniquement — jamais pour le client, déjà légitimé par
+// `canAccessTransaction`). Résolution tenant EN LIGNE (pas de garde de
+// route fail-closed) — même leçon P0-C que transactionController.js : un
+// staff sans aucun tenant reste autorisé sur une Transaction dont la
+// Property est elle-même non attribuée (legacy).
+async function assertTransactionTenantAccessForStaff(req, res, tx) {
+  const explicitTenantId = req.get?.('X-Platform-Tenant-Id') || req.get?.('X-Tenant-Id') || null;
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
+  try {
+    await assertResourceTenantOrUnattributed({ resourceType: 'Transaction', resource: tx, tenantId: tenant?._id });
+    return true;
+  } catch (error) {
+    res.status(error.statusCode || 404).json({ status: 'fail', message: 'Transaction introuvable.' });
+    return false;
+  }
+}
 
 const OPERATOR_LABEL = { AIRTEL: 'Airtel Money', MTN: 'MTN Mobile Money' };
 const YABETOO_WEBHOOK_TOLERANCE_SECONDS = 300;
@@ -430,6 +452,7 @@ exports.enregistrerEspecesCheque = async (req, res) => {
 
     const tx = await Transaction.findById(req.params.id).populate('property', 'title');
     if (!tx) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
+    if (!(await assertTransactionTenantAccessForStaff(req, res, tx))) return;
 
     const paiement = await PaiementTransaction.create({
       transaction:       tx._id,
@@ -477,6 +500,9 @@ exports.validerVirement = async (req, res) => {
     const paiement = await PaiementTransaction.findById(req.params.pId);
     if (!paiement) return res.status(404).json({ status: 'fail', message: 'Paiement introuvable.' });
     if (String(paiement.transaction) !== String(req.params.txId)) return res.status(409).json({ status: 'fail', message: 'Ce paiement n’appartient pas à cette transaction.' });
+    const parentTx = await Transaction.findById(req.params.txId);
+    if (!parentTx) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
+    if (!(await assertTransactionTenantAccessForStaff(req, res, parentTx))) return;
     if (paiement.methode !== 'virement') return res.status(400).json({ status: 'fail', message: 'Uniquement pour les virements.' });
 
     const isValid    = action === 'valider';

@@ -13,6 +13,12 @@ const { STAFF_ALL, STAFF_CM, STAFF_IMMO } = require('../utils/roles');
 
 const adminController = require('../controllers/adminController');
 const authController  = require('../controllers/authController');
+// SECURITY-CLOSURE-P0-WAVE-1 (P0-E, finding RA-09) — ce fichier duplique un
+// flux de modération Property legacy jamais aligné sur le correctif
+// TENANT-CERT-2 déjà appliqué à propertyRoutes.js/propertyController.js
+// (voir bandeau d'en-tête de propertyController.js) : même garde canonique
+// que GET /api/properties/status/pending (HZ-07), réutilisé verbatim.
+const { requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
 
 // ── Authentification obligatoire ──────────────────────────────────
 router.use(authController.protect);
@@ -41,13 +47,13 @@ router.get('/stats',    adminController.getDashboardStats);
 router.get('/activity', adminController.getActivityReport);
 
 // ── Propriétés : lecture (CM + Gestionnaire) ─────────────────────
-router.get('/properties/status/pending', authController.restrictTo(...STAFF_CM, ...STAFF_IMMO), adminController.getPendingProperties);
-router.get('/properties',               authController.restrictTo(...STAFF_CM, ...STAFF_IMMO), adminController.getAllProperties);
+router.get('/properties/status/pending', authController.restrictTo(...STAFF_CM, ...STAFF_IMMO), requireTenantScopeForStaffAllowPlatformWide, adminController.getPendingProperties);
+router.get('/properties',               authController.restrictTo(...STAFF_CM, ...STAFF_IMMO), requireTenantScopeForStaffAllowPlatformWide, adminController.getAllProperties);
 
 // ── Propriétés : modération / suppression (Admin uniquement) ─────
-router.patch('/properties/:id/approve', adminOnly, adminController.approveProperty);
-router.patch('/properties/:id/reject',  adminOnly, adminController.rejectProperty);
-router.delete('/properties/:id',        adminOnly, adminController.deleteProperty);
+router.patch('/properties/:id/approve', adminOnly, requireTenantScopeForStaffAllowPlatformWide, adminController.approveProperty);
+router.patch('/properties/:id/reject',  adminOnly, requireTenantScopeForStaffAllowPlatformWide, adminController.rejectProperty);
+router.delete('/properties/:id',        adminOnly, requireTenantScopeForStaffAllowPlatformWide, adminController.deleteProperty);
 
 // ── Utilisateurs (Admin uniquement) ──────────────────────────────
 router.get('/owners/active-sessions', adminOnly, adminController.getConnectedUsers);

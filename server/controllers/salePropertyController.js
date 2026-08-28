@@ -16,8 +16,23 @@ const { logAction, buildAuteur } = require('../services/actionLogService');
 const {
   uploadFilesToCloudinary, parseAmenities, parseAddress, parseGeoLocation,
   parseNonNegativeAmount, buildBasePropertyData, parseNumericField, parseStringArray,
-} = require('./propertyController');
+} = require('../services/propertyPublicationInputService');
 const { destroyFromCloudinary } = require('../config/cloudinary');
+const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-F, finding RA-11) — `isOwnerActor` (UX-OWNER-2)
+// vérifie déjà l'ownership pour un Proprietaire, mais aucune frontière
+// tenant n'existe pour le staff (`ROLES_ALTIMMO`), contrairement à
+// `propertyController.updateProperty` (`assertPropertyTenantAccess`,
+// TENANT-CERT-2) sur le même modèle `Property`. Même primitive canonique,
+// réutilisée directement (pas d'import depuis propertyController.js, pour
+// ne pas créer un edge controller→controller).
+async function assertStaffPropertyTenantAccess(req, property) {
+  const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
+  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
+  await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: tenant?._id });
+}
 
 const fail = (res, statusCode, message, extra = {}) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...extra });
@@ -155,6 +170,13 @@ exports.updateFull = async (req, res) => {
     const isOwnerActor = req.user.role === 'Proprietaire';
     if (isOwnerActor && (!property.owner || property.owner.toString() !== req.user.id.toString())) {
       return fail(res, 403, 'Vous ne pouvez modifier que vos propres biens.');
+    }
+    if (!isOwnerActor) {
+      try {
+        await assertStaffPropertyTenantAccess(req, property);
+      } catch (error) {
+        return fail(res, error.statusCode || 403, error.message);
+      }
     }
 
     // Validé AVANT toute mutation de `property`, même convention que

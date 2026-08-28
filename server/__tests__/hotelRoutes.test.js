@@ -71,6 +71,7 @@ RatePlan.RATE_TYPES = ['public', 'entreprise', 'weekend', 'promotion', 'haute_sa
 const OWNER_ID = '507f1f77bcf86cd799439011';
 const OTHER_OWNER_ID = '507f1f77bcf86cd799439099';
 const ADMIN_ID = '507f1f77bcf86cd799439012';
+const TENANT_ID = '607f1f77bcf86cd799439001';
 const PROPERTY_ID = '507f191e810c19729de860ea';
 const HOTEL_ID = '707f1f77bcf86cd799439055';
 const CATEGORY_ID = '807f1f77bcf86cd799439066';
@@ -542,7 +543,7 @@ describe('GET /api/hotels/portfolio — portefeuille validé non contournable', 
 
     expect(res.statusCode).toBe(200);
     expect(res.body.data.hotels).toHaveLength(1);
-    expect(Hotel.find).toHaveBeenCalledWith({ publicationStatus: 'publie', status: 'actif', active: { $ne: false } });
+    expect(Hotel.find).toHaveBeenCalledWith({ publicationStatus: 'publie', status: 'actif', active: { $ne: false }, tenant: TENANT_ID });
     expect(populate.mock.calls[0][0].match).toEqual(expect.objectContaining({ statusAdmin: 'Validée', availability: 'Disponible' }));
   });
 });

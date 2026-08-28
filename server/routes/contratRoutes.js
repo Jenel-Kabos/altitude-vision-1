@@ -15,6 +15,11 @@ const Contrat = require('../models/Contrat');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { requireCapability } = require('../middleware/capabilityMiddleware');
+// SECURITY-CLOSURE-P1-WAVE-1 (P1-A, finding RA-04) — `GET /` (liste)
+// n'appliquait aucune frontière tenant, contrairement aux routes `:id`
+// protégées par `router.param` ci-dessous. Même garde canonique que
+// P0-B (paiementRoutes.js).
+const { requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/tenantContext');
 
 const manageLeases = [auth.protect, requireCapability('leases.manage')];
 const readLeases = [auth.protect, requireCapability('leases.read')];
@@ -49,7 +54,7 @@ router.param('id', async (req, res, next, contratId) => {
   }
 });
 
-router.get('/', readLeases, ctrl.getAll);
+router.get('/', readLeases, requireTenantScopeForStaffOrPlatformOperator, ctrl.getAll);
 router.get('/:id', readLeases, ctrl.getOne);
 router.post('/', manageLeases, ctrl.create);
 router.put('/:id', manageLeases, ctrl.update);
