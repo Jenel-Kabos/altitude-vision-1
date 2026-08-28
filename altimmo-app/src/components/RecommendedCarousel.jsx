@@ -48,7 +48,7 @@ const PropertyCard = React.memo(function PropertyCard({ item, onPress, styles, c
       <View style={styles.imageWrap}>
         <Image
           source={imgUri ? { uri: imgUri } : PLACEHOLDER}
-          style={StyleSheet.absoluteFillObject}
+          style={styles.image}
           contentFit="cover"
           cachePolicy="memory-disk"
           transition={250}
@@ -203,6 +203,10 @@ const makeStyles = (c) => StyleSheet.create({
     height: IMAGE_H,
     backgroundColor: c.bgCardAlt,
     overflow: 'hidden',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
   },
 
   // ─── Badge Recommandé ───

@@ -10,7 +10,7 @@ export const CACHE_CATEGORIES = [
   { key: 'annonces',        prefix: 'properties:',  label: 'Annonces',        icon: 'home-outline'      },
   { key: 'carte',           prefix: 'carte:',        label: 'Carte',           icon: 'map-outline'       },
   { key: 'recommandations', prefix: 'recommended:',  label: 'Recommandations', icon: 'star-outline'      },
-  { key: 'publicites',      prefix: 'publicite:',    label: 'Publicités',      icon: 'megaphone-outline' },
+  { key: 'publicites',      prefix: 'publicites:',   label: 'Publicités',      icon: 'megaphone-outline' },
   { key: 'visites',         prefix: 'visites:',      label: 'Visites',         icon: 'calendar-outline'  },
 ];
 

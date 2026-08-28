@@ -246,6 +246,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
   const [annonces, setAnnonces]       = useState([]);
   const [recommended, setRecommended] = useState([]);
   const [pubs, setPubs]               = useState([]);
+  const [pubsLoadState, setPubsLoadState] = useState('loading');
   const [loading, setLoading]         = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing]   = useState(false);
@@ -289,7 +290,23 @@ export default function ListeAnnoncesScreen({ navigation }) {
 
   useEffect(() => {
     getRecommendedProperties().then(setRecommended).catch(() => {});
-    getActivePublicites().then(setPubs).catch(() => {});
+  }, []);
+
+  const loadPublicites = useCallback(async ({ forceRefresh = false } = {}) => {
+    setPubsLoadState('loading');
+    try {
+      const data = await getActivePublicites({ forceRefresh });
+      setPubs(data);
+      setPubsLoadState(data.length > 0 ? 'success_with_ads' : 'success_empty');
+    } catch (error) {
+      setPubsLoadState('error');
+      // Observation technique expurgée : jamais d'URL, token, headers ou
+      // payload. Le prochain focus/pull-to-refresh reste libre de retenter.
+      if (__DEV__) console.warn('[Publicites] load failed', {
+        code: error?.normalized?.code || error?.code || 'UNKNOWN',
+        status: error?.normalized?.status ?? error?.response?.status ?? null,
+      });
+    }
   }, []);
 
   const chargerPage = useCallback(async (pageNum, filters, append = false) => {
@@ -355,6 +372,13 @@ export default function ListeAnnoncesScreen({ navigation }) {
     setPage(1);
   }, [chargerPage]));
 
+  useFocusEffect(useCallback(() => {
+    // Une seule revalidation réseau par entrée sur l'écran. La callback est
+    // stable et ne dépend d'aucun state qu'elle modifie : aucun cycle
+    // focus → setState → render → fetch n'est possible.
+    loadPublicites({ forceRefresh: true });
+  }, [loadPublicites]));
+
   const onRefresh = useCallback(() => {
     cache.invalidate('properties:');
     // HOTFIX-MOB-RECOMMENDED-PROPERTIES-1 — la section "Biens recommandés"
@@ -368,11 +392,12 @@ export default function ListeAnnoncesScreen({ navigation }) {
     // manquait.
     cache.invalidate('recommended:');
     getRecommendedProperties().then(setRecommended).catch(() => {});
+    loadPublicites({ forceRefresh: true });
     setRefreshing(true);
     setPage(1);
     setHasMore(true);
     chargerPage(1, activeFilters, false);
-  }, [activeFilters, chargerPage]);
+  }, [activeFilters, chargerPage, loadPublicites]);
 
   const onEndReached = useCallback(() => {
     if (!hasMore || loadingMore || loading) return;
@@ -426,7 +451,14 @@ export default function ListeAnnoncesScreen({ navigation }) {
       {pubs.length > 0 ? (
         <AdCarousel items={pubs} tintColor={c.gold} />
       ) : (
-        <View style={styles.hero}>
+        <View
+          style={styles.hero}
+          testID="ads-fallback"
+          accessibilityState={{ busy: pubsLoadState === 'loading' }}
+          accessibilityHint={pubsLoadState === 'error'
+            ? 'Publicités temporairement indisponibles, nouvel essai au prochain rafraîchissement.'
+            : 'Aucune publicité active disponible.'}
+        >
           <LinearGradient
             colors={['#0A0A0A', '#1A1208', '#2D1E04']}
             style={StyleSheet.absoluteFillObject}
@@ -595,7 +627,7 @@ export default function ListeAnnoncesScreen({ navigation }) {
       <Text style={[styles.sectionTitle, { marginTop: spacing.md }]}>À découvrir</Text>
     </View>
   ), [
-    pubs, recommended, activeFilters, activeFilterCount, filterSummary, searchOpen,
+    pubs, pubsLoadState, recommended, activeFilters, activeFilterCount, filterSummary, searchOpen,
     styles, c,
     onPressNotifications, onPressRecommended, onToggleSearch, onCloseSearch,
     onResetFilters, onSearchSubmit,
