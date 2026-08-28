@@ -293,8 +293,8 @@ async function deleteHotel({ hotel, property }) {
 }
 
 /** Liste paginée pour le dashboard admin ("Établissements"). */
-async function listHotelsForAdmin({ status, search, sort, page = 1, limit = 20, hotelIds }) {
-  const query = {};
+async function listHotelsForAdmin({ status, search, sort, page = 1, limit = 20, hotelIds, tenantId }) {
+  const query = tenantId ? { tenant: tenantId } : {};
   if (status && status !== 'tous') query.publicationStatus = status;
   // F2.6.2 : scope optionnel (non-Admin) — même filtre pour la liste et le total.
   if (hotelIds) query._id = { $in: hotelIds };
@@ -325,11 +325,12 @@ async function listHotelsForAdmin({ status, search, sort, page = 1, limit = 20, 
  * filtre n'accepte aucun statut venant du client : la publication validée et
  * l'activation opérationnelle sont des invariants serveur.
  */
-async function listEligibleHotels({ search, city, district, starRating, sort, hotelIds, propertyOwnerIds } = {}) {
+async function listEligibleHotels({ search, city, district, starRating, sort, hotelIds, propertyOwnerIds, tenantId } = {}) {
   const query = {
     publicationStatus: 'publie',
     status: 'actif',
     active: { $ne: false },
+    ...(tenantId ? { tenant: tenantId } : {}),
   };
   if (hotelIds) query._id = { $in: hotelIds };
   if (starRating !== undefined && starRating !== '') query.starRating = Number(starRating);
@@ -350,8 +351,8 @@ async function listEligibleHotels({ search, city, district, starRating, sort, ho
   return hotels.filter((hotel) => hotel.property);
 }
 
-async function listValidatedHotelPortfolio({ search, city, district, starRating, sort, page = 1, limit = 20, hotelIds }) {
-  const eligible = await listEligibleHotels({ search, city, district, starRating, sort, hotelIds });
+async function listValidatedHotelPortfolio({ search, city, district, starRating, sort, page = 1, limit = 20, hotelIds, tenantId }) {
+  const eligible = await listEligibleHotels({ search, city, district, starRating, sort, hotelIds, tenantId });
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
   const start = (safePage - 1) * safeLimit;
