@@ -4,6 +4,8 @@ const request = require('supertest');
 jest.mock('../models/Event', () => ({ countDocuments: jest.fn() }));
 jest.mock('../models/User', () => ({ countDocuments: jest.fn() }));
 jest.mock('../models/portfolioItemModel', () => ({ countDocuments: jest.fn() }));
+jest.mock('../models/Property', () => ({ find: jest.fn() }));
+jest.mock('../models/Contrat', () => ({ countDocuments: jest.fn() }));
 jest.mock('../services/userKpiService', () => ({ getUserKpiSummary: jest.fn() }));
 jest.mock('../services/propertyPortfolioService', () => ({ getPropertyPortfolioForTenantScope: jest.fn() }));
 jest.mock('../controllers/authController', () => ({
@@ -17,6 +19,8 @@ jest.mock('../middleware/tenantContext', () => ({
 const Event = require('../models/Event');
 const User = require('../models/User');
 const PortfolioItem = require('../models/portfolioItemModel');
+const Property = require('../models/Property');
+const Contrat = require('../models/Contrat');
 const userKpiService = require('../services/userKpiService');
 const { getPropertyPortfolioForTenantScope } = require('../services/propertyPortfolioService');
 const authController = require('../controllers/authController');
@@ -29,12 +33,14 @@ const restrictToWasConfiguredForAllStaff = authController.restrictTo.mock.calls.
 const app = express();
 app.use('/api/dashboard', dashboardRoutes);
 
-function mockDashboardReads({ properties, events, users, owners, portfolio }) {
+function mockDashboardReads({ properties, events, users, owners, portfolio, rentalActiveContracts = 0 }) {
   getPropertyPortfolioForTenantScope.mockResolvedValue({ stats: { total: properties } });
   Event.countDocuments.mockResolvedValue(events);
   User.countDocuments.mockResolvedValue(users);
   userKpiService.getUserKpiSummary.mockResolvedValue({ proprietaires: owners });
   PortfolioItem.countDocuments.mockResolvedValue(portfolio);
+  Property.find.mockReturnValue({ distinct: jest.fn().mockResolvedValue(rentalActiveContracts > 0 ? ['property-1'] : []) });
+  Contrat.countDocuments.mockResolvedValue(rentalActiveContracts);
 }
 
 describe('GET /api/dashboard/stats — contrat de caractérisation ARCH-2F', () => {
@@ -61,6 +67,7 @@ describe('GET /api/dashboard/stats — contrat de caractérisation ARCH-2F', () 
           Altcom: 0,
           Users: 0,
           Owners: 0,
+          RentalActiveContracts: 0,
         },
       },
     });
@@ -71,8 +78,8 @@ describe('GET /api/dashboard/stats — contrat de caractérisation ARCH-2F', () 
     expect(PortfolioItem.countDocuments).toHaveBeenCalledWith({ isPublished: true });
   });
 
-  test('préserve les cinq clés, leurs valeurs et leur ordre avec des données partielles', async () => {
-    mockDashboardReads({ properties: 7, events: 2, users: 19, owners: 4, portfolio: 3 });
+  test('préserve les six clés, leurs valeurs et leur ordre avec des données partielles', async () => {
+    mockDashboardReads({ properties: 7, events: 2, users: 19, owners: 4, portfolio: 3, rentalActiveContracts: 5 });
 
     const response = await request(app).get('/api/dashboard/stats');
 
@@ -83,6 +90,7 @@ describe('GET /api/dashboard/stats — contrat de caractérisation ARCH-2F', () 
       'Altcom',
       'Users',
       'Owners',
+      'RentalActiveContracts',
     ]);
     expect(response.body.data.stats).toEqual({
       Altimmo: 7,
@@ -90,6 +98,7 @@ describe('GET /api/dashboard/stats — contrat de caractérisation ARCH-2F', () 
       Altcom: 3,
       Users: 19,
       Owners: 4,
+      RentalActiveContracts: 5,
     });
   });
 
@@ -105,5 +114,19 @@ describe('GET /api/dashboard/stats — contrat de caractérisation ARCH-2F', () 
       message: 'Erreur serveur lors du chargement des statistiques.',
       error: 'event count unavailable',
     });
+  });
+
+  // HOTFIX-ADMIN-DASHBOARD-RENTAL-KPI-CONTRACT-1 — la vraie surface live
+  // (GET /api/dashboard/stats) fournit désormais le KPI attendu par le
+  // widget "Contrats actifs" du dashboard Admin, avec la portée tenant déjà
+  // résolue par `requireTenantScope` (jamais un second mécanisme).
+  test('expose RentalActiveContracts avec la portée tenant déjà résolue par requireTenantScope', async () => {
+    mockDashboardReads({ properties: 3, events: 0, users: 0, owners: 0, portfolio: 0, rentalActiveContracts: 3 });
+
+    const response = await request(app).get('/api/dashboard/stats');
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.stats.RentalActiveContracts).toBe(3);
+    expect(Property.find).toHaveBeenCalledWith({ owner: { $in: ['staff-1'] } });
   });
 });
