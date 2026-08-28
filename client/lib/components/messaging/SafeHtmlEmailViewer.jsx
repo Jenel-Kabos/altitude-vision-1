@@ -14,7 +14,7 @@
 // texte brut est affiché échappé (jamais interprété comme HTML) — jamais
 // "[object Object]"/"undefined"/HTML brut non rendu.
 import { useEffect, useRef, useState } from 'react';
-import DOMPurify from 'dompurify';
+import { sanitizeForSandboxedIframe } from '../../utils/sanitizeSandboxedHtml';
 
 const MIN_HEIGHT = 80;
 const MAX_HEIGHT = 4000; // borne large : une newsletter peut être longue (mandat §45), la page hôte reste scrollable normalement au-delà.
@@ -25,64 +25,40 @@ const MAX_HEIGHT = 4000; // borne large : une newsletter peut être longue (mand
 // sans jamais forcer une largeur qui casserait un tableau de facture
 // volontairement large (mandat §16 : scroll horizontal LOCAL, jamais
 // une page dashboard élargie).
+// INBOX-2 — l'iframe est un document séparé : les tokens dark mode du
+// dashboard (`.dashboard-content-inner`, valeurs CSS custom properties
+// `--db-*`) ne peuvent pas la traverser (c'est précisément l'isolation
+// voulue par SECURITY-2, non touchée ici). Sans fond explicite, Chromium
+// applique son propre assombrissement automatique du document (fond
+// sombre) tout en conservant la couleur de texte codée en dur ci-dessous
+// (`#1f2937`, sombre) → texte illisible en mode sombre (confirmé par
+// capture d'écran réelle, voir INBOX2_VISUAL_VALIDATION.md). Fond ET texte
+// sont donc explicitement pilotés ici via `prefers-color-scheme`, sur les
+// mêmes valeurs que les tokens `--db-surface-solid`/`--db-text`/`--db-focus`
+// du dashboard (`client/app/dashboard/dashboard.css`) — jamais une nouvelle
+// palette indépendante.
 const BASE_STYLE = `
   html, body { margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'DM Sans', sans-serif;
-    font-size: 14px; line-height: 1.6; color: #1f2937;
+    font-size: 14px; line-height: 1.6; color: #1f2937; background: #ffffff;
     padding: 16px; box-sizing: border-box; overflow-x: auto; word-wrap: break-word;
   }
   img { max-width: 100%; height: auto; }
   table { max-width: 100%; }
   a { color: #2563eb; }
   * { box-sizing: border-box; }
+  @media (prefers-color-scheme: dark) {
+    body { color: #f1f5f9; background: #111827; }
+    a { color: #60a5fa; }
+  }
 `;
 
-// Config DOMPurify dédiée aux emails : le profil HTML par défaut de
-// DOMPurify exclut déjà script/iframe/object/embed/form et neutralise les
-// attributs on*/href="javascript:" — FORBID_TAGS/FORBID_ATTR ci-dessous
-// sont une déclaration explicite en défense en profondeur (mandat §13),
-// pas un changement de comportement par rapport au défaut. `<style>` reste
-// AUTORISÉ : contrairement à un rendu direct dans le DOM du dashboard, il
-// est ici confiné à l'intérieur du <head> de l'iframe sandboxée — aucune
-// règle CSS ne peut jamais atteindre le dashboard (c'est précisément ce
-// que l'isolation iframe garantit), donc l'interdire perdrait de la
-// fidélité de rendu (newsletters, mise en forme responsive) sans gain de
-// sécurité réel.
-const SANITIZE_CONFIG = {
-  // `<style>` n'est pas dans la liste par défaut de DOMPurify — l'ajouter
-  // explicitement ici (ADD_TAGS) est sûr uniquement parce que ce contenu
-  // est ensuite injecté dans une iframe sandboxée dédiée, jamais dans le
-  // DOM du dashboard.
-  ADD_TAGS: ['style'],
-  // Sans `FORCE_BODY`, DOMPurify traite un `<style>` en tête de fragment
-  // comme un élément de `<head>` et le retire silencieusement même avec
-  // `ADD_TAGS` — `FORCE_BODY` force l'interprétation "fragment de body",
-  // cohérente avec la façon dont ce contenu est injecté ci-dessous.
-  FORCE_BODY: true,
-  FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
-  FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover', 'formaction'],
-  ALLOW_DATA_ATTR: false,
-};
-
-function sanitizeEmailHtml(rawHtml) {
-  // Toute balise <a> reçoit target="_blank" + rel sécurisé : l'iframe est
-  // sandboxée sans `allow-top-navigation`, donc un clic ne doit jamais
-  // rester piégé dans l'iframe — il doit ouvrir un nouvel onglet (le
-  // sandbox autorise cela via `allow-popups`, voir plus bas).
-  const hook = (node) => {
-    if (node.tagName === 'A') {
-      node.setAttribute('target', '_blank');
-      node.setAttribute('rel', 'noopener noreferrer nofollow');
-    }
-  };
-  DOMPurify.addHook('afterSanitizeAttributes', hook);
-  try {
-    return DOMPurify.sanitize(rawHtml || '', SANITIZE_CONFIG);
-  } finally {
-    DOMPurify.removeHook('afterSanitizeAttributes', hook);
-  }
-}
+// Sanitization DOMPurify + hook target="_blank" : voir
+// `client/lib/utils/sanitizeSandboxedHtml.js` (HOTFIX-INBOX-SECURITY-2,
+// primitive extraite ici pour être réutilisée par `SafeAttachmentPreview`,
+// même config, même comportement, comportement inchangé pour ce composant).
+const sanitizeEmailHtml = (rawHtml) => sanitizeForSandboxedIframe(rawHtml);
 
 /**
  * @param {string} html - corps HTML original de l'email (non fiable, non sanitizé).

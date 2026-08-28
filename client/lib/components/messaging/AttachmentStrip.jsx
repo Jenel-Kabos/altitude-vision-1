@@ -1,12 +1,31 @@
 "use client";
 
 // INBOX-PRO-2 — extraction compacte du bloc pièces jointes qui vivait
-// inline dans MessageDetail (InternalMessagingPage.jsx). Mêmes actions
-// (voir/télécharger via `previewInternalMailAttachment`, endpoint
-// authentifié/scopé côté serveur — INCHANGÉ, mandat §22), présentation en
-// bande plutôt qu'en grands blocs.
-import { Download, Eye, FileText, Image as ImageIcon, Paperclip } from 'lucide-react';
-import { previewInternalMailAttachment } from '../../services/messageService';
+// inline dans MessageDetail (InternalMessagingPage.jsx). Endpoints
+// authentifiés/scopés côté serveur — INCHANGÉ, mandat §22.
+//
+// HOTFIX-INBOX-SECURITY-2 — les pièces jointes HTML/SVG (contenu actif,
+// voir attachmentSecurity.js) ne passent plus par `previewInternalMailAttachment`
+// (window.open sur un Blob brut — une URL blob: hérite de l'origine du
+// dashboard, ce n'est pas une origine opaque : du JS dans un tel document
+// aurait accès à localStorage, donc au JWT). Elles sont sanitizées
+// (DOMPurify) et rendues dans une iframe sandboxée isolée
+// (SafeAttachmentPreview, même modèle de sécurité que SafeHtmlEmailViewer).
+// Tous les autres types (image, PDF, etc.) conservent leur comportement
+// historique exact, inchangé.
+import { useState } from 'react';
+import {
+  Download, Eye, FileArchive, FileAudio, FileSpreadsheet, FileText, FileType, FileVideo,
+  Image as ImageIcon, Paperclip,
+} from 'lucide-react';
+import {
+  previewInternalMailAttachment,
+  fetchInternalMailAttachmentContent,
+  downloadInternalMailAttachment,
+} from '../../services/messageService';
+import { isActiveAttachmentContent, getActiveAttachmentKind } from '../../utils/attachmentSecurity';
+import { getAttachmentCategory } from '../../utils/attachmentPresentation';
+import SafeAttachmentPreview from './SafeAttachmentPreview';
 
 const formatFileSize = (bytes) => {
   if (!bytes) return '0 B';
@@ -16,8 +35,55 @@ const formatFileSize = (bytes) => {
   return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 };
 
+// INBOX-2 — icône présentationnelle uniquement (voir attachmentPresentation.js).
+const ICON_BY_CATEGORY = {
+  IMAGE: ImageIcon,
+  PDF: FileType,
+  OFFICE_WORD: FileText,
+  OFFICE_SHEET: FileSpreadsheet,
+  OFFICE_SLIDE: FileType,
+  ARCHIVE: FileArchive,
+  AUDIO: FileAudio,
+  VIDEO: FileVideo,
+  TEXT: FileText,
+  UNKNOWN: FileText,
+};
+
 export default function AttachmentStrip({ attachments }) {
+  const [preview, setPreview] = useState(null);
+
   if (!attachments?.length) return null;
+
+  const closePreview = () => setPreview(null);
+
+  const openActivePreview = async (att) => {
+    const kind = getActiveAttachmentKind(att);
+    setPreview({
+      filename: att.filename, kind, content: '', loading: true, error: false, downloadEndpoint: att.downloadEndpoint,
+    });
+    try {
+      const text = await fetchInternalMailAttachmentContent(att.previewEndpoint);
+      setPreview((prev) => (prev ? { ...prev, content: text, loading: false } : prev));
+    } catch {
+      setPreview((prev) => (prev ? { ...prev, loading: false, error: true } : prev));
+    }
+  };
+
+  const handleVoir = (att) => {
+    if (isActiveAttachmentContent(att)) {
+      openActivePreview(att);
+      return;
+    }
+    previewInternalMailAttachment(att.previewEndpoint);
+  };
+
+  const handleTelecharger = (att) => {
+    if (isActiveAttachmentContent(att)) {
+      downloadInternalMailAttachment(att.downloadEndpoint, att.filename);
+      return;
+    }
+    previewInternalMailAttachment(att.downloadEndpoint);
+  };
 
   return (
     <div className="mt-6 pt-4 border-t border-gray-200">
@@ -27,8 +93,7 @@ export default function AttachmentStrip({ attachments }) {
       </p>
       <div className="flex flex-wrap gap-2">
         {attachments.map((att, index) => {
-          const isImage = att.mimetype?.startsWith('image/');
-          const Icon = isImage ? ImageIcon : FileText;
+          const Icon = ICON_BY_CATEGORY[getAttachmentCategory(att)] || FileText;
           return (
             <div
               key={att.previewEndpoint || index}
@@ -41,7 +106,7 @@ export default function AttachmentStrip({ attachments }) {
                 <>
                   <button
                     type="button"
-                    onClick={() => previewInternalMailAttachment(att.previewEndpoint)}
+                    onClick={() => handleVoir(att)}
                     className="p-1 text-blue-600 hover:bg-blue-100 rounded"
                     title="Voir"
                     aria-label={`Voir ${att.filename}`}
@@ -50,7 +115,7 @@ export default function AttachmentStrip({ attachments }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => previewInternalMailAttachment(att.downloadEndpoint)}
+                    onClick={() => handleTelecharger(att)}
                     className="p-1 text-gray-500 hover:bg-gray-200 rounded"
                     title="Télécharger"
                     aria-label={`Télécharger ${att.filename}`}
@@ -63,6 +128,17 @@ export default function AttachmentStrip({ attachments }) {
           );
         })}
       </div>
+      {preview && (
+        <SafeAttachmentPreview
+          filename={preview.filename}
+          kind={preview.kind}
+          content={preview.content}
+          loading={preview.loading}
+          error={preview.error}
+          onClose={closePreview}
+          onDownload={() => downloadInternalMailAttachment(preview.downloadEndpoint, preview.filename)}
+        />
+      )}
     </div>
   );
 }

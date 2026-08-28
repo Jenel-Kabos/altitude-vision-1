@@ -121,6 +121,32 @@ export const previewInternalMailAttachment = async (endpoint) => {
     window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 };
 
+// HOTFIX-INBOX-SECURITY-2 — réservé aux pièces jointes classées "actives"
+// (HTML/SVG, voir client/lib/utils/attachmentSecurity.js). Récupère le
+// contenu texte pour sanitization (DOMPurify) puis rendu dans une iframe
+// sandboxée — jamais un window.open sur le Blob brut pour ces types.
+export const fetchInternalMailAttachmentContent = async (endpoint) => {
+    const response = await api.get(endpoint, { responseType: 'blob' });
+    return response.data.text();
+};
+
+// HOTFIX-INBOX-SECURITY-2 — réservé aux pièces jointes classées "actives".
+// `window.open` sur un Blob HTML/SVG le rend/l'exécute au lieu de le
+// sauvegarder (le Content-Disposition du serveur n'a plus d'effet une fois
+// le Blob reconstruit côté client) — un lien `<a download>` force une
+// sauvegarde réelle sans jamais exécuter le contenu, quel que soit le type.
+export const downloadInternalMailAttachment = async (endpoint, filename) => {
+    const response = await api.get(endpoint, { responseType: 'blob' });
+    const url = URL.createObjectURL(response.data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'attachment';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+};
+
 export const markAsRead = async (mailId) => {
     try {
         const response = await api.patch(`/internal-mails/${mailId}/read`);
