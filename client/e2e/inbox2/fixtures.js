@@ -4,6 +4,49 @@
 // HOTFIX_INBOX_SECURITY2_*): previewEndpoint/downloadEndpoint/canPreview,
 // mimetype/filename réels, tailles réalistes — rien d'inventé au-delà du
 // contrat déjà documenté.
+const realisticParagraphs = (count) => Array.from({ length: count }, (_, index) => (
+  `<p><strong>Point ${index + 1}.</strong> Le suivi du dossier est confirmé avec les informations utiles pour le destinataire.</p>`
+)).join('');
+
+export const HEIGHT_FIXTURE_MESSAGES = [
+  {
+    _id: 'height-short',
+    subject: 'IH3 — email court',
+    content: 'Fixture de hauteur courte.',
+    html: realisticParagraphs(5),
+    isRead: true,
+    isStarred: false,
+    sender: { name: 'Fixture Layout', email: 'fixture@example.test' },
+    receiver: { name: 'Moi' },
+    createdAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+    attachments: [],
+  },
+  {
+    _id: 'height-medium',
+    subject: 'IH3 — email moyen',
+    content: 'Fixture de hauteur moyenne.',
+    html: realisticParagraphs(14),
+    isRead: true,
+    isStarred: false,
+    sender: { name: 'Fixture Layout', email: 'fixture@example.test' },
+    receiver: { name: 'Moi' },
+    createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+    attachments: [],
+  },
+  {
+    _id: 'height-long',
+    subject: 'IH3 — email long',
+    content: 'Fixture de hauteur longue.',
+    html: realisticParagraphs(34),
+    isRead: true,
+    isStarred: false,
+    sender: { name: 'Fixture Layout', email: 'fixture@example.test' },
+    receiver: { name: 'Moi' },
+    createdAt: new Date(Date.now() - 6 * 86400000).toISOString(),
+    attachments: [],
+  },
+];
+
 export const FIXTURE_MESSAGES = [
   {
     _id: 'm1',

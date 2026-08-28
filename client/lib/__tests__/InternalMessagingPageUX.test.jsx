@@ -121,13 +121,15 @@ describe('InternalMessagingPage — UX (INBOX-PRO-2)', () => {
     expect(listScroll).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
     expect(viewer).toHaveClass('min-h-0', 'flex-1', 'flex', 'flex-col', 'overflow-hidden');
     expect(viewer).not.toHaveClass('overflow-y-auto');
-    expect(bodyScroll).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto', 'overflow-x-hidden');
+    expect(bodyScroll).toHaveClass('flex', 'min-h-0', 'flex-1', 'flex-col', 'overflow-hidden');
+    expect(bodyScroll).not.toHaveClass('overflow-y-auto');
     expect(header).not.toBeNull();
     expect(bodyScroll).not.toContainElement(header);
 
     const frame = screen.getByTestId('email-html-frame');
-    expect(frame).toHaveStyle({ width: '100%', display: 'block' });
+    expect(frame).toHaveStyle({ width: '100%', height: '100%', minHeight: '0', flex: '1 1 0%', display: 'block' });
     expect(frame.getAttribute('sandbox')).toBe('allow-popups allow-popups-to-escape-sandbox');
+    expect(frame.getAttribute('sandbox')).not.toMatch(/allow-same-origin/);
   });
 
   test('recherche : filtre la liste déjà chargée par objet/expéditeur/contenu', async () => {

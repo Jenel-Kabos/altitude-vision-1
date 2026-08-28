@@ -521,9 +521,11 @@ const ConversationViewer = ({ message, activeView, onToggleStar, onDelete, onRes
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5" data-testid="inbox-message-body-scroll">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 py-5" data-testid="inbox-message-body-scroll">
         <SafeHtmlEmailViewer html={message.html} text={message.content} />
-        <AttachmentStrip attachments={message.attachments} />
+        <div className="flex-shrink-0">
+          <AttachmentStrip attachments={message.attachments} />
+        </div>
       </div>
     </div>
   );

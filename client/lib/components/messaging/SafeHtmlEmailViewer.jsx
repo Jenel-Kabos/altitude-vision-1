@@ -13,11 +13,7 @@
 // texte brut, ou email dont seule la version texte a été conservée), le
 // texte brut est affiché échappé (jamais interprété comme HTML) — jamais
 // "[object Object]"/"undefined"/HTML brut non rendu.
-import { useEffect, useRef, useState } from 'react';
 import { sanitizeForSandboxedIframe } from '../../utils/sanitizeSandboxedHtml';
-
-const MIN_HEIGHT = 80;
-const MAX_HEIGHT = 4000; // borne large : une newsletter peut être longue (mandat §45), la page hôte reste scrollable normalement au-delà.
 
 // Feuille de style injectée à l'intérieur de l'iframe uniquement — n'a
 // aucun effet sur le dashboard. Neutralise les débordements classiques
@@ -65,9 +61,6 @@ const sanitizeEmailHtml = (rawHtml) => sanitizeForSandboxedIframe(rawHtml);
  * @param {string} text - corps texte brut (fallback si `html` absent/invalide).
  */
 export default function SafeHtmlEmailViewer({ html, text }) {
-  const iframeRef = useRef(null);
-  const [height, setHeight] = useState(MIN_HEIGHT);
-
   const hasHtml = typeof html === 'string' && html.trim().length > 0;
   const safeHtml = hasHtml ? sanitizeEmailHtml(html) : '';
   // Un HTML "sanitizé jusqu'à vide" (ex: uniquement un <script> malveillant
@@ -77,23 +70,6 @@ export default function SafeHtmlEmailViewer({ html, text }) {
     || /<img|<table|<br|<hr/i.test(safeHtml);
 
   const srcDoc = `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>${BASE_STYLE}</style></head><body>${safeHtml}</body></html>`;
-
-  useEffect(() => {
-    if (!hasRenderableHtml) return undefined;
-    const iframe = iframeRef.current;
-    if (!iframe) return undefined;
-    const handleLoad = () => {
-      try {
-        const doc = iframe.contentWindow?.document;
-        const measured = doc?.documentElement?.scrollHeight || doc?.body?.scrollHeight || MIN_HEIGHT;
-        setHeight(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, measured + 4)));
-      } catch {
-        setHeight(MIN_HEIGHT);
-      }
-    };
-    iframe.addEventListener('load', handleLoad);
-    return () => iframe.removeEventListener('load', handleLoad);
-  }, [hasRenderableHtml, srcDoc]);
 
   if (!hasRenderableHtml) {
     // Fallback texte : jamais interprété comme HTML, jamais
@@ -113,14 +89,17 @@ export default function SafeHtmlEmailViewer({ html, text }) {
 
   return (
     <iframe
-      ref={iframeRef}
       title="Contenu de l'email"
       srcDoc={srcDoc}
       // Aucun `allow-scripts`, aucun `allow-same-origin` : le contenu ne
       // peut jamais exécuter de JS ni accéder au parent. `allow-popups`
       // permet uniquement l'ouverture de liens dans un nouvel onglet.
       sandbox="allow-popups allow-popups-to-escape-sandbox"
-      style={{ width: '100%', height, border: 'none', display: 'block' }}
+      // Le sandbox sans `allow-same-origin` interdit volontairement toute
+      // mesure parent → document. Le viewport est donc dimensionné par le
+      // layout flex du panneau, et le document interne ne scrolle que si
+      // son contenu dépasse réellement cet espace disponible.
+      style={{ width: '100%', height: '100%', minHeight: 0, flex: '1 1 0%', border: 'none', display: 'block' }}
       data-testid="email-html-frame"
     />
   );

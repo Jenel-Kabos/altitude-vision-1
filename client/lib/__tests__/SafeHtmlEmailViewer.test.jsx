@@ -21,6 +21,8 @@ describe('SafeHtmlEmailViewer', () => {
     expect(iframe.getAttribute('sandbox')).toBe('allow-popups allow-popups-to-escape-sandbox');
     expect(iframe.getAttribute('sandbox')).not.toMatch(/allow-scripts/);
     expect(iframe.getAttribute('sandbox')).not.toMatch(/allow-same-origin/);
+    expect(iframe).toHaveStyle({ height: '100%', minHeight: '0', flex: '1 1 0%' });
+    expect(iframe.style.height).not.toBe('80px');
     expect(getSrcDoc(container)).toContain('Bonjour <strong>Client</strong>');
   });
 
