@@ -41,6 +41,10 @@ GoogleService-Info.plist
 *.p12
 *.mobileprovision
 
+# Artefacts de build mobile locaux (EAS/Expo) — jamais versionnés
+altimmo-app/*.apk
+altimmo-app/*.aab
+
 # Claude Code
 .claude/*
 !.claude/skills/
