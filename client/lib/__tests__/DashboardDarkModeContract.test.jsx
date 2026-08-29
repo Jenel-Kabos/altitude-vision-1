@@ -48,4 +48,13 @@ describe('contrat Light/Dark du dashboard', () => {
       expect(css.match(new RegExp(token, 'g'))?.length).toBeGreaterThanOrEqual(3);
     }
   });
+
+  test('les champs dashboard imposent le contrat de contraste et le schéma natif du thème', () => {
+    const css = readFileSync(`${process.cwd()}/app/dashboard/dashboard.css`, 'utf8');
+    expect(css).toContain('color: var(--db-text) !important');
+    expect(css).toContain('background: var(--db-surface-input)');
+    expect(css).toContain('color: var(--db-faint) !important');
+    expect(css).toContain('color-scheme: dark');
+    expect(css).toContain('color-scheme: light');
+  });
 });

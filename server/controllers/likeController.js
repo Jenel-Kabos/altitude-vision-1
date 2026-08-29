@@ -120,57 +120,92 @@ exports.getLikeStatus = asyncHandler(async (req, res) => {
  * @route GET /api/likes/my-favorites
  * @access Protected
  */
+const FAVORITES_PROPERTY_SELECT = 'title name description price images date location';
+
+/**
+ * Favoris "Property" : source canonique = Property.likes[] (alimentée par le
+ * cœur réel, DetailAnnonceScreen.jsx / PropertyDetailPage.jsx via
+ * POST /properties/:id/like). Union en LECTURE SEULE avec les documents Like
+ * legacy (targetType='Property'), toujours écrits par un second chemin réel
+ * et actif : LikeButton dans PropertyCard.jsx (POST /api/likes). Aucune
+ * écriture supplémentaire n'est faite ici — voir
+ * server/docs/HOTFIX_FAVORITES_CANONICAL_PROPERTY_LIKES1_REPORT.md (§24/§25).
+ * `likedAt` n'existe que pour les entrées issues de la collection Like ;
+ * Property.likes[] ne porte aucune date par utilisateur (limitation
+ * documentée, non inventée).
+ */
+async function getFavoriteProperties(userId) {
+  const [canonicalProperties, legacyLikes] = await Promise.all([
+    Property.find({ likes: userId }).select(FAVORITES_PROPERTY_SELECT).lean(),
+    Like.find({ user: userId, targetType: 'Property' })
+      .sort('-createdAt')
+      .populate({ path: 'targetId', select: FAVORITES_PROPERTY_SELECT })
+      .lean(),
+  ]);
+
+  const byId = new Map();
+  canonicalProperties.forEach((property) => {
+    byId.set(property._id.toString(), { ...property, likedAt: undefined });
+  });
+  legacyLikes.forEach((like) => {
+    if (!like.targetId) return; // Bien supprimé depuis — cible legacy ignorée
+    const idStr = like.targetId._id.toString();
+    const existing = byId.get(idStr);
+    if (existing) {
+      if (existing.likedAt === undefined) existing.likedAt = like.createdAt;
+    } else {
+      byId.set(idStr, { ...like.targetId, likedAt: like.createdAt });
+    }
+  });
+
+  return Array.from(byId.values()).sort((a, b) => {
+    if (a.likedAt && b.likedAt) return new Date(b.likedAt) - new Date(a.likedAt);
+    if (a.likedAt) return -1;
+    if (b.likedAt) return 1;
+    return 0;
+  });
+}
+
 exports.getMyFavorites = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { type } = req.query; // Filtrer par type (optionnel)
 
   logger.info(`⭐ [getMyFavorites] User: ${userId}, Type: ${type || 'Tous'}`);
 
-  const query = { user: userId };
-  if (type) {
-    query.targetType = type;
-  }
-
-  const likes = await Like.find(query)
-    .sort('-createdAt')
-    .populate({
-      path: 'targetId',
-      select: 'title name description price images date location'
-    });
-
-  // Grouper par type
   const favorites = {
     properties: [],
     events: [],
     services: []
   };
 
-  likes.forEach(like => {
-    if (!like.targetId) return; // Ignorer si la cible a été supprimée
+  if (!type || type === 'Property') {
+    favorites.properties = await getFavoriteProperties(userId);
+  }
 
-    if (like.targetType === 'Property') {
-      favorites.properties.push({
-        ...like.targetId.toObject(),
-        likedAt: like.createdAt
-      });
-    } else if (like.targetType === 'Event') {
-      favorites.events.push({
-        ...like.targetId.toObject(),
-        likedAt: like.createdAt
-      });
-    } else if (like.targetType === 'Service') {
-      favorites.services.push({
-        ...like.targetId.toObject(),
-        likedAt: like.createdAt
-      });
-    }
-  });
+  if (!type || type === 'Event' || type === 'Service') {
+    const eventServiceTypes = type ? [type] : ['Event', 'Service'];
+    const likes = await Like.find({ user: userId, targetType: { $in: eventServiceTypes } })
+      .sort('-createdAt')
+      .populate({ path: 'targetId', select: FAVORITES_PROPERTY_SELECT });
 
-  logger.success(`✅ [getMyFavorites] ${likes.length} favori(s) trouvé(s)`);
+    likes.forEach(like => {
+      if (!like.targetId) return; // Ignorer si la cible a été supprimée
+
+      if (like.targetType === 'Event') {
+        favorites.events.push({ ...like.targetId.toObject(), likedAt: like.createdAt });
+      } else if (like.targetType === 'Service') {
+        favorites.services.push({ ...like.targetId.toObject(), likedAt: like.createdAt });
+      }
+    });
+  }
+
+  const totalResults = favorites.properties.length + favorites.events.length + favorites.services.length;
+
+  logger.success(`✅ [getMyFavorites] ${totalResults} favori(s) trouvé(s)`);
 
   res.status(200).json({
     status: 'success',
-    results: likes.length,
+    results: totalResults,
     data: {
       favorites
     }

@@ -148,7 +148,7 @@ export default function AdCarousel({ items, tintColor = '#FFFFFF' }) {
       <View style={styles.slide}>
         <Image
           source={{ uri: item.media }}
-          style={StyleSheet.absoluteFillObject}
+          style={styles.image}
           contentFit="cover"
           cachePolicy="memory-disk"
           transition={300}
@@ -257,6 +257,10 @@ const styles = StyleSheet.create({
     height: HEIGHT,
     borderRadius: 20,
     overflow: 'hidden',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
   },
   gradient: {
     position: 'absolute',
