@@ -17,6 +17,9 @@ const { createFullAccommodation } = require('./accommodationService');
 const { ensureHotelManagerAssignment } = require('./hotel/hotelStaffAssignmentService');
 const { escapeRegex } = require('../utils/regexEscape');
 const logger = require('../utils/logger');
+const {
+  assertHotelNameAvailable, translateHotelNameDuplicate,
+} = require('./hotel/hotelNameUniquenessService');
 
 const cleanupImages = (images = []) => Promise.all(images.map((url) => destroyFromCloudinary(url))).catch(() => {});
 
@@ -173,18 +176,25 @@ async function ensureManagerGovernanceAtomic({ hotel, actingUser, accommodation,
  * gère la compensation orpheline) avec le type d'établissement canonique.
  */
 async function createFullHotel({ propertyData, hotelData, accommodationType = 'hotel', actingUser }) {
+  const tenantId = actingUser.platformTenant?._id || actingUser.platformTenant || null;
+  await assertHotelNameAvailable({ name: hotelData.name, tenantId, managerId: actingUser.id });
   const accommodationData = {
     accommodationType,
     checkInTime: '14:00',
     checkOutTime: '11:00',
   };
-  const result = await createFullAccommodation({
-    propertyData,
-    accommodationData,
-    rateData: null,
-    hotelInput: { mode: 'create', hotelData: { ...hotelData, manager: actingUser.id } },
-    actingUser,
-  });
+  let result;
+  try {
+    result = await createFullAccommodation({
+      propertyData,
+      accommodationData,
+      rateData: null,
+      hotelInput: { mode: 'create', hotelData: { ...hotelData, manager: actingUser.id } },
+      actingUser,
+    });
+  } catch (error) {
+    throw translateHotelNameDuplicate(error);
+  }
   const hotel = await Hotel.findById(result.hotel);
   await ensureManagerGovernanceAtomic({ hotel, actingUser, accommodation: result.accommodation, property: result.property });
   return { property: result.property, hotel, accommodation: result.accommodation };
@@ -192,6 +202,14 @@ async function createFullHotel({ propertyData, hotelData, accommodationType = 'h
 
 /** Mise à jour d'un hôtel existant (Property + Hotel). */
 async function updateFullHotel({ property, hotel, propertyUpdates, hotelUpdates, actingUser }) {
+  if (hotelUpdates.name !== undefined) {
+    await assertHotelNameAvailable({
+      name: hotelUpdates.name,
+      tenantId: hotel.tenant,
+      managerId: hotel.manager || actingUser.id,
+      excludeHotelId: hotel._id,
+    });
+  }
   Object.assign(property, propertyUpdates);
   await property.save();
 
@@ -207,6 +225,12 @@ async function updateFullHotel({ property, hotel, propertyUpdates, hotelUpdates,
 
 /** Duplique un hôtel (Property + Hotel + RoomCategory actives, jamais les tarifs — l'admin les redéfinit). */
 async function duplicateHotel({ hotel, property, actingUser }) {
+  const clonedName = `${hotel.name} (copie)`;
+  await assertHotelNameAvailable({
+    name: clonedName,
+    tenantId: hotel.tenant || actingUser.platformTenant?._id || actingUser.platformTenant || null,
+    managerId: hotel.manager || actingUser.id,
+  });
   const clonedProperty = await Property.create({
     owner: property.owner,
     title: `${property.title} (copie)`,
@@ -232,25 +256,31 @@ async function duplicateHotel({ hotel, property, actingUser }) {
     statusAdmin: 'En attente',
   });
 
-  const clonedHotel = await Hotel.create({
-    name: `${hotel.name} (copie)`,
-    brand: hotel.brand,
-    description: hotel.description,
-    starRating: hotel.starRating,
-    phone: hotel.phone,
-    email: hotel.email,
-    website: hotel.website,
-    contact: hotel.contact,
-    services: hotel.services,
-    hotelServices: hotel.hotelServices,
-    hasRestaurant: hotel.hasRestaurant,
-    hasReception: hotel.hasReception,
-    gallery: hotel.gallery,
-    manager: hotel.manager,
-    property: clonedProperty._id,
-    createdBy: actingUser.id,
-    tenant: actingUser.platformTenant?._id || actingUser.platformTenant || hotel.tenant || null,
-  });
+  let clonedHotel;
+  try {
+    clonedHotel = await Hotel.create({
+      name: clonedName,
+      brand: hotel.brand,
+      description: hotel.description,
+      starRating: hotel.starRating,
+      phone: hotel.phone,
+      email: hotel.email,
+      website: hotel.website,
+      contact: hotel.contact,
+      services: hotel.services,
+      hotelServices: hotel.hotelServices,
+      hasRestaurant: hotel.hasRestaurant,
+      hasReception: hotel.hasReception,
+      gallery: hotel.gallery,
+      manager: hotel.manager,
+      property: clonedProperty._id,
+      createdBy: actingUser.id,
+      tenant: actingUser.platformTenant?._id || actingUser.platformTenant || hotel.tenant || null,
+    });
+  } catch (error) {
+    await Property.findByIdAndDelete(clonedProperty._id).catch(() => {});
+    throw translateHotelNameDuplicate(error);
+  }
 
   await Accommodation.create({
     property: clonedProperty._id,

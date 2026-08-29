@@ -25,6 +25,10 @@ const {
   computeHotelCompletionScore, syncLinkedAccommodations, resyncLinkedAccommodations,
   createFullHotel, updateFullHotel, duplicateHotel, deleteHotel, listHotelsForAdmin, listValidatedHotelPortfolio,
 } = require('../services/hotelService');
+const {
+  assertHotelNameAvailable,
+  translateHotelNameDuplicate,
+} = require('../services/hotel/hotelNameUniquenessService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { notify } = require('../services/notificationService');
 const {
@@ -465,7 +469,8 @@ exports.createFull = async (req, res) => {
     try {
       result = await createFullHotel({ propertyData, hotelData, accommodationType, actingUser: req.user });
     } catch (error) {
-      return fail(res, error.statusCode || 500, error.message);
+      const typedError = translateHotelNameDuplicate(error);
+      return fail(res, typedError.statusCode || 500, typedError.message, typedError.code ? { code: typedError.code } : {});
     }
 
     logAction({
@@ -541,6 +546,15 @@ exports.updateFull = async (req, res) => {
     const hotelUpdates = buildHotelDataFromBody(req);
     if (!hotelUpdates.name) delete hotelUpdates.name;
 
+    if (hotelUpdates.name !== undefined) {
+      await assertHotelNameAvailable({
+        name: hotelUpdates.name,
+        tenantId: hotel.tenant,
+        managerId: hotel.manager || req.user.id,
+        excludeHotelId: hotel._id,
+      });
+    }
+
     let proposed = false;
     if (hotel.publicationStatus === 'publie') {
       if (hotel.proposedVersion?.status === 'pending') return fail(res, 409, 'Une modification sensible est déjà en attente de modération.', { code: 'HOTEL_PROPOSED_VERSION_PENDING' });
@@ -569,7 +583,8 @@ exports.updateFull = async (req, res) => {
 
     res.json({ status: 'success', data: { property: result.property, hotel: result.hotel, proposedVersionPending: proposed } });
   } catch (error) {
-    fail(res, 500, error.message);
+    const typedError = translateHotelNameDuplicate(error);
+    fail(res, typedError.statusCode || 500, typedError.message, typedError.code ? { code: typedError.code } : {});
   }
 };
 
@@ -663,7 +678,18 @@ exports.reviewDecision = async (req, res) => {
         submittedAt: proposed.submittedAt, reviewedAt: now, reason: String(req.body.reason || '').trim(),
       };
       const set = { proposedVersion: null, reviewedBy: req.user.id };
-      if (action === 'validate') Object.assign(set, hotelChanges);
+      if (action === 'validate') {
+        if (hotelChanges.name !== undefined) {
+          const { normalizedName } = await assertHotelNameAvailable({
+            name: hotelChanges.name,
+            tenantId: hotel.tenant,
+            managerId: hotel.manager,
+            excludeHotelId: hotel._id,
+          });
+          set.normalizedName = normalizedName;
+        }
+        Object.assign(set, hotelChanges);
+      }
       const transition = await Hotel.updateOne(
         { _id: hotel._id, 'proposedVersion.status': 'pending', 'proposedVersion.requestId': proposed.requestId },
         { $set: set, $push: { versionHistory: history } },
@@ -777,7 +803,8 @@ exports.reviewDecision = async (req, res) => {
 
     res.json({ status: 'success', data: { hotel } });
   } catch (error) {
-    fail(res, 500, error.message);
+    const typedError = translateHotelNameDuplicate(error);
+    fail(res, typedError.statusCode || 500, typedError.message, typedError.code ? { code: typedError.code } : {});
   }
 };
 
@@ -917,7 +944,8 @@ exports.duplicate = async (req, res) => {
 
     res.status(201).json({ status: 'success', data: result });
   } catch (error) {
-    fail(res, 500, error.message);
+    const typedError = translateHotelNameDuplicate(error);
+    fail(res, typedError.statusCode || 500, typedError.message, typedError.code ? { code: typedError.code } : {});
   }
 };
 

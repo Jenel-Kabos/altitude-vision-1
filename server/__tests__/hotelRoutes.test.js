@@ -21,6 +21,10 @@ jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
 jest.mock('../services/zohoImapService', () => ({ pollZohoInbox: jest.fn() }));
 jest.mock('../services/alerteService', () => ({ verifierPaiementsEnRetard: jest.fn() }));
+jest.mock('../services/hotel/hotelNameUniquenessService', () => ({
+  assertHotelNameAvailable: jest.fn().mockResolvedValue({ normalizedName: 'hotel test' }),
+  translateHotelNameDuplicate: jest.fn((error) => error),
+}));
 jest.mock('../services/platformTenant/tenantContextService', () => ({
   resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),
   resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' }),

@@ -14,6 +14,7 @@
 // Room/Reservation/Calendar — voir HOTEL_V2.md.
 
 const mongoose = require('mongoose');
+const { normalizeHotelName } = require('../utils/normalizeHotelName');
 
 // Services structurés (Sprint B2) — chaque clé est un booléen. Remplace
 // l'ancien `services: [String]` en tant que source de vérité pour le
@@ -33,6 +34,7 @@ const hotelSchema = new mongoose.Schema(
       required: [true, "Le nom de l'hôtel est requis."],
       trim: true,
     },
+    normalizedName: { type: String, select: false, default: null },
     // Enseigne / marque commerciale (Sprint B2) — distincte du nom légal
     // (ex : nom = "SARL Panorama Hôtellerie", enseigne = "Hôtel Panorama").
     brand: { type: String, trim: true, default: '' },
@@ -224,6 +226,22 @@ const hotelSchema = new mongoose.Schema(
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { timestamps: true },
+);
+
+hotelSchema.pre('validate', function deriveNormalizedHotelName() {
+  this.normalizedName = normalizeHotelName(this.name);
+});
+
+hotelSchema.index(
+  { tenant: 1, normalizedName: 1 },
+  {
+    name: 'tenant_normalized_hotel_name_unique',
+    unique: true,
+    partialFilterExpression: {
+      tenant: { $type: 'objectId' },
+      normalizedName: { $type: 'string' },
+    },
+  },
 );
 
 const Hotel = mongoose.model('Hotel', hotelSchema);

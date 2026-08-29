@@ -20,6 +20,7 @@ const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
+const { assertHotelNameAvailable } = require('../services/hotel/hotelNameUniquenessService');
 
 jest.setTimeout(120000);
 
@@ -86,6 +87,20 @@ const counts = async () => ({
   accommodation: await Accommodation.countDocuments(),
   ratePlan: await RatePlan.countDocuments(),
 });
+
+const fullHotelCounts = async () => Promise.all([
+  Hotel.countDocuments(), Property.countDocuments(), Accommodation.countDocuments(),
+  RoomCategory.countDocuments(), RatePlan.countDocuments(),
+]);
+
+const hotelPayloadNamed = (name) => {
+  const payload = hotelPayload();
+  payload.property.titre = name;
+  payload.accommodation.hotel.name = name;
+  return payload;
+};
+
+const userInTenant = (user, tenantId) => ({ ...user.toObject(), _id: user._id, id: user.id, platformTenant: { _id: tenantId } });
 
 beforeAll(async () => {
   await startFinancialMongo();
@@ -162,6 +177,82 @@ describe('createFullMobileAccommodation — établissement hôtelier professionn
       };
     };
     expect(await snapshot(web)).toEqual(await snapshot(mobile));
+  });
+});
+
+describe('createFullMobileAccommodation — unicité du nom hôtelier par tenant', () => {
+  test.each(['HÔTEL MILA', 'Hôtel Mila', '  Hôtel   Mila  ', 'Hotel Mila'])('refuse le doublon normalisé %s avant toute ressource orpheline', async (duplicateName) => {
+    const tenantId = new mongoose.Types.ObjectId();
+    const user = userInTenant(await makeUser(), tenantId);
+    await createFullMobileAccommodation({ user, payload: hotelPayloadNamed('Hôtel Mila'), publicationRequestId: `hotel-first-${Date.now()}` });
+    const before = await fullHotelCounts();
+
+    await expect(createFullMobileAccommodation({ user, payload: hotelPayloadNamed(duplicateName), publicationRequestId: `hotel-duplicate-${duplicateName}-${Date.now()}` }))
+      .rejects.toMatchObject({ statusCode: 409, code: 'HOTEL_NAME_ALREADY_EXISTS' });
+
+    expect(await fullHotelCounts()).toEqual(before);
+  });
+
+  test('autorise un nom réellement différent dans le même tenant', async () => {
+    const user = userInTenant(await makeUser(), new mongoose.Types.ObjectId());
+    await createFullMobileAccommodation({ user, payload: hotelPayloadNamed('Mila Hotel'), publicationRequestId: `hotel-a-${Date.now()}` });
+    await createFullMobileAccommodation({ user, payload: hotelPayloadNamed('Mila Residence'), publicationRequestId: `hotel-b-${Date.now()}` });
+    expect(await Hotel.countDocuments()).toBe(2);
+  });
+
+  test('autorise le même nom dans deux tenants sans fuite cross-tenant', async () => {
+    const owner = await makeUser();
+    const tenantAUser = userInTenant(owner, new mongoose.Types.ObjectId());
+    const tenantBUser = userInTenant(owner, new mongoose.Types.ObjectId());
+    await createFullMobileAccommodation({ user: tenantAUser, payload: hotelPayloadNamed('Mila Hotel'), publicationRequestId: `hotel-tenant-a-${Date.now()}` });
+    await createFullMobileAccommodation({ user: tenantBUser, payload: hotelPayloadNamed('MILA HOTEL'), publicationRequestId: `hotel-tenant-b-${Date.now()}` });
+    expect(await Hotel.countDocuments()).toBe(2);
+  });
+
+  test('un hôtel publié bloque aussi une seconde création du même nom', async () => {
+    const user = userInTenant(await makeUser(), new mongoose.Types.ObjectId());
+    const first = await createFullMobileAccommodation({ user, payload: hotelPayloadNamed('Mila Hotel'), publicationRequestId: `hotel-published-${Date.now()}` });
+    await Hotel.updateOne({ _id: first.hotel._id }, { $set: { publicationStatus: 'publie' } });
+    await expect(createFullMobileAccommodation({ user, payload: hotelPayloadNamed('mila hotel'), publicationRequestId: `hotel-after-published-${Date.now()}` }))
+      .rejects.toMatchObject({ statusCode: 409, code: 'HOTEL_NAME_ALREADY_EXISTS' });
+  });
+
+  test.each(['brouillon', 'rejete', 'suspendu'])('un hôtel %s reste réservé dans le tenant', async (publicationStatus) => {
+    const tenantId = new mongoose.Types.ObjectId();
+    const owner = await makeUser();
+    await Hotel.create({
+      name: 'Mila Hotel', tenant: tenantId, manager: owner._id,
+      createdBy: owner._id, publicationStatus,
+    });
+    await expect(assertHotelNameAvailable({ name: ' MILA   HOTEL ', tenantId, managerId: owner._id }))
+      .rejects.toMatchObject({ statusCode: 409, code: 'HOTEL_NAME_ALREADY_EXISTS' });
+  });
+
+  test('une édition conserve son propre nom mais refuse le nom normalisé d’un autre hôtel', async () => {
+    const tenantId = new mongoose.Types.ObjectId();
+    const owner = await makeUser();
+    const [mila, rival] = await Hotel.create([
+      { name: 'Mila Hotel', tenant: tenantId, manager: owner._id, createdBy: owner._id },
+      { name: 'Rival Palace', tenant: tenantId, manager: owner._id, createdBy: owner._id },
+    ]);
+
+    await expect(assertHotelNameAvailable({
+      name: ' MILA  HOTEL ', tenantId, managerId: owner._id, excludeHotelId: mila._id,
+    })).resolves.toMatchObject({ normalizedName: 'mila hotel' });
+    await expect(assertHotelNameAvailable({
+      name: 'Mila Hotel', tenantId, managerId: owner._id, excludeHotelId: rival._id,
+    })).rejects.toMatchObject({ statusCode: 409, code: 'HOTEL_NAME_ALREADY_EXISTS' });
+  });
+
+  test('deux créations concurrentes de même nom produisent au maximum un hôtel', async () => {
+    const user = userInTenant(await makeUser(), new mongoose.Types.ObjectId());
+    const results = await Promise.allSettled([
+      createFullMobileAccommodation({ user, payload: hotelPayloadNamed('MILA HOTEL'), publicationRequestId: `hotel-race-a-${Date.now()}` }),
+      createFullMobileAccommodation({ user, payload: hotelPayloadNamed('Mila Hotel'), publicationRequestId: `hotel-race-b-${Date.now()}` }),
+    ]);
+    expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(({ status }) => status === 'rejected')[0]?.reason).toMatchObject({ statusCode: 409, code: 'HOTEL_NAME_ALREADY_EXISTS' });
+    expect(await Hotel.countDocuments()).toBe(1);
   });
 });
 

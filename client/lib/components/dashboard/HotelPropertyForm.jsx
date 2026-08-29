@@ -462,6 +462,12 @@ export function HotelCreationWizard({ accommodationType, scope, onSuccess, onCan
       const result = await (scope === 'owner' ? createMyHotel : createFullHotel)(data);
       onSuccess?.(result);
     } catch (error) {
+      if (error.response?.status === 409 && error.response?.data?.code === 'HOTEL_NAME_ALREADY_EXISTS') {
+        const duplicateMessage = `Un établissement nommé « ${form.name.trim()} » existe déjà. Consultez le dossier existant plutôt que d’en créer un nouveau.`;
+        showErrors({ name: duplicateMessage });
+        toast.error(duplicateMessage);
+        return;
+      }
       const missingFields = error.response?.data?.missingFields;
       if (error.response?.status === 422 && Array.isArray(missingFields)) {
         const aliases = {

@@ -37,6 +37,9 @@ const { logAction, buildAuteur } = require('../actionLogService');
 const { destroyFromCloudinary } = require('../../config/cloudinary');
 const { fail, MobileAccommodationError } = require('./mobileAccommodationError');
 const { analyzeHotelRoomCategories } = require('./hotelPublicationPayload');
+const {
+  assertHotelNameAvailable, translateHotelNameDuplicate,
+} = require('../hotel/hotelNameUniquenessService');
 
 const MAX_ATTEMPTS = 5;
 const WINNER_WAIT_ATTEMPTS = 10;
@@ -198,6 +201,15 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
     ? analyzeHotelRoomCategories(payload.roomCategories)
     : null;
 
+  const tenantId = user.platformTenant?._id || user.platformTenant || null;
+  if (hotelAnalysis) {
+    await assertHotelNameAvailable({
+      name: payload.accommodation.hotel.name,
+      tenantId,
+      managerId: ownerId,
+    });
+  }
+
   const uploadedImages = Array.isArray(payload.property.photos) ? payload.property.photos : [];
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -236,7 +248,7 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
           manager: ownerId,
           property: property._id,
           createdBy: ownerId,
-          tenant: user.platformTenant?._id || user.platformTenant || null,
+          tenant: tenantId,
           publicationStatus: 'soumis',
           submittedAt: new Date(),
         }], { session });
@@ -256,7 +268,7 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
         hotel: hotel?._id,
         property: property._id,
         createdBy: ownerId,
-        tenant: user.platformTenant?._id || user.platformTenant || null,
+        tenant: tenantId,
         publicationRequestId,
       }], { session });
 
@@ -336,6 +348,12 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
     } catch (error) {
       await session.abortTransaction().catch(() => {});
       session.endSession();
+
+      const translatedError = translateHotelNameDuplicate(error);
+      if (translatedError !== error) {
+        await cleanupUploadedImages(uploadedImages);
+        throw translatedError;
+      }
 
       if (!isBusinessError(error)) {
         const winner = await waitForPublication(publicationRequestId, ownerId);

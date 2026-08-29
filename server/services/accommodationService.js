@@ -191,6 +191,9 @@ async function resolveHotel({ hotelInput, propertyId, actingUser }) {
     });
     return { hotelId: hotel._id, hotelWasCreated: true };
   } catch (error) {
+    // Preserve Mongo duplicate-key metadata so the hotel domain boundary can
+    // translate its own unique-index race into the public 409 contract.
+    if (error?.code === 11000) throw error;
     const wrapped = new Error(`Échec de création de l'établissement hôtelier : ${error.message}`);
     wrapped.step = 'hotel';
     if (error.name === 'ValidationError') wrapped.statusCode = 422;
