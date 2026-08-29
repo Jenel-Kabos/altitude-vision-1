@@ -28,4 +28,15 @@ describe('hotelWizardValidation', () => {
   test('un hôtel complet ne produit aucune erreur', () => {
     expect(validateHotelWizard(complete())).toEqual({});
   });
+
+  test('les validations suivent le parcours de création en 8 étapes sans étape de capacité isolée', () => {
+    const categoryErrors = validateHotelWizard({ ...complete(), roomCategories: [] });
+    expect(firstHotelWizardError(categoryErrors)).toMatchObject({ field: 'roomCategories', step: 2 });
+
+    const serviceErrors = validateHotelWizard({ ...complete(), hotelServices: {} });
+    expect(firstHotelWizardError(serviceErrors)).toMatchObject({ field: 'hotelServices', step: 4 });
+
+    const photoErrors = validateHotelWizard({ ...complete(), images: [] });
+    expect(firstHotelWizardError(photoErrors)).toMatchObject({ field: 'images', step: 6 });
+  });
 });

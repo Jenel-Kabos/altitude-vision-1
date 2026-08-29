@@ -327,7 +327,7 @@ export default function ManageHotelsPage() {
                     toast.success(
                       result?.proposedVersionPending
                         ? "Les informations ordinaires sont enregistrées. Les modifications sensibles restent en attente dans Modération Hôtellerie ; la version publiée demeure active."
-                        : (editing ? "Établissement mis à jour." : "L’établissement a été soumis à la Modération Hôtellerie. Il apparaîtra ici après validation.")
+                        : (editing ? "Établissement mis à jour." : "Établissement créé et soumis avec succès. Il est en attente de validation administrative et apparaîtra dans le portefeuille des établissements actifs uniquement après validation.")
                     );
                     load();
                   }}

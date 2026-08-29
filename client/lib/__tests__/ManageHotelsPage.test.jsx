@@ -45,11 +45,14 @@ describe('ManageHotelsPage — portefeuille hôtelier validé', () => {
     expect(getHotelPortfolio.mock.calls.flatMap(([params]) => Object.keys(params))).not.toContain('status');
   });
 
-  test('l’ajout annonce le passage obligatoire par Modération Hôtellerie', async () => {
+  test('l’ajout confirme la soumission et explique la visibilité après validation', async () => {
     render(<ManageHotelsPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Ajouter un établissement' }));
     fireEvent.click(screen.getByRole('button', { name: 'Soumettre le formulaire test' }));
-    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Modération Hôtellerie'));
+    expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/créé et soumis/i));
+    expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/en attente de validation administrative/i));
+    expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/portefeuille.*uniquement après validation/i));
+    expect(toast.success.mock.calls.at(-1)?.[0]).not.toMatch(/publié avec succès|désormais actif/i);
   });
 
   test('archive via le cycle de vie hôtelier et retire ensuite la carte', async () => {
@@ -57,6 +60,7 @@ describe('ManageHotelsPage — portefeuille hôtelier validé', () => {
     render(<ManageHotelsPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Actions pour Altitude Hôtel' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Archiver' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Archiver' }));
     await waitFor(() => expect(deactivateHotel).toHaveBeenCalledWith('HOTEL-1'));
   });
 });
