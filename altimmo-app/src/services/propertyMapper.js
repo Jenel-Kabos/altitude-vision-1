@@ -3,6 +3,7 @@
 // de façon cohérente des champs déjà renvoyés par l'API, sans inventer de règle.
 
 import api from './api';
+import { navigationRegistry, resolveWebDestination } from '../navigation/navigationSdk';
 
 const HEBERGEMENT_KEYWORDS = ['hebergement', 'hébergement'];
 const LOCATION_KEYWORDS = ['location', 'louer', 'rent', 'renting'];
@@ -308,4 +309,20 @@ export function getDisplayPrice(property) {
   const amount = Number(property.price || property.prix || 0);
   if (amount <= 0) return { amount: 0, hasPrice: false, suffix: '' };
   return { amount, hasPrice: true, suffix: listingType === 'location' ? '/ mois' : '' };
+}
+
+/**
+ * HOTFIX-MOBILE-PROPERTY-SHARE-CANONICAL-URL-1 — URL publique canonique d'un
+ * bien, dérivée du registre de navigation partagé (`PROPERTY_DETAILS.webRoute`
+ * = `/immobilier/property/:id`, identique à la route web réelle qui sert déjà
+ * les bonnes metadata Open Graph). Ne jamais construire `/annonces/:id` en
+ * dur : cette route n'existe pas côté Next.js (voir
+ * server/docs/AUDIT_PROPERTY_SHARE_WHATSAPP_OG1_REPORT.md).
+ * Couvre Vente/Location ET Hébergement (un item hébergement est toujours un
+ * Property, cf. `resolveDetailParams`/`fetchAnnonceDetail` ci-dessus).
+ */
+export function buildPropertyShareUrl(property) {
+  const id = property?._id || property?.id;
+  if (!id) return null;
+  return `${navigationRegistry.origins.web}${resolveWebDestination('PROPERTY_DETAILS', { id })}`;
 }

@@ -15,6 +15,7 @@ import {
   resolveDetailParams,
   fetchAnnonceDetail,
   getDisplayPrice,
+  buildPropertyShareUrl,
 } from '../propertyMapper';
 
 describe('normalizeListingType', () => {
@@ -383,5 +384,33 @@ describe('getDisplayPrice', () => {
 
   test('hébergement sans rates ni price : "Prix sur demande", jamais inventé', () => {
     expect(getDisplayPrice({ status: 'hebergement' })).toEqual({ amount: 0, hasPrice: false, suffix: '' });
+  });
+});
+
+// HOTFIX-MOBILE-PROPERTY-SHARE-CANONICAL-URL-1 — server/docs/AUDIT_PROPERTY_SHARE_WHATSAPP_OG1_REPORT.md
+// a confirmé que /annonces/:id ne correspond à aucune route Next.js réelle
+// (absorbée par le catch-all racine, "Page introuvable") alors que
+// /immobilier/property/:id fonctionne (HTTP 200, OG correct, testé en
+// production sur ce bien exact). buildPropertyShareUrl doit toujours
+// pointer vers la route canonique réelle, jamais vers /annonces/:id.
+describe('buildPropertyShareUrl', () => {
+  test('construit la route canonique /immobilier/property/:id — jamais /annonces/:id', () => {
+    const url = buildPropertyShareUrl({ _id: '6a911186cbe20b4c495d6591' });
+    expect(url).toBe('https://altitudevision.agency/immobilier/property/6a911186cbe20b4c495d6591');
+    expect(url).not.toContain('/annonces/');
+  });
+
+  test('fonctionne identiquement pour un bien hébergement (même route canonique)', () => {
+    const url = buildPropertyShareUrl({ _id: '6a911186cbe20b4c495d6591', status: 'hebergement', accommodationType: 'villa_meublee' });
+    expect(url).toBe('https://altitudevision.agency/immobilier/property/6a911186cbe20b4c495d6591');
+  });
+
+  test('accepte `id` en repli si `_id` est absent', () => {
+    expect(buildPropertyShareUrl({ id: 'p-legacy-1' })).toBe('https://altitudevision.agency/immobilier/property/p-legacy-1');
+  });
+
+  test('retourne null sans identifiant, jamais une URL cassée', () => {
+    expect(buildPropertyShareUrl(null)).toBeNull();
+    expect(buildPropertyShareUrl({})).toBeNull();
   });
 });

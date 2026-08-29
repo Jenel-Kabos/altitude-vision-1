@@ -21,7 +21,7 @@ import HeartFavoriteButton from '../../components/HeartFavoriteButton';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 import {
   getPropertyPermissions, extractConversation, resolveContactErrorMessage,
-  resolveDetailParams, fetchAnnonceDetail, getDisplayPrice,
+  resolveDetailParams, fetchAnnonceDetail, getDisplayPrice, buildPropertyShareUrl,
 } from '../../services/propertyMapper';
 import { formatDateFR, formatTimeHHmm, isFutureDateTime, buildVisitPayload, fetchAvailability } from '../../services/visiteService';
 import { resolveMobileDestination } from '../../navigation/navigationSdk';
@@ -338,7 +338,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
 
   const partagerBien = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const webLink = `https://altitudevision.agency/annonces/${annonce?._id}`;
+    const webLink = buildPropertyShareUrl(annonce);
     try {
       await Share.share({
         title:   title,
@@ -353,7 +353,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       // convention que le web (PropertyDetailPage.jsx).
       api.post(`/properties/${annonce?._id}/share`).catch(() => {});
     } catch { /* annulé */ }
-  }, [annonce?._id, title, addressText, prix]);
+  }, [annonce, title, addressText, prix]);
 
   const envoyerCommentaire = useCallback(async () => {
     if (!commentaire.trim()) return;

@@ -29,6 +29,17 @@ export function resolveMobileDestination(destination, params = {}) {
   return route ? interpolate(route, params) : null;
 }
 
+// HOTFIX-MOBILE-PROPERTY-SHARE-CANONICAL-URL-1 — même contrat que
+// client/lib/navigation/navigationSdk.js::resolveWebDestination : dérive
+// l'URL web publique d'une destination depuis le registre partagé
+// (`webRoute`), pour que tout lien externe construit côté mobile (partage,
+// deep-link universel) pointe toujours vers une route Next.js réellement
+// déployée, sans jamais dupliquer un chemin en dur.
+export function resolveWebDestination(destination, params = {}) {
+  const route = getDestination(destination)?.webRoute;
+  return route ? interpolate(route, params) : null;
+}
+
 export function resolveNotificationMobileTarget(notification = {}) {
   const data = notification.data || notification.metadata || notification;
   const id = notification.entityId || data.entityId || data.applicationId || data.conversationId;

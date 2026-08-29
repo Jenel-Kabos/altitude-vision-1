@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { cache } from '../../services/cacheService';
@@ -149,14 +150,17 @@ const VisiteCard = React.memo(function VisiteCard({ item, onCancel, onOwnerActio
   prev.styles === next.styles);
 
 // ─── VisitesScreen ────────────────────────────────────────────────────────────
-export default function VisitesScreen({ navigation }) {
+export default function VisitesScreen({ navigation, route }) {
   const { user } = useAuth();
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
 
   const isProprietaire = user?.role === 'Proprietaire';
-  const endpoint = isProprietaire ? '/visites/owner' : '/visites/my';
-  const titre    = isProprietaire ? 'Visites de mes biens' : 'Mes visites';
+  const initialContext = isProprietaire && route?.params?.visitContext === 'owner' ? 'owner' : 'my';
+  const [visitContext, setVisitContext] = useState(initialContext);
+  const isOwnerContext = isProprietaire && visitContext === 'owner';
+  const endpoint = isOwnerContext ? '/visites/owner' : '/visites/my';
+  const titre = isProprietaire ? 'Visites' : 'Mes demandes de visite';
 
   const [visites, setVisites]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -183,7 +187,9 @@ export default function VisitesScreen({ navigation }) {
     }
   }, [endpoint]);
 
-  useEffect(() => { chargerVisites(); }, [chargerVisites]);
+  useFocusEffect(useCallback(() => {
+    chargerVisites(true);
+  }, [chargerVisites]));
 
   useEffect(() => {
     let activeSocket;
@@ -248,11 +254,19 @@ export default function VisitesScreen({ navigation }) {
       item={item}
       onCancel={() => annulerVisite(item)}
       onOwnerAction={(action) => actionProprietaire(item, action)}
-      showCancel={tab === 'venir' && !isProprietaire}
+      showCancel={tab === 'venir' && !isOwnerContext}
       styles={styles}
       c={c}
     />
-  ), [annulerVisite, actionProprietaire, tab, isProprietaire, styles, c]);
+  ), [annulerVisite, actionProprietaire, tab, isOwnerContext, styles, c]);
+
+  const selectVisitContext = useCallback((nextContext) => {
+    if (nextContext === visitContext) return;
+    setVisites([]);
+    setLoading(true);
+    setTab('venir');
+    setVisitContext(nextContext);
+  }, [visitContext]);
 
   const keyExtractor = useCallback((item) => item._id || item.id, []);
 
@@ -271,6 +285,30 @@ export default function VisitesScreen({ navigation }) {
         title={titre}
         onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
       />
+
+      {isProprietaire && (
+        <View style={styles.contextTabsWrap}>
+          {[
+            { key: 'my', label: 'Mes demandes', icon: 'person-outline' },
+            { key: 'owner', label: 'Mes biens', icon: 'home-outline' },
+          ].map((context) => {
+            const active = visitContext === context.key;
+            return (
+              <TouchableOpacity
+                key={context.key}
+                style={[styles.contextTab, active && styles.contextTabActive]}
+                onPress={() => selectVisitContext(context.key)}
+                accessibilityRole="button"
+                accessibilityLabel={`Afficher ${context.label.toLowerCase()}`}
+                accessibilityState={{ selected: active }}
+              >
+                <Ionicons name={context.icon} size={14} color={active ? '#0A0A0A' : c.textMuted} />
+                <Text style={[styles.contextTabText, active && styles.contextTabTextActive]}>{context.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       {/* ─── Tabs ────────────────────────────────────────────── */}
       <View style={styles.tabsWrap}>
@@ -325,8 +363,10 @@ export default function VisitesScreen({ navigation }) {
         ListEmptyComponent={
           <EmptyState
             illustration={IllustrationNoVisites}
-            title={tab === 'venir' ? 'Aucune visite à venir' : 'Aucune visite passée'}
-            subtitle={tab === 'venir' ? 'Demandez une visite depuis une annonce.' : ''}
+            title={tab === 'venir'
+              ? (isOwnerContext ? 'Aucune demande de visite à venir' : 'Aucune visite à venir')
+              : (isOwnerContext ? 'Aucune demande de visite passée' : 'Aucune visite passée')}
+            subtitle={tab === 'venir' && !isOwnerContext ? 'Demandez une visite depuis une annonce.' : ''}
           />
         }
       />
@@ -336,6 +376,27 @@ export default function VisitesScreen({ navigation }) {
 
 const makeStyles = (c) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.bg },
+
+  contextTabsWrap: {
+    flexDirection: 'row',
+    backgroundColor: c.bgCard,
+    borderRadius: radius.lg,
+    padding: 4,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+  },
+  contextTab: {
+    flex: 1,
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: radius.md,
+  },
+  contextTabActive: { backgroundColor: c.gold },
+  contextTabText: { fontFamily: fonts.bodyMedium, fontSize: fontSize.sm, color: c.textMuted },
+  contextTabTextActive: { fontFamily: fonts.bodyBold, color: '#0A0A0A' },
 
   // ─── Tabs ───
   tabsWrap: {
