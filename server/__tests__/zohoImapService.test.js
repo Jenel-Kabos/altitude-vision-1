@@ -5,6 +5,7 @@ jest.mock('mailparser', () => ({ simpleParser: jest.fn() }));
 jest.mock('../models/InternalMail', () => ({ findOne: jest.fn(), create: jest.fn() }));
 jest.mock('../models/User', () => ({ findOne: jest.fn() }));
 jest.mock('../models/ImapSyncCheckpoint', () => ({ findOne: jest.fn(), findOneAndUpdate: jest.fn() }));
+jest.mock('../models/ImapMessageClaim', () => ({ findOneAndUpdate: jest.fn(), updateOne: jest.fn() }));
 jest.mock('../config/cloudinary', () => ({ uploadToCloudinary: jest.fn() }));
 jest.mock('../utils/logger', () => ({
     info: jest.fn(), success: jest.fn(), warn: jest.fn(), error: jest.fn(),
@@ -15,6 +16,7 @@ const { simpleParser } = require('mailparser');
 const InternalMail = require('../models/InternalMail');
 const User = require('../models/User');
 const ImapSyncCheckpoint = require('../models/ImapSyncCheckpoint');
+const ImapMessageClaim = require('../models/ImapMessageClaim');
 const logger = require('../utils/logger');
 const { pollZohoInbox, resolveSyncOrigin } = require('../services/zohoImapService');
 
@@ -65,6 +67,8 @@ describe('pollZohoInbox', () => {
         // (couverts séparément, voir tests "checkpoint").
         ImapSyncCheckpoint.findOne.mockResolvedValue({ uidValidity: '1000', lastProcessedUid: 0 });
         ImapSyncCheckpoint.findOneAndUpdate.mockResolvedValue({});
+        ImapMessageClaim.findOneAndUpdate.mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: 'claim-id' }) });
+        ImapMessageClaim.updateOne.mockResolvedValue({ modifiedCount: 1 });
     });
 
     afterAll(() => {
@@ -328,7 +332,7 @@ describe('pollZohoInbox — checkpoint UID (remplace `\\Seen` comme source de v�
         expect(InternalMail.create).toHaveBeenCalledTimes(1);
         expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
             { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
-            { uidValidity: '1000', lastProcessedUid: 113 },
+            { $set: { uidValidity: '1000' }, $max: { lastProcessedUid: 113 } },
             { upsert: true },
         );
     });
@@ -367,7 +371,7 @@ describe('pollZohoInbox — checkpoint UID (remplace `\\Seen` comme source de v�
         expect(InternalMail.create).toHaveBeenCalledTimes(1); // jamais de doublon pour 111/112
         expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
             { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
-            { uidValidity: '1000', lastProcessedUid: 113 },
+            { $set: { uidValidity: '1000', lastProcessedUid: 113 } },
             { upsert: true },
         );
     });
@@ -391,7 +395,7 @@ describe('pollZohoInbox — checkpoint UID (remplace `\\Seen` comme source de v�
         }));
         expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
             { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
-            { uidValidity: '2000', lastProcessedUid: 1 },
+            { $set: { uidValidity: '2000', lastProcessedUid: 1 } },
             { upsert: true },
         );
     });
@@ -418,7 +422,7 @@ describe('pollZohoInbox — checkpoint UID (remplace `\\Seen` comme source de v�
         // comme doublon par `zohoMessageId` (déjà importé), jamais recréé.
         expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
             { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
-            { uidValidity: '1000', lastProcessedUid: 113 },
+            { $set: { uidValidity: '1000' }, $max: { lastProcessedUid: 113 } },
             { upsert: true },
         );
     });
@@ -438,7 +442,7 @@ describe('pollZohoInbox — checkpoint UID (remplace `\\Seen` comme source de v�
 
         expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
             { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
-            { uidValidity: '1000', lastProcessedUid: 105 },
+            { $set: { uidValidity: '1000' }, $max: { lastProcessedUid: 105 } },
             { upsert: true },
         );
     });
@@ -464,7 +468,7 @@ describe('pollZohoInbox — checkpoint UID (remplace `\\Seen` comme source de v�
 
         expect(ImapSyncCheckpoint.findOneAndUpdate).toHaveBeenCalledWith(
             { account: 'inbox@altitudevision.test', mailbox: 'INBOX' },
-            { uidValidity: '1000', lastProcessedUid: 0 },
+            { $set: { uidValidity: '1000', lastProcessedUid: 0 } },
             { upsert: true },
         );
     });

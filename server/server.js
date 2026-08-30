@@ -23,166 +23,14 @@ const fs = require("fs");
 const mongoose = require("mongoose");
 const connectDB = require("./config/db");
 const { initializeCrmAutomation } = require('./services/crmAutomationEngine');
+const { registerScheduledJobs, registerStartupJobs } = require('./services/scheduledJobs/schedulerService');
 
 // --- Connexion MongoDB ---
 connectDB();
 initializeCrmAutomation();
-
-// ============================================================
-// ⏰ CRON JOB - Synchronisation Facebook automatique
-// ============================================================
-const cron = require('node-cron');
-const { syncFacebook } = require('./scripts/sync-facebook');
 const scheduledJobsDisabled = process.env.DISABLE_SCHEDULED_JOBS === '1';
-const schedule = scheduledJobsDisabled ? () => ({ stop() {} }) : cron.schedule.bind(cron);
-
-// 🔄 Tâches de démarrage une fois MongoDB connecté (un seul handler)
-if (!scheduledJobsDisabled) mongoose.connection.once('open', async () => {
-  // Sync Facebook
-  try {
-    await syncFacebook();
-    logger.success('✅ [STARTUP] Sync Facebook terminée');
-  } catch (error) {
-    logger.error('❌ [STARTUP] Erreur sync Facebook:', error.message);
-  }
-
-  // Premier polling IMAP Zoho (délai 10s pour laisser le serveur se stabiliser)
-  setTimeout(async () => {
-    try {
-      const stats = await pollZohoInbox();
-      if (stats.imported > 0) logger.success(`✅ [STARTUP] IMAP — ${stats.imported} email(s) importé(s)`);
-    } catch (err) {
-      logger.error('❌ [STARTUP] Erreur premier poll IMAP:', err.message);
-    }
-  }, 10000);
-});
-
-// ⏰ Sync automatique toutes les heures
-schedule('0 * * * *', async () => {
-  logger.info('⏰ [CRON] Démarrage synchronisation Facebook...');
-  try {
-    await syncFacebook();
-    logger.success('✅ [CRON] Synchronisation Facebook terminée');
-
-    // Nettoyage posts > 5 jours
-    const FacebookPost = mongoose.models.FacebookPost;
-    if (FacebookPost) {
-      const cinqJoursAvant = new Date();
-      cinqJoursAvant.setDate(cinqJoursAvant.getDate() - 5);
-      const deleted = await FacebookPost.deleteMany({
-        date_sync: { $lt: cinqJoursAvant }
-      });
-      logger.info(`🧹 [CRON] ${deleted.deletedCount} vieux posts supprimés`);
-    }
-
-  } catch (error) {
-    logger.error('❌ [CRON] Erreur:', error.message);
-  }
-});
-
-logger.info('⏰ [CRON] Planificateur Facebook activé (toutes les heures)');
-
-// ============================================================
-// 📬 CRON JOB — Polling IMAP Zoho (emails entrants)
-// À ajouter dans server.js, juste après le cron Facebook existant
-// ============================================================
-
-const { pollZohoInbox } = require('./services/zohoImapService');
-
-// ⏰ Polling toutes les 5 minutes
-schedule('*/5 * * * *', async () => {
-    logger.info('⏰ [CRON] Démarrage polling IMAP Zoho...');
-    try {
-        const stats = await pollZohoInbox();
-        if (stats.imported > 0) {
-            logger.success(`✅ [CRON] IMAP — ${stats.imported} email(s) importé(s)`);
-        }
-    } catch (error) {
-        logger.error('❌ [CRON] Erreur polling IMAP:', error.message);
-    }
-});
-
-// Rappels des séjours en hébergement indépendant. Le service porte toute la
-// logique de fuseau et d'idempotence ; le serveur ne fait que le déclencher.
-const { processAccommodationReservationReminders } = require('./services/accommodationReservationReminderService');
-schedule('*/15 * * * *', async () => {
-  try {
-    const result = await processAccommodationReservationReminders();
-    if (result.sent) logger.info(`⏰ [CRON Hébergements] ${result.sent} rappel(s) envoyé(s)`);
-  } catch (error) {
-    logger.error(`❌ [CRON Hébergements] ${error.message}`);
-  }
-});
-
-logger.info('⏰ [CRON] Polling IMAP Zoho activé (toutes les 5 minutes)');
-
-// ============================================================
-// 💸 CRON JOB — Pénalités de retard locatif (6h du matin)
-// ============================================================
-const { verifierPaiementsEnRetard } = require('./services/alerteService');
-const { runRentalFinancialAutomations } = require('./services/rentalFinancialAutomationService');
-
-schedule('0 6 * * *', async () => {
-  logger.info('⏰ [CRON] Vérification paiements en retard...');
-  try {
-    const result = await verifierPaiementsEnRetard();
-    logger.success(`✅ [CRON] ${result.verifies} paiements vérifiés, ${result.penalites} pénalité(s) appliquée(s)`);
-    const alerts = await runRentalFinancialAutomations();
-    logger.success(`✅ [CRON] Alertes locatives : ${alerts.payments.notified} paiement(s), ${alerts.contracts.notified} contrat(s)`);
-  } catch (err) {
-    logger.error('❌ [CRON] Erreur vérification paiements:', err.message);
-  }
-});
-
-logger.info('⏰ [CRON] Vérification pénalités locatives activée (6h quotidien)');
-
-// ============================================================
-// 📅 CRON JOB — rappels et expiration des demandes non confirmées.
-// Une visite confirmée n'est jamais annulée automatiquement sans décision métier.
-// ============================================================
-const { processVisitAutomation } = require('./services/visiteAutomationService');
-
-schedule('*/5 * * * *', async () => {
-  try {
-    const result = await processVisitAutomation();
-    if (result.reminders || result.expired) logger.info(`⏰ [CRON Visites] ${result.reminders} rappel(s), ${result.expired} expiration(s)`);
-  } catch (err) {
-    logger.error('❌ [CRON Visites] Erreur automatisation:', err.message);
-  }
-});
-
-logger.info('⏰ [CRON] Rappels de visites activés (toutes les 5 minutes)');
-
-// ============================================================
-// 🛎️ CRON JOB — Sprint C : expiration des demandes de réservation hôtelière
-// 'pending' non confirmées avant leur pendingExpiresAt. Même fréquence et
-// même pattern que le cron Visites ci-dessus (fonction pure testable,
-// aucune dépendance à l'horloge système dans son test).
-// ============================================================
-const { processReservationExpiry } = require('./services/hotelReservationExpiryService');
-const { expireReservations: expireRealEstateReservations, sendExpirationReminders: remindRealEstateReservations } = require('./services/realEstateApplicationService');
-
-schedule('*/5 * * * *', async () => {
-  try {
-    const result = await processReservationExpiry();
-    if (result.expired) logger.info(`⏰ [CRON Réservations Hôtel] ${result.expired} expiration(s)`);
-  } catch (err) {
-    logger.error('❌ [CRON Réservations Hôtel] Erreur automatisation:', err.message);
-  }
-});
-
-logger.info('⏰ [CRON] Expiration des réservations hôtelières en attente activée (toutes les 5 minutes)');
-
-schedule('*/5 * * * *', async () => {
-  try {
-    const result = await expireRealEstateReservations();
-    if (result.expired) logger.info(`⏰ [CRON Immobilier] ${result.expired} réservation(s) expirée(s)`);
-    const reminders = await remindRealEstateReservations();
-    if (reminders.reminded) logger.info(`⏰ [CRON Immobilier] ${reminders.reminded} rappel(s) d’expiration`);
-  } catch (err) {
-    logger.error(`❌ [CRON Immobilier] ${err.message}`);
-  }
-});
+registerStartupJobs({ disabled: scheduledJobsDisabled, connection: mongoose.connection });
+registerScheduledJobs({ disabled: scheduledJobsDisabled });
 
 
 const app = express();
@@ -614,11 +462,20 @@ app.get('/api/health', (req, res) => {
 app.get('/api/ready', (req, res) => {
   const mongoState = mongoose.connection.readyState;
   const ready = mongoState === 1;
+  // HOTFIX-SCALABILITY-P1-SOCKETIO-DISTRIBUTED-ADAPTER-1 — Redis/l'adaptateur
+  // distribué est une dépendance OPTIONNELLE du realtime (§14/§65 du
+  // mandat) : son absence ou sa perte ne fait jamais échouer /api/ready
+  // (Mongo reste la seule dépendance bloquante), mais l'état doit rester
+  // observable — jamais prétendre "multi-instance safe" en silence pendant
+  // qu'on tourne en réalité en DEGRADED LOCAL REALTIME (§15 du mandat).
+  const { getRealtimeStatus } = require('./socket');
+  const realtime = getRealtimeStatus();
   res.status(ready ? 200 : 503).json({
     status: ready ? 'ready' : 'not_ready',
     timestamp: new Date().toISOString(),
     dependencies: {
       mongo: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoState] || 'unknown',
+      realtime: { adapter: realtime.adapter, degraded: realtime.degraded, instanceId: realtime.instanceId },
     },
   });
 });

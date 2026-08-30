@@ -34,6 +34,7 @@
   "author": "Altitude-Vision Team",
   "license": "MIT",
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.3",
     "cloudinary": "^2.9.0",
@@ -47,6 +48,7 @@
     "google-auth-library": "^10.9.0",
     "helmet": "^7.1.0",
     "imapflow": "^1.2.18",
+    "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.2",
     "mailparser": "^3.9.6",
     "mongodb": "^7.1.1",
@@ -70,6 +72,7 @@
     "mongodb-memory-server": "^10.2.0",
     "nodemon": "^3.1.7",
     "prettier": "^3.3.3",
+    "redis-memory-server": "^0.17.1",
     "supertest": "^7.2.2"
   },
   "engines": {

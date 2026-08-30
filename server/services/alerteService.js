@@ -9,6 +9,56 @@ const MOIS_FR = [
   'juillet','août','septembre','octobre','novembre','décembre',
 ];
 
+const penaltyEmailKey = (paiement) => `rental-penalty:${paiement._id}:${paiement.annee}-${paiement.mois}:v1`;
+
+const claimAndSendPenaltyEmail = async ({ paiement, penalite, retardJours, now = new Date() }) => {
+  const key = penaltyEmailKey(paiement);
+  const claimed = await Paiement.findOneAndUpdate(
+    {
+      _id: paiement._id,
+      penaliteAppliquee: { $ne: true },
+      'penaltyEmailDelivery.status': { $exists: false },
+    },
+    {
+      $set: {
+        retardJours,
+        statut: 'en_retard',
+        penaliteAppliquee: true,
+        penaliteMontant: penalite,
+        montantTotal: paiement.montant + penalite,
+        dateDebutRetard: new Date(paiement.annee, (paiement.mois || 1) - 1, 1),
+        penaltyEmailDelivery: { key, status: 'sending', claimedAt: now },
+      },
+    },
+    { new: true },
+  );
+  if (!claimed) return { claimed: false, sent: false, key };
+
+  const locataire = paiement.contrat?.locataire;
+  if (!locataire?.email) {
+    await Paiement.updateOne(
+      { _id: paiement._id, 'penaltyEmailDelivery.key': key, 'penaltyEmailDelivery.status': 'sending' },
+      { $set: { 'penaltyEmailDelivery.status': 'unknown', 'penaltyEmailDelivery.error': 'recipient_missing' } },
+    );
+    return { claimed: true, sent: false, key, status: 'unknown' };
+  }
+
+  try {
+    await envoyerEmailRetard(paiement, penalite, retardJours, locataire);
+    await Paiement.updateOne(
+      { _id: paiement._id, 'penaltyEmailDelivery.key': key, 'penaltyEmailDelivery.status': 'sending' },
+      { $set: { 'penaltyEmailDelivery.status': 'sent', 'penaltyEmailDelivery.sentAt': new Date() }, $unset: { 'penaltyEmailDelivery.error': 1 } },
+    );
+    return { claimed: true, sent: true, key, status: 'sent' };
+  } catch (error) {
+    await Paiement.updateOne(
+      { _id: paiement._id, 'penaltyEmailDelivery.key': key, 'penaltyEmailDelivery.status': 'sending' },
+      { $set: { 'penaltyEmailDelivery.status': 'unknown', 'penaltyEmailDelivery.error': String(error.message || error).slice(0, 500) } },
+    );
+    return { claimed: true, sent: false, key, status: 'unknown' };
+  }
+};
+
 const verifierPaiementsEnRetard = async () => {
   const aujourd_hui = new Date();
 
@@ -36,20 +86,9 @@ const verifierPaiementsEnRetard = async () => {
 
     if (retardJours >= SEUIL_RETARD && !paiement.penaliteAppliquee) {
       const penalite = Math.round(paiement.montant * TAUX_PENALITE);
-      update.penaliteAppliquee = true;
-      update.penaliteMontant   = penalite;
-      update.montantTotal      = paiement.montant + penalite;
-      update.dateDebutRetard   = dateEcheance;
-      nbPenalitesAppliquees++;
-
-      const locataire = paiement.contrat?.locataire;
-      if (locataire?.email) {
-        try {
-          await envoyerEmailRetard(paiement, penalite, retardJours, locataire);
-        } catch (emailErr) {
-          console.error('❌ [Alerte] Email retard:', emailErr.message);
-        }
-      }
+      const outcome = await claimAndSendPenaltyEmail({ paiement, penalite, retardJours, now: aujourd_hui });
+      if (outcome.claimed) nbPenalitesAppliquees++;
+      if (outcome.claimed) continue;
     }
 
     await Paiement.findByIdAndUpdate(paiement._id, update);
@@ -106,4 +145,4 @@ const envoyerEmailRetard = async (paiement, penalite, retardJours, locataire) =>
   );
 };
 
-module.exports = { verifierPaiementsEnRetard };
+module.exports = { verifierPaiementsEnRetard, claimAndSendPenaltyEmail, penaltyEmailKey };

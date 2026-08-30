@@ -256,7 +256,10 @@ async function notify({
   }
 
   // 3 — Push Expo si l'utilisateur n'a pas de socket actif
-  if (!isUserOnline(id)) {
+  // HOTFIX-SCALABILITY-P1-SOCKETIO-DISTRIBUTED-ADAPTER-1 — isUserOnline()
+  // interroge désormais le cluster entier (fetchSockets() via l'adaptateur),
+  // plus seulement le processus courant — voir socket.js.
+  if (!(await isUserOnline(id))) {
     const user = await User.findById(id).select('pushToken').lean();
     if (user?.pushToken) {
       sendExpoPushNotification(user.pushToken, title, resolvedMessage, {

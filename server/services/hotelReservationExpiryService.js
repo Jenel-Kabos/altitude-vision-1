@@ -8,12 +8,66 @@
 // confirmée automatiquement — seule une décision métier explicite annule
 // une réservation confirmée (voir hotelReservationService.transitionStatus).
 
+const mongoose = require('mongoose');
 const HotelReservation = require('../models/HotelReservation');
-const { transitionStatus } = require('./hotelReservationService');
+const availabilityService = require('./hotelAvailabilityService');
+const roomAssignmentService = require('./roomAssignmentService');
+const { notifyReservationGuest } = require('./hotelReservationNotificationService');
+const { emitHotelEvent } = require('../socket');
 const { notifyStaff } = require('./notificationService');
 const logger = require('../utils/logger');
 
-async function processReservationExpiry(now = new Date()) {
+async function expireReservationAtomically(reservationId, { now = new Date(), faultInjector } = {}) {
+  const session = await mongoose.startSession();
+  let expired = null;
+  try {
+    await session.withTransaction(async () => {
+      expired = await HotelReservation.findOneAndUpdate(
+        { _id: reservationId, status: 'pending', pendingExpiresAt: { $ne: null, $lte: now } },
+        {
+          $set: { status: 'expired' },
+          $push: { statusHistory: { from: 'pending', to: 'expired', changedAt: now, reason: 'Expiration automatique (délai de confirmation dépassé).' } },
+        },
+        { new: true, session },
+      );
+      if (!expired) return;
+      await availabilityService.releaseInventory({
+        roomCategoryId: expired.roomCategory,
+        checkInDate: expired.checkInDate,
+        checkOutDate: expired.checkOutDate,
+        roomsCount: expired.roomsCount,
+        session,
+      });
+      if (roomAssignmentService.releaseAllRooms) {
+        await roomAssignmentService.releaseAllRooms({
+          reservationId: expired._id,
+          actingUser: null,
+          reason: 'Expiration automatique (délai de confirmation dépassé).',
+          nextRoomStatus: 'available',
+          session,
+        });
+      }
+      if (faultInjector) await faultInjector('after_inventory_release');
+    });
+  } finally {
+    await session.endSession();
+  }
+  if (!expired) return null;
+
+  await Promise.allSettled([
+    notifyReservationGuest({
+      reservation: expired,
+      eventKey: 'status:expired',
+      type: 'hotel_reservation_expired',
+      title: 'Demande de réservation expirée',
+      body: `Votre demande ${expired.reference} a expiré faute de confirmation dans le délai imparti.`,
+    }),
+    emitHotelEvent(expired.hotel, { eventType: 'reservation.expired', entityType: 'HotelReservation', entityId: expired._id, status: 'expired' }),
+  ]);
+  return expired;
+}
+
+async function processReservationExpiry(now = new Date(), { expireOne = expireReservationAtomically } = {}) {
   const candidates = await HotelReservation.find({
     status: 'pending',
     pendingExpiresAt: { $ne: null, $lte: now },
@@ -22,9 +76,8 @@ async function processReservationExpiry(now = new Date()) {
   let expiredCount = 0;
   for (const reservation of candidates) {
     try {
-      // eslint-disable-next-line no-await-in-loop
-      await transitionStatus(reservation, { to: 'expired', actingUser: null, reason: 'Expiration automatique (délai de confirmation dépassé).' });
-      expiredCount += 1;
+      const expired = await expireOne(reservation._id, { now });
+      if (expired) expiredCount += 1;
     } catch (error) {
       logger.error(`Expiration HotelReservation ${reservation._id} échouée`, error);
     }
@@ -42,4 +95,4 @@ async function processReservationExpiry(now = new Date()) {
   return { expired: expiredCount };
 }
 
-module.exports = { processReservationExpiry };
+module.exports = { processReservationExpiry, expireReservationAtomically };

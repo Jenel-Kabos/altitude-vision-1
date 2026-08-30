@@ -34,6 +34,13 @@ const paiementSchema = new mongoose.Schema({
   montantTotal:      { type: Number },
   dateDebutRetard:   { type: Date },
   retardJours:       { type: Number, default: 0 },
+  penaltyEmailDelivery: {
+    key:       { type: String, trim: true },
+    status:    { type: String, enum: ['sending', 'sent', 'unknown'] },
+    claimedAt: { type: Date },
+    sentAt:    { type: Date },
+    error:     { type: String, maxlength: 500 },
+  },
 }, { timestamps: true });
 paiementSchema.set('toJSON', { transform: (_doc, ret) => {
   const available = Boolean(ret.preuvePaiement?.asset || ret.preuvePaiement?.url);

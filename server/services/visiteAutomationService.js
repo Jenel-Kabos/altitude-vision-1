@@ -1,12 +1,38 @@
 const Visite = require('../models/Visite');
 const { notify, notifyStaff } = require('./notificationService');
-const { STATUS, appendHistory } = require('./visiteWorkflowService');
+const { STATUS } = require('./visiteWorkflowService');
 
 const REMINDERS = [
   ['twentyFourHours', 24 * 60 * 60 * 1000],
   ['twoHours', 2 * 60 * 60 * 1000],
   ['thirtyMinutes', 30 * 60 * 1000],
 ];
+
+async function expireVisitCandidate(visite, now = new Date()) {
+  return Visite.findOneAndUpdate(
+    { _id: visite._id, status: visite.status, requestedDate: { $lt: now } },
+    {
+      $set: {
+        status: STATUS.EXPIRED,
+        cancelledAt: now,
+        cancellationActor: 'cron',
+        cancellationReason: 'Créneau demandé dépassé sans confirmation.',
+      },
+      $push: {
+        workflowHistory: {
+          from: visite.status,
+          to: STATUS.EXPIRED,
+          action: 'expire_unconfirmed',
+          role: 'system',
+          source: 'cron',
+          comment: 'Créneau demandé dépassé sans confirmation.',
+          at: now,
+        },
+      },
+    },
+    { new: true },
+  );
+}
 
 async function processVisitAutomation(now = new Date()) {
   const horizon = new Date(now.getTime() + 24 * 60 * 60 * 1000 + 5 * 60 * 1000);
@@ -44,15 +70,13 @@ async function processVisitAutomation(now = new Date()) {
     status: { $in: [STATUS.REQUESTED, STATUS.AWAITING_CONFIRMATION] },
     requestedDate: { $lt: now },
   });
+  let expiredCount = 0;
   for (const visite of expired) {
-    appendHistory(visite, { to: STATUS.EXPIRED, action: 'expire_unconfirmed', role: 'system', source: 'cron', comment: 'Créneau demandé dépassé sans confirmation.' });
-    visite.cancelledAt = now;
-    visite.cancellationActor = 'cron';
-    visite.cancellationReason = 'Créneau demandé dépassé sans confirmation.';
-    await visite.save();
+    const claimed = await expireVisitCandidate(visite, now);
+    if (claimed) expiredCount += 1;
   }
-  if (expired.length) await notifyStaff({ type: 'visite_status', title: 'Demandes de visite expirées', body: `${expired.length} demande(s) non confirmée(s) ont expiré.`, data: { screen: 'AdminVisites' } });
-  return { reminders, expired: expired.length };
+  if (expiredCount) await notifyStaff({ type: 'visite_status', title: 'Demandes de visite expirées', body: `${expiredCount} demande(s) non confirmée(s) ont expiré.`, data: { screen: 'AdminVisites' } });
+  return { reminders, expired: expiredCount };
 }
 
-module.exports = { REMINDERS, processVisitAutomation };
+module.exports = { REMINDERS, processVisitAutomation, expireVisitCandidate };

@@ -5,9 +5,11 @@
 // ============================================================
 const { ImapFlow }          = require('imapflow');
 const { simpleParser }      = require('mailparser');
+const crypto                = require('crypto');
 const InternalMail          = require('../models/InternalMail');
 const User                  = require('../models/User');
 const ImapSyncCheckpoint    = require('../models/ImapSyncCheckpoint');
+const ImapMessageClaim      = require('../models/ImapMessageClaim');
 const { uploadPrivateAsset } = require('./storage/secureStorageService');
 const logger                = require('../utils/logger');
 
@@ -16,6 +18,30 @@ let pollSequence = 0;
 const LOGOUT_TIMEOUT_MS = 5000;
 const FETCH_BATCH_SIZE = 10;
 const SYNC_MAILBOX = 'INBOX';
+const MESSAGE_CLAIM_MS = 10 * 60 * 1000;
+
+const buildStableMessageIdentity = ({ account, mailbox, uidValidity, uid }) =>
+    `imap:${String(account).toLowerCase()}:${mailbox}:${uidValidity}:${uid}`;
+
+const checkpointAdvanceUpdate = ({ uidValidity, lastProcessedUid }) => ({
+    $set: { uidValidity }, $max: { lastProcessedUid },
+});
+
+const claimMessage = async ({ identity, account, mailbox, uidValidity, uid, ownerToken, now = new Date() }) => {
+    try {
+        return await ImapMessageClaim.findOneAndUpdate(
+            { identity, status: { $ne: 'imported' }, $or: [{ claimUntil: { $lte: now } }, { ownerToken }] },
+            {
+                $set: { account, mailbox, uidValidity, uid, ownerToken, status: 'processing', claimedAt: now, claimUntil: new Date(now.getTime() + MESSAGE_CLAIM_MS), lastError: '' },
+                $setOnInsert: { identity },
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true },
+        ).select('+ownerToken');
+    } catch (error) {
+        if (error.code === 11000) return null;
+        throw error;
+    }
+};
 
 const isImapConnectionError = (error) => [
     'ETIMEOUT', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'NoConnection', 'EConnectionClosed',
@@ -75,7 +101,7 @@ const runEmailStep = async (context, step, action) => {
     }
 };
 
-const processFetchedMessage = async (message, context) => {
+const processFetchedMessage = async (message, context, syncContext) => {
     logger.info('[IMAP] Email traitement démarré', context);
     const parsed = await runEmailStep(context, 'parse_mime', () => simpleParser(message.source));
 
@@ -90,7 +116,8 @@ const processFetchedMessage = async (message, context) => {
     // un email jamais importé ne l'est pas.
     const textContent = (parsed.text || '').slice(0, 10000);
     const htmlContent = (parsed.html || '').slice(0, 200000);
-    const messageId = parsed.messageId || `imap-uid-${message.uid}-${Date.now()}`;
+    const fallbackIdentity = buildStableMessageIdentity({ ...syncContext, uid: message.uid });
+    const messageId = parsed.messageId || fallbackIdentity;
 
     const duplicateCheckStartedAt = Date.now();
     logger.info('[IMAP] Étape démarrée', { ...context, step: 'duplicate_check' });
@@ -112,13 +139,25 @@ const processFetchedMessage = async (message, context) => {
         return { markSeen: true, status: 'duplicate' };
     }
 
+    const claim = await claimMessage({
+        identity: messageId, ...syncContext, uid: message.uid, ownerToken: syncContext.ownerToken,
+    });
+    if (!claim) {
+        logger.info('[IMAP] Message déjà revendiqué', { ...context, isDuplicate: true });
+        return { markSeen: false, status: 'claimed_elsewhere' };
+    }
+
     const attachmentDocs = [];
+    let attachmentIndex = 0;
+    try {
     for (const att of (parsed.attachments || [])) {
         if (!att.content || !att.filename) continue;
         try {
+            const assetKey = crypto.createHash('sha256').update(messageId).digest('hex').slice(0, 32);
             const asset = await uploadPrivateAsset(att.content, {
                 purpose: 'administrative', ownerType: 'InternalMail', ownerId: messageId,
                 filename: att.filename, mimeType: att.contentType || 'application/octet-stream',
+                publicId: `altitude-vision/private/administrative/InternalMail/${assetKey}/${attachmentIndex++}-${String(att.filename).replace(/[^a-zA-Z0-9._-]+/g, '-')}`,
             });
             attachmentDocs.push({
                 filename: att.filename,
@@ -138,6 +177,10 @@ const processFetchedMessage = async (message, context) => {
     if (!recipientUser) {
         // Aucun dossier de quarantaine IMAP n'existe dans le projet : ce rejet permanent est logué et acquitté.
         logger.warn('[IMAP] Email rejeté sans destinataire', { ...context, outcome: 'permanent_rejection' });
+        await ImapMessageClaim.updateOne(
+            { identity: messageId, ownerToken: syncContext.ownerToken },
+            { $set: { status: 'imported', completedAt: new Date(), claimUntil: new Date(), ownerToken: null } },
+        );
         return { markSeen: true, status: 'permanent_rejection' };
     }
 
@@ -168,7 +211,19 @@ const processFetchedMessage = async (message, context) => {
         attachments: attachmentDocs,
     }));
 
+    await ImapMessageClaim.updateOne(
+        { identity: messageId, ownerToken: syncContext.ownerToken },
+        { $set: { status: 'imported', completedAt: new Date(), claimUntil: new Date(), ownerToken: null } },
+    );
+
     return { markSeen: true, status: 'imported' };
+    } catch (error) {
+        await ImapMessageClaim.updateOne(
+            { identity: messageId, ownerToken: syncContext.ownerToken },
+            { $set: { status: 'failed', lastError: String(error.message || error).slice(0, 500), claimUntil: new Date(), ownerToken: null } },
+        ).catch(() => {});
+        throw error;
+    }
 };
 
 const logoutWithDeadline = async (client) => {
@@ -190,7 +245,7 @@ const logoutWithDeadline = async (client) => {
 };
 
 // ── Fonction principale ───────────────────────────────────────
-const pollZohoInbox = async () => {
+const pollZohoInbox = async ({ ownerToken: distributedOwnerToken } = {}) => {
     if (isPolling) {
         logger.warn('[IMAP] Polling ignoré : cycle déjà en cours');
         return { imported: 0, skipped: 0, errors: 0 };
@@ -198,6 +253,7 @@ const pollZohoInbox = async () => {
 
     isPolling = true;
     const pollCycleId = ++pollSequence;
+    const ownerToken = distributedOwnerToken || `local:${process.pid}:${pollCycleId}`;
     const startedAt = Date.now();
     let phase = 'configuration';
     let client;
@@ -310,7 +366,12 @@ const pollZohoInbox = async () => {
             for (const message of messages) {
                 const context = { pollCycleId, mailIndex: ++mailIndex, uid: message.uid };
                 try {
-                    const outcome = await processFetchedMessage(message, context);
+                    const outcome = await processFetchedMessage(message, context, {
+                        account: process.env.ZOHO_FROM_EMAIL,
+                        mailbox: SYNC_MAILBOX,
+                        uidValidity: checkpointUidValidity,
+                        ownerToken,
+                    });
                     if (outcome.status === 'imported') stats.imported++;
                     if (outcome.status !== 'imported') stats.skipped++;
                     if (outcome.markSeen) pendingSeen.push(context);
@@ -364,7 +425,9 @@ const pollZohoInbox = async () => {
             try {
                 await ImapSyncCheckpoint.findOneAndUpdate(
                     { account: process.env.ZOHO_FROM_EMAIL, mailbox: SYNC_MAILBOX },
-                    { uidValidity: checkpointUidValidity, lastProcessedUid: checkpointAdvanceUid },
+                    checkpointIsReset
+                        ? { $set: { uidValidity: checkpointUidValidity, lastProcessedUid: checkpointAdvanceUid } }
+                        : checkpointAdvanceUpdate({ uidValidity: checkpointUidValidity, lastProcessedUid: checkpointAdvanceUid }),
                     { upsert: true },
                 );
                 logger.info('[IMAP] Checkpoint avancé', {
@@ -411,4 +474,4 @@ const pollZohoInbox = async () => {
     return stats;
 };
 
-module.exports = { pollZohoInbox, resolveSyncOrigin };
+module.exports = { pollZohoInbox, resolveSyncOrigin, buildStableMessageIdentity, checkpointAdvanceUpdate, claimMessage };

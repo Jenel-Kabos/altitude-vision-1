@@ -5,18 +5,16 @@ jest.mock('../models/Hotel');
 jest.mock('../models/RoomCategory');
 jest.mock('../models/RatePlan');
 jest.mock('../services/hotelAvailabilityService');
-jest.mock('../services/roomAssignmentService', () => ({ releaseRoom: jest.fn() }));
+jest.mock('../services/roomAssignmentService', () => ({ releaseRoom: jest.fn(), releaseAllRooms: jest.fn() }));
+jest.mock('../services/hotelReservationNotificationService', () => ({ notifyReservationGuest: jest.fn().mockResolvedValue() }));
+jest.mock('../socket', () => ({ emitHotelEvent: jest.fn().mockResolvedValue() }));
 jest.mock('../services/notificationService', () => ({ notify: jest.fn().mockResolvedValue(), notifyStaff: jest.fn().mockResolvedValue() }));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 
 const HotelReservation = require('../models/HotelReservation');
-const availability = require('../services/hotelAvailabilityService');
-const roomAssignmentService = require('../services/roomAssignmentService');
 const { notifyStaff } = require('../services/notificationService');
 const { processReservationExpiry } = require('../services/hotelReservationExpiryService');
-
-const NO_ACTIVE_ASSIGNMENT = Object.assign(new Error('Aucune chambre active à libérer pour cette réservation.'), { statusCode: 404 });
 
 HotelReservation.ALLOWED_TRANSITIONS = {
   pending: ['confirmed', 'rejected', 'cancelled', 'expired'],
@@ -34,20 +32,17 @@ const pendingDoc = (id) => ({
 describe('processReservationExpiry — Sprint C §11 — TEST DATA', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    availability.releaseInventory.mockResolvedValue();
-    roomAssignmentService.releaseRoom.mockRejectedValue(NO_ACTIVE_ASSIGNMENT);
   });
 
   test('expire les réservations pending dont pendingExpiresAt est dépassé, et libère leur inventaire', async () => {
     const docs = [pendingDoc('1'), pendingDoc('2')];
     HotelReservation.find = jest.fn().mockResolvedValue(docs);
 
-    const result = await processReservationExpiry(new Date('2026-08-20T00:00:00Z'));
+    const expireOne = jest.fn(async (id) => ({ _id: id, status: 'expired' }));
+    const result = await processReservationExpiry(new Date('2026-08-20T00:00:00Z'), { expireOne });
 
     expect(result.expired).toBe(2);
-    expect(docs[0].status).toBe('expired');
-    expect(docs[1].status).toBe('expired');
-    expect(availability.releaseInventory).toHaveBeenCalledTimes(2);
+    expect(expireOne).toHaveBeenCalledTimes(2);
     expect(notifyStaff).toHaveBeenCalled();
   });
 
@@ -72,8 +67,11 @@ describe('processReservationExpiry — Sprint C §11 — TEST DATA', () => {
     broken.save = jest.fn().mockRejectedValue(new Error('DB error'));
     HotelReservation.find = jest.fn().mockResolvedValue([broken, ok]);
 
-    const result = await processReservationExpiry();
+    const expireOne = jest.fn()
+      .mockRejectedValueOnce(new Error('DB error'))
+      .mockResolvedValueOnce({ _id: 'ok', status: 'expired' });
+    const result = await processReservationExpiry(new Date(), { expireOne });
     expect(result.expired).toBe(1);
-    expect(ok.status).toBe('expired');
+    expect(expireOne).toHaveBeenCalledTimes(2);
   });
 });
