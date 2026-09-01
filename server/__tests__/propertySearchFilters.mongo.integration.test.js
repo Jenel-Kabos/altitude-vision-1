@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
+const Hotel = require('../models/Hotel');
 const { getAllProperties, getLatestProperties, getRecommendedProperties } = require('../controllers/propertyController');
 
 jest.setTimeout(120000);
@@ -103,6 +104,28 @@ describe('Audit filtrage Altimmo — getAllProperties (nomenclature canonique + 
     const { data } = await callGetAllProperties({ offerType: 'hebergement' });
     expect(data.properties).toHaveLength(1);
     expect(data.properties[0].title).toBe('Hébergement publié');
+  });
+
+  test('hôtel publié : son Property ancre doit aussi porter isPublished=true pour apparaître dans les annonces immobilières', async () => {
+    const property = await Property.create(baseProperty({
+      status: 'hebergement', type: 'Commerce', title: 'Hôtel public', isPublished: false,
+    }));
+    const hotel = await Hotel.create({
+      name: 'Hôtel public', property: property._id, manager: property.owner,
+      createdBy: property.owner,
+      publicationStatus: 'publie', status: 'actif', active: true,
+    });
+    await Accommodation.create({
+      property: property._id, accommodationType: 'hotel', hotel: hotel._id,
+      publicationStatus: 'publie', active: true, createdBy: property.owner,
+    });
+
+    expect((await callGetAllProperties({ offerType: 'hebergement' })).data.properties).toHaveLength(0);
+
+    await Property.updateOne({ _id: property._id }, { $set: { isPublished: true } });
+    const { data } = await callGetAllProperties({ offerType: 'hebergement' });
+    expect(data.properties).toHaveLength(1);
+    expect(data.properties[0].title).toBe('Hôtel public');
   });
 
   test('alias legacy status/transaction/listingType → offerType', async () => {

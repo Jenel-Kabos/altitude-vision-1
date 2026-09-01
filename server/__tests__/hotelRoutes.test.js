@@ -280,7 +280,33 @@ describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/sus
     expect(res.statusCode).toBe(200);
     expect(hotel.publicationStatus).toBe('publie');
     expect(hotel.publishedAt).not.toBeNull();
+    expect(Property.updateOne).toHaveBeenCalledWith(
+      { _id: PROPERTY_ID },
+      { $set: { statusAdmin: 'Validée', isPublished: true, reviewedAt: expect.any(Date) } },
+    );
     expect(Accommodation.updateMany).toHaveBeenCalledWith({ hotel: HOTEL_ID }, { $set: { publicationStatus: 'publie' } });
+  });
+
+  test('200 — rejeter un hôtel soumis dépublie explicitement son Property ancre', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const hotel = submitted();
+    Hotel.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(hotel) });
+    Accommodation.updateMany = jest.fn().mockResolvedValue({});
+
+    const res = await request(app)
+      .patch(`/api/hotels/${HOTEL_ID}/reject`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ reason: 'Publication refusée' });
+
+    expect(res.statusCode).toBe(200);
+    expect(Property.updateOne).toHaveBeenCalledWith(
+      { _id: PROPERTY_ID },
+      { $set: { statusAdmin: 'Rejetée', isPublished: false, reviewedAt: expect.any(Date) } },
+    );
+    expect(Accommodation.updateMany).toHaveBeenCalledWith(
+      { hotel: HOTEL_ID },
+      { $set: { publicationStatus: 'rejete' } },
+    );
   });
 
   test('409 — une seconde décision concurrente ne peut pas retraiter la même soumission', async () => {

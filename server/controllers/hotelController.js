@@ -741,15 +741,24 @@ exports.reviewDecision = async (req, res) => {
     );
     if (!transition?.modifiedCount) return fail(res, 409, 'Cette demande a déjà été traitée par un autre modérateur.', { code: 'HOTEL_MODERATION_CONFLICT' });
     Object.assign(hotel, changes);
-    // La Property est l'ancre publique historique. La décision hôtelière
-    // reste l'unique action de modération et aligne cette ancre sans créer
-    // un second workflow à terminer ailleurs.
+    // La Property est l'ancre du listing immobilier public. La décision
+    // hôtelière reste l'unique action de modération et aligne les deux gates
+    // exigés par runPropertySearch (`statusAdmin` + `isPublished`) sans créer
+    // un second workflow à terminer ailleurs. Rejeter retire symétriquement
+    // l'ancre du listing ; brouillons/soumissions ne passent jamais ici.
     if (hotel.property?._id && ['validate', 'reject'].includes(action)) {
       await Property.updateOne(
         { _id: hotel.property._id },
-        { $set: { statusAdmin: action === 'validate' ? 'Validée' : 'Rejetée', reviewedAt: now } },
+        {
+          $set: {
+            statusAdmin: action === 'validate' ? 'Validée' : 'Rejetée',
+            isPublished: action === 'validate',
+            reviewedAt: now,
+          },
+        },
       );
       hotel.property.statusAdmin = action === 'validate' ? 'Validée' : 'Rejetée';
+      hotel.property.isPublished = action === 'validate';
     }
 
     // Synchronise l'Accommodation-adaptateur pour que la visibilité publique
