@@ -131,8 +131,38 @@ describe('createFullMobileAccommodation — succès', () => {
 });
 
 describe('createFullMobileAccommodation — établissement hôtelier professionnel', () => {
-  test('crée Hotel, deux catégories, leurs tarifs et les totaux cohérents dans la transaction', async () => {
+  test('propage le tenant canonique serveur aux trois projections et ignore le tenant du payload', async () => {
+    const canonicalTenant = new mongoose.Types.ObjectId();
+    const foreignTenant = new mongoose.Types.ObjectId();
+    const user = userInTenant(await makeUser(), canonicalTenant);
+    const payload = hotelPayload({ property: { tenant: foreignTenant } });
+
+    const result = await createFullMobileAccommodation({
+      user,
+      payload,
+      publicationRequestId: `hotel-tenant-projections-${Date.now()}`,
+    });
+
+    expect(String(result.hotel.tenant)).toBe(String(canonicalTenant));
+    expect(String(result.property.tenant)).toBe(String(canonicalTenant));
+    expect(String(result.accommodation.tenant)).toBe(String(canonicalTenant));
+    expect(String(result.property.tenant)).not.toBe(String(foreignTenant));
+  });
+
+  test('refuse un établissement hôtelier sans tenant canonique avant toute écriture', async () => {
     const user = await makeUser();
+
+    await expect(createFullMobileAccommodation({
+      user,
+      payload: hotelPayload(),
+      publicationRequestId: `hotel-missing-tenant-${Date.now()}`,
+    })).rejects.toMatchObject({ code: 'HOTEL_SCOPE_REQUIRED', statusCode: 403 });
+
+    expect(await fullHotelCounts()).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  test('crée Hotel, deux catégories, leurs tarifs et les totaux cohérents dans la transaction', async () => {
+    const user = userInTenant(await makeUser(), new mongoose.Types.ObjectId());
     const result = await createFullMobileAccommodation({ user, payload: hotelPayload(), publicationRequestId: `hotel-${Date.now()}` });
     expect(result.hotel).toMatchObject({ totalRooms: 18, totalCapacity: 41, totalBeds: 23, minNightlyRate: 35000, maxNightlyRate: 85000, currency: 'XAF' });
     expect(result.roomCategories).toHaveLength(2);
@@ -151,7 +181,7 @@ describe('createFullMobileAccommodation — établissement hôtelier professionn
   });
 
   test('retry idempotent ne duplique ni catégorie ni tarif', async () => {
-    const user = await makeUser();
+    const user = userInTenant(await makeUser(), new mongoose.Types.ObjectId());
     const publicationRequestId = `hotel-retry-${Date.now()}`;
     const first = await createFullMobileAccommodation({ user, payload: hotelPayload(), publicationRequestId });
     const retry = await createFullMobileAccommodation({ user, payload: hotelPayload(), publicationRequestId });
@@ -162,7 +192,9 @@ describe('createFullMobileAccommodation — établissement hôtelier professionn
   });
 
   test('équivalence H-W1 — les payloads sémantiques Web et Mobile créent les mêmes documents métier', async () => {
-    const [webUser, mobileUser] = await Promise.all([makeUser(), makeUser()]);
+    const [webOwner, mobileOwner] = await Promise.all([makeUser(), makeUser()]);
+    const webUser = userInTenant(webOwner, new mongoose.Types.ObjectId());
+    const mobileUser = userInTenant(mobileOwner, new mongoose.Types.ObjectId());
     const web = await createFullMobileAccommodation({ user: webUser, payload: hotelPayload(), publicationRequestId: `web-${Date.now()}` });
     const mobile = await createFullMobileAccommodation({ user: mobileUser, payload: hotelPayload(), publicationRequestId: `mobile-${Date.now()}` });
     const snapshot = async (result) => {

@@ -202,6 +202,9 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
     : null;
 
   const tenantId = user.platformTenant?._id || user.platformTenant || null;
+  if (hotelAnalysis && !tenantId) {
+    fail('HOTEL_SCOPE_REQUIRED', 'Contexte tenant requis.', 403);
+  }
   if (hotelAnalysis) {
     await assertHotelNameAvailable({
       name: payload.accommodation.hotel.name,
@@ -217,14 +220,17 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
     try {
       session.startTransaction();
 
-      const propertyData = buildMobilePropertyData(
-        {
-          ...payload.property,
-          prix: hotelAnalysis?.totals.minNightlyRate ?? payload.property.prix,
-          categorie: 'hebergement',
-        },
-        ownerId,
-      );
+      const propertyData = {
+        ...buildMobilePropertyData(
+          {
+            ...payload.property,
+            prix: hotelAnalysis?.totals.minNightlyRate ?? payload.property.prix,
+            categorie: 'hebergement',
+          },
+          ownerId,
+        ),
+        ...(hotelAnalysis ? { tenant: tenantId } : {}),
+      };
       const [property] = await Property.create([propertyData], { session });
 
       let hotel = null;
