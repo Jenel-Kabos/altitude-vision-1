@@ -13,7 +13,9 @@ jest.mock('../config/cloudinary', () => ({
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
+const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
@@ -96,6 +98,49 @@ afterEach(async () => { await clearFinancialMongo(); jest.clearAllMocks(); });
 afterAll(stopFinancialMongo);
 
 describe('POST /api/accommodations/mobile/full', () => {
+  test('201 — un Proprietaire avec tenant canonique résolu publie un Hotel dans ce tenant', async () => {
+    const fixture = await createTenantFixture({ label: 'Mobile Hotel Route Tenant' });
+    const user = (await createTenantUser({
+      tenant: fixture.tenant,
+      bootstrap: fixture.bootstrap,
+      overrides: { role: 'Proprietaire' },
+    })).user;
+
+    const forgedTenant = new mongoose.Types.ObjectId();
+    const payload = professionalHotelPayload();
+    payload.tenant = forgedTenant.toString();
+    payload.platformTenant = forgedTenant.toString();
+    payload.property.tenant = forgedTenant.toString();
+
+    const res = await request(app)
+      .post('/api/accommodations/mobile/full')
+      .set('Authorization', `Bearer ${signToken(user._id)}`)
+      .send(payload);
+
+    expect(res.statusCode).toBe(201);
+    const [property, accommodation, hotel] = await Promise.all([
+      Property.findOne(), Accommodation.findOne(), Hotel.findOne(),
+    ]);
+    expect(String(property.tenant)).toBe(String(fixture.tenant._id));
+    expect(String(accommodation.tenant)).toBe(String(fixture.tenant._id));
+    expect(String(hotel.tenant)).toBe(String(fixture.tenant._id));
+    expect(String(property.tenant)).not.toBe(String(forgedTenant));
+  });
+
+  test('403 — un Proprietaire sans tenant canonique ne crée aucune projection Hotel', async () => {
+    const user = await makeUser();
+    const res = await request(app)
+      .post('/api/accommodations/mobile/full')
+      .set('Authorization', `Bearer ${signToken(user._id)}`)
+      .send(professionalHotelPayload());
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('HOTEL_SCOPE_REQUIRED');
+    expect(await Hotel.countDocuments()).toBe(0);
+    expect(await Property.countDocuments()).toBe(0);
+    expect(await Accommodation.countDocuments()).toBe(0);
+  });
+
   test('201 — succès, Property+Accommodation+RatePlan créés et soumis', async () => {
     const user = await makeUser();
     const res = await request(app)
@@ -112,7 +157,12 @@ describe('POST /api/accommodations/mobile/full', () => {
   });
 
   test.each(['hotel', 'residence_hoteliere'])('201 — établissement %s : Hotel créé, type/prix/tarif cohérents', async (type) => {
-    const user = await makeUser();
+    const fixture = await createTenantFixture({ label: `Mobile ${type}` });
+    const user = (await createTenantUser({
+      tenant: fixture.tenant,
+      bootstrap: fixture.bootstrap,
+      overrides: { role: 'Proprietaire' },
+    })).user;
     const res = await request(app)
       .post('/api/accommodations/mobile/full')
       .set('Authorization', `Bearer ${signToken(user._id)}`)

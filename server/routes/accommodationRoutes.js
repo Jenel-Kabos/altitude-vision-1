@@ -3,7 +3,11 @@ const auth = require('../controllers/authController');
 const ctrl = require('../controllers/accommodationController');
 const { ROLES_ALTIMMO, STAFF_CM } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
-const { requireTenantScope, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
+const {
+  requireTenantScope,
+  requireTenantScopeForStaffAllowPlatformWide,
+  attachTenantScopeIfResolvable,
+} = require('../middleware/tenantContext');
 
 const router = express.Router();
 const reservationCtrl = require('../controllers/accommodationReservationController');
@@ -26,7 +30,7 @@ router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), requireTenantSc
 // Property + Accommodation + RatePlan + soumission en une transaction). Mêmes
 // rôles que POST /api/properties/mobile (seule route qui crée une Property
 // depuis l'app) — jamais ouverte à un rôle qui ne peut pas publier de bien.
-router.post('/mobile/full', auth.restrictTo(...STAFF_CM, 'Proprietaire'), ctrl.createFullMobile);
+router.post('/mobile/full', auth.restrictTo(...STAFF_CM, 'Proprietaire'), attachTenantScopeIfResolvable, ctrl.createFullMobile);
 
 // Propriétaire
 router.get('/mine', ctrl.mine);
