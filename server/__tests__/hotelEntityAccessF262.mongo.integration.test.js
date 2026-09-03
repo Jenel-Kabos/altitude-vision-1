@@ -22,6 +22,7 @@ async function ensureTenant() {
 }
 const actorOf = (user) => tenantActor(user, tenantFixture.tenant);
 let userCounter = 0;
+let hotelCounter = 0;
 const makeUser = async (overrides = {}) => {
   userCounter += 1;
   const context = await ensureTenant();
@@ -29,9 +30,9 @@ const makeUser = async (overrides = {}) => {
   await addTenantMember({ tenant: context.tenant, user, bootstrap: admin });
   return user;
 };
-const makeHotel = async (overrides = {}) => { const managerId = id(); const { tenant } = await ensureTenant(); return Hotel.create({ name: 'Hôtel F262', tenant: tenant._id, createdBy: managerId, manager: managerId, ...overrides }); };
+const makeHotel = async (overrides = {}) => { hotelCounter += 1; const managerId = id(); const { tenant } = await ensureTenant(); return Hotel.create({ name: `Hôtel F262 fixture ${hotelCounter}`, tenant: tenant._id, createdBy: managerId, manager: managerId, ...overrides }); };
 
-beforeAll(async () => { await startFinancialMongo(); await HotelStaffAssignment.syncIndexes(); });
+beforeAll(async () => { await startFinancialMongo(); await Promise.all([Hotel.syncIndexes(), HotelStaffAssignment.syncIndexes()]); });
 afterEach(async () => { await clearFinancialMongo(); tenantFixture = null; delete admin.platformTenant; delete admin.tenantScopeUserIds; });
 afterAll(stopFinancialMongo);
 

@@ -29,6 +29,7 @@ const actorOf = (user) => tenantActor(user, tenantFixture.tenant);
 // tiret + identifiant long + TLD de 4 lettres — constat hors périmètre F2.6, non corrigé ici
 // (modèle User.js préexistant), contourné en gardant les emails de test dans un format sûr.
 let userCounter = 0;
+let hotelCounter = 0;
 async function makeUser(overrides = {}) {
   userCounter += 1;
   const context = await ensureTenant();
@@ -37,12 +38,13 @@ async function makeUser(overrides = {}) {
   return user;
 }
 async function makeHotel(overrides = {}) {
+  hotelCounter += 1;
   const managerId = id();
   const { tenant } = await ensureTenant();
-  return Hotel.create({ name: 'Hôtel F2.6', tenant: tenant._id, brand: 'F26', email: 'f26@example.test', manager: managerId, createdBy: managerId, ...overrides });
+  return Hotel.create({ name: `Hôtel F2.6 fixture ${hotelCounter}`, tenant: tenant._id, brand: 'F26', email: 'f26@example.test', manager: managerId, createdBy: managerId, ...overrides });
 }
 
-beforeAll(async () => { await startFinancialMongo(); await HotelStaffAssignment.syncIndexes(); });
+beforeAll(async () => { await startFinancialMongo(); await Promise.all([Hotel.syncIndexes(), HotelStaffAssignment.syncIndexes()]); });
 afterEach(async () => { await clearFinancialMongo(); tenantFixture = null; delete admin.platformTenant; delete admin.tenantScopeUserIds; });
 afterAll(stopFinancialMongo);
 
