@@ -3,6 +3,7 @@ import ChoixTypeAnnonceScreen from '../../screens/Publication/ChoixTypeAnnonceSc
 import AddSalePropertyScreen from '../../screens/Publication/AddSalePropertyScreen';
 import AddRentalPropertyScreen from '../../screens/Publication/AddRentalPropertyScreen';
 import AddAccommodationScreen from '../../screens/Publication/AddAccommodationScreen';
+import FirstOrganizationOnboardingScreen from '../../screens/Publication/FirstOrganizationOnboardingScreen';
 
 const Stack = createStackNavigator();
 
@@ -16,6 +17,7 @@ export default function PublicationStack() {
       <Stack.Screen name="AddSaleProperty" component={AddSalePropertyScreen} />
       <Stack.Screen name="AddRentalProperty" component={AddRentalPropertyScreen} />
       <Stack.Screen name="AddAccommodation" component={AddAccommodationScreen} />
+      <Stack.Screen name="FirstOrganizationOnboarding" component={FirstOrganizationOnboardingScreen} />
     </Stack.Navigator>
   );
 }

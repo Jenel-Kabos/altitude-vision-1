@@ -59,6 +59,8 @@ const actionLogSchema = new mongoose.Schema({
     nouvelleValeur: { type: String },
     ip:             { type: String },
     userAgent:      { type: String },
+    organizationApplicationId: { type: String, default: null },
+    reason: { type: String, maxlength: 1000, default: null },
     // TENANT-DATA-REGULARIZATION-EXEC-1 — enveloppe structurée sans
     // secrets, utilisée comme checkpoint append-only et clé d'idempotence.
     regularization: {

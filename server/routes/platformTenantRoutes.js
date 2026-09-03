@@ -28,9 +28,27 @@ const router = require('express').Router();
 const mongoose = require('mongoose');
 const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/platformTenantController');
+const applicationController = require('../controllers/tenantApplicationController');
+const applicationUpload = require('../middleware/tenantApplicationUpload');
 const PlatformTenantDomain = require('../models/PlatformTenantDomain');
 const { resolveAvailableTenantsForUser } = require('../services/platformTenant/tenantContextService');
 const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
+
+router.get('/applications/me/status', auth.protect, applicationController.status);
+router.get('/applications/me', auth.protect, auth.restrictTo('Proprietaire'), applicationController.me);
+router.post('/applications', auth.protect, auth.restrictTo('Proprietaire'), applicationController.create);
+router.patch('/applications/:applicationId', auth.protect, auth.restrictTo('Proprietaire'), applicationController.update);
+router.post('/applications/:applicationId/documents', auth.protect, auth.restrictTo('Proprietaire'), applicationUpload.single('document'), applicationController.uploadDocument);
+router.get('/applications/:applicationId/documents/:documentId', auth.protect, auth.restrictTo('Proprietaire'), applicationController.readDocument);
+router.delete('/applications/:applicationId/documents/:documentId', auth.protect, auth.restrictTo('Proprietaire'), applicationController.deleteDocument);
+router.post('/applications/:applicationId/submit', auth.protect, auth.restrictTo('Proprietaire'), applicationController.submit);
+router.get('/applications', auth.protect, applicationController.listForReview);
+router.get('/applications/:applicationId', auth.protect, applicationController.readForReview);
+router.get('/applications/:applicationId/review-documents/:documentId', auth.protect, applicationController.readDocumentForReview);
+router.post('/applications/:applicationId/start-review', auth.protect, applicationController.startReview);
+router.post('/applications/:applicationId/request-changes', auth.protect, applicationController.requestChanges);
+router.post('/applications/:applicationId/reject', auth.protect, applicationController.reject);
+router.post('/applications/:applicationId/approve', auth.protect, applicationController.approve);
 
 router.use(auth.protect, auth.restrictTo('Admin'));
 

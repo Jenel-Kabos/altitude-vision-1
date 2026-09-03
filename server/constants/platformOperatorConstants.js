@@ -32,6 +32,11 @@ const PLATFORM_OPERATOR_CAPABILITIES = [
   'platform.audit.read',
   'platform.documents.read',
   'platform.documents.manage',
+  'platform.tenant_applications.read',
+  'platform.tenant_applications.review',
+  'platform.tenant_applications.request_changes',
+  'platform.tenant_applications.approve',
+  'platform.tenant_applications.reject',
   'platform.support.impersonation',
   // Gouvernance de la capacité opérateur elle-même — distincte des autres :
   // seul un opérateur actif possédant CETTE capacité précise peut

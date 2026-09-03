@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import AdminDashboard from '../pages/dashboard/AdminDashboard';
 
 // Sprint 0 (architecture Altimmo) — vérifie la réorganisation de la
 // navigation admin en domaines métier (Immobilier / Gestion locative /
@@ -23,9 +22,11 @@ const CAPABILITIES_BY_ROLE = {
   Communicant: ['messages.read', 'messages.manage', 'visits.read'],
 };
 
-const renderAsRole = (role) => {
-  const capabilities = CAPABILITIES_BY_ROLE[role] || [];
-  const can = (capability) => capabilities.includes('*') || capabilities.includes('legacy.full') || capabilities.includes(capability);
+const renderAsRole = (role, explicitCapabilities) => {
+  const capabilities = explicitCapabilities || CAPABILITIES_BY_ROLE[role] || [];
+  const can = (capability) => capability === 'platform.tenant_applications.read'
+    ? capabilities.includes(capability)
+    : capabilities.includes('*') || capabilities.includes('legacy.full') || capabilities.includes(capability);
   vi.doMock('../context/AuthContext', () => ({
     useAuth: () => ({
       user: { _id: 'TEST-USER', role, name: 'TEST USER', capabilities },
@@ -98,5 +99,22 @@ describe('AdminDashboard — domaines métier Altimmo (Sprint 0) — TEST DATA',
 
     expect(screen.getByText('Modération Hébergement')).toBeInTheDocument();
     expect(screen.getByText('Modération Hôtellerie')).toBeInTheDocument();
+  });
+
+  test('DASH-01..06 — seule la capacité opérateur read affiche les activations professionnelles', async () => {
+    renderAsRole('Admin', ['platform.tenant_applications.read']);
+    const { default: Dashboard } = await import('../pages/dashboard/AdminDashboard');
+    const { unmount } = render(<Dashboard><p>CONTENU</p></Dashboard>);
+    expect(screen.getByRole('link', { name: 'Activations professionnelles' })).toHaveAttribute('href', '/dashboard/activations-professionnelles');
+    unmount();
+
+    for (const role of ['Admin', 'Collaborateur', 'CommunityManager', 'Proprietaire', 'Client']) {
+      vi.resetModules();
+      renderAsRole(role, []);
+      const { default: RestrictedDashboard } = await import('../pages/dashboard/AdminDashboard');
+      const view = render(<RestrictedDashboard><p>CONTENU</p></RestrictedDashboard>);
+      expect(screen.queryByRole('link', { name: 'Activations professionnelles' })).not.toBeInTheDocument();
+      view.unmount();
+    }
   });
 });

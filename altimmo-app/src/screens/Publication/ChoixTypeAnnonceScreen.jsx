@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { Alert, View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import Screen from '../../components/Screen';
 import { SelectableCard } from '../../components/publication';
 import { fonts, fontSize, spacing } from '../../theme';
+import { getFirstOrganizationOnboardingStatus } from '../../services/platformTenantService';
 
 const CHOICES = [
   {
@@ -42,6 +43,26 @@ export default function ChoixTypeAnnonceScreen({ navigation }) {
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [expanded, setExpanded] = React.useState(null);
+  const [checkingHotel, setCheckingHotel] = React.useState(false);
+
+  const openHotelFlow = async () => {
+    if (checkingHotel) return;
+    setCheckingHotel(true);
+    try {
+      const state = await getFirstOrganizationOnboardingStatus();
+      if (state === 'ALREADY_ONBOARDED') {
+        navigation.navigate('AddAccommodation', { publicationKind: 'hotel_establishment' });
+      } else if (['NO_APPLICATION', 'DRAFT', 'PENDING_REVIEW', 'ADDITIONAL_INFO_REQUIRED', 'REJECTED', 'REVIEW_REQUIRED', 'AMBIGUOUS', 'FORBIDDEN'].includes(state)) {
+        navigation.navigate('FirstOrganizationOnboarding', { publicationKind: 'hotel_establishment', initialStatus: state });
+      } else {
+        Alert.alert('Vérification impossible', 'L’état de votre activation professionnelle est inconnu. La création d’hôtel reste bloquée par sécurité.');
+      }
+    } catch (error) {
+      Alert.alert('Vérification impossible', error.normalized?.message || 'Impossible de vérifier votre organisation. Veuillez réessayer.');
+    } finally {
+      setCheckingHotel(false);
+    }
+  };
 
   return (
     <Screen scroll>
@@ -62,7 +83,9 @@ export default function ChoixTypeAnnonceScreen({ navigation }) {
                   icon={child.icon}
                   title={child.title}
                   description={child.description}
-                  onPress={() => navigation.navigate('AddAccommodation', { publicationKind: child.key })}
+                  onPress={() => child.key === 'hotel_establishment'
+                    ? openHotelFlow()
+                    : navigation.navigate('AddAccommodation', { publicationKind: child.key })}
                 />
               </View>
             ))}

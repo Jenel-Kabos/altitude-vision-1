@@ -96,6 +96,11 @@ const NOTIFICATION_TYPES = [
   // ── Compte ──
   'account_verified',     // client : compte propriétaire validé par admin
   'account_suspended',    // utilisateur : compte suspendu
+  'tenant_application_under_review',
+  'tenant_application_additional_info_required',
+  'tenant_application_approved',
+  'tenant_application_rejected',
+  'tenant_provisioned',
   // ── Formulaires publics ──
   'estimation_received',  // staff : nouvelle demande d'estimation
   'devis_received',       // staff : nouvelle demande de devis (gestion locative — modèle Devis)

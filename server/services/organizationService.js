@@ -18,21 +18,23 @@ class OrganizationError extends Error {
 }
 const fail = (code, message, statusCode) => { throw new OrganizationError(code, message, statusCode); };
 
-async function audit(event, { actor, target, targetType, reason, req }) {
-  await logAction({
+async function audit(event, { actor, target, targetType, reason, req, session }) {
+  const write = logAction({
     action: `organization.${event}`,
     description: reason || `${targetType} ${target._id} — ${event}`,
     module: 'Organisation',
     typeAction: event.includes('revoked') || event.includes('archived') ? 'SUPPRESSION' : event.includes('created') || event.includes('granted') ? 'CRÉATION' : 'MODIFICATION',
     auteur: buildAuteur(actor),
     cible: { id: String(target._id), type: targetType, nom: target.name || `${target.user}` },
-    req,
-  }).catch(() => {});
+    req, session,
+  });
+  if (session) await write;
+  else await write.catch(() => {});
 }
 
 // ── Unités organisationnelles ──────────────────────────────────────────
 
-async function createOrgUnit({ name, type, parentId, linkedEstablishment, actor, req } = {}) {
+async function createOrgUnit({ name, type, parentId, linkedEstablishment, actor, req, session } = {}) {
   if (!ORG_UNIT_TYPES.includes(type)) fail('ORG_UNIT_TYPE_INVALID', `Type d'unité inconnu : ${type}.`, 422);
   if (!name || !name.trim()) fail('ORG_UNIT_NAME_REQUIRED', 'Le nom est requis.', 422);
 
@@ -41,7 +43,7 @@ async function createOrgUnit({ name, type, parentId, linkedEstablishment, actor,
     if (parentId) fail('ORG_UNIT_ROOT_CANNOT_HAVE_PARENT', 'Une organisation racine ne peut avoir de parent.', 422);
   } else {
     if (!parentId || !mongoose.isValidObjectId(parentId)) fail('ORG_UNIT_PARENT_REQUIRED', 'Un parent est requis pour toute unité non-racine.', 422);
-    parent = await OrgUnit.findById(parentId);
+    parent = await OrgUnit.findById(parentId).session(session || null);
     if (!parent) fail('ORG_UNIT_PARENT_NOT_FOUND', 'Unité parente introuvable.', 404);
     if (parent.status !== 'active') fail('ORG_UNIT_PARENT_ARCHIVED', 'Impossible de rattacher une unité à un parent archivé.', 422);
   }
@@ -49,12 +51,13 @@ async function createOrgUnit({ name, type, parentId, linkedEstablishment, actor,
   const ancestors = parent ? [...parent.ancestors, parent._id] : [];
   const path = parent ? `${parent.path}${parent._id}/` : '/';
 
-  const orgUnit = await OrgUnit.create({
+  const data = {
     name: name.trim(), type, parent: parent?._id || null, ancestors, path,
     linkedEstablishment: linkedEstablishment || undefined,
     createdBy: actor?._id || actor?.id || null,
-  });
-  await audit('created', { actor, target: orgUnit, targetType: 'OrgUnit', req });
+  };
+  const orgUnit = session ? (await OrgUnit.create([data], { session }))[0] : await OrgUnit.create(data);
+  await audit('created', { actor, target: orgUnit, targetType: 'OrgUnit', req, session });
   return orgUnit;
 }
 
@@ -97,13 +100,16 @@ async function listOrgUnits({ type, status = 'active' } = {}) {
 
 // ── Appartenances (Phase 5 — multi-organisation/équipe/département) ────
 
-async function grantMembership({ userId, orgUnitId, roleInUnit = 'member', actor, metadata = {}, req } = {}) {
+async function grantMembership({ userId, orgUnitId, roleInUnit = 'member', actor, metadata = {}, req, session } = {}) {
   if (!mongoose.isValidObjectId(userId)) fail('ORG_MEMBERSHIP_USER_INVALID', 'Identifiant utilisateur invalide.', 400);
-  const [user, orgUnit] = await Promise.all([User.findById(userId).select('_id'), OrgUnit.findById(orgUnitId)]);
+  const [user, orgUnit] = await Promise.all([
+    User.findById(userId).select('_id').session(session || null),
+    OrgUnit.findById(orgUnitId).session(session || null),
+  ]);
   if (!user) fail('ORG_MEMBERSHIP_USER_NOT_FOUND', 'Utilisateur introuvable.', 404);
   if (!orgUnit) fail('ORG_MEMBERSHIP_UNIT_NOT_FOUND', 'Unité organisationnelle introuvable.', 404);
 
-  const existing = await OrgMembership.findOne({ user: userId, orgUnit: orgUnitId, roleInUnit });
+  const existing = await OrgMembership.findOne({ user: userId, orgUnit: orgUnitId, roleInUnit }).session(session || null);
   if (existing) {
     if (existing.status === 'active') return existing;
     existing.status = 'active';
@@ -111,13 +117,14 @@ async function grantMembership({ userId, orgUnitId, roleInUnit = 'member', actor
     existing.revokedBy = null; existing.revokedAt = null; existing.revocationReason = null;
     existing.grantedBy = actor?._id || actor?.id || null;
     existing.grantedAt = new Date();
-    await existing.save();
-    await audit('membership_reactivated', { actor, target: existing, targetType: 'OrgMembership', req });
+    await existing.save({ session });
+    await audit('membership_reactivated', { actor, target: existing, targetType: 'OrgMembership', req, session });
     return existing;
   }
 
-  const membership = await OrgMembership.create({ user: userId, orgUnit: orgUnitId, roleInUnit, metadata, grantedBy: actor?._id || actor?.id || null });
-  await audit('membership_granted', { actor, target: membership, targetType: 'OrgMembership', req });
+  const data = { user: userId, orgUnit: orgUnitId, roleInUnit, metadata, grantedBy: actor?._id || actor?.id || null };
+  const membership = session ? (await OrgMembership.create([data], { session }))[0] : await OrgMembership.create(data);
+  await audit('membership_granted', { actor, target: membership, targetType: 'OrgMembership', req, session });
   return membership;
 }
 

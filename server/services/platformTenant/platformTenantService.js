@@ -5,6 +5,7 @@
 // Même patron d'audit qu'OrgMembership/HotelStaffAssignment/UserBusinessProfile
 // (grantedBy/At, suspendedBy/At/Reason…) pour les transitions de statut.
 const PlatformTenant = require('../../models/PlatformTenant');
+const crypto = require('crypto');
 const PlatformTenantSettings = require('../../models/PlatformTenantSettings');
 const PlatformTenantTheme = require('../../models/PlatformTenantTheme');
 const PlatformTenantDomain = require('../../models/PlatformTenantDomain');
@@ -22,16 +23,19 @@ class PlatformTenantError extends Error {
 }
 const fail = (code, message, statusCode) => { throw new PlatformTenantError(code, message, statusCode); };
 
-async function audit(event, { actor, tenant, req }) {
-  await logAction({
+async function audit(event, { actor, tenant, req, session }) {
+  const write = logAction({
     action: `platform_tenant.${event}`,
     description: `PlatformTenant ${tenant.name} (${tenant._id}) — ${event}`,
     module: 'Organisation', // même module que ORGANIZATION-1, dont ce service est une extension directe
     typeAction: event.includes('archived') || event.includes('cancelled') ? 'SUPPRESSION' : event.includes('created') ? 'CRÉATION' : 'MODIFICATION',
     auteur: buildAuteur(actor),
     cible: { id: String(tenant._id), type: 'PlatformTenant', nom: tenant.name },
-    req,
-  }).catch(() => {});
+    metadata: { platformTenantId: tenant._id, orgUnitId: tenant.rootOrgUnit },
+    req, session,
+  });
+  if (session) await write;
+  else await write.catch(() => {});
 }
 
 const slugify = (name) => name.trim().toLowerCase()
@@ -41,30 +45,57 @@ const slugify = (name) => name.trim().toLowerCase()
 // Crée le PlatformTenant ET sa racine organisationnelle ensemble — les deux
 // n'ont aucun sens l'un sans l'autre (voir contrainte `unique` sur
 // `rootOrgUnit`). Réutilise organizationService.createOrgUnit tel quel.
-async function createTenant({ name, plan = 'trial', actor, req } = {}) {
+async function createTenantDocuments({ name, plan = 'trial', actor, req, session, deterministicOwner = false } = {}) {
   if (!name || !name.trim()) fail('TENANT_NAME_REQUIRED', 'Le nom est requis.', 422);
   if (plan && !PLATFORM_TENANT_PLANS.includes(plan)) fail('TENANT_PLAN_INVALID', `Plan inconnu : ${plan}.`, 422);
 
-  let slug = slugify(name);
+  const actorId = actor?._id || actor?.id;
+  let slug = deterministicOwner
+    ? `first-owner-${crypto.createHash('sha256').update(String(actorId)).digest('hex').slice(0, 40)}`
+    : slugify(name);
   if (!slug) fail('TENANT_NAME_INVALID', 'Nom invalide : aucun slug dérivable.', 422);
-  if (await PlatformTenant.findOne({ slug })) slug = `${slug}-${Date.now().toString(36)}`;
+  if (!deterministicOwner && await PlatformTenant.findOne({ slug }).session(session || null)) slug = `${slug}-${Date.now().toString(36)}`;
 
-  const rootOrgUnit = await organizationService.createOrgUnit({ name, type: 'organization', actor, req });
-  const tenant = await PlatformTenant.create({ name: name.trim(), slug, rootOrgUnit: rootOrgUnit._id, createdBy: actor?._id || actor?.id || null });
+  const rootOrgUnit = await organizationService.createOrgUnit({ name, type: 'organization', actor, req, session });
+  const tenantData = { name: name.trim(), slug, rootOrgUnit: rootOrgUnit._id, createdBy: actorId || null };
+  const tenant = session
+    ? (await PlatformTenant.create([tenantData], { session }))[0]
+    : await PlatformTenant.create(tenantData);
 
-  await Promise.all([
-    PlatformTenantSettings.create({ tenant: tenant._id }),
-    PlatformTenantTheme.create({ tenant: tenant._id }),
-    PlatformTenantSubscription.create({
+  const settingsData = { tenant: tenant._id };
+  const themeData = { tenant: tenant._id };
+  const subscriptionData = {
       tenant: tenant._id, plan, status: 'trialing',
       modulesIncluded: TENANT_FEATURE_MODULES, // trial complet par défaut — jamais restreint sans décision explicite
       quotas: DEFAULT_QUOTAS_BY_PLAN[plan] || DEFAULT_QUOTAS_BY_PLAN.trial,
-      createdBy: actor?._id || actor?.id || null,
-    }),
-  ]);
+      createdBy: actorId || null,
+  };
+  if (session) {
+    await Promise.all([
+      PlatformTenantSettings.create([settingsData], { session }),
+      PlatformTenantTheme.create([themeData], { session }),
+      PlatformTenantSubscription.create([subscriptionData], { session }),
+    ]);
+  } else {
+    await Promise.all([
+      PlatformTenantSettings.create(settingsData),
+      PlatformTenantTheme.create(themeData),
+      PlatformTenantSubscription.create(subscriptionData),
+    ]);
+  }
 
-  await audit('created', { actor, tenant, req });
+  await audit('created', { actor, tenant, req, session });
   return tenant;
+}
+
+async function createTenant({ name, plan = 'trial', actor, req } = {}) {
+  return createTenantDocuments({ name, plan, actor, req });
+}
+
+async function createFirstOwnerTenant({ name, actor, req, session } = {}) {
+  if (!session) fail('FIRST_TENANT_TRANSACTION_REQUIRED', 'Une transaction est requise.', 500);
+  if (!actor?._id && !actor?.id) fail('FIRST_TENANT_ACTOR_REQUIRED', 'Utilisateur authentifié requis.', 401);
+  return createTenantDocuments({ name, plan: 'trial', actor, req, session, deterministicOwner: true });
 }
 
 async function suspendTenant(id, { actor, reason, req } = {}) {
@@ -238,7 +269,7 @@ async function getActiveSubscription(tenantId) {
 
 module.exports = {
   PlatformTenantError,
-  createTenant, suspendTenant, reactivateTenant, archiveTenant, listTenants, getTenantOverview,
+  createTenant, createFirstOwnerTenant, suspendTenant, reactivateTenant, archiveTenant, listTenants, getTenantOverview,
   updateSettings, updateTheme, addDomain, verifyDomain,
   setFeature, listFeatures,
   changeSubscription, cancelSubscription, getActiveSubscription,

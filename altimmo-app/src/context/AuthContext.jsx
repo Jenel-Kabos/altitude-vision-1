@@ -208,6 +208,14 @@ export const AuthProvider = ({ children }) => {
 
   const updateUser = (data) => setUser((prev) => ({ ...prev, ...data }));
 
+  const refreshUser = async () => {
+    const response = await api.get('/users/me');
+    const refreshedUser = response.data?.data?.user || response.data?.user;
+    if (!refreshedUser) throw new Error('Profil utilisateur indisponible');
+    setUser(refreshedUser);
+    return refreshedUser;
+  };
+
   // Appelé par CompleterProfilScreen après un PATCH /users/complete-profile
   // réussi — referme l'écran de complétion (AppNavigator bascule sur Main).
   const markProfileCompleted = (updatedUser) => {
@@ -241,7 +249,7 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={{
       user, token, loading, needsProfileCompletion,
-      login, loginWithGoogle, register, logout, updateUser, refreshSession, markProfileCompleted,
+      login, loginWithGoogle, register, logout, updateUser, refreshUser, refreshSession, markProfileCompleted,
       accountStatusMessage,
       clearAccountStatusMessage: () => setAccountStatusMessage(null),
       can,

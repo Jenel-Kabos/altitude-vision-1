@@ -82,7 +82,7 @@ const errorHandler = (err, req, res, next) => {
     message = err.message;
   }
 
-  if (['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError'].includes(err.name)) {
+  if (['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError', 'TenantApplicationError'].includes(err.name)) {
     statusCode = err.statusCode || 400;
     message = err.message;
   }
@@ -103,7 +103,7 @@ const errorHandler = (err, req, res, next) => {
     ...(err.name === 'HotelAccessError' && { code: err.code }),
     ...(err.name === 'BusinessProfileError' && { code: err.code }),
     ...(err.name === 'OrganizationError' && { code: err.code }),
-    ...(['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError'].includes(err.name) && { code: err.code }),
+    ...(['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError', 'TenantApplicationError'].includes(err.name) && { code: err.code }),
     ...(['AccountStatusError', 'AuthSessionError'].includes(err.name) && { code: err.code }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });

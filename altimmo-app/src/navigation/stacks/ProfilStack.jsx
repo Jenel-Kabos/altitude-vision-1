@@ -8,6 +8,7 @@ import ChoixTypeAnnonceScreen  from '../../screens/Publication/ChoixTypeAnnonceS
 import AddSalePropertyScreen   from '../../screens/Publication/AddSalePropertyScreen';
 import AddRentalPropertyScreen from '../../screens/Publication/AddRentalPropertyScreen';
 import AddAccommodationScreen  from '../../screens/Publication/AddAccommodationScreen';
+import FirstOrganizationOnboardingScreen from '../../screens/Publication/FirstOrganizationOnboardingScreen';
 import FavorisScreen        from '../../screens/Profil/FavorisScreen';
 import TransactionsScreen   from '../../screens/Profil/TransactionsScreen';
 import PaiementScreen       from '../../screens/Paiements/PaiementScreen';
@@ -45,6 +46,7 @@ export default function ProfilStack() {
       <Stack.Screen name="AddSaleProperty"    component={AddSalePropertyScreen} />
       <Stack.Screen name="AddRentalProperty"  component={AddRentalPropertyScreen} />
       <Stack.Screen name="AddAccommodation"   component={AddAccommodationScreen} />
+      <Stack.Screen name="FirstOrganizationOnboarding" component={FirstOrganizationOnboardingScreen} />
       <Stack.Screen name="Favoris"         component={FavorisScreen} />
       <Stack.Screen name="Transactions"    component={TransactionsScreen} />
       <Stack.Screen name="RealEstateApplications" component={RealEstateApplicationsScreen} />
