@@ -187,8 +187,8 @@ const AdminDashboard = ({ children }) => {
   const router = useRouter();
   const pathname = usePathname();
   const isActive = (to, end = false) => end ? pathname === to : pathname.startsWith(to);
-  const { logout, user, isCollaborateur, activeWrites, timeLeft, can } = useAuth();
-  const { tenantReady, tenantRequired, selectedTenantId } = usePlatformTenantRuntime();
+  const { logout, user, isCollaborateur, activeWrites, timeLeft } = useAuth();
+  const { tenantReady, tenantRequired, selectedTenantId, can } = usePlatformTenantRuntime();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const menuButtonRef = useRef(null);

@@ -13,8 +13,8 @@ vi.mock('../services/tenantApplicationReviewService', () => ({
 }));
 
 let capabilities = [];
-vi.mock('../context/AuthContext', () => ({
-  useAuth: () => ({ can: (capability) => capabilities.includes(capability) }),
+vi.mock('../context/PlatformTenantRuntimeContext', () => ({
+  usePlatformTenantRuntime: () => ({ can: (capability) => capabilities.includes(capability) }),
 }));
 
 const row = { id: 'app-1', organizationName: 'Groupe Panorama', status: 'SUBMITTED', submittedAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-02T10:00:00Z' };

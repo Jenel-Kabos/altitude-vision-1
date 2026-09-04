@@ -33,6 +33,12 @@ const renderAsRole = (role, explicitCapabilities) => {
       logout: vi.fn(), isCollaborateur: false, activeWrites: {}, timeLeft: () => 0, can,
     }),
   }));
+  // PLATFORM-ADMIN-CAP-1 — le nav filtre désormais via le `can` composé de
+  // PlatformTenantRuntimeContext (rôle + capacité PlatformOperator active),
+  // jamais via useAuth().can seul, pour éviter deux systèmes de capacités.
+  vi.doMock('../context/PlatformTenantRuntimeContext', () => ({
+    usePlatformTenantRuntime: () => ({ tenantReady: true, tenantRequired: false, selectedTenantId: null, can }),
+  }));
 };
 
 describe('AdminDashboard — domaines métier Altimmo (Sprint 0) — TEST DATA', () => {

@@ -16,12 +16,13 @@ const DEFAULT_RUNTIME = {
   tenants: [],
   selectedTenantId: null,
   selectTenant: () => {},
+  can: () => false,
 };
 const TenantRuntimeContext = createContext(DEFAULT_RUNTIME);
 const userIdOf = (user) => String(user?._id || user?.id || '');
 
 export function PlatformTenantRuntimeProvider({ children }) {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, can: roleCan } = useAuth();
   const [state, setState] = useState({ loading: true, operator: null, tenants: [], selectedTenantId: null });
 
   useEffect(() => {
@@ -81,6 +82,18 @@ export function PlatformTenantRuntimeProvider({ children }) {
     window.dispatchEvent(new CustomEvent('altimmo:platform-operator:tenant-changed', { detail: { tenantId: validId } }));
   }, [state.tenants, user]);
 
+  // PLATFORM-ADMIN-CAP-1 — seul point de composition entre les capacités de
+  // rôle (RBAC-2, `getEffectiveCapabilities`) et les capacités PlatformOperator
+  // (grant explicite, jamais déduites d'un rôle). `state.operator` n'est
+  // jamais renseigné sauf `status === 'active'` (voir `initialize` ci-dessus),
+  // mais la vérification du statut reste explicite ici par défense en
+  // profondeur — fail closed si absent/suspendu/révoqué/en erreur.
+  const can = useCallback((capability) => (
+    roleCan(capability) || Boolean(
+      state.operator?.status === 'active' && state.operator.capabilities?.includes(capability)
+    )
+  ), [roleCan, state.operator]);
+
   const value = useMemo(() => ({
     tenantLoading: authLoading || state.loading,
     tenantReady: !authLoading && !state.loading,
@@ -89,7 +102,8 @@ export function PlatformTenantRuntimeProvider({ children }) {
     tenants: state.tenants,
     selectedTenantId: state.selectedTenantId,
     selectTenant,
-  }), [authLoading, state, selectTenant]);
+    can,
+  }), [authLoading, state, selectTenant, can]);
 
   return <TenantRuntimeContext.Provider value={value}>{children}</TenantRuntimeContext.Provider>;
 }

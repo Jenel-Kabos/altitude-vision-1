@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Building2, FileCheck2, RefreshCw, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
+import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeContext';
 import {
   approveTenantApplication,
   getTenantApplication,
@@ -74,7 +74,7 @@ function ConfirmPanel({ title, children, confirmLabel, onConfirm, onCancel, busy
 }
 
 export default function TenantApplicationsPage() {
-  const { can } = useAuth();
+  const { can } = usePlatformTenantRuntime();
   const mayRead = can('platform.tenant_applications.read');
   const [filters, setFilters] = useState({ status: '', organizationName: '', applicant: '', from: '', to: '' });
   const [query, setQuery] = useState(filters);
