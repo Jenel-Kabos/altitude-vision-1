@@ -6,6 +6,7 @@ const TenantLinkRequest = require('../models/TenantLinkRequest');
 const Notification = require('../models/Notification');
 const rentalMaintenanceService = require('./rentalMaintenanceService');
 const { resolveLocataireForUser } = require('./tenantLinkService');
+const { aggregatePaymentSummary, publicPayment } = require('./rentalPaymentProjectionService');
 
 function fail(message, statusCode) { const error = new Error(message); error.statusCode = statusCode; return error; }
 const asId = (value) => value?._id || value;
@@ -58,13 +59,12 @@ async function getMyPayments(userId) {
 async function getMyPaymentPage(userId, query = {}) {
   const l = await requireLocataire(userId); const leases = await getLeases(l._id); const leaseIds = leases.map(asId);
   const { page, limit } = pageOptions(query); const match = { contrat: { $in: leaseIds } };
-  const [payments, total] = await Promise.all([
+  const [payments, total, summary] = await Promise.all([
     Paiement.find(match).select('contrat mois annee montant montantTotal montantRecu statut modePaiement reference datePaiement penaliteAppliquee penaliteMontant retardJours jourEcheance').sort({ annee: -1, mois: -1 }).skip((page - 1) * limit).limit(limit).lean(),
     Paiement.countDocuments(match),
+    aggregatePaymentSummary(Paiement, match),
   ]);
-  const normalized = payments.map((p) => ({ ...p, restant: Math.max(0, (p.montantTotal ?? p.montant ?? 0) - (p.montantRecu ?? 0)), recuDisponible: p.statut === 'payé' }));
-  const totals = normalized.reduce((a, p) => ({ du: a.du + (p.montantTotal ?? p.montant ?? 0), recu: a.recu + (p.montantRecu ?? 0), penalites: a.penalites + (p.penaliteMontant ?? 0), restant: a.restant + p.restant }), { du: 0, recu: 0, penalites: 0, restant: 0 });
-  return { payments: normalized, summary: totals, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  return { payments: payments.map(publicPayment), summary, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
 }
 
 function documentRows(leases) {

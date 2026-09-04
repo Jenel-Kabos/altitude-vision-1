@@ -131,10 +131,10 @@ export const DashboardState = ({ type = "empty", title, description, action }) =
   );
 };
 
-export const DashboardPagination = ({ page, totalPages, onPrevious, onNext }) => (
+export const DashboardPagination = ({ page, totalPages, onPrevious, onNext, previousAriaLabel, nextAriaLabel }) => (
   <nav className="dashboard-pagination" aria-label="Pagination">
-    <button type="button" onClick={onPrevious} disabled={page <= 1}>Précédent</button>
+    <button type="button" aria-label={previousAriaLabel} onClick={onPrevious} disabled={page <= 1}>Précédent</button>
     <span>Page {page} sur {totalPages}</span>
-    <button type="button" onClick={onNext} disabled={page >= totalPages}>Suivant</button>
+    <button type="button" aria-label={nextAriaLabel} onClick={onNext} disabled={page >= totalPages}>Suivant</button>
   </nav>
 );

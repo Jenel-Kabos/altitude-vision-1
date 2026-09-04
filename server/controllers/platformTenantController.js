@@ -2,7 +2,6 @@
 // platformTenantService — aucune logique métier ici.
 const asyncHandler = require('express-async-handler');
 const service = require('../services/platformTenant/platformTenantService');
-
 exports.listTenants = asyncHandler(async (req, res) => {
   const tenants = await service.listTenants({ status: req.query.status });
   res.json({ status: 'success', data: { tenants } });

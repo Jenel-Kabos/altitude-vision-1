@@ -38,8 +38,10 @@ api.interceptors.request.use(
     // utilisateur ordinaire : le backend n'accorde cette portée qu'à un
     // opérateur réellement actif, jamais déduit de la seule présence de cet
     // en-tête (voir server/middleware/tenantContext.js).
-    if (_validatedPlatformTenantId) {
+    if (_validatedPlatformTenantId && !config.platformScoped) {
       config.headers["X-Platform-Tenant-Id"] = _validatedPlatformTenantId;
+    } else if (config.platformScoped) {
+      delete config.headers["X-Platform-Tenant-Id"];
     }
 
     if (config.data instanceof FormData) {

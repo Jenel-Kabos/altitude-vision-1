@@ -8,6 +8,7 @@ const { notifyStaff } = require('../services/notificationService');
 const { contractAlertWindowDays } = require('../services/rentalFinancialAutomationService');
 const onboarding = require('../services/rentalAssetOnboardingService');
 const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
+const { getOwnerPaymentPage } = require('../services/rentalOwnerFinancialService');
 
 // TENANT-SCOPE-AUDIT-1 — `req.tenantScopeUserIds` reste le scope brut
 // `OrgMembership`-only. `list`/`stats` comparent `RentalManagement.owner`/
@@ -189,6 +190,12 @@ exports.ownerList = async (req, res) => {
     const paymentMap = new Map(paymentRows.map((item) => [String(item._id), { expected: item.expected || 0, paid: item.paid || 0, remaining: Math.max(0, (item.expected || 0) - (item.paid || 0)), overdueCount: item.overdueCount || 0, partialCount: item.partialCount || 0, nextDueAt: item.nextDueAt || null }]));
     const rentals = rows.map((row) => ({ ...sync.serializeRentalManagement(row, 'owner'), paymentSummary: paymentMap.get(String(row.activeLease?._id || row.activeLease)) || { expected: 0, paid: 0, remaining: 0, overdueCount: 0, partialCount: 0, nextDueAt: null } }));
     res.json({ status: 'success', data: { rentals } });
+  } catch (error) { fail(res, error); }
+};
+
+exports.ownerPayments = async (req, res) => {
+  try {
+    res.json({ status: 'success', data: await getOwnerPaymentPage(req.user.id, req.query) });
   } catch (error) { fail(res, error); }
 };
 

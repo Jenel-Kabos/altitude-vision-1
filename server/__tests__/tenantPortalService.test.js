@@ -18,7 +18,7 @@ const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
 const { resolveLocataireForUser } = require('../services/tenantLinkService');
 const rentalMaintenanceService = require('../services/rentalMaintenanceService');
 const {
-  getMyProfile, getMyLease, getMyPayments, getMyDocuments, getMyNotice, createMyMaintenanceRequest,
+  getMyProfile, getMyLease, getMyPayments, getMyPaymentPage, getMyDocuments, getMyNotice, createMyMaintenanceRequest,
 } = require('../services/tenantPortalService');
 
 RentalMaintenanceTicket.RENTAL_MAINTENANCE_CATEGORIES = ['plomberie', 'electricite', 'structure', 'equipement', 'nuisible', 'serrurerie', 'peinture', 'autre'];
@@ -89,6 +89,27 @@ describe('tenantPortalService — résolution stricte via userId — TEST DATA',
     Paiement.find = jest.fn().mockReturnValue({ select: jest.fn().mockReturnThis(), sort: jest.fn().mockResolvedValue([]) });
     await getMyPayments(USER_ID);
     expect(Paiement.find).toHaveBeenCalledWith({ contrat: LEASE_ID });
+  });
+
+  test('summary reste global avec 12 échéances quand la page demandée est limitée à 5', async () => {
+    resolveLocataireForUser.mockResolvedValue(locataire());
+    Contrat.find = jest.fn().mockReturnValue({ sort: jest.fn().mockReturnThis(), populate: jest.fn().mockResolvedValue([lease()]) });
+    const pageRows = Array.from({ length: 5 }, (_, index) => ({
+      _id: `PAY-${index}`, contrat: LEASE_ID, mois: index + 1, annee: 2026,
+      montant: 100, montantTotal: 110, montantRecu: 60, penaliteMontant: 10, statut: 'partiel',
+    }));
+    Paiement.find = jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnThis(), sort: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(), limit: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(pageRows),
+    });
+    Paiement.countDocuments = jest.fn().mockResolvedValue(12);
+    Paiement.aggregate = jest.fn().mockResolvedValue([{ du: 1320, recu: 720, penalites: 120, restant: 600 }]);
+
+    const page = await getMyPaymentPage(USER_ID, { page: 1, limit: 5 });
+
+    expect(page.payments).toHaveLength(5);
+    expect(page.pagination.total).toBe(12);
+    expect(page.summary).toEqual({ du: 1320, recu: 720, penalites: 120, restant: 600 });
   });
 
   test('getMyDocuments renvoie les documents du bail (jamais ceux d\'un autre locataire)', async () => {

@@ -22,6 +22,7 @@ const { requireCapability } = require('../middleware/capabilityMiddleware');
 
 const router = express.Router();
 router.use(auth.protect);
+router.get('/owner/payments', auth.restrictTo('Proprietaire'), ctrl.ownerPayments);
 router.get('/owner/my', auth.restrictTo('Proprietaire'), ctrl.ownerList);
 router.post('/:id/owner/:action', auth.restrictTo('Proprietaire'), ctrl.ownerRequest);
 router.use(requireTenantScope);

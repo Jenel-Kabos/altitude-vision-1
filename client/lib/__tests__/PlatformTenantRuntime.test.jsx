@@ -39,6 +39,17 @@ describe('runtime tenant plateforme', () => {
     expect(config.headers['X-Platform-Tenant-Id']).toBe('tenant-b');
   });
 
+  test('une requête platform-scoped n’injecte jamais le tenant sélectionné', async () => {
+    const { result } = renderHook(() => usePlatformTenantRuntime(), { wrapper });
+    await waitFor(() => expect(result.current.tenantReady).toBe(true));
+    act(() => result.current.selectTenant('tenant-a'));
+    const config = await api.interceptors.request.handlers[0].fulfilled({
+      headers: { 'X-Platform-Tenant-Id': 'tenant-forged' },
+      platformScoped: true,
+    });
+    expect(config.headers['X-Platform-Tenant-Id']).toBeUndefined();
+  });
+
   test('reload restaure seulement le tenant autorisé lié au même utilisateur', async () => {
     localStorage.setItem('platformOperatorTenantSelection', JSON.stringify({ userId: 'operator-a', tenantId: 'tenant-a' }));
     const { result } = renderHook(() => usePlatformTenantRuntime(), { wrapper });
