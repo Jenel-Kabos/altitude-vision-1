@@ -5,9 +5,10 @@ import api from '../services/api';
 
 const back = vi.fn();
 const push = vi.fn();
+const replace = vi.fn();
 const sectionState = vi.hoisted(() => ({ commentsFail: false }));
 const authState = vi.hoisted(() => ({ user: null }));
-vi.mock('next/navigation', () => ({ useParams: () => ({ propertyId: 'TEST-DATA-PROPERTY' }), useRouter: () => ({ back, push }) }));
+vi.mock('next/navigation', () => ({ useParams: () => ({ propertyId: 'TEST-DATA-PROPERTY' }), useRouter: () => ({ back, push, replace }) }));
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authState.user }) }));
 vi.mock('../services/propertyService', () => ({ getPropertyById: vi.fn(), getPropertiesWithFilters: vi.fn(), likeProperty: vi.fn(), shareProperty: vi.fn() }));
 vi.mock('../services/api', () => ({ default: { post: vi.fn() } }));
@@ -31,6 +32,7 @@ describe('PropertyDetailPage — TEST DATA', () => {
     getPropertyById.mockReset();
     back.mockReset();
     push.mockReset();
+    replace.mockReset();
     sectionState.commentsFail = false;
     authState.user = null;
     api.post.mockReset();
@@ -167,5 +169,22 @@ describe('PropertyDetailPage — TEST DATA', () => {
     expect(screen.getByText('Villa meublée')).toBeInTheDocument();
     expect(screen.queryByText("Honoraires d'agence")).not.toBeInTheDocument();
     expect(screen.queryByText(/mandat de location|mandat de vente/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('PropertyDetailPage — PHASE-HW1 §2-3 (redirection Hotel-backed)', () => {
+  beforeEach(() => { getPropertyById.mockReset(); replace.mockReset(); });
+
+  test('un bien adossé à un Hotel redirige vers la fiche Hotel canonique (Hotel._id, jamais Property._id)', async () => {
+    getPropertyById.mockResolvedValue({ ...property, accommodation: { hotel: 'HOTEL-ID-1', accommodationType: 'hotel' } });
+    render(<PropertyDetailPage />);
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/immobilier/hotels/HOTEL-ID-1'));
+  });
+
+  test('un bien Hébergement non-hôtel ne redirige jamais (non-régression)', async () => {
+    getPropertyById.mockResolvedValue({ ...property, status: 'hebergement', accommodation: { accommodationType: 'villa_meublee', rates: [] } });
+    render(<PropertyDetailPage />);
+    await screen.findByRole('heading', { name: 'TEST DATA HOUSE' });
+    expect(replace).not.toHaveBeenCalled();
   });
 });

@@ -16,6 +16,25 @@ export const createPublicHotelReservation = async (hotelId, payload) => {
   return Object.assign(res.data.data.reservation, { idempotent: Boolean(res.data.data.idempotent) });
 };
 
+// PHASE-HW1 — recherche multi-catégories (H2/H4/H5), même endpoint que
+// mobile (HotelDetailScreen) : jamais un second moteur de disponibilité/prix.
+export const searchHotelPublicAvailability = async (hotelId, { checkIn, checkOut, adults, children, rooms }) => {
+  const res = await api.get(`/hotels/public/${hotelId}/availability`, { params: { checkIn, checkOut, adults, children, rooms } });
+  return res.data.data;
+};
+
+// PHASE-HW1 — avis publics vérifiés (H3), pagination indépendante de la fiche.
+export const getHotelPublicReviews = async (hotelId, { page = 1, limit = 5 } = {}) => {
+  const res = await api.get(`/hotels/public/${hotelId}/reviews`, { params: { page, limit } });
+  return res.data.data;
+};
+
+// PHASE-HW1 — hôtels à proximité (H4), distance calculée côté serveur.
+export const getNearbyPublicHotels = async (hotelId, { limit } = {}) => {
+  const res = await api.get(`/hotels/public/${hotelId}/nearby`, { params: { limit } });
+  return res.data.data.hotels;
+};
+
 // Client connecté — "Mes réservations"
 export const getMyHotelReservations = async () => {
   const res = await api.get('/hotel-reservations/mine');

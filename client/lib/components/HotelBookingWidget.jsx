@@ -6,30 +6,50 @@
 // tarif réel — voir hotelReservationService.computeReservationPricing).
 // Le bouton ne dit jamais "Payer" : aucun paiement n'est géré dans ce sprint.
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { getHotelAvailability, createPublicHotelReservation } from "../services/hotelReservationService";
 import { HOTEL_RATE_TYPES } from "../constants/hotel";
 import { formatCurrencyXAF } from "../utils/normalizePropertyDetail";
 
-const HotelBookingWidget = ({ hotelId, categories = [] }) => {
+// PHASE-HW1 §11 — `lockedSelection` (fourni par la recherche multi-catégories
+// en direct, HotelPublicDetailPage) verrouille catégorie/tarif/dates/
+// voyageurs EXACTEMENT comme mobile HotelBookingScreen (contexte verrouillé,
+// jamais re-choisi silencieusement — mission §12). La disponibilité affichée
+// par la recherche vient déjà du même moteur H2 ; elle n'est pas re-vérifiée
+// ici, mais le serveur revalide systématiquement à la création (H2/H5,
+// jamais un stock/prix autoritaire côté client).
+const HotelBookingWidget = ({ hotelId, categories = [], lockedSelection = null }) => {
   const requestIdRef = useRef(null);
   const bookableCategories = categories.filter((c) => c.rates?.length > 0);
+  const isLocked = Boolean(lockedSelection);
 
-  const [categoryId, setCategoryId] = useState(bookableCategories[0]?._id || "");
-  const [rateId, setRateId] = useState(bookableCategories[0]?.rates?.[0]?._id || "");
-  const [checkInDate, setCheckInDate] = useState("");
-  const [checkOutDate, setCheckOutDate] = useState("");
-  const [roomsCount, setRoomsCount] = useState(1);
-  const [adults, setAdults] = useState(2);
-  const [children, setChildren] = useState(0);
+  const [categoryId, setCategoryId] = useState(lockedSelection?.roomCategoryId || bookableCategories[0]?._id || "");
+  const [rateId, setRateId] = useState(lockedSelection?.ratePlanId || bookableCategories[0]?.rates?.[0]?._id || "");
+  const [checkInDate, setCheckInDate] = useState(lockedSelection?.checkInDate || "");
+  const [checkOutDate, setCheckOutDate] = useState(lockedSelection?.checkOutDate || "");
+  const [roomsCount, setRoomsCount] = useState(lockedSelection?.roomsCount || 1);
+  const [adults, setAdults] = useState(lockedSelection?.adults || 2);
+  const [children, setChildren] = useState(lockedSelection?.children || 0);
   const [guest, setGuest] = useState({ firstName: "", lastName: "", email: "", phone: "", country: "" });
   const [specialRequests, setSpecialRequests] = useState("");
 
   const [checking, setChecking] = useState(false);
-  const [availability, setAvailability] = useState(null); // { available, nights }
+  const [availability, setAvailability] = useState(isLocked ? { available: true } : null); // { available, nights }
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(null); // reference
+
+  useEffect(() => {
+    if (!lockedSelection) return;
+    setCategoryId(lockedSelection.roomCategoryId);
+    setRateId(lockedSelection.ratePlanId);
+    setCheckInDate(lockedSelection.checkInDate);
+    setCheckOutDate(lockedSelection.checkOutDate);
+    setRoomsCount(lockedSelection.roomsCount || 1);
+    setAdults(lockedSelection.adults || 2);
+    setChildren(lockedSelection.children || 0);
+    setAvailability({ available: true });
+  }, [lockedSelection]);
 
   const selectedCategory = bookableCategories.find((c) => c._id === categoryId);
   const selectedRate = selectedCategory?.rates?.find((r) => r._id === rateId);
@@ -39,7 +59,7 @@ const HotelBookingWidget = ({ hotelId, categories = [] }) => {
     : 0;
   const estimatedTotal = selectedRate && nights > 0 ? selectedRate.amount * nights * Number(roomsCount || 1) : null;
 
-  if (bookableCategories.length === 0) {
+  if (!isLocked && bookableCategories.length === 0) {
     return (
       <section className="mt-8 border rounded-lg p-4 bg-gray-50">
         <p className="text-sm text-gray-500">Aucune catégorie n'est disponible à la réservation pour le moment.</p>
@@ -109,52 +129,65 @@ const HotelBookingWidget = ({ hotelId, categories = [] }) => {
   }
 
   return (
-    <section className="mt-8 border rounded-lg p-4 sm:p-6">
-      <h2 className="text-xl font-bold mb-4" style={{ color: "#2E7BB5" }}>Vérifier la disponibilité</h2>
+    <section id="hotel-booking-widget" className="mt-8 border rounded-lg p-4 sm:p-6">
+      <h2 className="text-xl font-bold mb-4" style={{ color: "#2E7BB5" }}>{isLocked ? "Votre sélection" : "Vérifier la disponibilité"}</h2>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="sm:col-span-2">
-          <label className="block text-sm font-medium mb-1">Catégorie</label>
-          <select value={categoryId} onChange={(e) => handleCategoryChange(e.target.value)} aria-label="Catégorie" className="w-full px-3 py-2 border rounded-md">
-            {bookableCategories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Tarif</label>
-          <select value={rateId} onChange={(e) => setRateId(e.target.value)} aria-label="Tarif" className="w-full px-3 py-2 border rounded-md">
-            {selectedCategory?.rates.map((r) => (
-              <option key={r._id} value={r._id}>{HOTEL_RATE_TYPES.find((t) => t.value === r.rateType)?.label} — {formatCurrencyXAF(r.amount)}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Chambres</label>
-          <input type="number" min="1" value={roomsCount} onChange={(e) => { setRoomsCount(e.target.value); setAvailability(null); }} aria-label="Nombre de chambres" className="w-full px-3 py-2 border rounded-md" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Arrivée</label>
-          <input type="date" value={checkInDate} onChange={(e) => { setCheckInDate(e.target.value); setAvailability(null); }} aria-label="Date d'arrivée" className="w-full px-3 py-2 border rounded-md" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Départ</label>
-          <input type="date" value={checkOutDate} onChange={(e) => { setCheckOutDate(e.target.value); setAvailability(null); }} aria-label="Date de départ" className="w-full px-3 py-2 border rounded-md" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Adultes</label>
-          <input type="number" min="1" value={adults} onChange={(e) => setAdults(e.target.value)} aria-label="Adultes" className="w-full px-3 py-2 border rounded-md" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Enfants</label>
-          <input type="number" min="0" value={children} onChange={(e) => setChildren(e.target.value)} aria-label="Enfants" className="w-full px-3 py-2 border rounded-md" />
-        </div>
+        {isLocked ? (
+          <div className="sm:col-span-2 rounded-md border border-blue-200 bg-blue-50 p-3" aria-label="Offre sélectionnée, non modifiable">
+            <p className="font-semibold">{lockedSelection.categoryName} · {lockedSelection.rateLabel}</p>
+            <p className="text-sm text-gray-600 mt-1">{checkInDate} → {checkOutDate} · {roomsCount} chambre(s) · {adults} adulte(s){children ? `, ${children} enfant(s)` : ""}</p>
+            {lockedSelection.totalAmount != null && <p className="text-sm font-semibold mt-1">Total {lockedSelection.nights} nuit(s) : {formatCurrencyXAF(lockedSelection.totalAmount)}</p>}
+            {lockedSelection.onClear && (
+              <button type="button" onClick={lockedSelection.onClear} className="text-sm text-blue-700 underline mt-2">Modifier la sélection</button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium mb-1">Catégorie</label>
+              <select value={categoryId} onChange={(e) => handleCategoryChange(e.target.value)} aria-label="Catégorie" className="w-full px-3 py-2 border rounded-md">
+                {bookableCategories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Tarif</label>
+              <select value={rateId} onChange={(e) => setRateId(e.target.value)} aria-label="Tarif" className="w-full px-3 py-2 border rounded-md">
+                {selectedCategory?.rates.map((r) => (
+                  <option key={r._id} value={r._id}>{HOTEL_RATE_TYPES.find((t) => t.value === r.rateType)?.label} — {formatCurrencyXAF(r.amount)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Chambres</label>
+              <input type="number" min="1" value={roomsCount} onChange={(e) => { setRoomsCount(e.target.value); setAvailability(null); }} aria-label="Nombre de chambres" className="w-full px-3 py-2 border rounded-md" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Arrivée</label>
+              <input type="date" value={checkInDate} onChange={(e) => { setCheckInDate(e.target.value); setAvailability(null); }} aria-label="Date d'arrivée" className="w-full px-3 py-2 border rounded-md" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Départ</label>
+              <input type="date" value={checkOutDate} onChange={(e) => { setCheckOutDate(e.target.value); setAvailability(null); }} aria-label="Date de départ" className="w-full px-3 py-2 border rounded-md" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Adultes</label>
+              <input type="number" min="1" value={adults} onChange={(e) => setAdults(e.target.value)} aria-label="Adultes" className="w-full px-3 py-2 border rounded-md" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Enfants</label>
+              <input type="number" min="0" value={children} onChange={(e) => setChildren(e.target.value)} aria-label="Enfants" className="w-full px-3 py-2 border rounded-md" />
+            </div>
 
-        <div className="sm:col-span-2">
-          <button type="button" onClick={handleCheckAvailability} disabled={checking}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium disabled:opacity-50">
-            {checking ? "Vérification..." : "Vérifier la disponibilité"}
-          </button>
-        </div>
+            <div className="sm:col-span-2">
+              <button type="button" onClick={handleCheckAvailability} disabled={checking}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium disabled:opacity-50">
+                {checking ? "Vérification..." : "Vérifier la disponibilité"}
+              </button>
+            </div>
+          </>
+        )}
 
-        {availability && (
+        {!isLocked && availability && (
           <div className={`sm:col-span-2 rounded-md p-3 text-sm ${availability.available ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>
             {availability.available
               ? `Disponible pour ${nights} nuit(s).${estimatedTotal ? ` Prix estimé : ${formatCurrencyXAF(estimatedTotal)}.` : ""}`

@@ -785,6 +785,13 @@ const PropertyDetailPage = () => {
         setError({ kind: 'not_found', title: 'Bien introuvable', message: 'Ce bien n’existe plus ou n’est plus disponible.' });
         return;
       }
+      // PHASE-HW1 §2-3 — un bien adossé à un Hotel n'a pas de fiche Property
+      // canonique : redirection vers /immobilier/hotels/:hotelId (Hotel._id,
+      // jamais Property._id), jamais le rendu générique Property pour un Hotel.
+      if (data.accommodation?.hotel) {
+        router.replace(`/immobilier/hotels/${data.accommodation.hotel}`);
+        return;
+      }
       setProperty(data);
       setLocalLikes(data.likes.length);
       setLocalShares(data.shares);
@@ -797,6 +804,10 @@ const PropertyDetailPage = () => {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
+    // `router` (App Router) est stable en production ; l'omettre évite une
+    // boucle de rechargement avec certains mocks de test qui recréent
+    // l'objet router à chaque rendu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propertyId, user]);
 
   useEffect(() => {

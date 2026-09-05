@@ -18,7 +18,10 @@ import { CalendarCheck2 } from "lucide-react";
 import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
 
 const STATUS_TABS = [{ value: "", label: "Tous" }, ...RESERVATION_STATUSES];
-const isToday = (value) => value && new Date(value).toDateString() === new Date().toDateString();
+// Compare les sous-chaînes ISO (jamais new Date(...).toDateString(), sujet
+// au fuseau local — une date de réservation UTC-minuit peut basculer sur le
+// jour précédent/suivant selon le fuseau du navigateur, mission HW1 §35 non-régression).
+const isToday = (value) => value && String(value).slice(0, 10) === new Date().toISOString().slice(0, 10);
 
 const MyHotelReservationsPage = ({ initialHotelId = '' }) => {
   const createRequestIdRef = useRef(null);

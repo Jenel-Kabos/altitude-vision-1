@@ -136,6 +136,10 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
   const price     = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(displayAmount || 0);
   const priceSuffix = statusKey === 'hebergement' && nightlyRate ? '/ nuit' : 'FCFA';
   const badgeClass = statusKey === 'hebergement' ? 'pcard-badge-heb' : statusKey === 'location' ? 'pcard-badge-loc' : 'pcard-badge-vente';
+  // PHASE-HW1 §18 — un bien adossé à un Hotel publié route vers la fiche
+  // Hotel canonique (Hotel._id, jamais Property._id) — parité avec mobile H1.5.
+  const isHotel = property.accommodationType === 'hotel' && Boolean(property.hotel);
+  const detailHref = isHotel ? `/immobilier/hotels/${property.hotel}` : `/immobilier/property/${property._id}`;
   const amenities = getAmenities();
   const date      = formatDate(property.createdAt);
 
@@ -148,14 +152,14 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
       <motion.div className="pcard-root pcard-list"
         initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}>
-        <Link href={`/immobilier/property/${property._id}`} className="pcard-list-inner">
+        <Link href={detailHref} className="pcard-list-inner">
           <div className="pcard-list-img">
             {!imageError && imgUrl
               ? <Image src={imgUrl} alt={property.title} fill sizes="(max-width: 768px) 100vw, 360px" className="object-cover" onError={() => setImageError(true)} />
               : <ImagePlaceholder />}
             <div className="pcard-scrim" />
             <div className="pcard-corner" /><div className="pcard-corner pcard-corner-br" />
-            <div className={`pcard-badge ${badgeClass}`}>{STATUS_LABEL[statusKey] || property.status}</div>
+            <div className={`pcard-badge ${badgeClass}`}>{isHotel ? 'Hôtel' : (STATUS_LABEL[statusKey] || property.status)}</div>
             <div className="pcard-like"><LikeButton targetType="Property" targetId={property._id} size="sm" showCount={false} /></div>
           </div>
           <div className="pcard-list-body">
@@ -190,14 +194,14 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
     <motion.div className="pcard-root pcard-grid"
       initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}>
-      <Link href={`/immobilier/property/${property._id}`} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Link href={detailHref} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div className="pcard-img-wrap">
           {!imageError && imgUrl
             ? <Image src={imgUrl} alt={property.title} fill sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw" className="pcard-img" onError={() => setImageError(true)} />
             : <ImagePlaceholder />}
           <div className="pcard-scrim" />
           <div className="pcard-corner" /><div className="pcard-corner pcard-corner-br" />
-          <div className={`pcard-badge ${badgeClass}`}>{STATUS_LABEL[statusKey] || property.status}</div>
+          <div className={`pcard-badge ${badgeClass}`}>{isHotel ? 'Hôtel' : (STATUS_LABEL[statusKey] || property.status)}</div>
           <div className="pcard-price">{price}<span>{priceSuffix}</span></div>
           <div className="pcard-like"><LikeButton targetType="Property" targetId={property._id} size="sm" showCount={false} /></div>
         </div>

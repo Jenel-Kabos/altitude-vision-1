@@ -77,3 +77,47 @@ describe('HotelBookingWidget — Sprint C — TEST DATA', () => {
     expect(await screen.findByText(/RES-2026-000001/)).toBeInTheDocument();
   });
 });
+
+describe('HotelBookingWidget — PHASE-HW1 §11 (contexte verrouillé depuis la recherche multi-catégories)', () => {
+  const lockedSelection = {
+    roomCategoryId: 'CAT-2', ratePlanId: 'RATE-2', checkInDate: '2026-09-10', checkOutDate: '2026-09-12',
+    roomsCount: 1, adults: 2, children: 0, categoryName: 'Deluxe', rateLabel: 'Tarif public', totalAmount: 90000, nights: 2,
+    onClear: vi.fn(),
+  };
+
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  test('affiche un résumé non modifiable, jamais les listes déroulantes de sélection', () => {
+    render(<HotelBookingWidget hotelId="HOTEL-1" categories={[]} lockedSelection={lockedSelection} />);
+    expect(screen.getByText('Deluxe · Tarif public')).toBeInTheDocument();
+    expect(screen.getByText(/2026-09-10 → 2026-09-12/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Catégorie')).toBeNull();
+    expect(screen.queryByLabelText('Tarif')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Vérifier la disponibilité' })).toBeNull();
+  });
+
+  test('saute directement aux informations client (le contexte est déjà validé par la recherche en direct)', () => {
+    render(<HotelBookingWidget hotelId="HOTEL-1" categories={[]} lockedSelection={lockedSelection} />);
+    expect(screen.getByLabelText('Prénom')).toBeInTheDocument();
+  });
+
+  test('la réservation créée porte exactement la catégorie/le tarif/les dates fournis, jamais recalculés côté client', async () => {
+    getHotelAvailability.mockResolvedValue({ available: true, nights: [] });
+    createPublicHotelReservation.mockResolvedValue({ reference: 'RES-2026-000002' });
+    render(<HotelBookingWidget hotelId="HOTEL-1" categories={[]} lockedSelection={lockedSelection} />);
+    fireEvent.change(screen.getByLabelText('Prénom'), { target: { value: 'Jean' } });
+    fireEvent.change(screen.getByLabelText('Nom'), { target: { value: 'Dupont' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'jean@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Demander la réservation' }));
+    await waitFor(() => expect(createPublicHotelReservation).toHaveBeenCalledWith('HOTEL-1', expect.objectContaining({
+      roomCategoryId: 'CAT-2', ratePlanId: 'RATE-2', checkInDate: '2026-09-10', checkOutDate: '2026-09-12',
+    })));
+    expect(getHotelAvailability).not.toHaveBeenCalled();
+  });
+
+  test('"Modifier la sélection" appelle onClear fourni par la page', () => {
+    render(<HotelBookingWidget hotelId="HOTEL-1" categories={[]} lockedSelection={lockedSelection} />);
+    fireEvent.click(screen.getByText('Modifier la sélection'));
+    expect(lockedSelection.onClear).toHaveBeenCalled();
+  });
+});

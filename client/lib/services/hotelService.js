@@ -16,9 +16,12 @@ export const getHotelDetail = async (id) => {
   return res.data.data; // { hotel, completion }
 };
 
+// PHASE-HW1 — `detail` (H1-H5 normalisé : policies/reviewSummary/faq) est
+// désormais le contrat canonique consommé par les pages publiques ; `hotel`/
+// `categories` restent pour compatibilité (mobile H2 booking handoff).
 export const getPublicHotel = async (id) => {
   const res = await api.get(`/hotels/public/${id}`);
-  return res.data.data; // { hotel, categories }
+  return res.data.data; // { hotel, categories, detail }
 };
 
 /** @param {{ville?, search?, page?, limit?}} params */
