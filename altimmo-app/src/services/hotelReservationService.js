@@ -5,9 +5,32 @@ export const newReservationRequestId = () => Crypto.randomUUID();
 export const searchPublicHotels = async (params = {}) => (await api.get('/hotels/public', { params })).data.data;
 export const getPublicHotel = async (id) => (await api.get(`/hotels/public/${id}`)).data.data;
 export const getHotelAvailability = async (hotelId, params) => (await api.get(`/hotels/${hotelId}/availability`, { params })).data.data;
+// PHASE-H2 — recherche multi-catégories (jamais un roomCategoryId préalable
+// requis, contrairement à getHotelAvailability ci-dessus qui reste inchangé
+// pour son propre usage dans HotelBookingScreen).
+export const searchHotelAvailability = async (hotelId, { checkIn, checkOut, adults, children, rooms }) => (
+  await api.get(`/hotels/public/${hotelId}/availability`, { params: { checkIn, checkOut, adults, children, rooms } })
+).data.data;
 export const createHotelReservation = async (hotelId, payload) => (await api.post(`/hotels/${hotelId}/reservations`, payload)).data.data;
+// PHASE-H3 — avis publics (séjour vérifié uniquement), paginés indépendamment
+// de la fiche hôtel (jamais tous les avis chargés d'un coup).
+export const getHotelReviews = async (hotelId, { page = 1, limit = 5 } = {}) => (
+  await api.get(`/hotels/public/${hotelId}/reviews`, { params: { page, limit } })
+).data.data;
+// PHASE-H4 — hôtels à proximité (distance géospatiale calculée côté
+// serveur, jamais recalculée côté mobile).
+export const getNearbyHotels = async (hotelId, { limit } = {}) => (
+  await api.get(`/hotels/public/${hotelId}/nearby`, { params: { limit } })
+).data.data.hotels;
 export const getMyHotelReservations = async () => (await api.get('/hotel-reservations/mine')).data.data.reservations;
-export const getHotelReservation = async (id) => (await api.get(`/hotel-reservations/${id}`)).data.data.reservation;
+// PHASE-H5 §20 — `reviewEligibility` (server-authoritative, jamais déduit
+// côté mobile du seul statut) accompagne désormais la réservation.
+export const getHotelReservation = async (id) => (await api.get(`/hotel-reservations/${id}`)).data.data;
+// PHASE-H5 — calcul pur (aucune écriture), dérivé du snapshot contractuel.
+export const getCancellationEligibility = async (id) => (await api.get(`/hotel-reservations/${id}/cancellation-eligibility`)).data.data.eligibility;
+// PHASE-H5 §20/21 — complétion de la soumission d'avis mobile (H3 avait
+// déféré ce point d'entrée) : réutilise l'endpoint H3 existant tel quel.
+export const createHotelReview = async (hotelId, payload) => (await api.post(`/hotels/${hotelId}/reviews`, payload)).data.data;
 export const updateHotelReservation = async (id, payload) => (await api.patch(`/hotel-reservations/${id}`, payload)).data.data.reservation;
 export const cancelHotelReservation = async (id, reason) => (await api.patch(`/hotel-reservations/${id}/cancel`, { reason })).data.data.reservation;
 export const getOwnerHotelReservations = async (params = {}) => (await api.get('/hotel-reservations/owner', { params })).data.data;

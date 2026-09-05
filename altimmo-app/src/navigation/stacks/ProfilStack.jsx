@@ -17,6 +17,7 @@ import PolitiqueConfidentialiteScreen  from '../../screens/Profil/PolitiqueConfi
 import CacheManagementScreen          from '../../screens/Profil/CacheManagementScreen';
 import MyHotelReservationsScreen from '../../screens/Hotels/MyHotelReservationsScreen';
 import HotelReservationDetailScreen from '../../screens/Hotels/HotelReservationDetailScreen';
+import HotelDetailScreen from '../../screens/Hotels/HotelDetailScreen';
 import HotelBookingScreen from '../../screens/Hotels/HotelBookingScreen';
 import HotelOperationsScreen from '../../screens/Hotels/HotelOperationsScreen';
 import HotelCockpitScreen from '../../screens/Hotels/HotelCockpitScreen';
@@ -59,6 +60,7 @@ export default function ProfilStack() {
       <Stack.Screen name="CacheManagement"          component={CacheManagementScreen} />
       <Stack.Screen name="MyHotelReservations" component={MyHotelReservationsScreen} />
       <Stack.Screen name="HotelReservationDetail" component={HotelReservationDetailScreen} />
+      <Stack.Screen name="HotelDetail" component={HotelDetailScreen} />
       <Stack.Screen name="HotelBooking" component={HotelBookingScreen} />
       <Stack.Screen name="HotelOperations" component={HotelOperationsScreen} />
       <Stack.Screen name="HotelCockpit" component={HotelCockpitScreen} />

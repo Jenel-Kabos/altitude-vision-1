@@ -12,6 +12,8 @@ const RoomCategory = require('../models/RoomCategory');
 const RatePlan = require('../models/RatePlan');
 const { assertOperationalHotelAccess } = require('../services/hotel/hotelAccessScopeService');
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
+const { syncFutureTotalUnits } = require('../services/hotel/hotelInventoryProfessionalService');
+const { uploadFilesToCloudinary } = require('../services/propertyPublicationInputService');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
@@ -100,13 +102,46 @@ exports.update = async (req, res) => {
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
+    const previousUnitsAvailable = category.unitsAvailable;
     const ALLOWED = ['name', 'description', 'capacity', 'beds', 'surface', 'unitsAvailable', 'amenities', 'gallery', 'status'];
     ALLOWED.forEach((key) => { if (req.body[key] !== undefined) category[key] = req.body[key]; });
     category.updatedBy = req.user.id;
     await category.save();
+    // PHASE-HX1 §12 — synchronise les dates FUTURES et sûres uniquement
+    // (jamais l'historique, jamais un jour où le nouveau total tomberait
+    // sous le déjà-réservé) ; best-effort, ne bloque jamais la réponse.
+    if (req.body.unitsAvailable !== undefined && Number(req.body.unitsAvailable) !== previousUnitsAvailable) {
+      await syncFutureTotalUnits(category._id, Number(req.body.unitsAvailable)).catch(() => {});
+    }
     res.json({ status: 'success', data: { category } });
   } catch (error) {
     if (error.name === 'ValidationError') return fail(res, 422, error.message);
+    fail(res, 500, error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// PHASE-HX1 §10 — POST /api/hotels/room-categories/:id/gallery
+// Réutilise EXACTEMENT le mécanisme Cloudinary déjà en place pour la
+// galerie Hotel (uploadFilesToCloudinary, même dossier logique, même
+// absence de rollback explicite que le flux Hotel existant — convention
+// déjà établie, pas une nouvelle divergence). Renvoie les URLs ajoutées ;
+// le client les fusionne dans `gallery` et les persiste via PATCH
+// (mission §9/§10 : jamais un second champ ni une seconde route d'écriture
+// pour la galerie elle-même).
+// ─────────────────────────────────────────────
+exports.uploadGallery = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const category = await RoomCategory.findById(req.params.id);
+    if (!category) return fail(res, 404, 'Catégorie introuvable.');
+    const { error } = await assertHotelAccess(req, category.hotel, CAP.ROOM_MANAGE);
+    if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
+    if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
+    if (!req.files || req.files.length === 0) return fail(res, 422, 'Aucune photo fournie.');
+    const urls = await uploadFilesToCloudinary(req.files, 'altitude-vision/room-categories');
+    res.status(201).json({ status: 'success', data: { urls } });
+  } catch (error) {
     fail(res, 500, error.message);
   }
 };
@@ -232,10 +267,16 @@ exports.upsertRate = async (req, res) => {
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
-    const { rateType, amount, currency, seasonalPeriods = [] } = req.body;
+    const { rateType, amount, currency, seasonalPeriods = [], mealPlan = null, cancellation = null } = req.body;
     if (!RatePlan.RATE_TYPES.includes(rateType)) return fail(res, 422, 'Type de tarif invalide.');
     if (!(Number(amount) > 0)) return fail(res, 422, 'Un montant positif est requis.');
     if (!Array.isArray(seasonalPeriods) || seasonalPeriods.length > 50) return fail(res, 422, 'Périodes tarifaires invalides.');
+    // PHASE-H5 — conditions commerciales additives, `null` accepté (legacy/
+    // inconnu, jamais un défaut fabriqué). Validation de forme minimale ici ;
+    // la cohérence (non_refundable sans délai/pénalité, pénalité > 100%...)
+    // est appliquée par RatePlan.cancellationPolicySchema.pre('validate').
+    if (mealPlan != null && !RatePlan.MEAL_PLANS.includes(mealPlan)) return fail(res, 422, 'Formule de repas invalide.');
+    if (cancellation != null && !RatePlan.CANCELLATION_TYPES.includes(cancellation.type)) return fail(res, 422, 'Type de politique d’annulation invalide.');
 
     await RatePlan.updateMany(
       { roomCategory: category._id, rateType, active: true },
@@ -246,6 +287,8 @@ exports.upsertRate = async (req, res) => {
       rateType,
       amount,
       currency: currency || 'XAF',
+      mealPlan,
+      cancellation,
       seasonalPeriods: seasonalPeriods.map((period) => ({
         label: period.label, startDate: period.startDate, endDate: period.endDate,
         amount: Number(period.amount), priority: Number(period.priority || 0),

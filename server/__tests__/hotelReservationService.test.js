@@ -66,9 +66,12 @@ describe('computeReservationPricing — tarification recalculée côté serveur 
   test('rateSnapshot capture rateType/amount/currency (historisation, mission §6)', async () => {
     RatePlan.findOne = jest.fn().mockResolvedValue({ amount: 50000, currency: 'XAF', rateType: 'weekend', active: true });
     const pricing = await computeReservationPricing({ roomCategoryId: CATEGORY_ID, ratePlanId: RATE_ID, nights: 1, roomsCount: 1 });
+    // PHASE-H5 — mealPlan/cancellation figés dans le même snapshot ; `null`
+    // ici car le mock RatePlan n'en porte aucun (RatePlan antérieur à H5).
     expect(pricing.rateSnapshot).toEqual({
       rateType: 'weekend', amount: 50000, currency: 'XAF',
       nightlyRates: [{ date: null, amount: 50000, periodId: null, periodLabel: '', priority: null }],
+      mealPlan: null, cancellation: null,
     });
   });
 

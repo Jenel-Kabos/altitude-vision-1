@@ -24,7 +24,11 @@ const FinancialRefund = require('../models/FinancialRefund');
 const {
   computeHotelCompletionScore, syncLinkedAccommodations, resyncLinkedAccommodations,
   createFullHotel, updateFullHotel, duplicateHotel, deleteHotel, listHotelsForAdmin, listValidatedHotelPortfolio,
+  buildPublicHotelDetail,
+  findNearbyPublishedHotels,
 } = require('../services/hotelService');
+const { getRatingSummary } = require('../services/hotelReviewService');
+const { listPublicFaq } = require('../services/hotelFaqService');
 const {
   assertHotelNameAvailable,
   translateHotelNameDuplicate,
@@ -150,7 +154,11 @@ exports.getOne = async (req, res) => {
 // sur Hotel, exposant sans nécessité des identifiants internes
 // (manager/createdBy/updatedBy/reviewedBy) et des champs de modération
 // (rejectionReason/suspensionReason) à un consommateur non authentifié.
-const PUBLIC_HOTEL_FIELDS = 'name brand description starRating phone email website contact services hotelServices hasRestaurant hasReception gallery property publicationStatus active totalRooms totalCapacity totalBeds minNightlyRate maxNightlyRate currency';
+// PHASE-H1 — `hotelType` et `policies` ajoutés : classés PUBLIC SAFE (texte
+// descriptif à destination du client, jamais une donnée administrative ou
+// personnelle — voir HOTEL_DETAIL_H1_REPORT.md). `taxInformation`,
+// `legalName`, `administrativeDocuments` restent volontairement exclus.
+const PUBLIC_HOTEL_FIELDS = 'name brand description starRating hotelType phone email website contact services hotelServices hasRestaurant hasReception gallery property publicationStatus active totalRooms totalCapacity totalBeds minNightlyRate maxNightlyRate currency policies';
 
 exports.getPublic = async (req, res) => {
   try {
@@ -173,7 +181,41 @@ exports.getPublic = async (req, res) => {
       const rightRate = right.rates.find((rate) => rate.rateType === 'public')?.amount ?? Number.MAX_SAFE_INTEGER;
       return leftRate - rightRate;
     });
-    res.json({ status: 'success', data: { hotel, categories: categoriesWithRates } });
+    // PHASE-H3 — Accommodation liée (repli de politiques structurées) +
+    // résumé d'avis (léger, jamais la liste complète) + FAQ active (bornée
+    // par nature) — chargés ici, jamais recalculés dans buildPublicHotelDetail
+    // (fonction pure, testable sans DB).
+    const [accommodation, reviewSummary, faq] = await Promise.all([
+      Accommodation.findOne({ hotel: hotel._id }).select('rules cancellationPolicy securityDeposit currency'),
+      getRatingSummary(hotel._id),
+      listPublicFaq(hotel._id),
+    ]);
+    // PHASE-H1 — `detail` est additif : `hotel`/`categories` restent
+    // inchangés (contrat consommé par HotelBookingScreen, jamais cassé),
+    // `detail` est la nouvelle projection normalisée pour HotelDetailScreen.
+    res.json({ status: 'success', data: { hotel, categories: categoriesWithRates, detail: buildPublicHotelDetail(hotel, categoriesWithRates, { accommodation, reviewSummary, faq }) } });
+  } catch (error) {
+    fail(res, 500, error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// PHASE-H4 — GET /api/hotels/public/:hotelId/nearby
+// Hôtels publiés à proximité géographique réelle (distance Mongo, jamais
+// calculée côté JS). Même garde de publication que getPublic ci-dessus
+// (jamais un hôtel non publié révélé via ce endpoint, y compris pour
+// l'hôtel courant : un hôtel non publié n'a simplement pas de "proximité").
+// ─────────────────────────────────────────────
+exports.nearby = async (req, res) => {
+  try {
+    const { hotelId } = req.params;
+    if (!mongoose.isValidObjectId(hotelId)) return fail(res, 400, 'Identifiant invalide.');
+    const hotel = await Hotel.findById(hotelId).select('publicationStatus active');
+    if (!hotel || hotel.publicationStatus !== 'publie' || hotel.active === false) {
+      return fail(res, 404, 'Hôtel introuvable.');
+    }
+    const hotels = await findNearbyPublishedHotels({ hotelId, limit: req.query.limit });
+    res.json({ status: 'success', data: { hotels } });
   } catch (error) {
     fail(res, 500, error.message);
   }

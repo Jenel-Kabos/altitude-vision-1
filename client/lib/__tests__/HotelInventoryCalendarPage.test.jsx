@@ -2,10 +2,10 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import HotelInventoryCalendarPage from '../pages/dashboard/HotelInventoryCalendarPage';
-import { getHotelInventoryCalendar, rebuildHotelInventory, updateHotelInventoryRange } from '../services/hotelService';
+import { getHotelInventoryCalendar, rebuildHotelInventory, updateHotelInventoryRange, updateHotelInventoryDays } from '../services/hotelService';
 
 vi.mock('next/navigation', () => ({ useParams: () => ({ hotelId: 'hotel-1' }) }));
-vi.mock('../services/hotelService', () => ({ getHotelInventoryCalendar: vi.fn(), rebuildHotelInventory: vi.fn(), updateHotelInventoryRange: vi.fn() }));
+vi.mock('../services/hotelService', () => ({ getHotelInventoryCalendar: vi.fn(), rebuildHotelInventory: vi.fn(), updateHotelInventoryRange: vi.fn(), updateHotelInventoryDays: vi.fn() }));
 vi.mock('../components/RoomAssignmentPanel', () => ({ default: ({ reservation }) => <button>Affecter {reservation.reference}</button> }));
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -17,7 +17,7 @@ const payload = {
 };
 
 describe('HotelInventoryCalendarPage C/D.1.1', () => {
-  beforeEach(() => { vi.clearAllMocks(); getHotelInventoryCalendar.mockResolvedValue(payload); updateHotelInventoryRange.mockResolvedValue({}); rebuildHotelInventory.mockResolvedValue({ nights: 7 }); });
+  beforeEach(() => { vi.clearAllMocks(); getHotelInventoryCalendar.mockResolvedValue(payload); updateHotelInventoryRange.mockResolvedValue({}); rebuildHotelInventory.mockResolvedValue({ nights: 7 }); updateHotelInventoryDays.mockResolvedValue({ results: [] }); });
 
   test('charge uniquement la plage visible et bascule semaine/mois', async () => {
     render(<HotelInventoryCalendarPage />); await screen.findByRole('heading', { name: 'Standard' });
@@ -42,5 +42,65 @@ describe('HotelInventoryCalendarPage C/D.1.1', () => {
   test('reste lisible en thème sombre et expose les contrôles au clavier', async () => {
     const { container } = render(<div className="dark"><HotelInventoryCalendarPage /></div>); await screen.findByRole('heading', { name: 'Standard' });
     expect(container.querySelector('.dark\\:text-gray-100')).toBeTruthy(); expect(screen.getByLabelText('Inventaire Standard').getAttribute('tabindex')).toBe('0');
+  });
+});
+
+describe('HotelInventoryCalendarPage — PHASE-HX1 §17 (édition du stock vendable par date)', () => {
+  const twoDayPayload = {
+    ...payload,
+    days: [
+      { id: 'day-1', date: '2026-10-10T00:00:00Z', roomCategory: 'category-1', categoryName: 'Standard', totalUnits: 5, availableUnits: 5, reservedUnits: 0, blockedUnits: 0, physicalOutOfService: 0, stopSell: false, isClosed: false },
+      { id: 'day-2', date: '2026-10-11T00:00:00Z', roomCategory: 'category-1', categoryName: 'Standard', totalUnits: 5, availableUnits: 5, reservedUnits: 0, blockedUnits: 0, physicalOutOfService: 0, stopSell: false, isClosed: false },
+    ],
+  };
+  beforeEach(() => { vi.clearAllMocks(); getHotelInventoryCalendar.mockResolvedValue(twoDayPayload); updateHotelInventoryDays.mockResolvedValue({ results: [{ ok: true }, { ok: true }] }); });
+
+  test('un champ éditable de stock vendable est affiché pour chaque date, initialisé depuis les données canoniques', async () => {
+    render(<HotelInventoryCalendarPage />);
+    await screen.findByRole('heading', { name: 'Standard' });
+    expect(screen.getByLabelText('Stock vendable Standard 2026-10-10')).toHaveValue(5);
+    expect(screen.getByLabelText('Stock vendable Standard 2026-10-11')).toHaveValue(5);
+  });
+
+  test('des valeurs différentes sur des dates consécutives sont enregistrées en un seul appel groupé', async () => {
+    render(<HotelInventoryCalendarPage />);
+    await screen.findByRole('heading', { name: 'Standard' });
+    fireEvent.change(screen.getByLabelText('Stock vendable Standard 2026-10-10'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Stock vendable Standard 2026-10-11'), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le stock Standard' }));
+    await waitFor(() => expect(updateHotelInventoryDays).toHaveBeenCalledWith('hotel-1', expect.objectContaining({
+      roomCategoryId: 'category-1',
+      updates: expect.arrayContaining([
+        { date: '2026-10-10', sellableUnits: 3 },
+        { date: '2026-10-11', sellableUnits: 0 },
+      ]),
+    })));
+  });
+
+  test('le bouton Enregistrer reste désactivé sans modification', async () => {
+    render(<HotelInventoryCalendarPage />);
+    await screen.findByRole('heading', { name: 'Standard' });
+    expect(screen.getByRole('button', { name: 'Enregistrer le stock Standard' })).toBeDisabled();
+  });
+
+  test('une date refusée par le serveur (protection du réservé) est signalée, jamais silencieuse', async () => {
+    updateHotelInventoryDays.mockResolvedValue({ results: [{ ok: false, code: 'INVENTORY_BELOW_RESERVED' }, { ok: true }] });
+    render(<HotelInventoryCalendarPage />);
+    await screen.findByRole('heading', { name: 'Standard' });
+    fireEvent.change(screen.getByLabelText('Stock vendable Standard 2026-10-10'), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le stock Standard' }));
+    const { toast } = await import('react-hot-toast');
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+  });
+
+  test('le stock réservé reste visible et indiqué comme protégé', async () => {
+    getHotelInventoryCalendar.mockResolvedValue({
+      ...twoDayPayload,
+      days: [{ ...twoDayPayload.days[0], reservedUnits: 2, totalUnits: 5, blockedUnits: 0 }],
+    });
+    render(<HotelInventoryCalendarPage />);
+    await screen.findByRole('heading', { name: 'Standard' });
+    expect(screen.getByText(/réservé 2/)).toBeInTheDocument();
+    expect(screen.getByText('(protégé)')).toBeInTheDocument();
   });
 });

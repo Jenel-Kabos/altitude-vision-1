@@ -5,6 +5,8 @@ const roomCategoryCtrl = require('../controllers/roomCategoryController');
 const roomCtrl = require('../controllers/roomController');
 const roomAssignmentCtrl = require('../controllers/roomAssignmentController');
 const reservationCtrl = require('../controllers/hotelReservationController');
+const reviewCtrl = require('../controllers/hotelReviewController');
+const faqCtrl = require('../controllers/hotelFaqController');
 const staffCtrl = require('../controllers/hotelStaffAssignmentController');
 const inventoryCtrl = require('../controllers/hotelInventoryController');
 const { requireHotelCapability } = require('../middleware/hotelAccessMiddleware');
@@ -18,6 +20,16 @@ const router = express.Router();
 // Public — liste et fiche hôtel (pages publiques), AVANT auth.protect.
 router.get('/public', ctrl.listPublic);
 router.get('/public/:id', ctrl.getPublic);
+// PHASE-H2 — recherche multi-catégories, entièrement publique (même garde
+// de publication que getPublic ci-dessus, jamais un rôle/capacité requis).
+router.get('/public/:hotelId/availability', reservationCtrl.searchPublicAvailability);
+// PHASE-H3 — avis (séjour vérifié uniquement) et FAQ publiques, même garde
+// de publication que getPublic ci-dessus.
+router.get('/public/:hotelId/reviews', reviewCtrl.listPublic);
+router.get('/public/:hotelId/faq', faqCtrl.listPublic);
+// PHASE-H4 — hôtels à proximité (distance géospatiale réelle), même garde
+// de publication que getPublic ci-dessus.
+router.get('/public/:hotelId/nearby', ctrl.nearby);
 
 // Sprint C — disponibilité + demande de réservation, accessibles sans
 // compte. `auth.optionalAuth` attache req.user si un jeton valide est
@@ -85,10 +97,25 @@ router.patch('/:id/deactivate', ctrl.deactivate);
 router.patch('/:id/reactivate', ctrl.reactivate);
 router.delete('/:id', ctrl.remove);
 
+// PHASE-H3 — création d'avis : authentification obligatoire (jamais un avis
+// invité, contrairement à la réservation), ownership/séjour-terminé/
+// unicité vérifiés dans le service (jamais dans le contrôleur).
+router.post('/:hotelId/reviews', reviewCtrl.create);
+
+// PHASE-H3 — FAQ (propriétaire + staff, même convention d'accès que les
+// catégories de chambres ci-dessous).
+router.get('/:hotelId/faq', faqCtrl.list);
+router.post('/:hotelId/faq', faqCtrl.create);
+router.patch('/:hotelId/faq/:faqId', faqCtrl.update);
+router.delete('/:hotelId/faq/:faqId', faqCtrl.remove);
+
 // Catégories de chambres (propriétaire + staff, filtré par assertHotelAccess)
 router.get('/:hotelId/room-categories', roomCategoryCtrl.list);
 router.post('/:hotelId/room-categories', roomCategoryCtrl.create);
 router.patch('/room-categories/:id', roomCategoryCtrl.update);
+// PHASE-HX1 — upload de photos de catégorie (jamais un second champ ni une
+// seconde route pour la galerie elle-même, voir roomCategoryController.uploadGallery).
+router.post('/room-categories/:id/gallery', upload.array('images', 10), roomCategoryCtrl.uploadGallery);
 router.delete('/room-categories/:id', roomCategoryCtrl.remove);
 router.post('/room-categories/:id/duplicate', roomCategoryCtrl.duplicate);
 router.patch('/room-categories/:id/deactivate', roomCategoryCtrl.deactivate);
@@ -107,6 +134,9 @@ const inventoryView = requireHotelCapability(HOTEL_OPERATIONAL_CAPABILITIES.INVE
 const inventoryManage = requireHotelCapability(HOTEL_OPERATIONAL_CAPABILITIES.INVENTORY_MANAGE, (req) => req.params.hotelId);
 router.get('/:hotelId/inventory/calendar', inventoryView, inventoryCtrl.calendar);
 router.patch('/:hotelId/inventory/range', inventoryManage, inventoryCtrl.updateRange);
+// PHASE-HX1 — édition professionnelle par date (stock vendable), même garde
+// de capacité que updateRange ci-dessus.
+router.patch('/:hotelId/inventory/days', inventoryManage, inventoryCtrl.updateSellable);
 router.post('/:hotelId/inventory/rebuild', inventoryManage, inventoryCtrl.rebuild);
 
 // Sprint D — affectation de chambre (accès résolu via l'hôtel de la

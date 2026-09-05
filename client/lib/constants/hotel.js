@@ -33,3 +33,25 @@ export const HOTEL_PUBLICATION_STATUSES = [
 export const ROOM_CATEGORY_SUGGESTIONS = [
   "Standard", "Deluxe", "Suite", "Suite familiale", "Suite présidentielle",
 ];
+
+// PHASE-H5/HX1 — synchronisé avec server/models/RatePlan.js (MEAL_PLANS/
+// CANCELLATION_TYPES/PENALTY_TYPES). N'expose QUE les concepts H5
+// réellement implémentés — jamais paymentPolicy (différé, voir
+// HOTEL_H5_REPORT.md "Payment policy: DEFERRED").
+export const HOTEL_MEAL_PLANS = [
+  { value: "room_only", label: "Chambre seule" },
+  { value: "breakfast_included", label: "Petit-déjeuner inclus" },
+  { value: "half_board", label: "Demi-pension" },
+  { value: "full_board", label: "Pension complète" },
+];
+
+export const HOTEL_CANCELLATION_TYPES = [
+  { value: "free_until", label: "Annulation gratuite jusqu'à un délai" },
+  { value: "flexible", label: "Flexible (pénalité après délai)" },
+  { value: "non_refundable", label: "Non remboursable" },
+];
+
+export const HOTEL_PENALTY_TYPES = [
+  { value: "percentage", label: "Pourcentage du montant" },
+  { value: "fixed_amount", label: "Montant fixe" },
+];

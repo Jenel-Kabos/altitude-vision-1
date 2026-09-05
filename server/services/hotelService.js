@@ -389,10 +389,202 @@ async function listValidatedHotelPortfolio({ search, city, district, starRating,
   return { hotels: eligible.slice(start, start + safeLimit), total: eligible.length, page: safePage, limit: safeLimit };
 }
 
+// PHASE-H1 — seule projection canonique de la fiche hôtel publique (mobile/
+// web consumer). N'invente aucune donnée : chaque champ absent devient
+// `null`/tableau vide plutôt qu'une valeur fabriquée (mission Hotel Detail
+// H1, §3). Champs légaux/administratifs volontairement exclus (voir
+// HOTEL_DETAIL_H1_REPORT.md, classification PUBLIC SAFE / PRIVATE /
+// ADMIN ONLY / UNCERTAIN) : `legalName`, `taxInformation` et
+// `administrativeDocuments` ne sont jamais projetés ici, quel que soit
+// l'appelant — un futur champ légal public devra être explicitement
+// allowlisté ici, jamais ajouté à `PUBLIC_HOTEL_FIELDS` sans passer par
+// cette fonction.
+// PHASE-H3 — précédence de canonicalisation des politiques (voir
+// HOTEL_H3_REPORT.md §15) :
+//   checkIn/checkOut/visitors/accessibility : HOTEL CANONICAL uniquement
+//     (aucun équivalent Accommodation — jamais de repli inventé).
+//   children/pets/cancellation : HOTEL CANONICAL (texte libre) si renseigné,
+//     sinon ACCOMMODATION FALLBACK (dérivé d'un champ structuré réel).
+//   smoking/deposit/minimumAge : ABSENTS de Hotel → ACCOMMODATION FALLBACK
+//     est la seule source (jamais un défaut inventé si l'Accommodation
+//     liée n'existe pas non plus).
+//   paymentMethods : ABSENT du domaine entier (Hotel ET Accommodation) —
+//     toujours `null`, jamais inventé (rapporté comme lacune, voir §17).
+// RatePlan n'est JAMAIS consulté ici : ses politiques (cancellation, etc.)
+// n'existent pas (audit H2, confirmé de nouveau en H3) — jamais mélangées
+// à la politique générale de l'hôtel.
+const CANCELLATION_LABELS = { flexible: 'Annulation flexible', moderee: 'Annulation modérée', stricte: 'Annulation stricte' };
+
+function buildNormalizedPolicies(hotel, accommodation) {
+  const hp = hotel.policies || {};
+  const rules = accommodation?.rules || null;
+  return {
+    checkIn: hp.checkInTime || null,
+    checkOut: hp.checkOutTime || null,
+    children: hp.children || (rules ? (rules.childrenAllowed ? 'Autorisés' : 'Non autorisés') : null),
+    pets: hp.pets || (rules ? (rules.petsAllowed ? 'Autorisés' : 'Non autorisés') : null),
+    smoking: rules ? (rules.smokingAllowed ? 'Autorisé' : 'Non autorisé') : null,
+    deposit: accommodation?.securityDeposit ? { amount: accommodation.securityDeposit, currency: accommodation.currency || 'XAF' } : null,
+    paymentMethods: null,
+    minimumAge: rules?.minimumAge || null,
+    cancellation: hp.cancellation || (accommodation?.cancellationPolicy ? CANCELLATION_LABELS[accommodation.cancellationPolicy] : null) || null,
+    visitors: hp.visitors || null,
+    accessibility: hp.accessibility || null,
+  };
+}
+
+const NEARBY_DEFAULT_LIMIT = 6;
+const NEARBY_MAX_LIMIT = 20;
+
+// PHASE-H4 — hôtels à proximité, distance géospatiale réelle (jamais un
+// calcul JS post-hoc). `$geoNear` DOIT être le premier stage et opère sur
+// Property (seule collection indexée `2dsphere`, cf `location` GeoJSON
+// `{type:'Point', coordinates:[lng,lat]}` synchronisée depuis
+// latitude/longitude — voir Property.js). Hotel n'a pas de champ géo propre.
+// Réutilise exactement le même prédicat de publication que getPublic/
+// listPublic (publicationStatus:'publie', active !== false, Property
+// statusAdmin:'Validée'/availability:'Disponible') — jamais un second
+// contrat de visibilité publique. Aucune portée tenant : la découverte
+// cross-tenant d'hôtels PUBLIÉS est un comportement voulu (même règle que
+// /api/hotels/public), jamais une fuite d'hôtels non publiés.
+async function findNearbyPublishedHotels({ hotelId, limit = NEARBY_DEFAULT_LIMIT } = {}) {
+  const safeLimit = Math.min(NEARBY_MAX_LIMIT, Math.max(1, Number(limit) || NEARBY_DEFAULT_LIMIT));
+  if (!mongoose.isValidObjectId(hotelId)) return [];
+
+  const currentHotel = await Hotel.findById(hotelId).select('property');
+  if (!currentHotel || !currentHotel.property) return [];
+  const currentProperty = await Property.findById(currentHotel.property).select('location');
+  const coordinates = currentProperty?.location?.coordinates;
+  // Coordonnées absentes/invalides sur l'hôtel courant → liste vide, jamais
+  // une erreur ni des coordonnées inventées (mission §4).
+  if (!Array.isArray(coordinates) || coordinates.length !== 2) return [];
+
+  const publishedHotels = await Hotel.find({
+    _id: { $ne: currentHotel._id },
+    publicationStatus: 'publie',
+    active: { $ne: false },
+    property: { $ne: null },
+  }).select('_id property name starRating hotelType gallery');
+  if (publishedHotels.length === 0) return [];
+
+  const propertyToHotel = new Map(publishedHotels.map((h) => [String(h.property), h]));
+  const propertyIds = [...propertyToHotel.keys()].map((id) => new mongoose.Types.ObjectId(id));
+
+  // $geoNear exclut nativement tout document sans champ géo indexé valide —
+  // un candidat sans coordonnées est donc déjà absent du résultat, sans
+  // filtre JS additionnel (mission §4, "candidate without coordinates excluded").
+  const nearProperties = await Property.aggregate([
+    {
+      $geoNear: {
+        near: { type: 'Point', coordinates },
+        distanceField: 'distanceMeters',
+        spherical: true,
+        query: { _id: { $in: propertyIds }, statusAdmin: 'Validée', availability: 'Disponible' },
+      },
+    },
+    { $sort: { distanceMeters: 1, _id: 1 } }, // tri déterministe : distance croissante, puis _id (mission §2)
+    { $limit: safeLimit },
+  ]);
+  if (nearProperties.length === 0) return [];
+
+  const hotelIds = nearProperties.map((p) => propertyToHotel.get(String(p._id))._id);
+  // Tarif de départ : même prédicat que getPublic (RoomCategory actives +
+  // RatePlan actif, tarif public le moins cher) — jamais un prix inventé ;
+  // omis (null) si aucun tarif public actif n'existe pour cet hôtel.
+  const categories = await RoomCategory.find({ hotel: { $in: hotelIds }, status: 'actif' }).select('_id hotel');
+  const categoryToHotel = new Map(categories.map((c) => [String(c._id), String(c.hotel)]));
+  const categoryIds = categories.map((c) => c._id);
+  const rates = categoryIds.length
+    ? await RatePlan.find({ roomCategory: { $in: categoryIds }, active: true, rateType: 'public' }).select('roomCategory amount currency')
+    : [];
+  const startingPriceByHotel = new Map();
+  rates.forEach((rate) => {
+    const hid = categoryToHotel.get(String(rate.roomCategory));
+    if (!hid) return;
+    const current = startingPriceByHotel.get(hid);
+    if (!current || rate.amount < current.amount) startingPriceByHotel.set(hid, { amount: rate.amount, currency: rate.currency });
+  });
+
+  return nearProperties.map((property) => {
+    const hotel = propertyToHotel.get(String(property._id));
+    const startingPrice = startingPriceByHotel.get(String(hotel._id)) || null;
+    return {
+      hotelId: hotel._id,
+      name: hotel.name,
+      starRating: hotel.starRating ?? null,
+      hotelType: hotel.hotelType ?? null,
+      heroImage: hotel.gallery?.[0]?.url || null,
+      city: property.address?.city || null,
+      district: property.address?.arrondissement || null,
+      distanceMeters: Math.round(property.distanceMeters),
+      startingPrice: startingPrice ? startingPrice.amount : null,
+      currency: startingPrice ? startingPrice.currency : null,
+    };
+  });
+}
+
+function buildPublicHotelDetail(hotel, categoriesWithRates = [], { accommodation = null, reviewSummary = null, faq = [] } = {}) {
+  const property = hotel.property || null;
+  const policies = buildNormalizedPolicies(hotel, accommodation);
+
+  return {
+    id: hotel._id,
+    name: hotel.name,
+    brand: hotel.brand || null,
+    hotelType: hotel.hotelType ?? null,
+    starRating: hotel.starRating ?? null,
+    description: hotel.description || null,
+    gallery: hotel.gallery || [],
+    location: property ? {
+      address: property.address?.street || null,
+      neighborhood: property.address?.neighborhood || null,
+      district: property.address?.arrondissement || null,
+      city: property.address?.city || null,
+      country: null, // aucun champ pays sur Property à ce jour — jamais inventé
+      coordinates: Array.isArray(property.location?.coordinates) ? property.location.coordinates : null,
+    } : null,
+    contact: hotel.contact ? {
+      horaires: hotel.contact.horaires || null,
+      languesParlees: hotel.contact.languesParlees || [],
+    } : null,
+    amenities: {
+      hotelServices: hotel.hotelServices || {},
+      services: hotel.services || [],
+    },
+    policies,
+    // H1 : aucun champ légal n'a été classé PUBLIC SAFE (voir rapport) —
+    // jamais `null` par oubli, toujours par décision explicite documentée.
+    legal: null,
+    roomCategories: categoriesWithRates.map((category) => ({
+      id: category._id,
+      name: category.name,
+      capacity: category.capacity || null,
+      bedCount: category.beds ?? null,
+      size: category.surface ?? null,
+      amenities: category.amenities || null,
+      gallery: category.gallery || [],
+      rates: (category.rates || []).map((rate) => ({
+        id: rate._id, rateType: rate.rateType, amount: rate.amount, currency: rate.currency,
+      })),
+    })),
+    // PHASE-H3 — résumé léger uniquement (jamais la liste complète des avis
+    // ici, voir HOTEL_H3_REPORT.md §19) : 0 avis → `averageRating: null`,
+    // jamais `5.0`/"Nouveau" fabriqué. La liste paginée vit sur son propre
+    // endpoint (GET .../reviews).
+    reviewSummary: reviewSummary || { averageRating: null, reviewCount: 0, categories: null },
+    // FAQ bornée par nature (quelques entrées par hôtel) : incluse
+    // directement, jamais un lot de centaines d'entrées (§19).
+    faq,
+  };
+}
+
 module.exports = {
   computeHotelCompletionScore, syncLinkedAccommodations, resyncLinkedAccommodations,
   createFullHotel, updateFullHotel, duplicateHotel, deleteHotel, listHotelsForAdmin, listValidatedHotelPortfolio,
   listEligibleHotels,
   ensureManagerGovernanceAtomic,
+  buildPublicHotelDetail,
+  buildNormalizedPolicies,
+  findNearbyPublishedHotels,
   HOTEL_COMPLETION_WEIGHTS,
 };

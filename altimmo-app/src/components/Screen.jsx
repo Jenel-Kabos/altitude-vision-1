@@ -7,16 +7,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { spacing } from '../theme';
 
-export default function Screen({
+const Screen = React.forwardRef(function Screen({
   scroll = false,
   avoidKeyboard = false,
   style,
   children,
-}) {
+}, ref) {
   const { isDark, themeColors } = useTheme();
 
   const content = scroll ? (
     <ScrollView
+      ref={ref}
       style={{ flex: 1 }}
       contentContainerStyle={[{ padding: spacing.md }, style]}
       showsVerticalScrollIndicator={false}
@@ -46,4 +47,6 @@ export default function Screen({
       {wrapped}
     </SafeAreaView>
   );
-}
+});
+
+export default Screen;

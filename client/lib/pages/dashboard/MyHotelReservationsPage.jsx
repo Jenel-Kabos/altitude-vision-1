@@ -18,6 +18,7 @@ import { CalendarCheck2 } from "lucide-react";
 import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardPagination, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
 
 const STATUS_TABS = [{ value: "", label: "Tous" }, ...RESERVATION_STATUSES];
+const isToday = (value) => value && new Date(value).toDateString() === new Date().toDateString();
 
 const MyHotelReservationsPage = ({ initialHotelId = '' }) => {
   const createRequestIdRef = useRef(null);
@@ -28,6 +29,7 @@ const MyHotelReservationsPage = ({ initialHotelId = '' }) => {
   const [loading, setLoading] = useState(true);
   const [reasonInputs, setReasonInputs] = useState({});
   const [creating, setCreating] = useState(false);
+  const [dateFilter, setDateFilter] = useState(""); // '' | 'arrivals' | 'departures'
   const [form, setForm] = useState({
     hotelId: initialHotelId, roomCategoryId: "", ratePlanId: "", checkInDate: "", checkOutDate: "",
     roomsCount: 1, adults: 1, children: 0,
@@ -93,6 +95,12 @@ const MyHotelReservationsPage = ({ initialHotelId = '' }) => {
     catch (err) { toast.error(err.response?.data?.message || "Erreur."); }
   };
 
+  const visibleReservations = data.reservations.filter((r) => (
+    !dateFilter
+    || (dateFilter === "arrivals" && isToday(r.checkInDate))
+    || (dateFilter === "departures" && isToday(r.checkOutDate))
+  ));
+
   return (
     <DashboardPage>
       <DashboardPageHeader
@@ -146,15 +154,25 @@ const MyHotelReservationsPage = ({ initialHotelId = '' }) => {
 
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher une référence..."
         aria-label="Rechercher" className="w-full px-3 py-2 border rounded text-sm" />
+
+      {/* PHASE-HX1 §21 — dérivé des dates canoniques, jamais une seconde collection. */}
+      <div className="flex flex-wrap gap-2">
+        {[["", "Toutes"], ["arrivals", "Arrivées aujourd’hui"], ["departures", "Départs aujourd’hui"]].map(([value, label]) => (
+          <button key={value || 'toutes'} aria-pressed={dateFilter === value} onClick={() => setDateFilter(value)}
+            className={`px-3 py-1.5 rounded text-sm font-medium ${dateFilter === value ? "bg-blue-700 text-white" : "bg-gray-100 text-gray-700"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
       </DashboardToolbar>
 
       {loading ? (
         <DashboardState type="loading" title="Chargement des réservations" />
-      ) : data.reservations.length === 0 ? (
+      ) : visibleReservations.length === 0 ? (
         <DashboardState title="Aucune réservation" description="Aucune réservation ne correspond à ces critères." />
       ) : (
         <div className="space-y-3">
-          {data.reservations.map((r) => (
+          {visibleReservations.map((r) => (
             <DashboardCard key={r._id}>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
@@ -190,6 +208,9 @@ const MyHotelReservationsPage = ({ initialHotelId = '' }) => {
               )}
               {r.status === "rejected" && r.rejectionReason && <p className="text-xs text-red-600 mt-2">Motif : {r.rejectionReason}</p>}
               {r.status === "cancelled" && r.cancellationReason && <p className="text-xs text-gray-600 mt-2">Motif d'annulation : {r.cancellationReason}</p>}
+              {/* PHASE-HX1 §22 — check-in/check-out déjà implémentés dans
+                  RoomAssignmentPanel ci-dessous (garde financière incluse) ;
+                  jamais une seconde logique de transition dupliquée ici. */}
               {(r.status === "confirmed" || r.status === "checked_in") && (
                 <>
                   <RoomAssignmentPanel reservation={r} onChanged={load} />

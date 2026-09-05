@@ -14,6 +14,19 @@
 
 const mongoose = require('mongoose');
 const AutoIncrement = require('mongoose-sequence')(mongoose);
+// PHASE-H5 — mêmes enums que RatePlan (jamais une seconde source de vérité
+// pour mealPlan/cancellation.type/penaltyType).
+const { MEAL_PLANS, CANCELLATION_TYPES, PENALTY_TYPES } = require('./RatePlan');
+
+// PHASE-H5 — sous-schéma dédié (jamais `type: {type: {...}}` imbriqué,
+// ambigu pour Mongoose qui interprète alors la clé `type` interne comme un
+// descripteur de type plutôt qu'un champ nommé `type`).
+const cancellationSnapshotSchema = new mongoose.Schema({
+  type: { type: String, enum: CANCELLATION_TYPES, default: null },
+  deadlineHoursBeforeCheckIn: { type: Number, default: null },
+  penaltyType: { type: String, enum: PENALTY_TYPES, default: null },
+  penaltyValue: { type: Number, default: null },
+}, { _id: false });
 
 // Sprint D — 'checked_in'/'checked_out' ajoutés (annoncés dès le Sprint C
 // comme réservés à "un sprint ultérieur", c'est celui-ci). 'no_show' reste
@@ -122,6 +135,13 @@ const hotelReservationSchema = new mongoose.Schema(
         periodLabel: { type: String, trim: true, default: '' },
         priority: { type: Number, default: null },
       }],
+      // PHASE-H5 — conditions commerciales contractuelles figées à la
+      // création (mission §12) : une modification ultérieure du RatePlan
+      // (voire sa désactivation) ne doit JAMAIS réécrire ce qui a été promis
+      // au client à la réservation. `null` = RatePlan antérieur à H5, jamais
+      // une valeur favorable fabriquée (mission §4).
+      mealPlan: { type: String, enum: [...MEAL_PLANS, null], default: null },
+      cancellation: { type: cancellationSnapshotSchema, default: null },
     },
 
     status: { type: String, enum: RESERVATION_STATUSES, default: 'pending' },

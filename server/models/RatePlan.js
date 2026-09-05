@@ -25,6 +25,43 @@ const mongoose = require('mongoose');
 const RATE_MODES = ['nightly', 'weekly', 'monthly', 'yearly'];
 const RATE_TYPES = ['public', 'entreprise', 'weekend', 'promotion', 'haute_saison'];
 
+// PHASE-H5 — conditions commerciales, ADDITIVES uniquement (aucune migration
+// destructive) : les RatePlans existants n'ont aucun de ces champs, ce qui
+// reste une valeur légale (`null` = condition inconnue/héritée du régime
+// pré-H5), jamais interprétée comme une promesse favorable ("pas de
+// mealPlan" ≠ "petit-déjeuner inclus", "pas de cancellation" ≠
+// "remboursable" — voir audit HOTEL_H2/H3_REPORT.md, classification E,
+// et mission H5 §4/§6). `refundable` n'existe PAS comme champ indépendant :
+// il est TOUJOURS dérivé de `cancellation.type` (mission §6) pour éviter un
+// état contradictoire (refundable=true + cancellation.type=non_refundable).
+const MEAL_PLANS = ['room_only', 'breakfast_included', 'half_board', 'full_board'];
+const CANCELLATION_TYPES = ['free_until', 'non_refundable', 'flexible'];
+const PENALTY_TYPES = ['percentage', 'fixed_amount'];
+
+const cancellationPolicySchema = new mongoose.Schema({
+  type: { type: String, enum: CANCELLATION_TYPES, required: true },
+  // Pertinents uniquement pour free_until/flexible — `non_refundable` ne
+  // doit jamais transporter de délai/pénalité (contradictoire, rejeté à la
+  // validation ci-dessous).
+  deadlineHoursBeforeCheckIn: { type: Number, min: 0, default: null },
+  penaltyType: { type: String, enum: PENALTY_TYPES, default: null },
+  penaltyValue: { type: Number, min: 0, default: null },
+}, { _id: false });
+
+cancellationPolicySchema.pre('validate', function enforceCoherence(next) {
+  if (this.type === 'non_refundable') {
+    if (this.deadlineHoursBeforeCheckIn != null || this.penaltyType != null || this.penaltyValue != null) {
+      this.invalidate('type', 'Une politique "non remboursable" ne peut pas porter de délai ou de pénalité (configuration contradictoire).');
+    }
+  } else if (this.deadlineHoursBeforeCheckIn == null) {
+    this.invalidate('deadlineHoursBeforeCheckIn', 'Un délai d’annulation (en heures avant l’arrivée) est requis pour ce type de politique.');
+  }
+  if (this.penaltyType === 'percentage' && this.penaltyValue != null && this.penaltyValue > 100) {
+    this.invalidate('penaltyValue', 'Un pourcentage de pénalité ne peut pas dépasser 100.');
+  }
+  next();
+});
+
 const seasonalPeriodSchema = new mongoose.Schema({
   label: { type: String, trim: true, maxlength: 80, default: '' },
   startDate: { type: Date, required: true },
@@ -70,6 +107,9 @@ const ratePlanSchema = new mongoose.Schema(
     },
     currency: { type: String, default: 'XAF' },
     active: { type: Boolean, default: true },
+    // PHASE-H5 — `null` = legacy/inconnu, jamais un défaut favorable fabriqué.
+    mealPlan: { type: String, enum: MEAL_PLANS, default: null },
+    cancellation: { type: cancellationPolicySchema, default: null },
     // C29 — périodes inclusives au départ et exclusives à la fin. Elles
     // restent dans le RatePlan existant afin de ne pas créer un second
     // moteur tarifaire. Une nuit sans période applicable retombe sur
@@ -143,5 +183,8 @@ ratePlanSchema.index(
 const RatePlan = mongoose.model('RatePlan', ratePlanSchema);
 RatePlan.RATE_MODES = RATE_MODES;
 RatePlan.RATE_TYPES = RATE_TYPES;
+RatePlan.MEAL_PLANS = MEAL_PLANS;
+RatePlan.CANCELLATION_TYPES = CANCELLATION_TYPES;
+RatePlan.PENALTY_TYPES = PENALTY_TYPES;
 
 module.exports = RatePlan;

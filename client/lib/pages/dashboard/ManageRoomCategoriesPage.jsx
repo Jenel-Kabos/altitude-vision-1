@@ -9,15 +9,86 @@ import Link from "next/link";
 import { toast } from "react-hot-toast";
 import {
   getRoomCategories, createRoomCategory, updateRoomCategory, deleteRoomCategory,
-  duplicateRoomCategory, activateRoomCategory, deactivateRoomCategory,
+  duplicateRoomCategory, activateRoomCategory, deactivateRoomCategory, uploadRoomCategoryGallery,
 } from "../../services/hotelService";
 import { ROOM_CATEGORY_SUGGESTIONS } from "../../constants/hotel";
+import { AMENITY_CATEGORIES } from "../../constants/accommodation";
 import { Layers3 } from "lucide-react";
 import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState } from "../../components/dashboard/DashboardUI";
 
 const emptyForm = () => ({
   name: "", description: "", maxAdults: 2, maxChildren: 0, beds: 1, surface: "", unitsAvailable: 1,
+  amenities: {}, gallery: [],
 });
+
+// PHASE-HX1 §11 — réutilise le même vocabulaire d'équipements que le
+// formulaire hôtel (AMENITY_CATEGORIES), jamais une seconde liste concurrente.
+const RoomAmenitiesEditor = ({ amenities, onChange }) => (
+  <div className="space-y-2">
+    {AMENITY_CATEGORIES.map((group) => (
+      <div key={group.key}>
+        <p className="text-xs font-medium mb-1">{group.label}</p>
+        <div className="flex flex-wrap gap-2">
+          {group.options.map((option) => (
+            <label key={option} className="text-xs flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={(amenities[group.key] || []).includes(option)}
+                onChange={() => {
+                  const values = amenities[group.key] || [];
+                  onChange({
+                    ...amenities,
+                    [group.key]: values.includes(option) ? values.filter((v) => v !== option) : [...values, option],
+                  });
+                }}
+              />
+              {option}
+            </label>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+// PHASE-HX1 §10 — upload (via Cloudinary réutilisé)/aperçu/suppression ;
+// l'ordre canonique (`order`) est préservé à l'affichage et à la suppression,
+// jamais recalculé arbitrairement.
+const RoomGalleryEditor = ({ categoryId, gallery, onChange }) => {
+  const [uploading, setUploading] = useState(false);
+  const handleUpload = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      const urls = await uploadRoomCategoryGallery(categoryId, files);
+      const startOrder = gallery.length;
+      onChange([...gallery, ...urls.map((url, index) => ({ url, order: startOrder + index }))]);
+      toast.success("Photo(s) ajoutée(s). Enregistrez pour confirmer.");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Envoi impossible.");
+    } finally {
+      setUploading(false);
+      event.target.value = "";
+    }
+  };
+  const remove = (index) => onChange(gallery.filter((_, i) => i !== index));
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {gallery.map((item, index) => (
+          <div key={`${item.url}-${index}`} className="relative">
+            <img src={item.url} alt="" className="w-20 h-20 object-cover rounded border" />
+            <button type="button" aria-label={`Supprimer la photo ${index + 1}`} onClick={() => remove(index)}
+              className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 text-xs">×</button>
+          </div>
+        ))}
+      </div>
+      <input type="file" multiple accept="image/*" aria-label="Ajouter des photos de la chambre" onChange={handleUpload} disabled={uploading} />
+      {uploading && <span className="text-xs text-gray-500 ml-2">Envoi en cours…</span>}
+    </div>
+  );
+};
 
 const ManageRoomCategoriesPage = () => {
   const params = useParams();
@@ -69,6 +140,7 @@ const ManageRoomCategoriesPage = () => {
       name: cat.name, description: cat.description || "",
       maxAdults: cat.capacity?.maxAdults ?? 2, maxChildren: cat.capacity?.maxChildren ?? 0,
       beds: cat.beds ?? 1, surface: cat.surface ?? "", unitsAvailable: cat.unitsAvailable ?? 1,
+      amenities: cat.amenities || {}, gallery: cat.gallery || [],
     });
   };
 
@@ -80,6 +152,8 @@ const ManageRoomCategoriesPage = () => {
         beds: Number(editForm.beds) || 1,
         surface: editForm.surface !== "" ? Number(editForm.surface) : null,
         unitsAvailable: Number(editForm.unitsAvailable) || 1,
+        amenities: editForm.amenities,
+        gallery: editForm.gallery.map((item, index) => ({ ...item, order: index })),
       });
       toast.success("Catégorie modifiée.");
       setEditingId(null);
@@ -184,8 +258,45 @@ const ManageRoomCategoriesPage = () => {
         {categories.map((cat) => (
           <DashboardCard key={cat._id}>
             {editingId === cat._id ? (
-              <div className="space-y-2">
-                <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} aria-label="Nom" className="w-full p-2 border rounded text-sm" />
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Nom</label>
+                  <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} aria-label="Nom" className="w-full p-2 border rounded text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Description</label>
+                  <textarea value={editForm.description} onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))} aria-label="Description" className="w-full p-2 border rounded text-sm" rows={2} />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Adultes max</label>
+                    <input type="number" min="1" value={editForm.maxAdults} onChange={(e) => setEditForm((p) => ({ ...p, maxAdults: e.target.value }))} aria-label="Adultes max" className="w-full p-2 border rounded text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Enfants max</label>
+                    <input type="number" min="0" value={editForm.maxChildren} onChange={(e) => setEditForm((p) => ({ ...p, maxChildren: e.target.value }))} aria-label="Enfants max" className="w-full p-2 border rounded text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Lits</label>
+                    <input type="number" min="0" value={editForm.beds} onChange={(e) => setEditForm((p) => ({ ...p, beds: e.target.value }))} aria-label="Lits" className="w-full p-2 border rounded text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Surface (m²)</label>
+                    <input type="number" min="0" value={editForm.surface} onChange={(e) => setEditForm((p) => ({ ...p, surface: e.target.value }))} aria-label="Surface" className="w-full p-2 border rounded text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Unités disponibles</label>
+                    <input type="number" min="0" value={editForm.unitsAvailable} onChange={(e) => setEditForm((p) => ({ ...p, unitsAvailable: e.target.value }))} aria-label="Unités disponibles" className="w-full p-2 border rounded text-sm" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium mb-1">Équipements</p>
+                  <RoomAmenitiesEditor amenities={editForm.amenities} onChange={(amenities) => setEditForm((p) => ({ ...p, amenities }))} />
+                </div>
+                <div>
+                  <p className="text-xs font-medium mb-1">Photos</p>
+                  <RoomGalleryEditor categoryId={cat._id} gallery={editForm.gallery} onChange={(gallery) => setEditForm((p) => ({ ...p, gallery }))} />
+                </div>
                 <div className="flex gap-2">
                   <button onClick={() => handleUpdate(cat._id)} className="bg-gold text-white px-3 py-1.5 rounded text-sm">Enregistrer</button>
                   <button onClick={() => setEditingId(null)} className="text-gray-600 text-sm">Annuler</button>

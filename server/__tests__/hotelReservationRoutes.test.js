@@ -7,6 +7,9 @@ jest.mock('../models/RatePlan');
 jest.mock('../models/HotelReservation');
 jest.mock('../models/RoomAssignment');
 jest.mock('../models/User');
+// PHASE-H5 — getOne calcule désormais reviewEligibility via HotelReview.exists ;
+// ce fichier mocke les modèles (pas de vraie DB), donc HotelReview aussi.
+jest.mock('../models/HotelReview', () => ({ exists: jest.fn().mockResolvedValue(false) }));
 jest.mock('../services/hotelAvailabilityService');
 jest.mock('../services/hotelReservationService');
 jest.mock('../config/db', () => jest.fn());

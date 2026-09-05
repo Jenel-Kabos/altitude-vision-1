@@ -13,7 +13,7 @@ const HotelReservation = require('../models/HotelReservation');
 const RoomAssignment = require('../models/RoomAssignment');
 const { getAvailability } = require('../services/hotelAvailabilityService');
 const {
-  createReservation, transitionStatus, updateReservation,
+  createReservation, transitionStatus, updateReservation, searchAvailableRoomCategories,
 } = require('../services/hotelReservationService');
 const { performCheckIn } = require('../services/checkInService');
 const { performCheckOut } = require('../services/checkOutService');
@@ -22,6 +22,8 @@ const { evaluateHotelCheckoutFinancialReadiness } = require('../services/finance
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { resolveHotelAccessScope, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
 const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
+const { computeCancellationEligibility } = require('../services/hotel/hotelCancellationPolicyService');
+const HotelReview = require('../models/HotelReview');
 
 /**
  * N'attache le numéro de chambre QUE pour les réservations checked_in
@@ -109,6 +111,40 @@ async function assertReservationAccess(req, reservation) {
   if (scope) return { role: 'staff', hotel };
   return null;
 }
+
+// ─────────────────────────────────────────────
+// PHASE-H2 — Public GET /api/hotels/public/:hotelId/availability
+// Recherche multi-catégories (jamais le roomCategoryId préalable exigé par
+// getPublicAvailability ci-dessous, qui reste inchangé pour ses propres
+// appelants). Entièrement public — même garde de publication que
+// hotelController.getPublic, jamais un rôle/capacité requis.
+// ─────────────────────────────────────────────
+exports.searchPublicAvailability = async (req, res) => {
+  try {
+    const { hotelId } = req.params;
+    if (!mongoose.isValidObjectId(hotelId)) return fail(res, 400, 'Identifiant invalide.');
+    const { checkIn, checkOut, adults, children, rooms } = req.query;
+    if (!checkIn || !checkOut) return fail(res, 422, 'Dates d’arrivée et de départ requises.');
+    const adultsCount = Number(adults) || 1;
+    const childrenCount = Number(children) || 0;
+    const roomsCount = Number(rooms) || 1;
+    if (adultsCount < 1) return fail(res, 422, 'Au moins un adulte est requis.');
+    if (roomsCount < 1) return fail(res, 422, 'Au moins une chambre est requise.');
+
+    const hotel = await Hotel.findById(hotelId).select('publicationStatus active');
+    if (!hotel || hotel.publicationStatus !== 'publie' || hotel.active === false) {
+      return fail(res, 404, 'Hôtel introuvable.');
+    }
+
+    const result = await searchAvailableRoomCategories({
+      hotelId, checkInDate: checkIn, checkOutDate: checkOut,
+      roomsCount, adults: adultsCount, children: childrenCount,
+    });
+    res.json({ status: 'success', data: result });
+  } catch (error) {
+    fail(res, error.statusCode || 500, error.message);
+  }
+};
 
 // ─────────────────────────────────────────────
 // Public — GET /api/hotels/:hotelId/availability (avant auth.protect)
@@ -231,9 +267,38 @@ exports.getOne = async (req, res) => {
     const access = await assertReservationAccess(req, reservation);
     if (!access) { logDenied(req, 'Lecture réservation'); return fail(res, 403, 'Accès refusé.'); }
     const [withRoom] = await attachRoomNumberIfCheckedIn([reservation]);
-    res.json({ status: 'success', data: { reservation: withRoom } });
+    // PHASE-H5 §20 — complétion H3 : le CTA "Donner votre avis" doit rester
+    // server-authoritative (jamais déduit côté mobile du seul statut) —
+    // calculé uniquement pour le client propriétaire de la réservation
+    // (jamais pour le staff/propriétaire qui la consulte).
+    let reviewEligibility = null;
+    if (access.role === 'guest') {
+      const alreadyReviewed = await HotelReview.exists({ reservation: reservation._id });
+      reviewEligibility = { eligible: reservation.status === 'checked_out' && !alreadyReviewed, alreadyReviewed: Boolean(alreadyReviewed) };
+    }
+    res.json({ status: 'success', data: { reservation: withRoom, reviewEligibility } });
   } catch (error) {
     fail(res, 500, error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// PHASE-H5 — GET /hotel-reservations/:id/cancellation-eligibility
+// Calcul PUR à partir du snapshot contractuel (mission §12), jamais du
+// RatePlan courant. N'exécute aucune action ni aucun remboursement (mission
+// §5 : éligibilité séparée de l'exécution monétaire, hors scope H5).
+// ─────────────────────────────────────────────
+exports.cancellationEligibility = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
+    const reservation = await HotelReservation.findById(req.params.id);
+    if (!reservation) return fail(res, 404, 'Réservation introuvable.');
+    const access = await assertReservationAccess(req, reservation);
+    if (!access) { logDenied(req, 'Éligibilité annulation'); return fail(res, 403, 'Accès refusé.'); }
+    const eligibility = computeCancellationEligibility({ reservation });
+    res.json({ status: 'success', data: { eligibility } });
+  } catch (error) {
+    fail(res, error.statusCode || 500, error.message);
   }
 };
 

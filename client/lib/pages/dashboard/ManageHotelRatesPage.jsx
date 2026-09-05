@@ -12,7 +12,7 @@ import { toast } from "react-hot-toast";
 import {
   getRoomCategories, getRoomCategoryRates, upsertRoomCategoryRate, archiveRoomCategoryRate,
 } from "../../services/hotelService";
-import { HOTEL_RATE_TYPES } from "../../constants/hotel";
+import { HOTEL_RATE_TYPES, HOTEL_MEAL_PLANS, HOTEL_CANCELLATION_TYPES, HOTEL_PENALTY_TYPES } from "../../constants/hotel";
 import { BadgeDollarSign } from "lucide-react";
 import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState } from "../../components/dashboard/DashboardUI";
 
@@ -28,6 +28,11 @@ const ManageHotelRatesPage = () => {
   const [inputs, setInputs] = useState({});
   const [showHistory, setShowHistory] = useState({});
   const [seasonalPeriods, setSeasonalPeriods] = useState({});
+  // PHASE-HX1 §13-14 — conditions commerciales H5, valeurs canoniques
+  // uniquement (jamais paymentPolicy, différé). `cancellationType: ''`
+  // signifie "ne pas renseigner" (jamais envoyé comme non_refundable par défaut).
+  const [commercial, setCommercial] = useState({});
+  const setCommercialField = (key, field, value) => setCommercial((state) => ({ ...state, [key]: { ...state[key], [field]: value } }));
 
   const load = async () => {
     if (!hotelId) return;
@@ -50,10 +55,28 @@ const ManageHotelRatesPage = () => {
   useEffect(() => { load(); }, [hotelId]);
 
   const handleSave = async (categoryId, rateType) => {
-    const amount = Number(inputs[`${categoryId}_${rateType}`]);
+    const key = `${categoryId}_${rateType}`;
+    const amount = Number(inputs[key]);
     if (!amount || amount <= 0) { toast.error("Montant invalide."); return; }
+    const commercialForm = commercial[key] || {};
+    // PHASE-HX1 — jamais un enum fabriqué : une politique d'annulation
+    // n'est envoyée que si le professionnel a explicitement choisi un type ;
+    // la cohérence (non_refundable sans délai/pénalité, etc.) reste validée
+    // côté serveur (mission §14 : "Never make frontend the authority").
+    const cancellation = commercialForm.cancellationType ? {
+      type: commercialForm.cancellationType,
+      ...(commercialForm.cancellationType !== 'non_refundable' ? {
+        deadlineHoursBeforeCheckIn: commercialForm.deadlineHours ? Number(commercialForm.deadlineHours) : undefined,
+        penaltyType: commercialForm.penaltyType || undefined,
+        penaltyValue: commercialForm.penaltyValue ? Number(commercialForm.penaltyValue) : undefined,
+      } : {}),
+    } : undefined;
     try {
-      await upsertRoomCategoryRate(categoryId, { rateType, amount, seasonalPeriods: seasonalPeriods[`${categoryId}_${rateType}`] || [] });
+      await upsertRoomCategoryRate(categoryId, {
+        rateType, amount, seasonalPeriods: seasonalPeriods[key] || [],
+        mealPlan: commercialForm.mealPlan || undefined,
+        cancellation,
+      });
       toast.success("Tarif enregistré.");
       load();
     } catch (err) {
@@ -114,6 +137,30 @@ const ManageHotelRatesPage = () => {
                             Archiver
                           </button>
                         )}</div>
+                        {currentRate?.mealPlan && <p className="text-xs text-gray-600">Formule actuelle : {HOTEL_MEAL_PLANS.find((m) => m.value === currentRate.mealPlan)?.label}</p>}
+                        {currentRate?.cancellation && <p className="text-xs text-gray-600">Annulation actuelle : {HOTEL_CANCELLATION_TYPES.find((c) => c.value === currentRate.cancellation.type)?.label}</p>}
+                        {/* PHASE-HX1 §13-14 — n'expose QUE mealPlan/cancellation (H5
+                            implémenté) ; jamais paymentPolicy (différé). */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <select aria-label={`Plan repas ${rt.label}`} value={commercial[rateKey]?.mealPlan || ""} onChange={(e) => setCommercialField(rateKey, 'mealPlan', e.target.value)} className="border rounded p-1.5 text-xs">
+                            <option value="">Plan repas (non renseigné)</option>
+                            {HOTEL_MEAL_PLANS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                          </select>
+                          <select aria-label={`Conditions d'annulation ${rt.label}`} value={commercial[rateKey]?.cancellationType || ""} onChange={(e) => setCommercialField(rateKey, 'cancellationType', e.target.value)} className="border rounded p-1.5 text-xs">
+                            <option value="">Annulation (non renseignée)</option>
+                            {HOTEL_CANCELLATION_TYPES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                          </select>
+                        </div>
+                        {commercial[rateKey]?.cancellationType && commercial[rateKey].cancellationType !== 'non_refundable' && (
+                          <div className="grid grid-cols-3 gap-2">
+                            <input aria-label={`Délai d'annulation ${rt.label} (heures)`} type="number" min="0" placeholder="Délai (h)" value={commercial[rateKey]?.deadlineHours || ""} onChange={(e) => setCommercialField(rateKey, 'deadlineHours', e.target.value)} className="border rounded p-1 text-xs" />
+                            <select aria-label={`Type de pénalité ${rt.label}`} value={commercial[rateKey]?.penaltyType || ""} onChange={(e) => setCommercialField(rateKey, 'penaltyType', e.target.value)} className="border rounded p-1 text-xs">
+                              <option value="">Pénalité (aucune)</option>
+                              {HOTEL_PENALTY_TYPES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                            </select>
+                            <input aria-label={`Valeur de la pénalité ${rt.label}`} type="number" min="0" placeholder="Valeur" value={commercial[rateKey]?.penaltyValue || ""} onChange={(e) => setCommercialField(rateKey, 'penaltyValue', e.target.value)} className="border rounded p-1 text-xs" />
+                          </div>
+                        )}
                         {(currentRate?.seasonalPeriods || []).length > 0 && <p className="text-xs text-gray-600">{currentRate.seasonalPeriods.length} période(s) datée(s) active(s).</p>}
                         {(seasonalPeriods[rateKey] || []).map((period, index) => <div key={`${rateKey}_${index}`} className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                           <input aria-label={`Nom période ${rt.label} ${index + 1}`} placeholder="Nom" value={period.label} onChange={(event) => updateSeason(rateKey, index, { label: event.target.value })} className="border rounded p-1 text-xs" />

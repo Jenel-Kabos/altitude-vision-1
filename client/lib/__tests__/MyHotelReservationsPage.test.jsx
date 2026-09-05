@@ -14,6 +14,7 @@ vi.mock('../services/hotelReservationService', () => ({
   cancelHotelReservation: vi.fn(),
   checkInHotelReservation: vi.fn(),
   checkOutHotelReservation: vi.fn(),
+  getCheckoutFinancialReadiness: vi.fn().mockResolvedValue({ status: 'ready', blockers: [] }),
   getReservationRoomAssignment: vi.fn().mockResolvedValue(null),
 }));
 vi.mock('../services/hotelService', () => ({
@@ -85,5 +86,22 @@ describe('MyHotelReservationsPage — Sprint C (dashboard propriétaire) — TES
     await screen.findByText(/RES-2026-000001/);
     fireEvent.click(screen.getByRole('button', { name: 'Confirmée' }));
     await waitFor(() => expect(getOwnerHotelReservations).toHaveBeenCalledWith(expect.objectContaining({ status: 'confirmed' })));
+  });
+
+  test('PHASE-HX1 — filtre "Arrivées aujourd’hui" dérivé des dates canoniques', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    getOwnerHotelReservations.mockResolvedValue({
+      reservations: [
+        reservation({ _id: 'RES-1', reference: 'RES-TODAY', status: 'confirmed', checkInDate: today }),
+        reservation({ _id: 'RES-2', reference: 'RES-LATER', status: 'confirmed', checkInDate: '2030-01-01' }),
+      ],
+      total: 2, page: 1, limit: 20,
+    });
+    render(<MyHotelReservationsPage />);
+    await screen.findByText(/RES-TODAY/);
+    expect(screen.getByText(/RES-LATER/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Arrivées aujourd’hui' }));
+    expect(screen.getByText(/RES-TODAY/)).toBeInTheDocument();
+    expect(screen.queryByText(/RES-LATER/)).toBeNull();
   });
 });

@@ -48,3 +48,53 @@ describe('HotelBookingScreen — parcours public C/D.1.1', () => {
     expect(newReservationRequestId).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('HotelBookingScreen — contexte verrouillé depuis HotelDetailScreen (PHASE-H2)', () => {
+  const lockedNav = { replace: jest.fn(), goBack: jest.fn() };
+  const lockedParams = {
+    hotelId: 'hotel-1', roomCategoryId: 'category-1', ratePlanId: 'rate-1',
+    checkInDate: '2026-10-10', checkOutDate: '2026-10-12', adults: 2, children: 0, roomsCount: 1,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks(); jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    getPublicHotel.mockResolvedValue({ hotel, categories: [category] });
+    createHotelReservation.mockResolvedValue({ reservation: { _id: 'reservation-1', reference: 'RES-002' }, idempotent: false });
+  });
+
+  test('saute directement aux informations client avec la catégorie/le tarif déjà choisis, sans permettre de les changer', async () => {
+    render(<HotelBookingScreen navigation={lockedNav} route={{ params: lockedParams }} />);
+    await waitFor(() => expect(screen.getByLabelText('Offre sélectionnée, non modifiable')).toBeTruthy());
+    expect(screen.getByText('Standard · Tarif public')).toBeTruthy();
+    expect(screen.getByText('2026-10-10 → 2026-10-12 · 2 nuit(s) · 1 chambre(s)')).toBeTruthy();
+    // Aucun moyen de revenir choisir une autre catégorie/un autre tarif :
+    // uniquement un retour à la fiche hôtel, jamais "Retour aux tarifs".
+    expect(screen.queryByLabelText('Retour aux tarifs')).toBeNull();
+    expect(screen.getByLabelText('Retour à la fiche hôtel')).toBeTruthy();
+  });
+
+  test('la réservation créée porte exactement la catégorie/le tarif/les dates fournis, jamais recalculés côté client', async () => {
+    render(<HotelBookingScreen navigation={lockedNav} route={{ params: lockedParams }} />);
+    await waitFor(() => expect(screen.getByLabelText('Offre sélectionnée, non modifiable')).toBeTruthy());
+    fireEvent.changeText(screen.getByLabelText('Prénom'), 'Ada'); fireEvent.changeText(screen.getByLabelText('Nom'), 'Lovelace'); fireEvent.changeText(screen.getByLabelText('Email'), 'ada@example.test');
+    fireEvent.press(screen.getByLabelText('Voir le résumé'));
+    fireEvent.press(screen.getByLabelText('Confirmer la réservation'));
+    await waitFor(() => expect(createHotelReservation).toHaveBeenCalledWith('hotel-1', expect.objectContaining({
+      roomCategoryId: 'category-1', ratePlanId: 'rate-1', checkInDate: '2026-10-10', checkOutDate: '2026-10-12', adults: 2, children: 0, roomsCount: 1,
+    })));
+  });
+
+  test('"Retour à la fiche hôtel" revient en arrière sans jamais rouvrir les étapes catégorie/tarif', async () => {
+    render(<HotelBookingScreen navigation={lockedNav} route={{ params: lockedParams }} />);
+    await waitFor(() => expect(screen.getByLabelText('Retour à la fiche hôtel')).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('Retour à la fiche hôtel'));
+    expect(lockedNav.goBack).toHaveBeenCalled();
+  });
+
+  test('une offre qui n’existe plus dans la fiche hôtel (catégorie/tarif obsolète) échoue proprement, sans fallback silencieux', async () => {
+    getPublicHotel.mockResolvedValue({ hotel, categories: [{ ...category, rates: [] }] });
+    render(<HotelBookingScreen navigation={lockedNav} route={{ params: lockedParams }} />);
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Offre indisponible', expect.any(String)));
+    expect(screen.queryByLabelText('Offre sélectionnée, non modifiable')).toBeNull();
+  });
+});

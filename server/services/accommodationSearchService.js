@@ -80,6 +80,9 @@ async function searchPublicAccommodations(rawQuery = {}) {
     ...a.property,
     accommodationType: a.accommodationType,
     accommodationId: a._id,
+    // PHASE-H1.5 — même clé que runPropertySearch (propertyController.js)
+    // pour un contrat unique côté consommateur, quel que soit le chemin.
+    hotel: a.hotel || null,
   }));
 
   return { properties, total, page, limit };

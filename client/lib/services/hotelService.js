@@ -136,6 +136,20 @@ export const deactivateRoomCategory = async (id) => {
   return res.data.data.category;
 };
 
+// PHASE-HX1 §10 — upload de photos de catégorie (réutilise exactement le
+// mécanisme Cloudinary existant, jamais un second système de stockage).
+// Renvoie les URLs ajoutées ; le composant appelant les fusionne dans
+// `gallery` et persiste via updateRoomCategory (jamais une seconde route
+// d'écriture pour la galerie elle-même).
+export const uploadRoomCategoryGallery = async (categoryId, files) => {
+  const data = new FormData();
+  files.forEach((file) => data.append('images', file));
+  const res = await api.post(`/hotels/room-categories/${categoryId}/gallery`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data.data.urls;
+};
+
 // ── Tarifs par catégorie ──
 
 export const getRoomCategoryRates = async (categoryId, includeInactive = false) => {
@@ -208,5 +222,37 @@ export const updateHotelInventoryRange = async (hotelId, data) => {
 };
 export const rebuildHotelInventory = async (hotelId, data) => {
   const res = await api.post(`/hotels/${hotelId}/inventory/rebuild`, data);
+  return res.data.data;
+};
+// PHASE-HX1 §15-17 — édition professionnelle "stock vendable" par date,
+// des valeurs DIFFÉRENTES par date en un seul appel (updates: [{date, sellableUnits}]).
+export const updateHotelInventoryDays = async (hotelId, data) => {
+  const res = await api.patch(`/hotels/${hotelId}/inventory/days`, data);
+  return res.data.data;
+};
+
+// ── PHASE-HX1 §23 — FAQ professionnelle (H3 backend, réutilisé tel quel) ──
+
+export const getHotelFaqOwner = async (hotelId) => {
+  const res = await api.get(`/hotels/${hotelId}/faq`);
+  return res.data.data.faq;
+};
+export const createHotelFaq = async (hotelId, data) => {
+  const res = await api.post(`/hotels/${hotelId}/faq`, data);
+  return res.data.data.faq;
+};
+export const updateHotelFaq = async (hotelId, faqId, data) => {
+  const res = await api.patch(`/hotels/${hotelId}/faq/${faqId}`, data);
+  return res.data.data.faq;
+};
+export const deleteHotelFaq = async (hotelId, faqId) => {
+  await api.delete(`/hotels/${hotelId}/faq/${faqId}`);
+};
+
+// ── PHASE-HX1 §24 — avis professionnels (endpoint PUBLIC H3 réutilisé tel
+// quel : même projection sûre, jamais un accès élargi côté propriétaire —
+// mission §24 "Do not weaken public privacy projection"). ──
+export const getHotelReviewsForOwner = async (hotelId, params = {}) => {
+  const res = await api.get(`/hotels/public/${hotelId}/reviews`, { params });
   return res.data.data;
 };

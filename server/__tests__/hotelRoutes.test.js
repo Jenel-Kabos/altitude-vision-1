@@ -44,6 +44,20 @@ jest.mock('../config/cloudinary', () => ({
   ...jest.requireActual('../config/cloudinary'),
   destroyFromCloudinary: jest.fn().mockResolvedValue(),
 }));
+// PHASE-H3 — la fiche publique joint désormais résumé d'avis + FAQ ; ce
+// fichier mocke les modèles Mongoose (pas de vraie DB), donc les services
+// H3 (qui interrogent HotelReview/HotelFaq directement) doivent l'être aussi.
+jest.mock('../services/hotelReviewService', () => ({
+  getRatingSummary: jest.fn().mockResolvedValue({ averageRating: null, reviewCount: 0, categories: null }),
+  createReview: jest.fn(),
+}));
+jest.mock('../services/hotelFaqService', () => ({
+  listPublicFaq: jest.fn().mockResolvedValue([]),
+  listForOwner: jest.fn().mockResolvedValue([]),
+  createFaqEntry: jest.fn(),
+  updateFaqEntry: jest.fn(),
+  deleteFaqEntry: jest.fn(),
+}));
 
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
@@ -69,6 +83,9 @@ SaleManagement.findOne = jest.fn().mockResolvedValue(null);
 RentalManagement.findOne = jest.fn().mockResolvedValue(null);
 Accommodation.ACCOMMODATION_TYPES = ['villa_meublee', 'maison_meublee', 'appartement_meuble', 'studio_meuble', 'residence_meublee', 'bungalow', 'hotel', 'residence_hoteliere', 'chambre_hotes', 'autre'];
 Accommodation.HOTEL_ACCOMMODATION_TYPES = ['hotel'];
+// PHASE-H3 — getPublic joint l'Accommodation liée (rules/cancellationPolicy)
+// pour la normalisation des politiques ; par défaut, aucune liée (repli null).
+Accommodation.findOne = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
 RatePlan.RATE_MODES = ['nightly', 'weekly', 'monthly', 'yearly'];
 RatePlan.RATE_TYPES = ['public', 'entreprise', 'weekend', 'promotion', 'haute_saison'];
 

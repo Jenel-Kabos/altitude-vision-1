@@ -13,7 +13,7 @@ const RoomCategory = require('../models/RoomCategory');
 const RatePlan = require('../models/RatePlan');
 const HotelReservation = require('../models/HotelReservation');
 const {
-  assertNotPast, assertAvailability, reserveInventory, releaseInventory, getNightDates,
+  assertNotPast, assertAvailability, getAvailability, reserveInventory, releaseInventory, getNightDates,
 } = require('./hotelAvailabilityService');
 const roomAssignmentService = require('./roomAssignmentService');
 const { notify } = require('./notificationService');
@@ -21,6 +21,7 @@ const { notifyReservationGuest } = require('./hotelReservationNotificationServic
 const { emitHotelEvent } = require('../socket');
 const logger = require('../utils/logger');
 const { isTransactionUnavailable } = require('./finance/financialTransactionService');
+const { describeCancellationPolicy } = require('./hotel/hotelCancellationPolicyService');
 
 // Durée par défaut avant expiration d'une demande 'pending' — volontairement
 // simple (mission §11 : "ne pas créer un système complexe"). Documentée
@@ -70,8 +71,41 @@ async function computeReservationPricing({ roomCategoryId, ratePlanId, nights, r
   return {
     unitPrice, subtotal, taxes, fees, discount, totalAmount,
     currency: rate.currency,
-    rateSnapshot: { rateType: rate.rateType, amount: rate.amount, currency: rate.currency, nightlyRates },
+    // PHASE-H5 — `mealPlan`/`cancellation` figés ici, à l'identique du reste
+    // du snapshot (mission §12) : une modification du RatePlan après coup
+    // (voire sa désactivation) ne doit jamais changer les conditions déjà
+    // contractées. `null` si le RatePlan est antérieur à H5 — jamais une
+    // valeur favorable fabriquée (mission §4).
+    rateSnapshot: {
+      rateType: rate.rateType, amount: rate.amount, currency: rate.currency, nightlyRates,
+      mealPlan: rate.mealPlan || null,
+      cancellation: rate.cancellation ? {
+        type: rate.cancellation.type,
+        deadlineHoursBeforeCheckIn: rate.cancellation.deadlineHoursBeforeCheckIn,
+        penaltyType: rate.cancellation.penaltyType,
+        penaltyValue: rate.cancellation.penaltyValue,
+      } : null,
+    },
   };
+}
+
+// PHASE-H2 — l'occupation demandée n'était validée nulle part avant ce
+// sprint (audit confirmé : aucune comparaison adults/children ↔
+// RoomCategory.capacity dans tout le domaine hôtelier). Utilise
+// exclusivement les champs de schéma réels (`capacity.maxAdults`/
+// `capacity.maxChildren`, RoomCategory.js) — jamais un plafond combiné
+// inventé (`maxOccupancy` n'existe pas sur ce modèle).
+function assertOccupancyFits(category, { adults = 1, children = 0 } = {}) {
+  const maxAdults = category.capacity?.maxAdults;
+  const maxChildren = category.capacity?.maxChildren;
+  if (maxAdults != null && adults > maxAdults) {
+    const err = new Error(`Cette catégorie accueille au maximum ${maxAdults} adulte(s).`);
+    err.code = 'HOTEL_ROOM_OCCUPANCY_EXCEEDED'; err.statusCode = 422; throw err;
+  }
+  if (maxChildren != null && children > maxChildren) {
+    const err = new Error(`Cette catégorie accueille au maximum ${maxChildren} enfant(s).`);
+    err.code = 'HOTEL_ROOM_OCCUPANCY_EXCEEDED'; err.statusCode = 422; throw err;
+  }
 }
 
 function reservationFingerprint(payload) {
@@ -156,6 +190,11 @@ async function createReservation({
   }) : null;
   const alreadyCreated = await findIdempotentReservation(hotelId, normalizedRequestId, requestHash);
   if (alreadyCreated) return alreadyCreated;
+  // PHASE-H2 — après résolution d'idempotence (un retry avec un payload
+  // strictement identique ne doit jamais être re-jugé), avant l'inventaire :
+  // l'occupation demandée doit être authentique, jamais seulement filtrée
+  // côté aperçu mobile.
+  assertOccupancyFits(category, { adults, children });
   // Vérification de confort après la résolution d'idempotence : un retry
   // valide doit retrouver sa réservation même si celle-ci occupe désormais
   // le dernier stock.
@@ -416,12 +455,86 @@ async function updateReservation(reservation, changes, actingUser) {
   return reservation;
 }
 
+// ─────────────────────────────────────────────
+// PHASE-H2 — recherche de disponibilité multi-catégories (consommateur)
+// ─────────────────────────────────────────────
+//
+// N'invente AUCUN moteur : réutilise exactement hotelAvailabilityService
+// (inventaire nuit par nuit, protection anti-surbooking) et
+// computeReservationPricing (résolution des périodes saisonnières,
+// exactement le même calcul qu'à la création réelle) — jamais un second
+// calcul de prix/disponibilité côté "aperçu". PHASE-H5 : `mealPlan`/
+// `cancellation` sont désormais canoniques sur RatePlan et exposés ici
+// tels quels (`null` si absents — RatePlan antérieur à H5, jamais une
+// valeur favorable fabriquée). `refundable` n'existe pas comme champ
+// indépendant (toujours dérivé de `cancellation.type` côté consommateur).
+// `paymentPolicy` reste VOLONTAIREMENT absent : aucune distinction
+// prépaiement/paiement-sur-place n'est appliquée nulle part dans le flux de
+// réservation actuel (audit H5 — une seule voie de paiement de fait),
+// diversification reportée (HOTEL_H5_REPORT.md, "Payment policy: DEFERRED").
+async function searchAvailableRoomCategories({ hotelId, checkInDate, checkOutDate, roomsCount = 1, adults = 1, children = 0 }) {
+  const nightDates = getNightDates(checkInDate, checkOutDate); // valide aussi l'ordre des dates (422 sinon)
+  const categories = await RoomCategory.find({ hotel: hotelId, status: 'actif' }).sort({ displayOrder: 1 });
+
+  const roomCategories = [];
+  for (const category of categories) {
+    if (category.capacity?.maxAdults != null && adults > category.capacity.maxAdults) continue;
+    if (category.capacity?.maxChildren != null && children > category.capacity.maxChildren) continue;
+
+    // eslint-disable-next-line no-await-in-loop
+    const availability = await getAvailability({
+      roomCategoryId: category._id, checkInDate, checkOutDate, roomsCount,
+    });
+    if (!availability.available) continue;
+
+    // eslint-disable-next-line no-await-in-loop
+    const rates = await RatePlan.find({ roomCategory: category._id, active: true }).sort({ amount: 1 });
+    const offers = [];
+    for (const rate of rates) {
+      // eslint-disable-next-line no-await-in-loop
+      const pricing = await computeReservationPricing({
+        roomCategoryId: category._id, ratePlanId: rate._id, nights: nightDates.length, roomsCount, nightDates,
+      });
+      offers.push({
+        ratePlanId: rate._id, rateType: rate.rateType,
+        amount: rate.amount, currency: rate.currency,
+        nights: nightDates.length, totalAmount: pricing.totalAmount,
+        mealPlan: rate.mealPlan || null,
+        cancellation: describeCancellationPolicy(rate.cancellation, nightDates[0]),
+      });
+    }
+    // Une catégorie disponible mais sans aucun tarif actif ne peut pas être
+    // réservée — jamais affichée comme "choisissable" sans prix réel.
+    if (!offers.length) continue;
+
+    roomCategories.push({
+      id: category._id, name: category.name, description: category.description || null,
+      gallery: category.gallery || [],
+      capacity: category.capacity, beds: category.beds ?? null, size: category.surface ?? null,
+      amenities: category.amenities || null,
+      availableQuantity: Math.min(...availability.nights.map((n) => n.availableUnits)),
+      offers,
+    });
+  }
+
+  return {
+    hotelId,
+    search: {
+      checkIn: nightDates[0], checkOut: new Date(nightDates[nightDates.length - 1].getTime() + 86400000),
+      nights: nightDates.length, adults, children, rooms: roomsCount,
+    },
+    roomCategories,
+  };
+}
+
 module.exports = {
   PENDING_EXPIRY_HOURS,
   computeReservationPricing,
   reservationFingerprint,
+  assertOccupancyFits,
   createReservation,
   assertTransitionAllowed,
   transitionStatus,
   updateReservation,
+  searchAvailableRoomCategories,
 };

@@ -17,6 +17,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 import { PROPERTY_TYPES_WITH_ALL, formatPriceShort, PRICE_MAX } from '../../constants/propertyTypes';
 import { ACCOMMODATION_TYPES_WITH_ALL } from '../../constants/accommodation';
 import { DEFAULT_PROPERTY_FILTERS, buildPropertyQueryParams } from '../../utils/propertyQueryParams';
+import { resolveMobileDestination } from '../../navigation/navigationSdk';
 import {
   Screen, Card, PrixFCFA, RecommendedCarousel, SearchPanel,
   GreetingBar, AdCarousel,
@@ -70,9 +71,16 @@ const AnnonceCard = React.memo(function AnnonceCard({ item, index, onPress, styl
   const statusKey      = item.status?.toLowerCase();
   const isLocation     = statusKey === 'location';
   const isHebergement  = statusKey === 'hebergement';
-  const statusLabel    = isHebergement ? 'Hébergement' : isLocation ? 'Location' : 'Vente';
-  const badgeStyle     = isHebergement ? styles.badgeHeb : isLocation ? styles.badgeLoc : styles.badgeVente;
-  const badgeTextStyle = isHebergement ? styles.badgeTextHeb : isLocation ? styles.badgeTextLoc : styles.badgeTextVente;
+  // PHASE-H1.5 — un hébergement porte accommodationType==='hotel' quand il
+  // s'agit d'un établissement Hotel (voir propertyController.runPropertySearch
+  // / accommodationSearchService.searchPublicAccommodations, qui attachent
+  // désormais accommodationType/hotel à CHAQUE chemin de recherche public).
+  // Jamais un statut distinct : un Hotel reste un hébergement, seul le badge
+  // et la destination de navigation changent.
+  const isHotel        = isHebergement && item.accommodationType === 'hotel' && Boolean(item.hotel);
+  const statusLabel    = isHotel ? 'Hôtel' : isHebergement ? 'Hébergement' : isLocation ? 'Location' : 'Vente';
+  const badgeStyle     = isHotel ? styles.badgeHotel : isHebergement ? styles.badgeHeb : isLocation ? styles.badgeLoc : styles.badgeVente;
+  const badgeTextStyle = isHotel ? styles.badgeTextHotel : isHebergement ? styles.badgeTextHeb : isLocation ? styles.badgeTextLoc : styles.badgeTextVente;
   const arrondissement = item.address?.arrondissement || '';
   const city           = item.address?.city || 'Brazzaville';
   const addressText    = arrondissement ? `${arrondissement} · ${city}` : city;
@@ -407,6 +415,15 @@ export default function ListeAnnoncesScreen({ navigation }) {
   }, [hasMore, loadingMore, loading, page, activeFilters, chargerPage]);
 
   const handlePressItem = useCallback((item) => {
+    // PHASE-H1.5 — un établissement Hotel (accommodationType==='hotel', champ
+    // `hotel` = Hotel._id attaché par la recherche publique) ouvre l'écran
+    // HotelDetailScreen canonique via le registre de navigation partagé
+    // (jamais Property._id — HotelDetailScreen/l'API H1 exigent Hotel._id),
+    // au lieu de la fiche générique DetailAnnonce.
+    if (item.status?.toLowerCase() === 'hebergement' && item.accommodationType === 'hotel' && item.hotel) {
+      const target = resolveMobileDestination('HOTEL_DETAIL', { hotelId: item.hotel });
+      if (target) { navigation.navigate(target.screen, target.params); return; }
+    }
     // Convention canonique de navigation détail (correctif crash mobile) — `item` reste
     // transmis pour un affichage immédiat, `resourceId` (Property._id) permet le
     // rafraîchissement/rechargement même pour un item hébergement (accommodationType attaché).
@@ -899,6 +916,10 @@ const makeStyles = (c) => StyleSheet.create({
     backgroundColor: 'rgba(22,163,74,0.18)',
     borderColor: 'rgba(22,163,74,0.4)',
   },
+  badgeHotel: {
+    backgroundColor: 'rgba(109,40,217,0.18)',
+    borderColor: 'rgba(109,40,217,0.4)',
+  },
   badgeText: {
     fontSize: 10,
     fontFamily: fonts.bodyBold,
@@ -907,6 +928,7 @@ const makeStyles = (c) => StyleSheet.create({
   badgeTextVente: { color: c.gold },
   badgeTextLoc:   { color: c.blue },
   badgeTextHeb:   { color: '#16A34A' },
+  badgeTextHotel: { color: c.purple },
   priceOverlay: {
     position: 'absolute',
     bottom: spacing.sm, right: spacing.sm,

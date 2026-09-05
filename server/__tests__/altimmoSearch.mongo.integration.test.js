@@ -181,3 +181,68 @@ describe('GET /api/altimmo/search — offerType absent (tous)', () => {
     expect(data.properties.map((p) => p.title).sort()).toEqual(['Hôtel Publié', 'Location1', 'Vente1']);
   });
 });
+
+// PHASE-H1.5 — un établissement Hotel doit porter `accommodationType`/`hotel`
+// dans CHAQUE chemin de recherche public (tous ET hebergement), pour que la
+// découverte mobile distingue un Hotel d'un hébergement générique sans
+// requête supplémentaire (jamais un N+1, jamais un contrat divergent entre
+// les deux branches — voir propertyController.runPropertySearch et
+// accommodationSearchService.searchPublicAccommodations).
+describe('GET /api/altimmo/search — identité Hotel exposée à la découverte (PHASE-H1.5)', () => {
+  test('offerType=tous — un Hotel publié porte accommodationType et hotel (ObjectId Hotel, jamais Property)', async () => {
+    const { hotel, property } = await makeAccommodation('hotel', { title: 'Mila Hotel' });
+    const { data } = await callSearch({});
+    const item = data.properties.find((p) => p.title === 'Mila Hotel');
+    expect(item.accommodationType).toBe('hotel');
+    expect(String(item.hotel)).toBe(String(hotel._id));
+    expect(String(item.hotel)).not.toBe(String(property._id));
+  });
+
+  test('offerType=hebergement — un Hotel publié porte accommodationType et hotel', async () => {
+    const { hotel } = await makeAccommodation('hotel', { title: 'Mila Hotel' });
+    const { data } = await callSearch({ offerType: 'hebergement' });
+    const item = data.properties.find((p) => p.title === 'Mila Hotel');
+    expect(item.accommodationType).toBe('hotel');
+    expect(String(item.hotel)).toBe(String(hotel._id));
+  });
+
+  test('un hébergement non-hôtelier ne porte pas de champ hotel', async () => {
+    await makeAccommodation('villa_meublee', { title: 'Villa Ordinaire' });
+    const { data } = await callSearch({});
+    const item = data.properties.find((p) => p.title === 'Villa Ordinaire');
+    expect(item.hotel).toBeFalsy();
+  });
+
+  test('un Hotel non publié (Accommodation brouillon) est exclu de la découverte, dans les deux branches', async () => {
+    await makeAccommodation('hotel', { title: 'Hotel Non Publié' }, { publicationStatus: 'brouillon' });
+
+    const tous = await callSearch({});
+    expect(tous.data.properties.some((p) => p.title === 'Hotel Non Publié')).toBe(false);
+
+    const hebergement = await callSearch({ offerType: 'hebergement' });
+    expect(hebergement.data.properties.some((p) => p.title === 'Hotel Non Publié')).toBe(false);
+  });
+
+  test('deux Hotels publiés de tenants différents coexistent dans la découverte publique', async () => {
+    const tenantA = new mongoose.Types.ObjectId();
+    const tenantB = new mongoose.Types.ObjectId();
+    await makeAccommodation('hotel', { title: 'Hotel Tenant A', tenant: tenantA });
+    await makeAccommodation('hotel', { title: 'Hotel Tenant B', tenant: tenantB });
+
+    const { data } = await callSearch({});
+    expect(data.properties.map((p) => p.title).sort()).toEqual(['Hotel Tenant A', 'Hotel Tenant B']);
+  });
+
+  test('aucune donnée privée du Hotel n’est exposée — seul l’ObjectId est présent, jamais le document peuplé', async () => {
+    const { hotel } = await makeAccommodation('hotel', { title: 'Mila Hotel' });
+    const { data } = await callSearch({});
+    const item = data.properties.find((p) => p.title === 'Mila Hotel');
+    // `hotel` doit être un ObjectId brut (jamais populé) : aucune fuite de
+    // manager/createdBy/taxInformation/legalName/administrativeDocuments du
+    // document Hotel lui-même par ce chemin de recherche.
+    expect(typeof item.hotel === 'string' || item.hotel?.constructor?.name === 'ObjectId').toBe(true);
+    expect(String(item.hotel)).toBe(String(hotel._id));
+    expect(item.hotel).not.toHaveProperty('manager');
+    expect(item.hotel).not.toHaveProperty('taxInformation');
+  });
+});

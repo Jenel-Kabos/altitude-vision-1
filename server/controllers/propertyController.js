@@ -498,9 +498,23 @@ async function runPropertySearch({ query, isAdmin, tenantId = null }) {
     if (hebergementIds.length > 0) {
       const published = await Accommodation.find({
         property: { $in: hebergementIds }, publicationStatus: 'publie',
-      }).select('property').lean();
-      const publishedSet = new Set(published.map((a) => String(a.property)));
-      properties = properties.filter((p) => p.status !== 'hebergement' || publishedSet.has(String(p._id)));
+      }).select('property accommodationType hotel').lean();
+      const publishedByProperty = new Map(published.map((a) => [String(a.property), a]));
+      properties = properties
+        .filter((p) => p.status !== 'hebergement' || publishedByProperty.has(String(p._id)))
+        .map((p) => {
+          // PHASE-H1.5 — mêmes clés que searchPublicAccommodations
+          // (accommodationType/hotel) pour que le consommateur (discovery
+          // mobile) distingue un établissement hôtelier sans requête
+          // supplémentaire, quel que soit le chemin (`tous` ici, ou
+          // `hebergement` via l'autre branche) — jamais deux contrats
+          // différents pour la même donnée.
+          if (p.status !== 'hebergement') return p;
+          const accommodation = publishedByProperty.get(String(p._id));
+          if (!accommodation) return p;
+          const plain = p.toObject ? p.toObject() : p;
+          return { ...plain, accommodationType: accommodation.accommodationType || null, hotel: accommodation.hotel || null };
+        });
     }
   }
 

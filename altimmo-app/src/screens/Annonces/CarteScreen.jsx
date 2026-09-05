@@ -15,6 +15,7 @@ import { SearchPanel } from '../../components';
 import { formatPriceShort, PRICE_MAX } from '../../constants/propertyTypes';
 import { ACCOMMODATION_TYPES_WITH_ALL } from '../../constants/accommodation';
 import { DEFAULT_PROPERTY_FILTERS, buildPropertyQueryParams } from '../../utils/propertyQueryParams';
+import { resolveMobileDestination } from '../../navigation/navigationSdk';
 import PrixFCFA from '../../components/PrixFCFA';
 import { useTheme } from '../../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../../theme';
@@ -89,8 +90,9 @@ function formatPriceCourt(price) {
 
 const LOCATION_BG = '#1A2C4E';
 const HEBERGEMENT_BG = '#14532D';
+const HOTEL_BG = '#4C1D95';
 
-const PricePin = memo(function PricePin({ price, status, isSelected, pinStyles }) {
+const PricePin = memo(function PricePin({ price, status, isHotel, isSelected, pinStyles }) {
   const statusKey = status?.toLowerCase();
   const isLocation = statusKey === 'location';
   const isHebergement = statusKey === 'hebergement';
@@ -103,7 +105,8 @@ const PricePin = memo(function PricePin({ price, status, isSelected, pinStyles }
         pinStyles.bubble,
         isSelected && pinStyles.bubbleSelected,
         isLocation && !isSelected && pinStyles.bubbleLocation,
-        isHebergement && !isSelected && pinStyles.bubbleHebergement,
+        isHebergement && !isSelected && !isHotel && pinStyles.bubbleHebergement,
+        isHotel && !isSelected && pinStyles.bubbleHotel,
       ]}>
         <Text style={[pinStyles.amount, isSelected && pinStyles.amountSelected]}>{label}</Text>
         <Text style={[pinStyles.suffix, isSelected && pinStyles.suffixSelected]}>{suffix}</Text>
@@ -112,7 +115,8 @@ const PricePin = memo(function PricePin({ price, status, isSelected, pinStyles }
         pinStyles.triangle,
         isSelected && pinStyles.triangleSelected,
         isLocation && !isSelected && pinStyles.triangleLocation,
-        isHebergement && !isSelected && pinStyles.triangleHebergement,
+        isHebergement && !isSelected && !isHotel && pinStyles.triangleHebergement,
+        isHotel && !isSelected && pinStyles.triangleHotel,
       ]} />
     </View>
   );
@@ -242,13 +246,19 @@ export default function CarteScreen({ navigation }) {
 
   const handleDismiss   = useCallback(() => setSelected(null), []);
   const handleCardPress = useCallback(() => {
-    // Convention canonique de navigation détail (correctif crash mobile).
-    if (selected) {
-      navigation.navigate('Annonces', {
-        screen: 'DetailAnnonce',
-        params: { resourceType: 'property', resourceId: selected._id || selected.id, item: selected },
-      });
+    if (!selected) return;
+    // PHASE-H1.5 — même règle que ListeAnnoncesScreen : un établissement
+    // Hotel ouvre HotelDetailScreen (Hotel._id, via le registre de
+    // navigation partagé), jamais la fiche générique DetailAnnonce.
+    if (selected.status?.toLowerCase() === 'hebergement' && selected.accommodationType === 'hotel' && selected.hotel) {
+      const target = resolveMobileDestination('HOTEL_DETAIL', { hotelId: selected.hotel });
+      if (target) { navigation.navigate(target.screen, target.params); return; }
     }
+    // Convention canonique de navigation détail (correctif crash mobile).
+    navigation.navigate('Annonces', {
+      screen: 'DetailAnnonce',
+      params: { resourceType: 'property', resourceId: selected._id || selected.id, item: selected },
+    });
   }, [selected, navigation]);
 
   const onSearchSubmit = useCallback((filters) => {
@@ -378,6 +388,7 @@ export default function CarteScreen({ navigation }) {
                 <PricePin
                   price={annonce.price}
                   status={annonce.status}
+                  isHotel={annonce.accommodationType === 'hotel' && Boolean(annonce.hotel)}
                   isSelected={isSelected}
                   pinStyles={pinStyles}
                 />
@@ -593,6 +604,7 @@ const makePinStyles = (c) => StyleSheet.create({
   bubbleSelected: { backgroundColor: c.gold, borderColor: c.gold },
   bubbleLocation: { backgroundColor: LOCATION_BG, borderColor: c.blue },
   bubbleHebergement: { backgroundColor: HEBERGEMENT_BG, borderColor: '#16A34A' },
+  bubbleHotel: { backgroundColor: HOTEL_BG, borderColor: c.purple },
   amount: {
     fontFamily: fonts.bodyBold,
     fontSize: 13,
@@ -615,6 +627,7 @@ const makePinStyles = (c) => StyleSheet.create({
   triangleSelected: { borderTopColor: c.gold },
   triangleLocation: { borderTopColor: LOCATION_BG },
   triangleHebergement: { borderTopColor: HEBERGEMENT_BG },
+  triangleHotel: { borderTopColor: HOTEL_BG },
 });
 
 // ─── Styles écran ─────────────────────────────────────────────────────────────

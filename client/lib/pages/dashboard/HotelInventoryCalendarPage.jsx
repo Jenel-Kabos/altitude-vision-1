@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import RoomAssignmentPanel from "../../components/RoomAssignmentPanel";
-import { getHotelInventoryCalendar, rebuildHotelInventory, updateHotelInventoryRange } from "../../services/hotelService";
+import { getHotelInventoryCalendar, rebuildHotelInventory, updateHotelInventoryRange, updateHotelInventoryDays } from "../../services/hotelService";
 import { CalendarDays } from "lucide-react";
 import { DashboardPage, DashboardPageHeader, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
 
@@ -17,6 +17,11 @@ export default function HotelInventoryCalendarPage() {
   const { hotelId } = useParams(); const [from, setFrom] = useState(today); const [view, setView] = useState("week");
   const [data, setData] = useState({ days: [], reservations: [], rooms: [], housekeepingTasks: [], maintenanceTickets: [] }); const [loading, setLoading] = useState(false); const [selected, setSelected] = useState(null);
   const [filters, setFilters] = useState({ category: "", floor: "", status: "", assignment: "", arrivals: false, departures: false, unassigned: false, outOfService: false, stopSell: false, blocked: false, query: "" });
+  // PHASE-HX1 §17 — édition par date réelle : { [categoryId]: { [isoDate]: sellableUnits } },
+  // jamais un second champ persistant (voir hotelInventoryProfessionalService.js) —
+  // ces valeurs sont uniquement une transaction en attente côté formulaire.
+  const [pendingStock, setPendingStock] = useState({});
+  const [savingStock, setSavingStock] = useState({});
   const to = useMemo(() => { const date = new Date(`${from}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + (view === "week" ? 7 : 31)); return iso(date); }, [from, view]);
   const load = useCallback(async (signal) => { setLoading(true); try { setData(await getHotelInventoryCalendar(hotelId, { from, to }, { signal })); } catch (error) { if (error.code !== "ERR_CANCELED") toast.error(error.response?.data?.message || "Calendrier indisponible."); } finally { if (!signal?.aborted) setLoading(false); } }, [hotelId, from, to]);
   useEffect(() => { const controller = new AbortController(); load(controller.signal); return () => controller.abort(); }, [load]);
@@ -24,6 +29,28 @@ export default function HotelInventoryCalendarPage() {
   const floors = useMemo(() => [...new Set((data.rooms || []).map((room) => room.floor).filter((floor) => floor !== null && floor !== undefined))].sort((a, b) => a - b), [data.rooms]);
   const move = (direction) => { const date = new Date(`${from}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + direction * (view === "week" ? 7 : 31)); setFrom(iso(date)); };
   const mutate = async (category, changes) => { try { await updateHotelInventoryRange(hotelId, { from, to, roomCategoryId: category.id, ...changes, reason: "Calendrier opérationnel Web" }); toast.success("Inventaire mis à jour."); load(); } catch (error) { toast.error(error.response?.data?.message || "Modification impossible."); } };
+  // PHASE-HX1 §17 — chaque date peut porter une valeur DIFFÉRENTE (jamais
+  // une seule valeur imposée à toute la période, contrairement à `mutate`
+  // ci-dessus qui reste réservé au stop-sell/reopen/block en masse).
+  const stageStock = (categoryId, dateIso, value) => setPendingStock((state) => ({ ...state, [categoryId]: { ...state[categoryId], [dateIso]: value } }));
+  const saveStock = async (category) => {
+    const edits = pendingStock[category.id];
+    if (!edits || Object.keys(edits).length === 0) return;
+    setSavingStock((state) => ({ ...state, [category.id]: true }));
+    try {
+      const updates = Object.entries(edits).map(([date, sellableUnits]) => ({ date, sellableUnits: Number(sellableUnits) }));
+      const { results } = await updateHotelInventoryDays(hotelId, { roomCategoryId: category.id, updates, reason: "Édition par date — Extranet HX1" });
+      const failures = results.filter((r) => !r.ok);
+      if (failures.length) toast.error(`${failures.length} date(s) non appliquée(s) (stock protégé ou capacité dépassée).`);
+      else toast.success("Stock mis à jour.");
+      setPendingStock((state) => ({ ...state, [category.id]: {} }));
+      load();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Mise à jour du stock impossible.");
+    } finally {
+      setSavingStock((state) => ({ ...state, [category.id]: false }));
+    }
+  };
   const rebuild = async (category) => { try { await rebuildHotelInventory(hotelId, { from, to, roomCategoryId: category.id }); toast.success("Inventaire reconstruit."); load(); } catch (error) { toast.error(error.response?.data?.code === "INVENTORY_REBUILD_IN_PROGRESS" ? "Une reconstruction est déjà en cours pour cette période." : error.response?.data?.message || "Reconstruction impossible."); } };
   const query = filters.query.trim().toLowerCase();
   const visibleReservations = useMemo(() => data.reservations.filter((reservation) => {
@@ -55,7 +82,31 @@ export default function HotelInventoryCalendarPage() {
     {loading ? <DashboardState type="loading" title="Chargement du calendrier…" /> : visibleCategories.map((category) => {
       const categoryDays = data.days.filter((day) => String(day.roomCategory) === category.id && (!filters.stopSell || day.stopSell) && (!filters.blocked || day.blockedUnits > 0) && (!filters.outOfService || day.physicalOutOfService > 0));
       if (!categoryDays.length && (filters.stopSell || filters.blocked || filters.outOfService)) return null;
-      return <section key={category.id} className="mb-6 rounded-xl border dark:border-gray-700 overflow-hidden"><header className="flex flex-wrap gap-2 items-center p-3 bg-gray-50 dark:bg-gray-800"><h2 className="font-semibold mr-auto">{category.name}</h2><button onClick={() => mutate(category, { stopSell: true })} className="text-sm border rounded px-2 py-1">🚫 Stop-sell</button><button onClick={() => mutate(category, { stopSell: false, isClosed: false })} className="text-sm border rounded px-2 py-1">✅ Rouvrir</button><button onClick={() => { const value = window.prompt("Unités bloquées", "0"); if (value !== null) mutate(category, { blockedUnits: Number(value) }); }} className="text-sm border rounded px-2 py-1">⛔ Bloquer</button><button onClick={() => rebuild(category)} className="text-sm border rounded px-2 py-1">↻ Reconstruire</button></header><div className="overflow-x-auto" tabIndex="0" aria-label={`Inventaire ${category.name}`}><div className="flex min-w-max">{categoryDays.map((day) => <article key={day.id} title={`${day.availableUnits} disponibles, ${day.reservedUnits} réservées`} className={`w-40 border-r p-3 ${day.stopSell || day.isClosed ? "bg-red-50 dark:bg-red-950" : ""}`}><p className="text-xs font-medium">{new Date(day.date).toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" })}</p><p className="text-xl font-bold">{day.availableUnits} libre(s)</p><p className="text-xs">✅ réservé {day.reservedUnits}</p><p className="text-xs">⛔ bloqué {day.blockedUnits}</p><p className="text-xs">🔧 hors service {day.physicalOutOfService}</p>{(day.stopSell || day.isClosed) && <p className="text-xs text-red-700 dark:text-red-300">🚫 Vente fermée</p>}</article>)}</div></div></section>;
+      const categoryPending = pendingStock[category.id] || {};
+      const hasPendingEdits = Object.keys(categoryPending).length > 0;
+      return <section key={category.id} className="mb-6 rounded-xl border dark:border-gray-700 overflow-hidden"><header className="flex flex-wrap gap-2 items-center p-3 bg-gray-50 dark:bg-gray-800"><h2 className="font-semibold mr-auto">{category.name}</h2><button onClick={() => mutate(category, { stopSell: true })} className="text-sm border rounded px-2 py-1">🚫 Stop-sell</button><button onClick={() => mutate(category, { stopSell: false, isClosed: false })} className="text-sm border rounded px-2 py-1">✅ Rouvrir</button><button onClick={() => { const value = window.prompt("Unités bloquées", "0"); if (value !== null) mutate(category, { blockedUnits: Number(value) }); }} className="text-sm border rounded px-2 py-1">⛔ Bloquer</button><button onClick={() => rebuild(category)} className="text-sm border rounded px-2 py-1">↻ Reconstruire</button>
+        {/* PHASE-HX1 §17 — stock vendable éditable par date, jamais un second
+            champ persistant (voir updateHotelInventoryDays). */}
+        <button onClick={() => saveStock(category)} disabled={!hasPendingEdits || savingStock[category.id]} aria-label={`Enregistrer le stock ${category.name}`} className="text-sm border rounded px-2 py-1 bg-blue-700 text-white disabled:opacity-40 disabled:cursor-not-allowed">💾 Enregistrer le stock</button>
+      </header><div className="overflow-x-auto" tabIndex="0" aria-label={`Inventaire ${category.name}`}><div className="flex min-w-max">{categoryDays.map((day) => {
+        const dateIso = new Date(day.date).toISOString().slice(0, 10);
+        const currentSellable = Math.max(0, day.totalUnits - day.blockedUnits - day.physicalOutOfService);
+        const stagedValue = categoryPending[dateIso];
+        return <article key={day.id} title={`${day.availableUnits} disponibles, ${day.reservedUnits} réservées`} className={`w-40 border-r p-3 ${day.stopSell || day.isClosed ? "bg-red-50 dark:bg-red-950" : ""}`}>
+          <p className="text-xs font-medium">{new Date(day.date).toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" })}</p>
+          <label className="block text-[11px] text-gray-500 mt-1">Stock vendable</label>
+          <input
+            type="number" min={day.reservedUnits} aria-label={`Stock vendable ${category.name} ${dateIso}`}
+            value={stagedValue !== undefined ? stagedValue : currentSellable}
+            onChange={(e) => stageStock(category.id, dateIso, e.target.value)}
+            className={`w-full p-1 border rounded text-lg font-bold ${stagedValue !== undefined ? "border-blue-600 bg-blue-50 dark:bg-blue-950" : ""}`}
+          />
+          <p className="text-xs mt-1">✅ réservé {day.reservedUnits} <span className="text-gray-400">(protégé)</span></p>
+          <p className="text-xs">⛔ bloqué {day.blockedUnits}</p>
+          <p className="text-xs">🔧 hors service {day.physicalOutOfService}</p>
+          {(day.stopSell || day.isClosed) && <p className="text-xs text-red-700 dark:text-red-300">🚫 Vente fermée</p>}
+        </article>;
+      })}</div></div></section>;
     })}
     <section className="rounded-xl border dark:border-gray-700 p-3"><h2 className="font-semibold mb-2">Arrivées, départs et affectations ({visibleReservations.length})</h2>{!visibleReservations.length && <p>Aucune réservation ne correspond aux filtres.</p>}{visibleReservations.map((reservation) => <article id={`reservation-${reservation._id}`} key={reservation._id} className={`border-b py-3 ${selected?._id === reservation._id ? "ring-2 ring-blue-500 rounded p-2" : ""}`}><button className="text-left w-full focus:ring-2 rounded" onClick={() => setSelected(selected?._id === reservation._id ? null : reservation)} aria-expanded={selected?._id === reservation._id}><strong>{reservation.reference}</strong> — {statusLabels[reservation.status] || reservation.status} — {assignmentLabels[reservation.assignmentState] || reservation.assignmentState} — {reservation.assignedRooms?.map((room) => room?.roomNumber).filter(Boolean).join(", ") || "aucune chambre"}</button>{selected?._id === reservation._id && <div className="mt-2"><p>{reservation.guest?.firstName} {reservation.guest?.lastName} · {reservation.guest?.email || reservation.guest?.phone}</p><RoomAssignmentPanel reservation={reservation} onChanged={() => load()} /></div>}</article>)}</section>
     <section className="mt-4 grid md:grid-cols-3 gap-3" aria-label="État opérationnel des chambres">{(data.rooms || []).filter((room) => !filters.floor || String(room.floor) === filters.floor).map((room) => <article key={room._id} className="border rounded p-2"><strong>Chambre {room.roomNumber}</strong><p>{room.status === 'out_of_service' ? '⛔' : room.status === 'cleaning' ? '🧹' : room.status === 'inspection' ? '🔎' : room.status === 'occupied' ? '🔑' : '✅'} {room.status} · étage {room.floor ?? '—'}</p><div className="flex gap-3 mt-1 text-sm"><a className="underline" href={`/dashboard/hotels/${hotelId}/housekeeping`}>Ménage</a><a className="underline" href={`/dashboard/hotels/${hotelId}/maintenance`}>Maintenance</a></div></article>)}</section>

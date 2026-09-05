@@ -9,6 +9,7 @@ const MaintenanceTicket = require('../models/MaintenanceTicket');
 const { getNightDates, ensureInventoryExists, rebuildInventory } = require('../services/hotelAvailabilityService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { acquireInventoryOperationLock, heartbeatInventoryOperationLock, releaseInventoryOperationLock } = require('../services/inventoryOperationLockService');
+const { applySellableInventoryUpdates } = require('../services/hotel/hotelInventoryProfessionalService');
 const logger = require('../utils/logger');
 
 const fail = (res, statusCode, message, code) => res.status(statusCode).json({ status: 'fail', message, ...(code ? { code } : {}) });
@@ -59,6 +60,24 @@ exports.updateRange = async (req, res) => {
     logAction({ action: 'Inventaire hôtelier ajusté', description: `${category.name} du ${period.from.toISOString()} au ${period.to.toISOString()}`, module: 'Altimmo', typeAction: 'MODIFICATION', auteur: buildAuteur(req.user), cible: { id: String(category._id), type: 'RoomCategory', nom: category.name }, req });
     return res.json({ status: 'success', data: { updatedDays: period.dates.length } });
   } catch (error) { return fail(res, error.statusCode || 500, error.message); }
+};
+
+// PHASE-HX1 — édition professionnelle "stock vendable" par date (jamais un
+// second champ persistant, jamais une seule valeur imposée à toute une
+// plage comme updateRange) : chaque entrée peut porter une valeur DIFFÉRENTE.
+exports.updateSellable = async (req, res) => {
+  try {
+    const { roomCategoryId, updates, reason } = req.body;
+    const results = await applySellableInventoryUpdates({
+      hotelId: req.params.hotelId, roomCategoryId, updates, updatedBy: req.user.id, reason,
+    });
+    logAction({
+      action: 'Stock vendable ajusté par date', description: `${results.filter((r) => r.ok).length}/${results.length} date(s) appliquée(s)`,
+      module: 'Altimmo', typeAction: 'MODIFICATION', auteur: buildAuteur(req.user),
+      cible: { id: String(roomCategoryId), type: 'RoomCategory' }, req,
+    });
+    return res.json({ status: 'success', data: { results } });
+  } catch (error) { return fail(res, error.statusCode || 500, error.message, error.code); }
 };
 
 exports.rebuild = async (req, res) => {

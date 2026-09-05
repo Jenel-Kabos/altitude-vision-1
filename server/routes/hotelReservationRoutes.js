@@ -36,6 +36,8 @@ router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), requireTenantSc
 
 // Actions nommées à 2 segments — avant le fallback générique /:id.
 router.patch('/:id/cancel', ctrl.cancel);
+// PHASE-H5 — lecture seule, purement informative (aucune écriture).
+router.get('/:id/cancellation-eligibility', ctrl.cancellationEligibility);
 router.patch('/:id/confirm', ctrl.confirm);
 router.patch('/:id/reject', ctrl.reject);
 // Sprint D — jamais accessible au client (ownership vérifiée dans le contrôleur).
