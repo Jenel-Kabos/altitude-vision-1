@@ -11,7 +11,7 @@ const { logAction, buildAuteur } = require('../actionLogService');
 const { notify } = require('../notificationService');
 const { resolveEffectiveTenantContext, resolveAvailableTenantsForUser } = require('./tenantContextService');
 const storage = require('../storage/tenantApplicationStorageService');
-const { resolveActiveOperator, hasCapability } = require('../platformOperator/platformOperatorService');
+const { resolveActiveOperator, hasCapability, resolveActiveOperatorsByCapability } = require('../platformOperator/platformOperatorService');
 
 const EDITABLE_FIELDS = Object.freeze([
   'organizationName', 'organizationType', 'professionalContact',
@@ -136,10 +136,12 @@ async function submitOwnApplication({ applicationId, actor }) {
   if (missingFields.length || missingCategories.length) {
     fail('TENANT_APPLICATION_INCOMPLETE', `Dossier incomplet (${[...missingFields, ...missingCategories].join(', ')}).`, 422);
   }
-  return transitionCas({
+  const submitted = await transitionCas({
     applicationId, actor, from: application.status, to: 'SUBMITTED',
     extraSet: { reopenedFields: [], 'additionalInfo.reason': '', submittedAt: new Date() },
   });
+  await notifyReviewers(submitted);
+  return submitted;
 }
 
 async function getCurrentOwnApplication({ actor }) {
@@ -255,6 +257,36 @@ async function auditApplication(action, { application, actor, reason = '', sessi
 
 const notifyApplicant = (application, type, title, body) => notify({ recipient: application.applicant, type, title, body,
   entityType: 'TenantApplication', entityId: application._id, dedupeKey: `tenant-application:${application._id}:${type}:${application.revision}` }).catch(() => null);
+
+// Fan-out plateforme au premier passage à SUBMITTED — jamais aux transitions
+// suivantes (startReview/reject/approve notifient déjà le demandeur, pas les
+// opérateurs). `dedupeKey` réutilise le même contrat que `notifyApplicant`
+// (unique par destinataire+clé, voir models/Notification.js) : le CAS de
+// `transitionCas` garantit qu'une seule exécution réussit par révision, donc
+// un retry/une course concurrente ne peut jamais produire de second appel
+// pour la même (application, révision) — la dédupe ici est une deuxième
+// ligne de défense, jamais le seul garde-fou. Contenu volontairement minimal
+// (identifiants de navigation uniquement) : aucun descripteur de document
+// privé, aucune donnée sensible du demandeur.
+const notifyReviewers = async (application) => {
+  const operators = await resolveActiveOperatorsByCapability('platform.tenant_applications.read').catch(() => []);
+  await Promise.allSettled(operators.map((operator) => notify({
+    recipient: operator.user,
+    type: 'tenant_application_submitted',
+    title: 'Nouvelle demande d’activation professionnelle',
+    body: `${application.organizationName} a soumis une demande d’activation professionnelle.`,
+    audience: 'staff',
+    entityType: 'TenantApplication',
+    entityId: application._id,
+    metadata: { applicationId: String(application._id), organizationName: application.organizationName, status: application.status },
+    dedupeKey: `tenant-application:${application._id}:tenant_application_submitted:${application.revision}`,
+  }).catch(() => null)));
+};
+
+async function countPendingReview({ actor }) {
+  await assertOperatorCapability(actor, 'platform.tenant_applications.read');
+  return TenantApplication.countDocuments({ status: { $in: ['SUBMITTED', 'UNDER_REVIEW'] } });
+}
 
 async function listForReview({ actor, filters = {} }) {
   await assertOperatorCapability(actor, 'platform.tenant_applications.read');
@@ -406,5 +438,5 @@ module.exports = {
   createDraft, getOwnApplication, editOwnApplication, submitOwnApplication,
   getCurrentOwnApplication, getOnboardingStatus, uploadOwnDocument, readOwnDocument, deleteOwnDocument,
   listForReview, readForReview, startReview, requestAdditionalInfo, rejectApplication, approveApplication, readDocumentForReview,
-  transitionApprovedInternal,
+  transitionApprovedInternal, countPendingReview,
 };

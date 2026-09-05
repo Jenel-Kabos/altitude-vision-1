@@ -123,4 +123,30 @@ describe('AdminDashboard — domaines métier Altimmo (Sprint 0) — TEST DATA',
       view.unmount();
     }
   });
+
+  test('DASH-BADGE-01 — le badge affiche le nombre exact de dossiers en attente', async () => {
+    renderAsRole('Admin', ['platform.tenant_applications.read']);
+    vi.doMock('../hooks/useDashboardBadges', () => ({ useDashboardBadges: () => ({ badges: { tenantApplications: 4 } }) }));
+    const { default: Dashboard } = await import('../pages/dashboard/AdminDashboard');
+    render(<Dashboard><p>CONTENU</p></Dashboard>);
+    const link = screen.getByRole('link', { name: /Activations professionnelles/ });
+    expect(link).toHaveTextContent('4');
+  });
+
+  test('DASH-BADGE-02 — aucun badge affiché quand le compte est à zéro', async () => {
+    renderAsRole('Admin', ['platform.tenant_applications.read']);
+    vi.doMock('../hooks/useDashboardBadges', () => ({ useDashboardBadges: () => ({ badges: { tenantApplications: 0 } }) }));
+    const { default: Dashboard } = await import('../pages/dashboard/AdminDashboard');
+    render(<Dashboard><p>CONTENU</p></Dashboard>);
+    const link = screen.getByRole('link', { name: 'Activations professionnelles' });
+    expect(link).not.toHaveTextContent(/[0-9]/);
+  });
+
+  test('DASH-BADGE-03 — aucun badge affiché sans la capacité, même si le compte serait non nul', async () => {
+    renderAsRole('Admin', []);
+    vi.doMock('../hooks/useDashboardBadges', () => ({ useDashboardBadges: () => ({ badges: { tenantApplications: 7 } }) }));
+    const { default: Dashboard } = await import('../pages/dashboard/AdminDashboard');
+    render(<Dashboard><p>CONTENU</p></Dashboard>);
+    expect(screen.queryByRole('link', { name: 'Activations professionnelles' })).not.toBeInTheDocument();
+  });
 });

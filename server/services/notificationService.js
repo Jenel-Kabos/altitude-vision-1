@@ -64,6 +64,7 @@ const STAFF_LINKS = {
   estimation_received: '/dashboard/estimations', devis_received: '/dashboard/devis', contact_received: '/dashboard/contact-messages',
   property_pending_moderation: '/dashboard/moderation/properties', nouveau_signalement: '/dashboard/litiges',
   real_estate_application_submitted: '/dashboard/dossiers-immobiliers',
+  tenant_application_submitted: '/dashboard/activations-professionnelles',
   rental_ready_to_publish: '/dashboard/gestion-locative', rental_listing_published: '/dashboard/gestion-locative',
   rental_listing_suspended: '/dashboard/gestion-locative', rental_property_occupied: '/dashboard/gestion-locative',
   rental_exit_scheduled: '/dashboard/gestion-locative', rental_maintenance: '/dashboard/gestion-locative',

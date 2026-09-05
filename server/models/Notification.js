@@ -96,6 +96,7 @@ const NOTIFICATION_TYPES = [
   // ── Compte ──
   'account_verified',     // client : compte propriétaire validé par admin
   'account_suspended',    // utilisateur : compte suspendu
+  'tenant_application_submitted', // opérateur plateforme : nouvelle demande d'activation à examiner
   'tenant_application_under_review',
   'tenant_application_additional_info_required',
   'tenant_application_approved',

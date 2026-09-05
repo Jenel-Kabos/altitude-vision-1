@@ -78,8 +78,8 @@ export const deleteHotel = async (id) => {
   await api.delete(`/hotels/${id}`);
 };
 
-export const getPendingHotels = async () => {
-  const res = await api.get('/hotels/status/pending');
+export const getPendingHotels = async ({ platformScoped = false } = {}) => {
+  const res = await api.get('/hotels/status/pending', platformScoped ? { platformScoped: true } : undefined);
   return res.data.data.hotels;
 };
 

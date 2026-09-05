@@ -148,7 +148,7 @@ const NAV_SECTIONS = [
   {
     label: 'Administration',
     links: [
-      { to: '/dashboard/activations-professionnelles', end: true, Icon: ClipboardList, label: 'Activations professionnelles', accent: GOLD, capability: 'platform.tenant_applications.read' },
+      { to: '/dashboard/activations-professionnelles', end: true, Icon: ClipboardList, label: 'Activations professionnelles', accent: GOLD, capability: 'platform.tenant_applications.read', badge: 'tenantApplications' },
       { to: '/dashboard/users',            end: false, Icon: Users,         label: 'Utilisateurs',       accent: '#0D9488', roles: ['Admin'] },
       { to: '/dashboard/notifications',    end: false, Icon: Bell,          label: 'Notifications',      accent: BLUE,      roles: ['Admin'] },
       { to: '/dashboard/active-sessions',  end: false, Icon: ShieldCheck,   label: 'Sessions Actives',   accent: '#DC2626', roles: ['Admin'] },
@@ -195,7 +195,7 @@ const AdminDashboard = ({ children }) => {
   const closeButtonRef = useRef(null);
   const sidebarRef = useRef(null);
   const tenantScopedReady = tenantReady && (!tenantRequired || Boolean(selectedTenantId));
-  const { badges } = useDashboardBadges(!!user && tenantScopedReady);
+  const { badges } = useDashboardBadges(!!user && tenantScopedReady, can('platform.tenant_applications.read'));
 
   const activeWriteCount = Object.keys(activeWrites).length;
   // Plus petit temps restant parmi toutes les fenêtres actives

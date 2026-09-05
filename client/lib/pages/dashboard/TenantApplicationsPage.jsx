@@ -125,6 +125,7 @@ export default function TenantApplicationsPage() {
       await refreshSelected();
       setDecision(null); setReason(''); setRequestedFields([]); setRequestedCategories([]);
       toast.success('Dossier actualisé.');
+      window.dispatchEvent(new CustomEvent('altitude:dashboard-badges:refresh'));
     } catch (requestError) {
       if (requestError.response?.status === 409) {
         await refreshSelected().catch(() => undefined);

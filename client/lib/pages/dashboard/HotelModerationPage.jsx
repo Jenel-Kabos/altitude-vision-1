@@ -11,7 +11,7 @@
 // modal de détail pour l'action de modération (au lieu du formulaire de
 // rejet inline dans chaque carte).
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Filter, CheckCircle2, XCircle, Eye, MapPin, Tag, Star,
   BedDouble, Wallet, Sparkles, AlertTriangle, Building2,
@@ -21,6 +21,7 @@ import { getPendingHotels, reviewHotel } from "../../services/hotelService";
 import { HOTEL_SERVICES, HOTEL_RATE_TYPES } from "../../constants/hotel";
 import { getPublicationErrorMessage } from "../../utils/publicationError";
 import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
+import { usePlatformTenantRuntime } from "../../context/PlatformTenantRuntimeContext";
 
 const FILTERS = [
   { key: "Tous", label: "Tous" },
@@ -44,6 +45,7 @@ const HotelModerationPage = () => {
   const [rejectReason, setRejectReason] = useState("");
   const [validatingId, setValidatingId] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
+  const { selectedTenantId } = usePlatformTenantRuntime();
 
   const stats = {
     total: hotels.length,
@@ -52,19 +54,19 @@ const HotelModerationPage = () => {
     modifs: hotels.filter((h) => h.proposedVersion?.status === "pending").length,
   };
 
-  const fetchHotels = async () => {
+  const fetchHotels = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await getPendingHotels();
+      const list = await getPendingHotels({ platformScoped: !selectedTenantId });
       setHotels(list);
     } catch (err) {
       setError(err.response?.data?.message || "Impossible de charger les hôtels en attente.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedTenantId]);
 
-  useEffect(() => { fetchHotels(); }, []);
+  useEffect(() => { fetchHotels(); }, [fetchHotels]);
 
   useEffect(() => {
     if (selectedFilter === "Complets") {
@@ -223,6 +225,9 @@ const HotelModerationPage = () => {
                 <h2 className="text-lg font-semibold text-gray-800 mb-1">
                   {hotel.property?.title || hotel.name}
                 </h2>
+                {hotel.tenant?.name && (
+                  <p className="text-xs font-medium text-gray-600 mb-2">Organisation : {hotel.tenant.name}</p>
+                )}
                 <p className="text-sm text-gray-500 flex items-center gap-1 mb-3">
                   <MapPin size={13} className="text-red-500 flex-shrink-0" />
                   {[hotel.property?.address?.arrondissement, hotel.property?.address?.city].filter(Boolean).join(", ") || "Adresse non renseignée"}
@@ -294,6 +299,9 @@ const HotelModerationPage = () => {
               {[selectedHotel.property?.address?.street, selectedHotel.property?.address?.arrondissement, selectedHotel.property?.address?.city]
                 .filter(Boolean).join(", ") || "Adresse non renseignée"}
             </p>
+            {selectedHotel.tenant?.name && (
+              <p className="mb-5 text-sm font-medium text-gray-700">Organisation : {selectedHotel.tenant.name}</p>
+            )}
 
             {/* Images */}
             {selectedHotel.property?.images?.length > 0 && (

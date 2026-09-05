@@ -16,6 +16,10 @@ export const getTenantApplication = async (applicationId) => normalizeApplicatio
   (await api.get(`${root}/${applicationId}`, platformRequest)).data.data.application,
 );
 
+export const getTenantApplicationPendingCount = async () => (
+  await api.get(`${root}/pending-count`, platformRequest)
+).data.data.count;
+
 export const startTenantApplicationReview = async (applicationId) => normalizeApplication(
   (await api.post(`${root}/${applicationId}/start-review`, undefined, platformRequest)).data.data.application,
 );

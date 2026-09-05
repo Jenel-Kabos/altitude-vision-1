@@ -36,6 +36,7 @@ const {
   parseNonNegativeAmount, parseAddress, parseGeoLocation, buildBasePropertyData,
 } = require('../services/propertyPublicationInputService');
 const { assertOperationalHotelAccess, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
+const { hasCapability } = require('../services/platformOperator/platformOperatorService');
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 const { buildExactCiRegexFilter } = require('../services/propertyFilterService');
 const { escapeRegex } = require('../utils/regexEscape');
@@ -50,6 +51,11 @@ const fail = (res, statusCode, message, extra = {}) =>
 // (HotelStaffAssignment actif) ou dont il est le Hotel.manager legacy.
 async function assertHotelAccess(req, hotelId, capability) {
   return assertOperationalHotelAccess({ actor: req.user, hotelId, capability });
+}
+
+function platformCapability(req, capability) {
+  return req.isPlatformOperatorContext
+    && hasCapability({ status: 'active', capabilities: req.platformOperatorCapabilities || [] }, capability);
 }
 
 async function getHotelCompletion(hotel, property) {
@@ -619,6 +625,9 @@ exports.submit = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.pending = async (req, res) => {
   try {
+    if (req.isPlatformOperatorContext && !platformCapability(req, 'platform.hotels.read')) {
+      return fail(res, 403, 'Capacité PlatformOperator requise.', { code: 'PLATFORM_HOTELS_READ_REQUIRED' });
+    }
     const query = { $or: [{ publicationStatus: 'soumis' }, { 'proposedVersion.status': 'pending' }] };
     const tenantId = req.user.role === 'Admin' ? (req.platformTenant?._id || req.platformTenant || null) : null;
     if (tenantId) query.tenant = tenantId;
@@ -628,6 +637,7 @@ exports.pending = async (req, res) => {
     }
     const hotels = await Hotel.find(query)
       .populate('property', 'title images address owner')
+      .populate('tenant', 'name')
       .sort({ submittedAt: 1 });
     const { categoriesByHotel, completionByHotel } = await batchCategoriesAndCompletion(hotels);
     const withScore = hotels.map((h) => ({
@@ -659,7 +669,17 @@ exports.reviewDecision = async (req, res) => {
     // F2.6.2 : cette action n'avait auparavant AUCUN contrôle de portée au-delà du filtre de
     // rôle global au niveau route — n'importe quel membre du staff Altimmo pouvait valider,
     // rejeter, suspendre ou réactiver n'importe quel hôtel.
-    const { error: scopeError } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
+    if (req.isPlatformOperatorContext) {
+      if (!platformCapability(req, 'platform.hotels.manage')) {
+        return fail(res, 403, 'Capacité PlatformOperator requise.', { code: 'PLATFORM_HOTELS_MANAGE_REQUIRED' });
+      }
+      if (req.platformTenant && String(req.platformTenant._id || req.platformTenant) !== String(hotel.tenant || '')) {
+        return fail(res, 404, 'Hôtel introuvable.');
+      }
+    }
+    const { error: scopeError } = req.isPlatformOperatorContext
+      ? { error: null }
+      : await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
     if (scopeError) return fail(res, scopeError, scopeError === 404 ? 'Hôtel introuvable.' : 'Accès refusé.');
 
     const proposed = hotel.proposedVersion?.status === 'pending' ? hotel.proposedVersion : null;

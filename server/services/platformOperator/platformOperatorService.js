@@ -199,11 +199,26 @@ async function listOperators() {
   return PlatformOperator.find().sort({ createdAt: -1 }).populate('user', 'name email role').lean();
 }
 
+// Résolveur canonique unique pour "tous les opérateurs actifs détenant X" —
+// jamais un PlatformOperator.find(...) répété dans chaque service métier qui
+// a besoin de notifier/lister des opérateurs par capacité (mission §44-46 :
+// une seule interprétation de "opérateur éligible" dans tout le dépôt).
+// `unique: true` sur `PlatformOperator.user` (models/PlatformOperator.js)
+// garantit déjà l'absence de doublon utilisateur, aucune déduplication
+// manuelle n'est donc nécessaire ici. Tri déterministe sur `_id`.
+async function resolveActiveOperatorsByCapability(capability) {
+  if (!PLATFORM_OPERATOR_CAPABILITIES.includes(capability)) {
+    fail('PLATFORM_OPERATOR_INVALID_CAPABILITY', `Capacité inconnue : "${capability}".`, 422);
+  }
+  return PlatformOperator.find({ status: 'active', capabilities: capability }).sort({ _id: 1 }).select('user').lean();
+}
+
 module.exports = {
   PlatformOperatorError,
   getOperatorByUserId,
   resolveActiveOperator,
   hasCapability,
+  resolveActiveOperatorsByCapability,
   grantOperator,
   suspendOperator,
   reactivateOperator,

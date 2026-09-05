@@ -61,6 +61,13 @@ describe('DashboardLayout — portée plateforme des activations professionnelle
     expect(screen.getByText('Demandes d’activation professionnelle')).toBeInTheDocument();
   });
 
+  test('la modération hôtellerie est également accessible en vue plateforme', () => {
+    pathname = '/dashboard/moderation/hotellerie';
+    render(<DashboardLayout><p>Modération Hôtellerie</p></DashboardLayout>);
+    expect(screen.getByText('Modération Hôtellerie')).toBeInTheDocument();
+    expect(screen.queryByText('Sélectionnez un tenant à administrer')).not.toBeInTheDocument();
+  });
+
   test('un opérateur sans capacité reste bloqué', () => {
     capabilities = [];
     render(<DashboardLayout><ActivationContent /></DashboardLayout>);

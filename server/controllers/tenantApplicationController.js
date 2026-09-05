@@ -58,6 +58,10 @@ exports.submit = asyncHandler(async (req, res) => {
   const application = await service.submitOwnApplication({ applicationId: req.params.applicationId, actor: req.user });
   res.json({ status: 'success', data: { application: safeApplication(application) } });
 });
+exports.pendingCount = asyncHandler(async (req, res) => {
+  const count = await service.countPendingReview({ actor: req.user });
+  res.json({ status: 'success', data: { count } });
+});
 exports.listForReview = asyncHandler(async (req, res) => {
   const result = await service.listForReview({ actor: req.user, filters: req.query });
   res.json({ status: 'success', data: result });

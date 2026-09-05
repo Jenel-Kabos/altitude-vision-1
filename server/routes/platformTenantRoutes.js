@@ -43,6 +43,7 @@ router.get('/applications/:applicationId/documents/:documentId', auth.protect, a
 router.delete('/applications/:applicationId/documents/:documentId', auth.protect, auth.restrictTo('Proprietaire'), applicationController.deleteDocument);
 router.post('/applications/:applicationId/submit', auth.protect, auth.restrictTo('Proprietaire'), applicationController.submit);
 router.get('/applications', auth.protect, applicationController.listForReview);
+router.get('/applications/pending-count', auth.protect, applicationController.pendingCount);
 router.get('/applications/:applicationId', auth.protect, applicationController.readForReview);
 router.get('/applications/:applicationId/review-documents/:documentId', auth.protect, applicationController.readDocumentForReview);
 router.post('/applications/:applicationId/start-review', auth.protect, applicationController.startReview);

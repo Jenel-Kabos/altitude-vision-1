@@ -30,6 +30,7 @@ let adminB;
 let staffA;
 let staffB;
 let operator;
+let operatorNoRead;
 let proprietor;
 let client;
 let hotelsA;
@@ -88,7 +89,9 @@ beforeAll(async () => {
   proprietor = await User.create({ name: 'HZ06 Owner', email: 'hz06-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   client = await User.create({ name: 'HZ06 Client', email: 'hz06-client@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   operator = await User.create({ name: 'HZ06 Operator', email: 'hz06-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ06 hotel lists certification', capabilities: [] });
+  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ06 hotel lists certification', capabilities: ['platform.hotels.read', 'platform.hotels.manage'] });
+  operatorNoRead = await User.create({ name: 'HZ06 Operator No Read', email: 'hz06-operator-no-read@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+  await grantOperator({ userId: operatorNoRead._id, actor: adminA, reason: 'HZ06 capability denial certification', capabilities: [] });
 
   const propertyA1 = await makeProperty({ tenant: tenantA, owner: ownerA, suffix: 'A1', price: 111, city: 'Brazzaville', createdAt: new Date('2028-01-01') });
   const propertyA2 = await makeProperty({ tenant: tenantA, owner: ownerA, suffix: 'A2', price: 112, city: 'Brazzaville', createdAt: new Date('2028-01-02') });
@@ -162,6 +165,12 @@ test('PlatformOperator global conserve la portée globale historique', async () 
     expect(response.status).toBe(200);
     expect(new Set(hotelIds(response))).toEqual(new Set(ids(expected)));
   }
+});
+
+test('PlatformOperator sans platform.hotels.read est refusé en vue globale', async () => {
+  const response = await request(app).get('/api/hotels/status/pending').set(bearer(operatorNoRead));
+  expect(response.status).toBe(403);
+  expect(response.body.code).toBe('PLATFORM_HOTELS_READ_REQUIRED');
 });
 
 test.each([
