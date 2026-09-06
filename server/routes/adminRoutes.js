@@ -19,6 +19,7 @@ const authController  = require('../controllers/authController');
 // (voir bandeau d'en-tête de propertyController.js) : même garde canonique
 // que GET /api/properties/status/pending (HZ-07), réutilisé verbatim.
 const { requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
+const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
 
 // ── Authentification obligatoire ──────────────────────────────────
 router.use(authController.protect);
@@ -56,16 +57,16 @@ router.patch('/properties/:id/reject',  adminOnly, requireTenantScopeForStaffAll
 router.delete('/properties/:id',        adminOnly, requireTenantScopeForStaffAllowPlatformWide, adminController.deleteProperty);
 
 // ── Utilisateurs (Admin uniquement) ──────────────────────────────
-router.get('/owners/active-sessions', adminOnly, adminController.getConnectedUsers);
-router.get('/owners',                 adminOnly, adminController.getAllUsers);
-router.patch('/owners/:id/verify',    adminOnly, adminController.verifyOwner);
-router.patch('/owners/:id/suspend',   adminOnly, adminController.suspendUser);
-router.patch('/owners/:id/activate',  adminOnly, adminController.activateUser);
-router.patch('/owners/:id/ban',       adminOnly, adminController.banUser);
+router.get('/owners/active-sessions', adminOnly, requirePlatformOperatorCapability('platform.users.read'), adminController.getConnectedUsers);
+router.get('/owners',                 adminOnly, requirePlatformOperatorCapability('platform.users.read'), adminController.getAllUsers);
+router.patch('/owners/:id/verify',    adminOnly, requirePlatformOperatorCapability('platform.users.manage'), adminController.verifyOwner);
+router.patch('/owners/:id/suspend',   adminOnly, requirePlatformOperatorCapability('platform.users.manage'), adminController.suspendUser);
+router.patch('/owners/:id/activate',  adminOnly, requirePlatformOperatorCapability('platform.users.manage'), adminController.activateUser);
+router.patch('/owners/:id/ban',       adminOnly, requirePlatformOperatorCapability('platform.users.manage'), adminController.banUser);
 
 router.route('/owners/:id')
-  .get(   adminOnly, adminController.getUser)
-  .patch( adminOnly, adminController.updateUser)
-  .delete(adminOnly, adminController.deleteUser);
+  .get(   adminOnly, requirePlatformOperatorCapability('platform.users.read'), adminController.getUser)
+  .patch( adminOnly, requirePlatformOperatorCapability('platform.users.manage'), adminController.updateUser)
+  .delete(adminOnly, requirePlatformOperatorCapability('platform.users.manage'), adminController.deleteUser);
 
 module.exports = router;

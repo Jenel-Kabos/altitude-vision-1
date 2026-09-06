@@ -38,6 +38,9 @@ const PLATFORM_OPERATOR_CAPABILITIES = [
   'platform.tenant_applications.approve',
   'platform.tenant_applications.reject',
   'platform.support.impersonation',
+  // Lecture de la file support, distincte d'une éventuelle
+  // capacité d'impersonation utilisée par des outils d'assistance.
+  'platform.support.read',
   // Gouvernance de la capacité opérateur elle-même — distincte des autres :
   // seul un opérateur actif possédant CETTE capacité précise peut
   // accorder/suspendre/révoquer un autre opérateur (mission §44).

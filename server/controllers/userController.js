@@ -163,8 +163,10 @@ exports.getAllUsers = async (req, res) => {
         // utilisateurs réellement membres du tenant actif. Un PlatformOperator
         // sans capacité tenant sélectionnée n'atteint jamais ce contrôleur
         // (403 en amont) — jamais de `User.find()` global implicite.
+        const isGlobalPlatformRead = req.isPlatformOperatorContext && !req.platformTenant;
         const scopeUserIds = await expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || []).catch(() => req.tenantScopeUserIds || []);
-        const users = await User.find({ _id: { $in: scopeUserIds } }).select('-password');
+        const filter = isGlobalPlatformRead ? {} : { _id: { $in: scopeUserIds } };
+        const users = await User.find(filter).select('-password');
         res.status(200).json({ status: 'success', results: users.length, data: { users } });
     } catch (error) {
         console.error('Erreur getAllUsers:', error);
@@ -185,6 +187,10 @@ exports.getAllOwners = async (req, res) => {
         // même principe que getAllUsers ci-dessus (HOTFIX-USERS-COUNT-1 :
         // scope étendu localement, voir expandScopeWithUnaffiliatedUsersIfSoleTenant).
         const expandedScope = await expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || []).catch(() => req.tenantScopeUserIds || []);
+        if (req.isPlatformOperatorContext && !req.platformTenant) {
+            const owners = await User.find({ role: 'Proprietaire' }).select('-password');
+            return res.status(200).json({ status: 'success', results: owners.length, data: { owners } });
+        }
         const scopeSet = new Set(expandedScope.map(String));
         const scopedOwnerIds = ownerIds.filter((id) => scopeSet.has(String(id)));
         const owners = await User.find({ _id: { $in: scopedOwnerIds } }).select('-password');

@@ -80,12 +80,24 @@ const mockUserAuth = (id, role) => {
   User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
 };
 
+// The production list handlers use a real Mongoose query and may populate
+// more than one relation before sorting. Keep this fixture chainable so the
+// route-ordering assertions exercise the handler rather than a mock shape.
+const hotelFindQuery = () => {
+  const query = {
+    populate: jest.fn(),
+    sort: jest.fn().mockResolvedValue([]),
+  };
+  query.populate.mockReturnValue(query);
+  return query;
+};
+
 describe("Contrôle final — routage Hotel/Accommodation : aucune route dynamique ne capture les routes statiques", () => {
   afterEach(() => jest.clearAllMocks());
 
   test('GET /api/hotels/admin/list (authentifié, staff) appelle bien listAdmin — jamais interprété comme /:id', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
-    Hotel.find = jest.fn().mockReturnValue({ populate: jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([]) }) });
+    Hotel.find = jest.fn().mockReturnValue(hotelFindQuery());
     RoomCategory.find = jest.fn().mockResolvedValue([]);
 
     const res = await request(app)
@@ -102,7 +114,7 @@ describe("Contrôle final — routage Hotel/Accommodation : aucune route dynamiq
 
   test('GET /api/hotels/status/pending (authentifié, staff) appelle bien pending — jamais interprété comme /:id', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
-    Hotel.find = jest.fn().mockReturnValue({ populate: jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([]) }) });
+    Hotel.find = jest.fn().mockReturnValue(hotelFindQuery());
     RoomCategory.find = jest.fn().mockResolvedValue([]);
 
     const res = await request(app)
@@ -129,7 +141,7 @@ describe("Contrôle final — routage Hotel/Accommodation : aucune route dynamiq
 
   test("GET /api/hotels/mine (authentifié, propriétaire) appelle bien mine — jamais interprété comme /:id", async () => {
     mockUserAuth(OWNER_ID, 'Proprietaire');
-    Hotel.find = jest.fn().mockReturnValue({ populate: jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([]) }) });
+    Hotel.find = jest.fn().mockReturnValue(hotelFindQuery());
     const res = await request(app)
       .get('/api/hotels/mine')
       .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);

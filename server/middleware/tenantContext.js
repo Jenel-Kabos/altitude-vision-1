@@ -36,8 +36,16 @@ const attachTenantContext = async (req, res, next) => {
     const context = req.user ? await resolveEffectiveTenantContext(req.user._id || req.user.id, requestedTenant(req)) : null;
     req.platformTenant = context?.tenant || null;
     req.tenantContextSource = context?.source || null;
+    req.isPlatformOperatorContext = typeof req.tenantContextSource === 'string'
+      && req.tenantContextSource.startsWith('platform_operator');
+    req.platformOperator = req.isPlatformOperatorContext ? context?.operator || null : null;
+    req.platformOperatorCapabilities = req.platformOperator?.capabilities || [];
   } catch {
     req.platformTenant = null;
+    req.tenantContextSource = null;
+    req.isPlatformOperatorContext = false;
+    req.platformOperator = null;
+    req.platformOperatorCapabilities = [];
   }
   next();
 };
@@ -100,7 +108,18 @@ const createRequireTenantScope = ({ allowPlatformWide = false, requireWhen = () 
   // OrgMembership, tout en étant tenant-scoped pour le staff et les
   // Platform Operators. Le prédicat permet de réutiliser exactement le
   // garde canonique et ses codes sans imposer un tenant aux clients.
-  if (!requireWhen({ req, resolved, isPlatformOperator })) return next();
+  if (!requireWhen({ req, resolved, isPlatformOperator })) {
+    // A non-platform owner may not smuggle an arbitrary tenant context into
+    // a route that is otherwise self-scoped. Invalid explicit selection is a
+    // refusal, never a silent fallback to the user's own resources.
+    if (explicitTenantId && req.user?.role === 'Proprietaire' && !resolved) {
+      res.status(403);
+      const error = new Error("Accès refusé : le tenant demandé n'est pas accessible à cet utilisateur.");
+      error.name = 'TenantContextError'; error.code = 'TENANT_CONTEXT_FORBIDDEN'; error.statusCode = 403;
+      return next(error);
+    }
+    return next();
+  }
 
   const unscopedOperatorAllowed = allowPlatformWide && isPlatformOperator && req.tenantContextSource === 'platform_operator_unscoped';
 

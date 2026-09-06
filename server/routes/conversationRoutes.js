@@ -5,6 +5,7 @@ const router = express.Router();
 
 const authController = require('../controllers/authController');
 const { attachTenantContext, requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/tenantContext');
+const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
 const { restrictTo } = require('../middleware/authMiddleware');
 const {
   getConversationById,
@@ -32,10 +33,28 @@ const {
 // ci-dessous, inchangé.
 router.use(authController.protect, attachTenantContext);
 
+// Global support is a platform operation. A PlatformOperator may omit the
+// tenant only with the explicit support capability; ordinary staff remain
+// tenant-scoped and tenant owners/clients never enter this route group.
+const requireStaffConversationScope = async (req, res, next) => {
+  if (req.isPlatformOperatorContext && !req.platformTenant) {
+    const operator = await resolveActiveOperator(req.user?._id || req.user?.id).catch(() => null);
+    if (!hasCapability(operator, 'platform.support.read')) {
+      // Preserve the established fail-closed signal for operators that still
+      // need a tenant selection on this legacy surface. Operators with the
+      // explicit support capability take the global branch above.
+      return requireTenantScopeForStaffOrPlatformOperator(req, res, next);
+    }
+    req.platformOperator = operator;
+    return next();
+  }
+  return requireTenantScopeForStaffOrPlatformOperator(req, res, next);
+};
+
 // ── Routes statiques (AVANT /:conversationId pour éviter les conflits) ──────
 
 // Compteur global de non-lus
-router.get('/count/unread', requireTenantScopeForStaffOrPlatformOperator, getUnreadCount);
+router.get('/count/unread', requireStaffConversationScope, getUnreadCount);
 
 // HOTFIX-MESSAGING-TENANT-AMBIGUOUS-STAFF-1 (HF-FINAL-01) — `attachTenantContext`
 // ci-dessus ne bloque jamais, y compris pour un STAFF dont le contexte
@@ -61,7 +80,7 @@ router.get('/count/unread', requireTenantScopeForStaffOrPlatformOperator, getUnr
 // affectées par HF-FINAL-01 — voir ENDPOINT_MATRIX.md).
 
 // Boîte partagée staff (Admin + tous sous-rôles collaborateurs)
-router.get('/staff-inbox', restrictTo(...ALL_STAFF), requireTenantScopeForStaffOrPlatformOperator, getStaffInbox);
+router.get('/staff-inbox', restrictTo(...ALL_STAFF), requireStaffConversationScope, getStaffInbox);
 
 // Ma propre conversation staff-inbox (côté client/propriétaire)
 router.get('/my-inbox', getMyInbox);
@@ -79,9 +98,9 @@ router.post('/', createOrGetConversation);
 // ── Routes dynamiques ────────────────────────────────────────────────────────
 
 // AVANT /:conversationId/messages pour éviter tout conflit de route
-router.get('/:conversationId', requireTenantScopeForStaffOrPlatformOperator, getConversationById);
-router.get('/:conversationId/messages', requireTenantScopeForStaffOrPlatformOperator, getConversationMessages);
-router.patch('/:conversationId/mark-read', requireTenantScopeForStaffOrPlatformOperator, markConversationAsRead);
-router.delete('/:conversationId', requireTenantScopeForStaffOrPlatformOperator, deleteConversation);
+router.get('/:conversationId', requireStaffConversationScope, getConversationById);
+router.get('/:conversationId/messages', requireStaffConversationScope, getConversationMessages);
+router.patch('/:conversationId/mark-read', requireStaffConversationScope, markConversationAsRead);
+router.delete('/:conversationId', requireStaffConversationScope, deleteConversation);
 
 module.exports = router;

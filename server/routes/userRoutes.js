@@ -6,6 +6,8 @@ const userController = require('../controllers/userController');
 const { upload } = require('../config/cloudinary');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 const { requireTenantScope } = require('../middleware/tenantContext');
+const { attachTenantContext } = require('../middleware/tenantContext');
+const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
 const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
 
 const router = express.Router();
@@ -54,7 +56,32 @@ router.patch('/push-token',                               userController.savePus
 // dépôt — attache `req.tenantScopeUserIds` : l'ensemble des utilisateurs
 // réellement membres du tenant actif (ou du tenant explicitement sélectionné
 // par un PlatformOperator). Jamais un correctif isolé par contrôleur.
-router.use(restrictTo('Admin'), requireTenantScope);
+router.use(restrictTo('Admin'), attachTenantContext);
+
+// Tenant Admin legacy remains tenant-scoped. A PlatformOperator with the
+// explicit users.read capability may use the same resource in platform mode.
+const requireUsersReadScope = async (req, res, next) => {
+  if (req.isPlatformOperatorContext) {
+    req.platformOperator = req.platformOperator || await resolveActiveOperator(req.user?._id || req.user?.id).catch(() => null);
+    if (!hasCapability(req.platformOperator, 'platform.users.read')) {
+      return res.status(403).json({ status: 'fail', message: 'Capacité platform.users.read requise.' });
+    }
+    // A selected operator tenant still needs the canonical tenant-scope
+    // resolver so list/detail operations receive tenantScopeUserIds.
+    if (req.platformTenant) return requireTenantScope(req, res, next);
+    return next();
+  }
+  return requireTenantScope(req, res, next);
+};
+
+const requireUsersManageForPlatformOperator = (req, res, next) => {
+  if (req.isPlatformOperatorContext && !hasCapability(req.platformOperator, 'platform.users.manage')) {
+    return res.status(403).json({ status: 'fail', message: 'Capacité platform.users.manage requise.' });
+  }
+  return next();
+};
+
+router.use(requireUsersReadScope);
 
 // `router.param('id', …)` s'exécute AVANT chaque route `:id` ci-dessous —
 // même patron que paiementRoutes.js/contratRoutes.js/platformTenantRoutes.js.
@@ -70,7 +97,9 @@ router.param('id', async (req, res, next, userId) => {
   if (!mongoose.isValidObjectId(userId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
   const scopeUserIds = await expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || [])
     .catch(() => req.tenantScopeUserIds || []);
-  const inScope = scopeUserIds.some((id) => String(id) === String(userId));
+  const globalPlatformRead = req.isPlatformOperatorContext && !req.platformTenant
+    && hasCapability(req.platformOperator, 'platform.users.read');
+  const inScope = globalPlatformRead || scopeUserIds.some((id) => String(id) === String(userId));
   if (!inScope) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
   next();
 });
@@ -80,20 +109,20 @@ router.get('/owners',  userController.getAllOwners);
 
 // ✅ Création d'utilisateur par admin — ne cible aucune ressource existante
 //    d'un autre tenant, donc hors périmètre de la garde `:id` ci-dessus.
-router.post('/create-by-admin', userController.createByAdmin);
+router.post('/create-by-admin', requireUsersManageForPlatformOperator, userController.createByAdmin);
 
 // ✅ Gestion admin + suspension / vérification KYC
-router.patch('/:id/verify',             userController.verifyOwner);
-router.patch('/:id/suspend',            userController.suspendUser);
-router.patch('/:id/activate',           userController.activateUser);
-router.patch('/:id/role',               userController.updateUserRole);
-router.post( '/:id/renvoyer-contrat',   userController.renvoyerContrat);
+router.patch('/:id/verify',             requireUsersManageForPlatformOperator, userController.verifyOwner);
+router.patch('/:id/suspend',            requireUsersManageForPlatformOperator, userController.suspendUser);
+router.patch('/:id/activate',           requireUsersManageForPlatformOperator, userController.activateUser);
+router.patch('/:id/role',               requireUsersManageForPlatformOperator, userController.updateUserRole);
+router.post( '/:id/renvoyer-contrat',   requireUsersManageForPlatformOperator, userController.renvoyerContrat);
 router.get(  '/:id/contract-document',  userController.downloadContractDocument);
 
 router
   .route('/:id')
   .get(userController.getUser)
-  .put(userController.updateUser)
-  .delete(userController.deleteUser);
+  .put(requireUsersManageForPlatformOperator, userController.updateUser)
+  .delete(requireUsersManageForPlatformOperator, userController.deleteUser);
 
 module.exports = router;

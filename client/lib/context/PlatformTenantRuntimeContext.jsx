@@ -88,11 +88,14 @@ export function PlatformTenantRuntimeProvider({ children }) {
   // jamais renseigné sauf `status === 'active'` (voir `initialize` ci-dessus),
   // mais la vérification du statut reste explicite ici par défense en
   // profondeur — fail closed si absent/suspendu/révoqué/en erreur.
-  const can = useCallback((capability) => (
-    roleCan(capability) || Boolean(
-      state.operator?.status === 'active' && state.operator.capabilities?.includes(capability)
-    )
-  ), [roleCan, state.operator]);
+  const can = useCallback((capability) => {
+    // Platform capabilities are never inherited from User.role (including
+    // the legacy Admin wildcard). They require an active PlatformOperator.
+    if (String(capability || '').startsWith('platform.')) {
+      return Boolean(state.operator?.status === 'active' && state.operator.capabilities?.includes(capability));
+    }
+    return roleCan(capability);
+  }, [roleCan, state.operator]);
 
   const value = useMemo(() => ({
     tenantLoading: authLoading || state.loading,

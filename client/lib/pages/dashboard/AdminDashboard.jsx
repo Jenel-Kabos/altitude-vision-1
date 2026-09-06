@@ -51,7 +51,7 @@ const NAV_SECTIONS = [
       // (même périmètre que /api/platform-tenants). Nommé « Multi-Tenant »
       // dans l'UI pour rester sans ambiguïté avec l'espace locataire
       // existant (Gestion locative → Locataires).
-      { to: '/dashboard/tenants',            end: true,  Icon: Building2,       label: 'Multi-Tenant (SaaS)', accent: BLUE, roles: ['Admin'] },
+      { to: '/dashboard/tenants',            end: true,  Icon: Building2,       label: 'Multi-Tenant (SaaS)', accent: BLUE, capability: 'platform.tenants.read' },
       // REPORTING-1 — Centre de Pilotage, réservé à la Direction (même
       // périmètre que la route serveur /api/reporting).
       { to: REPORTING_ROUTE,                 end: true,  Icon: LayoutDashboard, label: 'Centre de Pilotage', accent: GOLD,   roles: ['Admin', 'GestionnaireImmobilier'] },
@@ -149,7 +149,7 @@ const NAV_SECTIONS = [
     label: 'Administration',
     links: [
       { to: '/dashboard/activations-professionnelles', end: true, Icon: ClipboardList, label: 'Activations professionnelles', accent: GOLD, capability: 'platform.tenant_applications.read', badge: 'tenantApplications' },
-      { to: '/dashboard/users',            end: false, Icon: Users,         label: 'Utilisateurs',       accent: '#0D9488', roles: ['Admin'] },
+      { to: '/dashboard/users',            end: false, Icon: Users,         label: 'Utilisateurs',       accent: '#0D9488', capability: 'platform.users.read' },
       { to: '/dashboard/notifications',    end: false, Icon: Bell,          label: 'Notifications',      accent: BLUE,      roles: ['Admin'] },
       { to: '/dashboard/active-sessions',  end: false, Icon: ShieldCheck,   label: 'Sessions Actives',   accent: '#DC2626', roles: ['Admin'] },
       { to: '/dashboard/historique',       end: false, Icon: ClipboardList, label: 'Historique',         accent: '#7C3AED', roles: ['Admin'] },
