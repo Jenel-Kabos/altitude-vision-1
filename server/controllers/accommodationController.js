@@ -543,6 +543,9 @@ exports.pending = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.listAdmin = async (req, res) => {
   try {
+    if (req.isPlatformOperatorContext && !req.platformOperatorCapabilities?.includes('platform.accommodations.read')) {
+      return fail(res, 403, 'Action refusée : capacité opérateur plateforme requise.');
+    }
     const { status, type, city, availability, search, sort, page, limit } = req.query;
     const result = await listAccommodationsForAdmin({
       status, type, city, availability, search, sort, page, limit,

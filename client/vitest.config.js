@@ -16,9 +16,7 @@ export default defineConfig({
     // pour réduire cette contention elle-même plutôt que la masquer
     // uniquement par des timeouts plus longs.
     testTimeout: 10000,
-    poolOptions: {
-      threads: { maxThreads: 8, minThreads: 2 },
-    },
+    maxWorkers: 8,
   },
   resolve: {
     alias: {

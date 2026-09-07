@@ -281,6 +281,9 @@ exports.mine = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.listAdmin = async (req, res) => {
   try {
+    if (req.isPlatformOperatorContext && !platformCapability(req, 'platform.hotels.read')) {
+      return fail(res, 403, 'Action refusée : capacité opérateur plateforme requise.');
+    }
     const { status, search, sort, page, limit } = req.query;
     const tenantId = req.user.role === 'Admin' ? (req.platformTenant?._id || req.platformTenant || null) : null;
     // F2.6.2 : un non-Admin ne voit que ses hôtels réellement rattachés (jamais {} pour tout
@@ -304,6 +307,9 @@ exports.listAdmin = async (req, res) => {
 // Aucun paramètre ne peut élargir le filtre de publication imposé par le service.
 exports.portfolio = async (req, res) => {
   try {
+    if (req.isPlatformOperatorContext && !platformCapability(req, 'platform.hotels.read')) {
+      return fail(res, 403, 'Action refusée : capacité opérateur plateforme requise.');
+    }
     const { search, city, district, starRating, sort, page, limit } = req.query;
     const tenantId = req.user.role === 'Admin' ? (req.platformTenant?._id || req.platformTenant || null) : null;
     let hotelIds;

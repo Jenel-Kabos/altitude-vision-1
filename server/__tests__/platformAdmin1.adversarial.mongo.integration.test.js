@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
 const User = require('../models/User');
+const Property = require('../models/Property');
 const PlatformOperator = require('../models/PlatformOperator');
 const Message = require('../models/Message');
 const platformTenantRoutes = require('../routes/platformTenantRoutes');
@@ -45,6 +46,7 @@ let revokedOperatorUser;
 let plainAdminNoTenant;
 let ordinaryClient;
 let proprietor;
+let globalPropertyIds;
 
 beforeAll(async () => {
   await startFinancialMongo();
@@ -71,6 +73,20 @@ beforeAll(async () => {
   ordinaryClient = await User.create({ name: 'Ordinary Client', email: `ordinary-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   proprietor = await User.create({ name: 'Isolated Owner', email: `owner-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
 
+  const propertyData = (title, owner, tenant = null) => ({
+    title, description: 'Description suffisamment longue pour le registre global Altimmo.',
+    pole: 'Altimmo', type: 'Villa', status: 'vente', statusAdmin: 'Validée', isPublished: true,
+    availability: 'Disponible', price: 100000, owner, tenant,
+    address: { city: 'Brazzaville', arrondissement: 'Centre' },
+    latitude: -4.26, longitude: 15.24, images: ['https://example.test/property.jpg'], surface: 80,
+  });
+  const createdProperties = await Property.create([
+    propertyData('Bien Tenant A', adminA._id, tenantA._id),
+    propertyData('Bien Tenant B', adminB._id, tenantB._id),
+    propertyData('Bien propriétaire simple', proprietor._id),
+  ]);
+  globalPropertyIds = createdProperties.map((item) => String(item._id));
+
   await grantOperator({
     userId: operatorUser._id, actor: grantingAdmin, reason: 'Test PLATFORM-ADMIN-1',
     capabilities: ['platform.tenants.read', 'platform.tenants.manage', 'platform.properties.read', 'platform.reporting.read', 'platform.operators.manage'],
@@ -84,21 +100,33 @@ beforeAll(async () => {
 afterAll(async () => stopFinancialMongo());
 
 describe('RCA — les 403 rapportés sont résolus pour un opérateur, inchangés sinon', () => {
-  test('opérateur SANS tenant sélectionné → 403 avec signal distinct (pas le message générique historique)', async () => {
+  test('opérateur SANS tenant sélectionné → registre global A+B+propriétaire simple', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorUser));
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe('PLATFORM_OPERATOR_TENANT_SELECTION_REQUIRED');
-    expect(res.body.message).not.toMatch(/aucun tenant SaaS actif résolu/);
+    expect(res.status).toBe(200);
+    expect(res.body.data.items.map((item) => String(item._id))).toEqual(expect.arrayContaining(globalPropertyIds));
   });
 
   test('opérateur AVEC tenant A sélectionné → Property Portfolio 200', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorUser, tenantA));
     expect(res.status).toBe(200);
+    const ids = res.body.data.items.map((item) => String(item._id));
+    expect(ids).toContain(globalPropertyIds[0]);
+    expect(ids).not.toContain(globalPropertyIds[1]);
   });
 
   test('opérateur AVEC tenant B sélectionné → Property Portfolio 200 (les DEUX tenants, mission §38)', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorUser, tenantB));
     expect(res.status).toBe(200);
+    const ids = res.body.data.items.map((item) => String(item._id));
+    expect(ids).toContain(globalPropertyIds[1]);
+    expect(ids).not.toContain(globalPropertyIds[0]);
+  });
+
+  test('opérateur sans platform.properties.read → registre refusé', async () => {
+    await PlatformOperator.updateOne({ user: operatorUser._id }, { $pull: { capabilities: 'platform.properties.read' } });
+    const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorUser));
+    expect(res.status).toBe(403);
+    await PlatformOperator.updateOne({ user: operatorUser._id }, { $addToSet: { capabilities: 'platform.properties.read' } });
   });
 
   test('opérateur SANS tenant sélectionné → Conversations unread 403 signal distinct', async () => {

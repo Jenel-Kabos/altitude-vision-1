@@ -101,6 +101,14 @@ exports.getModuleAnalytics = async (req, res) => {
   try {
     const handlers = { sales: getImmobilierReportData, rentals: getRentalReportData, accommodations, hotels };
     if (!handlers[req.params.module]) return res.status(404).json({ status: 'fail', message: 'Module analytics inconnu.' });
+    const platformCapabilityByModule = {
+      sales: 'platform.properties.read', rentals: 'platform.rentals.read',
+      accommodations: 'platform.accommodations.read', hotels: 'platform.hotels.read',
+    };
+    if (req.isPlatformOperatorContext
+      && !req.platformOperatorCapabilities?.includes(platformCapabilityByModule[req.params.module])) {
+      return res.status(403).json({ status: 'fail', message: 'Action refusée : capacité opérateur plateforme requise.' });
+    }
     const allowedRoles = req.params.module === 'rentals' ? ROLES_GL : (['hotels', 'accommodations'].includes(req.params.module) ? [...ROLES_ALTIMMO, 'Proprietaire'] : ROLES_ALTIMMO);
     if (!allowedRoles.includes(req.user?.role)) return res.status(403).json({ status: 'fail', message: 'Accès refusé à ce module.' });
     const requestedAccommodationId = req.query?.accommodationId;

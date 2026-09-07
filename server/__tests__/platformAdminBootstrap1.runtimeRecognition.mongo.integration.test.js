@@ -118,10 +118,9 @@ describe('Reconnaissance runtime — Property Portfolio', () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(bootstrappedOperator, tenantB));
     expect(res.status).toBe(200);
   });
-  test('opérateur bootstrappé, sans tenant sélectionné → signal distinct, jamais un accès global implicite', async () => {
+  test('opérateur bootstrappé, sans tenant sélectionné → registre global', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(bootstrappedOperator));
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe('PLATFORM_OPERATOR_TENANT_SELECTION_REQUIRED');
+    expect(res.status).toBe(200);
   });
 });
 

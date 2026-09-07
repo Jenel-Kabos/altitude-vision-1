@@ -68,6 +68,18 @@ describe('DashboardLayout — portée plateforme des activations professionnelle
     expect(screen.queryByText('Sélectionnez un tenant à administrer')).not.toBeInTheDocument();
   });
 
+  test.each([
+    '/dashboard/properties',
+    '/dashboard/sales',
+    '/dashboard/rentals',
+    '/dashboard/hebergements',
+  ])('la page global-first %s charge la vue plateforme sans tenant', (route) => {
+    pathname = route;
+    render(<DashboardLayout><p>Registre global Altimmo</p></DashboardLayout>);
+    expect(screen.getByText('Registre global Altimmo')).toBeInTheDocument();
+    expect(screen.queryByText('Sélectionnez un tenant à administrer')).not.toBeInTheDocument();
+  });
+
   test('un opérateur sans capacité reste bloqué', () => {
     capabilities = [];
     render(<DashboardLayout><ActivationContent /></DashboardLayout>);
@@ -90,15 +102,15 @@ describe('DashboardLayout — portée plateforme des activations professionnelle
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
   });
 
-  test('une route tenant-scoped exige toujours un tenant', () => {
-    pathname = '/dashboard/etablissements';
-    render(<DashboardLayout><p>Gestion des établissements</p></DashboardLayout>);
+  test('une route tenant-only exige toujours un tenant', () => {
+    pathname = '/dashboard/gestion-locative';
+    render(<DashboardLayout><p>Gestion locative</p></DashboardLayout>);
     expect(screen.getByText('Sélectionnez un tenant à administrer')).toBeInTheDocument();
-    expect(screen.queryByText('Gestion des établissements')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gestion locative')).not.toBeInTheDocument();
   });
 
   test('une route tenant-scoped rend son contenu avec un tenant validé', () => {
-    pathname = '/dashboard/etablissements';
+    pathname = '/dashboard/gestion-locative';
     runtime = { ...runtime, selectedTenantId: 'tenant-1' };
     render(<DashboardLayout><p>Gestion des établissements</p></DashboardLayout>);
     expect(screen.getByText('Gestion des établissements')).toBeInTheDocument();

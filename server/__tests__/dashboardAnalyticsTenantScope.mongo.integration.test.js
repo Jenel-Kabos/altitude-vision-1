@@ -96,7 +96,12 @@ beforeAll(async () => {
   operatorUser = await standalone('AnalyticsOperator');
   client = await standalone('AnalyticsClient', 'Client');
   proprietor = await standalone('AnalyticsOwner', 'Proprietaire');
-  await grantOperator({ userId: operatorUser._id, actor: plainAdmin, reason: 'Analytics tenant test', capabilities: ['platform.reporting.read'] });
+  await grantOperator({
+    userId: operatorUser._id,
+    actor: plainAdmin,
+    reason: 'Analytics tenant test',
+    capabilities: ['platform.reporting.read', 'platform.accommodations.read'],
+  });
 });
 
 afterAll(stopFinancialMongo);

@@ -1,5 +1,5 @@
 const asyncHandler = require('express-async-handler');
-const { getPropertyPortfolioForTenantScope } = require('../services/propertyPortfolioService');
+const { getPropertyPortfolio, getPropertyPortfolioForTenantScope } = require('../services/propertyPortfolioService');
 
 // TENANT-SCOPE-AUDIT-1 — `req.tenantScopeUserIds` reste le scope brut
 // `OrgMembership`-only : un bien appartenant à un Proprietaire créé par
@@ -12,6 +12,11 @@ const { getPropertyPortfolioForTenantScope } = require('../services/propertyPort
 // élargissement global de cette nature avait provoqué une fuite réelle
 // démontrée par test sur ce catalogue, voir HOTFIX_USERS_COUNT1_REPORT.md).
 exports.list = asyncHandler(async (req, res) => {
-  const portfolio = await getPropertyPortfolioForTenantScope({ scopeUserIds: req.tenantScopeUserIds || [] });
+  if (req.isPlatformOperatorContext && !req.platformOperatorCapabilities?.includes('platform.properties.read')) {
+    return res.status(403).json({ status: 'fail', message: 'Action refusée : capacité opérateur plateforme requise.' });
+  }
+  const portfolio = req.isPlatformOperatorContext && !req.platformTenant
+    ? await getPropertyPortfolio()
+    : await getPropertyPortfolioForTenantScope({ scopeUserIds: req.tenantScopeUserIds || [] });
   res.status(200).json({ status: 'success', results: portfolio.items.length, data: portfolio });
 });

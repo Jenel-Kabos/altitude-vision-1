@@ -76,7 +76,10 @@ beforeAll(async () => {
   operator = await User.create({ name: 'HZ04 Operator', email: 'hz04-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   client = await User.create({ name: 'HZ04 Client', email: 'hz04-client@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   proprietor = await User.create({ name: 'HZ04 Owner', email: 'hz04-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
-  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ04 admin lists certification', capabilities: [] });
+  await grantOperator({
+    userId: operator._id, actor: adminA, reason: 'HZ04 admin lists certification',
+    capabilities: ['platform.accommodations.read'],
+  });
   accommodationA1 = await makeAccommodation({ tenant: tenantA, owner: adminA, suffix: 'A1', status: 'soumis', submittedAt: new Date('2028-01-01') });
   accommodationA2 = await makeAccommodation({ tenant: tenantA, owner: adminA, suffix: 'A2', status: 'publie', type: 'appartement_meuble', city: 'Pointe-Noire' });
   accommodationB1 = await makeAccommodation({ tenant: tenantB, owner: adminB, suffix: 'B1', status: 'soumis', submittedAt: new Date('2028-01-02') });
