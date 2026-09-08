@@ -129,7 +129,7 @@ const HotelBookingWidget = ({ hotelId, categories = [], lockedSelection = null }
   }
 
   return (
-    <section id="hotel-booking-widget" className="mt-8 border rounded-lg p-4 sm:p-6">
+    <section id="hotel-booking-widget" className="mt-8 border border-gray-200 rounded-lg p-4 sm:p-6 bg-white shadow-sm">
       <h2 className="text-xl font-bold mb-4" style={{ color: "#2E7BB5" }}>{isLocked ? "Votre sélection" : "Vérifier la disponibilité"}</h2>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {isLocked ? (
@@ -145,13 +145,13 @@ const HotelBookingWidget = ({ hotelId, categories = [], lockedSelection = null }
           <>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">Catégorie</label>
-              <select value={categoryId} onChange={(e) => handleCategoryChange(e.target.value)} aria-label="Catégorie" className="w-full px-3 py-2 border rounded-md">
+              <select value={categoryId} onChange={(e) => handleCategoryChange(e.target.value)} aria-label="Catégorie" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900">
                 {bookableCategories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Tarif</label>
-              <select value={rateId} onChange={(e) => setRateId(e.target.value)} aria-label="Tarif" className="w-full px-3 py-2 border rounded-md">
+              <select value={rateId} onChange={(e) => setRateId(e.target.value)} aria-label="Tarif" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900">
                 {selectedCategory?.rates.map((r) => (
                   <option key={r._id} value={r._id}>{HOTEL_RATE_TYPES.find((t) => t.value === r.rateType)?.label} — {formatCurrencyXAF(r.amount)}</option>
                 ))}
@@ -159,23 +159,23 @@ const HotelBookingWidget = ({ hotelId, categories = [], lockedSelection = null }
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Chambres</label>
-              <input type="number" min="1" value={roomsCount} onChange={(e) => { setRoomsCount(e.target.value); setAvailability(null); }} aria-label="Nombre de chambres" className="w-full px-3 py-2 border rounded-md" />
+              <input type="number" min="1" value={roomsCount} onChange={(e) => { setRoomsCount(e.target.value); setAvailability(null); }} aria-label="Nombre de chambres" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Arrivée</label>
-              <input type="date" value={checkInDate} onChange={(e) => { setCheckInDate(e.target.value); setAvailability(null); }} aria-label="Date d'arrivée" className="w-full px-3 py-2 border rounded-md" />
+              <input type="date" value={checkInDate} onChange={(e) => { setCheckInDate(e.target.value); setAvailability(null); }} aria-label="Date d'arrivée" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Départ</label>
-              <input type="date" value={checkOutDate} onChange={(e) => { setCheckOutDate(e.target.value); setAvailability(null); }} aria-label="Date de départ" className="w-full px-3 py-2 border rounded-md" />
+              <input type="date" value={checkOutDate} onChange={(e) => { setCheckOutDate(e.target.value); setAvailability(null); }} aria-label="Date de départ" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Adultes</label>
-              <input type="number" min="1" value={adults} onChange={(e) => setAdults(e.target.value)} aria-label="Adultes" className="w-full px-3 py-2 border rounded-md" />
+              <input type="number" min="1" value={adults} onChange={(e) => setAdults(e.target.value)} aria-label="Adultes" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Enfants</label>
-              <input type="number" min="0" value={children} onChange={(e) => setChildren(e.target.value)} aria-label="Enfants" className="w-full px-3 py-2 border rounded-md" />
+              <input type="number" min="0" value={children} onChange={(e) => setChildren(e.target.value)} aria-label="Enfants" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" />
             </div>
 
             <div className="sm:col-span-2">
@@ -202,23 +202,23 @@ const HotelBookingWidget = ({ hotelId, categories = [], lockedSelection = null }
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Prénom *</label>
-              <input value={guest.firstName} onChange={(e) => setGuest((g) => ({ ...g, firstName: e.target.value }))} aria-label="Prénom" className="w-full px-3 py-2 border rounded-md" />
+              <input value={guest.firstName} onChange={(e) => setGuest((g) => ({ ...g, firstName: e.target.value }))} aria-label="Prénom" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Nom *</label>
-              <input value={guest.lastName} onChange={(e) => setGuest((g) => ({ ...g, lastName: e.target.value }))} aria-label="Nom" className="w-full px-3 py-2 border rounded-md" />
+              <input value={guest.lastName} onChange={(e) => setGuest((g) => ({ ...g, lastName: e.target.value }))} aria-label="Nom" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Email *</label>
-              <input type="email" value={guest.email} onChange={(e) => setGuest((g) => ({ ...g, email: e.target.value }))} aria-label="Email" className="w-full px-3 py-2 border rounded-md" />
+              <input type="email" value={guest.email} onChange={(e) => setGuest((g) => ({ ...g, email: e.target.value }))} aria-label="Email" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Téléphone</label>
-              <input value={guest.phone} onChange={(e) => setGuest((g) => ({ ...g, phone: e.target.value }))} aria-label="Téléphone" className="w-full px-3 py-2 border rounded-md" />
+              <input value={guest.phone} onChange={(e) => setGuest((g) => ({ ...g, phone: e.target.value }))} aria-label="Téléphone" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" />
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">Demandes particulières</label>
-              <textarea value={specialRequests} onChange={(e) => setSpecialRequests(e.target.value)} rows={2} aria-label="Demandes particulières" className="w-full px-3 py-2 border rounded-md" />
+              <textarea value={specialRequests} onChange={(e) => setSpecialRequests(e.target.value)} rows={2} aria-label="Demandes particulières" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" />
             </div>
             <div className="sm:col-span-2">
               <button type="submit" disabled={submitting} className="bg-gold text-white px-5 py-2.5 rounded-md font-semibold disabled:opacity-50">

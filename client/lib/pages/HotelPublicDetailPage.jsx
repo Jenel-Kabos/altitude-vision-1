@@ -135,8 +135,8 @@ const HotelPublicDetailPage = () => {
     if (typeof el?.scrollIntoView === "function") el.scrollIntoView({ behavior: "smooth" });
   }, [locked]);
 
-  if (loading) return <p className="text-center py-20 text-gray-500">Chargement...</p>;
-  if (notFound || !data?.detail) return <p className="text-center py-20 text-gray-500">Cet hôtel n'est pas disponible.</p>;
+  if (loading) return <div className="min-h-screen bg-[#FAF8F5]"><p className="text-center py-20 text-gray-500">Chargement...</p></div>;
+  if (notFound || !data?.detail) return <div className="min-h-screen bg-[#FAF8F5]"><p className="text-center py-20 text-gray-500">Cet hôtel n'est pas disponible.</p></div>;
 
   const { detail } = data;
   const images = detail.gallery?.length ? detail.gallery.map((g) => g.url) : [];
@@ -159,6 +159,7 @@ const HotelPublicDetailPage = () => {
   };
 
   return (
+    <div className="min-h-screen bg-[#FAF8F5] text-[#2A241D]">
     <div className="max-w-5xl mx-auto px-4 py-10">
       <HotelGallery images={images} name={detail.name} />
 
@@ -174,7 +175,7 @@ const HotelPublicDetailPage = () => {
             {Array.from({ length: detail.starRating }).map((_, i) => <Star key={i} size={14} fill={GOLD} stroke={GOLD} />)}
           </span>
         )}
-        {detail.hotelType && <span className="text-xs px-2 py-1 rounded-full bg-gray-100 capitalize">{detail.hotelType}</span>}
+        {detail.hotelType && <span className="text-xs px-2 py-1 rounded-full bg-white border border-gray-200 text-gray-700 capitalize">{detail.hotelType}</span>}
         {/* PHASE-H3 — jamais une note fabriquée : le résumé n'apparaît que si reviewCount > 0. */}
         {detail.reviewSummary?.reviewCount > 0 && (
           <span className="text-sm font-semibold flex items-center gap-1"><Star size={14} fill={GOLD} stroke={GOLD} /> {detail.reviewSummary.averageRating} · {detail.reviewSummary.reviewCount} avis</span>
@@ -188,20 +189,20 @@ const HotelPublicDetailPage = () => {
         <section className="mt-8">
           <h2 className="text-xl font-bold mb-2" style={{ color: BLUE }}>Points forts</h2>
           <div className="flex flex-wrap gap-2">
-            {activeHighlights.map((s) => <span key={s.key} className="text-sm px-3 py-1 rounded-full bg-gray-100">{s.label}</span>)}
+            {activeHighlights.map((s) => <span key={s.key} className="text-sm px-3 py-1 rounded-full bg-white border border-gray-200 text-gray-800 shadow-sm">{s.label}</span>)}
           </div>
         </section>
       )}
 
       {/* PHASE-HW1 §9 — recherche multi-catégories en direct, même moteur H2/H4/H5 que mobile. */}
-      <section className="mt-8 border rounded-lg p-4 sm:p-6">
+      <section className="mt-8 border border-gray-200 rounded-lg p-4 sm:p-6 bg-white shadow-sm">
         <h2 className="text-xl font-bold mb-4" style={{ color: BLUE }}>Vérifier la disponibilité</h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div><label className="block text-sm font-medium mb-1">Arrivée</label><input type="date" min={todayISO()} value={search.checkIn} onChange={(e) => setSearch((s) => ({ ...s, checkIn: e.target.value }))} aria-label="Date d'arrivée" className="w-full px-3 py-2 border rounded-md" /></div>
-          <div><label className="block text-sm font-medium mb-1">Départ</label><input type="date" min={search.checkIn || todayISO()} value={search.checkOut} onChange={(e) => setSearch((s) => ({ ...s, checkOut: e.target.value }))} aria-label="Date de départ" className="w-full px-3 py-2 border rounded-md" /></div>
-          <div><label className="block text-sm font-medium mb-1">Adultes</label><input type="number" min="1" value={search.adults} onChange={(e) => setSearch((s) => ({ ...s, adults: Number(e.target.value) }))} aria-label="Adultes" className="w-full px-3 py-2 border rounded-md" /></div>
-          <div><label className="block text-sm font-medium mb-1">Enfants</label><input type="number" min="0" value={search.children} onChange={(e) => setSearch((s) => ({ ...s, children: Number(e.target.value) }))} aria-label="Enfants" className="w-full px-3 py-2 border rounded-md" /></div>
-          <div><label className="block text-sm font-medium mb-1">Chambres</label><input type="number" min="1" value={search.rooms} onChange={(e) => setSearch((s) => ({ ...s, rooms: Number(e.target.value) }))} aria-label="Nombre de chambres" className="w-full px-3 py-2 border rounded-md" /></div>
+          <div><label className="block text-sm font-medium mb-1">Arrivée</label><input type="date" min={todayISO()} value={search.checkIn} onChange={(e) => setSearch((s) => ({ ...s, checkIn: e.target.value }))} aria-label="Date d'arrivée" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" /></div>
+          <div><label className="block text-sm font-medium mb-1">Départ</label><input type="date" min={search.checkIn || todayISO()} value={search.checkOut} onChange={(e) => setSearch((s) => ({ ...s, checkOut: e.target.value }))} aria-label="Date de départ" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" /></div>
+          <div><label className="block text-sm font-medium mb-1">Adultes</label><input type="number" min="1" value={search.adults} onChange={(e) => setSearch((s) => ({ ...s, adults: Number(e.target.value) }))} aria-label="Adultes" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" /></div>
+          <div><label className="block text-sm font-medium mb-1">Enfants</label><input type="number" min="0" value={search.children} onChange={(e) => setSearch((s) => ({ ...s, children: Number(e.target.value) }))} aria-label="Enfants" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" /></div>
+          <div><label className="block text-sm font-medium mb-1">Chambres</label><input type="number" min="1" value={search.rooms} onChange={(e) => setSearch((s) => ({ ...s, rooms: Number(e.target.value) }))} aria-label="Nombre de chambres" className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" /></div>
         </div>
         <button type="button" onClick={runSearch} disabled={!search.checkIn || !search.checkOut || availability.status === "loading"}
           className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-md font-medium disabled:opacity-50">
@@ -216,7 +217,7 @@ const HotelPublicDetailPage = () => {
           (detail.roomCategories || []).length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {detail.roomCategories.map((cat) => (
-                <div key={cat.id} className="border rounded-lg p-4">
+                <div key={cat.id} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
                   <h3 className="font-semibold">{cat.name}</h3>
                   <p className="text-sm text-gray-500">{cat.capacity?.maxAdults || 0} adulte(s) · {cat.bedCount} lit(s){cat.size ? ` · ${cat.size} m²` : ""}</p>
                   {cat.rates?.length > 0 && <p className="text-sm font-semibold mt-2" style={{ color: BLUE }}>Dès {formatCurrencyXAF(Math.min(...cat.rates.map((r) => r.amount)))} / nuit</p>}
@@ -230,7 +231,7 @@ const HotelPublicDetailPage = () => {
         {availability.status === "success" && (
           <div className="grid grid-cols-1 gap-4">
             {availability.data.roomCategories.map((cat) => (
-              <div key={cat.id} className="border rounded-lg p-4">
+              <div key={cat.id} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
                 <h3 className="font-semibold">{cat.name}</h3>
                 <p className="text-sm text-gray-500">{cat.capacity?.maxAdults || 0} adulte(s) · {cat.beds} lit(s){cat.size ? ` · ${cat.size} m²` : ""} · {cat.availableQuantity} chambre(s) disponible(s)</p>
                 <div className="mt-3 divide-y">
@@ -258,19 +259,19 @@ const HotelPublicDetailPage = () => {
       {locked && <HotelBookingWidget hotelId={hotelId} categories={[]} lockedSelection={locked} />}
 
       {detail.description && (
-        <section className="mt-8">
+        <section className="mt-8 border border-gray-200 rounded-lg p-4 sm:p-6 bg-white shadow-sm">
           <h2 className="text-xl font-bold mb-2" style={{ color: BLUE }}>Présentation</h2>
           <p className="text-gray-700 whitespace-pre-line">{detail.description}</p>
         </section>
       )}
 
-      <section className="mt-8">
+      <section className="mt-8 border border-gray-200 rounded-lg p-4 sm:p-6 bg-white shadow-sm">
         <h2 className="text-xl font-bold mb-2" style={{ color: BLUE }}>Localisation</h2>
         <p className="text-gray-700">{[detail.location?.address, detail.location?.district, detail.location?.city].filter(Boolean).join(", ") || "Adresse non communiquée."}</p>
         {Array.isArray(coordinates) && coordinates.length === 2 && (
           <iframe
             title="Localisation de l'hôtel"
-            className="w-full h-64 rounded-lg mt-3 border-0"
+            className="w-full h-64 rounded-lg mt-3 border border-gray-200"
             src={`https://www.google.com/maps?q=${coordinates[1]},${coordinates[0]}&output=embed`}
             loading="lazy"
           />
@@ -278,13 +279,13 @@ const HotelPublicDetailPage = () => {
       </section>
 
       {activePolicies.length > 0 && (
-        <section className="mt-8">
+        <section className="mt-8 border border-gray-200 rounded-lg p-4 sm:p-6 bg-white shadow-sm">
           <h2 className="text-xl font-bold mb-2" style={{ color: BLUE }}>Informations pratiques</h2>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
             {activePolicies.map(([key, value]) => (
-              <div key={key} className="flex justify-between border-b py-1">
+              <div key={key} className="flex justify-between border-b border-gray-100 py-1.5">
                 <dt className="text-gray-500">{POLICY_LABELS[key] || key}</dt>
-                <dd className="font-medium">{key === "deposit" ? `${Number(value.amount || 0).toLocaleString("fr-FR")} ${value.currency || "XAF"}` : String(value)}</dd>
+                <dd className="font-medium text-gray-800">{key === "deposit" ? `${Number(value.amount || 0).toLocaleString("fr-FR")} ${value.currency || "XAF"}` : String(value)}</dd>
               </div>
             ))}
           </dl>
@@ -292,12 +293,12 @@ const HotelPublicDetailPage = () => {
       )}
 
       {/* PHASE-H3 — avis vérifiés uniquement, jamais les commentaires génériques Property (mission §8/§13). */}
-      <section className="mt-8">
+      <section className="mt-8 border border-gray-200 rounded-lg p-4 sm:p-6 bg-white shadow-sm">
         <h2 className="text-xl font-bold mb-2" style={{ color: BLUE }}>Avis clients</h2>
         {reviews.items.length === 0 && !reviews.loading && <p className="text-sm text-gray-500">Aucun avis pour le moment.</p>}
         <div className="space-y-3">
           {reviews.items.map((review) => (
-            <div key={review.id} className="border rounded-lg p-3">
+            <div key={review.id} className="border border-gray-200 rounded-lg p-3 bg-white">
               <div className="flex items-center justify-between">
                 <span className="font-semibold">{review.author}</span>
                 {review.verifiedStay && <span className="text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800">Séjour vérifié</span>}
@@ -315,11 +316,11 @@ const HotelPublicDetailPage = () => {
       </section>
 
       {detail.faq?.length > 0 && (
-        <section className="mt-8">
+        <section className="mt-8 border border-gray-200 rounded-lg p-4 sm:p-6 bg-white shadow-sm">
           <h2 className="text-xl font-bold mb-2" style={{ color: BLUE }}>Questions fréquentes</h2>
           <div className="space-y-2">
             {detail.faq.map((entry) => (
-              <details key={entry.id} className="border rounded-lg p-3">
+              <details key={entry.id} className="border border-gray-200 rounded-lg p-3 bg-white">
                 <summary className="font-medium cursor-pointer">{entry.question}</summary>
                 <p className="text-sm text-gray-700 mt-2">{entry.answer}</p>
               </details>
@@ -334,7 +335,7 @@ const HotelPublicDetailPage = () => {
           <h2 className="text-xl font-bold mb-3" style={{ color: BLUE }}>Hôtels à proximité</h2>
           <div className="flex gap-4 overflow-x-auto pb-2">
             {nearby.hotels.map((hotel) => (
-              <Link key={hotel.hotelId} href={`/immobilier/hotels/${hotel.hotelId}`} className="flex-shrink-0 w-56 border rounded-lg overflow-hidden">
+              <Link key={hotel.hotelId} href={`/immobilier/hotels/${hotel.hotelId}`} className="flex-shrink-0 w-56 border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
                 {hotel.heroImage ? <img src={hotel.heroImage} alt={hotel.name} className="w-full h-32 object-cover" /> : <div className="w-full h-32 bg-gray-100" />}
                 <div className="p-3">
                   <p className="font-semibold text-sm">{hotel.name}</p>
@@ -346,6 +347,7 @@ const HotelPublicDetailPage = () => {
           </div>
         </section>
       )}
+    </div>
     </div>
   );
 };
