@@ -7,6 +7,7 @@ const { grantOperator } = require('../services/platformOperator/platformOperator
 const User = require('../models/User');
 const RoomCategory = require('../models/RoomCategory');
 const HotelReservation = require('../models/HotelReservation');
+const PlatformOperator = require('../models/PlatformOperator');
 const routes = require('../routes/hotelReservationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 
@@ -27,6 +28,9 @@ let tenantB;
 let adminA;
 let adminB;
 let operator;
+let operatorNoRead;
+let suspendedOperator;
+let managingOperator;
 let client;
 let proprietor;
 let hotelA;
@@ -76,11 +80,18 @@ beforeAll(async () => {
   ({ user: adminA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Admin' } }));
   ({ user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } }));
   operator = await User.create({ name: 'HZ05 Operator', email: 'hz05-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+  operatorNoRead = await User.create({ name: 'HZ05 Operator No Read', email: 'hz05-operator-no-read@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+  suspendedOperator = await User.create({ name: 'HZ05 Suspended Operator', email: 'hz05-suspended-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+  managingOperator = await User.create({ name: 'HZ05 Managing Operator', email: 'hz05-managing-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   client = await User.create({ name: 'HZ05 Client', email: 'hz05-client@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   proprietor = await User.create({ name: 'HZ05 Owner', email: 'hz05-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
-  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ05 admin lists certification', capabilities: [] });
+  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ05 admin lists certification', capabilities: ['platform.hotels.read'] });
+  await grantOperator({ userId: operatorNoRead._id, actor: adminA, reason: 'HZ05 missing read certification', capabilities: [] });
+  await grantOperator({ userId: suspendedOperator._id, actor: adminA, reason: 'HZ05 suspended certification', capabilities: ['platform.hotels.read'] });
+  await grantOperator({ userId: managingOperator._id, actor: adminA, reason: 'HZ05 manage certification', capabilities: ['platform.hotels.read', 'platform.hotels.manage'] });
+  await PlatformOperator.updateOne({ user: suspendedOperator._id }, { status: 'suspended', suspendedBy: adminA._id, suspendedAt: new Date(), suspensionReason: 'Test' });
 
-  hotelA = await createTenantHotel({ tenant: tenantA, manager: adminA, createdBy: adminA, overrides: { name: 'HZ05 Hotel A' } });
+  hotelA = await createTenantHotel({ tenant: tenantA, manager: proprietor, createdBy: adminA, overrides: { name: 'HZ05 Hotel A' } });
   hotelB = await createTenantHotel({ tenant: tenantB, manager: adminB, createdBy: adminB, overrides: { name: 'HZ05 Hotel B' } });
   const categoryA = await RoomCategory.create({ hotel: hotelA._id, name: 'HZ05 Category A', createdBy: adminA._id });
   const categoryB = await RoomCategory.create({ hotel: hotelB._id, name: 'HZ05 Category B', createdBy: adminB._id });
@@ -149,6 +160,26 @@ test('PlatformOperator global conserve records et total globaux', async () => {
 
   const pending = await request(app).get('/api/hotel-reservations/status/pending').set(bearer(operator));
   expect(new Set(ids(pending))).toEqual(new Set(expectedIds([...reservationsA, ...reservationsB].filter((item) => item.status === 'pending'))));
+});
+
+test.each(['/admin/list', '/status/pending'])('PlatformOperator sans platform.hotels.read est refusé sur %s', async (path) => {
+  expect((await request(app).get(`/api/hotel-reservations${path}`).set(bearer(operatorNoRead))).status).toBe(403);
+});
+
+test.each(['/admin/list', '/status/pending'])('PlatformOperator suspendu est refusé sur %s', async (path) => {
+  expect((await request(app).get(`/api/hotel-reservations${path}`).set(bearer(suspendedOperator))).status).toBe(403);
+});
+
+test('les mutations globales exigent platform.hotels.manage', async () => {
+  expect((await request(app).patch('/api/hotel-reservations/not-an-object-id').set(bearer(operator)).send({})).status).toBe(403);
+  expect((await request(app).patch('/api/hotel-reservations/not-an-object-id').set(bearer(managingOperator)).send({})).status).toBe(400);
+});
+
+test('Proprietaire hôtel A conserve ses réservations et ne lit pas une réservation hôtel B', async () => {
+  const own = await request(app).get('/api/hotel-reservations/owner').set(bearer(proprietor));
+  expect(own.status).toBe(200);
+  expect(new Set(ids(own))).toEqual(new Set(expectedIds(reservationsA)));
+  expect((await request(app).get(`/api/hotel-reservations/${reservationsB[0]._id}`).set(bearer(proprietor))).status).toBe(403);
 });
 
 test.each([

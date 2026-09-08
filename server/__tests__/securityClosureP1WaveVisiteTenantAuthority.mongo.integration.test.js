@@ -15,6 +15,7 @@ const visiteRoutes = require('../routes/visiteRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const organizationService = require('../services/organizationService');
 const platformTenantService = require('../services/platformTenant/platformTenantService');
+const { grantOperator } = require('../services/platformOperator/platformOperatorService');
 
 jest.setTimeout(180000);
 
@@ -52,10 +53,35 @@ async function buildTenantWithVisite(label) {
     statusAdmin: 'Validée', availability: 'Disponible', owner: owner._id,
   });
   const visite = await Visite.create({ property: property._id, client: client._id, owner: owner._id, paiementStatus: 'en_attente' });
-  return { admin, tenant, property, visite };
+  return { admin, owner, tenant, property, visite };
 }
 
 describe('SECURITY-CLOSURE-P1-WAVE-1 (P1-B) — GET /api/visites, /all-payments, /unread-count', () => {
+  test('PlatformOperator avec platform.properties.read sans tenant voit les visites globales', async () => {
+    const a = await buildTenantWithVisite('GLOBAL-A');
+    const b = await buildTenantWithVisite('GLOBAL-B');
+    const operator = await User.create({ name: 'Visit Operator', email: `visit-operator-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+    await grantOperator({ userId: operator._id, actor: a.admin, reason: 'ALTIMMO-CORE-4 visit global read', capabilities: ['platform.properties.read'] });
+    const res = await request(app).get('/api/visites').set(bearer(operator));
+    expect(res.status).toBe(200);
+    expect(res.body.data.visites.map((visit) => String(visit._id))).toEqual(expect.arrayContaining([String(a.visite._id), String(b.visite._id)]));
+
+    const scoped = await request(app).get('/api/visites').set(bearer(operator, a.tenant._id));
+    expect(scoped.status).toBe(200);
+    expect(scoped.body.data.visites.map((visit) => String(visit._id))).toContain(String(a.visite._id));
+    expect(scoped.body.data.visites.map((visit) => String(visit._id))).not.toContain(String(b.visite._id));
+  });
+
+  test('PlatformOperator sans platform.properties.read et Proprietaire restent privés de la liste globale', async () => {
+    const a = await buildTenantWithVisite('DENIED-A');
+    const b = await buildTenantWithVisite('DENIED-B');
+    const operator = await User.create({ name: 'Visit Operator No Read', email: `visit-operator-no-read-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+    await grantOperator({ userId: operator._id, actor: a.admin, reason: 'ALTIMMO-CORE-4 visit missing read', capabilities: [] });
+    expect((await request(app).get('/api/visites').set(bearer(operator))).status).toBe(403);
+    expect((await request(app).get('/api/visites').set(bearer(a.owner))).status).toBe(403);
+    expect((await request(app).get('/api/visites').set(bearer(a.owner, b.tenant._id))).status).toBe(403);
+  });
+
   test('1. Admin A ne voit QUE les visites du tenant A', async () => {
     const a = await buildTenantWithVisite('A');
     const b = await buildTenantWithVisite('B');

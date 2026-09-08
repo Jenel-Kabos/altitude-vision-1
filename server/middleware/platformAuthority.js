@@ -18,4 +18,16 @@ const requirePlatformOperatorCapability = (capability) => async (req, res, next)
   return next();
 };
 
-module.exports = { requirePlatformOperatorCapability };
+// Compose after tenant-context resolution on dual-mode staff routes. Legacy
+// staff keeps its role capabilities; a recognized PlatformOperator must also
+// hold the explicit cross-platform capability.
+const requirePlatformOperatorCapabilityWhenPresent = (capability) => (req, res, next) => {
+  if (!req.isPlatformOperatorContext) return next();
+  if (hasCapability({ status: 'active', capabilities: req.platformOperatorCapabilities || [] }, capability)) return next();
+  return res.status(403).json({
+    status: 'fail',
+    message: 'Action refusée : capacité opérateur plateforme requise.',
+  });
+};
+
+module.exports = { requirePlatformOperatorCapability, requirePlatformOperatorCapabilityWhenPresent };

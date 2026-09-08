@@ -8,6 +8,7 @@ const {
   requireTenantScopeForStaffAllowPlatformWide,
   attachTenantScopeIfResolvable,
 } = require('../middleware/tenantContext');
+const { requirePlatformOperatorCapabilityWhenPresent } = require('../middleware/platformAuthority');
 
 const router = express.Router();
 const reservationCtrl = require('../controllers/accommodationReservationController');
@@ -23,8 +24,8 @@ router.use(auth.protect);
 // le paramètre générique ':id'.
 router.post('/admin', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScope, upload.array('images', 10), ctrl.createFull);
 router.put('/admin/:propertyId', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.updateFull);
-router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, ctrl.listAdmin);
-router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, ctrl.pending);
+router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, requirePlatformOperatorCapabilityWhenPresent('platform.accommodations.read'), ctrl.listAdmin);
+router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, requirePlatformOperatorCapabilityWhenPresent('platform.accommodations.read'), ctrl.pending);
 
 // Mobile — publication atomique et idempotente (correctif robustesse 2026-07,
 // Property + Accommodation + RatePlan + soumission en une transaction). Mêmes

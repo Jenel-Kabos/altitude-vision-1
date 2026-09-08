@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import DashboardLayout from '../../app/dashboard/layout';
 import { useAuth } from '../context/AuthContext';
+import { DASHBOARD_SCOPE, dashboardScopeForRoute } from '../navigation/dashboardRouteScope';
 
 let pathname = '/dashboard/activations-professionnelles';
 let authUser = { _id: 'operator-1', role: 'Admin' };
@@ -114,5 +115,13 @@ describe('DashboardLayout — portée plateforme des activations professionnelle
     runtime = { ...runtime, selectedTenantId: 'tenant-1' };
     render(<DashboardLayout><p>Gestion des établissements</p></DashboardLayout>);
     expect(screen.getByText('Gestion des établissements')).toBeInTheDocument();
+  });
+
+  test('la taxonomie distingue global-first, platform-only et tenant-only sans scope personnel mort', () => {
+    expect(dashboardScopeForRoute('/dashboard/visites')).toBe(DASHBOARD_SCOPE.GLOBAL_FIRST);
+    expect(dashboardScopeForRoute('/dashboard/hotel-reservations')).toBe(DASHBOARD_SCOPE.GLOBAL_FIRST);
+    expect(dashboardScopeForRoute('/dashboard/moderation/hebergement')).toBe(DASHBOARD_SCOPE.PLATFORM_ONLY);
+    expect(dashboardScopeForRoute('/dashboard/gestion-locative')).toBe(DASHBOARD_SCOPE.TENANT_ONLY);
+    expect(DASHBOARD_SCOPE).not.toHaveProperty('PERSONAL');
   });
 });

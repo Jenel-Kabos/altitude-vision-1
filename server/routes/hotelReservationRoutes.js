@@ -12,6 +12,7 @@ const auth = require('../controllers/authController');
 const ctrl = require('../controllers/hotelReservationController');
 const { ROLES_ALTIMMO } = require('../utils/roles');
 const { attachTenantContext, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
+const { requirePlatformOperatorCapabilityWhenPresent } = require('../middleware/platformAuthority');
 
 const router = express.Router();
 router.use(auth.protect);
@@ -31,26 +32,26 @@ router.get('/owner', ctrl.ownerList);
 router.post('/owner', ctrl.ownerCreate);
 
 // Administration — littéral, avant /:id.
-router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, ctrl.listAdmin);
-router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, ctrl.pending);
+router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, requirePlatformOperatorCapabilityWhenPresent('platform.hotels.read'), ctrl.listAdmin);
+router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, requirePlatformOperatorCapabilityWhenPresent('platform.hotels.read'), ctrl.pending);
 
 // Actions nommées à 2 segments — avant le fallback générique /:id.
-router.patch('/:id/cancel', ctrl.cancel);
+router.patch('/:id/cancel', requirePlatformOperatorCapabilityWhenPresent('platform.hotels.manage'), ctrl.cancel);
 // PHASE-H5 — lecture seule, purement informative (aucune écriture).
-router.get('/:id/cancellation-eligibility', ctrl.cancellationEligibility);
-router.patch('/:id/confirm', ctrl.confirm);
-router.patch('/:id/reject', ctrl.reject);
+router.get('/:id/cancellation-eligibility', requirePlatformOperatorCapabilityWhenPresent('platform.hotels.read'), ctrl.cancellationEligibility);
+router.patch('/:id/confirm', requirePlatformOperatorCapabilityWhenPresent('platform.hotels.manage'), ctrl.confirm);
+router.patch('/:id/reject', requirePlatformOperatorCapabilityWhenPresent('platform.hotels.manage'), ctrl.reject);
 // Sprint D — jamais accessible au client (ownership vérifiée dans le contrôleur).
-router.patch('/:id/check-in', ctrl.checkIn);
-router.get('/:id/checkout-financial-readiness', ctrl.checkoutFinancialReadiness);
-router.patch('/:id/check-out', ctrl.checkOut);
+router.patch('/:id/check-in', requirePlatformOperatorCapabilityWhenPresent('platform.hotels.manage'), ctrl.checkIn);
+router.get('/:id/checkout-financial-readiness', requirePlatformOperatorCapabilityWhenPresent('platform.hotels.read'), ctrl.checkoutFinancialReadiness);
+router.patch('/:id/check-out', requirePlatformOperatorCapabilityWhenPresent('platform.hotels.manage'), ctrl.checkOut);
 // Correctif Sprint D — lecture persistante de l'affectation active (voir
 // mission "AFFECTATION PERSISTANTE"). Accessible au client, mais projection
 // nulle avant check-in (contrôlée dans le contrôleur).
-router.get('/:id/room-assignment', ctrl.getRoomAssignment);
+router.get('/:id/room-assignment', requirePlatformOperatorCapabilityWhenPresent('platform.hotels.read'), ctrl.getRoomAssignment);
 
 // Génériques — toujours en dernier.
-router.patch('/:id', ctrl.update);
-router.get('/:id', ctrl.getOne);
+router.patch('/:id', requirePlatformOperatorCapabilityWhenPresent('platform.hotels.manage'), ctrl.update);
+router.get('/:id', requirePlatformOperatorCapabilityWhenPresent('platform.hotels.read'), ctrl.getOne);
 
 module.exports = router;
