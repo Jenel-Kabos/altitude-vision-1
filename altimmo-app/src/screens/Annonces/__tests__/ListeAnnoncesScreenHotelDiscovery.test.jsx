@@ -60,6 +60,7 @@ const HOTEL_ITEM = {
   images: ['https://res.cloudinary.com/dop8vzm5z/image/upload/v1/hotel.jpg'],
   address: { arrondissement: 'Moungali', city: 'Brazzaville' },
   accommodationType: 'hotel', hotel: 'hotel-object-id-1',
+  hotelServices: { restaurant: true, bar: true, piscine: true, spa: true, wifi: true },
 };
 const GENERIC_HEBERGEMENT_ITEM = {
   _id: 'property-heb-1', title: 'Villa Meublée', type: 'Villa', status: 'hebergement', price: 40000,
@@ -81,6 +82,10 @@ describe('ListeAnnoncesScreen — découverte Hotel (PHASE-H1.5)', () => {
     expect(await screen.findByText('Mila Hotel')).toBeTruthy();
     expect(screen.getByText('Hôtel')).toBeTruthy();
     expect(screen.queryByText('Hébergement')).toBeNull();
+    expect(screen.getByText('Restaurant')).toBeTruthy();
+    expect(screen.getByText('Bar')).toBeTruthy();
+    expect(screen.getByText('Piscine')).toBeTruthy();
+    expect(screen.getByText('+2')).toBeTruthy();
   });
 
   test('un hébergement générique (non-hôtel) garde le badge "Hébergement" existant', async () => {
@@ -89,6 +94,7 @@ describe('ListeAnnoncesScreen — découverte Hotel (PHASE-H1.5)', () => {
     expect(await screen.findByText('Villa Meublée')).toBeTruthy();
     expect(screen.getByText('Hébergement')).toBeTruthy();
     expect(screen.queryByText('Hôtel')).toBeNull();
+    expect(screen.queryByLabelText('Points forts de l’hôtel')).toBeNull();
   });
 
   test('appuyer sur une carte Hotel navigue vers HotelDetailScreen avec Hotel._id, jamais Property._id', async () => {

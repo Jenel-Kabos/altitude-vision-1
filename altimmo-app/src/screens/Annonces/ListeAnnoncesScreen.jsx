@@ -28,6 +28,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import IllustrationNoAnnonces from '../../components/illustrations/IllustrationNoAnnonces';
 import IllustrationNetworkError from '../../components/illustrations/IllustrationNetworkError';
 import SkeletonPropertyCard from '../../components/ui/SkeletonPropertyCard';
+import HotelHighlights from '../../components/hotel/HotelHighlights';
 
 const PLACEHOLDER_IMG = require('../../../assets/Logo_Altitude_transparent.png');
 
@@ -229,9 +230,10 @@ const AnnonceCard = React.memo(function AnnonceCard({ item, index, onPress, styl
                 <Ionicons name="location-outline" size={12} color={c.textMuted} />
                 <Text style={styles.location} numberOfLines={1}>{addressText}</Text>
               </View>
+              {isHotel && <HotelHighlights hotelServices={item.hotelServices} max={3} style={styles.hotelHighlights} />}
             </View>
 
-            {attrs.length > 0 && (
+            {!isHotel && attrs.length > 0 && (
               <View style={styles.cardAttrs}>
                 {attrs.map((a, i) => (
                   <View key={i} style={styles.cardAttr}>
@@ -968,6 +970,9 @@ const makeStyles = (c) => StyleSheet.create({
     fontSize: fontSize.xs,
     color: c.textMuted,
     flex: 1,
+  },
+  hotelHighlights: {
+    marginTop: spacing.xs,
   },
   cardAttrs: {
     flexDirection: 'row',

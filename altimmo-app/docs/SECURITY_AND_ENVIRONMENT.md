@@ -20,7 +20,7 @@ Variables mobiles attendues:
 - `EXPO_PUBLIC_SENTRY_DSN`
 - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`
 - `EXPO_PUBLIC_WHATSAPP_NUMBER`
-- `GOOGLE_MAPS_API_KEY` (configuration native publique, restreinte au package/bundle)
+- `GOOGLE_MAPS_ANDROID_API_KEY` (configuration native publique, restreinte au package Android et au SHA-1 de signature)
 
 Les valeurs précédemment suivies doivent être révoquées ou renouvelées côté MongoDB,
 JWT, Cloudinary, Zoho, Facebook, Google Maps et tout autre fournisseur concerné.

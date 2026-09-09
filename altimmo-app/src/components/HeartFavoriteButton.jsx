@@ -24,6 +24,7 @@ export default function HeartFavoriteButton({
   size = 22,
   style,
   accessibilityLabel,
+  disabled = false,
 }) {
   // ─── Valeurs partagées ──────────────────────────────────────────
   const heartScale   = useSharedValue(1);
@@ -99,6 +100,7 @@ export default function HeartFavoriteButton({
   };
 
   const handlePress = () => {
+    if (disabled) return;
     const nextLiked = !liked;
     triggerAnimation(nextLiked);
     onPress?.(nextLiked);
@@ -110,8 +112,9 @@ export default function HeartFavoriteButton({
       activeOpacity={0.85}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? (liked ? 'Retirer des favoris' : 'Ajouter aux favoris')}
-      accessibilityState={{ selected: liked }}
-      style={[styles.container, style]}
+      accessibilityState={{ selected: liked, disabled, busy: disabled }}
+      disabled={disabled}
+      style={[styles.container, disabled && styles.disabled, style]}
     >
       {/* Anneau d'expansion */}
       <Animated.View
@@ -149,6 +152,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
   },
+  disabled: { opacity: 0.65 },
   ring: {
     position: 'absolute',
     borderWidth: 2,

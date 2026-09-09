@@ -19,7 +19,7 @@ const router = express.Router();
 
 // Public — liste et fiche hôtel (pages publiques), AVANT auth.protect.
 router.get('/public', ctrl.listPublic);
-router.get('/public/:id', ctrl.getPublic);
+router.get('/public/:id', auth.optionalAuth, ctrl.getPublic);
 // PHASE-H2 — recherche multi-catégories, entièrement publique (même garde
 // de publication que getPublic ci-dessus, jamais un rôle/capacité requis).
 router.get('/public/:hotelId/availability', reservationCtrl.searchPublicAvailability);

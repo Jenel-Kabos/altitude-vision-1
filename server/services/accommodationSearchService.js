@@ -59,6 +59,7 @@ async function searchPublicAccommodations(rawQuery = {}) {
     ...(accommodationType ? { accommodationType } : {}),
   })
     .populate({ path: 'property', match: propertyMatch })
+    .populate({ path: 'hotel', select: '_id hotelServices' })
     .lean();
 
   const visible = accommodations.filter((a) => a.property);
@@ -82,7 +83,8 @@ async function searchPublicAccommodations(rawQuery = {}) {
     accommodationId: a._id,
     // PHASE-H1.5 — même clé que runPropertySearch (propertyController.js)
     // pour un contrat unique côté consommateur, quel que soit le chemin.
-    hotel: a.hotel || null,
+    hotel: a.hotel?._id || a.hotel || null,
+    hotelServices: a.accommodationType === 'hotel' ? (a.hotel?.hotelServices || {}) : undefined,
   }));
 
   return { properties, total, page, limit };

@@ -523,12 +523,19 @@ async function findNearbyPublishedHotels({ hotelId, limit = NEARBY_DEFAULT_LIMIT
   });
 }
 
-function buildPublicHotelDetail(hotel, categoriesWithRates = [], { accommodation = null, reviewSummary = null, faq = [] } = {}) {
+function buildPublicHotelDetail(hotel, categoriesWithRates = [], {
+  accommodation = null, reviewSummary = null, faq = [], viewerId = null,
+} = {}) {
   const property = hotel.property || null;
   const policies = buildNormalizedPolicies(hotel, accommodation);
+  const propertyLikes = Array.isArray(property?.likes) ? property.likes : [];
 
   return {
     id: hotel._id,
+    // Un hôtel reste favorisé via son Property canonique : aucun second
+    // modèle/endpoint Favorite et aucune ambiguïté Hotel._id/Property._id.
+    propertyId: property?._id || null,
+    isFavorite: Boolean(viewerId && propertyLikes.some((id) => String(id?._id || id) === String(viewerId))),
     name: hotel.name,
     brand: hotel.brand || null,
     hotelType: hotel.hotelType ?? null,

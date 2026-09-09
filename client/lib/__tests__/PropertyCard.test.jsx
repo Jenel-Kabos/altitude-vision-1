@@ -44,6 +44,27 @@ describe('PropertyCard — PHASE-HW1 §18 (routage Hotel-backed)', () => {
     expect(screen.getByText('Hôtel')).toBeInTheDocument();
   });
 
+  test('un Hotel affiche au plus trois points forts canoniques et le compteur restant', () => {
+    render(<PropertyCard property={{ ...baseProperty, status: 'hebergement', accommodationType: 'hotel', hotel: 'HOTEL-ID-1', hotelServices: { restaurant: true, bar: true, piscine: true, spa: true, wifi: true } }} />);
+    expect(screen.getByText('Restaurant')).toBeInTheDocument();
+    expect(screen.getByText('Bar')).toBeInTheDocument();
+    expect(screen.getByText('Piscine')).toBeInTheDocument();
+    expect(screen.getByText('+2')).toBeInTheDocument();
+    expect(screen.queryByText('Spa')).not.toBeInTheDocument();
+  });
+
+  test('un Hotel sans point fort ne rend aucune zone vide', () => {
+    render(<PropertyCard property={{ ...baseProperty, status: 'hebergement', accommodationType: 'hotel', hotel: 'HOTEL-ID-1', hotelServices: {} }} />);
+    expect(screen.queryByLabelText('Points forts de l’hôtel')).not.toBeInTheDocument();
+  });
+
+  test('une Vente ne transforme jamais ses commodités en points forts Hotel', () => {
+    render(<PropertyCard property={{ ...baseProperty, status: 'vente', amenities: ['Piscine'], hotelServices: { restaurant: true } }} />);
+    expect(screen.getByText('Piscine')).toBeInTheDocument();
+    expect(screen.queryByText('Restaurant')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Points forts de l’hôtel')).not.toBeInTheDocument();
+  });
+
   test('un hébergement non-hôtel (meublé indépendant) route toujours vers /immobilier/property/:id (non-régression)', () => {
     render(<PropertyCard property={{ ...baseProperty, status: 'hebergement', accommodationType: 'appartement_meuble', hotel: null, accommodation: { rates: [] } }} />);
     const link = screen.getByText('TEST DATA HOUSE').closest('a');

@@ -2,6 +2,7 @@
 // GET /api/hotels/public/:id, canonique pour HotelDetailScreen (mobile).
 const express = require('express');
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const User = require('../models/User');
 const Property = require('../models/Property');
@@ -50,6 +51,7 @@ const makeCategory = (hotel, owner, overrides = {}) => RoomCategory.create({
 const makeRate = (category, owner, overrides = {}) => RatePlan.create({
   roomCategory: category._id, rateType: 'public', amount: 45000, currency: 'XAF', active: true, createdBy: owner._id, ...overrides,
 });
+const signToken = (userId) => jwt.sign({ id: userId, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
 beforeAll(startFinancialMongo);
 afterEach(clearFinancialMongo);
@@ -69,10 +71,31 @@ describe('GET /api/hotels/public/:id — projection normalisée H1', () => {
     expect(detail).toBeTruthy();
 
     expect(detail.id).toBe(String(hotel._id));
+    expect(detail.propertyId).toBe(String(property._id));
+    expect(detail.isFavorite).toBe(false);
     expect(detail.name).toBe(hotel.name);
     expect(detail.hotelType).toBe('hotel');
     expect(detail.starRating).toBe(4);
     expect(detail.description).toBe('Un hôtel confortable en plein centre-ville.');
+  });
+
+  test('l’état favori est calculé pour le visiteur authentifié, isolé par utilisateur', async () => {
+    const owner = await makeUser();
+    const favoriteUser = await makeUser({ role: 'Client' });
+    const otherUser = await makeUser({ role: 'Client' });
+    const property = await makeProperty(owner, { likes: [favoriteUser._id] });
+    const hotel = await makeHotel(property, owner);
+
+    const favoriteResponse = await request(app)
+      .get(`/api/hotels/public/${hotel._id}`)
+      .set('Authorization', `Bearer ${signToken(favoriteUser._id)}`);
+    const otherResponse = await request(app)
+      .get(`/api/hotels/public/${hotel._id}`)
+      .set('Authorization', `Bearer ${signToken(otherUser._id)}`);
+
+    expect(favoriteResponse.body.data.detail.isFavorite).toBe(true);
+    expect(otherResponse.body.data.detail.isFavorite).toBe(false);
+    expect(favoriteResponse.body.data.detail.propertyId).toBe(String(property._id));
   });
 
   test('la galerie de l’hôtel est renvoyée', async () => {

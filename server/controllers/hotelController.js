@@ -193,7 +193,16 @@ exports.getPublic = async (req, res) => {
     // PHASE-H1 — `detail` est additif : `hotel`/`categories` restent
     // inchangés (contrat consommé par HotelBookingScreen, jamais cassé),
     // `detail` est la nouvelle projection normalisée pour HotelDetailScreen.
-    res.json({ status: 'success', data: { hotel, categories: categoriesWithRates, detail: buildPublicHotelDetail(hotel, categoriesWithRates, { accommodation, reviewSummary, faq }) } });
+    res.json({
+      status: 'success',
+      data: {
+        hotel,
+        categories: categoriesWithRates,
+        detail: buildPublicHotelDetail(hotel, categoriesWithRates, {
+          accommodation, reviewSummary, faq, viewerId: req.user?._id || req.user?.id,
+        }),
+      },
+    });
   } catch (error) {
     fail(res, 500, error.message);
   }

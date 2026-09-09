@@ -191,19 +191,23 @@ describe('GET /api/altimmo/search — offerType absent (tous)', () => {
 describe('GET /api/altimmo/search — identité Hotel exposée à la découverte (PHASE-H1.5)', () => {
   test('offerType=tous — un Hotel publié porte accommodationType et hotel (ObjectId Hotel, jamais Property)', async () => {
     const { hotel, property } = await makeAccommodation('hotel', { title: 'Mila Hotel' });
+    await Hotel.findByIdAndUpdate(hotel._id, { hotelServices: { restaurant: true, bar: true, piscine: true } });
     const { data } = await callSearch({});
     const item = data.properties.find((p) => p.title === 'Mila Hotel');
     expect(item.accommodationType).toBe('hotel');
     expect(String(item.hotel)).toBe(String(hotel._id));
     expect(String(item.hotel)).not.toBe(String(property._id));
+    expect(item.hotelServices).toEqual(expect.objectContaining({ restaurant: true, bar: true, piscine: true }));
   });
 
   test('offerType=hebergement — un Hotel publié porte accommodationType et hotel', async () => {
     const { hotel } = await makeAccommodation('hotel', { title: 'Mila Hotel' });
+    await Hotel.findByIdAndUpdate(hotel._id, { hotelServices: { spa: true, wifi: true } });
     const { data } = await callSearch({ offerType: 'hebergement' });
     const item = data.properties.find((p) => p.title === 'Mila Hotel');
     expect(item.accommodationType).toBe('hotel');
     expect(String(item.hotel)).toBe(String(hotel._id));
+    expect(item.hotelServices).toEqual(expect.objectContaining({ spa: true, wifi: true }));
   });
 
   test('un hébergement non-hôtelier ne porte pas de champ hotel', async () => {
@@ -211,6 +215,7 @@ describe('GET /api/altimmo/search — identité Hotel exposée à la découverte
     const { data } = await callSearch({});
     const item = data.properties.find((p) => p.title === 'Villa Ordinaire');
     expect(item.hotel).toBeFalsy();
+    expect(item.hotelServices).toBeUndefined();
   });
 
   test('un Hotel non publié (Accommodation brouillon) est exclu de la découverte, dans les deux branches', async () => {

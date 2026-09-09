@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Calendar, ImageOff, Bed, Bath, Maximize2, MapPin, Home } from 'lucide-react';
 import LikeButton from './likes/LikeButton';
+import HotelHighlights from './HotelHighlights';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL
   ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '')
@@ -178,7 +179,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
                 {property.surface > 0 && <div className="pcard-stat"><div className="pcard-stat-icon"><Maximize2 size={13} color="#C8960C" /></div><strong>{property.surface}</strong> m²</div>}
                 {property.livingRooms > 0 && <div className="pcard-stat"><div className="pcard-stat-icon"><Home size={13} color="#C8960C" /></div><strong>{property.livingRooms}</strong> Salon</div>}
               </div>
-              {amenities.length > 0 && <div className="pcard-tags">{amenities.slice(0, 5).map((a, i) => <span key={i} className="pcard-tag">{a}</span>)}{amenities.length > 5 && <span className="pcard-tag">+{amenities.length - 5}</span>}</div>}
+              {isHotel ? <HotelHighlights hotelServices={property.hotelServices} max={3} className="mb-4" /> : amenities.length > 0 && <div className="pcard-tags">{amenities.slice(0, 5).map((a, i) => <span key={i} className="pcard-tag">{a}</span>)}{amenities.length > 5 && <span className="pcard-tag">+{amenities.length - 5}</span>}</div>}
               <div className="pcard-footer">
                 <div className="pcard-date"><Calendar size={11} />{date}</div>
                 <span className="pcard-cta">Voir le bien</span>
@@ -216,7 +217,7 @@ const PropertyCard = ({ property, index = 0, viewMode = 'grid' }) => {
             {property.bathrooms > 0 && <div className="pcard-stat"><div className="pcard-stat-icon"><Bath size={12} color="#C8960C" /></div><strong>{property.bathrooms}</strong>&nbsp;SDB</div>}
             {property.surface > 0 && <div className="pcard-stat"><div className="pcard-stat-icon"><Maximize2 size={12} color="#C8960C" /></div><strong>{property.surface}</strong>&nbsp;m²</div>}
           </div>
-          {amenities.length > 0 && <div className="pcard-tags">{amenities.slice(0, 3).map((a, i) => <span key={i} className="pcard-tag">{a}</span>)}{amenities.length > 3 && <span className="pcard-tag">+{amenities.length - 3}</span>}</div>}
+          {isHotel ? <HotelHighlights hotelServices={property.hotelServices} max={3} className="mb-4" /> : amenities.length > 0 && <div className="pcard-tags">{amenities.slice(0, 3).map((a, i) => <span key={i} className="pcard-tag">{a}</span>)}{amenities.length > 3 && <span className="pcard-tag">+{amenities.length - 3}</span>}</div>}
           <div className="pcard-footer">
             <div className="pcard-date"><Calendar size={11} />{date}</div>
             <span className="pcard-cta">Voir</span>

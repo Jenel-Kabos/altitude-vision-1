@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import PrixFCFA from './PrixFCFA';
 import { useTheme } from '../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../theme';
+import HotelHighlights from './hotel/HotelHighlights';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -27,7 +28,8 @@ const PropertyCard = React.memo(function PropertyCard({ item, onPress, styles, c
   const statusKey    = item.status?.toLowerCase();
   const isLocation   = statusKey === 'location';
   const isHebergement = statusKey === 'hebergement';
-  const statusLabel  = isHebergement ? 'Hébergement' : isLocation ? 'Location' : 'Vente';
+  const isHotel       = isHebergement && item.accommodationType === 'hotel' && Boolean(item.hotel);
+  const statusLabel  = isHotel ? 'Hôtel' : isHebergement ? 'Hébergement' : isLocation ? 'Location' : 'Vente';
   const statusBadgeStyle = isHebergement ? styles.badgeStatusHeb : isLocation ? styles.badgeStatusLoc : styles.badgeStatusVente;
   const statusTextStyle  = isHebergement ? styles.badgeStatusTextHeb : isLocation ? styles.badgeStatusTextLoc : styles.badgeStatusTextVente;
   const imgUri       = item.images?.[0] || item.photos?.[0] || null;
@@ -85,6 +87,7 @@ const PropertyCard = React.memo(function PropertyCard({ item, onPress, styles, c
           <Ionicons name="location-outline" size={11} color={c.textMuted} />
           <Text style={styles.location} numberOfLines={1}>{locationText}</Text>
         </View>
+        {isHotel && <HotelHighlights hotelServices={item.hotelServices} max={2} style={styles.highlights} />}
         <PrixFCFA montant={item.price} compact style={styles.price} />
       </View>
     </TouchableOpacity>
@@ -296,6 +299,9 @@ const makeStyles = (c) => StyleSheet.create({
     flex: 1,
   },
   price: {
+    marginTop: spacing.xs,
+  },
+  highlights: {
     marginTop: spacing.xs,
   },
 });

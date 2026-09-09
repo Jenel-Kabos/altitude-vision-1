@@ -62,4 +62,13 @@ describe('RecommendedCarousel — contrat de surface image', () => {
     expect(source).toBeTruthy();
     expect(source).not.toEqual(expect.objectContaining({ uri: expect.anything() }));
   });
+
+  test('une carte Hotel compacte limite les points forts à deux et affiche +N', () => {
+    render(<RecommendedCarousel properties={[{ ...BASE_PROPERTY, status: 'hebergement', accommodationType: 'hotel', hotel: 'hotel-1', hotelServices: { restaurant: true, bar: true, piscine: true, wifi: true } }]} />);
+    expect(screen.getByText('Hôtel')).toBeTruthy();
+    expect(screen.getByText('Restaurant')).toBeTruthy();
+    expect(screen.getByText('Bar')).toBeTruthy();
+    expect(screen.getByText('+2')).toBeTruthy();
+    expect(screen.queryByText('Piscine')).toBeNull();
+  });
 });

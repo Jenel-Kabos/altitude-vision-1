@@ -9,6 +9,7 @@ import { MapPin, Star } from "lucide-react";
 import { getPublicHotels } from "../services/hotelService";
 import { VILLES } from "../constants/locations";
 import { formatCurrencyXAF } from "../utils/normalizePropertyDetail";
+import HotelHighlights from "../components/HotelHighlights";
 
 const GOLD = "#C8960C";
 const BLUE = "#2E7BB5";
@@ -59,6 +60,7 @@ const HotelsListingPage = () => {
                   </p>
                 )}
                 {hotel.property?.price && <p className="text-sm text-gray-700 mt-1">À partir de {formatCurrencyXAF(hotel.property.price)}</p>}
+                <HotelHighlights hotelServices={hotel.hotelServices} max={3} className="mt-3" />
               </div>
             </Link>
           ))}

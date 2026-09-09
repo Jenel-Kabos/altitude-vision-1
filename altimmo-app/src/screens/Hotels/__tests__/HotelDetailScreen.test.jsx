@@ -1,7 +1,11 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { Alert, Share } from 'react-native';
 import HotelDetailScreen from '../HotelDetailScreen';
 import { getPublicHotel, getHotelReviews, getNearbyHotels, searchHotelAvailability } from '../../../services/hotelReservationService';
+import api from '../../../services/api';
+
+const mockAuthState = { user: null };
 
 jest.mock('@expo/vector-icons', () => { const ReactActual = require('react'); const RN = require('react-native'); return { Ionicons: (props) => ReactActual.createElement(RN.Text, props, props.name) }; });
 jest.mock('@react-native-async-storage/async-storage', () => require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
@@ -12,6 +16,25 @@ jest.mock('react-native-safe-area-context', () => {
 jest.mock('expo-linear-gradient', () => {
   const RN = require('react-native');
   return { LinearGradient: RN.View };
+});
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: { extra: { googleMapsConfigured: true } } },
+}));
+jest.mock('../../../context/AuthContext', () => ({ useAuth: () => mockAuthState }));
+jest.mock('../../../services/api', () => ({ __esModule: true, default: { post: jest.fn() } }));
+jest.mock('../../../components/HeartFavoriteButton', () => {
+  const ReactActual = require('react');
+  const RN = require('react-native');
+  return function MockHeartFavoriteButton({ liked, onPress, disabled }) {
+    return ReactActual.createElement(RN.TouchableOpacity, {
+      accessibilityRole: 'button',
+      accessibilityLabel: liked ? 'Retirer des favoris' : 'Ajouter aux favoris',
+      accessibilityState: { selected: liked, disabled, busy: disabled },
+      disabled,
+      onPress,
+    });
+  };
 });
 jest.mock('react-native-maps', () => {
   const ReactActual = require('react');
@@ -40,6 +63,8 @@ const navigation = { goBack: jest.fn(), navigate: jest.fn(), replace: jest.fn() 
 
 const fullDetail = {
   id: 'hotel-1',
+  propertyId: 'property-1',
+  isFavorite: false,
   name: 'Altitude Palace',
   brand: 'Altitude Collection',
   hotelType: 'hotel',
@@ -67,6 +92,7 @@ const fullDetail = {
 describe('HotelDetailScreen — Phase H1', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAuthState.user = null;
     getHotelReviews.mockResolvedValue({ reviews: [], pagination: { page: 1, limit: 5, total: 0, pages: 1 } });
     getNearbyHotels.mockResolvedValue([]);
   });
@@ -168,6 +194,76 @@ describe('HotelDetailScreen — Phase H1', () => {
     expect(screen.queryByText('Carte indisponible pour cet établissement.')).toBeNull();
   });
 
+  test('affiche le cœur vide puis l’ajoute via le Property canonique', async () => {
+    mockAuthState.user = { _id: 'user-1' };
+    api.post.mockResolvedValue({ data: { liked: true } });
+    getPublicHotel.mockResolvedValue({ detail: fullDetail });
+    render(<HotelDetailScreen navigation={navigation} route={{ params: { hotelId: 'hotel-1' } }} />);
+
+    const button = await screen.findByLabelText('Ajouter aux favoris');
+    fireEvent.press(button);
+    await waitFor(() => expect(screen.getByLabelText('Retirer des favoris')).toBeTruthy());
+    expect(api.post).toHaveBeenCalledWith('/properties/property-1/like');
+    expect(api.post).not.toHaveBeenCalledWith(expect.stringContaining('hotel-1'));
+  });
+
+  test('initialise un hôtel déjà favori et permet son retrait', async () => {
+    mockAuthState.user = { _id: 'user-1' };
+    api.post.mockResolvedValue({ data: { liked: false } });
+    getPublicHotel.mockResolvedValue({ detail: { ...fullDetail, isFavorite: true } });
+    render(<HotelDetailScreen navigation={navigation} route={{ params: { hotelId: 'hotel-1' } }} />);
+
+    fireEvent.press(await screen.findByLabelText('Retirer des favoris'));
+    await waitFor(() => expect(screen.getByLabelText('Ajouter aux favoris')).toBeTruthy());
+  });
+
+  test('restaure l’état visuel si la mutation favorite échoue', async () => {
+    mockAuthState.user = { _id: 'user-1' };
+    api.post.mockRejectedValue(new Error('network'));
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    getPublicHotel.mockResolvedValue({ detail: fullDetail });
+    render(<HotelDetailScreen navigation={navigation} route={{ params: { hotelId: 'hotel-1' } }} />);
+
+    fireEvent.press(await screen.findByLabelText('Ajouter aux favoris'));
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Erreur', 'Impossible de mettre à jour vos favoris.'));
+    expect(screen.getByLabelText('Ajouter aux favoris')).toBeTruthy();
+  });
+
+  test('redirige vers le Login sans mutation lorsque l’utilisateur est déconnecté', async () => {
+    getPublicHotel.mockResolvedValue({ detail: fullDetail });
+    render(<HotelDetailScreen navigation={navigation} route={{ params: { hotelId: 'hotel-1' } }} />);
+
+    fireEvent.press(await screen.findByLabelText('Ajouter aux favoris'));
+    expect(navigation.navigate).toHaveBeenCalledWith('Login');
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  test('bloque une seconde mutation pendant une requête favorite en cours', async () => {
+    mockAuthState.user = { _id: 'user-1' };
+    let resolveMutation;
+    api.post.mockReturnValue(new Promise((resolve) => { resolveMutation = resolve; }));
+    getPublicHotel.mockResolvedValue({ detail: fullDetail });
+    render(<HotelDetailScreen navigation={navigation} route={{ params: { hotelId: 'hotel-1' } }} />);
+
+    const button = await screen.findByLabelText('Ajouter aux favoris');
+    fireEvent.press(button);
+    fireEvent.press(button);
+    expect(api.post).toHaveBeenCalledTimes(1);
+    resolveMutation({ data: { liked: true } });
+    await waitFor(() => expect(screen.getByLabelText('Retirer des favoris')).toBeTruthy());
+  });
+
+  test('préserve les actions retour et partage de la galerie', async () => {
+    jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    getPublicHotel.mockResolvedValue({ detail: fullDetail });
+    render(<HotelDetailScreen navigation={navigation} route={{ params: { hotelId: 'hotel-1' } }} />);
+
+    fireEvent.press(await screen.findByLabelText('Retour'));
+    fireEvent.press(screen.getByLabelText('Partager cet hôtel'));
+    expect(navigation.goBack).toHaveBeenCalled();
+    expect(Share.share).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('Altitude Palace') }));
+  });
+
   test('hôtel introuvable (404) affiche un message dédié et un retour', async () => {
     getPublicHotel.mockRejectedValue({ response: { status: 404 } });
     render(<HotelDetailScreen navigation={navigation} route={{ params: { hotelId: 'hotel-1' } }} />);
@@ -194,6 +290,7 @@ describe('HotelDetailScreen — Phase H1', () => {
 describe('HotelDetailScreen — Phase H2 (recherche + disponibilité en direct)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAuthState.user = null;
     getPublicHotel.mockResolvedValue({ detail: fullDetail });
     getHotelReviews.mockResolvedValue({ reviews: [], pagination: { page: 1, limit: 5, total: 0, pages: 1 } });
     getNearbyHotels.mockResolvedValue([]);

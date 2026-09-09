@@ -1,6 +1,15 @@
 const navigationRegistry = require('../shared/navigation/registry.json');
 const { URL } = require('url');
 
+const googleMapsAndroidApiKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY?.trim();
+
+// EAS must never produce an Android binary that can mount Google Maps without
+// the native manifest key. Local config inspection remains possible without a
+// secret; the UI then uses its explicit address-only fallback.
+if (process.env.EAS_BUILD === 'true' && process.env.EAS_BUILD_PLATFORM === 'android' && !googleMapsAndroidApiKey) {
+  throw new Error('GOOGLE_MAPS_ANDROID_API_KEY is required for EAS Android builds.');
+}
+
 const universalLinkPrefixes = [...new Set(navigationRegistry.destinations
   .map((destination) => destination.universalLink?.split('/:')[0])
   .filter(Boolean))];
@@ -53,11 +62,9 @@ module.exports = {
         backgroundColor: '#0A0A0A',
       },
 
-      config: {
-        googleMaps: {
-          apiKey: process.env.GOOGLE_MAPS_API_KEY,
-        },
-      },
+      config: googleMapsAndroidApiKey
+        ? { googleMaps: { apiKey: googleMapsAndroidApiKey } }
+        : {},
 
       intentFilters: [
         {
@@ -108,6 +115,7 @@ module.exports = {
     ],
 
     extra: {
+      googleMapsConfigured: Boolean(googleMapsAndroidApiKey),
       eas: {
         projectId: '20e7342e-6723-404c-bd44-66ef60758a19',
       },

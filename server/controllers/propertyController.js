@@ -79,6 +79,37 @@ async function assertPropertyTenantAccess(req, res, property) {
   }
 }
 
+async function decoratePublicHotelProperties(properties, { requirePublishedAccommodation = true } = {}) {
+  const propertyIds = properties.filter((property) => property?.status === 'hebergement').map((property) => property._id);
+  if (propertyIds.length === 0) return properties;
+  const accommodations = await Accommodation.find({
+    property: { $in: propertyIds },
+    ...(requirePublishedAccommodation ? { publicationStatus: 'publie' } : {}),
+  }).select('property accommodationType hotel').lean();
+  const hotelIds = accommodations
+    .filter((accommodation) => accommodation.accommodationType === 'hotel' && accommodation.hotel)
+    .map((accommodation) => accommodation.hotel);
+  const hotels = hotelIds.length
+    ? await Hotel.find({ _id: { $in: hotelIds } }).select('_id hotelServices').lean()
+    : [];
+  const hotelById = new Map(hotels.map((hotel) => [String(hotel._id), hotel]));
+  const byProperty = new Map(accommodations.map((accommodation) => [String(accommodation.property), accommodation]));
+  return properties
+    .filter((property) => property.status !== 'hebergement' || byProperty.has(String(property._id)))
+    .map((property) => {
+      if (property.status !== 'hebergement') return property;
+      const accommodation = byProperty.get(String(property._id));
+      const hotel = accommodation?.hotel ? hotelById.get(String(accommodation.hotel)) : null;
+      const plain = property.toObject ? property.toObject() : property;
+      return {
+        ...plain,
+        accommodationType: accommodation?.accommodationType || null,
+        hotel: accommodation?.hotel || null,
+        hotelServices: accommodation?.accommodationType === 'hotel' ? (hotel?.hotelServices || {}) : undefined,
+      };
+    });
+}
+
 /**
  * Projection publique de SaleManagement — jamais le document complet côté
  * public (GET /api/properties/:id utilise `optionalAuth`, donc accessible
@@ -496,25 +527,7 @@ async function runPropertySearch({ query, isAdmin, tenantId = null }) {
   if (!isAdmin) {
     const hebergementIds = properties.filter((p) => p.status === 'hebergement').map((p) => p._id);
     if (hebergementIds.length > 0) {
-      const published = await Accommodation.find({
-        property: { $in: hebergementIds }, publicationStatus: 'publie',
-      }).select('property accommodationType hotel').lean();
-      const publishedByProperty = new Map(published.map((a) => [String(a.property), a]));
-      properties = properties
-        .filter((p) => p.status !== 'hebergement' || publishedByProperty.has(String(p._id)))
-        .map((p) => {
-          // PHASE-H1.5 — mêmes clés que searchPublicAccommodations
-          // (accommodationType/hotel) pour que le consommateur (discovery
-          // mobile) distingue un établissement hôtelier sans requête
-          // supplémentaire, quel que soit le chemin (`tous` ici, ou
-          // `hebergement` via l'autre branche) — jamais deux contrats
-          // différents pour la même donnée.
-          if (p.status !== 'hebergement') return p;
-          const accommodation = publishedByProperty.get(String(p._id));
-          if (!accommodation) return p;
-          const plain = p.toObject ? p.toObject() : p;
-          return { ...plain, accommodationType: accommodation.accommodationType || null, hotel: accommodation.hotel || null };
-        });
+      properties = await decoratePublicHotelProperties(properties);
     }
   }
 
@@ -1190,6 +1203,8 @@ const getRecommendedProperties = asyncHandler(async (req, res) => {
       .limit(10);
     isFallback = true;
   }
+
+  properties = await decoratePublicHotelProperties(properties);
 
   res.status(200).json({
     status: 'success',

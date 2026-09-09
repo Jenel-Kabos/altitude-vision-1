@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Screen from '../../components/Screen';
 import Button from '../../components/Button';
@@ -13,24 +13,15 @@ import HotelReviewsSection from '../../components/hotel/HotelReviewsSection';
 import HotelFaqAccordion from '../../components/hotel/HotelFaqAccordion';
 import HotelNearbySection from '../../components/hotel/HotelNearbySection';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
 import { fonts, fontSize, radius, spacing } from '../../theme';
 import { getPublicHotel, getHotelReviews, getNearbyHotels, searchHotelAvailability } from '../../services/hotelReservationService';
+import { HOTEL_HIGHLIGHT_DEFINITIONS } from '../../constants/hotel';
 
 // PHASE-H1 — icônes/étiquettes des points forts déterministes uniquement,
 // dérivées de Hotel.hotelServices (jamais un highlight inventé si le champ
 // est absent/false — voir HOTEL_DETAIL_H1_REPORT.md §9).
-const HIGHLIGHT_DEFINITIONS = [
-  { key: 'restaurant', icon: 'restaurant-outline', label: 'Restaurant' },
-  { key: 'bar', icon: 'wine-outline', label: 'Bar' },
-  { key: 'piscine', icon: 'water-outline', label: 'Piscine' },
-  { key: 'spa', icon: 'flower-outline', label: 'Spa' },
-  { key: 'salleSport', icon: 'barbell-outline', label: 'Salle de sport' },
-  { key: 'salleConference', icon: 'business-outline', label: 'Salle de conférence' },
-  { key: 'navette', icon: 'bus-outline', label: 'Navette' },
-  { key: 'parking', icon: 'car-outline', label: 'Parking' },
-  { key: 'reception24h', icon: 'time-outline', label: 'Réception 24h/24' },
-  { key: 'wifi', icon: 'wifi-outline', label: 'Wi-Fi' },
-];
 // PHASE-H3 — clés normalisées par buildNormalizedPolicies (server/services/
 // hotelService.js) : checkIn/checkOut remplacent checkInTime/checkOutTime,
 // et smoking/deposit/paymentMethods/minimumAge s'ajoutent (précédence
@@ -60,9 +51,13 @@ const SECTION_NAV = [
 export default function HotelDetailScreen({ route, navigation }) {
   const { hotelId } = route.params || {};
   const { themeColors: c } = useTheme();
+  const { user } = useAuth();
   const styles = useMemo(() => makeStyles(c), [c]);
 
   const [state, setState] = useState({ loading: true, error: null, hotel: null });
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoritePending, setFavoritePending] = useState(false);
+  const favoritePendingRef = useRef(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [amenitiesExpanded, setAmenitiesExpanded] = useState(false);
 
@@ -165,6 +160,7 @@ export default function HotelDetailScreen({ route, navigation }) {
     try {
       const data = await getPublicHotel(hotelId);
       if (!data?.detail) { setState({ loading: false, error: 'NOT_FOUND', hotel: null }); return; }
+      setIsFavorite(Boolean(data.detail.isFavorite));
       setState({ loading: false, error: null, hotel: data.detail });
     } catch (error) {
       const status = error?.response?.status;
@@ -178,6 +174,30 @@ export default function HotelDetailScreen({ route, navigation }) {
     if (!state.hotel) return;
     Share.share({ message: `${state.hotel.name} — découvert sur Altitude Vision` }).catch(() => {});
   }, [state.hotel]);
+
+  const toggleFavorite = useCallback(async () => {
+    if (!user) {
+      navigation.navigate('Login');
+      return;
+    }
+    const propertyId = state.hotel?.propertyId;
+    if (!propertyId || favoritePendingRef.current) return;
+
+    favoritePendingRef.current = true;
+    setFavoritePending(true);
+    const previous = isFavorite;
+    setIsFavorite(!previous);
+    try {
+      const response = await api.post(`/properties/${propertyId}/like`);
+      setIsFavorite(Boolean(response.data?.liked));
+    } catch {
+      setIsFavorite(previous);
+      Alert.alert('Erreur', 'Impossible de mettre à jour vos favoris.');
+    } finally {
+      favoritePendingRef.current = false;
+      setFavoritePending(false);
+    }
+  }, [isFavorite, navigation, state.hotel?.propertyId, user]);
 
   const goToBooking = useCallback(() => {
     navigation.navigate('HotelBooking', { hotelId });
@@ -208,7 +228,7 @@ export default function HotelDetailScreen({ route, navigation }) {
   }
 
   const hotel = state.hotel;
-  const activeHighlights = HIGHLIGHT_DEFINITIONS.filter((def) => hotel.amenities?.hotelServices?.[def.key]);
+  const activeHighlights = HOTEL_HIGHLIGHT_DEFINITIONS.filter((def) => hotel.amenities?.hotelServices?.[def.key]);
   const structuredAmenities = Object.entries(AMENITY_CATEGORY_LABELS)
     .flatMap(([key, label]) => (hotel.roomCategories?.[0]?.amenities?.[key] || []).map((item) => ({ label, item })));
   // Les points forts (Highlights, dérivés de hotelServices) sont déjà
@@ -236,7 +256,14 @@ export default function HotelDetailScreen({ route, navigation }) {
   return (
     <View style={styles.root}>
       <Screen ref={scrollRef} scroll style={styles.scrollContent}>
-        <HotelHeroGallery images={hotel.gallery} onBack={() => navigation.goBack()} onShare={share} />
+        <HotelHeroGallery
+          images={hotel.gallery}
+          onBack={() => navigation.goBack()}
+          onShare={share}
+          isFavorite={isFavorite}
+          onFavorite={toggleFavorite}
+          favoritePending={favoritePending}
+        />
 
         {/* PHASE-H3 — navigation de section (ancres présentes uniquement) */}
         <View style={styles.sectionNavBar}>
