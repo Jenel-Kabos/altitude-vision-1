@@ -8,7 +8,6 @@ import { usePlatformTenantRuntime } from '@/lib/context/PlatformTenantRuntimeCon
 import AdminDashboard from "@/lib/pages/dashboard/AdminDashboard";
 import { Loader2 } from 'lucide-react';
 import { isPlatformScopedDashboardRoute } from '@/lib/navigation/dashboardRouteScope';
-import './dashboard.css';
 
 const ALLOWED_ROLES = [
   'Admin',

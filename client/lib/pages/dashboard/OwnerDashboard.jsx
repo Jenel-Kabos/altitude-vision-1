@@ -134,7 +134,7 @@ const OwnerDashboard = ({ children }) => {
   }, [sidebarOpen]);
 
   return (
-    <div className="flex min-h-screen" style={{ background: '#F1F5F9' }}>
+    <div className="dashboard-shell owner-workspace-shell flex min-h-screen">
 
       {/* Overlay mobile */}
       {sidebarOpen && (
@@ -269,7 +269,7 @@ const OwnerDashboard = ({ children }) => {
           horizontalement à 390px (bug réel reproduit dans le navigateur),
           jamais le formulaire seul. Correctif structurel au niveau du shell,
           bénéficie à tout contenu futur, pas seulement à ce formulaire. */}
-      <main className="flex-1 flex flex-col min-h-screen min-w-0">
+      <main className="dashboard-content flex-1 flex flex-col min-h-screen min-w-0">
 
         {/* Topbar mobile */}
         <div className="md:hidden grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2 px-3 py-2 bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
@@ -288,7 +288,7 @@ const OwnerDashboard = ({ children }) => {
           <div className="w-11" aria-hidden="true" />
         </div>
 
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+        <div className="dashboard-content-inner flex-1 p-4 md:p-6 overflow-y-auto">
           {children}
         </div>
       </main>

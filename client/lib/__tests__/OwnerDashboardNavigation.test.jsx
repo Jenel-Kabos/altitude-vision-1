@@ -46,6 +46,15 @@ describe('Navigation propriétaire', () => {
     await waitFor(() => expect(getOwnerVisitesUnreadCount).toHaveBeenCalled());
   });
 
+  test('monte le contrat visuel partagé sur le shell et son contenu', () => {
+    getOwnerVisitesUnreadCount.mockResolvedValue(0);
+    const { container } = render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
+
+    expect(container.firstChild).toHaveClass('dashboard-shell', 'owner-workspace-shell');
+    expect(container.querySelector('main')).toHaveClass('dashboard-content');
+    expect(screen.getByText('CONTENU PROPRIETAIRE').parentElement).toHaveClass('dashboard-content-inner');
+  });
+
   test('un utilisateur portant les deux profils voit un seul contexte à la fois et peut basculer explicitement', async () => {
     getOwnerVisitesUnreadCount.mockResolvedValue(0);
     render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);

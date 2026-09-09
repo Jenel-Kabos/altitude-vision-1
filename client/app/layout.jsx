@@ -1,4 +1,5 @@
 import "./globals.css";
+import "./dashboard/dashboard.css";
 import { Cinzel, Cormorant_Garamond, DM_Sans } from 'next/font/google';
 import AppProviders from "./AppProviders";
 import ClientLayout from "./ClientLayout";

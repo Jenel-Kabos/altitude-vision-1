@@ -183,3 +183,36 @@
   .dashboard-page, .dashboard-content-inner > * { animation: none !important; }
   .dashboard-card:hover { transform: none; }
 }
+
+/* Shared light workspace contract. DashboardUI is consumed by both the staff
+   dashboard and the owner routes; owner routes must not inherit the public
+   site's dark body palette or the OS dark preference. */
+.owner-workspace-shell {
+  --db-bg: #faf8f5;
+  --db-surface: rgba(255, 255, 255, 0.96);
+  --db-surface-solid: #ffffff;
+  --db-surface-soft: #f5f2ed;
+  --db-surface-raised: #ffffff;
+  --db-surface-input: #ffffff;
+  --db-text: #2a241d;
+  --db-muted: #5f574e;
+  --db-faint: #7b7166;
+  --db-focus: #2e7bb5;
+  --db-border: rgba(42, 36, 29, 0.13);
+  --db-shadow: 0 8px 24px rgba(42, 36, 29, 0.07);
+  --db-shadow-hover: 0 14px 34px rgba(42, 36, 29, 0.11);
+  color: var(--db-text);
+  background: var(--db-bg);
+  color-scheme: light;
+}
+
+.owner-workspace-shell .dashboard-content-inner { padding-bottom: 3rem; }
+.owner-workspace-shell .dashboard-card { background: var(--db-surface-solid); }
+.owner-workspace-shell .dashboard-page-header .dashboard-eyebrow { color: #1a5a8a; }
+.owner-workspace-shell :where(.dashboard-toolbar, .dashboard-card, .dashboard-state, .dashboard-table-container) :where(h1, h2, h3, h4) {
+  color: var(--db-text);
+}
+
+@media (max-width: 479px) {
+  .owner-workspace-shell .dashboard-kpi-grid { grid-template-columns: minmax(0, 1fr); }
+}
