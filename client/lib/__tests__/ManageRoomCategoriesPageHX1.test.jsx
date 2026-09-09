@@ -5,7 +5,7 @@ import {
   getRoomCategories, updateRoomCategory, uploadRoomCategoryGallery,
 } from '../services/hotelService';
 
-vi.mock('next/navigation', () => ({ useParams: () => ({ hotelId: 'hotel-1' }) }));
+vi.mock('next/navigation', () => ({ useParams: () => ({ hotelId: 'hotel-1' }), usePathname: () => '/dashboard/hotels/hotel-1/room-categories' }));
 vi.mock('next/link', () => ({ default: ({ children, href }) => <a href={href}>{children}</a> }));
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../services/hotelService', () => ({

@@ -4,7 +4,7 @@
 // hôtel (Standard/Deluxe/Suite…) — jamais de chambre physique individuelle.
 
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import {
@@ -93,6 +93,13 @@ const RoomGalleryEditor = ({ categoryId, gallery, onChange }) => {
 const ManageRoomCategoriesPage = () => {
   const params = useParams();
   const hotelId = params?.hotelId;
+  // Cette page est montée sous deux namespaces (`/dashboard/hotels/[hotelId]`
+  // et `/mes-hotels/[hotelId]`). Les liens sortants doivent rester dans le
+  // namespace courant : un Proprietaire poussé vers `/dashboard/hotels/...`
+  // est retombé sur `/mes-biens` via getPostAuthDestination (voir bug
+  // HOTEL-ROOM-CATEGORY-RATES-NAV-1).
+  const pathname = usePathname();
+  const hotelBasePath = pathname?.startsWith('/mes-hotels/') ? `/mes-hotels/${hotelId}` : `/dashboard/hotels/${hotelId}`;
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -200,7 +207,7 @@ const ManageRoomCategoriesPage = () => {
   return (
     <DashboardPage>
       <DashboardPageHeader icon={Layers3} title="Catégories de chambres" description="Structurez les capacités et caractéristiques des chambres."
-        actions={<Link href={`/dashboard/hotels/${hotelId}`} className="text-sm text-blue-600 underline">← Retour à l'établissement</Link>} />
+        actions={<Link href={hotelBasePath} className="text-sm text-blue-600 underline">← Retour à l'établissement</Link>} />
 
       {!creating && (
         <button onClick={() => setCreating(true)} className="mb-4 bg-gold text-white px-3 py-1.5 rounded text-sm">
@@ -320,7 +327,7 @@ const ManageRoomCategoriesPage = () => {
                 </div>
                 <div className="flex flex-wrap gap-2 mt-3">
                   <button onClick={() => startEdit(cat)} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Modifier</button>
-                  <Link href={`/dashboard/hotels/${hotelId}/rates?category=${cat._id}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Tarifs</Link>
+                  <Link href={`${hotelBasePath}/rates?category=${cat._id}`} className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm">Tarifs</Link>
                   <button onClick={() => handleDuplicate(cat._id)} className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded text-sm">Dupliquer</button>
                   <button onClick={() => handleToggleStatus(cat)} className={`px-3 py-1.5 rounded text-sm text-white ${cat.status === 'actif' ? 'bg-gray-600' : 'bg-green-600'}`}>
                     {cat.status === 'actif' ? 'Désactiver' : 'Activer'}
