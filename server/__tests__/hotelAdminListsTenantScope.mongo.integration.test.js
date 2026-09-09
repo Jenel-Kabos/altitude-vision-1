@@ -8,7 +8,9 @@ const User = require('../models/User');
 const Property = require('../models/Property');
 const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
+const RatePlan = require('../models/RatePlan');
 const routes = require('../routes/hotelRoutes');
+const propertyRoutes = require('../routes/propertyRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 
 jest.setTimeout(180000);
@@ -16,6 +18,7 @@ jest.setTimeout(180000);
 const app = express();
 app.use(express.json());
 app.use('/api/hotels', routes);
+app.use('/api/properties', propertyRoutes);
 app.use(errorHandler);
 
 const bearer = (user, tenant) => ({
@@ -33,6 +36,7 @@ let operator;
 let operatorNoRead;
 let proprietor;
 let client;
+let ownerA;
 let hotelsA;
 let hotelsB;
 
@@ -84,7 +88,7 @@ beforeAll(async () => {
   ({ user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } }));
   ({ user: staffA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Collaborateur' } }));
   ({ user: staffB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Collaborateur' } }));
-  const ownerA = (await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Proprietaire' } })).user;
+  ownerA = (await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Proprietaire' } })).user;
   const ownerB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Proprietaire' } })).user;
   proprietor = await User.create({ name: 'HZ06 Owner', email: 'hz06-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   client = await User.create({ name: 'HZ06 Client', email: 'hz06-client@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
@@ -203,7 +207,9 @@ test('PII, tarifs et inventaire privé B ne fuient pas vers Admin A', async () =
     expect(serialized).not.toContain('HZ06 Hotel B');
     expect(serialized).not.toContain('hz06-b');
     expect(serialized).not.toContain('+242777777777');
-    expect(serialized).not.toContain('778');
+    expect(response.body.data.hotels).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ minNightlyRate: 778 }),
+    ]));
   }
 });
 
@@ -222,4 +228,95 @@ test('les trois GET restent strictement read-only', async () => {
   }
   expect(await Hotel.find().sort({ _id: 1 }).lean()).toEqual(beforeHotels);
   expect(await Property.find().sort({ _id: 1 }).lean()).toEqual(beforeProperties);
+});
+
+test('un hôtel publié modifié via sa Property propriétaire rejoint la file hôtelière sans duplication', async () => {
+  const originalHotel = hotelsA[1];
+  const originalProperty = await Property.findById(originalHotel.property);
+  const category = await RoomCategory.findOne({ hotel: originalHotel._id });
+  await Promise.all([
+    Property.updateOne({ _id: originalProperty._id }, {
+      $set: {
+        status: 'hebergement',
+        images: ['https://example.test/1.jpg', 'https://example.test/2.jpg', 'https://example.test/3.jpg'],
+      },
+    }),
+    Hotel.updateOne({ _id: originalHotel._id }, {
+      $set: {
+        description: 'Description complète de l’hôtel publié.',
+        phone: '+242060000000',
+        'hotelServices.wifi': true,
+      },
+    }),
+    RatePlan.create({ roomCategory: category._id, rateType: 'public', amount: 35000, currency: 'XAF', active: true, createdBy: ownerA._id }),
+  ]);
+
+  const publicBefore = await request(app).get('/api/hotels/public');
+  expect(hotelIds(publicBefore)).toContain(String(originalHotel._id));
+
+  const edit = await request(app)
+    .put(`/api/properties/${originalProperty._id}`)
+    .set(bearer(ownerA, tenantA))
+    .send({ description: 'Description hôtelière modifiée par le propriétaire.' });
+
+  expect(edit.status).toBe(200);
+  const [propertyAfterEdit, hotelAfterEdit] = await Promise.all([
+    Property.findById(originalProperty._id),
+    Hotel.findById(originalHotel._id),
+  ]);
+  expect(propertyAfterEdit.statusAdmin).toBe('En attente');
+  expect(propertyAfterEdit.isPublished).toBe(false);
+  expect(hotelAfterEdit.publicationStatus).toBe('soumis');
+  expect(String(hotelAfterEdit.property)).toBe(String(originalProperty._id));
+
+  const ownerProperties = await request(app).get('/api/properties/my-properties').set(bearer(ownerA, tenantA));
+  const ownerProjection = ownerProperties.body.data.properties.find((item) => String(item._id) === String(originalProperty._id));
+  expect(ownerProjection.statusAdmin).toBe('En attente');
+  expect(hotelIds(await request(app).get('/api/hotels/public'))).not.toContain(String(originalHotel._id));
+
+  const pending = await request(app).get('/api/hotels/status/pending').set(bearer(operator));
+  expect(pending.status).toBe(200);
+  expect(hotelIds(pending)).toContain(String(originalHotel._id));
+  expect(hotelIds(await request(app).get('/api/hotels/status/pending').set(bearer(operator, tenantA)))).toContain(String(originalHotel._id));
+  expect(hotelIds(await request(app).get('/api/hotels/status/pending').set(bearer(operator, tenantB)))).not.toContain(String(originalHotel._id));
+  expect((await request(app).patch(`/api/hotels/${originalHotel._id}/validate`).set(bearer(ownerA, tenantA))).status).toBe(403);
+
+  const approve = await request(app).patch(`/api/hotels/${originalHotel._id}/validate`).set(bearer(operator));
+  expect(approve.status).toBe(200);
+  const [approvedProperty, approvedHotel] = await Promise.all([
+    Property.findById(originalProperty._id), Hotel.findById(originalHotel._id),
+  ]);
+  expect(approvedProperty).toMatchObject({ statusAdmin: 'Validée', isPublished: true });
+  expect(approvedHotel.publicationStatus).toBe('publie');
+  expect(hotelIds(await request(app).get('/api/hotels/public'))).toContain(String(originalHotel._id));
+  expect(await Hotel.countDocuments({ property: originalProperty._id })).toBe(1);
+  expect(await Property.countDocuments({ _id: originalProperty._id })).toBe(1);
+  expect((await Hotel.findById(hotelsB[1]._id)).publicationStatus).toBe('publie');
+});
+
+test('le rejet d’une revalidation conserve les identifiants et maintient l’hôtel hors du public', async () => {
+  const originalHotel = hotelsA[1];
+  const originalPropertyId = originalHotel.property;
+  expect((await request(app)
+    .put(`/api/properties/${originalPropertyId}`)
+    .set(bearer(ownerA, tenantA))
+    .send({ description: 'Nouvelle description à rejeter.' })).status).toBe(200);
+
+  const reject = await request(app)
+    .patch(`/api/hotels/${originalHotel._id}/reject`)
+    .set(bearer(operator))
+    .send({ reason: 'Informations insuffisamment justifiées.' });
+  expect(reject.status).toBe(200);
+
+  const [property, hotel] = await Promise.all([
+    Property.findById(originalPropertyId), Hotel.findById(originalHotel._id),
+  ]);
+  expect(property).toMatchObject({ statusAdmin: 'Rejetée', isPublished: false });
+  expect(hotel).toMatchObject({ publicationStatus: 'rejete', rejectionReason: 'Informations insuffisamment justifiées.' });
+  expect(String(hotel._id)).toBe(String(originalHotel._id));
+  expect(String(hotel.property)).toBe(String(originalPropertyId));
+  expect(hotelIds(await request(app).get('/api/hotels/public'))).not.toContain(String(originalHotel._id));
+  expect(hotelIds(await request(app).get('/api/hotels/status/pending').set(bearer(operator)))).not.toContain(String(originalHotel._id));
+  expect(await Hotel.countDocuments({ property: originalPropertyId })).toBe(1);
+  expect(await Property.countDocuments({ _id: originalPropertyId })).toBe(1);
 });

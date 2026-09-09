@@ -13,6 +13,7 @@ const Hotel = require('../models/Hotel');
 const RatePlan = require('../models/RatePlan');
 const { isPubliclyVisible } = require('../services/accommodationService');
 const { buildPropertyMongoFilter } = require('../services/propertyFilterService');
+const { updateOwnerPropertyAndQueueLinkedHotel } = require('../services/hotelRepublishModerationService');
 // Sprint A (séparation Vente/Location) — fiches satellites embarquées dans
 // GET /api/properties/:id pour le préremplissage d'édition
 // (SalePropertyForm/RentalPropertyForm), même convention que `accommodation`.
@@ -942,11 +943,20 @@ const updateProperty = asyncHandler(async (req, res) => {
     };
   }
 
-  const updatedProperty = await Property.findByIdAndUpdate(
-    req.params.id,
-    updateData,
-    { new: true, runValidators: true }
-  );
+  const linkedPublishedHotel = !isAdmin
+    ? await Hotel.exists({ property: property._id, publicationStatus: 'publie' })
+    : null;
+  const updatedProperty = isAdmin || !linkedPublishedHotel
+    ? await Property.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true },
+    )
+    : (await updateOwnerPropertyAndQueueLinkedHotel({
+      propertyId: property._id,
+      updateData,
+      actorId: req.user.id,
+    })).property;
 
   res.status(200).json({
     status: 'success',
