@@ -10,13 +10,17 @@
 const mongoose = require('mongoose');
 const RoomCategory = require('../models/RoomCategory');
 const RatePlan = require('../models/RatePlan');
+const Room = require('../models/Room');
+const RoomInventory = require('../models/RoomInventory');
+const HotelReservation = require('../models/HotelReservation');
 const { assertOperationalHotelAccess } = require('../services/hotel/hotelAccessScopeService');
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 const { syncFutureTotalUnits } = require('../services/hotel/hotelInventoryProfessionalService');
 const { uploadFilesToCloudinary } = require('../services/propertyPublicationInputService');
+const { getHotelRoomCapacityConsistency } = require('../services/hotel/roomCapacityConsistencyService');
 
-const fail = (res, statusCode, message) =>
-  res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
+const fail = (res, statusCode, message, code) =>
+  res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...(code ? { code } : {}) });
 
 // F2.6.1 : les catégories de chambres sont hôtelières (RoomCategory.hotel) — même scope central
 // que les chambres (pas de capacité dédiée, réutilise hotel.room.view/manage, mission §5/§10).
@@ -50,11 +54,14 @@ exports.list = async (req, res) => {
       if (!ratesByCategory.has(key)) ratesByCategory.set(key, []);
       ratesByCategory.get(key).push(rate);
     });
+    const consistency = await getHotelRoomCapacityConsistency(req.params.hotelId);
+    const capacityByCategory = new Map(consistency.categories.map((item) => [String(item.roomCategoryId), item]));
     const withRates = categories.map((cat) => ({
       ...cat.toObject(),
       rates: ratesByCategory.get(String(cat._id)) || [],
+      capacityConsistency: capacityByCategory.get(String(cat._id)),
     }));
-    res.json({ status: 'success', data: { categories: withRates } });
+    res.json({ status: 'success', data: { categories: withRates, capacitySummary: consistency } });
   } catch (error) {
     fail(res, 500, error.message);
   }
@@ -103,6 +110,16 @@ exports.update = async (req, res) => {
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
     const previousUnitsAvailable = category.unitsAvailable;
+    if (req.body.unitsAvailable !== undefined && Number(req.body.unitsAvailable) < previousUnitsAvailable) {
+      const proposed = Number(req.body.unitsAvailable);
+      const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+      const [physicalRooms, reservedInventory] = await Promise.all([
+        Room.countDocuments({ roomCategory: category._id, active: true }),
+        RoomInventory.findOne({ roomCategory: category._id, date: { $gte: today }, reservedUnits: { $gt: proposed } }),
+      ]);
+      if (proposed < physicalRooms) return fail(res, 409, `La capacité commerciale ne peut pas être inférieure aux ${physicalRooms} chambres physiques actives.`, 'CATEGORY_CAPACITY_BELOW_PHYSICAL_ROOMS');
+      if (reservedInventory) return fail(res, 409, 'La capacité proposée est inférieure au stock déjà réservé sur une date future.', 'CATEGORY_CAPACITY_BELOW_RESERVED_INVENTORY');
+    }
     const ALLOWED = ['name', 'description', 'capacity', 'beds', 'surface', 'unitsAvailable', 'amenities', 'gallery', 'status'];
     ALLOWED.forEach((key) => { if (req.body[key] !== undefined) category[key] = req.body[key]; });
     category.updatedBy = req.user.id;
@@ -158,9 +175,20 @@ exports.remove = async (req, res) => {
     if (error === 404) return fail(res, 404, 'Hôtel introuvable.');
     if (error === 403) return fail(res, 403, "Vous ne pouvez gérer que vos propres hôtels.");
 
+    const [rooms, reservations, inventory] = await Promise.all([
+      Room.countDocuments({ roomCategory: category._id }),
+      HotelReservation.countDocuments({ roomCategory: category._id }),
+      RoomInventory.countDocuments({ roomCategory: category._id }),
+    ]);
+    if (rooms || reservations || inventory) {
+      category.status = 'inactif';
+      category.updatedBy = req.user.id;
+      await category.save();
+      return res.json({ status: 'success', data: { category, archived: true, references: { rooms, reservations, inventory } } });
+    }
     await RatePlan.deleteMany({ roomCategory: category._id });
     await RoomCategory.findByIdAndDelete(category._id);
-    res.json({ status: 'success', data: {} });
+    res.json({ status: 'success', data: { archived: false } });
   } catch (error) {
     fail(res, 500, error.message);
   }

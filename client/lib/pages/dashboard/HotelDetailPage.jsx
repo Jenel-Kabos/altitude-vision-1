@@ -71,8 +71,15 @@ const HotelDetailPage = () => {
     return `/dashboard/${operation === 'finance' ? 'hotel-finance' : operation}?hotelId=${hotelId}`;
   };
   const reservationsHref = ownerMode ? `/mes-hotels/reservations?hotelId=${hotelId}` : `/dashboard/hotel-reservations?hotelId=${hotelId}`;
+  const physicalRooms = kpis.physicalRooms || 0;
+  const categoryCapacity = kpis.categoryCapacity || 0;
+  const occupancyDetail = categoryCapacity !== physicalRooms
+    ? `${physicalRooms} chambre(s) physique(s) · ${categoryCapacity} unité(s) commerciale(s) configurée(s)`
+    : kpis.outOfServiceRooms
+      ? `${kpis.outOfServiceRooms} chambre(s) hors service exclue(s)`
+      : undefined;
   const todayCards = [
-    { label: 'Occupation', value: `${kpis.occupiedRooms || 0}/${kpis.totalRooms || 0}`, Icon: BedDouble, href: operationPath('rooms') },
+    { label: 'Occupation', value: `${kpis.occupiedRooms || 0}/${kpis.totalRooms || 0}`, detail: occupancyDetail, Icon: BedDouble, href: operationPath('rooms') },
     { label: 'Arrivées aujourd’hui', value: kpis.checkInsToday || 0, detail: `${kpis.pendingCheckIns || 0} check-in en attente`, Icon: LogIn, href: reservationsHref },
     { label: 'Départs aujourd’hui', value: kpis.checkOutsToday || 0, detail: `${kpis.pendingCheckOuts || 0} check-out en attente`, Icon: LogOut, href: reservationsHref },
     { label: 'À nettoyer', value: kpis.cleaningRooms || 0, detail: `${kpis.housekeeping || 0} tâche(s) ouverte(s)`, Icon: Sparkles, href: operationPath('housekeeping') },

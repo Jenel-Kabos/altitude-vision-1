@@ -26,7 +26,7 @@ describe('HotelDetailPage — DASH-3 today board — TEST DATA', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getHotelDetail.mockResolvedValue({ hotel: hotel(), completion: { score: 100, complete: true } });
-    getDashboardAnalytics.mockResolvedValue({ kpis: { totalRooms: 6, occupiedRooms: 1, cleaningRooms: 1, inspectionRooms: 1, outOfServiceRooms: 1, checkInsToday: 2, pendingCheckIns: 1, checkOutsToday: 1, pendingCheckOuts: 1, housekeeping: 2, maintenance: 1, remainingAmount: 5000 } });
+    getDashboardAnalytics.mockResolvedValue({ kpis: { totalRooms: 6, physicalRooms: 7, categoryCapacity: 7, occupiedRooms: 1, cleaningRooms: 1, inspectionRooms: 1, outOfServiceRooms: 1, checkInsToday: 2, pendingCheckIns: 1, checkOutsToday: 1, pendingCheckOuts: 1, housekeeping: 2, maintenance: 1, remainingAmount: 5000 } });
   });
 
   test('affiche un cockpit quotidien issu d’une seule agrégation sélectionnée', async () => {
@@ -38,6 +38,15 @@ describe('HotelDetailPage — DASH-3 today board — TEST DATA', () => {
     expect(screen.getByText('Arrivées aujourd’hui')).toBeInTheDocument();
     expect(screen.getByText('À nettoyer')).toBeInTheDocument();
     expect(screen.getByText('Alertes financières')).toBeInTheDocument();
+    expect(screen.getByText('1 chambre(s) hors service exclue(s)')).toBeInTheDocument();
+  });
+
+  test('signale distinctement une capacité commerciale sans chambres physiques', async () => {
+    getDashboardAnalytics.mockResolvedValue({ kpis: { totalRooms: 0, physicalRooms: 0, categoryCapacity: 27, occupiedRooms: 0 } });
+    render(<HotelDetailPage />);
+    await screen.findByText('Hôtel Test');
+    expect(screen.getByText('0/0')).toBeInTheDocument();
+    expect(screen.getByText('0 chambre(s) physique(s) · 27 unité(s) commerciale(s) configurée(s)')).toBeInTheDocument();
   });
 
   test('affiche des zéros fiables quand l’établissement est vide', async () => {

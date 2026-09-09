@@ -310,6 +310,9 @@ const ManageRoomCategoriesPage = () => {
                     <p className="text-xs text-gray-500">
                       {cat.capacity?.maxAdults || 0} adulte(s) · {cat.beds} lit(s) · {cat.unitsAvailable} unité(s) disponible(s)
                     </p>
+                    {cat.capacityConsistency && <p className={`text-xs mt-1 ${cat.capacityConsistency.configurationConsistent ? 'text-green-700' : 'text-amber-700'}`}>
+                      {cat.capacityConsistency.commercialCapacity} unité(s) commerciale(s) · {cat.capacityConsistency.physicalRooms} chambre(s) physique(s) · écart {cat.capacityConsistency.configurationGap}
+                    </p>}
                   </div>
                   <span className={`text-xs font-semibold px-2 py-1 rounded ${cat.status === 'actif' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                     {cat.status === 'actif' ? 'Actif' : 'Inactif'}

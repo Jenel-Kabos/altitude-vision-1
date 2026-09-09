@@ -4,7 +4,7 @@ import RoomsPage from '../pages/dashboard/RoomsPage';
 import { getRooms, createRoom, updateRoom, deleteRoom, getRoomCategories } from '../services/hotelService';
 
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('next/navigation', () => ({ useParams: () => ({ hotelId: 'HOTEL-1' }) }));
+vi.mock('next/navigation', () => ({ useParams: () => ({ hotelId: 'HOTEL-1' }), usePathname: () => '/mes-hotels/HOTEL-1/rooms' }));
 vi.mock('../services/hotelService', () => ({
   getRooms: vi.fn(),
   createRoom: vi.fn(),
@@ -80,12 +80,28 @@ describe('RoomsPage — Sprint D (tableau des chambres + plan d\'étage) — TES
     render(<RoomsPage />);
     await screen.findByText('101');
     fireEvent.change(screen.getByLabelText('Filtrer par statut'), { target: { value: 'occupied' } });
-    await waitFor(() => expect(getRooms).toHaveBeenCalledWith('HOTEL-1', expect.objectContaining({ status: 'occupied' })));
+    await waitFor(() => expect(getRooms).toHaveBeenCalledWith('HOTEL-1', expect.objectContaining({ status: 'occupied' }), { includeSummary: true }));
   });
 
   test("le tableau de bord ne filtre pas par 'active' — les chambres désactivées restent visibles pour réactivation", async () => {
     render(<RoomsPage />);
     await screen.findByText('101');
-    expect(getRooms).toHaveBeenCalledWith('HOTEL-1', expect.not.objectContaining({ active: expect.anything() }));
+    expect(getRooms).toHaveBeenCalledWith('HOTEL-1', expect.not.objectContaining({ active: expect.anything() }), { includeSummary: true });
+  });
+
+  test('explique 27 unités commerciales sans aucune chambre physique et propose la configuration', async () => {
+    getRooms.mockResolvedValue({ rooms: [], capacitySummary: { commercialCapacity: 27, physicalRooms: 0, operationalRooms: 0, outOfServiceRooms: 0, configurationConsistent: false } });
+    render(<RoomsPage />);
+    expect(await screen.findByText('Aucune chambre physique configurée')).toBeInTheDocument();
+    expect(screen.getByText(/27 unité\(s\) commerciale\(s\).*0 chambre\(s\) physique\(s\)/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ajouter une chambre' })).toBeInTheDocument();
+  });
+
+  test('affiche une capacité cohérente 27/27', async () => {
+    getRooms.mockResolvedValue({ rooms: [room()], capacitySummary: { commercialCapacity: 27, physicalRooms: 27, operationalRooms: 27, outOfServiceRooms: 0, configurationConsistent: true } });
+    render(<RoomsPage />);
+    expect(await screen.findByText('Capacité commerciale')).toBeInTheDocument();
+    expect(screen.getAllByText('27')).toHaveLength(3);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

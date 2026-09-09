@@ -174,9 +174,9 @@ export const archiveRoomCategoryRate = async (categoryId, rateId) => {
 
 // ── Sprint D — chambres physiques (tableau des chambres / plan d'étage) ──
 
-export const getRooms = async (hotelId, params = {}) => {
+export const getRooms = async (hotelId, params = {}, { includeSummary = false } = {}) => {
   const res = await api.get(`/hotels/${hotelId}/rooms`, { params });
-  return res.data.data.rooms;
+  return includeSummary ? res.data.data : res.data.data.rooms;
 };
 
 export const createRoom = async (hotelId, data) => {

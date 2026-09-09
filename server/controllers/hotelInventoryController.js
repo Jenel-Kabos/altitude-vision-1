@@ -11,6 +11,7 @@ const { logAction, buildAuteur } = require('../services/actionLogService');
 const { acquireInventoryOperationLock, heartbeatInventoryOperationLock, releaseInventoryOperationLock } = require('../services/inventoryOperationLockService');
 const { applySellableInventoryUpdates } = require('../services/hotel/hotelInventoryProfessionalService');
 const logger = require('../utils/logger');
+const { getHotelRoomCapacityConsistency } = require('../services/hotel/roomCapacityConsistencyService');
 
 const fail = (res, statusCode, message, code) => res.status(statusCode).json({ status: 'fail', message, ...(code ? { code } : {}) });
 function range(req) {
@@ -24,10 +25,11 @@ exports.calendar = async (req, res) => {
     const period = range(req); if (!period) return fail(res, 422, 'La plage doit contenir entre 1 et 62 jours.');
     const categories = await RoomCategory.find({ hotel: req.params.hotelId, status: 'actif' }).select('name unitsAvailable');
     await Promise.all(categories.map((category) => ensureInventoryExists(req.params.hotelId, category._id, period.dates, category)));
-    const [inventory, operationalRooms, reservations] = await Promise.all([
+    const [inventory, operationalRooms, reservations, capacitySummary] = await Promise.all([
       RoomInventory.find({ hotel: req.params.hotelId, date: { $gte: period.from, $lt: period.to } }).sort({ date: 1 }),
       Room.find({ hotel: req.params.hotelId, active: true }).select('roomCategory roomNumber floor status'),
       HotelReservation.find({ hotel: req.params.hotelId, status: { $nin: ['cancelled', 'rejected', 'expired'] }, checkInDate: { $lt: period.to }, checkOutDate: { $gt: period.from } }).select('reference guest status roomCategory checkInDate checkOutDate roomsCount actualCheckInAt actualCheckOutAt'),
+      getHotelRoomCapacityConsistency(req.params.hotelId, { from: period.from }),
     ]);
     const categoryNames = new Map(categories.map((item) => [String(item._id), item.name]));
     const outCounts = operationalRooms.filter((room) => room.status === 'out_of_service').reduce((map, room) => map.set(String(room.roomCategory), (map.get(String(room.roomCategory)) || 0) + 1), new Map());
@@ -37,11 +39,14 @@ exports.calendar = async (req, res) => {
       MaintenanceTicket.find({ hotel: req.params.hotelId, status: { $in: MaintenanceTicket.OPEN_MAINTENANCE_STATUSES } }).select('room status category'),
     ]);
     const assignedByReservation = assignmentRows.reduce((map, item) => { const key = String(item.reservation); map.set(key, [...(map.get(key) || []), item.room]); return map; }, new Map());
+    const capacityByCategory = new Map(capacitySummary.categories.map((item) => [String(item.roomCategoryId), item]));
     const days = inventory.map((item) => {
       const physicalOutOfService = outCounts.get(String(item.roomCategory)) || 0;
-      return { id: item._id, date: item.date, roomCategory: item.roomCategory, categoryName: categoryNames.get(String(item.roomCategory)), totalUnits: item.totalUnits, reservedUnits: item.reservedUnits, blockedUnits: item.blockedUnits, physicalOutOfService, isClosed: item.isClosed, stopSell: item.stopSell, availableUnits: Math.max(0, item.totalUnits - item.reservedUnits - item.blockedUnits - physicalOutOfService) };
+      const categoryCapacity = capacityByCategory.get(String(item.roomCategory));
+      const effectiveCapacity = Math.min(Math.max(0, item.totalUnits - item.blockedUnits - physicalOutOfService), categoryCapacity?.operationalRooms || 0);
+      return { id: item._id, date: item.date, roomCategory: item.roomCategory, categoryName: categoryNames.get(String(item.roomCategory)), totalUnits: item.totalUnits, effectiveCapacity, reservedUnits: item.reservedUnits, blockedUnits: item.blockedUnits, physicalOutOfService, isClosed: item.isClosed, stopSell: item.stopSell, availableUnits: Math.max(0, effectiveCapacity - item.reservedUnits), configurationGap: categoryCapacity?.configurationGap || 0 };
     });
-    return res.json({ status: 'success', data: { hotelId: req.params.hotelId, from: period.from, to: period.to, days, rooms: operationalRooms, housekeepingTasks, maintenanceTickets, reservations: reservations.map((item) => ({ ...item.toObject(), assignedRooms: assignedByReservation.get(String(item._id)) || [], assignmentState: (assignedByReservation.get(String(item._id)) || []).length === 0 ? 'unassigned' : (assignedByReservation.get(String(item._id)) || []).length < item.roomsCount ? 'partially_assigned' : 'fully_assigned' })) } });
+    return res.json({ status: 'success', data: { hotelId: req.params.hotelId, from: period.from, to: period.to, days, rooms: operationalRooms, capacitySummary, housekeepingTasks, maintenanceTickets, reservations: reservations.map((item) => ({ ...item.toObject(), assignedRooms: assignedByReservation.get(String(item._id)) || [], assignmentState: (assignedByReservation.get(String(item._id)) || []).length === 0 ? 'unassigned' : (assignedByReservation.get(String(item._id)) || []).length < item.roomsCount ? 'partially_assigned' : 'fully_assigned' })) } });
   } catch (error) { return fail(res, 500, error.message); }
 };
 

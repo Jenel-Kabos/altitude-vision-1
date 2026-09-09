@@ -4,7 +4,7 @@
 // + plan d'étage simple, groupé par étage, sans plan graphique (mission §9).
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import {
@@ -18,8 +18,11 @@ const emptyForm = () => ({ roomNumber: "", roomCategoryId: "", floor: 0, wing: "
 
 const RoomsPage = () => {
   const params = useParams();
+  const pathname = usePathname();
   const hotelId = params?.hotelId;
+  const hotelBase = pathname?.startsWith('/mes-hotels/') ? '/mes-hotels' : '/dashboard/hotels';
   const [rooms, setRooms] = useState([]);
+  const [capacitySummary, setCapacitySummary] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("table"); // 'table' | 'floors'
@@ -35,8 +38,10 @@ const RoomsPage = () => {
       if (filters.floor !== "") query.floor = filters.floor;
       if (filters.roomCategoryId) query.roomCategoryId = filters.roomCategoryId;
       if (filters.status) query.status = filters.status;
-      const list = await getRooms(hotelId, query);
+      const result = await getRooms(hotelId, query, { includeSummary: true });
+      const list = Array.isArray(result) ? result : result?.rooms;
       setRooms(list || []);
+      if (!Array.isArray(result)) setCapacitySummary(result?.capacitySummary || null);
     } catch (err) {
       toast.error("Erreur lors du chargement des chambres.");
     } finally {
@@ -103,13 +108,27 @@ const RoomsPage = () => {
   }, [rooms]);
 
   const floorOptions = useMemo(() => [...new Set(rooms.map((r) => r.floor ?? 0))].sort((a, b) => a - b), [rooms]);
+  const hasFilters = Boolean(filters.floor !== "" || filters.roomCategoryId || filters.status);
 
   if (loading && rooms.length === 0) return <DashboardState type="loading" title="Chargement des chambres…" />;
 
   return (
     <DashboardPage>
       <DashboardPageHeader icon={BedDouble} title="Chambres" description="Chambres physiques de cet établissement — statut, catégorie et affectation en cours."
-        actions={<Link href={`/dashboard/hotels/${hotelId}`} className="text-sm text-blue-600 underline">← Retour à l'établissement</Link>} />
+        actions={<Link href={`${hotelBase}/${hotelId}`} className="text-sm text-blue-600 underline">← Retour à l'établissement</Link>} />
+
+      {capacitySummary && (
+        <DashboardCard className="mb-4" aria-label="Cohérence des capacités">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[["Capacité commerciale", capacitySummary.commercialCapacity], ["Chambres physiques", capacitySummary.physicalRooms], ["Chambres opérationnelles", capacitySummary.operationalRooms], ["Hors service", capacitySummary.outOfServiceRooms]].map(([label, value]) => (
+              <div key={label}><p className="text-xs text-gray-600">{label}</p><p className="text-2xl font-semibold text-gray-900">{value}</p></div>
+            ))}
+          </div>
+          {!capacitySummary.configurationConsistent && <div role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <strong>Configuration incomplète.</strong> {capacitySummary.commercialCapacity} unité(s) commerciale(s) configurée(s), {capacitySummary.physicalRooms} chambre(s) physique(s) enregistrée(s). Les chambres physiques doivent être enregistrées individuellement avant leur commercialisation.
+          </div>}
+        </DashboardCard>
+      )}
 
       <DashboardToolbar label="Vues et actions des chambres">
         <button onClick={() => setView("table")} className={`px-3 py-1.5 rounded text-sm font-medium ${view === "table" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
@@ -118,7 +137,7 @@ const RoomsPage = () => {
         <button onClick={() => setView("floors")} className={`px-3 py-1.5 rounded text-sm font-medium ${view === "floors" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}>
           Plan d'étage
         </button>
-        <Link href={`/dashboard/hotels/${hotelId}/inventory`} className="px-3 py-1.5 rounded text-sm font-medium bg-indigo-100 text-indigo-800">Calendrier d’inventaire</Link>
+        <Link href={`${hotelBase}/${hotelId}/inventory`} className="px-3 py-1.5 rounded text-sm font-medium bg-indigo-100 text-indigo-800">Calendrier d’inventaire</Link>
         {!creating && (
           <button onClick={() => setCreating(true)} className="ml-auto bg-gold text-white px-3 py-1.5 rounded text-sm">
             + Nouvelle chambre
@@ -163,7 +182,7 @@ const RoomsPage = () => {
       </DashboardToolbar>
 
       {rooms.length === 0 ? (
-        <DashboardState title="Aucune chambre" description="Aucune chambre ne correspond aux critères sélectionnés." />
+        <DashboardState title={hasFilters ? "Aucun résultat" : "Aucune chambre physique configurée"} description={hasFilters ? "Aucune chambre ne correspond aux critères sélectionnés." : "Ajoutez chaque chambre avec son numéro et sa catégorie avant de recevoir les clients."} action={!hasFilters ? <button onClick={() => setCreating(true)} className="bg-blue-600 text-white px-3 py-2 rounded">Ajouter une chambre</button> : undefined} />
       ) : view === "table" ? (
         <DashboardTableContainer label="Liste des chambres">
           <table className="w-full text-sm">

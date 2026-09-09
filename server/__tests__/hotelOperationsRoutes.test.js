@@ -14,6 +14,10 @@ jest.mock('../services/checkInService');
 jest.mock('../services/checkOutService');
 jest.mock('../services/hotelAvailabilityService');
 jest.mock('../services/hotelReservationService');
+jest.mock('../services/hotel/roomCapacityConsistencyService', () => ({
+  getHotelRoomCapacityConsistency: jest.fn().mockResolvedValue({ categories: [], commercialCapacity: 0, physicalRooms: 0, operationalRooms: 0, outOfServiceRooms: 0, futureSellableCapacity: 0, configurationGap: 0, configurationConsistent: true }),
+  getCategoryOperationalCapacity: jest.fn().mockResolvedValue(0),
+}));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));

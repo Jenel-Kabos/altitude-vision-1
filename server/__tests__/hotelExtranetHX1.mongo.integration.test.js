@@ -19,6 +19,7 @@ const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
 const RoomInventory = require('../models/RoomInventory');
 const HotelReservation = require('../models/HotelReservation');
+const Room = require('../models/Room');
 const hotelRoutes = require('../routes/hotelRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { applySellableInventoryUpdates, syncFutureTotalUnits } = require('../services/hotel/hotelInventoryProfessionalService');
@@ -38,14 +39,17 @@ async function makeHotel(overrides = {}) {
   return { hotel, manager };
 }
 async function makeCategory(hotel, overrides = {}) {
-  return RoomCategory.create({ hotel: hotel._id, name: 'Standard', code: `C-${Date.now()}-${Math.random()}`, status: 'actif', capacity: { maxAdults: 2, maxChildren: 1 }, unitsAvailable: 5, createdBy: hotel.manager, ...overrides });
+  const category = await RoomCategory.create({ hotel: hotel._id, name: 'Standard', code: `C-${Date.now()}-${Math.random()}`, status: 'actif', capacity: { maxAdults: 2, maxChildren: 1 }, unitsAvailable: 5, createdBy: hotel.manager, ...overrides });
+  const physicalRooms = overrides.physicalRooms === undefined ? category.unitsAvailable : overrides.physicalRooms;
+  if (physicalRooms > 0) await Room.create(Array.from({ length: physicalRooms }, (_, index) => ({ hotel: hotel._id, roomCategory: category._id, roomNumber: `${String(category._id).slice(-4)}-${index + 1}`, createdBy: hotel.manager })));
+  return category;
 }
 const bearer = (user) => ({ Authorization: `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' })}` });
 const daysFromNow = (n) => { const d = new Date(); d.setUTCDate(d.getUTCDate() + n); return normalizeDate(d); };
 
 beforeAll(async () => {
   await startFinancialMongo();
-  await Promise.all([Hotel, RoomCategory, RoomInventory, HotelReservation].map((m) => m.syncIndexes()));
+  await Promise.all([Hotel, RoomCategory, RoomInventory, HotelReservation, Room].map((m) => m.syncIndexes()));
 });
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);
@@ -278,6 +282,27 @@ describe('syncFutureTotalUnits — capacité physique (PHASE-HX1 §12)', () => {
     expect(response.status).toBe(200);
     const doc = await RoomInventory.findOne({ roomCategory: category._id, date });
     expect(doc.totalUnits).toBe(7);
+  });
+});
+
+describe('Cohérence capacité commerciale / chambres physiques', () => {
+  test('refuse une réduction sous le nombre de chambres physiques actives', async () => {
+    const { hotel, manager } = await makeHotel();
+    const category = await makeCategory(hotel, { unitsAvailable: 5 });
+    const response = await request(app).patch(`/api/hotels/room-categories/${category._id}`).set(bearer(await User.findById(manager))).send({ unitsAvailable: 1 });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe('CATEGORY_CAPACITY_BELOW_PHYSICAL_ROOMS');
+    expect((await RoomCategory.findById(category._id)).unitsAvailable).toBe(5);
+  });
+
+  test('archive une catégorie référencée au lieu de laisser des références orphelines', async () => {
+    const { hotel, manager } = await makeHotel();
+    const category = await makeCategory(hotel);
+    const response = await request(app).delete(`/api/hotels/room-categories/${category._id}`).set(bearer(await User.findById(manager)));
+    expect(response.status).toBe(200);
+    expect(response.body.data.archived).toBe(true);
+    expect((await RoomCategory.findById(category._id)).status).toBe('inactif');
+    expect(await Room.countDocuments({ roomCategory: category._id })).toBe(5);
   });
 });
 

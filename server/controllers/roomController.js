@@ -14,6 +14,7 @@ const { assertOperationalHotelAccess } = require('../services/hotel/hotelAccessS
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
 const { syncPhysicalInventoryBlock } = require('../services/hotelAvailabilityService');
 const { runFinancialOperation } = require('../services/finance/financialTransactionService');
+const { getHotelRoomCapacityConsistency } = require('../services/hotel/roomCapacityConsistencyService');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
@@ -67,7 +68,8 @@ exports.list = async (req, res) => {
       };
     });
 
-    res.json({ status: 'success', data: { rooms: withAssignment } });
+    const capacitySummary = await getHotelRoomCapacityConsistency(req.params.hotelId);
+    res.json({ status: 'success', data: { rooms: withAssignment, capacitySummary } });
   } catch (error) {
     fail(res, 500, error.message);
   }

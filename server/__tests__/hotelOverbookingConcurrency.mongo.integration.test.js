@@ -12,6 +12,7 @@ const RoomCategory = require('../models/RoomCategory');
 const RatePlan = require('../models/RatePlan');
 const HotelReservation = require('../models/HotelReservation');
 const RoomInventory = require('../models/RoomInventory');
+const Room = require('../models/Room');
 const { createReservation } = require('../services/hotelReservationService');
 
 jest.setTimeout(120000);
@@ -19,7 +20,7 @@ const id = () => new mongoose.Types.ObjectId();
 
 beforeAll(async () => {
   await startFinancialMongo();
-  await Promise.all([HotelReservation, RoomInventory, RoomCategory, RatePlan].map((model) => model.syncIndexes()));
+  await Promise.all([HotelReservation, RoomInventory, RoomCategory, RatePlan, Room].map((model) => model.syncIndexes()));
 });
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);
@@ -29,6 +30,7 @@ async function fixtureWithOneUnit() {
   const hotel = await Hotel.create({ name: 'Hôtel Surbooking', manager: actor.id, createdBy: actor.id });
   const category = await RoomCategory.create({ hotel: hotel._id, name: 'Standard', code: 'STD', unitsAvailable: 1, createdBy: actor.id });
   const rate = await RatePlan.create({ roomCategory: category._id, rateType: 'public', amount: 35000, currency: 'XAF', createdBy: actor.id });
+  await Room.create({ hotel: hotel._id, roomCategory: category._id, roomNumber: '101', createdBy: actor.id });
   return { actor, hotel, category, rate };
 }
 

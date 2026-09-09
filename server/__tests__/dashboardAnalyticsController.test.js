@@ -12,6 +12,7 @@ jest.mock('../models/Paiement', () => mockModel());
 jest.mock('../models/RentalMaintenanceTicket', () => ({ ...mockModel(), OPEN_RENTAL_MAINTENANCE_STATUSES: ['ouvert'] }));
 jest.mock('../models/HotelReservation', () => mockModel());
 jest.mock('../models/Room', () => mockModel());
+jest.mock('../models/RoomCategory', () => mockModel());
 jest.mock('../models/HousekeepingTask', () => mockModel());
 jest.mock('../models/MaintenanceTicket', () => ({ ...mockModel(), OPEN_MAINTENANCE_STATUSES: ['open'] }));
 jest.mock('../models/AccommodationReservation', () => mockModel());

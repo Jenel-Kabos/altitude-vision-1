@@ -3,6 +3,7 @@ const Accommodation = require('../models/Accommodation');
 const Hotel = require('../models/Hotel');
 const HotelReservation = require('../models/HotelReservation');
 const Room = require('../models/Room');
+const RoomCategory = require('../models/RoomCategory');
 const HousekeepingTask = require('../models/HousekeepingTask');
 const MaintenanceTicket = require('../models/MaintenanceTicket');
 const AccommodationReservation = require('../models/AccommodationReservation');
@@ -76,8 +77,9 @@ async function hotels(actor, requestedHotelId = null) {
   const eligibleHotels = validatedHotels.filter((hotel) => hotel.property);
   const activeEligibleHotels = eligibleHotels.filter((hotel) => hotel.status === 'actif' && hotel.active !== false);
   const hotelIds = activeEligibleHotels.map((hotel) => hotel._id);
-  const [rooms, reservations, housekeeping, maintenance, collections, refunds, balances] = await Promise.all([
-    Room.aggregate([{ $match: { hotel: { $in: hotelIds }, active: true } }, { $group: { _id: null, availableRooms: { $sum: { $cond: [{ $eq: ['$status', 'available'] }, 1, 0] } }, occupiedRooms: { $sum: { $cond: [{ $eq: ['$status', 'occupied'] }, 1, 0] } }, cleaningRooms: { $sum: { $cond: [{ $eq: ['$status', 'cleaning'] }, 1, 0] } }, inspectionRooms: { $sum: { $cond: [{ $eq: ['$status', 'inspection'] }, 1, 0] } }, outOfServiceRooms: { $sum: { $cond: [{ $eq: ['$status', 'out_of_service'] }, 1, 0] } }, totalRooms: { $sum: 1 } } }]),
+  const [rooms, categoryCapacityRows, reservations, housekeeping, maintenance, collections, refunds, balances] = await Promise.all([
+    Room.aggregate([{ $match: { hotel: { $in: hotelIds }, active: true } }, { $group: { _id: null, availableRooms: { $sum: { $cond: [{ $eq: ['$status', 'available'] }, 1, 0] } }, occupiedRooms: { $sum: { $cond: [{ $eq: ['$status', 'occupied'] }, 1, 0] } }, cleaningRooms: { $sum: { $cond: [{ $eq: ['$status', 'cleaning'] }, 1, 0] } }, inspectionRooms: { $sum: { $cond: [{ $eq: ['$status', 'inspection'] }, 1, 0] } }, outOfServiceRooms: { $sum: { $cond: [{ $eq: ['$status', 'out_of_service'] }, 1, 0] } }, physicalRooms: { $sum: 1 }, operationalRooms: { $sum: { $cond: [{ $ne: ['$status', 'out_of_service'] }, 1, 0] } } } }]),
+    RoomCategory.aggregate([{ $match: { hotel: { $in: hotelIds }, status: 'actif' } }, { $group: { _id: null, categoryCapacity: { $sum: '$unitsAvailable' } } }]),
     HotelReservation.aggregate([{ $match: { hotel: { $in: hotelIds } } }, { $group: { _id: null, reservations: { $sum: { $cond: [{ $in: ['$status', activeReservation] }, 1, 0] } }, reservationsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$createdAt', today] }, { $lt: ['$createdAt', tomorrow] }] }, 1, 0] } }, checkInsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$checkInDate', today] }, { $lt: ['$checkInDate', tomorrow] }, { $in: ['$status', activeReservation] }] }, 1, 0] } }, checkOutsToday: { $sum: { $cond: [{ $and: [{ $gte: ['$checkOutDate', today] }, { $lt: ['$checkOutDate', tomorrow] }, { $in: ['$status', activeReservation] }] }, 1, 0] } }, pendingCheckIns: { $sum: { $cond: [{ $and: [{ $gte: ['$checkInDate', today] }, { $lt: ['$checkInDate', tomorrow] }, { $eq: ['$status', 'confirmed'] }] }, 1, 0] } }, pendingCheckOuts: { $sum: { $cond: [{ $and: [{ $gte: ['$checkOutDate', today] }, { $lt: ['$checkOutDate', tomorrow] }, { $eq: ['$status', 'checked_in'] }] }, 1, 0] } } } }]),
     HousekeepingTask.countDocuments({ hotel: { $in: hotelIds }, status: { $in: ['pending', 'assigned', 'in_progress'] } }),
     MaintenanceTicket.countDocuments({ hotel: { $in: hotelIds }, status: { $in: MaintenanceTicket.OPEN_MAINTENANCE_STATUSES } }),
@@ -85,10 +87,11 @@ async function hotels(actor, requestedHotelId = null) {
     FinancialRefund.aggregate([{ $match: { domain: 'hotel', establishmentType: 'Hotel', establishmentId: { $in: hotelIds }, status: 'completed' } }, { $group: { _id: null, refundedAmount: { $sum: '$amountMinor' } } }]),
     FinancialDocument.aggregate([{ $match: { domain: 'hotel', establishmentType: 'Hotel', establishmentId: { $in: hotelIds }, status: { $in: ['issued', 'credited'] } } }, { $group: { _id: null, remainingAmount: { $sum: '$balanceMinor' } } }]),
   ]);
-  const roomStats = rooms[0] || { availableRooms: 0, occupiedRooms: 0, cleaningRooms: 0, inspectionRooms: 0, outOfServiceRooms: 0, totalRooms: 0 };
+  const roomStats = rooms[0] || { availableRooms: 0, occupiedRooms: 0, cleaningRooms: 0, inspectionRooms: 0, outOfServiceRooms: 0, physicalRooms: 0, operationalRooms: 0 };
+  const totalRooms = roomStats.operationalRooms || 0;
   const gross = collections[0]?.grossAmountCollected || 0;
   const refunded = refunds[0]?.refundedAmount || 0;
-  return { kpis: { activeHotels: hotelIds.length, temporarilyClosedHotels: eligibleHotels.length - hotelIds.length, ...roomStats, occupancyRate: roomStats.totalRooms ? Math.round((roomStats.occupiedRooms / roomStats.totalRooms) * 10000) / 100 : 0, ...(reservations[0] || { reservations: 0, reservationsToday: 0, checkInsToday: 0, checkOutsToday: 0 }), housekeeping, maintenance, grossAmountCollected: gross, refundedAmount: refunded, netAmountCollected: Math.max(0, gross - refunded), remainingAmount: balances[0]?.remainingAmount || 0 }, revenueBasis: 'Encaissements hôteliers confirmés, remboursements terminés et soldes de factures émis ; hôtels validés et actifs uniquement.' };
+  return { kpis: { activeHotels: hotelIds.length, temporarilyClosedHotels: eligibleHotels.length - hotelIds.length, ...roomStats, totalRooms, categoryCapacity: categoryCapacityRows[0]?.categoryCapacity || 0, occupancyRate: totalRooms ? Math.round((roomStats.occupiedRooms / totalRooms) * 10000) / 100 : 0, ...(reservations[0] || { reservations: 0, reservationsToday: 0, checkInsToday: 0, checkOutsToday: 0 }), housekeeping, maintenance, grossAmountCollected: gross, refundedAmount: refunded, netAmountCollected: Math.max(0, gross - refunded), remainingAmount: balances[0]?.remainingAmount || 0 }, occupancyFormula: 'Chambres physiques actives au statut occupied / chambres physiques actives hors out_of_service. categoryCapacity expose séparément le stock commercial déclaré par les catégories.', revenueBasis: 'Encaissements hôteliers confirmés, remboursements terminés et soldes de factures émis ; hôtels validés et actifs uniquement.' };
 }
 
 // REPORTING-1 — ces trois fonctions restent temporairement exportées pour

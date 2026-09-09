@@ -25,6 +25,7 @@ const RoomInventory = require('../models/RoomInventory');
 const Room = require('../models/Room');
 const mongoose = require('mongoose');
 const logger = require('../utils/logger');
+const { getCategoryOperationalCapacity } = require('./hotel/roomCapacityConsistencyService');
 
 // ─────────────────────────────────────────────
 // Dates — normalisation et découpage en nuits
@@ -104,6 +105,7 @@ async function getAvailability({ roomCategoryId, checkInDate, checkOutDate, room
     date: { $in: nightDates },
   });
   const byDate = new Map(existing.map((doc) => [doc.date.getTime(), doc]));
+  const operationalCapacity = await getCategoryOperationalCapacity(roomCategoryId, { fallbackCapacity: category.unitsAvailable });
   const currentPhysicalBlockedUnits = mongoose.connection.readyState
     ? await Room.countDocuments({ roomCategory: roomCategoryId, active: true, status: 'out_of_service' })
     : 0;
@@ -116,13 +118,14 @@ async function getAvailability({ roomCategoryId, checkInDate, checkOutDate, room
     const reservedUnits = doc ? doc.reservedUnits : 0;
     const isClosed = doc ? doc.isClosed : false;
     const stopSell = doc ? doc.stopSell : false;
-    const availableUnits = Math.max(0, totalUnits - blockedUnits - physicalBlockedUnits - reservedUnits);
+    const effectiveCapacity = Math.min(Math.max(0, totalUnits - blockedUnits - physicalBlockedUnits), operationalCapacity);
+    const availableUnits = Math.max(0, effectiveCapacity - reservedUnits);
     const sufficient = category.status === 'actif' && !isClosed && !stopSell && availableUnits >= roomsCount;
-    return { date, totalUnits, availableUnits, isClosed, stopSell, sufficient };
+    return { date, totalUnits, effectiveCapacity, availableUnits, isClosed, stopSell, sufficient };
   });
 
   const unavailableDates = nights.filter((n) => !n.sufficient).map((n) => n.date);
-  return { available: unavailableDates.length === 0, nights, unavailableDates };
+  return { available: unavailableDates.length === 0, nights, unavailableDates, operationalCapacity };
 }
 
 /** Lève une erreur 409 (avec `unavailableDates`, sans autre détail interne) si insuffisant. */
@@ -130,6 +133,7 @@ async function assertAvailability(params) {
   const result = await getAvailability(params);
   if (!result.available) {
     const err = new Error('Certaines dates ne sont plus disponibles pour cette catégorie.');
+    if (result.operationalCapacity < Number(params.roomsCount || 1)) err.code = 'INSUFFICIENT_PHYSICAL_ROOM_CAPACITY';
     err.statusCode = 409;
     err.unavailableDates = result.unavailableDates;
     throw err;
@@ -197,6 +201,7 @@ async function reserveInventory({ hotelId, roomCategoryId, checkInDate, checkOut
     throw err;
   }
   await ensureInventoryExists(hotelId, roomCategoryId, nightDates, category, { session });
+  const operationalCapacity = await getCategoryOperationalCapacity(roomCategoryId, { session, fallbackCapacity: category.unitsAvailable });
 
   const reservedSoFar = [];
   for (const date of nightDates) {
@@ -216,6 +221,7 @@ async function reserveInventory({ hotelId, roomCategoryId, checkInDate, checkOut
             { $subtract: ['$totalUnits', { $add: ['$blockedUnits', { $ifNull: ['$physicalBlockedUnits', 0] }] }] },
           ],
         },
+        reservedUnits: { $lte: operationalCapacity - roomsCount },
       },
       { $inc: { reservedUnits: roomsCount }, $set: { updatedBy: actingUserId } },
       { new: true, session },

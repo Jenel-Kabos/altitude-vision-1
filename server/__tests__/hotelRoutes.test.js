@@ -7,6 +7,7 @@ jest.mock('../models/User');
 jest.mock('../models/Hotel');
 jest.mock('../models/RoomCategory');
 jest.mock('../models/Room');
+jest.mock('../models/RoomInventory');
 jest.mock('../models/HotelReservation');
 jest.mock('../models/HousekeepingTask');
 jest.mock('../models/MaintenanceTicket');
@@ -24,6 +25,10 @@ jest.mock('../services/alerteService', () => ({ verifierPaiementsEnRetard: jest.
 jest.mock('../services/hotel/hotelNameUniquenessService', () => ({
   assertHotelNameAvailable: jest.fn().mockResolvedValue({ normalizedName: 'hotel test' }),
   translateHotelNameDuplicate: jest.fn((error) => error),
+}));
+jest.mock('../services/hotel/roomCapacityConsistencyService', () => ({
+  getHotelRoomCapacityConsistency: jest.fn().mockResolvedValue({ categories: [], commercialCapacity: 0, physicalRooms: 0, operationalRooms: 0, outOfServiceRooms: 0, futureSellableCapacity: 0, configurationGap: 0, configurationConsistent: true }),
+  getCategoryOperationalCapacity: jest.fn().mockResolvedValue(0),
 }));
 jest.mock('../services/platformTenant/tenantContextService', () => ({
   resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001' }]),
@@ -69,6 +74,7 @@ const User = require('../models/User');
 const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
 const Room = require('../models/Room');
+const RoomInventory = require('../models/RoomInventory');
 const HotelReservation = require('../models/HotelReservation');
 const HousekeepingTask = require('../models/HousekeepingTask');
 const MaintenanceTicket = require('../models/MaintenanceTicket');
@@ -533,6 +539,9 @@ describe('Sprint B2 — cycle de vie propriétaire (deactivate/reactivate/duplic
     Hotel.findById = jest.fn().mockReturnValue(Object.assign(Promise.resolve(hotelDoc), { populate: jest.fn().mockResolvedValue(hotelDoc) }));
     RoomCategory.find = jest.fn().mockResolvedValue([]);
     RatePlan.deleteMany = jest.fn().mockResolvedValue({});
+    Room.countDocuments = jest.fn().mockResolvedValue(0);
+    HotelReservation.countDocuments = jest.fn().mockResolvedValue(0);
+    RoomInventory.countDocuments = jest.fn().mockResolvedValue(0);
     RoomCategory.deleteMany = jest.fn().mockResolvedValue({});
     Accommodation.deleteMany = jest.fn().mockResolvedValue({});
     Hotel.findByIdAndDelete = jest.fn().mockResolvedValue({});

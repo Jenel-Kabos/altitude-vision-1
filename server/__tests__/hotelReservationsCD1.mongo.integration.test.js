@@ -18,6 +18,7 @@ async function fixture({ units = 3 } = {}) {
   return { actor, hotel, category, rate };
 }
 const reservationInput = (f, key) => ({ hotelId: f.hotel._id, roomCategoryId: f.category._id, ratePlanId: f.rate._id, guest: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test' }, checkInDate: '2026-09-10', checkOutDate: '2026-09-13', roomsCount: 2, adults: 2, children: 0, source: 'public_web', actingUser: {}, reservationRequestId: key });
+const createPhysicalRooms = (f, count) => Room.create(Array.from({ length: count }, (_, index) => ({ hotel: f.hotel._id, roomCategory: f.category._id, roomNumber: `PRE-${index + 1}`, createdBy: f.actor.id })));
 
 beforeAll(async () => {
   await startFinancialMongo();
@@ -26,7 +27,7 @@ beforeAll(async () => {
 afterEach(clearFinancialMongo); afterAll(stopFinancialMongo);
 
 test('20 créations concurrentes avec la même clé créent une réservation et une consommation', async () => {
-  const f = await fixture(); const input = reservationInput(f, 'mobile-retry-001');
+  const f = await fixture(); await createPhysicalRooms(f, 3); const input = reservationInput(f, 'mobile-retry-001');
   const results = await Promise.all(Array.from({ length: 20 }, () => createReservation(input)));
   expect(new Set(results.map((item) => String(item._id))).size).toBe(1);
   expect(await HotelReservation.countDocuments()).toBe(1);
@@ -35,12 +36,13 @@ test('20 créations concurrentes avec la même clé créent une réservation et 
 });
 
 test('même clé avec payload différent renvoie RESERVATION_IDEMPOTENCY_CONFLICT', async () => {
-  const f = await fixture(); const input = reservationInput(f, 'conflict-001'); await createReservation(input);
+  const f = await fixture(); await createPhysicalRooms(f, 3); const input = reservationInput(f, 'conflict-001'); await createReservation(input);
   await expect(createReservation({ ...input, adults: 3 })).rejects.toMatchObject({ code: 'RESERVATION_IDEMPOTENCY_CONFLICT', statusCode: 409 });
 });
 
 test('C29 réel : un séjour traversant deux périodes persiste son détail tarifaire nuit par nuit', async () => {
   const f = await fixture({ units: 2 });
+  await createPhysicalRooms(f, 2);
   f.rate.seasonalPeriods = [
     { label: 'Vacances', startDate: '2026-09-01', endDate: '2026-09-30', amount: 50000, priority: 10 },
     { label: 'Festival', startDate: '2026-09-11', endDate: '2026-09-12', amount: 85000, priority: 20 },

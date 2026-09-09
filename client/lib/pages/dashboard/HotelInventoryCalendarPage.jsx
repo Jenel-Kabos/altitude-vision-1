@@ -90,7 +90,7 @@ export default function HotelInventoryCalendarPage() {
         <button onClick={() => saveStock(category)} disabled={!hasPendingEdits || savingStock[category.id]} aria-label={`Enregistrer le stock ${category.name}`} className="text-sm border rounded px-2 py-1 bg-blue-700 text-white disabled:opacity-40 disabled:cursor-not-allowed">💾 Enregistrer le stock</button>
       </header><div className="overflow-x-auto" tabIndex="0" aria-label={`Inventaire ${category.name}`}><div className="flex min-w-max">{categoryDays.map((day) => {
         const dateIso = new Date(day.date).toISOString().slice(0, 10);
-        const currentSellable = Math.max(0, day.totalUnits - day.blockedUnits - day.physicalOutOfService);
+        const currentSellable = day.effectiveCapacity ?? Math.max(0, day.totalUnits - day.blockedUnits - day.physicalOutOfService);
         const stagedValue = categoryPending[dateIso];
         return <article key={day.id} title={`${day.availableUnits} disponibles, ${day.reservedUnits} réservées`} className={`w-40 border-r p-3 ${day.stopSell || day.isClosed ? "bg-red-50 dark:bg-red-950" : ""}`}>
           <p className="text-xs font-medium">{new Date(day.date).toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" })}</p>
@@ -104,6 +104,7 @@ export default function HotelInventoryCalendarPage() {
           <p className="text-xs mt-1">✅ réservé {day.reservedUnits} <span className="text-gray-400">(protégé)</span></p>
           <p className="text-xs">⛔ bloqué {day.blockedUnits}</p>
           <p className="text-xs">🔧 hors service {day.physicalOutOfService}</p>
+          {day.configurationGap !== 0 && <p className="text-xs text-amber-700">⚠ Stock plafonné par les chambres physiques</p>}
           {(day.stopSell || day.isClosed) && <p className="text-xs text-red-700 dark:text-red-300">🚫 Vente fermée</p>}
         </article>;
       })}</div></div></section>;

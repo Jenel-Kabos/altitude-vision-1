@@ -14,6 +14,7 @@ const RoomCategory = require('../../models/RoomCategory');
 const RoomInventory = require('../../models/RoomInventory');
 const Room = require('../../models/Room');
 const { normalizeDate, ensureInventoryExists } = require('../hotelAvailabilityService');
+const { getCategoryOperationalCapacity } = require('./roomCapacityConsistencyService');
 
 const MAX_DATES_PER_REQUEST = 62;
 
@@ -45,6 +46,7 @@ async function applySellableInventoryUpdates({ hotelId, roomCategoryId, updates,
   // chambres réellement hors service au moment de l'opération — jamais
   // recalculé indépendamment ici (même source que hotelInventoryController.calendar).
   const physicalBlockedUnits = await Room.countDocuments({ roomCategory: roomCategoryId, active: true, status: 'out_of_service' });
+  const operationalCapacity = await getCategoryOperationalCapacity(roomCategoryId);
 
   const results = [];
   // eslint-disable-next-line no-restricted-syntax
@@ -58,7 +60,7 @@ async function applySellableInventoryUpdates({ hotelId, roomCategoryId, updates,
     }
     // eslint-disable-next-line no-await-in-loop
     const doc = await RoomInventory.findOne({ roomCategory: roomCategoryId, date });
-    const maxSellable = Math.max(0, doc.totalUnits - physicalBlockedUnits);
+    const maxSellable = Math.min(Math.max(0, doc.totalUnits - physicalBlockedUnits), operationalCapacity);
     if (sellableUnits > maxSellable) {
       results.push({ date: entry.date, ok: false, code: 'INVENTORY_EXCEEDS_CAPACITY', maxSellable });
       // eslint-disable-next-line no-continue
