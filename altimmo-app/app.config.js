@@ -56,6 +56,11 @@ module.exports = {
     android: {
       package: 'com.altitudevision.altimmo',
       versionCode: 2,
+      // EAS Build ne téléverse que les fichiers suivis par Git. `google-services.json`
+      // reste gitignoré : on le passe au builder via une file env var EAS
+      // (`GOOGLE_SERVICES_JSON`) qui matérialise le fichier dans un chemin temporaire.
+      // En local (dev, tests) on retombe sur le fichier au racine du projet mobile.
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON || './google-services.json',
 
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',

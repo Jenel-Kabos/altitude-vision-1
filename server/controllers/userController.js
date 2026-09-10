@@ -668,15 +668,28 @@ exports.completeProfile = async (req, res) => {
  */
 exports.savePushToken = async (req, res) => {
     try {
-        const { pushToken } = req.body;
-        if (!pushToken) {
+        // Contrat explicite (ALTIMMO-PUSH-TOKEN-LOGOUT-1) :
+        // - `pushToken` = string non vide  → enregistrement / remplacement
+        // - `pushToken` = null             → dissociation à la déconnexion mobile
+        // - `pushToken` absent ou autre    → 400 (empêche un clear silencieux
+        //   causé par un bug côté client)
+        if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'pushToken')) {
             return res.status(400).json({ status: 'fail', message: 'pushToken requis.' });
         }
+        const { pushToken } = req.body;
+        const isClear = pushToken === null;
+        const isRegister = typeof pushToken === 'string' && pushToken.trim() !== '';
+        if (!isClear && !isRegister) {
+            return res.status(400).json({ status: 'fail', message: 'pushToken invalide.' });
+        }
 
-        await User.findByIdAndUpdate(req.user._id, { pushToken });
+        await User.findByIdAndUpdate(req.user._id, { pushToken: isClear ? null : pushToken });
 
-        console.log(`✅ [PushToken] Enregistré pour ${req.user._id}`);
-        res.status(200).json({ status: 'success', message: 'Push token enregistré.' });
+        console.log(`✅ [PushToken] ${isClear ? 'Dissocié' : 'Enregistré'} pour ${req.user._id}`);
+        res.status(200).json({
+            status: 'success',
+            message: isClear ? 'Push token dissocié.' : 'Push token enregistré.',
+        });
     } catch (error) {
         console.error('❌ Erreur savePushToken:', error.message);
         res.status(500).json({ status: 'error', message: error.message });

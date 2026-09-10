@@ -265,7 +265,7 @@ const AdminDashboard = ({ children }) => {
 
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside className={`
-        w-64 flex flex-col justify-between
+        w-64 flex flex-col
         fixed md:sticky top-0 h-[100dvh] z-50 md:z-auto
         transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
@@ -277,8 +277,8 @@ const AdminDashboard = ({ children }) => {
         inert={isMobileViewport && !sidebarOpen ? true : undefined}
       >
 
-        {/* Header sidebar */}
-        <div>
+        {/* Header sidebar — bloc supérieur fixe : logo, utilisateur, contexte tenant. */}
+        <div className="flex-shrink-0">
           {/* Brand */}
           <div className="px-5 py-5 flex items-center justify-between"
             style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -368,10 +368,13 @@ const AdminDashboard = ({ children }) => {
               <PlatformOperatorContextSwitcher />
             </div>
           )}
+        </div>
 
-          {/* Nav */}
-          <nav className="px-3 py-3 space-y-0.5 overflow-y-auto"
-            style={{ maxHeight: 'calc(100dvh - 220px)' }}>
+        {/* Nav — zone centrale scrollable. flex-1 min-h-0 : la navigation prend
+            l'espace restant sans pousser le footer hors du viewport, quelle que
+            soit la hauteur du bloc supérieur (Admin PlatformOperator switcher,
+            fenêtre d'écriture collaborateur, etc.). */}
+        <nav className="flex-1 min-h-0 px-3 py-3 space-y-0.5 overflow-y-auto">
             {NAV_SECTIONS.map((section, si) => {
               const visibleLinks = section.links.filter(link => (
                 // RBAC-3 — `can()` lit les capacités effectives calculées côté
@@ -419,11 +422,10 @@ const AdminDashboard = ({ children }) => {
               </div>
               );
             })}
-          </nav>
-        </div>
+        </nav>
 
-        {/* Footer sidebar */}
-        <div className="px-3 py-3 space-y-1"
+        {/* Footer sidebar — ancré en bas, hors zone scrollable (flex-shrink-0). */}
+        <div className="flex-shrink-0 px-3 py-3 space-y-1"
           style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <button onClick={() => { router.push('/'); close(); }}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-white/50 hover:text-white hover:bg-white/6 transition-all"
