@@ -250,7 +250,7 @@ const AnnonceCard = React.memo(function AnnonceCard({ item, index, onPress, styl
   );
 }, (prev, next) => prev.item._id === next.item._id && prev.styles === next.styles);
 
-export default function ListeAnnoncesScreen({ navigation }) {
+export default function ListeAnnoncesScreen({ navigation, route }) {
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
   const [annonces, setAnnonces]       = useState([]);
@@ -262,7 +262,14 @@ export default function ListeAnnoncesScreen({ navigation }) {
   const [refreshing, setRefreshing]   = useState(false);
   const [erreur, setErreur]           = useState('');
   const [searchOpen, setSearchOpen]   = useState(false);
-  const [activeFilters, setActiveFilters] = useState(DEFAULT_FILTERS);
+  // ALTIMMO-MAP-LOCALITY-CENTROIDS-2 — la carte agrégée pousse
+  // `route.params.initialFilters` (filtres actifs + city/arrondissement de la
+  // bulle tapée) au montage. Fusion défensive avec DEFAULT_FILTERS pour éviter
+  // toute clé manquante.
+  const [activeFilters, setActiveFilters] = useState(() => ({
+    ...DEFAULT_FILTERS,
+    ...(route?.params?.initialFilters || {}),
+  }));
   const [page, setPage]               = useState(1);
   const [hasMore, setHasMore]         = useState(true);
 

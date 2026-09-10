@@ -1,17 +1,20 @@
+// ALTIMMO-MAP-LOCALITY-CENTROIDS-2 — la carte agrège désormais par localité :
+// 1 marker = 1 arrondissement, jamais 1 marker = 1 propriété. Le test H1.5
+// précédent (marqueur Hotel + navigation vers HotelDetailScreen depuis un pin
+// par-propriété) a été remplacé par une couverture du nouveau contrat produit
+// (bubble par localité + bottom card + navigation vers ListeAnnonces avec
+// filtres préservés).
+
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import CarteScreen from '../CarteScreen';
-import api from '../../../services/api';
-import { cache } from '../../../services/cacheService';
+import { fetchMapAggregates } from '../../../services/mapAggregatesService';
 
-// PHASE-H1.5 — première couverture de CarteScreen (gap pré-existant, aucun
-// test ne rendait cet écran auparavant). Se limite au périmètre H1.5 :
-// marqueur Hotel distinct, aperçu, navigation vers HotelDetailScreen, et
-// absence de crash pour un item sans coordonnées.
-
-jest.mock('@expo/vector-icons', () => { const ReactActual = require('react'); const RN = require('react-native'); return { Ionicons: (props) => ReactActual.createElement(RN.Text, props, props.name) }; });
+jest.mock('@expo/vector-icons', () => {
+  const ReactActual = require('react'); const RN = require('react-native');
+  return { Ionicons: (props) => ReactActual.createElement(RN.Text, props, props.name) };
+});
 jest.mock('@react-native-async-storage/async-storage', () => require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
-jest.mock('expo-image', () => ({ Image: require('react-native').Image }));
 jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'denied' })),
   getCurrentPositionAsync: jest.fn(),
@@ -22,9 +25,9 @@ jest.mock('react-native-safe-area-context', () => {
   return { SafeAreaView: RN.View, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
 });
 jest.mock('react-native-maps', () => {
-  const ReactActual = require('react');
-  const RN = require('react-native');
-  const MockMapView = ReactActual.forwardRef((props, ref) => ReactActual.createElement(RN.View, { testID: 'carte-map', ...props }, props.children));
+  const ReactActual = require('react'); const RN = require('react-native');
+  const MockMapView = ReactActual.forwardRef((props, ref) =>
+    ReactActual.createElement(RN.View, { testID: 'carte-map', ...props }, props.children));
   const MockMarker = (props) => ReactActual.createElement(
     RN.TouchableOpacity,
     { testID: `marker-${props.accessibilityLabel}`, onPress: props.onPress, accessibilityLabel: props.accessibilityLabel },
@@ -36,84 +39,93 @@ jest.mock('../../../components', () => {
   const React = require('react');
   return { SearchPanel: () => React.createElement(React.Fragment) };
 });
-// `supercluster` est ESM pur (comme @miblanchard/react-native-slider, voir
-// ListeAnnoncesScreenRecommended.test.jsx) — non transpilé par ce preset
-// Jest, sans rapport avec ce test. Mock minimal : un point isolé (jamais 2
-// dans ces scénarios, `minPoints:2` dans CarteScreen.jsx) reste un point
-// individuel, jamais un cluster — comportement réel de la librairie ici.
-jest.mock('supercluster', () => {
-  return class MockSupercluster {
-    load(points) { this.points = points; return this; }
-    getClusters() {
-      return (this.points || []).map((p) => ({
-        type: 'Feature', geometry: p.geometry, properties: { ...p.properties, cluster: false },
-      }));
-    }
-    getLeaves() { return []; }
-  };
-});
-jest.mock('../../../services/api');
+jest.mock('../../../services/mapAggregatesService');
 
 const navigation = { navigate: jest.fn() };
 
-const HOTEL_ANNONCE = {
-  _id: 'property-hotel-1', title: 'Mila Hotel', status: 'hebergement', price: 25000,
-  latitude: -4.26, longitude: 15.24, images: [],
-  accommodationType: 'hotel', hotel: 'hotel-object-id-1',
-};
-const GENERIC_ANNONCE = {
-  _id: 'property-heb-1', title: 'Villa Meublée', status: 'hebergement', price: 40000,
-  latitude: -4.27, longitude: 15.25, images: [],
-};
-const NO_COORDS_ANNONCE = {
-  _id: 'property-no-coords', title: 'Sans Coordonnées', status: 'hebergement', price: 10000,
-  accommodationType: 'hotel', hotel: 'hotel-object-id-2', images: [],
-};
-
-beforeEach(() => {
-  jest.clearAllMocks();
-  cache.clear();
+const AREA = (label, count, extra = {}) => ({
+  key: `brazzaville:${label.toLowerCase()}`,
+  city: 'Brazzaville', label, count,
+  latitude: -4.27 + Math.random() * 0.05, longitude: 15.27 + Math.random() * 0.05,
+  ...extra,
 });
 
-describe('CarteScreen — découverte Hotel (PHASE-H1.5)', () => {
-  test('un Hotel publié avec coordonnées apparaît comme marqueur, sans crash', async () => {
-    api.get.mockResolvedValue({ data: { data: { properties: [HOTEL_ANNONCE], total: 1 } } });
+beforeEach(() => { jest.clearAllMocks(); });
+
+describe('CarteScreen — agrégation par localité (ALTIMMO-MAP-LOCALITY-CENTROIDS-2)', () => {
+  test('affiche un marker par zone + le total exact dans le header (indépendant de la pagination)', async () => {
+    fetchMapAggregates.mockResolvedValue({
+      total: 15, mappedTotal: 15, unmappedTotal: 0,
+      areas: [AREA('Poto-Poto', 5), AREA('Ouenzé', 7), AREA('Moungali', 3)],
+    });
     render(<CarteScreen navigation={navigation} />);
-    await waitFor(() => expect(screen.getByTestId('carte-map')).toBeTruthy());
-    await waitFor(() => expect(screen.getByLabelText('Mila Hotel')).toBeTruthy());
+    await waitFor(() => screen.getByTestId(/marker-5 biens à Poto-Poto/));
+    expect(screen.getByTestId('marker-7 biens à Ouenzé')).toBeTruthy();
+    expect(screen.getByTestId('marker-3 biens à Moungali')).toBeTruthy();
+    expect(screen.getByLabelText('15 biens au total')).toBeTruthy();
   });
 
-  test('un item sans coordonnées est exclu du rendu carte sans planter', async () => {
-    api.get.mockResolvedValue({ data: { data: { properties: [NO_COORDS_ANNONCE], total: 1 } } });
+  test('tap sur une bulle ouvre la bottom card puis "Voir les biens" navigue avec city+arrondissement injectés', async () => {
+    fetchMapAggregates.mockResolvedValue({
+      total: 5, mappedTotal: 5, unmappedTotal: 0,
+      areas: [AREA('Poto-Poto', 5)],
+    });
     render(<CarteScreen navigation={navigation} />);
-    await waitFor(() => expect(screen.getByTestId('carte-map')).toBeTruthy());
-    expect(screen.queryByLabelText('Sans Coordonnées')).toBeNull();
-  });
-
-  test('appuyer sur le marqueur Hotel ouvre l’aperçu, puis la carte de l’aperçu navigue vers HotelDetailScreen', async () => {
-    api.get.mockResolvedValue({ data: { data: { properties: [HOTEL_ANNONCE], total: 1 } } });
-    render(<CarteScreen navigation={navigation} />);
-    const marker = await screen.findByLabelText('Mila Hotel');
+    const marker = await screen.findByTestId('marker-5 biens à Poto-Poto');
     fireEvent.press(marker);
-    const previewCard = await screen.findByText('Mila Hotel');
-    fireEvent.press(previewCard);
-    await waitFor(() => expect(navigation.navigate).toHaveBeenCalled());
-    const [screenName, params] = navigation.navigate.mock.calls[0];
-    expect(screenName).toBe('Profil');
-    expect(params.screen).toBe('HotelDetail');
-    expect(params.params.hotelId).toBe('hotel-object-id-1');
+    const seeBtn = await screen.findByLabelText('Voir les 5 biens à Poto-Poto');
+    fireEvent.press(seeBtn);
+    expect(navigation.navigate).toHaveBeenCalledWith('Annonces', {
+      screen: 'ListeAnnonces',
+      params: expect.objectContaining({
+        initialFilters: expect.objectContaining({ city: 'Brazzaville', arrondissement: 'Poto-Poto' }),
+      }),
+    });
   });
 
-  test('un établissement non-hôtelier navigue toujours vers DetailAnnonce (comportement inchangé)', async () => {
-    api.get.mockResolvedValue({ data: { data: { properties: [GENERIC_ANNONCE], total: 1 } } });
+  test('total = 0 → empty state + bouton "Réinitialiser les filtres" absent (car aucun filtre actif)', async () => {
+    fetchMapAggregates.mockResolvedValue({ total: 0, mappedTotal: 0, unmappedTotal: 0, areas: [] });
     render(<CarteScreen navigation={navigation} />);
-    const marker = await screen.findByLabelText('Villa Meublée');
-    fireEvent.press(marker);
-    const previewCard = await screen.findByText('Villa Meublée');
-    fireEvent.press(previewCard);
-    await waitFor(() => expect(navigation.navigate).toHaveBeenCalledWith('Annonces', expect.objectContaining({
-      screen: 'DetailAnnonce',
-      params: expect.objectContaining({ resourceType: 'property', resourceId: 'property-heb-1' }),
-    })));
+    await waitFor(() => screen.getByText('Aucun bien correspondant'));
+    expect(screen.queryByText('Réinitialiser les filtres')).toBeNull();
+  });
+
+  test('unmappedTotal affiche un bandeau explicite (sans marker inventé)', async () => {
+    fetchMapAggregates.mockResolvedValue({
+      total: 12, mappedTotal: 10, unmappedTotal: 2,
+      areas: [AREA('Poto-Poto', 6), AREA('Moungali', 4)],
+    });
+    render(<CarteScreen navigation={navigation} />);
+    await waitFor(() => screen.getByText(/2 biens dans des zones non encore cartographiées/));
+    // Aucun marker inventé pour les biens non mappés.
+    expect(screen.queryByTestId(/marker-\d+ biens à Ouesso/)).toBeNull();
+  });
+
+  test('erreur API → carte affiche un état d\'erreur avec "Réessayer"', async () => {
+    fetchMapAggregates.mockRejectedValueOnce(new Error('network'));
+    render(<CarteScreen navigation={navigation} />);
+    await waitFor(() => screen.getByText('Impossible de charger la carte.'));
+    expect(screen.getByText('Réessayer')).toBeTruthy();
+  });
+
+  test('permission localisation refusée : la carte reste utilisable, les markers restent affichés', async () => {
+    fetchMapAggregates.mockResolvedValue({
+      total: 3, mappedTotal: 3, unmappedTotal: 0, areas: [AREA('Poto-Poto', 3)],
+    });
+    render(<CarteScreen navigation={navigation} />);
+    const locate = await screen.findByLabelText('Me localiser');
+    fireEvent.press(locate);
+    // Le mock retourne 'denied' — pas de crash, marker toujours présent.
+    expect(await screen.findByTestId('marker-3 biens à Poto-Poto')).toBeTruthy();
+  });
+
+  test('confidentialité : aucune coordonnée exacte de propriété n\'est utilisée pour les markers', async () => {
+    // Le contrat mobile ne consomme jamais Property.latitude/longitude sur cet écran.
+    // On vérifie ici que fetchMapAggregates est bien la seule source de données appelée
+    // et qu'aucun appel à /altimmo/search n'est effectué depuis le montage.
+    fetchMapAggregates.mockResolvedValue({ total: 2, mappedTotal: 2, unmappedTotal: 0, areas: [AREA('Poto-Poto', 2)] });
+    render(<CarteScreen navigation={navigation} />);
+    await waitFor(() => screen.getByTestId('marker-2 biens à Poto-Poto'));
+    expect(fetchMapAggregates).toHaveBeenCalledTimes(1);
   });
 });

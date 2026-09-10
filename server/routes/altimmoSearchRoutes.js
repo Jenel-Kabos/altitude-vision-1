@@ -4,9 +4,13 @@
 
 const express = require('express');
 const { search } = require('../controllers/altimmoSearchController');
+const { getMapAggregates } = require('../controllers/mapAggregatesController');
 
 const router = express.Router();
 
 router.get('/search', search);
+// ALTIMMO-MAP-LOCALITY-CENTROIDS-2 — agrégation publique par localité (n'expose
+// jamais les coordonnées de propriétés individuelles).
+router.get('/map-aggregates', getMapAggregates);
 
 module.exports = router;
