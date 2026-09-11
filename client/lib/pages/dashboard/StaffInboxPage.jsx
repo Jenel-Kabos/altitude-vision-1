@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import {
   MessageCircle, Send, Loader2, Home, User, AlertTriangle,
@@ -53,12 +53,13 @@ const formatTime = (d) => {
 
 const StaffInboxPage = () => {
   const { user } = useAuth();
-  const { selectedTenantId } = usePlatformTenantRuntime();
+  const { selectedTenantId, tenants } = usePlatformTenantRuntime();
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected]           = useState(null);
   const [messages, setMessages]           = useState([]);
   const [input, setInput]                 = useState("");
   const [loadingList, setLoadingList]     = useState(true);
+  const [errorList, setErrorList]         = useState(null); // MESSAGING-PLATFORM-INBOX-AGGREGATION-1B
   const [loadingMsgs, setLoadingMsgs]     = useState(false);
   const [sending, setSending]             = useState(false);
   const [notif, setNotif]                 = useState(null);
@@ -67,20 +68,62 @@ const StaffInboxPage = () => {
   const bottomRef    = useRef(null);
   const fileInputRef = useRef(null);
   const listScrollRef = useRef(null);
+  // Race protection : la dernière requête gagne. Toute réponse d'un scope
+  // désuet (utilisateur bascule Mila → Vue plateforme → Altitude en série)
+  // est ignorée si son epoch ne matche pas le compteur courant.
+  const fetchEpochRef = useRef(0);
 
-  // Charger la liste des conversations staff-inbox
-  const fetchConversations = async () => {
+  // Résolveur label tenant (pour le badge en Vue plateforme). Utilise la
+  // liste tenants exposée par PlatformTenantRuntimeContext ; ne fait aucun
+  // appel supplémentaire ; si le tenant n'est pas dans la liste courante
+  // (ex. tenant retiré) la conversation retombe sur un libellé neutre.
+  const tenantNameById = useMemo(() => {
+    const map = new Map();
+    (tenants || []).forEach((t) => map.set(String(t._id), t.name));
+    return map;
+  }, [tenants]);
+  const isPlatformScope = !selectedTenantId;
+  const tenantLabelFor = useCallback((conv) => {
+    const raw = conv?.tenant;
+    if (!raw) return 'Support général';
+    const id = String(raw?._id || raw);
+    return tenantNameById.get(id) || 'Tenant';
+  }, [tenantNameById]);
+
+  const fetchConversations = useCallback(async () => {
+    const epoch = ++fetchEpochRef.current;
+    setLoadingList(true);
+    setErrorList(null);
     try {
       const data = await getStaffInbox();
-      setConversations(data);
-    } catch {
-      showNotif("Impossible de charger les conversations.", "error");
+      if (fetchEpochRef.current !== epoch) return; // scope changed while in-flight
+      setConversations(Array.isArray(data) ? data : []);
+    } catch (err) {
+      if (fetchEpochRef.current !== epoch) return;
+      // Un 403/500 ne doit jamais s'afficher comme « 0 conversation ».
+      const status = err?.response?.status;
+      setConversations([]);
+      setErrorList({
+        status: typeof status === 'number' ? status : null,
+        message: 'Impossible de charger les conversations.',
+      });
+      showNotif('Impossible de charger les conversations.', 'error');
     } finally {
-      setLoadingList(false);
+      if (fetchEpochRef.current === epoch) setLoadingList(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchConversations(); }, []);
+  // Recharge à chaque changement de contexte. Désélectionne toute
+  // conversation qui n'appartient plus au scope courant (ex. Mila → Altitude).
+  useEffect(() => {
+    setSelected((prev) => {
+      if (!prev) return prev;
+      if (!selectedTenantId) return prev; // platform sees all
+      const convTenantId = String(prev.tenant?._id || prev.tenant || '');
+      return convTenantId === String(selectedTenantId) ? prev : null;
+    });
+    fetchConversations();
+  }, [selectedTenantId, fetchConversations]);
 
   // Socket.IO temps réel — nouveaux messages clients sans recharger la page.
   // AuthContext n'expose pas `token` (uniquement localStorage) : on le lit ici,
@@ -226,8 +269,24 @@ const StaffInboxPage = () => {
           aria-label="Conversations clients"
         >
           {loadingList ? (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center" role="status" aria-label="Chargement">
               <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            </div>
+          ) : errorList ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center" role="alert">
+              <AlertTriangle className="w-8 h-8 text-red-400" />
+              <p className="text-sm text-red-600 font-semibold">{errorList.message}</p>
+              {errorList.status ? (
+                <p className="text-xs text-gray-400">HTTP {errorList.status}</p>
+              ) : null}
+              <button
+                type="button"
+                onClick={fetchConversations}
+                className="mt-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
+                style={{ background: GOLD }}
+              >
+                Réessayer
+              </button>
             </div>
           ) : conversations.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
@@ -268,6 +327,14 @@ const StaffInboxPage = () => {
                             <Home className="w-3 h-3 flex-shrink-0" />
                             {propertyTitle}
                           </p>
+                        )}
+                        {isPlatformScope && (
+                          <span
+                            className="mt-1 inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700"
+                            data-testid="conv-tenant-badge"
+                          >
+                            {tenantLabelFor(conv)}
+                          </span>
                         )}
                       </div>
                     </div>
