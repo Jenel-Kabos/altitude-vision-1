@@ -7,7 +7,7 @@ const Message = require('../models/Message');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
-const { getIO } = require('../socket');
+const { getIO, emitConversationEvent } = require('../socket');
 const { notify, notifyStaff } = require('../services/notificationService');
 const { ALL_STAFF } = require('../utils/roles');
 const logger = require('../utils/logger');
@@ -147,13 +147,24 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     }
 
     // --- 3. Créer le message ---
+    // MESSAGING-PLATFORM-INBOX-AGGREGATION-1A — INVARIANT DE PRÉSERVATION DE TENANT :
+    // Une réponse dans une conversation existante hérite TOUJOURS de
+    // `convDoc.tenant`. Le contexte dashboard `req.platformTenant` sert à
+    // décider de l'autorité de lecture/écriture, jamais à réattribuer une
+    // conversation à un autre tenant. Un opérateur global ne doit pas
+    // pouvoir transférer une conversation Mila Events vers Altitude Vision
+    // en changeant son sélecteur de tenant dans le dashboard, et un client
+    // ne peut pas forger un `X-Platform-Tenant-Id` dans ce but non plus.
+    // Ne consulter `req.platformTenant` qu'en dernier recours, uniquement
+    // quand aucune conversation existante n'ancre le message.
+    const messageTenant = convDoc?.tenant ?? req.platformTenant?._id ?? null;
     const message = await Message.create({
         sender: req.user.id,
         receiver: targetUserId || null,
         conversation: convDoc?._id || null,
         content,
         attachments: attachmentsData,
-        tenant: req.platformTenant?._id ?? convDoc?.tenant ?? null,
+        tenant: messageTenant,
     });
 
     await message.populate('sender', 'name email avatar');
@@ -201,17 +212,22 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     // si hors-ligne — géré en interne, pas besoin de dupliquer l'appel ici).
     try {
         if (isStaffInbox && !targetUserId) {
-            // Client → staff : notifier tous les membres du staff
-            const staff = await User.find({ role: { $in: ALL_STAFF } }).select('_id');
-            for (const s of staff) {
-                getIO().to(s._id.toString()).emit('new-staff-message', { conversationId: convDoc._id, message });
-            }
-            console.log('[NOTIF DEBUG] notifyStaff appelé, staff roles:', ALL_STAFF);
+            // Client → staff : émission scopée sur la room staff du tenant de
+            // la CONVERSATION (jamais tous les ALL_STAFF de la plateforme) +
+            // room globale `platform:support` pour les opérateurs porteurs
+            // de `platform.support.read`. Un staff tenant B ne peut plus
+            // recevoir accidentellement une conversation Mila.
+            emitConversationEvent(
+                'new-staff-message',
+                { conversationId: convDoc._id, message },
+                { conversationTenantId: convDoc.tenant }
+            );
             notifyStaff({
                 type: 'new_staff_message',
                 title: senderName,
                 body: preview,
                 data: { conversationId: convDoc._id.toString(), screen: 'Conversations' },
+                platformTenantId: convDoc.tenant || null,
             }).catch(() => {});
         } else if (targetUserId) {
             // Conv 1-à-1 ou staff → client : notifier le destinataire
