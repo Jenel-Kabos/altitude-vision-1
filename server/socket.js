@@ -8,7 +8,15 @@ const mongoose = require('mongoose');
 const User = require('./models/User');
 const Conversation = require('./models/Conversation');
 const { resolveEffectiveTenantContext } = require('./services/platformTenant/tenantContextService');
+const { hasCapability } = require('./services/platformOperator/platformOperatorService');
 const logger = require('./utils/logger');
+
+// MESSAGING-PLATFORM-INBOX-AGGREGATION-1C — room canonique pour les
+// PlatformOperator porteurs de `platform.support.read`. Réutilisée par
+// `emitToConversationTenant` pour toute émission liée à une conversation ;
+// jamais accessible sans capacité (voir handshake ci-dessous).
+const PLATFORM_SUPPORT_ROOM = 'platform:support';
+const tenantStaffRoom = (tenantId) => (tenantId ? `tenant:${String(tenantId)}:staff` : null);
 
 let _io = null;
 
@@ -155,10 +163,18 @@ const initSocket = (httpServer, corsOptions) => {
         || socket.handshake.headers?.['x-tenant-id']
         || null;
       const tenantContext = await resolveEffectiveTenantContext(user._id, requestedTenantId);
-      if (!tenantContext?.tenant) return next(new Error('Contexte tenant requis'));
-      socket.platformTenantId = String(tenantContext.tenant._id);
-      socket.user.platformTenant = tenantContext.tenant._id;
-      socket.tenantContextSource = tenantContext.source;
+      // MESSAGING-PLATFORM-INBOX-AGGREGATION-1C — un PlatformOperator actif
+      // non scopé (`source: 'platform_operator_unscoped'`) doit pouvoir
+      // établir sa connexion socket même sans tenant sélectionné (Vue
+      // plateforme). L'ancien fail-closed sur `!tenantContext?.tenant`
+      // empêchait tout realtime en mode plateforme. Le platform:support
+      // room reste gated en aval par la capability `platform.support.read`.
+      const isPlatformUnscoped = tenantContext?.source === 'platform_operator_unscoped';
+      if (!tenantContext?.tenant && !isPlatformUnscoped) return next(new Error('Contexte tenant requis'));
+      socket.platformTenantId = tenantContext?.tenant ? String(tenantContext.tenant._id) : null;
+      socket.user.platformTenant = tenantContext?.tenant?._id || null;
+      socket.tenantContextSource = tenantContext?.source;
+      socket.platformOperator = tenantContext?.operator || null;
       // HOTFIX-SCALABILITY-P1-SOCKETIO-DISTRIBUTED-ADAPTER-1 — `socket.data`
       // est le seul sac de propriétés répliqué par l'adaptateur distribué
       // vers les RemoteSocket renvoyés par fetchSockets() sur une autre
@@ -184,6 +200,21 @@ const initSocket = (httpServer, corsOptions) => {
 
     // Room personnelle = userId (pour push ciblé depuis les controllers)
     socket.join(socket.userId);
+
+    // MESSAGING-PLATFORM-INBOX-AGGREGATION-1C — rooms staff/platform.
+    // (a) Membre staff d'un tenant → rejoint la room staff de ce tenant
+    //     UNIQUEMENT. Un Admin/Collaborateur/etc. dont le contexte tenant
+    //     résolu diffère ne rejoint jamais la room d'un autre tenant.
+    // (b) PlatformOperator porteur de `platform.support.read` → rejoint la
+    //     room globale `platform:support`. Un simple Admin sans opérateur
+    //     actif ne rejoint jamais cette room ; un opérateur sans la
+    //     capability non plus.
+    if (STAFF_ROLES.has(socket.user.role) && socket.platformTenantId) {
+      socket.join(tenantStaffRoom(socket.platformTenantId));
+    }
+    if (hasCapability(socket.platformOperator, 'platform.support.read')) {
+      socket.join(PLATFORM_SUPPORT_ROOM);
+    }
 
     socket.on('establishment:join', async ({ type, id } = {}, acknowledge) => {
       if (type !== 'hotel' || !mongoose.isValidObjectId(id)) {
@@ -400,7 +431,32 @@ async function emitHotelEvent(hotelId, payload = {}) {
 
 const getRealtimeReadyPromise = () => _adapterReadyPromise;
 
+/**
+ * MESSAGING-PLATFORM-INBOX-AGGREGATION-1C — émission canonique d'un event
+ * de conversation. L'appelant fournit `conversationTenantId` DÉRIVÉ DE LA
+ * CONVERSATION (jamais de req.platformTenant/body/header) et l'event est
+ * routé vers :
+ *   - la room staff du tenant de la conversation (si le tenant existe) ;
+ *   - la room globale `platform:support` (opérateurs porteurs de la
+ *     capability). Socket.IO dédup automatiquement un socket présent dans
+ *     les deux rooms lors d'un `to(room1).to(room2).emit(...)`.
+ *   - optionnellement une room additionnelle (participant client).
+ * Aucune diffusion à tous les ALL_STAFF via user-room.
+ */
+function emitConversationEvent(eventName, payload, { conversationTenantId, extraRooms = [] } = {}) {
+  if (!_io) return;
+  const rooms = new Set(extraRooms.filter(Boolean).map(String));
+  const staffRoom = tenantStaffRoom(conversationTenantId);
+  if (staffRoom) rooms.add(staffRoom);
+  rooms.add(PLATFORM_SUPPORT_ROOM);
+  if (rooms.size === 0) return;
+  let emitter = _io;
+  for (const room of rooms) emitter = emitter.to(room);
+  emitter.emit(eventName, payload);
+}
+
 module.exports = {
   initSocket, getIO, isUserOnline, canAccessConversation, canAccessHotel, hotelRoom, emitHotelEvent,
+  PLATFORM_SUPPORT_ROOM, tenantStaffRoom, emitConversationEvent,
   getRealtimeStatus, getRealtimeReadyPromise, INSTANCE_ID,
 };
