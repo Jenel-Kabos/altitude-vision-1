@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "description": "Altitude Vision — last certified test baselines and known non-product blockers. Update this file only when a certification actually re-runs; do not paint over failures here.",
+  "generated_by": "INDUSTRIALIZATION-1",
+  "domains": {
+    "sales": {
+      "command": "npm run certify:sales",
+      "last_certified": "SCL-3",
+      "suites": 14,
+      "tests": 278,
+      "passed": 278,
+      "failed": 0,
+      "duration_seconds": 861,
+      "notes": "Includes saleContractLifecycle (30) + regression bundle + architectureBoundaries."
+    },
+    "architecture": {
+      "command": "npm run certify:architecture",
+      "last_certified": "SCL-2",
+      "suites": 2,
+      "tests": 26,
+      "passed": 26,
+      "failed": 0,
+      "duration_seconds": 2
+    },
+    "release": {
+      "command": "npm run test:mongo (server workspace)",
+      "last_certified": "Phase 3F-FINAL",
+      "suites": 190,
+      "tests": 2302,
+      "passed": 2301,
+      "failed": 1,
+      "duration_seconds": 5005
+    },
+    "frontend": {
+      "command": "npm run certify:frontend",
+      "last_certified": "FRONTEND-BASELINE-GREEN",
+      "suites": 128,
+      "tests": 945,
+      "passed": 945,
+      "failed": 0,
+      "duration_seconds": 60.1,
+      "ready": true,
+      "notes": "STALE_TEST_EXPECTATION: incomplete tenant-context and service fixtures aligned; original assertions preserved, platform/tenant separation assertions strengthened. ManagePropertiesPageTenantSwitch portfolio transport mocked to prevent unintended network requests. No tests skipped or removed."
+    }
+  },
+  "known_non_product_blockers": [
+    {
+      "id": "harness-tenantMembershipPromotion2E1-PROMOTE-08",
+      "suite": "server/__tests__/tenantMembershipPromotion2E1.mongo.integration.test.js",
+      "test": "PROMOTE-08: last-admin invariant remains protected on demotion & removal",
+      "classification": "ORDER_DEPENDENT_HARNESS_TIMEOUT",
+      "evidence": {
+        "shared_harness_duration_seconds": 208,
+        "isolated_runs": [
+          { "result": "GREEN", "tests": "8/8", "duration_seconds": 33.5 },
+          { "result": "GREEN", "tests": "8/8", "duration_seconds": 33.0 }
+        ]
+      },
+      "policy": "Reported visibly by certify:release but does not automatically block release. Do not silence. Do not encode 'ignore forever' — re-verify each release."
+    }
+  ]
+}

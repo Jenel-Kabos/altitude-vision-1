@@ -222,7 +222,10 @@ const webhookRoutes = require('./routes/webhookRoutes');
 const proprietaireRoutes     = require('./routes/proprietaireRoutes');
 const locataireRoutes        = require('./routes/locataireRoutes');
 const contratRoutes          = require('./routes/contratRoutes');
+const rentalContratRoutes    = require('./routes/rentalContratRoutes');
+const saleContratRoutes      = require('./routes/saleContratRoutes');
 const paiementRoutes         = require('./routes/paiementRoutes');
+const paiementLocationRoutes = require('./routes/paiementLocationRoutes');
 const gestionDocumentRoutes  = require('./routes/gestionDocumentRoutes');
 const rentalDocumentRoutes   = require('./routes/rentalDocumentRoutes');
 const rentalManagementRoutes = require('./routes/rentalManagementRoutes');
@@ -257,6 +260,11 @@ const propertyAssetRoutes = require('./routes/propertyAssetRoutes');
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use('/api/auth', require('./routes/authRoutes'));
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-1E — canonical tenant members surface.
+// Phase 1D certified the routes but only mounted them inside its own test
+// app ; production `server.js` never exposed them. Frontend consumers of
+// /api/members would otherwise 404. This mount is the missing contract link.
+app.use('/api/members', require('./routes/tenantMemberRoutes'));
 
 // 🏠 Pôle Altimmo
 app.use("/api/properties", propertyRoutes);
@@ -267,7 +275,19 @@ app.use('/api/publicites', require('./routes/publiciteRoutes'));
 // 🏘️ Gestion Locative
 app.use('/api/proprietaires',    proprietaireRoutes);
 app.use('/api/locataires',       locataireRoutes);
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIV — CONTRAT-DOMAIN-SPLIT.
+// Les surfaces typées `/api/contrats/location` et `/api/contrats/vente`
+// DOIVENT être montées AVANT `/api/contrats` : sans cela, une requête
+// `GET /api/contrats/location` serait absorbée par `GET /api/contrats/:id`
+// avec `id='location'`. Express résout les préfixes par ordre de montage.
+app.use('/api/contrats/location', rentalContratRoutes);
+app.use('/api/contrats/vente',    saleContratRoutes);
 app.use('/api/contrats',         contratRoutes);
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TENANT-CONTEXT-B.2 —
+// bounded context `/api/paiements/location/*` (rental payments, canonical
+// tenant authority). Monté AVANT la route legacy pour prendre la précédence.
+// La route legacy `/api/paiements/*` reste montée pour compatibilité.
+app.use('/api/paiements/location', paiementLocationRoutes);
 app.use('/api/paiements',        paiementRoutes);
 app.use('/api/gestion-docs',     gestionDocumentRoutes);
 // Accès contrôlé aux documents Gestion Locative (GL-DEBT-1, Phase 3) —

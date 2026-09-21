@@ -5,6 +5,11 @@ attendant, ces commandes exécutent **exactement les mêmes validations en
 local**, sur les trois workspaces (`server`, `client`, `altimmo-app`), dans
 cet ordre : **server → client → mobile**.
 
+> **Working on a single feature?** Prefer domain certification
+> (`npm run certify:<domain>`) — see
+> [`docs/testing/CERTIFICATION.md`](testing/CERTIFICATION.md). The commands
+> below are the LEVEL-3 release gate and take ~1–2 hours.
+
 ## Commandes
 
 ### `npm run ci`

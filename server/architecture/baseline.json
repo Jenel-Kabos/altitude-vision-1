@@ -107,6 +107,41 @@
       "to": "controllers/dashboardAnalyticsController.js",
       "reason": "Dette historique certifiée par ARCH-1 ; suppression progressive obligatoire.",
       "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/paiementLocationRoutes.js",
+      "to": "models/Contrat.js",
+      "reason": "USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TENANT-CONTEXT-B.2 — PAYMENT ROUTE DOMAIN SPLIT (LOCATION). Router typé location, même dette héritée que routes/paiementRoutes.js (ARCH-1) ; scope canonique `assertRentalPaymentDomain` chargé directement pour raison d'authorisation.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/paiementLocationRoutes.js",
+      "to": "models/Paiement.js",
+      "reason": "USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TENANT-CONTEXT-B.2 — PAYMENT ROUTE DOMAIN SPLIT (LOCATION). Même dette héritée que routes/paiementRoutes.js (ARCH-1) — router.param tenant frontier utilise `Paiement.findById`.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/paiementLocationRoutes.js",
+      "to": "models/Property.js",
+      "reason": "USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TENANT-CONTEXT-B.2 — PAYMENT ROUTE DOMAIN SPLIT (LOCATION). Router utilise `Property.find` pour scoper le calcul des pénalités locatives au tenant ; même dette héritée que la surface legacy.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/rentalContratRoutes.js",
+      "to": "models/Contrat.js",
+      "reason": "USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIV — CONTRAT-DOMAIN-SPLIT. Router typé rental Contrat, même dette héritée que routes/contratRoutes.js (ARCH-1) ; `router.param('id', …)` charge le Contrat pour la frontière tenant canonique.",
+      "category": "legacy-layer-debt"
+    },
+    {
+      "rule": "ARCH-LAYER-003",
+      "from": "routes/saleContratRoutes.js",
+      "to": "models/Contrat.js",
+      "reason": "USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIV — CONTRAT-DOMAIN-SPLIT. Router typé sale Contrat, même dette héritée que routes/contratRoutes.js (ARCH-1) ; `router.param('id', …)` charge le Contrat pour la frontière tenant canonique.",
+      "category": "legacy-layer-debt"
     }
   ],
   "cycles": [],

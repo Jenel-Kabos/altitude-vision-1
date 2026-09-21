@@ -11,7 +11,15 @@
     "verify:client": "npm --prefix client run verify",
     "verify:mobile": "npm --prefix altimmo-app run verify",
     "release-check": "node scripts/local-ci.js release",
-    "health": "node scripts/health.js"
+    "health": "node scripts/health.js",
+    "certify:tenant": "node scripts/certify.js tenant",
+    "certify:contracts": "node scripts/certify.js contracts",
+    "certify:rental": "node scripts/certify.js rental",
+    "certify:sales": "node scripts/certify.js sales",
+    "certify:financial": "node scripts/certify.js financial",
+    "certify:frontend": "node scripts/certify.js frontend",
+    "certify:architecture": "node scripts/certify.js architecture",
+    "certify:release": "node scripts/certify.js release"
   },
   "dependencies": {
     "axios": "^1.13.5",

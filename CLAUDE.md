@@ -2,6 +2,25 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Canonical references (read before non-trivial work)
+
+- [`docs/architecture/INVARIANTS.md`](docs/architecture/INVARIANTS.md) — permanent architectural invariants (multi-tenant authority, Contrat domain, sale/rental lifecycles, marketplace, financial). **Supersedes older sprint reports when they disagree.**
+- [`docs/architecture/DOMAIN_OWNERSHIP.md`](docs/architecture/DOMAIN_OWNERSHIP.md) — which module owns which write; forbidden cross-domain side effects.
+- [`docs/workflow/FEATURE_WORKFLOW.md`](docs/workflow/FEATURE_WORKFLOW.md) — 9-step feature workflow and stop conditions.
+- [`docs/workflow/VERTICAL_SLICE.md`](docs/workflow/VERTICAL_SLICE.md) — what "feature complete" means end-to-end.
+- [`docs/testing/CERTIFICATION.md`](docs/testing/CERTIFICATION.md) — three test levels and the `certify:*` commands.
+- [`docs/testing/FAILURE_CLASSIFICATION.md`](docs/testing/FAILURE_CLASSIFICATION.md) — blocking vs non-blocking test failures.
+- [`docs/testing/certification-baseline.json`](docs/testing/certification-baseline.json) — last-known baseline and known non-product blockers.
+
+## Non-negotiable repository rules
+
+1. **AUDIT BEFORE CREATE.** Never create a parallel model / service / controller / route when a canonical implementation exists. Read the file and the domain-ownership map first.
+2. **PRESERVE DIRTY WORKTREE.** Never `git add .`, `git add -A`, `git reset`, `git restore .`, `git checkout .`, `git clean`, or `git stash` globally. Never destroy unrelated changes.
+3. **NO AUTONOMOUS RELEASE ACTIONS.** Never commit, push, deploy, run production migrations, or perform backfills without explicit user authorization in the same message.
+4. **STOP CONDITIONS.** Halt and ask for a decision when a change would require: destructive migration, tenant/financial authority change, cross-tenant behavior change, new infrastructure dependency, mandatory data backfill, breaking public API compatibility, or production mutation. Full list in `docs/workflow/FEATURE_WORKFLOW.md`.
+5. **CERTIFY THE DOMAIN, NOT THE REPO.** After a feature, run `npm run certify:<domain>` — not `npm run test:mongo` and not `npm run certify:release`. The full release gate is a release-boundary tool.
+6. **CLASSIFY FAILURES.** Do not paper over. Every red test gets a classification from `FAILURE_CLASSIFICATION.md` with evidence (baseline comparison + isolated repro).
+
 ## Commands
 
 ### Development
@@ -135,6 +154,21 @@ client/
 3. Register route in `server/server.js`
 4. `client/lib/services/newFeatureService.js` — API calls
 5. `client/app/new-feature/page.jsx` — page component (add `'use client'` if interactive)
+
+Full workflow (audit → invariants → vertical slice → domain certification) in [`docs/workflow/FEATURE_WORKFLOW.md`](docs/workflow/FEATURE_WORKFLOW.md).
+
+### Domain certification commands
+
+```bash
+npm run certify:tenant         # OrgMembership, tenant authority
+npm run certify:contracts      # Polymorphic Contrat + typed rental/sale + lifecycles
+npm run certify:rental         # Rental lease / rental payment domain
+npm run certify:sales          # Sale contract lifecycle + Transaction seam
+npm run certify:financial      # Finalization, ledger, invoice, payment
+npm run certify:architecture   # Structural boundaries + boundary tests
+npm run certify:frontend       # Client Vitest suite
+npm run certify:release        # LEVEL-3 release gate (~1–2 h) — release only
+```
 
 ## Code Conventions
 
