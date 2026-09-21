@@ -71,5 +71,6 @@ test('FINANCE/HOTEL — Admin A ne bénéficie plus d’un bypass global vers Ho
   const { tenantA, adminA, adminB } = await fixture();
   const hotelB = await Hotel.create({ name: 'Hotel secret B', manager: adminB._id, createdBy: adminB._id });
   const actorA = { ...adminA.toObject(), platformTenant: tenantA, tenantScopeUserIds: [adminA._id] };
-  await expect(assertFinancialScope(actorA, hotelB._id)).rejects.toMatchObject({ statusCode: 404 });
+  // A global Admin with businessRole=null is denied before resource lookup.
+  await expect(assertFinancialScope(actorA, hotelB._id)).rejects.toMatchObject({ statusCode: 403, code: 'FINANCIAL_UNAUTHORIZED' });
 });

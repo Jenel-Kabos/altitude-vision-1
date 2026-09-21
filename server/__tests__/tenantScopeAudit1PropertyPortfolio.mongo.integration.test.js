@@ -28,8 +28,14 @@ app.use(express.json());
 app.use('/api/properties', propertyRoutes);
 app.use(errorHandler);
 
-const bearer = (user) => ({
+const OrgMembership = require('../models/OrgMembership');
+const promoteMembershipTo = (user, tenant, businessRole) => OrgMembership.updateOne(
+  { user: user._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
+  { $set: { businessRole } },
+);
+const bearer = (user, tenantId) => ({
   Authorization: `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' })}`,
+  ...(tenantId ? { 'X-Platform-Tenant-Id': String(tenantId) } : {}),
 });
 
 let seq = 0;
@@ -45,6 +51,10 @@ async function createPublishedPropertyForUnaffiliatedOwner(overrides = {}) {
     price: 300000, address: { street: 'Rue Test', city: 'Brazzaville', arrondissement: 'Centre' },
     latitude: -4.26, longitude: 15.24, images: ['https://placehold.co/1200x800/png?text=Test'],
     surface: 90, availability: 'Disponible', owner: owner._id,
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-E — le portefeuille tenant
+    // filtre désormais par `Property.tenant` (fix multi-tenant leak). Un
+    // bien "affilié au tenant unique" doit être attribué explicitement.
+    tenant: overrides.tenantId || null,
     ...overrides,
   });
   return { owner, property };
@@ -57,12 +67,15 @@ describe('TENANT-SCOPE-AUDIT-1 — Property Portfolio : propriétaire public-sig
   let fixture; let property;
 
   beforeAll(async () => {
-    fixture = await createTenantFixture({ label: 'ScopeAuditPortfolio Solo' });
-    ({ property } = await createPublishedPropertyForUnaffiliatedOwner());
+    fixture = await createTenantFixture({ label: 'ScopeAuditPortfolio Solo', withAdminMembership: true });
+    // Post-Lot-E: the portfolio filters by `Property.tenant`. Attribute the
+    // seed property to the tenant so the intent (staff sees "their" bien)
+    // is preserved with the new strict semantics.
+    ({ property } = await createPublishedPropertyForUnaffiliatedOwner({ tenantId: fixture.tenant._id }));
   });
 
-  test('GET /api/properties/portfolio (staff, tenant unique) inclut le bien d’un propriétaire non affilié', async () => {
-    const res = await request(app).get('/api/properties/portfolio').set(bearer(fixture.bootstrap));
+  test('GET /api/properties/portfolio (staff, tenant unique) inclut le bien attribué au tenant', async () => {
+    const res = await request(app).get('/api/properties/portfolio').set(bearer(fixture.bootstrap, fixture.tenant._id));
     expect(res.status).toBe(200);
     const ids = res.body.data.items.map((i) => String(i._id));
     expect(ids).toContain(String(property._id));
@@ -73,20 +86,21 @@ describe('TENANT-SCOPE-AUDIT-1 — Property Portfolio : cross-tenant préservé'
   let fixtureA; let fixtureB; let propertyA; let adminB;
 
   beforeAll(async () => {
-    fixtureA = await createTenantFixture({ label: 'ScopeAuditPortfolio CrossA' });
+    fixtureA = await createTenantFixture({ label: 'ScopeAuditPortfolio CrossA', withAdminMembership: true });
     ({ property: propertyA } = await createPublishedPropertyForUnaffiliatedOwner());
-    fixtureB = await createTenantFixture({ label: 'ScopeAuditPortfolio CrossB' });
+    fixtureB = await createTenantFixture({ label: 'ScopeAuditPortfolio CrossB', withAdminMembership: true });
     adminB = (await createTenantUser({ tenant: fixtureB.tenant, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } })).user;
+    await promoteMembershipTo(adminB, fixtureB.tenant, 'Admin');
   });
 
   test('dès qu’un second tenant existe, le bien non affilié au Tenant A n’est plus automatiquement inclus (repli sûr, pas une fuite)', async () => {
-    const res = await request(app).get('/api/properties/portfolio').set(bearer(fixtureA.bootstrap));
+    const res = await request(app).get('/api/properties/portfolio').set(bearer(fixtureA.bootstrap, fixtureA.tenant._id));
     const ids = res.body.data.items.map((i) => String(i._id));
     expect(ids).not.toContain(String(propertyA._id));
   });
 
   test('AdminB (tenant distinct) ne voit jamais le portefeuille du Tenant A', async () => {
-    const res = await request(app).get('/api/properties/portfolio').set(bearer(adminB));
+    const res = await request(app).get('/api/properties/portfolio').set(bearer(adminB, fixtureB.tenant._id));
     const ids = res.body.data.items.map((i) => String(i._id));
     expect(ids).not.toContain(String(propertyA._id));
   });
@@ -94,7 +108,7 @@ describe('TENANT-SCOPE-AUDIT-1 — Property Portfolio : cross-tenant préservé'
 
 describe('TENANT-SCOPE-AUDIT-1 — Property Portfolio : non-régression staff avec OrgMembership normal', () => {
   test('un bien dont le propriétaire a un OrgMembership réel continue de fonctionner sans changement', async () => {
-    const fixture = await createTenantFixture({ label: 'ScopeAuditPortfolio IAM' });
+    const fixture = await createTenantFixture({ label: 'ScopeAuditPortfolio IAM', withAdminMembership: true });
     const owner = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Proprietaire' } })).user;
     seq += 1;
     const property = await Property.create({
@@ -102,9 +116,9 @@ describe('TENANT-SCOPE-AUDIT-1 — Property Portfolio : non-régression staff av
       pole: 'Altimmo', type: 'Villa', status: 'vente', statusAdmin: 'Validée', isPublished: true,
       price: 300000, address: { street: 'Rue Test', city: 'Brazzaville', arrondissement: 'Centre' },
       latitude: -4.26, longitude: 15.24, images: ['https://placehold.co/1200x800/png?text=Test'],
-      surface: 90, availability: 'Disponible', owner: owner._id,
+      surface: 90, availability: 'Disponible', owner: owner._id, tenant: fixture.tenant._id,
     });
-    const res = await request(app).get('/api/properties/portfolio').set(bearer(fixture.bootstrap));
+    const res = await request(app).get('/api/properties/portfolio').set(bearer(fixture.bootstrap, fixture.tenant._id));
     const ids = res.body.data.items.map((i) => String(i._id));
     expect(ids).toContain(String(property._id));
   });

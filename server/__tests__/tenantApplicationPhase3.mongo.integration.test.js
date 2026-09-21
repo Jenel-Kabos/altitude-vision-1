@@ -134,14 +134,32 @@ describe('TenantApplication Phase 3 — preuve RED review API', () => {
     expect(response.body.data.application.status).toBe('SUBMITTED');
     expect(response.body.data.application).not.toHaveProperty('rejectionReason');
   });
-  test('APP-01..16 — approbation atomique crée le graphe canonique et résout le tenant', async () => {
+  test('APP-01..16 / FOUNDER-01..06/09/10/12 — approbation atomique crée un founder owner/Admin sans autorité globale', async () => {
     const owner = await makeUser(); const review = await operator(['platform.tenant_applications.review']); const approver = await operator(['platform.tenant_applications.approve']);
-    const item = await underReview(owner, review);
-    expect((await request(app).post(`/api/platform-tenants/applications/${item._id}/approve`).set(bearer(await makeUser('Admin')))).status).toBe(403);
+    const item = await underReview(owner, review); const plainAdmin = await makeUser('Admin');
+    const beforeOwner = await User.findById(owner._id).select('role isActive status historiqueRoles').lean();
+    const beforeGlobalAdminCount = await User.countDocuments({ role: 'Admin' });
+    expect(beforeOwner.role).toBe('Proprietaire'); // FOUNDER-01
+    expect((await request(app).post(`/api/platform-tenants/applications/${item._id}/approve`).set(bearer(plainAdmin))).status).toBe(403);
     const approved = await request(app).post(`/api/platform-tenants/applications/${item._id}/approve`).set(bearer(approver)).send({ tenantId: new (require('mongoose').Types.ObjectId)(), applicant: approver._id });
     expect(approved.status).toBe(200);
     const stored = await TenantApplication.findById(item._id);
     expect(stored.status).toBe('APPROVED'); expect(stored.provisionedTenant).toBeTruthy(); expect(stored.provisionedMembership).toBeTruthy();
+    const tenant = await PlatformTenant.findById(stored.provisionedTenant);
+    const membership = await OrgMembership.findById(stored.provisionedMembership);
+    const afterOwner = await User.findById(owner._id).select('role isActive status historiqueRoles').lean();
+    expect(afterOwner).toMatchObject(beforeOwner); // FOUNDER-02 / aucune mutation globale User
+    expect(membership.roleInUnit).toBe('owner'); // FOUNDER-03
+    expect(membership.businessRole).toBe('Admin'); // FOUNDER-04 — RED attendu: null avant correctif
+    expect(membership.status).toBe('active'); // FOUNDER-05
+    expect(await PlatformOperator.countDocuments({ user: owner._id })).toBe(0); // FOUNDER-06
+    expect(await User.countDocuments({ role: 'Admin' })).toBe(beforeGlobalAdminCount);
+    expect(await OrgMembership.countDocuments({ user: owner._id })).toBe(1); // FOUNDER-09
+    expect(String(membership.orgUnit)).toBe(String(tenant.rootOrgUnit)); // FOUNDER-10
+    expect(String(stored.provisionedMembership)).toBe(String(membership._id)); // FOUNDER-12
+    const globalEscalation = await request(app).get('/api/platform-tenants/applications')
+      .set(bearer(owner)).set('X-Platform-Tenant-Id', String(tenant._id));
+    expect(globalEscalation.status).toBe(403);
     expect(await PlatformTenant.countDocuments()).toBe(1); expect(await OrgUnit.countDocuments({ type: 'organization' })).toBe(1);
     expect(await OrgMembership.countDocuments({ user: owner._id, status: 'active' })).toBe(1);
     expect(await PlatformTenantSettings.countDocuments()).toBe(1); expect(await PlatformTenantTheme.countDocuments()).toBe(1); expect(await PlatformTenantSubscription.countDocuments({ status: 'trialing' })).toBe(1);
@@ -149,13 +167,27 @@ describe('TenantApplication Phase 3 — preuve RED review API', () => {
     expect((await request(app).get('/api/platform-tenants/applications/me/status').set(bearer(owner))).body.data.state).toBe('ALREADY_ONBOARDED');
     expect(await ActionLog.countDocuments({ action: 'tenant_application.approved' })).toBe(1);
   });
+  test.each([
+    ['FOUNDER-07', 'Client'],
+    ['FOUNDER-08', 'Admin'],
+  ])('%s — un applicant devenu %s avant provisioning est refusé sans graphe partiel', async (_caseId, role) => {
+    const owner = await makeUser(); const review = await operator(['platform.tenant_applications.review']); const approver = await operator(['platform.tenant_applications.approve']);
+    const item = await underReview(owner, review);
+    await User.updateOne({ _id: owner._id }, { $set: { role } });
+    await expect(service.approveApplication({ applicationId: item._id, actor: approver }))
+      .rejects.toMatchObject({ code: 'TENANT_APPLICATION_APPLICANT_INVALID' });
+    expect((await TenantApplication.findById(item._id)).status).toBe('UNDER_REVIEW');
+    expect(await PlatformTenant.countDocuments()).toBe(0);
+    expect(await OrgMembership.countDocuments()).toBe(0);
+    expect(await PlatformOperator.countDocuments({ user: owner._id })).toBe(0);
+  });
   test('APP-17/18 — approbations parallèles créent un seul graphe', async () => {
     const owner = await makeUser(); const review = await operator(['platform.tenant_applications.review']); const approver = await operator(['platform.tenant_applications.approve']); const item = await underReview(owner, review);
     const outcomes = await Promise.allSettled([service.approveApplication({ applicationId: item._id, actor: approver }), service.approveApplication({ applicationId: item._id, actor: approver })]);
     expect(outcomes.filter((outcome) => outcome.status === 'fulfilled').length).toBeGreaterThanOrEqual(1);
     expect(await PlatformTenant.countDocuments()).toBe(1); expect(await OrgUnit.countDocuments({ type: 'organization' })).toBe(1); expect(await OrgMembership.countDocuments()).toBe(1); expect(await PlatformTenantSubscription.countDocuments()).toBe(1);
   });
-  test.each(['after_tenant', 'after_membership', 'before_commit'])('ROLL — %s annule tout le graphe', async (failurePoint) => {
+  test.each(['after_tenant', 'after_membership', 'before_commit'])('FOUNDER-11 / ROLL — %s annule tout le graphe', async (failurePoint) => {
     const owner = await makeUser(); const review = await operator(['platform.tenant_applications.review']); const approver = await operator(['platform.tenant_applications.approve']); const item = await underReview(owner, review);
     await expect(service.approveApplication({ applicationId: item._id, actor: approver, failurePoint })).rejects.toThrow();
     expect((await TenantApplication.findById(item._id)).status).toBe('UNDER_REVIEW'); expect(await PlatformTenant.countDocuments()).toBe(0); expect(await OrgUnit.countDocuments()).toBe(0); expect(await OrgMembership.countDocuments()).toBe(0); expect(await PlatformTenantSubscription.countDocuments()).toBe(0);

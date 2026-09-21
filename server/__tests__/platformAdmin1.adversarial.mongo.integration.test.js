@@ -46,7 +46,6 @@ let revokedOperatorUser;
 let plainAdminNoTenant;
 let ordinaryClient;
 let proprietor;
-let globalPropertyIds;
 
 beforeAll(async () => {
   await startFinancialMongo();
@@ -54,8 +53,8 @@ beforeAll(async () => {
   const fixtureB = await createTenantFixture({ label: 'PlatformAdmin1 B' });
   tenantA = fixtureA.tenant;
   tenantB = fixtureB.tenant;
-  adminA = (await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Admin' } })).user;
-  adminB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } })).user;
+  adminA = (await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, businessRole: 'Admin', overrides: { role: 'Admin' } })).user;
+  adminB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, businessRole: 'Admin', overrides: { role: 'Admin' } })).user;
   staffA = (await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Collaborateur' } })).user;
 
   // Un compte Admin sans AUCUNE OrgMembership et sans preuve legacy — exactement
@@ -80,13 +79,11 @@ beforeAll(async () => {
     address: { city: 'Brazzaville', arrondissement: 'Centre' },
     latitude: -4.26, longitude: 15.24, images: ['https://example.test/property.jpg'], surface: 80,
   });
-  const createdProperties = await Property.create([
+  await Property.create([
     propertyData('Bien Tenant A', adminA._id, tenantA._id),
     propertyData('Bien Tenant B', adminB._id, tenantB._id),
     propertyData('Bien propriétaire simple', proprietor._id),
   ]);
-  globalPropertyIds = createdProperties.map((item) => String(item._id));
-
   await grantOperator({
     userId: operatorUser._id, actor: grantingAdmin, reason: 'Test PLATFORM-ADMIN-1',
     capabilities: ['platform.tenants.read', 'platform.tenants.manage', 'platform.properties.read', 'platform.reporting.read', 'platform.operators.manage'],
@@ -99,30 +96,23 @@ beforeAll(async () => {
 
 afterAll(async () => stopFinancialMongo());
 
-describe('RCA — les 403 rapportés sont résolus pour un opérateur, inchangés sinon', () => {
-  test('opérateur SANS tenant sélectionné → registre global A+B+propriétaire simple', async () => {
+describe('RCA — PlatformOperator et membership tenant restent orthogonaux', () => {
+  test('opérateur SANS tenant sélectionné → portfolio tenant refusé', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorUser));
-    expect(res.status).toBe(200);
-    expect(res.body.data.items.map((item) => String(item._id))).toEqual(expect.arrayContaining(globalPropertyIds));
+    expect(res.status).toBe(403);
   });
 
-  test('opérateur AVEC tenant A sélectionné → Property Portfolio 200', async () => {
+  test('opérateur AVEC tenant A sélectionné mais sans membership → refusé', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorUser, tenantA));
-    expect(res.status).toBe(200);
-    const ids = res.body.data.items.map((item) => String(item._id));
-    expect(ids).toContain(globalPropertyIds[0]);
-    expect(ids).not.toContain(globalPropertyIds[1]);
+    expect(res.status).toBe(403);
   });
 
-  test('opérateur AVEC tenant B sélectionné → Property Portfolio 200 (les DEUX tenants, mission §38)', async () => {
+  test('opérateur AVEC tenant B sélectionné mais sans membership → refusé', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorUser, tenantB));
-    expect(res.status).toBe(200);
-    const ids = res.body.data.items.map((item) => String(item._id));
-    expect(ids).toContain(globalPropertyIds[1]);
-    expect(ids).not.toContain(globalPropertyIds[0]);
+    expect(res.status).toBe(403);
   });
 
-  test('opérateur sans platform.properties.read → registre refusé', async () => {
+  test('une capability plateforme ne synthétise jamais une membership tenant', async () => {
     await PlatformOperator.updateOne({ user: operatorUser._id }, { $pull: { capabilities: 'platform.properties.read' } });
     const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorUser));
     expect(res.status).toBe(403);

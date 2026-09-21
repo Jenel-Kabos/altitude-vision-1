@@ -8,7 +8,7 @@ const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
-const { createTenantFixture, createTenantUser, createTenantHotel } = require('./helpers/tenantAwareFixture');
+const { createTenantFixture, createTenantUser, createTenantHotel, addTenantMember } = require('./helpers/tenantAwareFixture');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
@@ -157,12 +157,9 @@ describe('CRM — dont fusion cross-tenant', () => {
     customerA1 = await mk(tenantA, 'CustomerA1');
   });
 
-  test('TESTÉ DIRECTEMENT : PlatformOperator Tenant B liste les customers de B', async () => {
+  test('2B.2-D : PlatformOperator sans membership ne liste pas les customers de B', async () => {
     const res = await request(app).get('/api/crm/customers').set(bearer(operatorUser, tenantB));
-    expect(res.status).toBe(200);
-    const ids = res.body.data.customers.map((c) => String(c._id));
-    expect(ids).toEqual(expect.arrayContaining([String(customerB1._id), String(customerB2._id)]));
-    expect(ids).not.toContain(String(customerA1._id));
+    expect(res.status).toBe(403);
   });
 
   test('TESTÉ DIRECTEMENT : fusion CRM cross-tenant refusée même pour un opérateur scopé à B (customerA1 hors scope)', async () => {
@@ -173,29 +170,28 @@ describe('CRM — dont fusion cross-tenant', () => {
     expect(check.mergedInto).toBeFalsy();
   });
 
-  test('POSITIF : fusion CRM intra-tenant fonctionne pour l\'opérateur scopé à B', async () => {
+  test('2B.2-D : fusion CRM reste refusée à l\'opérateur sans membership', async () => {
     const res = await request(app).post('/api/crm/consolidations').set(bearer(operatorUser, tenantB))
       .send({ customerA: String(customerB1._id), customerB: String(customerB2._id), decision: 'keep_a', justification: 'Test PLATFORM-ADMIN-CERT-1 fusion' });
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
   });
 });
 
 describe('Marketing', () => {
   let templateB;
-  let campaignB;
+  let _campaignB;
   beforeAll(async () => {
     templateB = await MarketingTemplate.create({
       tenant: tenantB._id, name: 'Template B', channel: 'email', body: 'Corps du modèle', family: `family-b-${Date.now()}`, status: 'active',
     });
-    campaignB = await MarketingCampaign.create({
+    _campaignB = await MarketingCampaign.create({
       tenant: tenantB._id, name: 'Campaign B', channel: 'email', template: templateB._id, segmentKey: 'all_customers',
     });
   });
 
-  test('TESTÉ DIRECTEMENT : PlatformOperator Tenant B liste ses campagnes, pas celles de A', async () => {
+  test('2B.2-D : PlatformOperator sans membership ne liste pas les campagnes de B', async () => {
     const res = await request(app).get('/api/marketing/campaigns').set(bearer(operatorUser, tenantB));
-    expect(res.status).toBe(200);
-    expect(res.body.data.campaigns.map((c) => String(c._id))).toContain(String(campaignB._id));
+    expect(res.status).toBe(403);
   });
 
   test('TESTÉ DIRECTEMENT : PlatformOperator sans tenant sélectionné refusé (pas de mode global fabriqué)', async () => {
@@ -246,25 +242,22 @@ describe('ERP', () => {
     expect(res.status).toBe(403);
   });
 
-  test('TESTÉ DIRECTEMENT : PlatformOperator avec Tenant B sélectionné accède à ERP', async () => {
+  test('2B DEP-06 : PlatformOperator avec Tenant B sélectionné mais sans membership est refusé par ERP', async () => {
     const res = await request(app).get('/api/erp/executive').set(bearer(operatorUser, tenantB));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
   });
 });
 
 describe('API Platform', () => {
-  let apiKeyB;
   beforeAll(async () => {
-    const { apiKey } = await createApiKey({ name: 'Key B', scopes: ['properties:read'], tenant: tenantB._id, actor: adminB });
-    apiKeyB = apiKey;
+    await createApiKey({ name: 'Key B', scopes: ['properties:read'], tenant: tenantB._id, actor: adminB });
   });
 
-  test('TESTÉ DIRECTEMENT : PlatformOperator Tenant B liste la clé B ; Tenant A ne la voit jamais', async () => {
+  test('2B DEP-06 : PlatformOperator sans membership ne peut lister les clés d’aucun tenant', async () => {
     const withB = await request(app).get('/api/dev-portal/keys').set(bearer(operatorUser, tenantB));
-    expect(withB.status).toBe(200);
-    expect(withB.body.data.keys.map((k) => String(k._id))).toContain(String(apiKeyB._id));
+    expect(withB.status).toBe(403);
     const withA = await request(app).get('/api/dev-portal/keys').set(bearer(operatorUser, tenantA));
-    expect(withA.body.data.keys.map((k) => String(k._id))).not.toContain(String(apiKeyB._id));
+    expect(withA.status).toBe(403);
   });
 });
 
@@ -290,17 +283,25 @@ describe('GL — RentalManagement', () => {
   let rentalB;
   beforeAll(async () => {
     const property = await makeProperty(adminB);
-    rentalB = await RentalManagement.create({ property: property._id, owner: adminB._id, managementActivated: true, active: true });
+    property.tenant = tenantB._id;
+    await property.save();
+    rentalB = await RentalManagement.create({ property: property._id, owner: adminB._id, tenant: tenantB._id, managementActivated: true, active: true });
   });
 
-  test('TESTÉ DIRECTEMENT : PlatformOperator Tenant B liste RentalManagement de B, pas de A', async () => {
+  test('PlatformOperator sans membership reste refusé sur RentalManagement tenant', async () => {
+    const res = await request(app).get('/api/rental-management').set(bearer(operatorUser, tenantB));
+    expect(res.status).toBe(403);
+  });
+
+  test('le même acteur avec membership Admin est évalué par son businessRole tenant', async () => {
+    await addTenantMember({ tenant: tenantB, user: operatorUser, bootstrap: adminB, businessRole: 'Admin' });
     const res = await request(app).get('/api/rental-management').set(bearer(operatorUser, tenantB));
     expect(res.status).toBe(200);
     expect(res.body.data.rentals.map((r) => String(r._id))).toContain(String(rentalB._id));
   });
 
-  test('TESTÉ DIRECTEMENT : PlatformOperator Tenant A ne voit pas RentalManagement de B', async () => {
+  test('la membership Tenant B ne donne aucun accès au Tenant A', async () => {
     const res = await request(app).get('/api/rental-management').set(bearer(operatorUser, tenantA));
-    expect(res.body.data.rentals.map((r) => String(r._id))).not.toContain(String(rentalB._id));
+    expect(res.status).toBe(403);
   });
 });

@@ -215,7 +215,7 @@ describe('reportingService — intégration ORGANIZATION-1 (Phase 7/9, additive)
   test('un orgUnitId lié à un hôtel scope le détail financier hôtelier, jamais un calcul RevPAR/ADR approximé', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const { tenant, bootstrap } = await createTenantFixture({ label: 'Organization reporting', bootstrap: admin });
-    await addTenantMember({ tenant, user: admin, bootstrap });
+    await addTenantMember({ tenant, user: admin, bootstrap, businessRole: 'Admin' });
     const actor = tenantActor(admin, tenant);
     const hotel = await Hotel.create({ name: 'Hotel Reporting Org', tenant: tenant._id, manager: admin._id, createdBy: admin._id });
     const org = await createOrgUnit({ name: 'Org', type: 'organization', actor: admin });

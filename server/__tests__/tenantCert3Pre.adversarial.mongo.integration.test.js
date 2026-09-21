@@ -12,6 +12,7 @@ const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
 const User = require('../models/User');
+const OrgMembership = require('../models/OrgMembership');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
 const AccommodationReservation = require('../models/AccommodationReservation');
@@ -59,6 +60,7 @@ beforeAll(async () => {
   ownerB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Proprietaire' } })).user;
   adminA = (await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Admin' } })).user;
   adminB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } })).user;
+  await OrgMembership.updateMany({ user: { $in: [adminA._id, adminB._id] }, status: 'active' }, { $set: { businessRole: 'Admin' } });
   platformOperator = await User.create({
     name: 'Platform Operator', email: `platform-operator-${Date.now()}@example.test`,
     password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
@@ -299,9 +301,24 @@ describe('CRM merge/consolidation — preuve positive qu\'une fusion cross-tenan
 
 // ── Mass assignment — RentalManagement (preuve positive) ──────────────────
 describe('Mass assignment — RentalManagement.create ignore les champs hostiles owner/manager/tenant/orgUnit', () => {
-  test('un GestionnaireImmobilier ne peut pas s\'auto-attribuer un dossier appartenant au Property.owner réel', async () => {
+  test('un rôle User legacy avec businessRole null est refusé', async () => {
     const property = await makeProperty(ownerA);
-    const { user: managerA } = await createTenantUser({ tenant: tenantA, bootstrap: adminA, overrides: { role: 'GestionnaireImmobilier' } });
+    const { user: legacyManager } = await createTenantUser({ tenant: tenantA, bootstrap: adminA, overrides: { role: 'GestionnaireImmobilier' } });
+    const res = await request(app).post('/api/rental-management').set(bearer(legacyManager, tenantA)).send({ property: String(property._id) });
+    expect(res.status).toBe(403);
+    expect(await RentalManagement.countDocuments({ property: property._id })).toBe(0);
+  });
+
+  test('un businessRole GestionnaireImmobilier ne peut pas forger owner/tenant/orgUnit', async () => {
+    const property = await makeProperty(ownerA);
+    property.tenant = tenantA._id;
+    await property.save();
+    const { user: managerA } = await createTenantUser({
+      tenant: tenantA,
+      bootstrap: adminA,
+      overrides: { role: 'Client' },
+      businessRole: 'GestionnaireImmobilier',
+    });
     const attackerId = new mongoose.Types.ObjectId();
     const res = await request(app).post('/api/rental-management').set(bearer(managerA, tenantA)).send({
       property: String(property._id), owner: String(attackerId), tenant: String(tenantB._id), orgUnit: String(tenantB.rootOrgUnit),

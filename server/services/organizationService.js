@@ -10,7 +10,7 @@ const mongoose = require('mongoose');
 const OrgUnit = require('../models/OrgUnit');
 const OrgMembership = require('../models/OrgMembership');
 const User = require('../models/User');
-const { ORG_UNIT_TYPES } = require('../constants/organizationConstants');
+const { ORG_UNIT_TYPES, TENANT_BUSINESS_ROLES } = require('../constants/organizationConstants');
 const { logAction, buildAuteur } = require('./actionLogService');
 
 class OrganizationError extends Error {
@@ -100,8 +100,11 @@ async function listOrgUnits({ type, status = 'active' } = {}) {
 
 // ── Appartenances (Phase 5 — multi-organisation/équipe/département) ────
 
-async function grantMembership({ userId, orgUnitId, roleInUnit = 'member', actor, metadata = {}, req, session } = {}) {
+async function grantMembership({ userId, orgUnitId, roleInUnit = 'member', businessRole = null, actor, metadata = {}, req, session } = {}) {
   if (!mongoose.isValidObjectId(userId)) fail('ORG_MEMBERSHIP_USER_INVALID', 'Identifiant utilisateur invalide.', 400);
+  if (businessRole !== null && !TENANT_BUSINESS_ROLES.includes(businessRole)) {
+    fail('ORG_MEMBERSHIP_BUSINESS_ROLE_INVALID', 'Rôle métier tenant invalide.', 422);
+  }
   const [user, orgUnit] = await Promise.all([
     User.findById(userId).select('_id').session(session || null),
     OrgUnit.findById(orgUnitId).session(session || null),
@@ -122,7 +125,7 @@ async function grantMembership({ userId, orgUnitId, roleInUnit = 'member', actor
     return existing;
   }
 
-  const data = { user: userId, orgUnit: orgUnitId, roleInUnit, metadata, grantedBy: actor?._id || actor?.id || null };
+  const data = { user: userId, orgUnit: orgUnitId, roleInUnit, businessRole, metadata, grantedBy: actor?._id || actor?.id || null };
   const membership = session ? (await OrgMembership.create([data], { session }))[0] : await OrgMembership.create(data);
   await audit('membership_granted', { actor, target: membership, targetType: 'OrgMembership', req, session });
   return membership;

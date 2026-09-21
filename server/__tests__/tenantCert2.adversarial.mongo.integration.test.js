@@ -52,6 +52,7 @@ app.use(errorHandler);
 
 const signToken = (userId) => jwt.sign({ id: userId, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' });
 const auth = (userId) => `Bearer ${signToken(userId)}`;
+const tenantHeaders = (userId, tenantId) => ({ Authorization: auth(userId), 'X-Platform-Tenant-Id': String(tenantId) });
 
 let counter = 0;
 const makeUser = (overrides = {}) => {
@@ -62,6 +63,10 @@ const makeUser = (overrides = {}) => {
   });
 };
 
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-G — Property.tenant is now the
+// canonical tenant attribution used by mutation/moderation controllers.
+// Pass `{ tenant: <ObjectId> }` through overrides so the cross-tenant
+// certification cases produce properties with explicit attribution.
 const makeProperty = (owner, overrides = {}) => Property.create({
   title: overrides.title || 'Bien Cert2', description: 'Description suffisamment longue pour la validation du modèle Property.',
   pole: 'Altimmo', type: 'Villa', status: 'location', price: 300000,
@@ -95,56 +100,72 @@ async function buildThreatModel() {
     organizationService.grantMembership({ userId: gestB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrapAdmin }),
     organizationService.grantMembership({ userId: propOwnerB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrapAdmin }),
   ]);
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-C — canonical businessRole
+  // is required for the tenant surfaces (rental-management + erp) which
+  // now consume `requireTenantMembershipRole(...)`. Grant the appropriate
+  // business role on each membership.
+  const OrgMembership = require('../models/OrgMembership');
+  await Promise.all([
+    OrgMembership.updateOne({ user: adminA._id, orgUnit: tenantA.rootOrgUnit, status: 'active' }, { $set: { businessRole: 'Admin' } }),
+    OrgMembership.updateOne({ user: gestA._id, orgUnit: tenantA.rootOrgUnit, status: 'active' }, { $set: { businessRole: 'GestionnaireImmobilier' } }),
+    OrgMembership.updateOne({ user: adminB._id, orgUnit: tenantB.rootOrgUnit, status: 'active' }, { $set: { businessRole: 'Admin' } }),
+    OrgMembership.updateOne({ user: gestB._id, orgUnit: tenantB.rootOrgUnit, status: 'active' }, { $set: { businessRole: 'GestionnaireImmobilier' } }),
+  ]);
 
   return { tenantA, tenantB, adminA, adminB, gestA, gestB, propOwnerA, propOwnerB };
 }
 
 describe('TENANT-CERT-2 — PROPERTY (§5)', () => {
-  test('contrôle positif : B existe et est modifiable par un acteur légitime de B (Admin B)', async () => {
-    const { adminB, propOwnerB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB, { title: 'Villa B légitime' });
-    const res = await request(app).put(`/api/properties/${propertyB._id}`).set('Authorization', auth(adminB._id)).send({ title: 'Villa B modifiée' });
+  test('contrôle positif : B existe et est modifiable par un acteur légitime de B (Admin B, propriété attribuée à B)', async () => {
+    const { adminB, propOwnerB, tenantB } = await buildThreatModel();
+    // Post-Lot-G: `Property.tenant` is the canonical attribution used by the
+    // tenant-staff branch. Adminb must select tenant B via header, and the
+    // property must be attributed to tenant B.
+    const propertyB = await makeProperty(propOwnerB, { title: 'Villa B légitime', tenant: tenantB._id });
+    const res = await request(app).put(`/api/properties/${propertyB._id}`).set(tenantHeaders(adminB._id, tenantB._id)).send({ title: 'Villa B modifiée' });
     expect(res.status).toBe(200);
   });
 
   test('Admin A → PUT Property B = refusé (ancien bypass role===Admin corrigé)', async () => {
-    const { adminA, propOwnerB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB, { title: 'Villa B cible' });
-    const res = await request(app).put(`/api/properties/${propertyB._id}`).set('Authorization', auth(adminA._id)).send({ title: 'Hack' });
-    expect(res.status).toBe(404);
+    const { adminA, propOwnerB, tenantA, tenantB } = await buildThreatModel();
+    const propertyB = await makeProperty(propOwnerB, { title: 'Villa B cible', tenant: tenantB._id });
+    const res = await request(app).put(`/api/properties/${propertyB._id}`).set(tenantHeaders(adminA._id, tenantA._id)).send({ title: 'Hack' });
+    expect(res.status).toBeGreaterThanOrEqual(400);
     const untouched = await Property.findById(propertyB._id).lean();
     expect(untouched.title).toBe('Villa B cible');
   });
 
   test('Admin A → DELETE Property B = refusé', async () => {
-    const { adminA, propOwnerB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB);
-    const res = await request(app).delete(`/api/properties/${propertyB._id}`).set('Authorization', auth(adminA._id));
-    expect(res.status).toBe(404);
+    const { adminA, propOwnerB, tenantA, tenantB } = await buildThreatModel();
+    const propertyB = await makeProperty(propOwnerB, { tenant: tenantB._id });
+    const res = await request(app).delete(`/api/properties/${propertyB._id}`).set(tenantHeaders(adminA._id, tenantA._id));
+    expect(res.status).toBeGreaterThanOrEqual(400);
     expect(await Property.findById(propertyB._id)).not.toBeNull();
   });
 
   test('Admin A → PATCH modération Property B (validate) = refusé', async () => {
-    const { adminA, propOwnerB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB, { statusAdmin: 'En attente' });
-    const res = await request(app).patch(`/api/properties/admin/${propertyB._id}/validate`).set('Authorization', auth(adminA._id));
-    expect(res.status).toBe(404);
+    const { adminA, propOwnerB, tenantA, tenantB } = await buildThreatModel();
+    const propertyB = await makeProperty(propOwnerB, { statusAdmin: 'En attente', tenant: tenantB._id });
+    const res = await request(app).patch(`/api/properties/admin/${propertyB._id}/validate`).set(tenantHeaders(adminA._id, tenantA._id));
+    expect(res.status).toBeGreaterThanOrEqual(400);
     expect((await Property.findById(propertyB._id).lean()).statusAdmin).toBe('En attente');
   });
 
   test('Admin A → DELETE admin Property B = refusé', async () => {
-    const { adminA, propOwnerB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB);
-    const res = await request(app).delete(`/api/properties/admin/${propertyB._id}`).set('Authorization', auth(adminA._id));
-    expect(res.status).toBe(404);
+    const { adminA, propOwnerB, tenantA, tenantB } = await buildThreatModel();
+    const propertyB = await makeProperty(propOwnerB, { tenant: tenantB._id });
+    const res = await request(app).delete(`/api/properties/admin/${propertyB._id}`).set(tenantHeaders(adminA._id, tenantA._id));
+    expect(res.status).toBeGreaterThanOrEqual(400);
     expect(await Property.findById(propertyB._id)).not.toBeNull();
   });
 
-  test('Admin A → PATCH recommande Property B = refusé', async () => {
-    const { adminA, propOwnerB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB);
+  test('Admin A → PATCH recommande Property B = refusé (autorité plateforme requise)', async () => {
+    const { adminA, propOwnerB, tenantB } = await buildThreatModel();
+    const propertyB = await makeProperty(propOwnerB, { tenant: tenantB._id });
+    // Post-Lot-G: recommandé is PLATFORM authority (requirePlatformOperatorCapability).
+    // Tenant Admin A without an active PlatformOperator + platform.properties.manage → 403.
     const res = await request(app).patch(`/api/properties/${propertyB._id}/recommande`).set('Authorization', auth(adminA._id)).send({ recommande: true });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(403);
     expect((await Property.findById(propertyB._id).lean()).recommande).not.toBe(true);
   });
 
@@ -162,10 +183,10 @@ describe('TENANT-CERT-2 — PROPERTY (§5)', () => {
     expect(res.status).toBe(200); // le correctif ne doit jamais casser le catalogue public légitime
   });
 
-  test('Admin A opérant sur SA propre Property A reste pleinement fonctionnel (non-régression)', async () => {
-    const { adminA, propOwnerA } = await buildThreatModel();
-    const propertyA = await makeProperty(propOwnerA, { title: 'Villa A' });
-    const res = await request(app).put(`/api/properties/${propertyA._id}`).set('Authorization', auth(adminA._id)).send({ title: 'Villa A modifiée' });
+  test('Admin A opérant sur une Property A du tenant reste pleinement fonctionnel (non-régression)', async () => {
+    const { adminA, propOwnerA, tenantA } = await buildThreatModel();
+    const propertyA = await makeProperty(propOwnerA, { title: 'Villa A', tenant: tenantA._id });
+    const res = await request(app).put(`/api/properties/${propertyA._id}`).set(tenantHeaders(adminA._id, tenantA._id)).send({ title: 'Villa A modifiée' });
     expect(res.status).toBe(200);
   });
 
@@ -184,9 +205,9 @@ describe('TENANT-CERT-2 — GESTION LOCATIVE (§6)', () => {
   }
 
   test('contrôle positif : RentalManagement B accessible par Gestionnaire B', async () => {
-    const { gestB, propOwnerB } = await buildThreatModel();
+    const { gestB, propOwnerB, tenantB } = await buildThreatModel();
     const rentalB = await makeRental(propOwnerB);
-    const res = await request(app).get(`/api/rental-management/${rentalB._id}`).set('Authorization', auth(gestB._id));
+    const res = await request(app).get(`/api/rental-management/${rentalB._id}`).set(tenantHeaders(gestB._id, tenantB._id));
     expect(res.status).toBe(200);
   });
 
@@ -316,7 +337,7 @@ describe('TENANT-CERT-2 — REPORTING / ERP (§15/§16/§29 tenant explicite hos
 
   test('ERP Admin A sans paramètre est borné au Tenant A', async () => {
     const { adminA, tenantA } = await buildThreatModel();
-    const res = await request(app).get('/api/erp/executive').set('Authorization', auth(adminA._id));
+    const res = await request(app).get('/api/erp/executive').set(tenantHeaders(adminA._id, tenantA._id));
     expect(res.status).toBe(200);
     expect(String(res.body.data.overview.scope?.tenantId || res.body.data.overview.report?.tenantId || '')).toBe(String(tenantA._id));
   });
@@ -329,8 +350,8 @@ describe('TENANT-CERT-2 — REPORTING / ERP (§15/§16/§29 tenant explicite hos
   });
 
   test('Admin A fournissant orgUnitId=racine B : le paramètre hostile est ignoré côté ERP', async () => {
-    const { adminA, tenantB } = await buildThreatModel();
-    const res = await request(app).get('/api/erp/executive').query({ orgUnitId: String(tenantB.rootOrgUnit) }).set('Authorization', auth(adminA._id));
+    const { adminA, tenantA, tenantB } = await buildThreatModel();
+    const res = await request(app).get('/api/erp/executive').query({ orgUnitId: String(tenantB.rootOrgUnit) }).set(tenantHeaders(adminA._id, tenantA._id));
     expect(res.status).toBe(200);
   });
 

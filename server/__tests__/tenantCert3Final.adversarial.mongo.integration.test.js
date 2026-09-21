@@ -3,7 +3,6 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
-const User = require('../models/User');
 const OrgMembership = require('../models/OrgMembership');
 const UserBusinessProfile = require('../models/UserBusinessProfile');
 const PlatformTenant = require('../models/PlatformTenant');
@@ -49,8 +48,8 @@ beforeAll(async () => {
   const fixtureB = await createTenantFixture({ label: 'Cert3 Final B' });
   tenantA = fixtureA.tenant;
   tenantB = fixtureB.tenant;
-  adminA = (await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Admin' } })).user;
-  adminB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } })).user;
+  adminA = (await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, businessRole: 'Admin', overrides: { role: 'Admin' } })).user;
+  adminB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, businessRole: 'Admin', overrides: { role: 'Admin' } })).user;
   userB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Client' } })).user;
 });
 

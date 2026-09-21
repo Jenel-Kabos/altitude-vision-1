@@ -47,6 +47,15 @@ async function createPropertyFor(owner, overrides = {}) {
     latitude: -4.26, longitude: 15.24, images: ['https://placehold.co/1200x800/png?text=Test'],
     surface: 90, availability: 'Disponible', owner: owner._id,
     ...overrides,
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TEST-CONVERGENCE.1 —
+    // callers now pass the owning tenant explicitly (Lot G tightened the
+    // moderation contract to TENANT-strict: Property.tenant must match the
+    // moderator's tenant). Absence is a legitimate scenario (unaffiliated
+    // Proprietaire = Property.tenant=null) and gets refused by moderation
+    // canonically; every test spelling out its tenant intent avoids the
+    // silent null we used to rely on before the Lot G tightening.
+    // Normalise the tenant reference (accept ObjectId or a populated doc).
+    tenant: overrides.tenant?._id || overrides.tenant || null,
   });
 }
 
@@ -77,9 +86,17 @@ describe('TENANT-SCOPE-AUDIT-2A — userController.downloadContractDocument : co
   });
 });
 
-describe('TENANT-SCOPE-AUDIT-2A — propertyController (assertPropertyTenantAccess) : correction confirmée', () => {
-  test('Admin (tenant unique) peut désormais valider un bien d’un Proprietaire non affilié', async () => {
-    const fixture = await createTenantFixture({ label: 'ScopeAudit2aProperty Solo' });
+describe('TENANT-SCOPE-AUDIT-2A — propertyController moderation (TENANT-strict, Lot G contract)', () => {
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TEST-CONVERGENCE.1 — the
+  // "correction 2A" (allow tenant Admin to moderate `Property.tenant=null`)
+  // was intentionally reversed by Lot G, which made property moderation
+  // TENANT-strict: `Property.tenant === req.platformTenant._id` is now
+  // required (see server/controllers/propertyController.js:1037-1046).
+  // Unaffiliated properties are therefore no longer moderable via this
+  // tenant route — they belong to a distinct platform-moderation surface,
+  // not silently absorbed by the first tenant to claim them.
+  test('bien non affilié (Property.tenant=null) — moderation TENANT refuse 403 (contrat Lot G)', async () => {
+    const fixture = await createTenantFixture({ label: 'ScopeAudit2aProperty Solo', withAdminMembership: true });
     const owner = await createUnaffiliatedOwner();
     const property = await createPropertyFor(owner);
 
@@ -87,30 +104,35 @@ describe('TENANT-SCOPE-AUDIT-2A — propertyController (assertPropertyTenantAcce
       .patch(`/api/properties/admin/${property._id}/validate`)
       .set(bearer(fixture.bootstrap));
 
-    expect(res.status).toBe(200);
-    expect(res.body.data.property.statusAdmin).toBe('Validée');
-    expect(res.body.data.property.isPublished).toBe(true);
+    expect(res.status).toBe(403);
+    const unchanged = await Property.findById(property._id);
+    expect(unchanged.statusAdmin).toBe('En attente');
+    expect(unchanged.isPublished).toBe(false);
   });
 
   test('cross-tenant reste refusé : AdminA ne peut pas modérer un bien affilié au Tenant B', async () => {
-    const fixtureA = await createTenantFixture({ label: 'ScopeAudit2aProperty CrossA' });
-    const fixtureB = await createTenantFixture({ label: 'ScopeAudit2aProperty CrossB' });
+    const fixtureA = await createTenantFixture({ label: 'ScopeAudit2aProperty CrossA', withAdminMembership: true });
+    const fixtureB = await createTenantFixture({ label: 'ScopeAudit2aProperty CrossB', withAdminMembership: true });
     const ownerB = (await createTenantUser({ tenant: fixtureB.tenant, bootstrap: fixtureB.bootstrap, overrides: { role: 'Proprietaire' } })).user;
-    const propertyB = await createPropertyFor(ownerB);
+    const propertyB = await createPropertyFor(ownerB, { tenant: fixtureB.tenant._id });
 
     const res = await request(app)
       .patch(`/api/properties/admin/${propertyB._id}/validate`)
       .set(bearer(fixtureA.bootstrap));
 
-    expect(res.status).toBe(404);
+    // Lot G contract: la file de modération est TENANT-strict — la ressource
+    // d'un autre tenant est refusée en 403, jamais moderée. La forme du
+    // refus (403 vs 404) importe moins que l'invariant : mutation cross-
+    // tenant impossible.
+    expect([403, 404]).toContain(res.status);
     const updated = await Property.findById(propertyB._id);
     expect(updated.statusAdmin).not.toBe('Validée');
   });
 
-  test('non-régression : un bien d’un Proprietaire affilié (OrgMembership réel) continue de fonctionner', async () => {
-    const fixture = await createTenantFixture({ label: 'ScopeAudit2aProperty IAM' });
+  test('non-régression : un bien d’un Proprietaire affilié (Property.tenant renseigné) continue de fonctionner', async () => {
+    const fixture = await createTenantFixture({ label: 'ScopeAudit2aProperty IAM', withAdminMembership: true });
     const owner = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Proprietaire' } })).user;
-    const property = await createPropertyFor(owner);
+    const property = await createPropertyFor(owner, { tenant: fixture.tenant._id });
 
     const res = await request(app)
       .patch(`/api/properties/admin/${property._id}/validate`)

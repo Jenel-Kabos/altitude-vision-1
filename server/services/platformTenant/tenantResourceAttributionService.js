@@ -38,6 +38,17 @@ async function fromUser(userId, label = 'user') {
 // sprint de certification), et permet aux appelants de fournir une
 // projection minimale sans dépendre d'un `Property.findById` non mocké
 // dans les tests unitaires qui contrôlent déjà l'accès par d'autres moyens.
+//
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-TENANT-ATTRIBUTION-SERVICE-
+// PROPERTY-DIRECT-TENANT — précédence canonique : le champ `Property.tenant`
+// (introduit par Lot G comme attribution ressource explicite) est
+// l'autorité de rattachement primaire, jamais réinterprétable par les
+// OrgMemberships du owner. L'inférence via `fromUser(property.owner)` ne
+// subsiste que comme fallback historique quand `Property.tenant` est null
+// (Property historique créé avant Lot G — comportement business inchangé).
+// Autorité et attribution restent séparées : ce service répond
+// exclusivement à « à quel tenant cette ressource est-elle rattachée ? »
+// — jamais à « ce caller a-t-il l'autorité ? ».
 async function fromProperty(propertyOrId, label = 'property') {
   // Un document déjà chargé (Mongoose ou objet simple portant plus que le
   // seul `_id`) est utilisé tel quel ; un ObjectId/chaîne brute déclenche la
@@ -45,8 +56,9 @@ async function fromProperty(propertyOrId, label = 'property') {
   // — une instance ObjectId passe le test, un document complet jamais.
   const property = propertyOrId && typeof propertyOrId === 'object' && !mongoose.isValidObjectId(propertyOrId)
     ? propertyOrId
-    : validId(propertyOrId) && await Property.findById(validId(propertyOrId)).select('owner').lean();
+    : validId(propertyOrId) && await Property.findById(validId(propertyOrId)).select('owner tenant').lean();
   if (!property) return unresolved([`${label}:${rawId(propertyOrId)}→missing`]);
+  if (property.tenant) return resolved(property.tenant, [`${label}:${property._id || rawId(propertyOrId)}.tenant`]);
   return fromUser(property.owner, `${label}:${property._id || rawId(propertyOrId)}.owner`);
 }
 

@@ -29,9 +29,15 @@ app.use(express.json());
 app.use('/api/rental-management', rentalManagementRoutes);
 app.use(errorHandler);
 
-const bearer = (user) => ({
+const bearer = (user, tenantId) => ({
   Authorization: `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' })}`,
+  ...(tenantId ? { 'X-Platform-Tenant-Id': String(tenantId) } : {}),
 });
+const OrgMembership = require('../models/OrgMembership');
+const promoteMembershipTo = (user, tenant, businessRole) => OrgMembership.updateOne(
+  { user: user._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
+  { $set: { businessRole } },
+);
 
 let seq = 0;
 async function createActivatedRentalForUnaffiliatedOwner(actorId) {
@@ -58,19 +64,19 @@ describe('TENANT-SCOPE-AUDIT-1 — Gestion Locative : propriétaire public-signu
   let fixture; let rental;
 
   beforeAll(async () => {
-    fixture = await createTenantFixture({ label: 'ScopeAuditGL Solo' });
+    fixture = await createTenantFixture({ label: 'ScopeAuditGL Solo', withAdminMembership: true });
     ({ rental } = await createActivatedRentalForUnaffiliatedOwner(fixture.bootstrap._id));
   });
 
   test('GET /api/rental-management (liste, staff, tenant unique) inclut le dossier d’un propriétaire non affilié', async () => {
-    const res = await request(app).get('/api/rental-management').set(bearer(fixture.bootstrap));
+    const res = await request(app).get('/api/rental-management').set(bearer(fixture.bootstrap, fixture.tenant._id));
     expect(res.status).toBe(200);
     const ids = res.body.data.rentals.map((r) => String(r._id));
     expect(ids).toContain(String(rental._id));
   });
 
   test('GET /api/rental-management/stats compte ce dossier dans les totaux', async () => {
-    const res = await request(app).get('/api/rental-management/stats').set(bearer(fixture.bootstrap));
+    const res = await request(app).get('/api/rental-management/stats').set(bearer(fixture.bootstrap, fixture.tenant._id));
     expect(res.status).toBe(200);
     expect(res.body.data.stats.total).toBeGreaterThanOrEqual(1);
   });
@@ -80,20 +86,21 @@ describe('TENANT-SCOPE-AUDIT-1 — Gestion Locative : cross-tenant préservé', 
   let fixtureA; let fixtureB; let rentalA; let adminB;
 
   beforeAll(async () => {
-    fixtureA = await createTenantFixture({ label: 'ScopeAuditGL CrossA' });
+    fixtureA = await createTenantFixture({ label: 'ScopeAuditGL CrossA', withAdminMembership: true });
     ({ rental: rentalA } = await createActivatedRentalForUnaffiliatedOwner(fixtureA.bootstrap._id));
-    fixtureB = await createTenantFixture({ label: 'ScopeAuditGL CrossB' });
+    fixtureB = await createTenantFixture({ label: 'ScopeAuditGL CrossB', withAdminMembership: true });
     adminB = (await createTenantUser({ tenant: fixtureB.tenant, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } })).user;
+    await promoteMembershipTo(adminB, fixtureB.tenant, 'Admin');
   });
 
   test('dès qu’un second tenant existe, le dossier non affilié au Tenant A n’est plus automatiquement inclus (repli sûr, pas une fuite)', async () => {
-    const res = await request(app).get('/api/rental-management').set(bearer(fixtureA.bootstrap));
+    const res = await request(app).get('/api/rental-management').set(bearer(fixtureA.bootstrap, fixtureA.tenant._id));
     const ids = res.body.data.rentals.map((r) => String(r._id));
     expect(ids).not.toContain(String(rentalA._id));
   });
 
   test('AdminB (tenant distinct) ne voit jamais le dossier GL du Tenant A', async () => {
-    const res = await request(app).get('/api/rental-management').set(bearer(adminB));
+    const res = await request(app).get('/api/rental-management').set(bearer(adminB, fixtureB.tenant._id));
     const ids = res.body.data.rentals.map((r) => String(r._id));
     expect(ids).not.toContain(String(rentalA._id));
   });
@@ -101,7 +108,7 @@ describe('TENANT-SCOPE-AUDIT-1 — Gestion Locative : cross-tenant préservé', 
 
 describe('TENANT-SCOPE-AUDIT-1 — Gestion Locative : non-régression staff avec OrgMembership normal', () => {
   test('un dossier dont le propriétaire a un OrgMembership réel continue de fonctionner sans changement', async () => {
-    const fixture = await createTenantFixture({ label: 'ScopeAuditGL IAM' });
+    const fixture = await createTenantFixture({ label: 'ScopeAuditGL IAM', withAdminMembership: true });
     const owner = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Proprietaire' } })).user;
     seq += 1;
     const property = await Property.create({
@@ -112,7 +119,7 @@ describe('TENANT-SCOPE-AUDIT-1 — Gestion Locative : non-régression staff avec
       surface: 90, availability: 'Disponible', owner: owner._id,
     });
     const rental = await ensureRentalManagementActive({ property, actor: fixture.bootstrap._id, monthlyRent: 250000 });
-    const res = await request(app).get('/api/rental-management').set(bearer(fixture.bootstrap));
+    const res = await request(app).get('/api/rental-management').set(bearer(fixture.bootstrap, fixture.tenant._id));
     const ids = res.body.data.rentals.map((r) => String(r._id));
     expect(ids).toContain(String(rental._id));
   });

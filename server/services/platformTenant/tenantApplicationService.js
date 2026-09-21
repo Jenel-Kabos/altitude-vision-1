@@ -391,7 +391,7 @@ async function approveApplication({ applicationId, actor, req, failurePoint = nu
       const tenant = await platformTenantService.createFirstOwnerTenant({ name: application.organizationName, actor: applicant, req, session });
       if (failurePoint === 'after_tenant') throw new Error('TENANT_APPLICATION_TEST_FAILURE_AFTER_TENANT');
       const membership = await organizationService.grantMembership({ userId: applicant._id, orgUnitId: tenant.rootOrgUnit,
-        roleInUnit: 'owner', actor, metadata: { tenantApplicationId: application._id }, req, session });
+        roleInUnit: 'owner', businessRole: 'Admin', actor, metadata: { tenantApplicationId: application._id }, req, session });
       if (failurePoint === 'after_membership') throw new Error('TENANT_APPLICATION_TEST_FAILURE_AFTER_MEMBERSHIP');
       const now = new Date();
       const approved = await TenantApplication.findOneAndUpdate(

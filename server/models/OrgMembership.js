@@ -9,12 +9,20 @@
 // `profileType`, une seule dimension) — voir audit Phase 1 : aucun des deux
 // ne peut représenter "quelle équipe/département" sans détourner son sens.
 const mongoose = require('mongoose');
-const { ROLE_IN_UNIT, MEMBERSHIP_STATUSES } = require('../constants/organizationConstants');
+const { ROLE_IN_UNIT, MEMBERSHIP_STATUSES, TENANT_BUSINESS_ROLES } = require('../constants/organizationConstants');
 
 const schema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   orgUnit: { type: mongoose.Schema.Types.ObjectId, ref: 'OrgUnit', required: true, index: true },
   roleInUnit: { type: String, enum: ROLE_IN_UNIT, default: 'member' },
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-1B — rôle métier PORTÉ PAR LA
+  // MEMBERSHIP, distinct du `roleInUnit` hiérarchique et du `User.role`
+  // legacy global. Nullable pour compatibilité : toute membership créée
+  // avant cette phase reste valide sans backfill. Une `businessRole`
+  // renseignée sur une membership `active` d'une racine tenant est
+  // l'autorité canonique pour ce (user, tenant) — voir
+  // `services/tenantMembershipService.resolveTenantMembership`.
+  businessRole: { type: String, enum: TENANT_BUSINESS_ROLES, default: null },
   status: { type: String, enum: MEMBERSHIP_STATUSES, default: 'active' },
   grantedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   grantedAt: { type: Date, default: Date.now },

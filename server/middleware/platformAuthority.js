@@ -1,10 +1,24 @@
 const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
 
 /**
- * Require an active PlatformOperator capability. User.role is deliberately
- * not used as a substitute for platform authority.
+ * Global platform-administrator identity. This guard deliberately reads only
+ * the authenticated User identity; tenant context and memberships are not
+ * authority inputs for global administration.
+ */
+const requireGlobalAdmin = (req, res, next) => {
+  if (req.user?.role === 'Admin') return next();
+  return res.status(403).json({
+    status: 'fail',
+    message: 'Action refusée : identité administrateur plateforme requise.',
+  });
+};
+
+/**
+ * Require both the global Admin identity and an active PlatformOperator
+ * carrying the exact capability. Neither authority substitutes for the other.
  */
 const requirePlatformOperatorCapability = (capability) => async (req, res, next) => {
+  if (req.user?.role !== 'Admin') return requireGlobalAdmin(req, res, next);
   const operator = await resolveActiveOperator(req.user?._id || req.user?.id).catch(() => null);
   if (!operator || !hasCapability(operator, capability)) {
     return res.status(403).json({
@@ -30,4 +44,4 @@ const requirePlatformOperatorCapabilityWhenPresent = (capability) => (req, res, 
   });
 };
 
-module.exports = { requirePlatformOperatorCapability, requirePlatformOperatorCapabilityWhenPresent };
+module.exports = { requireGlobalAdmin, requirePlatformOperatorCapability, requirePlatformOperatorCapabilityWhenPresent };

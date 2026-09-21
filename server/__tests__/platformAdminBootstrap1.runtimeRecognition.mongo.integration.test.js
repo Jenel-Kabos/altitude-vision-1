@@ -109,18 +109,27 @@ test('l\'opérateur bootstrappé par le script CLI existe réellement en base av
   expect(doc.capabilities.sort()).toEqual(['platform.crm.read', 'platform.properties.read', 'platform.reporting.read']);
 });
 
-describe('Reconnaissance runtime — Property Portfolio', () => {
-  test('opérateur bootstrappé, Tenant A sélectionné → 200', async () => {
+describe('Reconnaissance runtime — Property Portfolio (contrat tenant-strict)', () => {
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TEST-CONVERGENCE.1 —
+  // `/api/properties/portfolio` est TENANT_CANONICAL : la chaîne canonique
+  // est protect → requireTenantScope → requireTenantModule('immobilier') →
+  // requireTenantMembershipRole(...). Un PlatformOperator (même
+  // bootstrappé) SANS OrgMembership tenant est refusé, quel que soit
+  // l'entête `X-Platform-Tenant-Id` — la capacité plateforme ne synthétise
+  // jamais une membership tenant (contrat §5 : « Une capability plateforme
+  // ne remplace jamais businessRole »). C'est la même invariante que la
+  // suite CRM Automation ci-dessous, appliquée à Property.
+  test('opérateur bootstrappé, Tenant A sélectionné → refusé faute de membership', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(bootstrappedOperator, tenantA));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
   });
-  test('opérateur bootstrappé, Tenant B sélectionné → 200', async () => {
+  test('opérateur bootstrappé, Tenant B sélectionné → refusé faute de membership', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(bootstrappedOperator, tenantB));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
   });
-  test('opérateur bootstrappé, sans tenant sélectionné → registre global', async () => {
+  test('opérateur bootstrappé, sans tenant sélectionné → refusé (registre plateforme non fabriqué ici)', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(bootstrappedOperator));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
   });
 });
 
@@ -139,9 +148,9 @@ describe('Reconnaissance runtime — Reporting (mode plateforme natif)', () => {
 });
 
 describe('Reconnaissance runtime — CRM Automation (mission §24, hérité mais non testé par PLATFORM-ADMIN-CERT-1)', () => {
-  test('opérateur bootstrappé, Tenant A sélectionné → liste les règles sans erreur', async () => {
+  test('2B.2-D — opérateur bootstrappé sans membership reste refusé avec Tenant A sélectionné', async () => {
     const res = await request(app).get('/api/crm-automation/rules').set(bearer(bootstrappedOperator, tenantA));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
   });
   test('opérateur bootstrappé, sans tenant sélectionné → refusé (pas de mode plateforme fabriqué)', async () => {
     const res = await request(app).get('/api/crm-automation/rules').set(bearer(bootstrappedOperator));

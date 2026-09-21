@@ -14,7 +14,11 @@ const TENANT_FEATURE_MODULES = [
   'erp', 'api',
 ];
 
-const PLATFORM_TENANT_PLANS = ['trial', 'starter', 'pro', 'enterprise'];
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-H — commercial plans added
+// additively. Existing internal identifiers (`trial`, `starter`, `pro`,
+// `enterprise`) remain valid — no persisted data migrated. The three
+// commercial names carry the Lot H `maxManagedProperties` quota.
+const PLATFORM_TENANT_PLANS = ['trial', 'starter', 'pro', 'enterprise', 'essentiel', 'professionnel', 'premium'];
 const PLATFORM_TENANT_SUBSCRIPTION_STATUSES = ['trialing', 'active', 'past_due', 'cancelled'];
 
 module.exports = { TENANT_FEATURE_MODULES, PLATFORM_TENANT_PLANS, PLATFORM_TENANT_SUBSCRIPTION_STATUSES };

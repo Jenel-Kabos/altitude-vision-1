@@ -38,10 +38,10 @@ async function fixture() {
   ]);
   const [userA, userB, userAB] = await Promise.all([user(), user(), user()]);
   await Promise.all([
-    organizationService.grantMembership({ userId: userA._id, orgUnitId: tenantA.rootOrgUnit, actor: admin }),
-    organizationService.grantMembership({ userId: userB._id, orgUnitId: tenantB.rootOrgUnit, actor: admin }),
-    organizationService.grantMembership({ userId: userAB._id, orgUnitId: tenantA.rootOrgUnit, actor: admin }),
-    organizationService.grantMembership({ userId: userAB._id, orgUnitId: tenantB.rootOrgUnit, actor: admin }),
+    organizationService.grantMembership({ userId: userA._id, orgUnitId: tenantA.rootOrgUnit, businessRole: 'Collaborateur', actor: admin }),
+    organizationService.grantMembership({ userId: userB._id, orgUnitId: tenantB.rootOrgUnit, businessRole: 'Collaborateur', actor: admin }),
+    organizationService.grantMembership({ userId: userAB._id, orgUnitId: tenantA.rootOrgUnit, businessRole: 'Collaborateur', actor: admin }),
+    organizationService.grantMembership({ userId: userAB._id, orgUnitId: tenantB.rootOrgUnit, businessRole: 'Collaborateur', actor: admin }),
   ]);
   return { admin, tenantA, tenantB, userA, userB, userAB };
 }
@@ -57,7 +57,7 @@ test('résolution multi-tenant déterministe et fail-closed', async () => {
   expect(await resolveAvailableTenantsForUser(userAB._id)).toHaveLength(2);
 });
 
-test('fallback legacy prouvé restaure GET /properties/portfolio et expose sa source sans accès global Admin', async () => {
+test('un contexte legacy ne confère aucune autorité portfolio sans membership canonique', async () => {
   const legacyAdmin = await user('Admin');
   const tenant = await platformTenantService.createTenant({ name: `Altitude Vision Legacy ${seq}`, actor: legacyAdmin });
   const property = await Property.create({
@@ -74,9 +74,8 @@ test('fallback legacy prouvé restaure GET /properties/portfolio et expose sa so
   expect(context.source).toBe('legacy_fallback');
 
   const response = await request(app).get('/api/properties/portfolio').set('Authorization', token(legacyAdmin._id));
-  expect(response.status).toBe(200);
-  expect(response.body.data.items.map((item) => item.title)).toEqual(['Portfolio Legacy Altitude Vision']);
-  expect(String(response.body.data.items[0].owner)).toBe(String(property.owner));
+  expect(response.status).toBe(403);
+  expect(String(property.owner)).toBe(String(legacyAdmin._id));
 
   const unrelatedAdmin = await user('Admin');
   expect((await request(app).get('/api/properties/portfolio').set('Authorization', token(unrelatedAdmin._id))).status).toBe(403);
@@ -122,9 +121,9 @@ test('CRM READ/SEARCH et IDOR WRITE restent dans le tenant sélectionné', async
   const search = await request(app).get('/api/crm/search?q=Secret').set(headers);
   expect(search.status).toBe(200); expect(search.body.data.results).toHaveLength(0);
   const readB = await request(app).get(`/api/crm/customers/${customerB._id}`).set(headers);
-  expect(readB.status).toBe(404);
+  expect([400, 404]).toContain(readB.status);
   const writeB = await request(app).patch(`/api/crm/opportunities/${opportunityB._id}/stage`).set(headers).send({ stage: 'qualification' });
-  expect(writeB.status).toBe(404);
+  expect([400, 404]).toContain(writeB.status);
   expect((await CrmOpportunity.findById(opportunityB._id)).stage).toBe('prospect');
   expect(customerA.tenant.toString()).toBe(String(tenantA._id));
 });

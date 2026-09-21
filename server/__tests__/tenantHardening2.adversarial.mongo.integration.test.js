@@ -44,8 +44,8 @@ async function threat() {
   const bootstrap = await User.create({ name: 'Bootstrap', email: `h2-bootstrap-${seq}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin' });
   const { tenant: tenantA } = await createTenantFixture({ label: 'H2 A', bootstrap });
   const { tenant: tenantB } = await createTenantFixture({ label: 'H2 B', bootstrap });
-  const { user: adminA } = await createTenantUser({ tenant: tenantA, bootstrap, overrides: { role: 'Admin', email: `h2-admin-a-${seq}@example.test`, name: 'Admin A' } });
-  const { user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap, overrides: { role: 'Admin', email: `h2-admin-b-${seq}@example.test`, name: 'Admin B' } });
+  const { user: adminA } = await createTenantUser({ tenant: tenantA, bootstrap, businessRole: 'Admin', overrides: { role: 'Admin', email: `h2-admin-a-${seq}@example.test`, name: 'Admin A' } });
+  const { user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap, businessRole: 'Admin', overrides: { role: 'Admin', email: `h2-admin-b-${seq}@example.test`, name: 'Admin B' } });
   const { user: ownerA } = await createTenantUser({ tenant: tenantA, bootstrap, overrides: { role: 'Proprietaire', email: `h2-owner-a-${seq}@example.test`, name: 'Owner A' } });
   const { user: ownerB } = await createTenantUser({ tenant: tenantB, bootstrap, overrides: { role: 'Proprietaire', email: `h2-owner-b-${seq}@example.test`, name: 'Owner B Secret' } });
   return { tenantA, tenantB, adminA, adminB, ownerA, ownerB };

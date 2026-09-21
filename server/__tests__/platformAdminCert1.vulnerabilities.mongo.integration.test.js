@@ -64,9 +64,13 @@ beforeAll(async () => {
   const fixtureB = await createTenantFixture({ label: 'Cert1 Vuln B' });
   tenantA = fixtureA.tenant;
   tenantB = fixtureB.tenant;
-  adminA = (await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Admin' } })).user;
-  adminB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } })).user;
-  staffB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Collaborateur' } })).user;
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TEST-CONVERGENCE.2 —
+  // canonical fixture: OrgMembership.businessRole is the tenant authority,
+  // no fallback from User.role. adminA/adminB must be full tenant admins;
+  // staffB is a tenant Collaborateur.
+  adminA = (await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Admin' }, businessRole: 'Admin' })).user;
+  adminB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' }, businessRole: 'Admin' })).user;
+  staffB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Collaborateur' }, businessRole: 'Collaborateur' })).user;
   grantingAdmin = await User.create({
     name: 'GrantingAdmin V', email: `granting-v-${Date.now()}@example.test`,
     password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
@@ -110,13 +114,18 @@ describe('V1 — User CRUD (userRoutes.js)', () => {
     expect(ids).not.toContain(String(staffB._id));
   });
 
-  test('POSITIF : AdminB peut lire/suspendre/réactiver un utilisateur de son propre tenant', async () => {
+  test('POSITIF (contrat 1F) : AdminB peut LIRE un utilisateur de son propre tenant, mais suspendre/activer GLOBALEMENT est refusé (canal canonique = /api/members)', async () => {
+    // La lecture reste ouverte à un Tenant Admin (scope tenant-canonique).
     const read = await request(app).get(`/api/users/${staffB._id}`).set(bearer(adminB));
     expect(read.status).toBe(200);
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-1F — les mutations globales
+    // User.isActive/role/delete/create ne sont plus accessibles à un simple
+    // Tenant Admin. Le workflow tenant canonique passe désormais par
+    // /api/members/:membershipId/suspend + /reactivate.
     const suspend = await request(app).patch(`/api/users/${staffB._id}/suspend`).set(bearer(adminB));
-    expect(suspend.status).toBe(200);
+    expect(suspend.status).toBe(403);
     const activate = await request(app).patch(`/api/users/${staffB._id}/activate`).set(bearer(adminB));
-    expect(activate.status).toBe(200);
+    expect(activate.status).toBe(403);
   });
 
   test('POSITIF : PlatformOperator avec Tenant B sélectionné peut lister/lire staffB', async () => {
@@ -219,11 +228,20 @@ describe('V3 — Centre de régularisation (17 contrats historiques)', () => {
     expect(res.status).toBe(200);
   });
 
-  test('POSITIF : PlatformOperator avec Tenant B sélectionné voit le dossier ; avec Tenant A, non', async () => {
+  test('CANONICAL §5 : PlatformOperator SANS OrgMembership est refusé sur la file de régularisation, tenant sélectionné ou non', async () => {
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TEST-CONVERGENCE.2 —
+    // §5 : « Une capability plateforme ne remplace jamais businessRole ».
+    // `/api/rental-contract-regularization` est TENANT_CANONICAL
+    // (`requireTenantMembershipRole('Admin', 'GestionnaireImmobilier',
+    // 'Collaborateur')`). L'opérateur sans OrgMembership est refusé, quel
+    // que soit l'entête `X-Platform-Tenant-Id`. La lecture cross-tenant
+    // pilotée par la seule capacité plateforme n'existe pas sur cette
+    // surface (c'est le contrat commercial actuel — les capabilities
+    // `platform.rentals.*` ne synthétisent pas d'OrgMembership).
     const withB = await request(app).get('/api/rental-contract-regularization').set(bearer(operatorUser, tenantB));
-    expect(withB.body.data.cases.map((c) => String(c.contract._id))).toContain(String(historicalContractB._id));
+    expect(withB.status).toBe(403);
     const withA = await request(app).get('/api/rental-contract-regularization').set(bearer(operatorUser, tenantA));
-    expect(withA.body.data.cases.map((c) => String(c.contract._id))).not.toContain(String(historicalContractB._id));
+    expect(withA.status).toBe(403);
   });
 });
 

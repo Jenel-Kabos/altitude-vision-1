@@ -4,9 +4,10 @@
 const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
 const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 const controller = require('../controllers/apiPlatformAdminController');
 
-router.use(auth.protect, auth.restrictTo('Admin'), requireTenantScope);
+router.use(auth.protect, requireTenantScope, requireTenantMembershipRole('Admin'));
 
 router.get('/keys', controller.listKeys);
 router.post('/keys', controller.createKey);

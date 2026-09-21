@@ -22,6 +22,9 @@ const PLATFORM_OPERATOR_CAPABILITIES = [
   'platform.crm.manage',
   'platform.finance.read',
   'platform.finance.manage',
+  // Marketplace commercial (non-financial) platform operations —
+  // independent of platform.finance.*; never implied by finance.manage.
+  'platform.commercial.manage',
   'platform.reporting.read',
   'platform.organization.read',
   'platform.organization.manage',

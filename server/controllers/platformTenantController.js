@@ -2,6 +2,29 @@
 // platformTenantService — aucune logique métier ici.
 const asyncHandler = require('express-async-handler');
 const service = require('../services/platformTenant/platformTenantService');
+const { resolveAvailableTenantsForUser } = require('../services/platformTenant/tenantContextService');
+const { resolveTenantMembership } = require('../services/tenantMembershipService');
+
+exports.listAccessibleTenants = asyncHandler(async (req, res) => {
+  const userId = req.user._id || req.user.id;
+  const tenants = await resolveAvailableTenantsForUser(userId) || [];
+  const accessible = await Promise.all(tenants.map(async (tenant) => {
+    const resolved = await resolveTenantMembership(userId, tenant._id);
+    const membership = resolved && !resolved.ambiguous ? resolved.membership : null;
+    return {
+      ...tenant,
+      businessRole: resolved && !resolved.ambiguous ? resolved.businessRole : null,
+      membership: membership ? {
+        _id: membership._id,
+        roleInUnit: membership.roleInUnit,
+        businessRole: resolved.businessRole,
+        status: membership.status,
+      } : null,
+    };
+  }));
+  res.json({ status: 'success', data: { tenants: accessible } });
+});
+
 exports.listTenants = asyncHandler(async (req, res) => {
   const tenants = await service.listTenants({ status: req.query.status });
   res.json({ status: 'success', data: { tenants } });
