@@ -233,12 +233,13 @@ describe('HTTP /api/dev-portal — administration (Phase 9)', () => {
     expect(nonAdmin.status).toBe(403);
   });
 
-  test('un Admin peut créer, tourner puis révoquer une clé via le portail', async () => {
+  test('DEP-03/07/11/12 — un Proprietaire tenant Admin peut créer, tourner puis révoquer une clé', async () => {
     const fixture = await createTenantFixture({ label: 'Public API HTTP' });
     const { user: admin } = await createTenantUser({
       tenant: fixture.tenant,
       bootstrap: fixture.bootstrap,
-      overrides: { role: 'Admin' },
+      overrides: { role: 'Proprietaire' },
+      businessRole: 'Admin',
     });
     await PlatformTenantSubscription.updateOne(
       { tenant: fixture.tenant._id, status: { $in: ['trialing', 'active'] } },

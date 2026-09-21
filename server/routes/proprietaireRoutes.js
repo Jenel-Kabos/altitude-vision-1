@@ -5,8 +5,9 @@ const multer     = require('multer');
 const auth       = require('../controllers/authController');
 const ctrl       = require('../controllers/proprietaireController');
 const { upload } = require('../config/cloudinary');
-const { STAFF_IMMO } = require('../utils/roles');
-const { requireTenantScope, requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/tenantContext');
+const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireTenantModule } = require('../middleware/tenantModuleGate');
+const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 // PLATFORM-ADMIN-CERT-1 — vulnérabilité V2 corrigée, même patron que
 // locataireRoutes.js (voir son commentaire pour le détail complet).
 const Proprietaire = require('../models/Proprietaire');
@@ -34,9 +35,30 @@ async function assertProprietaireInScope(req, res, next) {
   }
 }
 
-const protect    = [auth.protect, auth.restrictTo(...STAFF_IMMO)];
-const readAll    = [auth.protect, auth.restrictTo(...STAFF_IMMO, 'Secretaire')];
-const adminOnly  = [auth.protect, auth.restrictTo('Admin')];
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-D — Autorité tenant canonique :
+//   protect (au niveau routeur, déjà appliqué)
+//   → requireTenantScope
+//   → requireTenantModule('location')
+//   → requireTenantMembershipRole(...)
+//   → assertProprietaireInScope (cross-tenant per-`:id`)
+//
+// Ce routeur ne comporte pas de branche self/ownership : un Proprietaire
+// gère son propre profil via `/api/users/me` (et ses ressources via les
+// endpoints `/owner/*` du rental-management, Lot C). Toutes les routes ici
+// sont donc TENANT-scopées — une agence gère des mandants dans son
+// portefeuille. `restrictTo(...STAFF_IMMO, 'Secretaire')` et
+// `restrictTo(...STAFF_IMMO)` — qui lisaient `User.role` global comme
+// autorité tenant — sont retirés au profit de `requireTenantMembershipRole`.
+const GL_READ = ['Admin', 'GestionnaireImmobilier', 'Collaborateur', 'Secretaire'];
+const GL_MANAGE = ['Admin', 'GestionnaireImmobilier'];
+
+const tenantAuthBase = [
+  requireTenantScope,
+  requireTenantModule('location'),
+];
+const tenantRead = [...tenantAuthBase, requireTenantMembershipRole(...GL_READ)];
+const tenantManage = [...tenantAuthBase, requireTenantMembershipRole(...GL_MANAGE)];
+
 const multiPics  = upload.array('photos', 20);
 
 // Multer dédié pièce d'identité : 5 MB, PDF + images uniquement
@@ -54,20 +76,20 @@ const single = multer({
 // ── CRUD Proprietaire ─────────────────────────────────────────
 // SECURITY-CLOSURE-P1-WAVE-1 (P1-J, finding RA-15) — `GET /` n'appliquait
 // aucune frontière tenant, contrairement aux routes `:id` de ce fichier.
-router.get('/',       readAll,   requireTenantScopeForStaffOrPlatformOperator, ctrl.getAll);
-router.get('/:id/identity-document', auth.protect, requireTenantScope, auth.restrictTo(...STAFF_IMMO, 'Secretaire'), ctrl.downloadIdentityDocument);
-router.get('/:id',    readAll,   assertProprietaireInScope, ctrl.getOne);
-router.post('/',      protect,   single, ctrl.create);
-router.put('/:id',    protect,   assertProprietaireInScope, single, ctrl.update);
-router.delete('/:id', protect,   assertProprietaireInScope, ctrl.delete);
+router.get('/',                       ...tenantRead, ctrl.getAll);
+router.get('/:id/identity-document',  ...tenantRead, ctrl.downloadIdentityDocument);
+router.get('/:id',                    ...tenantRead, assertProprietaireInScope, ctrl.getOne);
+router.post('/',                      ...tenantManage, single, ctrl.create);
+router.put('/:id',                    ...tenantManage, assertProprietaireInScope, single, ctrl.update);
+router.delete('/:id',                 ...tenantManage, assertProprietaireInScope, ctrl.delete);
 
 // ── Gestion des biens ─────────────────────────────────────────
 // PLATFORM-ADMIN-CERT-1 — même garde : muter les "biens" d'un Proprietaire
 // d'un autre tenant était tout aussi accessible que le CRUD racine.
-router.post(  '/:id/biens',                               protect, assertProprietaireInScope, multiPics, ctrl.addBien);
-router.put(   '/:id/biens/:bienIndex',                    protect, assertProprietaireInScope, ctrl.updateBien);
-router.delete('/:id/biens/:bienIndex',                    protect, assertProprietaireInScope, ctrl.deleteBien);
-router.post(  '/:id/biens/:bienIndex/photos',             protect, assertProprietaireInScope, multiPics, ctrl.addBienPhotos);
-router.delete('/:id/biens/:bienIndex/photos/:photoIndex', protect, assertProprietaireInScope, ctrl.deleteBienPhoto);
+router.post(  '/:id/biens',                               ...tenantManage, assertProprietaireInScope, multiPics, ctrl.addBien);
+router.put(   '/:id/biens/:bienIndex',                    ...tenantManage, assertProprietaireInScope, ctrl.updateBien);
+router.delete('/:id/biens/:bienIndex',                    ...tenantManage, assertProprietaireInScope, ctrl.deleteBien);
+router.post(  '/:id/biens/:bienIndex/photos',             ...tenantManage, assertProprietaireInScope, multiPics, ctrl.addBienPhotos);
+router.delete('/:id/biens/:bienIndex/photos/:photoIndex', ...tenantManage, assertProprietaireInScope, ctrl.deleteBienPhoto);
 
 module.exports = router;

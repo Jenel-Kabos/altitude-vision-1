@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getAllProperties, getPropertyById, deleteProperty, updateProperty, addProperty, toggleRecommande } from "../../services/propertyService";
 import { createFullAccommodation, updateFullAccommodation } from "../../services/accommodationService";
 import { useAuth } from '../../context/AuthContext';
+import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeContext';
 import { isStaffDocs } from '../../utils/staffRoles';
 import {
   PlusCircle, X, Edit, Trash2, Home, Search, Loader2, AlertTriangle, Eye,
@@ -32,6 +33,14 @@ const PROPERTIES_PER_PAGE = 8;
 
 const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
   const { canEdit, canDelete, user } = useAuth();
+  // TENANT-DATA-ISOLATION-SALES-RENTALS-1B — clé de scope tenant canonique.
+  // Le changement de tenant (ou passage Vue plateforme) doit invalider les
+  // données du tenant précédent et déclencher un refetch. `selectedTenantId`
+  // est la valeur stable exposée par PlatformTenantRuntimeContext ; `null`
+  // signifie "Vue plateforme (unscoped)" et est traité comme une clé
+  // distincte à part entière.
+  const { selectedTenantId } = usePlatformTenantRuntime();
+  const tenantScopeKey = selectedTenantId || 'platform';
   const canAddProperty = ['Admin', 'CommunityManager', 'Collaborateur', 'GestionnaireImmobilier'].includes(user?.role);
   // Sprint 0 (architecture Altimmo) — pré-filtre lu depuis l'URL
   // (?status=vente|location|hebergement), posé par les liens dédiés du
@@ -89,12 +98,37 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
   const [loadingSubmit, setSubmit]    = useState(false);
   const [errors, setErrors]           = useState({});
 
-  useEffect(() => { fetchProperties(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // TENANT-DATA-ISOLATION-SALES-RENTALS-1B — race protection.
+  // Chaque effet capture un epoch monotone ; toute réponse tardive dont
+  // l'epoch ne correspond plus au compteur courant est ignorée. Empêche
+  // qu'une réponse lente Tenant A vienne écraser l'état d'un Tenant B
+  // sélectionné entretemps.
+  const analyticsEpochRef = useRef(0);
+  const propertiesEpochRef = useRef(0);
+
   useEffect(() => {
-    const module = section === 'vente' ? 'sales' : section === 'location' ? 'rentals' : null;
-    if (!module) return;
-    getDashboardAnalytics(module).then(setAnalytics).catch(() => setAnalytics({ kpis: {} }));
-  }, [section]);
+    const epoch = ++propertiesEpochRef.current;
+    // Purge immédiate : aucune ligne du tenant précédent ne doit rester
+    // affichée pendant qu'un nouveau fetch est en cours.
+    setProperties([]);
+    setLoading(true);
+    getAllProperties({ portfolio: true })
+      .then((res) => { if (propertiesEpochRef.current === epoch) setProperties(res); })
+      .catch(() => { if (propertiesEpochRef.current === epoch) showNotif('Erreur lors du chargement des biens.', 'error'); })
+      .finally(() => { if (propertiesEpochRef.current === epoch) setLoading(false); });
+  }, [tenantScopeKey]);
+
+  useEffect(() => {
+    const moduleKey = section === 'vente' ? 'sales' : section === 'location' ? 'rentals' : null;
+    if (!moduleKey) return;
+    // Purge immédiate des KPI du scope précédent — évite la fenêtre de
+    // confidentialité visuelle « Contexte : Tenant B / KPIs : Tenant A ».
+    setAnalytics(null);
+    const epoch = ++analyticsEpochRef.current;
+    getDashboardAnalytics(moduleKey)
+      .then((data) => { if (analyticsEpochRef.current === epoch) setAnalytics(data); })
+      .catch(() => { if (analyticsEpochRef.current === epoch) setAnalytics({ kpis: {} }); });
+  }, [section, tenantScopeKey]);
 
   useEffect(() => {
     let list = statusFilter ? properties.filter((p) => p.status === statusFilter) : properties;

@@ -62,14 +62,24 @@ function projectHotel(hotel) {
   };
 }
 
-async function getPropertyPortfolio({ scopeUserIds } = {}) {
+async function getPropertyPortfolio({ scopeUserIds, tenantId } = {}) {
   const ownerScope = Array.isArray(scopeUserIds) ? { owner: { $in: scopeUserIds } } : {};
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-E — when a selected tenant is
+  // provided (canonical tenant staff surface), scope by `Property.tenant`
+  // directly. This closes the multi-tenant leak documented in the phase
+  // spec § "MULTI-TENANT PROPERTY TEST": a Proprietaire who is a member of
+  // tenants A and B previously had all their properties (including
+  // personal ones with `tenant=null`) surface in BOTH portfolios via the
+  // owner-scope filter. Direct attribution wins, exactly like the
+  // Phase 1A fix for sales/rentals analytics.
+  const tenantScope = tenantId ? { tenant: tenantId } : {};
+  const propertyFilter = { ...PROPERTY_PUBLICATION_FILTER, ...ownerScope, ...tenantScope };
   const [properties, accommodations, hotels] = await Promise.all([
-    Property.find({ ...PROPERTY_PUBLICATION_FILTER, ...ownerScope }).lean(),
+    Property.find(propertyFilter).lean(),
     Accommodation.find({
       publicationStatus: 'publie', active: { $ne: false },
       $or: [{ hotel: null }, { hotel: { $exists: false } }],
-    }).populate({ path: 'property', match: ownerScope }).lean(),
+    }).populate({ path: 'property', match: { ...ownerScope, ...tenantScope } }).lean(),
     listEligibleHotels({ propertyOwnerIds: Array.isArray(scopeUserIds) ? scopeUserIds : undefined }),
   ]);
 
@@ -97,10 +107,10 @@ async function getPropertyPortfolio({ scopeUserIds } = {}) {
   return { items, stats };
 }
 
-async function getPropertyPortfolioForTenantScope({ scopeUserIds = [] } = {}) {
+async function getPropertyPortfolioForTenantScope({ scopeUserIds = [], tenantId = null } = {}) {
   const expandedScopeUserIds = await expandScopeWithUnaffiliatedUsersIfSoleTenant(scopeUserIds)
     .catch(() => scopeUserIds);
-  return getPropertyPortfolio({ scopeUserIds: expandedScopeUserIds });
+  return getPropertyPortfolio({ scopeUserIds: expandedScopeUserIds, tenantId });
 }
 
 module.exports = { getPropertyPortfolio, getPropertyPortfolioForTenantScope, PROPERTY_PUBLICATION_FILTER };

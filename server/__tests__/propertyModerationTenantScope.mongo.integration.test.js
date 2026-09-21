@@ -65,8 +65,8 @@ beforeAll(async () => {
   const fixtureB = await createTenantFixture({ label: 'HZ07 B' });
   tenantA = fixtureA.tenant;
   tenantB = fixtureB.tenant;
-  ({ user: adminA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Admin' } }));
-  ({ user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } }));
+  ({ user: adminA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Admin' }, businessRole: 'Admin' }));
+  ({ user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' }, businessRole: 'Admin' }));
   ({ user: ownerA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Proprietaire' } }));
   ({ user: ownerB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Proprietaire' } }));
   operator = await User.create({ name: 'HZ07 Operator', email: 'hz07-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
@@ -123,26 +123,36 @@ test('Admin et Collaborateur sans tenant échouent fermés sur leurs routes de f
   expect((await request(app).get('/api/properties/status/pending-count').set(bearer(collaborator))).status).toBe(403);
 });
 
-test('PlatformOperator global conserve les trois lectures globales', async () => {
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TEST-CONVERGENCE.1 — the
+// TENANT moderation queue (`/status/pending`, `/status/pending-count`) and
+// individual moderation (`/admin/:id/:action`) require an active tenant
+// OrgMembership with `businessRole='Admin'`. Per §5 of the tenant authority
+// contract, a PlatformOperator capability NEVER substitutes for a business
+// role: platform-wide marketplace moderation lives on distinct routes
+// (`PATCH /:id/recommande`, guarded by `requirePlatformOperatorCapability`),
+// never absorbed into the tenant chain.
+test('PlatformOperator garde la lecture publique `/` (staff platform-wide), mais la file `/status/pending` reste TENANT-strict', async () => {
   const root = await request(app).get('/api/properties').set(bearer(operator));
   expect(new Set(rootIds(root))).toEqual(new Set(expectedIds([...propertiesA, ...propertiesB])));
   expect(root.body.total).toBe(5);
-  const pending = await request(app).get('/api/properties/status/pending').set(bearer(operator));
-  expect(new Set(rootIds(pending))).toEqual(new Set(expectedIds([propertiesA[0], propertiesB[0]])));
-  expect((await request(app).get('/api/properties/status/pending-count').set(bearer(operator))).body.data.unreadCount).toBe(2);
+  // Sans membership tenant, l'opérateur ne peut pas atteindre la file de
+  // modération TENANT-scoped, quel que soit son statut plateforme.
+  expect((await request(app).get('/api/properties/status/pending').set(bearer(operator))).status).toBe(403);
+  expect((await request(app).get('/api/properties/status/pending-count').set(bearer(operator))).status).toBe(403);
 });
 
 test.each([
   ['A', () => tenantA, () => propertiesA],
   ['B', () => tenantB, () => propertiesB],
-])('PlatformOperator scoped %s reste isolé sur les trois lectures', async (_label, tenant, expected) => {
+])('PlatformOperator scoped %s : lecture `/` isolée au tenant, file `/status/pending` toujours TENANT-strict (pas de bypass plateforme)', async (_label, tenant, expected) => {
   const root = await request(app).get('/api/properties').set(bearer(operator, tenant()));
   expect(new Set(rootIds(root))).toEqual(new Set(expectedIds(expected())));
   expect(root.body.total).toBe(expected().length);
-  const pendingExpected = expected().filter((item) => item.statusAdmin === 'En attente');
-  const pending = await request(app).get('/api/properties/status/pending').set(bearer(operator, tenant()));
-  expect(new Set(rootIds(pending))).toEqual(new Set(expectedIds(pendingExpected)));
-  expect((await request(app).get('/api/properties/status/pending-count').set(bearer(operator, tenant()))).body.data.unreadCount).toBe(pendingExpected.length);
+  // La sélection d'un tenant par un PlatformOperator ne synthétise pas une
+  // membership : la file de modération reste refusée pour un opérateur sans
+  // OrgMembership Admin sur ce tenant.
+  expect((await request(app).get('/api/properties/status/pending').set(bearer(operator, tenant()))).status).toBe(403);
+  expect((await request(app).get('/api/properties/status/pending-count').set(bearer(operator, tenant()))).status).toBe(403);
 });
 
 test('les paramètres hostiles restent composés avec le scope serveur', async () => {
@@ -170,12 +180,17 @@ test('public, Client et Proprietaire conservent le catalogue public historique',
   }
 });
 
-test.each(['validate', 'reject'])('la mutation %s cross-tenant est déjà sûre et sans effet', async (action) => {
+test.each(['validate', 'reject'])('la mutation %s cross-tenant est refusée sans effet — Lot G TENANT-strict', async (action) => {
   const target = propertiesB[0];
   const before = await Property.findById(target._id).lean();
   const notificationCount = await Notification.countDocuments();
   const response = await request(app).patch(`/api/properties/admin/${target._id}/${action}`).set(bearer(adminA, tenantA));
-  expect(response.status).toBe(404);
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TEST-CONVERGENCE.1 —
+  // Lot G explicitly refuses cross-tenant moderation at the controller
+  // level with 403 ("Cette propriété n'appartient pas au tenant
+  // sélectionné"), no longer masking as 404. The safety invariant (no
+  // mutation, no notification) is unchanged; only the refusal code moves.
+  expect([403, 404]).toContain(response.status);
   expect(await Property.findById(target._id).lean()).toEqual(before);
   expect(await Notification.countDocuments()).toBe(notificationCount);
 });

@@ -38,6 +38,20 @@ jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
 jest.mock('../services/zohoImapService', () => ({ pollZohoInbox: jest.fn() }));
 jest.mock('../services/alerteService', () => ({ verifierPaiementsEnRetard: jest.fn() }));
+// Route-level gates qui interrogent la DB (Mongoose) — stubbés en passthrough
+// pour rester indépendant d'une connexion Mongo dans ce test unitaire ;
+// couverts par les certifs mongo dédiées (tenantModuleGate/tenantMembershipService).
+jest.mock('../middleware/tenantModuleGate', () => ({ requireTenantModule: () => (_req, _res, next) => next() }));
+globalThis.__propertyRoutesTestUserRoleById = new Map();
+jest.mock('../services/tenantMembershipService', () => ({
+  resolveTenantMembership: jest.fn(async (userId) => {
+    const map = globalThis.__propertyRoutesTestUserRoleById;
+    const role = map ? map.get(String(userId)) : null;
+    const staff = new Set(['Admin', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant', 'Collaborateur', 'Secretaire']);
+    if (!role || !staff.has(role)) return null;
+    return { membership: { _id: 'MEMBERSHIP-1', businessRole: role, status: 'active' }, businessRole: role, status: 'active' };
+  }),
+}));
 jest.mock('../utils/generateSitemap', () => jest.fn().mockResolvedValue('<xml/>'));
 const mockMiddleware = () => (req, res, next) => next();
 jest.mock('../config/cloudinary', () => ({
@@ -81,7 +95,7 @@ const makeToken = (role = 'Client') =>
     { expiresIn: '1d' },
   );
 
-const fakeUser = (role = 'Client') => ({
+const fakeUser = (role = 'Client') => (globalThis.__propertyRoutesTestUserRoleById.set('507f1f77bcf86cd799439011', role), {
   _id:          '507f1f77bcf86cd799439011',
   name:         'Test User',
   email:        'test@altitude.com',
@@ -156,9 +170,10 @@ describe('PATCH /api/properties/admin/:id/:action', () => {
   test('borne le broadcast de publication aux utilisateurs du tenant validé', async () => {
     User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
     User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
-    Property.findById = jest.fn().mockResolvedValue({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012' });
+    Property.findById = jest.fn().mockResolvedValue({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012', tenant: '607f1f77bcf86cd799439001' });
     Property.findByIdAndUpdate = jest.fn().mockResolvedValue({
       ...fakeProp, owner: '507f1f77bcf86cd799439012', isPublished: true,
+      tenant: '607f1f77bcf86cd799439001',
       address: { city: 'Brazzaville' },
     });
     const userQuery = { select: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([{ _id: '507f1f77bcf86cd799439011' }]) };
@@ -182,9 +197,10 @@ describe('PATCH /api/properties/admin/:id/:action', () => {
   test('une annonce classique validée est publiée dans la même transition canonique', async () => {
     User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
     User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
-    Property.findById = jest.fn().mockResolvedValue({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012', status: 'vente' });
+    Property.findById = jest.fn().mockResolvedValue({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012', status: 'vente', tenant: '607f1f77bcf86cd799439001' });
     Property.findByIdAndUpdate = jest.fn().mockResolvedValue({
       ...fakeProp, owner: '507f1f77bcf86cd799439012', isPublished: true,
+      tenant: '607f1f77bcf86cd799439001',
     });
     User.find = jest.fn();
 
@@ -715,6 +731,9 @@ describe('Rental management route security', () => {
   test('403 — un propriétaire ne peut pas forcer une publication', async () => {
     User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Proprietaire')) });
     User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    // Le dossier existe et appartient à un autre utilisateur (sinon router.param
+    // court-circuiterait la garde membership via le shortcut ownership).
+    RentalManagement.findById = jest.fn().mockResolvedValue({ _id: '507f191e810c19729de860ea', owner: '507f191e810c19729de860ff', tenant: '607f1f77bcf86cd799439001' });
     const res = await request(app)
       .post('/api/rental-management/507f191e810c19729de860ea/publish')
       .set('Authorization', `Bearer ${makeToken('Proprietaire')}`)

@@ -20,6 +20,7 @@ const baseProperty = (overrides = {}) => ({
   pole: 'Altimmo', type: 'Appartement', status: 'vente', price: 50000000,
   address: { city: 'Brazzaville', arrondissement: 'Poto-Poto' },
   latitude: -4.27, longitude: 15.27, images: ['https://example.test/image.jpg'],
+  location: { type: 'Point', coordinates: [15.27, -4.27] },
   surface: 120, statusAdmin: 'Validée', isPublished: true, availability: 'Disponible',
   owner: ownerId(),
   ...overrides,

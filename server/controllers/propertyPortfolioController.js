@@ -15,8 +15,15 @@ exports.list = asyncHandler(async (req, res) => {
   if (req.isPlatformOperatorContext && !req.platformOperatorCapabilities?.includes('platform.properties.read')) {
     return res.status(403).json({ status: 'fail', message: 'Action refusée : capacité opérateur plateforme requise.' });
   }
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-E — forward the selected
+  // tenant so the portfolio filters strictly by `Property.tenant` when a
+  // canonical tenant context is resolved. PlatformOperator platform-wide
+  // (no tenant selected) keeps the unscoped variant.
   const portfolio = req.isPlatformOperatorContext && !req.platformTenant
     ? await getPropertyPortfolio()
-    : await getPropertyPortfolioForTenantScope({ scopeUserIds: req.tenantScopeUserIds || [] });
+    : await getPropertyPortfolioForTenantScope({
+      scopeUserIds: req.tenantScopeUserIds || [],
+      tenantId: req.platformTenant?._id || null,
+    });
   res.status(200).json({ status: 'success', results: portfolio.items.length, data: portfolio });
 });

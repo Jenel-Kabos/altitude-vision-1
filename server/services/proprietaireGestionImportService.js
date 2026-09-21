@@ -20,6 +20,7 @@ const Property = require('../models/Property');
 const RentalManagement = require('../models/RentalManagement');
 const User = require('../models/User');
 const { logAction, buildAuteur } = require('./actionLogService');
+const { withActivationQuotaGuard, QuotaError } = require('./rentalManagementQuotaService');
 
 class ImportError extends Error {
   constructor(message, statusCode, code, extra = {}) {
@@ -140,11 +141,32 @@ function findMissingFields(candidate) {
 async function findExistingImport(sourceOwnerAssetId) {
   const property = await Property.findOne({ sourceOwnerAssetId });
   if (!property) return null;
-  const rental = await RentalManagement.findOneAndUpdate(
-    { property: property._id },
-    { $setOnInsert: { property: property._id }, $set: { owner: property.owner, managementActivated: true } },
-    { new: true, upsert: true, runValidators: true },
-  );
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-H.1 — ré-import idempotent :
+  // si la gestion existe déjà et est activée, aucun incrément d'usage → pas
+  // de contrôle de quota. Sinon on flippe managementActivated à true via la
+  // garde canonique.
+  const existing = await RentalManagement.findOne({ property: property._id })
+    .select('_id managementActivated tenant');
+  if (existing?.managementActivated) {
+    return { property, rentalManagement: existing, alreadyImported: true };
+  }
+  let rental = null;
+  await withActivationQuotaGuard({
+    tenantId: property.tenant || null,
+    run: async (session) => {
+      const opts = session
+        ? { new: true, upsert: true, runValidators: true, session }
+        : { new: true, upsert: true, runValidators: true };
+      rental = await RentalManagement.findOneAndUpdate(
+        { property: property._id, managementActivated: { $ne: true } },
+        {
+          $setOnInsert: { property: property._id },
+          $set: { owner: property.owner, managementActivated: true, tenant: property.tenant || null },
+        },
+        opts,
+      );
+    },
+  });
   return { property, rentalManagement: rental, alreadyImported: true };
 }
 
@@ -190,6 +212,12 @@ async function importBienPropreVersGestion({ proprietaireId, bienIndex, override
 
   const { user: ownerUser, created: ownerUserCreated } = await resolveOwnerUser(proprietaire);
 
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-H.1 — Property.tenant hérité de
+  // l'acteur staff (ou null si l'acteur n'est rattaché à aucun tenant). Le
+  // contrat de quota est per-tenant : sans tenant, aucun budget à appliquer,
+  // conformément à Lot E/G.
+  const tenantId = actor?.platformTenant?._id || actor?.platformTenant || null;
+
   let property;
   try {
     property = await Property.create({
@@ -208,6 +236,7 @@ async function importBienPropreVersGestion({ proprietaireId, bienIndex, override
       bathrooms: candidate.bathrooms,
       availability: candidate.availability,
       owner: ownerUser._id,
+      tenant: tenantId,
       statusAdmin: 'En attente',
       isPublished: false,
       sourceType: 'proprietaire_bien_propre',
@@ -225,14 +254,22 @@ async function importBienPropreVersGestion({ proprietaireId, bienIndex, override
 
   let rentalManagement;
   try {
-    rentalManagement = await RentalManagement.create({
-      property: property._id,
-      owner: ownerUser._id,
-      manager: actorId,
-      managementActivated: true,
-      monthlyRent: candidate.price,
-      occupancyStatus: 'vacant',
-      availabilityStatus: 'disponible',
+    await withActivationQuotaGuard({
+      tenantId: property.tenant || null,
+      run: async (session) => {
+        const doc = new RentalManagement({
+          property: property._id,
+          owner: ownerUser._id,
+          manager: actorId,
+          managementActivated: true,
+          tenant: property.tenant || null,
+          monthlyRent: candidate.price,
+          occupancyStatus: 'vacant',
+          availabilityStatus: 'disponible',
+        });
+        await doc.save(session ? { session } : undefined);
+        rentalManagement = doc;
+      },
     });
   } catch (error) {
     // Compensation (pattern déjà utilisé par propertyTransactionService) :
@@ -240,6 +277,11 @@ async function importBienPropreVersGestion({ proprietaireId, bienIndex, override
     // l'activation échoue. Le User (technique ou existant) n'est jamais
     // supprimé : il peut légitimement être réutilisé pour un futur import.
     await Property.deleteOne({ _id: property._id });
+    if (error instanceof QuotaError) {
+      throw new ImportError(error.message, error.statusCode || 409, error.code, {
+        current: error.current, limit: error.limit, plan: error.plan,
+      });
+    }
     throw error;
   }
 

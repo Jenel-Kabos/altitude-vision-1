@@ -88,9 +88,14 @@ describe('Reproduction — bien historique déjà approuvé mais isPublished=fal
 
 describe('Réparation idempotente — re-validation via le vrai workflow (PATCH /admin/:id/validate)', () => {
   test('une nouvelle annonce validée par le vrai workflow devient immédiatement visible sur les trois surfaces', async () => {
-    const { bootstrap: admin } = await createTenantFixture({ label: 'ApprovedVisibilityE2E' });
+    const { tenant, bootstrap: admin } = await createTenantFixture({ label: 'ApprovedVisibilityE2E', withAdminMembership: true });
     const owner = await makeUser({ role: 'Proprietaire' });
-    const pending = await Property.create(propertyPayload(owner)); // statusAdmin: 'En attente', isPublished non défini (undefined/false par défaut)
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TEST-CONVERGENCE.1 —
+    // Lot G moderation is TENANT-strict: `Property.tenant` must match the
+    // moderator's tenant. Every property this describe block mutates via
+    // `/admin/:id/{validate,reject}` is therefore attributed to the fixture
+    // tenant explicitly, no silent null relied upon.
+    const pending = await Property.create(propertyPayload(owner, { tenant: tenant._id })); // statusAdmin: 'En attente', isPublished non défini (undefined/false par défaut)
 
     const res = await request(app)
       .patch(`/api/properties/admin/${pending._id}/validate`)
@@ -108,10 +113,11 @@ describe('Réparation idempotente — re-validation via le vrai workflow (PATCH 
   });
 
   test('re-valider un bien déjà Validée mais resté isPublished=false (le cas réel historique) le répare de façon idempotente', async () => {
-    const { bootstrap: admin } = await createTenantFixture({ label: 'ApprovedVisibilityE2E' });
+    const { tenant, bootstrap: admin } = await createTenantFixture({ label: 'ApprovedVisibilityE2E', withAdminMembership: true });
     const owner = await makeUser({ role: 'Proprietaire' });
-    // Reproduit exactement l'état réel avant réparation.
-    const stuck = await Property.create(propertyPayload(owner, { statusAdmin: 'Validée', isPublished: false }));
+    // Reproduit exactement l'état réel avant réparation (Property attribué
+    // au tenant du modérateur — Lot G contract).
+    const stuck = await Property.create(propertyPayload(owner, { statusAdmin: 'Validée', isPublished: false, tenant: tenant._id }));
 
     let portfolio = await getPropertyPortfolio();
     expect(portfolio.items).toHaveLength(0); // confirmé invisible avant réparation
@@ -140,9 +146,9 @@ describe('Réparation idempotente — re-validation via le vrai workflow (PATCH 
   });
 
   test('un rejet explicite dépublie un bien resté isPublished=false par erreur (statut final cohérent)', async () => {
-    const { bootstrap: admin } = await createTenantFixture({ label: 'ApprovedVisibilityE2E' });
+    const { tenant, bootstrap: admin } = await createTenantFixture({ label: 'ApprovedVisibilityE2E', withAdminMembership: true });
     const owner = await makeUser({ role: 'Proprietaire' });
-    const stuck = await Property.create(propertyPayload(owner, { statusAdmin: 'Validée', isPublished: false }));
+    const stuck = await Property.create(propertyPayload(owner, { statusAdmin: 'Validée', isPublished: false, tenant: tenant._id }));
     const res = await request(app)
       .patch(`/api/properties/admin/${stuck._id}/reject`)
       .set('Authorization', `Bearer ${signToken(admin._id)}`);

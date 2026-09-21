@@ -39,7 +39,8 @@ async function getPublicAccommodationAvailability(id, { from, to } = {}) {
   const fromDate = from ? accommodationService.parseDate(from) : accommodationService.parseDate(new Date());
   const toDate = to ? accommodationService.parseDate(to) : new Date(fromDate.getTime() + 90 * 86400000);
   const days = accommodationService.nightsBetween(fromDate, toDate);
-  const locks = await NightLock.find({ accommodation: accommodation._id, date: { $gte: fromDate, $lt: toDate } })
+  const now = new Date();
+  const locks = await NightLock.find({ accommodation: accommodation._id, date: { $gte: fromDate, $lt: toDate }, $or: [{ lockType: { $ne: 'hold' } }, { expiresAt: { $gt: now } }] })
     .select('date').sort({ date: 1 }).lean();
   const pricing = from && to ? await accommodationService.quote(accommodation, fromDate, toDate).catch(() => null) : null;
   return {

@@ -1,201 +1,192 @@
 // server/routes/propertyRoutes.js
+//
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-G — final authority split:
+//   PUBLIC        : /latest, /recommended, /:id (optionalAuth), /:id/share
+//   PUBLIC-AUTH   : /:id/like, /:id/reviews
+//   OWNERSHIP     : /my-properties (protect + controller-level owner filter)
+//                   POST /  and POST /mobile (restrictTo('Proprietaire') —
+//                                             personal listing; tenant=null
+//                                             ALWAYS by controller design)
+//                   PUT /:id, DELETE /:id (MIXED owner-OR-tenant-staff,
+//                                          dual-branch in controller,
+//                                          canonical tenantBusinessRole
+//                                          via `resolveTenantMembershipIfPresent`)
+//   TENANT        : /portfolio                     (Lot E)
+//                   POST /portfolio                (NEW — Decision 1)
+//                   GET /status/pending            (Decision 3 — tenant mod)
+//                   GET /status/pending-count      (Decision 3)
+//                   PATCH /admin/:id/:action       (Decision 3)
+//                   DELETE /admin/:id              (Decision 3)
+//   PLATFORM      : PATCH /:id/recommande          (Decision 3 — cross-tenant
+//                                                   marketplace moderation,
+//                                                   requires
+//                                                   `platform.properties.manage`)
+//
+// Zero `req.user.role === 'Admin'` bypass remains on the mutation surfaces
+// migrated in Lot G. `capabilityMiddleware.requireCapability` is not used
+// on this router.
+
 const express = require('express');
-const { STAFF_ALL, STAFF_DOC, STAFF_IMMO, STAFF_CM, STAFF_COMM } = require('../utils/roles');
 const router = express.Router();
 
-// ✅ IMPORT 1 : Le contrôleur Auth (Sécurité unifiée)
 const authController = require('../controllers/authController');
-
-// ✅ IMPORT 2 : Configuration Cloudinary
 const { upload } = require('../config/cloudinary');
-
-// ✅ IMPORT 3 : Le contrôleur Property
 const propertyController = require('../controllers/propertyController');
 const propertyPortfolioController = require('../controllers/propertyPortfolioController');
-const { requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
-
-// ✅ IMPORT 4 : Contrôleur mobile (JSON pur, photos déjà uploadées)
 const { createPropertyMobile } = require('../controllers/propertyMobileController');
 
-// ============================================================
-// 1️⃣ ROUTES SPÉCIFIQUES (Doivent être EN PREMIER)
-// ============================================================
+const { requireTenantScope, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
+const { requireTenantModule } = require('../middleware/tenantModuleGate');
+const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
+const { resolveTenantMembershipIfPresent } = require('../middleware/resolveTenantMembershipIfPresent');
+const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
 
+// ── Lot E portfolio (unchanged) ─────────────────────────────────────────────
+const GL_PORTFOLIO_READ = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
 router.get(
-    '/portfolio',
-    authController.protect,
-    authController.restrictTo(...STAFF_IMMO),
-    requireTenantScopeForStaffAllowPlatformWide,
-    propertyPortfolioController.list
+  '/portfolio',
+  authController.protect,
+  requireTenantScope,
+  requireTenantModule('immobilier'),
+  requireTenantMembershipRole(...GL_PORTFOLIO_READ),
+  propertyPortfolioController.list,
 );
 
-/**
- * @route GET /api/properties/latest
- * @description Les dernières propriétés (Public)
- */
+// ── Lot G TENANT CREATE (Decision 1) ────────────────────────────────────────
+// Contract: staff of a tenant creates a Property attributed to that tenant.
+// `Property.tenant = req.platformTenant._id` is set by the controller because
+// this middleware chain populates `req.platformTenant`. `Property.owner`
+// remains the calling staff user by schema constraint (Property.owner is
+// `required: true, ref: 'User'`). A future `createdBy` refinement is
+// intentionally not introduced here — the caller identity is preserved via
+// the ActionLog on creation, and reassignment tooling belongs to a later
+// dedicated phase.
+const GL_PORTFOLIO_CREATE = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
+router.post(
+  '/portfolio',
+  authController.protect,
+  requireTenantScope,
+  requireTenantModule('immobilier'),
+  requireTenantMembershipRole(...GL_PORTFOLIO_CREATE),
+  upload.array('images', 10),
+  propertyController.createProperty,
+);
+
+// ── PUBLIC marketplace reads ────────────────────────────────────────────────
 router.get('/latest', propertyController.getLatestProperties, propertyController.getAllProperties);
+router.get('/recommended', propertyController.getRecommendedProperties);
 
-/**
- * @route GET /api/properties/status/pending
- * @description Propriétés en attente (ADMIN UNIQUEMENT)
- * ✅ Placé ici pour éviter le conflit avec /:id
- */
+// ── OWNERSHIP self-listing ──────────────────────────────────────────────────
+router.get('/my-properties', authController.protect, propertyController.getMyProperties);
+
+// ── TENANT MODERATION (Decision 3) ──────────────────────────────────────────
+// Previously `restrictTo('Admin')` — a legacy User.role gate. Post-Lot-G the
+// authority chain is canonical:
 router.get(
-    '/status/pending', 
-    authController.protect, 
-    authController.restrictTo('Admin'), 
-    requireTenantScopeForStaffAllowPlatformWide,
-    propertyController.getPendingProperties
+  '/status/pending',
+  authController.protect,
+  requireTenantScope,
+  requireTenantModule('immobilier'),
+  requireTenantMembershipRole('Admin'),
+  propertyController.getPendingProperties,
 );
 router.get(
-    '/status/pending-count',
-    authController.protect,
-    authController.restrictTo('Admin', 'Collaborateur'),
-    requireTenantScopeForStaffAllowPlatformWide,
-    propertyController.getPendingPropertiesCount
+  '/status/pending-count',
+  authController.protect,
+  requireTenantScope,
+  requireTenantModule('immobilier'),
+  requireTenantMembershipRole('Admin'),
+  propertyController.getPendingPropertiesCount,
 );
 
-/**
- * @route GET /api/properties/my-properties
- * @description Propriétés de l'utilisateur connecté
- */
+// ── PUBLIC list (with staff-aware filter) ──────────────────────────────────
 router.get(
-    '/my-properties',
-    authController.protect,
-    propertyController.getMyProperties
+  '/',
+  authController.optionalAuth,
+  requireTenantScopeForStaffAllowPlatformWide,
+  propertyController.getAllProperties,
 );
 
-/**
- * @route GET /api/properties/recommended
- * @description Biens recommandés (Public) — placé avant /:id pour éviter
- * que 'recommended' soit interprété comme un ObjectId
- */
-router.get(
-    '/recommended',
-    propertyController.getRecommendedProperties
-);
-
-/**
- * @route GET /api/properties
- * @description Toutes les propriétés avec filtres
- */
-router.get(
-    '/', 
-    authController.optionalAuth,
-    requireTenantScopeForStaffAllowPlatformWide,
-    propertyController.getAllProperties
-);
-
-
-// ============================================================
-// 2️⃣ ROUTE DE CRÉATION
-// ============================================================
-
-/**
- * @route POST /api/properties/mobile
- * @description Création depuis l'app mobile (JSON, photos déjà sur Cloudinary)
- */
+// ── OWNERSHIP personal create (Decision 1) ─────────────────────────────────
+// `restrictTo('Proprietaire')` narrows the personal-listing contract. Staff
+// who wish to create a Property on behalf of their tenant use POST /portfolio.
+// Global Admin creating personal listings via this route is intentionally
+// removed — that operation belongs to admin tooling with a documented
+// contract, not a silent bypass here.
 router.post(
-    '/mobile',
-    authController.protect,
-    authController.restrictTo(...STAFF_CM, 'Proprietaire'),
-    createPropertyMobile
+  '/mobile',
+  authController.protect,
+  authController.restrictTo('Proprietaire'),
+  createPropertyMobile,
 );
-
-/**
- * @route POST /api/properties
- * @description Créer une propriété + Upload images
- * ✅ Correction du rôle : 'Admin' (et pas AdminOnly)
- */
 router.post(
-    '/',
-    authController.protect,
-    authController.restrictTo(...STAFF_CM, 'Proprietaire'),
-    upload.array('images', 10),
-    propertyController.createProperty
+  '/',
+  authController.protect,
+  authController.restrictTo('Proprietaire'),
+  upload.array('images', 10),
+  propertyController.createProperty,
 );
 
-
-// ============================================================
-// 3️⃣ ROUTES ADMIN SPÉCIFIQUES
-// ============================================================
-
-/**
- * @route PATCH /api/properties/admin/:id/:action
- * @description Valider ou Rejeter (Admin)
- */
+// ── TENANT MODERATION on individual :id (Decision 3) ────────────────────────
 router.patch(
-    '/admin/:id/:action', 
-    authController.protect, 
-    authController.restrictTo('Admin'), 
-    propertyController.updatePropertyStatus
+  '/admin/:id/:action',
+  authController.protect,
+  requireTenantScope,
+  requireTenantModule('immobilier'),
+  requireTenantMembershipRole('Admin'),
+  propertyController.updatePropertyStatus,
 );
-
-/**
- * @route DELETE /api/properties/admin/:id
- * @description Suppression forcée (Admin)
- */
 router.delete(
-    '/admin/:id',
-    authController.protect,
-    authController.restrictTo('Admin'),
-    propertyController.adminDeleteProperty
+  '/admin/:id',
+  authController.protect,
+  requireTenantScope,
+  requireTenantModule('immobilier'),
+  requireTenantMembershipRole('Admin'),
+  propertyController.adminDeleteProperty,
 );
 
-/**
- * @route PATCH /api/properties/:id/recommande
- * @description Marquer / démarquer un bien comme recommandé (Admin)
- * Placé ici (sous-route :id/recommande, pas conflit avec /:id qui catch-all)
- */
+// ── PLATFORM MARKETPLACE MODERATION (Decision 3) ────────────────────────────
+// `recommande` is a global-marketplace flag consumed by GET /recommended
+// (a PUBLIC endpoint that spans tenants). Tenant Admin authority is not
+// sufficient — the operation is platform-scoped and requires an active
+// PlatformOperator with `platform.properties.manage`.
 router.patch(
-    '/:id/recommande',
-    authController.protect,
-    authController.restrictTo('Admin'),
-    propertyController.setRecommande
+  '/:id/recommande',
+  authController.protect,
+  requirePlatformOperatorCapability('platform.properties.manage'),
+  propertyController.setRecommande,
 );
 
-router.post('/:id/like',  authController.protect, propertyController.toggleLike);
+// ── PUBLIC/AUTH interactions ────────────────────────────────────────────────
+router.post('/:id/like', authController.protect, propertyController.toggleLike);
 router.post('/:id/share', propertyController.incrementShare);
 router.post('/:id/reviews', authController.protect, propertyController.addPropertyReview);
 
-
-// ============================================================
-// 4️⃣ ROUTES DYNAMIQUES PAR ID (EN DERNIER)
-// ============================================================
-
-/**
- * @route PUT /api/properties/:id
- * @description Mise à jour (Propriétaire ou Admin)
- * Note: La vérification de propriété est faite dans le contrôleur
- */
+// ── MIXED owner-or-tenant-staff mutations (Decision 2) ──────────────────────
+// The controller resolves the authority dually:
+//  • OWNER: `Property.owner === req.user.id` → allowed without any tenant
+//    context.
+//  • TENANT STAFF: `req.tenantBusinessRole ∈ {Admin, GestionnaireImmobilier}`
+//    AND `Property.tenant === req.platformTenant._id` (strict). A
+//    tenant=null property is intentionally OUT of the tenant staff branch.
+// Route-level `restrictTo(...)` is retired here: it filtered by User.role
+// (a legacy tenant-authority proxy). The narrower controller-level dual
+// branch is authoritative and canonical.
 router.put(
-    '/:id', 
-    authController.protect, 
-    authController.restrictTo('Admin', 'Proprietaire'), 
-    upload.array('images', 10), 
-    propertyController.updateProperty
+  '/:id',
+  authController.protect,
+  resolveTenantMembershipIfPresent,
+  upload.array('images', 10),
+  propertyController.updateProperty,
 );
-
-/**
- * @route DELETE /api/properties/:id
- * @description Suppression (Propriétaire ou Admin)
- */
 router.delete(
-    '/:id', 
-    authController.protect, 
-    authController.restrictTo('Admin', 'Proprietaire'), 
-    propertyController.deleteProperty
+  '/:id',
+  authController.protect,
+  resolveTenantMembershipIfPresent,
+  propertyController.deleteProperty,
 );
 
-/**
- * @route GET /api/properties/:id
- * @description Détail d'une propriété (Public ou Privé selon statut)
- * ⚠️ C'est la route "Catch-All", elle doit être tout en bas !
- */
-router.get(
-    '/:id', 
-    authController.optionalAuth, 
-    propertyController.getProperty
-);
+// ── PUBLIC catch-all detail ─────────────────────────────────────────────────
+router.get('/:id', authController.optionalAuth, propertyController.getProperty);
 
 module.exports = router;

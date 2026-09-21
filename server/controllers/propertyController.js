@@ -394,8 +394,16 @@ const createProperty = asyncHandler(async (req, res, next) => {
   const { longitude, latitude } = req.body;
 
   // 5. Création en base
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-G — tenant attribution
+  // vient EXCLUSIVEMENT du contexte tenant canonique. Sur la route
+  // OWNERSHIP `POST /`, aucun `attachTenantContext` n'est composé →
+  // `req.platformTenant` reste undefined → `tenant: null` (bien personnel).
+  // Sur la route TENANT `POST /portfolio`, la chaîne canonique pose
+  // `req.platformTenant` → `tenant: req.platformTenant._id`. Aucun body,
+  // query ou header custom n'est lu ici.
   const newProperty = await Property.create({
     owner:           req.user.id,
+    tenant:          req.platformTenant?._id || null,
     title,
     description,
     price:           parseFloat(price),
@@ -818,16 +826,48 @@ const updateProperty = asyncHandler(async (req, res) => {
     throw new Error('Propriété non trouvée.');
   }
 
-  const isAdmin = req.user.role === 'Admin';
   const isOwner = property.owner && property.owner.toString() === req.user.id.toString();
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-G — le bypass historique
+  // `req.user.role === 'Admin'` a été retiré (Décision 2 de la phase 2E.1.X-G).
+  // L'autorité TENANT dérive désormais EXCLUSIVEMENT d'une OrgMembership
+  // active + `businessRole` canonique, résolue en amont par le middleware
+  // `resolveTenantMembershipIfPresent`. Un Admin global sans membership ne
+  // peut plus muter le bien personnel d'un tiers.
+  const TENANT_STAFF_MUTATE_ROLES = new Set(['Admin', 'GestionnaireImmobilier']);
+  const isTenantStaff = Boolean(
+    req.tenantBusinessRole
+    && TENANT_STAFF_MUTATE_ROLES.has(req.tenantBusinessRole)
+    && req.platformTenant?._id,
+  );
 
-  if (!isAdmin && !isOwner) {
+  if (!isOwner && !isTenantStaff) {
     res.status(403);
     throw new Error('Vous ne pouvez modifier que vos propres biens.');
   }
-  // Le rôle Admin autorise l'action fonctionnelle, jamais à lui seul la
-  // frontière tenant — voir assertPropertyTenantAccess en tête de fichier.
-  if (isAdmin && !isOwner) await assertPropertyTenantAccess(req, res, property);
+  // Sur le chemin TENANT STAFF, la frontière tenant est autoritaire :
+  // `Property.tenant === req.platformTenant._id`. La primitive canonique
+  // (`assertResourceTenantOrUnattributed`) refuse une ressource attribuée à
+  // un AUTRE tenant. Sur un bien `tenant=null` (personnel), l'attribution
+  // reste `unresolved` — la garde `!isOwner && !isTenantStaff` a déjà
+  // repoussé les callers non-owner qui ne sont pas non plus tenant staff,
+  // donc un tenant Admin ne peut jamais muter un bien personnel d'un tiers
+  // (parce que sa membership canonique n'attribue pas ce bien à son tenant).
+  if (isTenantStaff && !isOwner) {
+    // Décision 2 (2E.1.X-G) : le tenant staff ne peut muter QUE des biens
+    // strictement attribués à son tenant. La règle « unresolved = allow »
+    // du helper canonique s'applique à d'autres surfaces ; ici on veut la
+    // frontière STRICTE. Un bien `Property.tenant=null` (personnel) reste
+    // hors périmètre tenant staff.
+    if (!property.tenant || String(property.tenant) !== String(req.platformTenant._id)) {
+      res.status(403);
+      throw new Error('Ce bien n\'appartient pas au tenant sélectionné.');
+    }
+    await assertPropertyTenantAccess(req, res, property);
+  }
+  // Pour maintenir la compat des drapeaux internes (moderation flags,
+  // status/pole/...), `isAdmin` reste dérivé, mais désormais uniquement de
+  // l'autorité tenant staff canonique. Aucun `User.role='Admin'` global.
+  const isAdmin = isTenantStaff;
 
   // Champs interdits à la modification directe
   const excludedFields = ['_id', 'owner', 'createdAt', 'reviewedAt', 'images'];
@@ -994,9 +1034,17 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Propriété non trouvée.');
   }
-  // Modération = action Admin par capacité, jamais un accès global — voir
-  // assertPropertyTenantAccess en tête de fichier.
-  const tenant = await assertPropertyTenantAccess(req, res, target);
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-G — modération TENANT stricte :
+  // Property.tenant === req.platformTenant._id. La règle canonique refuse
+  // toute ressource attribuée à un AUTRE tenant. La règle "unresolved =
+  // allow" du helper canonique reste utile ailleurs, mais la modération
+  // exige une attribution positive.
+  if (!target.tenant || !req.platformTenant?._id
+      || String(target.tenant) !== String(req.platformTenant._id)) {
+    res.status(403);
+    throw new Error('Cette propriété n\'appartient pas au tenant sélectionné.');
+  }
+  const tenant = req.platformTenant;
 
   // Pour les annonces Property classiques (vente/location), la file de
   // modération est l'unique transition staff disponible : valider publie et
@@ -1097,14 +1145,28 @@ const deleteProperty = asyncHandler(async (req, res) => {
     throw new Error('Propriété non trouvée.');
   }
 
-  const isAdmin = req.user.role === 'Admin';
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-G — même contrat que
+  // updateProperty (voir commentaire équivalent ci-dessus) : le bypass
+  // `req.user.role === 'Admin'` est retiré. L'autorité TENANT vient
+  // exclusivement d'une OrgMembership active + businessRole canonique.
   const isOwner = property.owner && property.owner.toString() === req.user.id.toString();
-
-  if (!isAdmin && !isOwner) {
+  const TENANT_STAFF_MUTATE_ROLES = new Set(['Admin', 'GestionnaireImmobilier']);
+  const isTenantStaff = Boolean(
+    req.tenantBusinessRole
+    && TENANT_STAFF_MUTATE_ROLES.has(req.tenantBusinessRole)
+    && req.platformTenant?._id,
+  );
+  if (!isOwner && !isTenantStaff) {
     res.status(403);
     throw new Error('Vous ne pouvez supprimer que vos propres biens.');
   }
-  if (isAdmin && !isOwner) await assertPropertyTenantAccess(req, res, property);
+  if (isTenantStaff && !isOwner) {
+    if (!property.tenant || String(property.tenant) !== String(req.platformTenant._id)) {
+      res.status(403);
+      throw new Error('Ce bien n\'appartient pas au tenant sélectionné.');
+    }
+    await assertPropertyTenantAccess(req, res, property);
+  }
 
   const [transaction, contract] = await Promise.all([
     Transaction.exists({ property: property._id }),
@@ -1139,7 +1201,14 @@ const adminDeleteProperty = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Propriété non trouvée.');
   }
-  await assertPropertyTenantAccess(req, res, property);
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-G — same strict tenant
+  // attribution as updatePropertyStatus. Personal properties (tenant=null)
+  // are OUT of tenant admin moderation reach.
+  if (!property.tenant || !req.platformTenant?._id
+      || String(property.tenant) !== String(req.platformTenant._id)) {
+    res.status(403);
+    throw new Error('Cette propriété n\'appartient pas au tenant sélectionné.');
+  }
   if (property.hasReservationHistory) {
     res.status(409);
     throw new Error('Ce bien possède un historique de réservation et ne peut pas être supprimé physiquement.');
@@ -1168,7 +1237,13 @@ const setRecommande = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Propriété non trouvée.');
   }
-  await assertPropertyTenantAccess(req, res, target);
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-G — la vitrine globale
+  // Altimmo (GET /recommended, PUBLIC, cross-tenant) est une décision
+  // PLATFORM, jamais tenant : le routeur exige désormais
+  // `requirePlatformOperatorCapability('platform.properties.manage')`.
+  // Aucun `assertPropertyTenantAccess` — l'opération porte volontairement
+  // sur le catalogue global. `Property.tenant` et `Property.owner` restent
+  // inchangés (patch limité à `recommande`).
 
   const property = await Property.findByIdAndUpdate(
     req.params.id,

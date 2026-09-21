@@ -99,20 +99,30 @@ describe('GL-ARCH-1 — PUT /api/properties/:id — availability (univers 1 vs u
     expect(updated.availability).toBe('Disponible');
   });
 
-  test('un Admin garde le contrôle total de availability, même sur un bien géré', async () => {
+  test('un Tenant Admin (staff canonique) garde le contrôle total de availability, même sur un bien géré', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const owner = await makeUser({ role: 'Proprietaire' });
     const tenant = await platformTenantService.createTenant({ name: `GL-ARCH-1 ${Date.now()}`, actor: admin });
-    await Promise.all([
-      organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
-      organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
-    ]);
-    const property = await makeProperty(owner);
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TEST-CONVERGENCE.2 —
+    // Lot G a supprimé le bypass `User.role === 'Admin'` sur cette surface.
+    // Une mutation staff exige désormais une OrgMembership active +
+    // businessRole ∈ {Admin, GestionnaireImmobilier}, et le bien doit être
+    // strictement attribué au tenant du staff (Property.tenant ===
+    // req.platformTenant._id).
+    const OrgMembership = require('../models/OrgMembership');
+    await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin });
+    await OrgMembership.updateOne(
+      { user: admin._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
+      { $set: { businessRole: 'Admin' } },
+    );
+    await organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, actor: admin });
+    const property = await makeProperty(owner, { tenant: tenant._id });
     await RentalManagement.create({ property: property._id, owner: owner._id, managementActivated: true, monthlyRent: property.price });
 
     const res = await request(app)
       .put(`/api/properties/${property._id}`)
       .set('Authorization', `Bearer ${signToken(admin._id)}`)
+      .set('X-Platform-Tenant-Id', String(tenant._id))
       .send({ availability: 'Loué' });
 
     expect(res.status).toBe(200);

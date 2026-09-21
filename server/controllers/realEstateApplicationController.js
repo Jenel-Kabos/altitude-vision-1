@@ -7,10 +7,27 @@ const workflow = require('../services/realEstateApplicationService');
 const mongoose = require('mongoose');
 const storage = require('../services/storage/realEstateApplicationStorageService');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
 
 const isStaff = (user) => STAFF_IMMO.includes(user?.role);
 const fail = (res, error) => res.status(error.statusCode || 500).json({ status: 'fail', code: error.code, message: error.message });
 const canManage = (user, application) => isStaff(user) || String(application.owner) === String(user._id);
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-MARKETPLACE-RENTAL-CONTRACT-
+// FORMATION — la décision commerciale d'ACCEPTER/REJETER un dossier
+// (`accept`/`reject`) engage la commercialisation Altitude Vision (locking
+// Property, invalidation des candidatures concurrentes, réservation
+// commerciale). Elle est autorisée SOIT au propriétaire du bien (OWNER
+// self-service — le propriétaire choisit son locataire), SOIT à un
+// PlatformOperator canonique avec `platform.commercial.manage`. La lecture
+// `isStaff(user)` (User.role global via STAFF_IMMO) n'est plus suffisante
+// — c'est le legacy leak identifié par ce lot.
+async function canManageDecision(user, application) {
+  if (!user) return false;
+  if (String(application.owner) === String(user._id || user.id)) return true;
+  if (user.role !== 'Admin') return false;
+  const operator = await resolveActiveOperator(user._id || user.id).catch(() => null);
+  return hasCapability(operator, 'platform.commercial.manage');
+}
 
 // SECURITY-CLOSURE-P1-WAVE-1 (P1-D, finding RA-08) — `canManage` accordait
 // l'accès à TOUT staff, de n'importe quel tenant, sans jamais vérifier que
@@ -119,7 +136,12 @@ exports.accept = async (req, res) => {
   try {
     const application = await Application.findById(req.params.id);
     if (!application) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
-    if (!canManage(req.user, application)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-MARKETPLACE-RENTAL-CONTRACT-
+    // FORMATION — accept est une décision commerciale plateforme
+    // (locking Property, disqualification des candidatures concurrentes,
+    // création de RealEstateReservation). Autorité : OWNER self-service
+    // OU PlatformOperator + platform.commercial.manage.
+    if (!(await canManageDecision(req.user, application))) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
     if (!(await assertApplicationTenantAccessIfStaff(req, res, application, isStaff(req.user)))) return;
     const result = await workflow.acceptApplication({ applicationId: application._id, actorId: req.user._id, idempotencyKey: req.get('Idempotency-Key') });
     if (!result.idempotent) await notify({ recipient: result.application.applicant, type: 'real_estate_application_accepted', title: 'Dossier accepté', body: 'Votre dossier est accepté et le bien est temporairement réservé.', entityType: 'RealEstateReservation', entityId: result.reservation._id, dedupeKey: `reservation:${result.reservation._id}:created` });
@@ -130,7 +152,8 @@ exports.accept = async (req, res) => {
 exports.reject = async (req, res) => {
   const application = await Application.findById(req.params.id);
   if (!application) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
-  if (!canManage(req.user, application)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+  // idem accept — reject est aussi une décision commerciale plateforme.
+  if (!(await canManageDecision(req.user, application))) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
   if (!(await assertApplicationTenantAccessIfStaff(req, res, application, isStaff(req.user)))) return;
   if (!['submitted', 'under_review'].includes(application.status)) return res.status(409).json({ status: 'fail', code: 'INVALID_TRANSITION', message: 'Transition impossible.' });
   const reason = String(req.body.reason || '').trim();
