@@ -6,15 +6,17 @@ const router  = express.Router();
 const authController = require('../controllers/authController');
 const { getDashboardKpis } = require('../services/dashboardKpiQueryService');
 const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 
 router.use(authController.protect);
-router.use(authController.restrictTo(...STAFF_ALL));
+router.use(requireTenantScope);
+router.use(requireTenantMembershipRole(...STAFF_ALL));
 
 /**
  * @DESC   Obtenir les statistiques du Dashboard
  * @ROUTE  GET /api/dashboard/stats
  */
-router.get('/stats', requireTenantScope, async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
     const statsData = await getDashboardKpis({ scopeUserIds: req.tenantScopeUserIds || [] });
 

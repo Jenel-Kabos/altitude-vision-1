@@ -132,7 +132,13 @@ exports.getModuleAnalytics = async (req, res) => {
       }
       data = await handlers.accommodations(accommodationId, { tenantId: req.user.role === 'Proprietaire' ? null : (req.user.platformTenant?._id || req.user.platformTenant || null) });
     }
-    else data = await handlers[req.params.module]({ scopeUserIds });
+    else {
+      // TENANT-DATA-ISOLATION-SALES-RENTALS-1A — propager le tenantId
+      // canonique aux services de reporting sales/rentals. Sans cela le
+      // filtre owner seul laissait fuiter les biens d'autres tenants.
+      const tenantId = req.platformTenant?._id || req.platformTenant || null;
+      data = await handlers[req.params.module]({ scopeUserIds, tenantId });
+    }
     res.json({ status: 'success', data });
   } catch (error) { res.status(error.statusCode || 500).json({ status: 'error', message: error.message }); }
 };

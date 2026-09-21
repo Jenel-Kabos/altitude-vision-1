@@ -43,7 +43,7 @@ describe('reportingService — orchestrateur (base vide)', () => {
   test('getExecutiveReport() renvoie les 9 domaines sans jamais lever, même sans aucune donnée', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const { tenant, bootstrap } = await createTenantFixture({ label: 'Reporting', bootstrap: admin });
-    await addTenantMember({ tenant, user: admin, bootstrap });
+    await addTenantMember({ tenant, user: admin, bootstrap, businessRole: 'Admin' });
     await createTenantHotel({ tenant, manager: admin, createdBy: admin });
     const report = await getExecutiveReport({ user: tenantActor(admin, tenant) });
     expect(Object.keys(report.domains)).toEqual(DOMAINS);

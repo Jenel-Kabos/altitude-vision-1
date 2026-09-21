@@ -2,6 +2,7 @@ jest.mock('node-cron', () => ({ schedule: jest.fn(() => ({ stop: jest.fn() })) }
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
 jest.mock('../services/zohoImapService', () => ({ pollZohoInbox: jest.fn() }));
 jest.mock('../services/accommodationReservationReminderService', () => ({ processAccommodationReservationReminders: jest.fn() }));
+jest.mock('../services/accommodationReservationExpiryService', () => ({ processAccommodationReservationExpiry: jest.fn() }));
 jest.mock('../services/alerteService', () => ({ verifierPaiementsEnRetard: jest.fn() }));
 jest.mock('../services/rentalFinancialAutomationService', () => ({ runRentalFinancialAutomations: jest.fn() }));
 jest.mock('../services/visiteAutomationService', () => ({ processVisitAutomation: jest.fn() }));
@@ -14,11 +15,12 @@ const { registerScheduledJobs } = require('../services/scheduledJobs/schedulerSe
 
 beforeEach(() => jest.clearAllMocks());
 
-test('registre canonique préserve les sept jobs et leurs cadences', () => {
+test('registre canonique préserve les huit jobs et leurs cadences', () => {
   expect(JOB_REGISTRY.map(({ name, schedule }) => [name, schedule])).toEqual([
     ['facebook-sync', '0 * * * *'],
     ['zoho-imap-poll', '*/5 * * * *'],
     ['accommodation-reminders', '*/15 * * * *'],
+    ['accommodation-reservation-expiry', '*/5 * * * *'],
     ['rental-penalties-alerts', '0 6 * * *'],
     ['visit-automation', '*/5 * * * *'],
     ['hotel-reservation-expiry', '*/5 * * * *'],
@@ -34,6 +36,6 @@ test('DISABLE_SCHEDULED_JOBS reste un kill switch complet', () => {
 
 test('chaque job est enregistré une seule fois et le timezone quotidien est explicite', () => {
   registerScheduledJobs({ disabled: false });
-  expect(cron.schedule).toHaveBeenCalledTimes(7);
+  expect(cron.schedule).toHaveBeenCalledTimes(8);
   expect(cron.schedule).toHaveBeenCalledWith('0 6 * * *', expect.any(Function), { timezone: 'Africa/Brazzaville' });
 });

@@ -38,8 +38,10 @@ let currentTenant;
 const handleEvent = (event, options) => handleTenantEvent({ ...event, platformTenantId: currentTenant._id }, options);
 const makeUser = async (overrides = {}) => {
   counter += 1;
-  const created = await User.create({ name: 'Test User', email: `crmauto${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
-  await OrgMembership.create({ user: created._id, orgUnit: currentTenant.rootOrgUnit, status: 'active' });
+  const { businessRole, ...userOverrides } = overrides;
+  const created = await User.create({ name: 'Test User', email: `crmauto${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...userOverrides });
+  const legacyTenantRole = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'CommunityManager', 'Communicant'].includes(created.role) ? created.role : null;
+  await OrgMembership.create({ user: created._id, orgUnit: currentTenant.rootOrgUnit, status: 'active', businessRole: businessRole || legacyTenantRole });
   return created;
 };
 
@@ -225,6 +227,14 @@ describe('HTTP /api/crm-automation — administration (Phase 7)', () => {
   test('401 sans authentification', async () => {
     const res = await request(app).get('/api/crm-automation/rules');
     expect(res.status).toBe(401);
+  });
+
+  test('2B.2-D RED — Proprietaire avec membership Admin peut créer une règle tenant', async () => {
+    const founder = await makeUser({ role: 'Proprietaire', businessRole: 'Admin' });
+    const response = await request(app).post('/api/crm-automation/rules')
+      .set('Authorization', `Bearer ${signToken(founder._id)}`)
+      .send({ ruleId: 'founder-admin', label: 'Founder Admin', triggerEvent: 'quote_received', actions: [{ actionId: 'crm.task.create' }] });
+    expect(response.status).toBe(201);
   });
 
   test('un Secretaire peut lister les règles mais pas en créer', async () => {

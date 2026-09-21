@@ -42,7 +42,7 @@ const makeUser = (overrides = {}) => {
 const attachTenant = async (member) => {
   const admin = await makeUser({ role: 'Admin' });
   const tenant = await require('../services/platformTenant/platformTenantService').createTenant({ name: `Marketing HTTP ${Date.now()} ${counter}`, actor: admin });
-  await require('../services/organizationService').grantMembership({ userId: member._id, orgUnitId: tenant.rootOrgUnit, actor: admin });
+  await require('../services/organizationService').grantMembership({ userId: member._id, orgUnitId: tenant.rootOrgUnit, businessRole: member.role, actor: admin });
   return tenant;
 };
 

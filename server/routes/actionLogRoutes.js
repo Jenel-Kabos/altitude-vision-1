@@ -1,13 +1,14 @@
 // server/routes/actionLogRoutes.js
 const express    = require('express');
 const router     = express.Router();
-const { protect, restrictTo } = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 const ctrl       = require('../controllers/actionLogController');
 const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 
 router.use(protect);
-router.use(restrictTo('Admin'));
 router.use(requireTenantScope);
+router.use(requireTenantMembershipRole('Admin'));
 
 router.get('/',        ctrl.getLogs);
 router.get('/stats',   ctrl.getStats);

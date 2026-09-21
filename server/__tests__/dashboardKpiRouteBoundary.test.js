@@ -15,6 +15,9 @@ jest.mock('../controllers/authController', () => ({
 jest.mock('../middleware/tenantContext', () => ({
   requireTenantScope: (req, res, next) => { req.tenantScopeUserIds = ['staff-1']; next(); },
 }));
+jest.mock('../middleware/tenantMembershipRole', () => ({
+  requireTenantMembershipRole: jest.fn(() => (req, res, next) => next()),
+}));
 
 const Event = require('../models/Event');
 const User = require('../models/User');
@@ -25,8 +28,9 @@ const userKpiService = require('../services/userKpiService');
 const { getPropertyPortfolioForTenantScope } = require('../services/propertyPortfolioService');
 const authController = require('../controllers/authController');
 const { STAFF_ALL } = require('../utils/roles');
+const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 const dashboardRoutes = require('../routes/dashboardRoutes');
-const restrictToWasConfiguredForAllStaff = authController.restrictTo.mock.calls.some(
+const membershipWasConfiguredForAllStaff = requireTenantMembershipRole.mock.calls.some(
   (roles) => JSON.stringify(roles) === JSON.stringify(STAFF_ALL),
 );
 
@@ -48,8 +52,9 @@ describe('GET /api/dashboard/stats — contrat de caractérisation ARCH-2F', () 
     jest.clearAllMocks();
   });
 
-  test('conserve les gardes staff définies sur le routeur', () => {
-    expect(restrictToWasConfiguredForAllStaff).toBe(true);
+  test('utilise la garde businessRole tenant avec tous les rôles staff', () => {
+    expect(membershipWasConfiguredForAllStaff).toBe(true);
+    expect(authController.restrictTo).not.toHaveBeenCalled();
   });
 
   test('retourne le contrat exact avec une base vide et les filtres historiques', async () => {

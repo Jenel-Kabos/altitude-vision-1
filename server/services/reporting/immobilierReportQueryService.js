@@ -3,11 +3,21 @@ const Property = require('../../models/Property');
 const Transaction = require('../../models/Transaction');
 const Visite = require('../../models/Visite');
 
-async function getImmobilierReportData({ scopeUserIds = null } = {}) {
+async function getImmobilierReportData({ scopeUserIds = null, tenantId = null } = {}) {
   const now = new Date();
   if (scopeUserIds instanceof Set) scopeUserIds = [...scopeUserIds];
   if (scopeUserIds) scopeUserIds = scopeUserIds.map((id) => new mongoose.Types.ObjectId(String(id)));
-  const propertyFilter = { status: 'vente', ...(scopeUserIds ? { owner: { $in: scopeUserIds } } : {}) };
+  const tenantOid = tenantId ? new mongoose.Types.ObjectId(String(tenantId)) : null;
+  // TENANT-DATA-ISOLATION-SALES-RENTALS-1A — `owner` scope seul est
+  // INSUFFISANT : une identité User globale peut posséder des biens dans
+  // plusieurs tenants. La frontière canonique est `Property.tenant` ; le
+  // filtre owner reste appliqué pour préserver la compatibilité legacy
+  // (Proprietaire self-service sans PlatformTenant propre).
+  const propertyFilter = {
+    status: 'vente',
+    ...(tenantOid ? { tenant: tenantOid } : {}),
+    ...(scopeUserIds ? { owner: { $in: scopeUserIds } } : {}),
+  };
   const ids = await Property.find(propertyFilter).distinct('_id');
   const [properties, visits, transactions, recent] = await Promise.all([
     Property.aggregate([{ $match: propertyFilter }, { $group: { _id: null, total: { $sum: 1 }, published: { $sum: { $cond: [{ $and: [{ $eq: ['$statusAdmin', 'Validée'] }, { $eq: ['$isPublished', true] }, { $eq: ['$availability', 'Disponible'] }, { $eq: ['$pole', 'Altimmo'] }] }, 1, 0] } }, drafts: { $sum: { $cond: [{ $or: [{ $ne: ['$statusAdmin', 'Validée'] }, { $ne: ['$isPublished', true] }] }, 1, 0] } }, sold: { $sum: { $cond: [{ $eq: ['$availability', 'Vendu'] }, 1, 0] } }, active: { $sum: { $cond: [{ $eq: ['$availability', 'Disponible'] }, 1, 0] } } } }]),

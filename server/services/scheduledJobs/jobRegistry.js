@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { syncFacebook } = require('../../scripts/sync-facebook');
 const { pollZohoInbox } = require('../zohoImapService');
 const { processAccommodationReservationReminders } = require('../accommodationReservationReminderService');
+const { processAccommodationReservationExpiry } = require('../accommodationReservationExpiryService');
 const { verifierPaiementsEnRetard } = require('../alerteService');
 const { runRentalFinancialAutomations } = require('../rentalFinancialAutomationService');
 const { processVisitAutomation } = require('../visiteAutomationService');
@@ -37,6 +38,7 @@ const JOB_REGISTRY = Object.freeze([
   { name: 'facebook-sync', schedule: '0 * * * *', leaseDurationMs: 15 * 60 * 1000, heartbeatMs: 60 * 1000, handler: facebookHandler, boot: true },
   { name: 'zoho-imap-poll', schedule: '*/5 * * * *', leaseDurationMs: 4 * 60 * 1000, heartbeatMs: 30 * 1000, handler: pollZohoInbox, bootDelayMs: 10000 },
   { name: 'accommodation-reminders', schedule: '*/15 * * * *', leaseDurationMs: 14 * 60 * 1000, heartbeatMs: 60 * 1000, handler: processAccommodationReservationReminders },
+  { name: 'accommodation-reservation-expiry', schedule: '*/5 * * * *', leaseDurationMs: 4 * 60 * 1000, heartbeatMs: 30 * 1000, handler: processAccommodationReservationExpiry },
   { name: 'rental-penalties-alerts', schedule: '0 6 * * *', timezone: BUSINESS_TIME_ZONE, leaseDurationMs: 30 * 60 * 1000, heartbeatMs: 60 * 1000, handler: rentalHandler },
   { name: 'visit-automation', schedule: '*/5 * * * *', leaseDurationMs: 4 * 60 * 1000, heartbeatMs: 30 * 1000, handler: () => processVisitAutomation() },
   { name: 'hotel-reservation-expiry', schedule: '*/5 * * * *', leaseDurationMs: 4 * 60 * 1000, heartbeatMs: 30 * 1000, handler: () => processReservationExpiry() },

@@ -6,17 +6,18 @@ const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/crmAutomationController');
 const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 
 const STAFF = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'CommunityManager', 'Communicant'];
 const MANAGERS = ['Admin', 'GestionnaireImmobilier'];
 
-router.use(auth.protect, auth.restrictTo(...STAFF), requireTenantScope);
+router.use(auth.protect, requireTenantScope, requireTenantMembershipRole(...STAFF));
 
 router.get('/rules', controller.listRules);
-router.post('/rules', auth.restrictTo(...MANAGERS), controller.createRule);
-router.patch('/rules/:id', auth.restrictTo(...MANAGERS), controller.updateRule);
-router.patch('/rules/:id/enabled', auth.restrictTo(...MANAGERS), controller.setEnabled);
-router.post('/simulate', auth.restrictTo(...MANAGERS), controller.simulate);
+router.post('/rules', requireTenantMembershipRole(...MANAGERS), controller.createRule);
+router.patch('/rules/:id', requireTenantMembershipRole(...MANAGERS), controller.updateRule);
+router.patch('/rules/:id/enabled', requireTenantMembershipRole(...MANAGERS), controller.setEnabled);
+router.post('/simulate', requireTenantMembershipRole(...MANAGERS), controller.simulate);
 router.get('/runs', controller.listRuns);
 router.get('/score/:customerId', controller.getCustomerScore);
 router.get('/cockpit', controller.getCockpit);

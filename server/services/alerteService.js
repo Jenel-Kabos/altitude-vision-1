@@ -59,12 +59,25 @@ const claimAndSendPenaltyEmail = async ({ paiement, penalite, retardJours, now =
   }
 };
 
-const verifierPaiementsEnRetard = async () => {
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TENANT-CONTEXT-B.2 —
+// `contratIds` (optionnel) : restreint la vérification aux Contrats
+// canoniquement scopés au tenant appelant (résolus en amont par le
+// contrôleur via `scopedContratIdsForTenant`). Sans argument (scheduler
+// SYSTEM_INTERNAL), comportement inchangé — traite tous les paiements en
+// retard, comportement historique préservé. L'absence d'argument N'EST
+// JAMAIS déduite d'une absence d'input de requête : c'est l'appelant
+// interne qui décide explicitement d'un scope tenant.
+const verifierPaiementsEnRetard = async ({ contratIds = null } = {}) => {
   const aujourd_hui = new Date();
 
-  const paiements = await Paiement.find({
-    statut: { $in: ['impayé', 'en_retard'] },
-  }).populate({
+  const filter = { statut: { $in: ['impayé', 'en_retard'] } };
+  if (Array.isArray(contratIds)) {
+    // Tenant-local execution : aucune fuite cross-tenant.
+    if (contratIds.length === 0) return { verifies: 0, penalites: 0 };
+    filter.contrat = { $in: contratIds };
+  }
+
+  const paiements = await Paiement.find(filter).populate({
     path: 'contrat',
     populate: [
       { path: 'locataire',    select: 'nom prenom email' },

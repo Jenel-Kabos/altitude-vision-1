@@ -7,26 +7,27 @@ const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/marketingController');
 const { ROLES_CM } = require('../utils/roles');
 const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 
 const STAFF = ROLES_CM; // ['Admin', 'Collaborateur', 'CommunityManager'] — même périmètre qu'Altcom
 const MANAGERS = ['Admin', 'CommunityManager'];
 
-router.use(auth.protect, auth.restrictTo(...STAFF), requireTenantScope);
+router.use(auth.protect, requireTenantScope, requireTenantMembershipRole(...STAFF));
 
 router.get('/segments', controller.listSegments);
 router.get('/segments/:key/preview', controller.previewSegment);
 
 router.get('/templates', controller.listTemplates);
 router.get('/templates/:family/history', controller.templateHistory);
-router.post('/templates', auth.restrictTo(...MANAGERS), controller.createTemplateVersion);
-router.patch('/templates/:id/activate', auth.restrictTo(...MANAGERS), controller.activateTemplate);
+router.post('/templates', requireTenantMembershipRole(...MANAGERS), controller.createTemplateVersion);
+router.patch('/templates/:id/activate', requireTenantMembershipRole(...MANAGERS), controller.activateTemplate);
 router.post('/templates/:id/preview', controller.previewTemplate);
 
 router.get('/campaigns', controller.listCampaigns);
-router.post('/campaigns', auth.restrictTo(...MANAGERS), controller.createCampaign);
-router.patch('/campaigns/:id/approve', auth.restrictTo(...MANAGERS), controller.approveCampaign);
-router.patch('/campaigns/:id/cancel', auth.restrictTo(...MANAGERS), controller.cancelCampaign);
-router.post('/campaigns/:id/send', auth.restrictTo(...MANAGERS), controller.sendCampaign);
+router.post('/campaigns', requireTenantMembershipRole(...MANAGERS), controller.createCampaign);
+router.patch('/campaigns/:id/approve', requireTenantMembershipRole(...MANAGERS), controller.approveCampaign);
+router.patch('/campaigns/:id/cancel', requireTenantMembershipRole(...MANAGERS), controller.cancelCampaign);
+router.post('/campaigns/:id/send', requireTenantMembershipRole(...MANAGERS), controller.sendCampaign);
 
 router.get('/sends', controller.listSends);
 

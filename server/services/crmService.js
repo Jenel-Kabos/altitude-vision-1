@@ -134,22 +134,70 @@ async function getCustomer360(customerId, { tenantId } = {}) {
   if (!customer) throw new CrmError('Customer introuvable.', 404);
   const refs = (type) => customer.sourceRefs.filter((r) => r.entityType === type).map((r) => r.entityId);
   const userIds = refs('User'); const ownerIds = refs('Proprietaire'); const tenantIds = refs('Locataire'); const emails = customer.emails || [];
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-CRM360-TENANT-BOUNDARY —
+  // Every relation is projected through the ACTIVE tenant. Identity match
+  // (user/email/participant) is NOT tenant attribution: the SAME user may
+  // legitimately belong to multiple tenants, so an identity-only filter
+  // would leak commercial data from tenant B into tenant A's 360. Fail-
+  // closed: relations without a canonical tenant attribution
+  // (ContactMessage/QuoteRequest/AltcomProject — public intake surfaces
+  // that carry no `tenant` field, and legacy Contrat rows with `bien:null`)
+  // are excluded from a tenant-scoped 360 rather than silently included
+  // on email match. `tenantId == null` (no tenant selected) preserves the
+  // legacy identity-only view — the caller is already refused upstream by
+  // `requireTenantScope + requireTenantMembershipRole`, so a null tenant
+  // reaches this service only from platform-owned CRM code paths.
+  const tenantFilterOr = (filter) => tenantFilter(tenantId, filter);
   const [properties, contracts, visits, transactions, stays, hotelStays, financialDocs, conversations, messages, notifications, opportunities, activities, contacts, quotes, projects] = await Promise.all([
-    Property.find({ owner: { $in: userIds } }).select('title type status availability owner createdAt').lean(),
-    Contrat.find({ $or: [{ locataire: { $in: tenantIds } }, { proprietaire: { $in: ownerIds } }] }).select('type statut montantLoyer dateEntree dateFinBail bien createdAt').lean(),
-    Visite.find({ client: { $in: userIds } }).select('property statut scheduledStartAt createdAt').lean(),
-    Transaction.find({ client: { $in: userIds } }).select('property status finalAmount transactionType transactionDate').lean(),
-    AccommodationReservation.find({ $or: [{ guest: { $in: userIds } }, { user: { $in: userIds } }, { email: { $in: emails } }] }).select('status totalAmount checkIn checkOut createdAt').lean(),
-    HotelReservation.find({ $or: [{ customer: { $in: userIds } }, { user: { $in: userIds } }, { guestEmail: { $in: emails } }] }).select('status totalAmount checkIn checkOut createdAt').lean(),
-    FinancialDocument.find({ $or: [{ 'customer.userId': { $in: userIds } }, { 'customer.email': { $in: emails } }] }).select('documentType documentNumber status currency totalMinor amountAllocatedMinor refundedAmountMinor balanceMinor issueDate createdAt').lean(),
-    Conversation.find({ participants: { $in: userIds } }).select('lastMessage relatedProperty relatedEvent updatedAt').lean(),
-    Message.find({ $or: [{ sender: { $in: userIds } }, { receiver: { $in: userIds } }] }).select('subject content conversation createdAt').sort({ createdAt: -1 }).limit(50).lean(),
-    Notification.find({ recipient: { $in: userIds } }).select('type title destination entityType entityId createdAt').sort({ createdAt: -1 }).limit(50).lean(),
+    Property.find(tenantFilterOr({ owner: { $in: userIds } })).select('title type status availability owner createdAt').lean(),
+    // Contrat has no `tenant` field: canonical attribution is via `bien`
+    // → Property.tenant. Legacy `bien:null` rows are unattributable and
+    // fail-closed excluded from a tenant 360 (still visible on the
+    // dedicated regularization surface).
+    (async () => {
+      if (!tenantId) {
+        return Contrat.find({ $or: [{ locataire: { $in: tenantIds } }, { proprietaire: { $in: ownerIds } }] })
+          .select('type statut montantLoyer dateEntree dateFinBail bien createdAt').lean();
+      }
+      const propertyIds = await Property.distinct('_id', { tenant: tenantId });
+      if (!propertyIds.length) return [];
+      return Contrat.find({
+        bien: { $in: propertyIds },
+        $or: [{ locataire: { $in: tenantIds } }, { proprietaire: { $in: ownerIds } }],
+      }).select('type statut montantLoyer dateEntree dateFinBail bien createdAt').lean();
+    })(),
+    Visite.find(tenantFilterOr({ client: { $in: userIds } })).select('property statut scheduledStartAt createdAt').lean(),
+    // Transaction has no `tenant` field: canonical attribution via
+    // `property` → Property.tenant. Same fail-closed pattern.
+    (async () => {
+      if (!tenantId) {
+        return Transaction.find({ client: { $in: userIds } }).select('property status finalAmount transactionType transactionDate').lean();
+      }
+      const propertyIds = await Property.distinct('_id', { tenant: tenantId });
+      if (!propertyIds.length) return [];
+      return Transaction.find({ client: { $in: userIds }, property: { $in: propertyIds } })
+        .select('property status finalAmount transactionType transactionDate').lean();
+    })(),
+    AccommodationReservation.find(tenantFilterOr({ $or: [{ guest: { $in: userIds } }, { user: { $in: userIds } }, { email: { $in: emails } }] })).select('status totalAmount checkIn checkOut createdAt').lean(),
+    HotelReservation.find(tenantFilterOr({ $or: [{ customer: { $in: userIds } }, { user: { $in: userIds } }, { guestEmail: { $in: emails } }] })).select('status totalAmount checkIn checkOut createdAt').lean(),
+    FinancialDocument.find(tenantFilterOr({ $or: [{ 'customer.userId': { $in: userIds } }, { 'customer.email': { $in: emails } }] })).select('documentType documentNumber status currency totalMinor amountAllocatedMinor refundedAmountMinor balanceMinor issueDate createdAt').lean(),
+    Conversation.find(tenantFilterOr({ participants: { $in: userIds } })).select('lastMessage relatedProperty relatedEvent updatedAt').lean(),
+    Message.find(tenantFilterOr({ $or: [{ sender: { $in: userIds } }, { receiver: { $in: userIds } }] })).select('subject content conversation createdAt').sort({ createdAt: -1 }).limit(50).lean(),
+    // Notification uses `platformTenant` (not `tenant`).
+    Notification.find(tenantId
+      ? { recipient: { $in: userIds }, platformTenant: tenantId }
+      : { recipient: { $in: userIds } })
+      .select('type title destination entityType entityId createdAt').sort({ createdAt: -1 }).limit(50).lean(),
     CrmOpportunity.find(tenantFilter(tenantId, { customer: customer._id })).populate('assignedTo', 'name').sort({ updatedAt: -1 }).lean(),
     CrmActivity.find(tenantFilter(tenantId, { customer: customer._id })).populate('assignedTo createdBy', 'name').sort({ dueAt: 1, createdAt: -1 }).lean(),
-    ContactMessage.find({ email: { $in: emails } }).select('subject status submittedAt').lean(),
-    QuoteRequest.find({ email: { $in: emails } }).select('source service status date createdAt').lean(),
-    AltcomProject.find({ email: { $in: emails } }).select('projectName projectType status submittedAt').lean(),
+    // ContactMessage / QuoteRequest / AltcomProject are PUBLIC intake
+    // surfaces with no `tenant` field. They cannot be reliably attributed
+    // to a specific tenant — fail-closed: excluded from a tenant-scoped
+    // 360. Platform-CRM code paths (tenantId==null) keep the identity-
+    // only view. Do NOT invent tenant attribution here.
+    tenantId ? Promise.resolve([]) : ContactMessage.find({ email: { $in: emails } }).select('subject status submittedAt').lean(),
+    tenantId ? Promise.resolve([]) : QuoteRequest.find({ email: { $in: emails } }).select('source service status date createdAt').lean(),
+    tenantId ? Promise.resolve([]) : AltcomProject.find({ email: { $in: emails } }).select('projectName projectType status submittedAt').lean(),
   ]);
   const revenueMinor = financialDocs.reduce((n, d) => n + (d.amountAllocatedMinor || 0) - (d.refundedAmountMinor || 0), 0);
   const timeline = buildTimeline([

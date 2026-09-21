@@ -7,11 +7,22 @@ const RentalMaintenanceTicket = require('../../models/RentalMaintenanceTicket');
 
 // Owner canonique read-only des KPI de gestion locative. Le scope est fourni
 // par l'appelant ; ce service ne décide ni tenant, ni IAM, ni PlatformOperator.
-async function getRentalReportData({ scopeUserIds = null } = {}) {
+async function getRentalReportData({ scopeUserIds = null, tenantId = null } = {}) {
   const now = new Date(); const soon = new Date(now.getTime() + 30 * 86400000);
   if (scopeUserIds instanceof Set) scopeUserIds = [...scopeUserIds];
   if (scopeUserIds) scopeUserIds = scopeUserIds.map((id) => new mongoose.Types.ObjectId(String(id)));
-  const properties = scopeUserIds ? await Property.find({ owner: { $in: scopeUserIds } }).distinct('_id') : null;
+  const tenantOid = tenantId ? new mongoose.Types.ObjectId(String(tenantId)) : null;
+  // TENANT-DATA-ISOLATION-SALES-RENTALS-1A — cf. immobilierReportQueryService :
+  // le filtre owner seul laisse fuiter des biens d'autres tenants dont
+  // l'owner (User global) est aussi membre du tenant courant. `Property.tenant`
+  // est la frontière canonique.
+  const propertyBaseFilter = {
+    ...(tenantOid ? { tenant: tenantOid } : {}),
+    ...(scopeUserIds ? { owner: { $in: scopeUserIds } } : {}),
+  };
+  const properties = (tenantOid || scopeUserIds)
+    ? await Property.find(propertyBaseFilter).distinct('_id')
+    : null;
   const rentalFilter = properties ? { property: { $in: properties } } : {};
   const contractFilter = properties ? { bien: { $in: properties } } : {};
   const contractsInScope = properties ? await Contrat.find(contractFilter).distinct('_id') : null;

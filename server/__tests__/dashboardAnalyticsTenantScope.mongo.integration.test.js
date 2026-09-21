@@ -54,10 +54,10 @@ async function insertTenantAnalytics({ tenant, owner, amount, suffix }) {
   const contractId = oid();
 
   await Property.collection.insertMany([
-    { _id: salePropertyId, owner: owner._id, title: `Sale ${suffix}`, status: 'vente', pole: 'Altimmo', statusAdmin: 'Validée', isPublished: true, availability: 'Disponible' },
-    { _id: rentalPropertyId, owner: owner._id, title: `Rental ${suffix}`, status: 'location', pole: 'Altimmo', statusAdmin: 'Validée', isPublished: true, availability: 'Disponible' },
-    { _id: accommodationPropertyId, owner: owner._id, title: `Accommodation ${suffix}`, status: 'hebergement', pole: 'Altimmo', statusAdmin: 'Validée', isPublished: true, availability: 'Disponible' },
-    { _id: hotelPropertyId, owner: owner._id, title: `Hotel ${suffix}`, status: 'hebergement', pole: 'Altimmo', statusAdmin: 'Validée', isPublished: true, availability: 'Disponible' },
+    { _id: salePropertyId, tenant: tenant._id, owner: owner._id, title: `Sale ${suffix}`, status: 'vente', pole: 'Altimmo', statusAdmin: 'Validée', isPublished: true, availability: 'Disponible' },
+    { _id: rentalPropertyId, tenant: tenant._id, owner: owner._id, title: `Rental ${suffix}`, status: 'location', pole: 'Altimmo', statusAdmin: 'Validée', isPublished: true, availability: 'Disponible' },
+    { _id: accommodationPropertyId, tenant: tenant._id, owner: owner._id, title: `Accommodation ${suffix}`, status: 'hebergement', pole: 'Altimmo', statusAdmin: 'Validée', isPublished: true, availability: 'Disponible' },
+    { _id: hotelPropertyId, tenant: tenant._id, owner: owner._id, title: `Hotel ${suffix}`, status: 'hebergement', pole: 'Altimmo', statusAdmin: 'Validée', isPublished: true, availability: 'Disponible' },
   ]);
   await Transaction.collection.insertOne({ _id: oid(), property: salePropertyId, reservation: oid(), transactionType: 'vente', status: 'Réussie', finalAmount: amount, commission: { agencyNet: amount }, transactionDate: new Date() });
   await RentalManagement.collection.insertOne({ _id: oid(), property: rentalPropertyId, managementActivated: true, availabilityStatus: 'disponible', occupancyStatus: 'libre' });
