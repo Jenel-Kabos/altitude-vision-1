@@ -50,13 +50,13 @@ test('liste le dossier et explique les Property compatibles sans mutation', asyn
 test('rattache, synchronise, journalise puis permet une réversion Admin contrôlée', async () => {
   const { admin, property, contract, owner } = await fixture();
   const scope = { tenantScopeUserIds: [owner._id] };
-  const record = await service.decide({ contractId: contract._id, action: 'link_existing', data: { propertyId: property._id, reason: 'Vérification humaine des pièces du dossier' }, actor: admin, ...scope });
+  const record = await service.decide({ contractId: contract._id, action: 'link_existing', data: { propertyId: property._id, reason: 'Vérification humaine des pièces du dossier' }, actor: admin, actorBusinessRole: 'Admin', ...scope });
   expect(record.status).toBe('resolved');
   expect(String((await Contrat.findById(contract._id)).bien)).toBe(String(property._id));
   expect(await RentalManagement.exists({ property: property._id, activeLease: contract._id, occupancyStatus: 'occupe' })).toBeTruthy();
   expect(await ActionLog.exists({ action: 'Régularisation contrat historique' })).toBeTruthy();
 
-  await service.revert({ contractId: contract._id, reason: 'Correction contrôlée après double vérification', actor: admin, ...scope });
+  await service.revert({ contractId: contract._id, reason: 'Correction contrôlée après double vérification', actor: admin, actorBusinessRole: 'Admin', ...scope });
   expect((await Contrat.findById(contract._id)).bien).toBeFalsy();
   expect(await RentalManagement.exists({ property: property._id, activeLease: null, occupancyStatus: 'vacant' })).toBeTruthy();
   expect(await ActionLog.exists({ action: 'Réversion régularisation contrat' })).toBeTruthy();
@@ -66,17 +66,17 @@ test('classe une anomalie sans modifier le contrat et réserve la réversion à 
   const { contract, admin, owner } = await fixture();
   const scope = { tenantScopeUserIds: [owner._id] };
   const manager = await user('GestionnaireImmobilier');
-  await service.decide({ contractId: contract._id, action: 'flag_anomaly', data: { reason: 'Adresse insuffisante à confirmer manuellement' }, actor: manager, ...scope });
+  await service.decide({ contractId: contract._id, action: 'flag_anomaly', data: { reason: 'Adresse insuffisante à confirmer manuellement' }, actor: manager, actorBusinessRole: 'GestionnaireImmobilier', ...scope });
   expect((await Contrat.findById(contract._id)).statut).toBe('actif');
-  await expect(service.revert({ contractId: contract._id, reason: 'Tentative gestionnaire', actor: manager, ...scope })).rejects.toMatchObject({ code: 'ADMIN_REQUIRED' });
-  await expect(service.revert({ contractId: contract._id, reason: 'Validation administrateur', actor: admin, ...scope })).resolves.toMatchObject({ status: 'reverted' });
+  await expect(service.revert({ contractId: contract._id, reason: 'Tentative gestionnaire', actor: manager, actorBusinessRole: 'GestionnaireImmobilier', ...scope })).rejects.toMatchObject({ code: 'ADMIN_REQUIRED' });
+  await expect(service.revert({ contractId: contract._id, reason: 'Validation administrateur', actor: admin, actorBusinessRole: 'Admin', ...scope })).resolves.toMatchObject({ status: 'reverted' });
 });
 
 test('reconstruit exactement un Property non publié et un RentalManagement pour un contrat legacy', async () => {
   const { admin, contract, owner } = await fixture();
   const scope = { tenantScopeUserIds: [owner._id] };
   const before = await Property.countDocuments();
-  const record = await service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: admin, ...scope });
+  const record = await service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: admin, actorBusinessRole: 'Admin', ...scope });
   const updated = await Contrat.findById(contract._id);
   const property = await Property.findById(updated.bien);
   const rental = await RentalManagement.findOne({ property: property._id });
@@ -97,24 +97,24 @@ test('refuse la reconstruction sans motif, pour Collaborateur et pour un contrat
     contractId: contract._id,
     action: 'create_internal',
     data: { ...reconstructionData, reason: '' },
-    actor: admin,
+    actor: admin, actorBusinessRole: 'Admin',
     ...scope,
   })).rejects.toMatchObject({ code: 'REASON_REQUIRED' });
-  await expect(service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: collaborator, ...scope }))
+  await expect(service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: collaborator, actorBusinessRole: 'Collaborateur', ...scope }))
     .rejects.toMatchObject({ code: 'HISTORICAL_RECONSTRUCTION_FORBIDDEN' });
 
   contract.bien = property._id;
   await contract.save();
-  await expect(service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: admin, ...scope }))
+  await expect(service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: admin, actorBusinessRole: 'Admin', ...scope }))
     .rejects.toMatchObject({ code: 'CASE_NOT_PENDING' });
 });
 
 test('la réversion d’une reconstruction conserve le Property et le rend interne non publié', async () => {
   const { admin, contract, owner } = await fixture();
   const scope = { tenantScopeUserIds: [owner._id] };
-  await service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: admin, ...scope });
+  await service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: admin, actorBusinessRole: 'Admin', ...scope });
   const propertyId = (await Contrat.findById(contract._id)).bien;
-  await service.revert({ contractId: contract._id, reason: 'Réversion contrôlée sans suppression patrimoniale', actor: admin, ...scope });
+  await service.revert({ contractId: contract._id, reason: 'Réversion contrôlée sans suppression patrimoniale', actor: admin, actorBusinessRole: 'Admin', ...scope });
 
   expect(await Property.exists({ _id: propertyId })).toBeTruthy();
   expect(await Property.findById(propertyId)).toMatchObject({ isPublished: false });

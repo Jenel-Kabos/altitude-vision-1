@@ -15,6 +15,8 @@ const RentalManagement = require('../models/RentalManagement');
 const OrgUnit = require('../models/OrgUnit');
 const OrgMembership = require('../models/OrgMembership');
 const PlatformTenant = require('../models/PlatformTenant');
+const PlatformTenantSubscription = require('../models/PlatformTenantSubscription');
+const { TENANT_FEATURE_MODULES } = require('../constants/platformTenantConstants');
 const rentalManagementRoutes = require('../routes/rentalManagementRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 
@@ -32,13 +34,26 @@ beforeAll(startFinancialMongo);
 beforeEach(async () => {
   const root = await OrgUnit.create({ name: `GL stats ${Date.now()}`, type: 'organization', status: 'active' });
   currentTenant = await PlatformTenant.create({ name: root.name, slug: `gl-stats-${Date.now()}-${Math.random().toString(36).slice(2)}`, rootOrgUnit: root._id, status: 'active' });
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-C — rentalManagement now
+  // requires `requireTenantModule('location')`. Grant the tenant a trial
+  // subscription with all modules (matches platformTenantService default).
+  await PlatformTenantSubscription.create({ tenant: currentTenant._id, plan: 'trial', status: 'trialing', modulesIncluded: TENANT_FEATURE_MODULES });
 });
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);
 
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-C — memberships now carry a
+// canonical `businessRole`. Preserve the intent (Admin caller = tenant
+// Admin) by projecting User.role → businessRole for the fixture.
+const projectBusinessRole = (userRole) => (userRole === 'Admin' ? 'Admin'
+  : userRole === 'GestionnaireImmobilier' ? 'GestionnaireImmobilier'
+  : userRole === 'Collaborateur' ? 'Collaborateur' : null);
 const makeTenantUser = async (data) => {
   const user = await User.create(data);
-  await OrgMembership.create({ user: user._id, orgUnit: currentTenant.rootOrgUnit, status: 'active' });
+  await OrgMembership.create({
+    user: user._id, orgUnit: currentTenant.rootOrgUnit, status: 'active',
+    businessRole: projectBusinessRole(data.role),
+  });
   return user;
 };
 const tenantGet = (admin) => request(app).get('/api/rental-management/stats')

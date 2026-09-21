@@ -39,6 +39,15 @@ jest.mock('../services/platformTenant/tenantResourceAttributionService', () => (
   assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
   resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
 }));
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIV-3E — CONTRAT-CERTIFICATION-
+// BASELINE-CLEANUP. `requireTenantMembershipRole` de la chaîne canonique
+// (DELETE /api/contrats/:id, Phase 2/3) interroge `resolveTenantMembership`
+// qui, sans DB (convention unit test), reste bloquant. Mock canonique
+// aligné sur la même précédence que les autres services tenant déjà
+// mockés ci-dessus — jamais un mock ad-hoc au niveau du test.
+jest.mock('../services/tenantMembershipService', () => ({
+  resolveTenantMembership: jest.fn().mockResolvedValue({ membership: { _id: 'MEMBERSHIP-1', businessRole: 'Admin', status: 'active' }, businessRole: 'Admin', status: 'active' }),
+}));
 jest.mock('../utils/generateSitemap', () => jest.fn().mockResolvedValue('<xml/>'));
 jest.mock('../services/notificationService', () => ({
   notify: jest.fn().mockResolvedValue(), notifyStaff: jest.fn().mockResolvedValue(), notifyMany: jest.fn().mockResolvedValue(),
@@ -59,7 +68,42 @@ const Document = require('../models/Document');
 const User = require('../models/User');
 const Property = require('../models/Property');
 
-Property.find = jest.fn().mockReturnValue({ distinct: jest.fn().mockResolvedValue([]) });
+// Property.find est utilisé par plusieurs chaînes (`.distinct(...)` pour
+// les scopes propriétaire legacy, `.select(...).lean()` pour la résolution
+// tenant canonique via `scopedContratIdsForTenant`). Le stub doit satisfaire
+// les deux sans dépendre d'un ordre d'appel.
+Property.find = jest.fn(() => {
+  const chain = {};
+  chain.distinct = jest.fn().mockResolvedValue([]);
+  chain.select = jest.fn().mockReturnValue(chain);
+  chain.lean = jest.fn().mockResolvedValue([]);
+  chain.where = jest.fn().mockReturnValue(chain);
+  chain.equals = jest.fn().mockReturnValue(chain);
+  chain.sort = jest.fn().mockReturnValue(chain);
+  chain.limit = jest.fn().mockReturnValue(chain);
+  chain.populate = jest.fn().mockReturnValue(chain);
+  chain.then = (resolve) => resolve([]);
+  return chain;
+});
+// Contrat.find(...).distinct(...) est aussi appelé par scopedContratIdsForTenant.
+// Le mock automatique de jest.mock('../models/Contrat') ne fournit pas la
+// chaîne : on installe un stub minimal ici, à côté du reset par test.
+const _origContratFind = Contrat.find;
+Contrat.find = jest.fn(() => {
+  const chain = {};
+  chain.distinct = jest.fn().mockResolvedValue([]);
+  chain.select = jest.fn().mockReturnValue(chain);
+  chain.sort = jest.fn().mockReturnValue(chain);
+  chain.populate = jest.fn().mockReturnValue(chain);
+  chain.limit = jest.fn().mockReturnValue(chain);
+  chain.lean = jest.fn().mockResolvedValue([]);
+  chain.then = (resolve) => resolve([]);
+  return chain;
+});
+// Les tests individuels peuvent surcharger Contrat.find quand ils ont besoin
+// d'un comportement précis ; on garde une référence au mock initial pour
+// documentation seule.
+void _origContratFind;
 
 const ADMIN_ID = '507f1f77bcf86cd799439012';
 const GESTIONNAIRE_ID = '507f1f77bcf86cd799439044';
@@ -199,13 +243,21 @@ describe('Paiements locatifs — immutabilité et concurrence', () => {
 describe('Contrats — protection de l’historique financier', () => {
   afterEach(() => jest.clearAllMocks());
 
-  test('409 — un contrat avec encaissement ne peut pas être supprimé', async () => {
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIV-3C — LEGACY-CONTRAT-
+  // MUTATION-RETIREMENT. DELETE /api/contrats/:id est désormais retiré
+  // uniformément (410 CONTRACT_LEGACY_MUTATION_RETIRED) — jamais aucune
+  // évaluation métier (dont CONTRACT_HISTORY_IMMUTABLE) sur la surface
+  // legacy. L'invariant `CONTRACT_HISTORY_IMMUTABLE` reste intégralement
+  // couvert sur la surface typée par PCCTA-40 (paid payment blocks
+  // DELETE /api/contrats/location/:id → 409). La suite LCR-07/08/09
+  // certifie parallèlement le 410 legacy + zéro effet de bord.
+  test('410 — legacy DELETE /api/contrats/:id est retiré uniformément', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
     Contrat.findById = jest.fn().mockResolvedValue({ _id: CONTRACT_ID, type: 'location', documents: [] });
     Paiement.findOne = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: PAYMENT_ID }) });
     const res = await request(app).delete(`/api/contrats/${CONTRACT_ID}`).set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
-    expect(res.statusCode).toBe(409);
-    expect(res.body.code).toBe('CONTRACT_HISTORY_IMMUTABLE');
+    expect(res.statusCode).toBe(410);
+    expect(res.body.code).toBe('CONTRACT_LEGACY_MUTATION_RETIRED');
     expect(Contrat.deleteOne).not.toHaveBeenCalled();
     expect(Paiement.deleteMany).not.toHaveBeenCalled();
   });

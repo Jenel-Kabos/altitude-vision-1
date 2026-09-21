@@ -37,6 +37,7 @@ exports.decide = async (req, res) => {
     const tenantScopeUserIds = await resolveScope(req);
     const record = await service.decide({
       contractId: req.params.contractId, action: req.body.action, data: req.body, actor: req.user,
+      actorBusinessRole: req.tenantBusinessRole || null,
       tenantScopeUserIds,
     });
     res.json({ status: 'success', data: { reconciliation: record } });
@@ -48,6 +49,7 @@ exports.revert = async (req, res) => {
     const tenantScopeUserIds = await resolveScope(req);
     const record = await service.revert({
       contractId: req.params.contractId, reason: req.body.reason, actor: req.user,
+      actorBusinessRole: req.tenantBusinessRole || null,
       tenantScopeUserIds,
     });
     res.json({ status: 'success', data: { reconciliation: record } });

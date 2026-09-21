@@ -30,6 +30,11 @@ const fail = (res, error) => res.status(error.statusCode || 500).json({
   ...(error.missingFields?.length && { missingFields: error.missingFields }),
   ...(error.readiness && { publicationReadiness: error.readiness }),
   ...(error.vacancyReadiness && { vacancyReadiness: error.vacancyReadiness }),
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-H — expose safe quota
+  // diagnostics for UI upgrade prompts. Never leaks subscription IDs.
+  ...(error.code === 'TENANT_MANAGED_PROPERTY_QUOTA_EXCEEDED' && {
+    current: error.current, limit: error.limit, plan: error.plan,
+  }),
 });
 
 exports.onboardingOptions = async (_req, res) => {
@@ -288,17 +293,33 @@ exports.create = async (req, res) => {
     if (property.status !== 'location') return res.status(422).json({ status: 'fail', message: 'Seul un bien en location peut être activé en gestion locative.' });
     const allowed = ['monthlyRent', 'charges', 'depositAmount', 'managementFee', 'mandateStartAt', 'mandateEndAt', 'publicationPolicy', 'publicationAuthorized'];
     const details = Object.fromEntries(allowed.filter((key) => req.body[key] !== undefined).map((key) => [key, req.body[key]]));
-    const rental = await RentalManagement.findOneAndUpdate(
-      { property: property._id },
-      {
-        $setOnInsert: { property: property._id, owner: property.owner, manager: req.user.id },
-        // Activation explicite (Sprint A) : marque le dossier comme
-        // réellement géré, même s'il avait été créé "en attente" par le
-        // nouveau flux de simple annonce (POST /api/rental-properties).
-        $set: { ...details, managementActivated: true },
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-H.1 — canonical quota guard
+    // + serialising sentinel around any activation that flips
+    // `managementActivated: true`. `Property.tenant` is authoritative for
+    // attribution; a personal property (`tenant=null`) bypasses the quota
+    // enforcement here — the tenant contract has no budget to enforce.
+    const { withActivationQuotaGuard } = require('../services/rentalManagementQuotaService');
+    let rental;
+    // Prevent an in-flight duplicate activation from being counted twice by
+    // this controller: if a RentalManagement doc already exists AND is
+    // already activated, we short-circuit before the quota check.
+    const existing = await RentalManagement.findOne({ property: property._id }).select('_id managementActivated tenant');
+    if (existing?.managementActivated) {
+      return res.status(409).json({ status: 'fail', code: 'ALREADY_MANAGED', message: 'Ce bien est déjà sous gestion.' });
+    }
+    await withActivationQuotaGuard({
+      tenantId: property.tenant,
+      run: async (session) => {
+        rental = await RentalManagement.findOneAndUpdate(
+          { property: property._id, managementActivated: { $ne: true } },
+          {
+            $setOnInsert: { property: property._id, owner: property.owner, manager: req.user.id },
+            $set: { ...details, managementActivated: true, tenant: property.tenant || null },
+          },
+          { new: true, upsert: true, runValidators: true, session: session || undefined },
+        );
       },
-      { new: true, upsert: true, runValidators: true },
-    );
+    });
     sync.refreshReadiness(rental, property);
     rental.workflowHistory.push({ action: 'rental_management_enabled', actor: req.user.id, source: 'api', to: rental.occupancyStatus });
     await rental.save();

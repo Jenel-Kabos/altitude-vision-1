@@ -12,7 +12,7 @@ import {
 import {
   getProprietaires, createProprietaire, updateProprietaire, deleteProprietaire,
   getLocataires,    createLocataire,    updateLocataire,    deleteLocataire,
-  getContrats,      createContrat,      updateContrat,      deleteContrat,
+  getContrats,      createContrat,      updateContratByResource, deleteContratByResource,
   getPaiements,     updatePaiement,     marquerPaiementPaye, calculerPenalites,
   addBienPhotos,
   getRentalManagement, getRentalManagementStats, getRentalManagementDetail, runRentalAction,
@@ -1902,7 +1902,10 @@ const GestionLocativePage = () => {
         }),
       };
       if (editContrat) {
-        const up = await updateContrat(editContrat._id, payload);
+        // CONTRAT-DOMAIN-SPLIT-3B — le domaine (location/vente) vient
+        // exclusivement de la ressource chargée `editContrat`, jamais du
+        // champ `f.type` du formulaire.
+        const up = await updateContratByResource(editContrat, payload);
         setContrats(prev => prev.map(c => c._id===editContrat._id ? up : c));
         toast('Contrat mis à jour');
       } else {
@@ -1918,7 +1921,10 @@ const GestionLocativePage = () => {
 
   const handleDeleteContrat = async () => {
     try {
-      await deleteContrat(deleteTarget.id);
+      // CONTRAT-DOMAIN-SPLIT-3B — même règle canonique que l'update : le
+      // domaine vient de la ressource (`deleteTarget.contratType`),
+      // renseigné au clic depuis le contrat listé.
+      await deleteContratByResource({ _id: deleteTarget.id, type: deleteTarget.contratType });
       setContrats(prev => prev.filter(c => c._id!==deleteTarget.id));
       toast('Contrat supprimé');
     } catch { toast('Erreur', 'error'); }
@@ -2317,7 +2323,7 @@ const GestionLocativePage = () => {
                                 };
                                 setEditContrat({...c,...init}); setContratModal(true);
                               }}
-                              onDelete={() => setDeleteTarget({id:c._id, label:c.adresseBien||`Contrat ${c.type}`, type:'contrat'})}
+                              onDelete={() => setDeleteTarget({id:c._id, label:c.adresseBien||`Contrat ${c.type}`, type:'contrat', contratType:c.type})}
                             />
                           </TRow>
                         ))}

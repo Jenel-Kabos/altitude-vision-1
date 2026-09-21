@@ -24,11 +24,29 @@ jest.mock('../models/User');
 jest.mock('../models/PlatformTenant');
 jest.mock('../models/OrgMembership');
 jest.mock('../models/PlatformOperator');
+const mockWithActivationQuotaGuard = jest.fn(({ run }) => run(null));
+jest.mock('../services/rentalManagementQuotaService', () => ({
+  withActivationQuotaGuard: (...args) => mockWithActivationQuotaGuard(...args),
+}));
 jest.mock('../services/platformTenant/tenantContextService', () => ({
   resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439002' }),
-  resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439002' }, source: 'single_membership' }),
+  resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439002', status: 'active' }, source: 'single_membership' }),
   resolveAvailableTenantsForUser: jest.fn().mockResolvedValue([{ _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439002' }]),
   resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set(['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439011']) }),
+}));
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-C — rentalManagementRoutes now
+// composes `requireTenantModule('location')` + `requireTenantMembershipRole(...)`.
+// Since this file uses jest.mock for models (no real DB), mock both gates so
+// the unit test still asserts controller/service behaviour, not middleware.
+jest.mock('../services/tenantMembershipService', () => ({
+  resolveTenantMembership: jest.fn().mockResolvedValue({
+    membership: { _id: 'm-fixture' }, tenant: { _id: '607f1f77bcf86cd799439001' },
+    businessRole: 'Admin', roleInUnit: 'owner', status: 'active', source: 'membership_business_role',
+  }),
+}));
+jest.mock('../middleware/tenantModuleGate', () => ({
+  requireTenantModule: () => (req, res, next) => next(),
+  isModuleAvailable: jest.fn().mockResolvedValue(true),
 }));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
@@ -104,6 +122,9 @@ describe('RentalManagement — annonce simple vs dossier activé (Sprint A, audi
       _id: 'rental1', occupancyStatus: 'vacant', workflowHistory: [], save: jest.fn().mockResolvedValue(),
       toObject() { return { ...this, toObject: undefined, save: undefined }; },
     };
+    RentalManagement.findOne = jest.fn().mockReturnValue({
+      select: jest.fn().mockResolvedValue({ _id: 'rental1', managementActivated: false, tenant: null }),
+    });
     RentalManagement.findOneAndUpdate = jest.fn().mockResolvedValue(rental);
 
     const res = await request(app)
@@ -112,13 +133,52 @@ describe('RentalManagement — annonce simple vs dossier activé (Sprint A, audi
       .send({ property: PROPERTY_ID, monthlyRent: 150000 });
 
     expect(res.statusCode).toBe(201);
+    expect(mockWithActivationQuotaGuard).toHaveBeenCalledTimes(1);
     expect(RentalManagement.findOneAndUpdate).toHaveBeenCalledWith(
-      { property: PROPERTY_ID },
+      { property: PROPERTY_ID, managementActivated: { $ne: true } },
       expect.objectContaining({
         $set: expect.objectContaining({ managementActivated: true }),
       }),
       expect.objectContaining({ upsert: true }),
     );
+  });
+
+  test('un dossier déjà actif ne consomme pas un nouveau slot', async () => {
+    mockUserAuth(ADMIN_ID, 'GestionnaireImmobilier');
+    Property.findById = jest.fn().mockResolvedValue({ _id: PROPERTY_ID, status: 'location', owner: OWNER_ID, price: 150000 });
+    RentalManagement.findOne = jest.fn().mockReturnValue({
+      select: jest.fn().mockResolvedValue({ _id: 'rental1', managementActivated: true }),
+    });
+
+    const res = await request(app)
+      .post('/api/rental-management')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ property: PROPERTY_ID });
+
+    expect(res.statusCode).toBe(409);
+    expect(mockWithActivationQuotaGuard).not.toHaveBeenCalled();
+  });
+
+  test('le rejet quota canonique est propagé sans write d’activation', async () => {
+    mockUserAuth(ADMIN_ID, 'GestionnaireImmobilier');
+    Property.findById = jest.fn().mockResolvedValue({ _id: PROPERTY_ID, status: 'location', owner: OWNER_ID, price: 150000, tenant: '607f1f77bcf86cd799439001' });
+    RentalManagement.findOne = jest.fn().mockReturnValue({
+      select: jest.fn().mockResolvedValue({ _id: 'rental1', managementActivated: false }),
+    });
+    const quotaError = Object.assign(new Error('Quota atteint.'), {
+      statusCode: 409,
+      code: 'TENANT_MANAGED_PROPERTY_QUOTA_EXCEEDED',
+    });
+    mockWithActivationQuotaGuard.mockRejectedValueOnce(quotaError);
+
+    const res = await request(app)
+      .post('/api/rental-management')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .send({ property: PROPERTY_ID });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body.code).toBe('TENANT_MANAGED_PROPERTY_QUOTA_EXCEEDED');
+    expect(RentalManagement.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
   test('GET /api/rental-management (liste) ne remonte que les dossiers activés par défaut', async () => {

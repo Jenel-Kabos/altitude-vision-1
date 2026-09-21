@@ -14,6 +14,7 @@ const Locataire = require('../models/Locataire');
 const Contrat = require('../models/Contrat');
 const contratRoutes = require('../routes/contratRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const OrgMembership = require('../models/OrgMembership');
 const organizationService = require('../services/organizationService');
 const platformTenantService = require('../services/platformTenant/platformTenantService');
 
@@ -44,6 +45,16 @@ async function buildTenantWithContrat(label, montantLoyer) {
     organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
     organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
   ]);
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE — la lecture polymorphique
+  // `GET /api/contrats(/:id)` migrée en Phase 2 exige `businessRole` canonique,
+  // jamais un fallback User.role='Admin' global. Le fixture élève l'admin
+  // à businessRole='Admin' pour prouver le chemin AUTORISÉ ; les tests
+  // adjacents (staff multi-tenant sans header) continuent d'exercer les
+  // refus canoniques (test 2 ci-dessous).
+  await OrgMembership.updateOne(
+    { user: admin._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
+    { $set: { businessRole: 'Admin' } },
+  );
   const property = await Property.create({
     title: `Villa P1A ${label}`, description: 'Description suffisamment longue pour la validation du modele Property.',
     pole: 'Altimmo', type: 'Villa', status: 'location', price: 300000,

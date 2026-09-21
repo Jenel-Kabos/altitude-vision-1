@@ -161,9 +161,36 @@ export const cancelTenantInvitation = async (requestId) => (await api.patch(`/lo
 export const resendTenantInvitation = async (requestId) => (await api.post(`/locataires/invitations/${requestId}/resend`)).data.data;
 
 // ── Contrats ──────────────────────────────────────────────────
+//
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIV — CONTRAT-DOMAIN-SPLIT
+// (Phase 3B). Le backend expose des surfaces typées certifiées :
+//   /api/contrats/location/*   → rental, module `location` requis
+//   /api/contrats/vente/*      → sale,  module `location` indépendant
+// La conclusion marketplace `POST /api/contrats` reste PLATFORM-only.
+//
+// Règle canonique du service frontend : le DOMAINE d'un contrat vient
+// TOUJOURS d'une ressource déjà chargée (`contrat.type`), JAMAIS d'un
+// champ contrôlé par l'utilisateur dans le payload. Les callers doivent
+// utiliser `updateContratByResource` / `deleteContratByResource` en
+// passant l'objet `Contrat` chargé, jamais un couple `(id, formType)`
+// où `formType` serait un champ de formulaire.
+//
+// Lecture polymorphique legacy `GET /api/contrats` est CONSERVÉE pour
+// les surfaces UI polymorphiques (GestionLocativePage affiche location
+// + vente) — décision B (POLYMORPHIC_READ_STILL_REQUIRED=YES).
 
 export const getContrats = async (params = {}) => {
   const res = await api.get('/contrats', { params });
+  return res.data.data.contrats;
+};
+
+export const getRentalContracts = async (params = {}) => {
+  const res = await api.get('/contrats/location', { params });
+  return res.data.data.contrats;
+};
+
+export const getSaleContracts = async (params = {}) => {
+  const res = await api.get('/contrats/vente', { params });
   return res.data.data.contrats;
 };
 
@@ -172,13 +199,37 @@ export const createContrat = async (data) => {
   return res.data.data.contrat;
 };
 
-export const updateContrat = async (id, data) => {
-  const res = await api.put(`/contrats/${id}`, data);
+export const updateRentalContract = async (id, data) => {
+  const res = await api.put(`/contrats/location/${id}`, data);
   return res.data.data.contrat;
 };
 
-export const deleteContrat = async (id) => {
-  await api.delete(`/contrats/${id}`);
+export const updateSaleContract = async (id, data) => {
+  const res = await api.put(`/contrats/vente/${id}`, data);
+  return res.data.data.contrat;
+};
+
+export const deleteRentalContract = async (id) => {
+  await api.delete(`/contrats/location/${id}`);
+};
+
+export const deleteSaleContract = async (id) => {
+  await api.delete(`/contrats/vente/${id}`);
+};
+
+// Dispatchers pilotés PAR LA RESSOURCE (jamais par un champ de payload).
+// `contrat` doit être l'objet Contrat chargé depuis le backend — son
+// `.type` est la référence canonique du domaine.
+export const updateContratByResource = async (contrat, data) => {
+  if (contrat?.type === 'location') return updateRentalContract(contrat._id, data);
+  if (contrat?.type === 'vente') return updateSaleContract(contrat._id, data);
+  throw new Error("Type de contrat inconnu ; mise à jour typée impossible sans ressource fiable.");
+};
+
+export const deleteContratByResource = async (contrat) => {
+  if (contrat?.type === 'location') return deleteRentalContract(contrat._id);
+  if (contrat?.type === 'vente') return deleteSaleContract(contrat._id);
+  throw new Error("Type de contrat inconnu ; suppression typée impossible sans ressource fiable.");
 };
 
 // GL-RECON-UX-1 — centre staff de régularisation, décisions serveur only.
@@ -188,12 +239,21 @@ export const revertRentalRegularization = async (contractId, reason) => (await a
 
 // ── Paiements ─────────────────────────────────────────────────
 
-export const getPaiements = async (contratId, annee) => {
+// La grille de paiements par échéances est un artefact exclusif du domaine
+// location (aucun contrat de vente n'a de schedule de paiement mensuel).
+// La surface typée `/api/contrats/location/:id/paiements` applique déjà le
+// module `location` en amont — un contrat de vente y renvoie 404 domain
+// mismatch, comportement attendu.
+export const getRentalContractPayments = async (contratId, annee) => {
   const params = {};
   if (annee) params.annee = annee;
-  const res = await api.get(`/contrats/${contratId}/paiements`, { params });
+  const res = await api.get(`/contrats/location/${contratId}/paiements`, { params });
   return res.data.data.paiements;
 };
+
+// Alias historique — même signature, backend typé. Conservé pour ne pas
+// casser les callers existants pendant la migration progressive.
+export const getPaiements = getRentalContractPayments;
 
 export const updatePaiement = async (id, data) => {
   const res = await api.put(`/paiements/${id}`, data);

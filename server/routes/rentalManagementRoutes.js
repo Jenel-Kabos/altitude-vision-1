@@ -18,24 +18,61 @@ const RentalManagement = require('../models/RentalManagement');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { requireTenantScope } = require('../middleware/tenantContext');
-const { requireCapability } = require('../middleware/capabilityMiddleware');
+const { requireTenantModule } = require('../middleware/tenantModuleGate');
+const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 
 const router = express.Router();
 router.use(auth.protect);
+
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-C — OWNERSHIP path.
+// Un Proprietaire individuel peut gérer SES propres ressources sans passer
+// par le rattachement tenant. `restrictTo('Proprietaire')` reste une garde
+// GLOBAL User.role — jamais un rôle tenant. Le contrôleur filtre en interne
+// par `owner: req.user.id`, ce qui constitue le contrat ownership.
 router.get('/owner/payments', auth.restrictTo('Proprietaire'), ctrl.ownerPayments);
 router.get('/owner/my', auth.restrictTo('Proprietaire'), ctrl.ownerList);
 router.post('/:id/owner/:action', auth.restrictTo('Proprietaire'), ctrl.ownerRequest);
+
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-C — TENANT path.
+// À partir d'ici toute route est tenant-scopée. La chaîne canonique est :
+//   protect → requireTenantScope → requireTenantModule('location') → requireTenantMembershipRole(...)
+// Aucune lecture de `User.role` comme autorité tenant. `requireTenantScope`
+// pose `req.platformTenant` ; `requireTenantModule('location')` refuse si
+// le tenant n'a pas souscrit / activé la gestion locative ; le membership
+// role fournit l'autorité tenant. `restrictTo(...)` legacy et
+// `requireCapability(...)` (qui lisait `User.role`) sont retirés sur cette
+// section.
 router.use(requireTenantScope);
-router.get('/onboarding/options', auth.restrictTo('Admin', 'GestionnaireImmobilier'), ctrl.onboardingOptions);
-router.post('/onboarding', auth.restrictTo('Admin', 'GestionnaireImmobilier'), ctrl.onboard);
+router.use(requireTenantModule('location'));
+
+// Rôles GL par action, dérivés du DEFAULT_CAPABILITIES existant :
+//  - rental.read / occupancy.read / maintenance.read / notice.read
+//    → GestionnaireImmobilier natif + Admin + Collaborateur (legacy.full)
+//  - rental.manage / occupancy.manage / maintenance.manage / notice.manage
+//    → GestionnaireImmobilier natif + Admin (mutations sensibles).
+const GL_READ = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
+const GL_MANAGE = ['Admin', 'GestionnaireImmobilier'];
+
+router.get('/onboarding/options', requireTenantMembershipRole(...GL_MANAGE), ctrl.onboardingOptions);
+router.post('/onboarding', requireTenantMembershipRole(...GL_MANAGE), ctrl.onboard);
 
 router.param('id', async (req, res, next, rentalId) => {
   try {
-    // Les routes staff appliquent ensuite leur capability. Ne pas révéler
-    // l'existence d'un dossier (404) à un compte non-staff avant son 403.
-    // La route self-service propriétaire conserve son contrôle ressource.
-    const staffRoles = ['Admin', 'Collaborateur', 'Secretaire', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant'];
-    if (!staffRoles.includes(req.user?.role) && !req.path.includes('/owner/')) return next();
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-C — la garde cross-tenant
+    // se déclenche pour toute route TENANT (celle qui a franchi
+    // requireTenantMembershipRole → `req.tenantBusinessRole` renseigné). La
+    // route OWNERSHIP `/:id/owner/:action` reste régie par le contrôleur
+    // (filtre `owner: req.user.id`) — le path check `/owner/` la reconnaît.
+    // L'ancien filtre `staffRoles.includes(req.user?.role)` reposait sur
+    // User.role global comme proxy de "staff tenant" — obsolète après Lot C.
+    if (req.path.includes('/owner/')) return next();
+    // Tenant path — `requireTenantScope` + `requireTenantModule('location')`
+    // ont déjà posé `req.platformTenant` avant router.param. On borne à ce
+    // tenant l'attribution de la ressource : `router.param` s'exécute AVANT
+    // `requireTenantMembershipRole` (défini par route), donc on ne peut pas
+    // lire `req.tenantBusinessRole` ici — mais on n'en a pas besoin : le
+    // membership est validé au niveau du handler, la garde ici se limite au
+    // scope tenant de la ressource.
     if (!mongoose.isValidObjectId(rentalId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
     const rental = await RentalManagement.findById(rentalId);
     if (!rental) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
@@ -58,23 +95,23 @@ router.param('id', async (req, res, next, rentalId) => {
   }
 });
 
-router.get('/stats', requireCapability('rental.read'), ctrl.stats);
-router.get('/', requireCapability('rental.read'), ctrl.list);
-router.post('/', requireCapability('rental.manage'), ctrl.create);
-router.get('/:id', requireCapability('rental.read'), ctrl.getOne);
-router.patch('/:id', requireCapability('rental.manage'), ctrl.update);
-router.post('/:id/deactivate', auth.restrictTo('Admin', 'GestionnaireImmobilier'), ctrl.deactivate);
-router.get('/:id/history', requireCapability('rental.read'), ctrl.history);
-router.post('/:id/publish', requireCapability('rental.manage'), ctrl.publish);
-router.post('/:id/suspend-listing', requireCapability('rental.manage'), ctrl.suspend);
-router.post('/:id/mark-rented', requireCapability('occupancy.manage'), ctrl.markRented);
-router.post('/:id/mark-vacant', requireCapability('occupancy.manage'), ctrl.markVacant);
-router.post('/:id/maintenance', requireCapability('maintenance.manage'), ctrl.markMaintenance);
-router.post('/:id/complete-maintenance', requireCapability('maintenance.manage'), ctrl.completeMaintenance);
-router.post('/:id/start-notice', requireCapability('notice.manage'), ctrl.startNotice);
-router.post('/:id/acknowledge-notice', requireCapability('notice.manage'), ctrl.acknowledgeNotice);
-router.post('/:id/cancel-notice', requireCapability('notice.manage'), ctrl.cancelNotice);
-router.post('/:id/validate-exit', requireCapability('occupancy.manage'), ctrl.validateExitInspection);
-router.post('/:id/requests/:requestId/resolve', requireCapability('rental.manage'), ctrl.resolveRequest);
+router.get('/stats', requireTenantMembershipRole(...GL_READ), ctrl.stats);
+router.get('/', requireTenantMembershipRole(...GL_READ), ctrl.list);
+router.post('/', requireTenantMembershipRole(...GL_MANAGE), ctrl.create);
+router.get('/:id', requireTenantMembershipRole(...GL_READ), ctrl.getOne);
+router.patch('/:id', requireTenantMembershipRole(...GL_MANAGE), ctrl.update);
+router.post('/:id/deactivate', requireTenantMembershipRole(...GL_MANAGE), ctrl.deactivate);
+router.get('/:id/history', requireTenantMembershipRole(...GL_READ), ctrl.history);
+router.post('/:id/publish', requireTenantMembershipRole(...GL_MANAGE), ctrl.publish);
+router.post('/:id/suspend-listing', requireTenantMembershipRole(...GL_MANAGE), ctrl.suspend);
+router.post('/:id/mark-rented', requireTenantMembershipRole(...GL_MANAGE), ctrl.markRented);
+router.post('/:id/mark-vacant', requireTenantMembershipRole(...GL_MANAGE), ctrl.markVacant);
+router.post('/:id/maintenance', requireTenantMembershipRole(...GL_MANAGE), ctrl.markMaintenance);
+router.post('/:id/complete-maintenance', requireTenantMembershipRole(...GL_MANAGE), ctrl.completeMaintenance);
+router.post('/:id/start-notice', requireTenantMembershipRole(...GL_MANAGE), ctrl.startNotice);
+router.post('/:id/acknowledge-notice', requireTenantMembershipRole(...GL_MANAGE), ctrl.acknowledgeNotice);
+router.post('/:id/cancel-notice', requireTenantMembershipRole(...GL_MANAGE), ctrl.cancelNotice);
+router.post('/:id/validate-exit', requireTenantMembershipRole(...GL_MANAGE), ctrl.validateExitInspection);
+router.post('/:id/requests/:requestId/resolve', requireTenantMembershipRole(...GL_MANAGE), ctrl.resolveRequest);
 
 module.exports = router;

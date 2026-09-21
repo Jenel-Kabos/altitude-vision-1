@@ -72,14 +72,16 @@ async function buildTenantFixture(label) {
 }
 
 describe('SECURITY-CLOSURE-P1-WAVE-1 (P1-I) — GET /api/transactions', () => {
-  test('1. Admin A ne voit QUE les transactions du tenant A', async () => {
+  test('1. Tenant Admin refusé sur `/api/transactions` — la lecture commerciale est PLATFORM-ONLY (contrat 2E.1.X-I-TENANT-CONTEXT-C.1)', async () => {
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TENANT-CONTEXT-C.1 —
+    // La lecture agrégée des transactions marketplace exige désormais
+    // l'autorité canonique plateforme (`platform.finance.read`). Un
+    // Tenant Admin n'est jamais Altitude Vision commercial admin. La
+    // cross-tenant isolation reste vraie a fortiori.
     const a = await buildTenantFixture('A');
-    const b = await buildTenantFixture('B');
+    await buildTenantFixture('B');
     const res = await request(app).get('/api/transactions').set(bearer(a.admin, a.tenant._id));
-    expect(res.status).toBe(200);
-    const ids = res.body.data.transactions.map((t) => t._id);
-    expect(ids).toContain(String(a.transaction._id));
-    expect(ids).not.toContain(String(b.transaction._id));
+    expect(res.status).toBe(403);
   });
 
   test('2. GET /:id : Admin A refusé sur la transaction du tenant B', async () => {
@@ -124,9 +126,14 @@ describe('SECURITY-CLOSURE-P1-WAVE-1 (P1-I) — mutations financières', () => {
     expect(await PaiementTransaction.countDocuments({ transaction: b.transaction._id })).toBe(0);
   });
 
-  test('7. Admin A PEUT annuler sa propre transaction (comportement historique préservé)', async () => {
+  test('7. Tenant Admin REFUSÉ pour annuler une transaction (contrat 2E.1.X-I-TENANT-CONTEXT-C.1 : les mutations financières marketplace sont PLATFORM-ONLY)', async () => {
+    // La commercialisation marketplace appartient à Altitude Vision.
+    // Un Tenant Admin ne peut pas annuler une transaction, même la
+    // sienne — la mutation impacte la commission (revenu plateforme)
+    // et le settlement financier. `PlatformOperator + platform.finance.
+    // manage` est requis.
     const a = await buildTenantFixture('L');
     const res = await request(app).patch(`/api/transactions/${a.transaction._id}/cancel`).set(bearer(a.admin, a.tenant._id)).send({ raison: 'test valide' });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
   });
 });

@@ -24,6 +24,17 @@ jest.mock('../services/platformTenant/tenantResourceAttributionService', () => (
   assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
   resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
 }));
+jest.mock('../middleware/tenantModuleGate', () => ({ requireTenantModule: () => (_req, _res, next) => next() }));
+globalThis.__rentalAssetOnbTestUserRoleById = new Map();
+jest.mock('../services/tenantMembershipService', () => ({
+  resolveTenantMembership: jest.fn(async (userId) => {
+    const map = globalThis.__rentalAssetOnbTestUserRoleById;
+    const role = map ? map.get(String(userId)) : null;
+    const staff = new Set(['Admin', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant', 'Collaborateur', 'Secretaire']);
+    if (!role || !staff.has(role)) return null;
+    return { membership: { _id: 'MEMBERSHIP-1', businessRole: role, status: 'active' }, businessRole: role, status: 'active' };
+  }),
+}));
 jest.mock('../config/db', () => jest.fn());
 jest.mock('node-cron', () => ({ schedule: jest.fn() }));
 jest.mock('../scripts/sync-facebook', () => ({ syncFacebook: jest.fn() }));
@@ -43,7 +54,7 @@ const Contrat = require('../models/Contrat');
 const onboarding = require('../services/rentalAssetOnboardingService');
 const ADMIN='507f1f77bcf86cd799439012'; const PROPERTY='507f191e810c19729de860ea';
 const token=(id)=>jwt.sign({id,tokenVersion:0},process.env.JWT_SECRET,{expiresIn:'1d'});
-const auth=(role)=>{ User.findById=jest.fn().mockReturnValue({select:jest.fn().mockResolvedValue({_id:ADMIN,id:ADMIN,name:'Staff',email:'staff@test.dev',role,isActive:true,status:'Actif',tokenVersion:0})}); User.findByIdAndUpdate=jest.fn().mockReturnValue({catch:jest.fn()}); };
+const auth=(role)=>{ User.findById=jest.fn().mockReturnValue({select:jest.fn().mockResolvedValue({_id:ADMIN,id:ADMIN,name:'Staff',email:'staff@test.dev',role,isActive:true,status:'Actif',tokenVersion:0})}); User.findByIdAndUpdate=jest.fn().mockReturnValue({catch:jest.fn()}); globalThis.__rentalAssetOnbTestUserRoleById.set(String(ADMIN), role); };
 
 describe('GL-ASSET-UX-1.1 — onboarding routes',()=>{
   afterEach(()=>jest.clearAllMocks());

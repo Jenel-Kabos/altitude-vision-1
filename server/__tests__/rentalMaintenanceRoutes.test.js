@@ -11,6 +11,28 @@ jest.mock('../models/Paiement');
 jest.mock('../models/User');
 jest.mock('../services/rentalMaintenanceService');
 jest.mock('../services/rentalListingSyncService');
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-A — `requireTenantModule` interroge
+// PlatformTenantFeature/PlatformTenantSubscription (Mongoose). Sans DB, stubbe
+// le gate en passthrough : ce test unitaire couvre la sécurité de routage HTTP,
+// pas la propagation module (couverte par `__tests__/tenantModuleGate2E1X.mongo`).
+jest.mock('../middleware/tenantModuleGate', () => ({
+  requireTenantModule: () => (_req, _res, next) => next(),
+}));
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE — `requireTenantMembershipRole` interroge
+// resolveTenantMembership (Mongo). Mock canonique : businessRole miroir de
+// `User.role` déclaré via mockUserAuth ; les rôles non-staff (Proprietaire/
+// Client) renvoient `null` = pas d'adhésion active → fail-closed correct.
+// Registre partagé via globalThis pour rester hors du hoisting jest.mock.
+globalThis.__rentalMaintTestUserRoleById = new Map();
+jest.mock('../services/tenantMembershipService', () => ({
+  resolveTenantMembership: jest.fn(async (userId) => {
+    const map = globalThis.__rentalMaintTestUserRoleById;
+    const role = map ? map.get(String(userId)) : null;
+    const staff = new Set(['Admin', 'GestionnaireImmobilier', 'CommunityManager', 'Communicant', 'Collaborateur', 'Secretaire']);
+    if (!role || !staff.has(role)) return null;
+    return { membership: { _id: 'MEMBERSHIP-1', businessRole: role, status: 'active' }, businessRole: role, status: 'active' };
+  }),
+}));
 // TENANT-CERT-2 — les routes `:id` de rentalManagementRoutes.js vérifient
 // désormais la frontière tenant via ces services (voir
 // __tests__/tenantCert2.adversarial.mongo.integration.test.js pour la
@@ -67,6 +89,7 @@ const fakeUser = (id, role) => ({ _id: id, id, name: 'Test User', email: 't@a.co
 const mockUserAuth = (id, role) => {
   User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser(id, role)) });
   User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+  globalThis.__rentalMaintTestUserRoleById.set(String(id), role);
 };
 
 describe('POST /api/rental-maintenance — création (Sprint GL-B2)', () => {

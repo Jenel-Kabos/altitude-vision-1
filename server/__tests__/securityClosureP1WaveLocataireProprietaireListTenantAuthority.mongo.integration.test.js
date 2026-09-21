@@ -50,6 +50,14 @@ async function buildTenantFixture(label) {
     organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
     organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
   ]);
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-D — /api/proprietaires now
+  // consumes `requireTenantMembershipRole(...)`. Grant admin the canonical
+  // businessRole to keep the test's intent (admin = tenant Admin).
+  const OrgMembership = require('../models/OrgMembership');
+  await OrgMembership.updateOne(
+    { user: admin._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
+    { $set: { businessRole: 'Admin' } },
+  );
   const property = await Property.create({
     title: `Villa P1J ${label}`, description: 'Description suffisamment longue pour la validation du modele Property.',
     pole: 'Altimmo', type: 'Villa', status: 'location', price: 300000,

@@ -51,14 +51,20 @@ describe('producteurs réels de notifications locatives GL-B3.1', () => {
     await documentController.getDocuments({params:{contratId:contract._id}},response());
     expect(tenantNotifications.notifyContractTenant).not.toHaveBeenCalled();
   });
-  test('paiement créé en base → événement avec clé anti-doublon', async () => {
-    Paiement.create.mockResolvedValue({_id:'PAY-2',contrat:contract._id,mois:2,annee:2026,statut:'impayé'});
-    await contratController.createPaiement({params:{id:contract._id},body:{}},response());
-    expect(tenantNotifications.notifyContractTenant).toHaveBeenCalledWith(contract._id,expect.objectContaining({type:'tenant_payment_recorded',dedupeKey:'tenant:payment:PAY-2:impayé'}));
-  });
-  test('paiement refusé en base → aucune notification', async () => {
-    Paiement.create.mockRejectedValue(new Error('DB failure'));
-    await contratController.createPaiement({params:{id:contract._id},body:{}},response());
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIV-3C — LEGACY-CONTRAT-
+  // MUTATION-RETIREMENT. Le point d'écriture historique
+  // `POST /api/contrats/:id/paiements` (contratController.createPaiement) est
+  // retiré (`CONTRACT_PAYMENT_ENDPOINT_RETIRED`, 410). Il ne peut plus
+  // produire de Paiement, ni notification. La production canonique de
+  // notification côté paiement locatif reste couverte par le test suivant
+  // (`marquerPaye` → dedupeKey `tenant:payment:...:payé`), qui exerce le
+  // vrai producteur canonique sur la surface `/api/paiements/location/*`.
+  test('paiement legacy — route retirée → 410, jamais de Paiement.create ni de notification', async () => {
+    const res = response();
+    await contratController.createPaiement({params:{id:contract._id},body:{montant:1,statut:'impayé'}}, res);
+    expect(res.status).toHaveBeenCalledWith(410);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code:'CONTRACT_PAYMENT_ENDPOINT_RETIRED' }));
+    expect(Paiement.create).not.toHaveBeenCalled();
     expect(tenantNotifications.notifyContractTenant).not.toHaveBeenCalled();
   });
   test('validation paiement réussie → destinataire résolu par contrat et événement payé', async () => {

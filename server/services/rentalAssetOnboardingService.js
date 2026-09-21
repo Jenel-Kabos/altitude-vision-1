@@ -5,15 +5,17 @@ const RentalManagement = require('../models/RentalManagement');
 const User = require('../models/User');
 const Proprietaire = require('../models/Proprietaire');
 const Contrat = require('../models/Contrat');
+const PlatformTenantSubscription = require('../models/PlatformTenantSubscription');
 const sync = require('./rentalListingSyncService');
 const { logAction, buildAuteur } = require('./actionLogService');
 
 class OnboardingError extends Error {
-  constructor(message, statusCode = 422, code = 'ONBOARDING_ERROR', missingFields = []) {
+  constructor(message, statusCode = 422, code = 'ONBOARDING_ERROR', missingFields = [], details = {}) {
     super(message);
     this.statusCode = statusCode;
     this.code = code;
     this.missingFields = missingFields;
+    Object.assign(this, details || {});
   }
 }
 
@@ -134,20 +136,39 @@ async function activateExisting({ propertyId, actor }) {
   const existing = await RentalManagement.findOne({ property: property._id });
   if (existing?.managementActivated) throw new OnboardingError('Ce bien est déjà sous gestion.', 409, 'ALREADY_MANAGED');
 
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-H.1 — canonical helper.
+  // `withActivationQuotaGuard` performs the quota assertion + sentinel
+  // serialisation + write inside one `session.withTransaction`. Concurrent
+  // activations on the same tenant serialise via the subscription sentinel
+  // write and retry, observing the freshly-committed count.
   let rental;
-  try { rental = await RentalManagement.findOneAndUpdate(
-    { property: property._id, managementActivated: { $ne: true } },
-    {
-      $setOnInsert: { property: property._id },
-      $set: {
-        owner: property.owner, manager: actor.id || actor._id, managementActivated: true, active: true,
-        monthlyRent: property.price, occupancyStatus: 'vacant', publicationStatus: 'brouillon',
-        publicationAuthorized: false,
+  const { withActivationQuotaGuard, QuotaError } = require('./rentalManagementQuotaService');
+  try {
+    await withActivationQuotaGuard({
+      tenantId: property.tenant,
+      run: async (session) => {
+        rental = await RentalManagement.findOneAndUpdate(
+          { property: property._id, managementActivated: { $ne: true } },
+          {
+            $setOnInsert: { property: property._id },
+            $set: {
+              owner: property.owner, manager: actor.id || actor._id, managementActivated: true, active: true,
+              tenant: property.tenant || null,
+              monthlyRent: property.price, occupancyStatus: 'vacant', publicationStatus: 'brouillon',
+              publicationAuthorized: false,
+            },
+            $push: { workflowHistory: { action: 'rental_management_onboarded', actor: actor.id || actor._id, source: 'staff', to: 'vacant' } },
+          },
+          { new: true, upsert: !existing, runValidators: true, session: session || undefined },
+        );
       },
-      $push: { workflowHistory: { action: 'rental_management_onboarded', actor: actor.id || actor._id, source: 'staff', to: 'vacant' } },
-    },
-    { new: true, upsert: !existing, runValidators: true },
-  ); } catch (error) {
+    });
+  } catch (error) {
+    if (error instanceof QuotaError) {
+      throw new OnboardingError(error.message, error.statusCode || 409, error.code, undefined, {
+        current: error.current, limit: error.limit, plan: error.plan,
+      });
+    }
     if (error?.code === 11000) throw new OnboardingError('Ce bien est déjà sous gestion.', 409, 'ALREADY_MANAGED');
     throw error;
   }
@@ -208,14 +229,39 @@ async function reconstructHistoricalManagedProperty({ data, actor, contractId, r
       amenities: Array.isArray(data.amenities) ? data.amenities : [], availability: data.initialAvailability || 'Disponible',
       statusAdmin: 'En attente', isPublished: false, recommande: false, internalManagedOnly: true,
       onboardingFingerprint,
+      // Historical reconstruction inherits attribution from the caller's
+      // resolved tenant when available (Lot G contract). Falls back to the
+      // owner's canonical tenant if the caller is unattributed.
+      tenant: actor?.platformTenant?._id || null,
     });
-    const rental = await RentalManagement.create({
-      property: property._id, owner: owner._id, manager: actor.id || actor._id, managementActivated: true,
-      active: true, monthlyRent, occupancyStatus: 'vacant', availabilityStatus: 'disponible',
-      publicationStatus: 'brouillon', publicationPolicy: 'manuelle', publicationAuthorized: false,
-      availableFrom: data.availableFrom || null,
-      workflowHistory: [{ action: 'historical_property_reconstructed', actor: actor.id || actor._id, source: 'regularization', to: 'vacant', comment: String(reason).slice(0, 1000) }],
-    });
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-H.1 — historical reconstruction
+    // must participate in the canonical quota invariant. Admin/GestionnaireImmobilier
+    // authority does not override subscription budget.
+    const { withActivationQuotaGuard, QuotaError } = require('./rentalManagementQuotaService');
+    let rental = null;
+    try {
+      await withActivationQuotaGuard({
+        tenantId: property.tenant,
+        run: async (session) => {
+          rental = new RentalManagement({
+            property: property._id, owner: owner._id, manager: actor.id || actor._id, managementActivated: true,
+            active: true, monthlyRent, occupancyStatus: 'vacant', availabilityStatus: 'disponible',
+            publicationStatus: 'brouillon', publicationPolicy: 'manuelle', publicationAuthorized: false,
+            availableFrom: data.availableFrom || null,
+            tenant: property.tenant || null,
+            workflowHistory: [{ action: 'historical_property_reconstructed', actor: actor.id || actor._id, source: 'regularization', to: 'vacant', comment: String(reason).slice(0, 1000) }],
+          });
+          await rental.save(session ? { session } : undefined);
+        },
+      });
+    } catch (err) {
+      if (err instanceof QuotaError) {
+        throw new OnboardingError(err.message, err.statusCode || 409, err.code, undefined, {
+          current: err.current, limit: err.limit, plan: err.plan,
+        });
+      }
+      throw err;
+    }
     sync.refreshReadiness(rental, property);
     await rental.save();
     await logAction({ action: 'Reconstruction patrimoniale historique', description: `Contrat ${contractId} — ${String(reason).trim()}`, module: 'GestionLocative', typeAction: 'CRÉATION', auteur: buildAuteur(actor), cible: { id: String(property._id), type: 'Property', nom: property.title } }).catch(() => {});

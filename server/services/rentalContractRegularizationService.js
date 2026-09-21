@@ -5,6 +5,7 @@ const RentalManagement = require('../models/RentalManagement');
 const Reconciliation = require('../models/RentalContractReconciliation');
 const onboarding = require('./rentalAssetOnboardingService');
 const { ensureRentalManagementActive, syncLeaseOccupation } = require('./rentalManagementLeaseSyncService');
+const { withActivationQuotaGuard } = require('./rentalManagementQuotaService');
 const { logAction, buildAuteur } = require('./actionLogService');
 
 class RegularizationError extends Error {
@@ -121,7 +122,13 @@ async function finish({ contract, record, decision, property, rental, actor, rea
   return record;
 }
 
-async function decide({ contractId, action, data, actor, tenantScopeUserIds = [] }) {
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-B — `actorBusinessRole` (nullable)
+// is the CANONICAL tenant role forwarded by the controller from
+// `req.tenantBusinessRole` (populated by `requireTenantMembershipRole`). It
+// replaces every legacy read of `actor.role` inside this service. Passing
+// `null` from a non-tenant caller is refused (the sub-action gates fail
+// closed). No fallback to `User.role`.
+async function decide({ contractId, action, data, actor, actorBusinessRole = null, tenantScopeUserIds = [] }) {
   const reason = String(data.reason || '').trim();
   if (reason.length < 5) throw new RegularizationError('Un motif explicite est obligatoire.', 422, 'REASON_REQUIRED');
   const { contract, record } = await loadOpenCase(contractId, tenantScopeUserIds);
@@ -145,7 +152,7 @@ async function decide({ contractId, action, data, actor, tenantScopeUserIds = []
     return finish({ contract, record, decision: action, property, rental, actor, reason, before });
   }
   if (action === 'create_internal') {
-    if (!['Admin', 'GestionnaireImmobilier'].includes(actor?.role)) throw new RegularizationError('Reconstruction réservée aux responsables immobiliers.', 403, 'HISTORICAL_RECONSTRUCTION_FORBIDDEN');
+    if (!['Admin', 'GestionnaireImmobilier'].includes(actorBusinessRole)) throw new RegularizationError('Reconstruction réservée aux responsables immobiliers.', 403, 'HISTORICAL_RECONSTRUCTION_FORBIDDEN');
     if (!contract.proprietaire?.user) throw new RegularizationError('La fiche Propriétaire doit être liée à un compte avant de créer le Property.', 422, 'OWNER_USER_REQUIRED');
     const created = await onboarding.reconstructHistoricalManagedProperty({
       data: { ...data.property, owner: contract.proprietaire.user, monthlyRent: data.property?.monthlyRent || contract.montantLoyer },
@@ -162,8 +169,41 @@ async function decide({ contractId, action, data, actor, tenantScopeUserIds = []
   throw new RegularizationError('Décision inconnue.', 422, 'UNKNOWN_DECISION');
 }
 
-async function revert({ contractId, reason, actor, tenantScopeUserIds = [] }) {
-  if (actor.role !== 'Admin') throw new RegularizationError('Réversion réservée à l’Administrateur.', 403, 'ADMIN_REQUIRED');
+async function restoreRentalSnapshot(rentalSnapshot) {
+  if (!rentalSnapshot?._id) return;
+  const { _id, ...rentalState } = rentalSnapshot;
+  const current = await RentalManagement.findById(_id)
+    .select('_id property tenant managementActivated')
+    .lean();
+  if (!current) return;
+
+  const activatesManagement = current.managementActivated !== true
+    && rentalState.managementActivated === true;
+  if (!activatesManagement) {
+    await RentalManagement.updateOne({ _id }, { $set: rentalState });
+    return;
+  }
+
+  // H1-R — une restauration de snapshot est une activation commerciale au
+  // même titre que l'onboarding, l'import ou le lease-sync. La source de
+  // tenant primaire reste RentalManagement. Pour une ancienne ligne encore
+  // non attribuée, Property.tenant fournit l'attribution canonique Lot G.
+  const property = current.tenant
+    ? null
+    : await Property.findById(current.property).select('tenant').lean();
+  const tenantId = current.tenant || property?.tenant || null;
+  await withActivationQuotaGuard({
+    tenantId,
+    run: (session) => RentalManagement.updateOne(
+      { _id, managementActivated: { $ne: true } },
+      { $set: rentalState },
+      session ? { session } : undefined,
+    ),
+  });
+}
+
+async function revert({ contractId, reason, actor, actorBusinessRole = null, tenantScopeUserIds = [] }) {
+  if (actorBusinessRole !== 'Admin') throw new RegularizationError('Réversion réservée à l’Administrateur.', 403, 'ADMIN_REQUIRED');
   if (String(reason || '').trim().length < 5) throw new RegularizationError('Un motif de réversion est obligatoire.', 422, 'REASON_REQUIRED');
   const record = await Reconciliation.findOne({ contract: contractId });
   if (!record || !['resolved', 'anomaly'].includes(record.status)) throw new RegularizationError('Aucune décision réversible.', 409, 'NOT_REVERSIBLE');
@@ -175,15 +215,19 @@ async function revert({ contractId, reason, actor, tenantScopeUserIds = [] }) {
   if (record.property && contract.bien && String(contract.bien) !== String(record.property)) throw new RegularizationError('Le contrat a divergé depuis la décision.', 409, 'STATE_DIVERGED');
   const beforeRevert = snapshot(contract);
   const original = event.before?.contract || {};
+  // Le quota doit être décidé avant toute autre restauration : un refus ne
+  // peut ainsi laisser ni contrat, ni Property, ni décision partiellement
+  // rétabli. La branche activante exécute décision + write dans la transaction
+  // et sous la sentinelle canonique de l'abonnement.
+  if (event.before?.rental?._id) {
+    await restoreRentalSnapshot(event.before.rental);
+  }
   contract.bien = original.bien || null; contract.statut = original.statut; contract.cycleVie = original.cycleVie || null; await contract.save();
   if (event.before?.property?._id) {
     const { _id, ...propertyState } = event.before.property;
     await Property.updateOne({ _id }, { $set: propertyState });
   }
-  if (event.before?.rental?._id) {
-    const { _id, ...rentalState } = event.before.rental;
-    await RentalManagement.updateOne({ _id }, { $set: rentalState });
-  } else if (record.property) {
+  if (!event.before?.rental?._id && record.property) {
     await RentalManagement.updateOne(
       { property: record.property, activeLease: contract._id },
       { $set: { activeLease: null, currentTenant: null, occupancyStatus: 'vacant', availabilityStatus: 'disponible', publicationStatus: 'brouillon' } },

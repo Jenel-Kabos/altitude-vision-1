@@ -44,7 +44,7 @@ async function buildLeaseFixture(label) {
   const owner = await User.create({ name: `Owner ${label}`, email: `p0d-owner-${label}-${seq}-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   const tenant = await platformTenantService.createTenant({ name: `P0D-${label}-${seq}-${Date.now()}`, actor: admin });
   await Promise.all([
-    organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
+    organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin, businessRole: 'Admin' }),
     organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
   ]);
   const property = await Property.create({
@@ -102,8 +102,8 @@ describe('SECURITY-CLOSURE-P0-WAVE-1 (P0-D) — POST /:id/transition, /:id/cauti
     const a = await buildLeaseFixture('G');
     const b = await buildLeaseFixture('H');
     const staffMulti = await User.create({ name: 'Staff Multi', email: `p0d-multi-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-    await organizationService.grantMembership({ userId: staffMulti._id, orgUnitId: a.tenant.rootOrgUnit, actor: a.admin });
-    await organizationService.grantMembership({ userId: staffMulti._id, orgUnitId: b.tenant.rootOrgUnit, actor: b.admin });
+    await organizationService.grantMembership({ userId: staffMulti._id, orgUnitId: a.tenant.rootOrgUnit, actor: a.admin, businessRole: 'Admin' });
+    await organizationService.grantMembership({ userId: staffMulti._id, orgUnitId: b.tenant.rootOrgUnit, actor: b.admin, businessRole: 'Admin' });
     const res = await request(app).post(`/api/rental-lease-lifecycle/${a.contrat._id}/transition`).set(bearer(staffMulti)).send({ target: 'preavis' });
     expect(res.status).not.toBe(200);
   });
